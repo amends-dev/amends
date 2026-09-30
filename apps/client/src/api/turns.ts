@@ -1,6 +1,7 @@
-import { ApiErrors, Thread, Turn, Workspace } from "@amends/api-http";
+import { ApiErrors, Turn, Workspace } from "@amends/api-http";
 import { Cause, Effect, Option, Schema } from "effect";
 import type { ApiClient } from "./client.ts";
+import { timelineRead } from "./conversations.ts";
 import { command } from "./failures.ts";
 import { itemKeys, workspaceKey } from "./keys.ts";
 import { refreshResult } from "./refresh.ts";
@@ -8,22 +9,6 @@ import { requestAtom } from "./request.ts";
 import { newWorkspaceRequestKey } from "./workspaces.ts";
 
 export type { Turn };
-
-/**
- * Each agent's latest turn in a thread and the one before it, newest first for each agent, with
- * what the reader may do with each; it follows the thread's turn facts and access changes.
- * Replies name their own turns, so older turns are never needed here. Undefined for an invalid
- * workspace or thread ID.
- */
-export const threadTurnsRead = (client: ApiClient, workspaceId: string, threadId: string) => {
-  const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
-  const thread = Schema.decodeOption(Thread.Id)(threadId);
-  if (Option.isNone(workspace) || Option.isNone(thread)) return undefined;
-  return client.query("turns", "latestByThread", {
-    params: { workspaceId: workspace.value, threadId: thread.value },
-    reactivityKeys: itemKeys(workspaceId, "turns", threadId),
-  });
-};
 
 /**
  * The workspace's active turns in threads the reader may open, for marks where agents are at work.
@@ -64,7 +49,7 @@ export type TurnCommand = (
 ) & { readonly log?: boolean };
 
 /**
- * Stop or retry a turn, then refresh its thread's turns, when given, and its log, when asked,
+ * Stop or retry a turn, then refresh its thread's timeline, when given, and its log, when asked,
  * before answering, so a completed command is followed by the state it produced. Answers with the
  * turn it acted on, or for a retry, the new turn.
  */
@@ -80,8 +65,8 @@ export const turnsRequest = (client: ApiClient, workspace: string, thread: strin
         input.kind === "stop"
           ? yield* api.turns.cancel({ params })
           : yield* api.turns.retry({ params, headers: { "idempotency-key": input.key } });
-      const read = thread === undefined ? undefined : threadTurnsRead(client, workspace, thread);
-      if (read !== undefined) yield* Effect.ignore(refreshResult(get, read));
+      const timeline = thread === undefined ? undefined : timelineRead(client, workspace, thread);
+      if (timeline !== undefined) yield* Effect.ignore(refreshResult(get, timeline.atom));
       const log = input.log ? turnLogRead(client, workspace, input.turnId) : undefined;
       if (log !== undefined) yield* Effect.ignore(refreshResult(get, log));
       return turn;

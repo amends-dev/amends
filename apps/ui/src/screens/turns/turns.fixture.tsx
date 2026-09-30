@@ -1,4 +1,4 @@
-// Workshop harness: a group with a thread where agents work, their turns under its messages, and
+// Workshop harness: a group with a thread where agents work, their turns among its messages, and
 // a turn's log in place of the thread, shaped like the connected app's data. Not exported.
 import { Show, createSignal } from "solid-js";
 import type { TurnState } from "../../components/turn-status/index.ts";
@@ -7,7 +7,7 @@ import { GroupPane } from "../group/group-pane.tsx";
 import { GroupThreads } from "../group/group-threads.tsx";
 import { ThreadPane } from "../group/thread-pane.tsx";
 import { navigation, people } from "../sample.ts";
-import type { TimelineEntry } from "../timeline/index.ts";
+import type { TimelineEntry, TimelineTurn } from "../timeline/index.ts";
 import { HomeSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import type { TurnLogActivity, TurnLogTurn } from "./turn-log.tsx";
 import { TurnLogPane } from "./turn-log.tsx";
@@ -20,7 +20,7 @@ const at = (minutes: number, seconds = 0) =>
 const reply =
   "Deploy the API first, verify compatibility, then release clients on Thursday. Keep rollback ready if error rates rise.";
 
-/** The thread's messages; a completed turn's reply follows them. */
+/** The thread's messages; a completed turn's reply follows them, and shows in its turn's place. */
 const messages = (replied: boolean): readonly TimelineEntry[] => [
   {
     kind: "message",
@@ -72,6 +72,7 @@ export type Scenario =
   | "follow-only"
   | "stop-failed";
 
+/** The agent's turn in a scenario, if its row shows: a turn that replied shows as its reply. */
 const turnOf = (scenario: Scenario): ThreadTurn | undefined => {
   const agent = { name: "Yumi" };
   const base = { id: "turn-1", agent, stoppable: false, retryable: false, agentHref: "#agents" };
@@ -92,13 +93,7 @@ const turnOf = (scenario: Scenario): ThreadTurn | undefined => {
     case "failed":
       return { ...base, state: "failed", failure: "Anthropic needs its API key.", retryable: true };
     case "retried":
-      return {
-        ...base,
-        id: "turn-2",
-        state: "queued",
-        stoppable: true,
-        previous: { id: "turn-1", state: "failed" },
-      };
+      return { ...base, id: "turn-2", state: "queued", stoppable: true };
     case "done-quietly":
       return { ...base, state: "done" };
     case "done":
@@ -159,6 +154,26 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
   const [log, setLog] = createSignal(props.log ?? false);
   const [scenario, setScenario] = createSignal(props.scenario);
   const turn = () => turnOf(scenario());
+  /** The thread as it reads: its messages, then each turn where the agent took on the work. */
+  const entries = (): readonly TimelineEntry[] => {
+    const current = turn();
+    const row = (turn: ThreadTurn, seconds: number): TimelineTurn => ({
+      kind: "turn",
+      ...turn,
+      at: at(10, seconds),
+    });
+    // A retry leaves the failed attempt in place, no longer retryable, and follows it.
+    const failed = turnOf("failed")!;
+    const earlier =
+      scenario() === "retried"
+        ? [row({ ...failed, retryable: false, agentHref: undefined }, 2)]
+        : [];
+    return [
+      ...messages(scenario() === "done"),
+      ...earlier,
+      ...(current ? [row(current, earlier.length > 0 ? 30 : 2)] : []),
+    ];
+  };
   const active = () => {
     const state = turn()?.state;
     return state === "queued" || state === "working" || state === "stopping" ? state : undefined;
@@ -226,7 +241,7 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
           <ThreadPane
             title="Thread"
             groupName="general"
-            entries={messages(scenario() === "done")}
+            entries={entries()}
             repliesDivider
             onClose={() => {}}
             placeholder="Reply in thread"
@@ -234,20 +249,15 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
             onDraftChange={() => {}}
             onSend={() => {}}
             onOpenTurnLog={() => setLog(true)}
-            turns={
-              turn()
-                ? {
-                    list: [turn()!],
-                    onStop: () => setScenario("stopping"),
-                    onRetry: () => setScenario("retried"),
-                    onOpenLog: () => setLog(true),
-                    problem:
-                      scenario() === "stop-failed"
-                        ? { turnId: "turn-1", problem: "stop-failed" as const }
-                        : undefined,
-                  }
-                : undefined
-            }
+            turns={{
+              onStop: () => setScenario("stopping"),
+              onRetry: () => setScenario("retried"),
+              onOpenLog: () => setLog(true),
+              problem:
+                scenario() === "stop-failed"
+                  ? { turnId: "turn-1", problem: "stop-failed" as const }
+                  : undefined,
+            }}
           />
         }
       >

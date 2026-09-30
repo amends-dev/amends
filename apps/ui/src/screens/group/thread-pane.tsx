@@ -5,7 +5,7 @@ import { typingText } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Timeline, type TimelineEntry } from "../timeline/index.ts";
-import { ThreadTurns, type ThreadTurn, type ThreadTurnControls } from "../turns/turn-row.tsx";
+import type { ThreadTurnControls } from "../turns/turn-row.tsx";
 import type { GroupFollow } from "./group-pane.tsx";
 import {
   ConversationComposer,
@@ -36,10 +36,10 @@ export interface ThreadPaneProps extends ConversationProps {
   /** What Back returns to on phones. Default the group's name. */
   readonly backLabel?: string;
   /**
-   * The agents' turns on the thread, under its messages: each agent's latest, with stopping,
-   * retrying, and opening its log.
+   * Stopping, retrying, and opening the logs of the agents' turns among the entries, each shown
+   * where its agent took on the work.
    */
-  readonly turns?: ThreadTurnControls & { readonly list: readonly ThreadTurn[] };
+  readonly turns?: ThreadTurnControls;
   /** Opens the log of the turn that posted a reply, from the note under the reply. */
   readonly onOpenTurnLog?: (turnId: string) => void;
 }
@@ -68,7 +68,7 @@ function withReplies(entries: readonly TimelineEntry[]): readonly TimelineEntry[
  * composer. Render it while the thread is open.
  */
 export function ThreadPane(props: ThreadPaneProps) {
-  const scroll = useStickToBottom(() => props.entries.length + (props.turns?.list.length ?? 0));
+  const scroll = useStickToBottom(() => props.entries.length);
   return (
     <Shell.Aside aria-label={props.title} onClose={() => props.onClose()}>
       <Pane.Root variant="side">
@@ -124,10 +124,8 @@ export function ThreadPane(props: ThreadPaneProps) {
                     days={props.days}
                     focusId={props.focusId}
                     onOpenTurnLog={props.onOpenTurnLog}
+                    turns={props.turns}
                   />
-                  <Show when={props.turns}>
-                    {(turns) => <ThreadTurns {...turns()} turns={turns().list} />}
-                  </Show>
                 </div>
               </>
             }

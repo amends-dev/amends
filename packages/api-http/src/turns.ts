@@ -24,11 +24,6 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
       success: Schema.Array(view),
       error: [...ApiErrors.member, ApiErrors.TurnThreadNotFound],
     }),
-    HttpApiEndpoint.get("latestByThread", "/threads/:threadId/latest-turns", {
-      params: { workspaceId: Workspace.Id, threadId: Thread.Id },
-      success: Schema.Array(view),
-      error: [...ApiErrors.member, ApiErrors.TurnThreadNotFound],
-    }),
     HttpApiEndpoint.get("listActive", "/active-turns", {
       params: { workspaceId: Workspace.Id },
       query: { limit },

@@ -11,6 +11,7 @@ import {
   ThreadApplication,
   ThreadMessageApplication,
   ThreadParticipationApplication,
+  type ThreadTimeline,
 } from "@amends/core/thread";
 import { Turn, TurnApplication, TurnExecution } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";
@@ -39,6 +40,34 @@ const accept = (id: Workspace.Id) =>
   Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackground(id, "turn.accept"));
 const stopDeparted = (id: Workspace.Id) =>
   Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackground(id, "turn.stop-departed"));
+const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
+  as(
+    id,
+    alice,
+    Effect.flatMap(ThreadApplication.Service, (threads) =>
+      threads.readTimeline(threadId, { limit: 50 }),
+    ),
+  );
+/** A timeline item in brief: a message's text, or a turn's change. */
+const told = (item: ThreadTimeline.Item) => {
+  if ("message" in item) return `message: ${item.message.text}`;
+  const activity = item.activity;
+  switch (activity.kind) {
+    case "turn.created":
+      return `created ${activity.details.turnId}${activity.details.retryOf === null ? "" : ` retrying ${activity.details.retryOf}`}`;
+    case "turn.started":
+      return `started ${activity.details.turnId}`;
+    case "turn.stopping":
+      return `stopping ${activity.details.turnId} ${activity.details.cancelReason}`;
+    case "turn.ended": {
+      const details = activity.details;
+      const why = details.reason ?? details.cancelReason;
+      return `ended ${details.turnId} ${details.outcome}${why === null ? "" : ` ${why}`}${details.messageIds.length === 0 ? "" : ` replying ${details.messageIds.join(",")}`}`;
+    }
+    default:
+      return activity.kind;
+  }
+};
 
 /** A workspace owned by alice with an agent, Scout, that has a ready model connection. */
 const workspaceWithAgent = Effect.gen(function* () {
@@ -279,15 +308,19 @@ export const turns = (harness: ConformanceHarness) => {
               expect(closed?.messageIds).toHaveLength(2);
               // The early answer came before more input was taken in, so it is owed too: each is
               // the agent's own message, verbatim, in order, after the input that followed it.
-              const timeline = yield* as(
-                workspace.id,
-                alice,
-                Effect.flatMap(ThreadApplication.Service, (threads) =>
-                  threads.readTimeline(threadId, { limit: 10 }),
-                ),
-              );
+              const timeline = yield* timelineOf(workspace.id, threadId);
+              // The turn began where the agent took on the first message, and ended replying.
+              expect(timeline.map(told)).toEqual([
+                "message: Scout, summarize the plan.",
+                `created ${turnId}`,
+                `started ${turnId}`,
+                "message: Include the risks too.",
+                "message: An early answer.",
+                "message: The plan, with its risks.",
+                `ended ${turnId} completed replying ${closed!.messageIds.join(",")}`,
+              ]);
               // Each reply names the turn that posted it; people's messages name none.
-              expect(timeline.slice(-3)).toMatchObject([
+              expect(timeline.filter((item) => "message" in item).slice(-3)).toMatchObject([
                 { message: { text: "Include the risks too.", turnId: null } },
                 {
                   activity: { kind: "message.published" },
@@ -419,17 +452,20 @@ export const turns = (harness: ConformanceHarness) => {
                 _tag: "TurnApplication.NotActive",
                 status: "failed",
               });
-              // A thread reads each agent's latest turn and the one before it, however many it had.
-              const latest = yield* as(
-                workspace.id,
-                alice,
-                Effect.flatMap(TurnApplication.Service, (turns) => turns.latestByThread(threadId)),
-              );
-              expect(
-                latest.map(({ id, status, retryable }) => ({ id, status, retryable })),
-              ).toEqual([
-                { id: third!.id, status: "failed", retryable: true },
-                { id: second!.id, status: "cancelled", retryable: false },
+              // The thread tells each turn where the agent took on the work, and how it went.
+              expect((yield* timelineOf(workspace.id, threadId)).map(told)).toEqual([
+                "message: Scout, draft the notes.",
+                `created ${first!.id}`,
+                `ended ${first!.id} cancelled requested`,
+                "message: Please try again.",
+                `created ${second!.id}`,
+                `started ${second!.id}`,
+                `stopping ${second!.id} requested`,
+                "message: Actually, just the summary.",
+                `ended ${second!.id} cancelled requested`,
+                `created ${third!.id}`,
+                `started ${third!.id}`,
+                `ended ${third!.id} failed The model provider is unavailable.`,
               ]);
             }),
           ),
@@ -519,6 +555,14 @@ export const turns = (harness: ConformanceHarness) => {
               expect(flags(yield* turnsOf(workspace.id, threadId))).toEqual([
                 { status: "queued", stoppable: true, retryable: false },
                 { status: "failed", stoppable: false, retryable: false },
+              ]);
+              // The failed attempt stays where it began; the retry follows, once.
+              expect((yield* timelineOf(workspace.id, threadId)).map(told)).toEqual([
+                "message: Scout, draft the notes.",
+                `created ${failed!.id}`,
+                `started ${failed!.id}`,
+                `ended ${failed!.id} failed The model provider is unavailable.`,
+                `created ${retried.id} retrying ${failed!.id}`,
               ]);
 
               // It continues from what the failed turn took in, and its input is who asked again.
@@ -944,6 +988,12 @@ export const turns = (harness: ConformanceHarness) => {
               cancelReason: "participation-ended",
               retryable: false,
             });
+            expect((yield* timelineOf(workspace.id, threadId)).map(told)).toEqual([
+              "message: Scout, look into this.",
+              `created ${stopped!.id}`,
+              "participation.ended",
+              `ended ${stopped!.id} cancelled participation-ended`,
+            ]);
             // It can't run again where the agent no longer takes part.
             expect(
               yield* Effect.flip(

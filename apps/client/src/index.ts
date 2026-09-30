@@ -178,6 +178,7 @@ export {
   type ThreadEntry,
   type ThreadMessageEntry,
   type ThreadNoteEntry,
+  type ThreadTurnEntry,
 } from "./conversations/views.ts";
 export { useInboxView, type InboxEntry, type NotificationReason } from "./conversations/inbox.ts";
 export {
@@ -212,11 +213,10 @@ export { useMemberName, type MemberNameController } from "./workspaces/member-na
 export { suggestedName } from "./api/workspaces.ts";
 export {
   activeState,
-  useThreadTurns,
+  useThreadTurnControls,
   useTurnActivity,
   useTurnLog,
   type ActiveTurn,
-  type ThreadTurnsView,
   type TurnActivity,
   type TurnActivityView,
   type TurnCommandProblem,

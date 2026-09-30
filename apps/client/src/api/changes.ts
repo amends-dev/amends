@@ -160,31 +160,28 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     { collection: "streams", id: text(payload, "groupId") },
   ],
   // Who belongs to a group, and which of its threads the reader may see. A fact names its group
-  // but not its threads, so every open timeline, participant list, and turn list checks its
-  // access again.
+  // but not its threads, so every open timeline and participant list checks its access again.
   "group.membership.added": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
     { collection: "timelines", id: undefined },
     { collection: "participants", id: undefined },
-    { collection: "turns", id: undefined },
   ],
   "group.membership.removed": (payload) => [
     { collection: "streams", id: text(payload, "groupId") },
     { collection: "rosters", id: text(payload, "groupId") },
     { collection: "timelines", id: undefined },
     { collection: "participants", id: undefined },
-    { collection: "turns", id: undefined },
   ],
-  // Who takes part in a thread, and so follows it; an agent that left can't retry its turns there.
+  // Who takes part in a thread, and so follows it.
   "thread.participation.added": (payload) => [
     { collection: "participants", id: text(payload, "threadId") },
   ],
   "thread.participation.ended": (payload) => [
     { collection: "participants", id: text(payload, "threadId") },
-    { collection: "turns", id: text(payload, "threadId") },
   ],
-  // Agents' turns on a thread: what each is doing there, and how it ended.
+  // A turn's log: what it is doing, and how it ended. Its thread's timeline follows from the turn
+  // activity recorded there.
   ...Object.fromEntries(
     [
       "turn.created",
@@ -199,7 +196,6 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     ].map((name) => [
       name,
       (payload: unknown): ReadonlyArray<Target> => [
-        { collection: "turns", id: text(payload, "threadId") },
         // A new turn's fact names it by its own ID; the others by `turnId`.
         { collection: "turn-logs", id: text(payload, "turnId") ?? text(payload, "id") },
       ],

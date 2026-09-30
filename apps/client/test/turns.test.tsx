@@ -8,9 +8,11 @@ import {
   ClientProvider,
   DirectoryProvider,
   Session,
-  useThreadTurns,
+  useThreadConversation,
+  useThreadTurnControls,
   type SessionStore,
-  type ThreadTurnsView,
+  type ThreadTurnEntry,
+  type TurnControls,
 } from "../src/index.ts";
 
 afterEach(cleanup);
@@ -18,6 +20,7 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" });
 const store: SessionStore = { read: () => session, write: () => {}, subscribe: () => () => {} };
+const at = (minute: number) => new Date(Date.UTC(2026, 8, 28, 12, minute)).toISOString();
 
 const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner" };
 const member = (id: string, name: string, identity: { _tag: string; id: string }) => ({
@@ -32,114 +35,172 @@ const members = [
   owner,
   member("member-scout", "Scout", { _tag: "Agent", id: "scout" }),
   member("member-atlas", "Atlas", { _tag: "Agent", id: "atlas" }),
+  member("member-echo", "Echo", { _tag: "Agent", id: "echo" }),
 ];
+/** The agents as the reader sees them: Alice may direct Scout and Atlas, not Echo. */
+const agents = ["scout", "atlas", "echo"].map((id) => ({
+  id,
+  memberId: `member-${id}`,
+  name: id,
+  instructions: "",
+  model: { connectionId: "team", model: "model", reasoning: null },
+  environmentId: "in-process",
+  createdBy: "owner",
+  createdAt: at(0),
+  role: null,
+  configurable: false,
+  removable: false,
+  usable: id !== "echo",
+  readiness: { _tag: "Ready" },
+}));
 
-interface Stored {
-  id: string;
-  memberId: string;
-  status: string;
-  failure?: string;
-  cancelReason?: string;
-  messageId?: string;
-  createdAt: string;
-  stoppable: boolean;
-  retryable: boolean;
-}
-const viewOf = (turn: Stored) => ({
-  id: turn.id,
+const activity = (sequence: number, kind: string, subject: string, details: unknown) => ({
+  id: `activity-${sequence}`,
   workspaceId: "one",
-  groupId: "general",
   threadId: "thread",
-  agentId: turn.memberId.replace("member-", ""),
-  memberId: turn.memberId,
-  participationId: `participation-${turn.memberId}`,
-  logAfter: null,
-  historyFrom: null,
-  retryOf: null,
-  status: turn.status,
-  inputAfterSequence: 0,
-  acceptedThroughSequence: 3,
-  incorporatedThroughSequence: 0,
-  selection: null,
-  messageIds: turn.messageId === undefined ? [] : [turn.messageId],
-  failure: turn.failure ?? null,
-  cancelReason: turn.cancelReason ?? null,
-  createdAt: turn.createdAt,
-  startedAt: null,
-  finishedAt: null,
-  stoppable: turn.stoppable,
-  retryable: turn.retryable,
+  sequence,
+  occurredAt: at(sequence),
+  kind,
+  subject,
+  occurrence: subject,
+  newActivity: kind === "message.published",
+  details,
 });
+const message = (id: string, by: string, text: string, turnId: string | null = null) => ({
+  id,
+  workspaceId: "one",
+  threadId: "thread",
+  author: { _tag: "Member", memberId: by },
+  text,
+  mentions: [],
+  publishedAt: at(1),
+  turnId,
+});
+type Item = { readonly activity: { readonly sequence: number } };
+/** The thread's activity so far, oldest first; each write adds what the host would. */
+function thread() {
+  const items: Array<Item> = [];
+  const next = () => items.length + 1;
+  const say = (id: string, by: string, text: string, turnId?: string) =>
+    items.push({
+      activity: activity(next(), "message.published", `message:${id}`, { messageId: id }),
+      message: message(id, by, text, turnId),
+    } as Item);
+  const turn = (kind: string, details: { readonly turnId: string } & Record<string, unknown>) =>
+    items.push({
+      activity: activity(next(), `turn.${kind}`, `turn:${details.turnId}`, details),
+    } as Item);
+  const created = (turnId: string, memberId: string, retryOf: string | null = null) =>
+    turn("created", { turnId, memberId, retryOf });
+  const ended = (
+    turnId: string,
+    outcome: string,
+    more: { messageIds?: string[]; reason?: string; cancelReason?: string } = {},
+  ) =>
+    turn("ended", {
+      turnId,
+      outcome,
+      messageIds: more.messageIds ?? [],
+      reason: more.reason ?? null,
+      cancelReason: more.cancelReason ?? null,
+    });
+  const left = (memberId: string) =>
+    items.push({
+      activity: activity(next(), "participation.ended", `thread-participation:${memberId}`, {
+        participationId: `p-${memberId}`,
+        reason: "group-removed",
+      }),
+      participant: {
+        id: `p-${memberId}`,
+        workspaceId: "one",
+        threadId: "thread",
+        participant: { _tag: "Member", memberId },
+        joinedAt: at(1),
+        joinedAtSequence: 1,
+      },
+    } as Item);
+  return { items, say, turn, created, ended, left };
+}
 
-function fixture() {
-  const server = {
-    // Newest first, as the host lists them.
-    turns: [
-      {
-        id: "scout-2",
-        memberId: "member-scout",
-        status: "running",
-        createdAt: "2026-09-28T12:05:00.000Z",
-        stoppable: true,
-        retryable: false,
-      },
-      {
-        id: "atlas-1",
-        memberId: "member-atlas",
-        status: "failed",
-        failure: "Anthropic needs its API key.",
-        createdAt: "2026-09-28T12:02:00.000Z",
-        stoppable: false,
-        retryable: true,
-      },
-      {
-        id: "scout-1",
-        memberId: "member-scout",
-        status: "completed",
-        messageId: "reply",
-        createdAt: "2026-09-28T12:00:00.000Z",
-        stoppable: false,
-        retryable: false,
-      },
-    ] as Stored[],
-    /** Answers to the next writes, in order; then success. */
-    answers: [] as Response[],
-  };
+/**
+ * A thread where Scout replied and is working on a follow-up, Atlas failed, and Echo, whom the
+ * reader may not direct, waits.
+ */
+function fixture(options: { readonly atlasLeft?: boolean } = {}) {
+  const server = thread();
+  server.say("m1", "owner", "Scout and Atlas, check the terms.");
+  server.created("scout-1", "member-scout");
+  server.created("atlas-1", "member-atlas");
+  server.turn("started", { turnId: "scout-1" });
+  server.turn("started", { turnId: "atlas-1" });
+  server.say("reply", "member-scout", "The terms look fine.", "scout-1");
+  server.ended("scout-1", "completed", { messageIds: ["reply"] });
+  server.ended("atlas-1", "failed", { reason: "Anthropic needs its API key." });
+  if (options.atlasLeft) server.left("member-atlas");
+  server.say("m2", "owner", "Scout, and the renewal date?");
+  server.created("scout-2", "member-scout");
+  server.turn("started", { turnId: "scout-2" });
+  server.created("echo-1", "member-echo");
+  /** Answers to the next writes, in order; then success. */
+  const answers: Array<Response> = [];
   const writes: Array<{ path: string; key: string | null }> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
-    const path = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const path = url.pathname;
     if (path === "/me/workspaces")
-      return json({ memberships: [{ workspace, member: owner, people: 3 }], invitations: [] });
+      return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/threads/thread/latest-turns")
-      return json(server.turns.map(viewOf));
-    if (request.method !== "POST") return json({}, 404);
-    writes.push({ path, key: request.headers.get("idempotency-key") });
-    const answer = server.answers.shift();
-    if (answer) return answer;
-    const id = path.split("/")[4];
-    const stored = server.turns.find((turn) => turn.id === id);
-    if (!stored) return json({ _tag: "TurnApplication.NotFound", turnId: id }, 404);
-    if (path.endsWith("/cancel")) {
-      Object.assign(stored, { status: "cancelling", cancelReason: "requested", stoppable: false });
-      return json(viewOf(stored));
+    if (path === "/workspaces/one/agents") return json(agents);
+    if (path === "/workspaces/one/threads/thread/timeline") {
+      const after = Number(url.searchParams.get("afterSequence") ?? 0);
+      return json(server.items.filter((item) => item.activity.sequence > after));
     }
-    stored.retryable = false;
-    const retried: Stored = {
-      id: `${stored.id}-retry`,
-      memberId: stored.memberId,
-      status: "queued",
-      createdAt: "2026-09-28T12:06:00.000Z",
-      stoppable: true,
+    if (request.method !== "POST" || !path.startsWith("/workspaces/one/turns/"))
+      return json({}, 404);
+    writes.push({ path, key: request.headers.get("idempotency-key") });
+    const answer = answers.shift();
+    if (answer) return answer;
+    const id = path.split("/")[4]!;
+    const view = (turnId: string, status: string) => ({
+      id: turnId,
+      workspaceId: "one",
+      groupId: "general",
+      threadId: "thread",
+      agentId: "atlas",
+      memberId: "member-atlas",
+      participationId: "p-member-atlas",
+      logAfter: null,
+      historyFrom: null,
+      retryOf: null,
+      status,
+      inputAfterSequence: 0,
+      acceptedThroughSequence: 1,
+      incorporatedThroughSequence: 0,
+      selection: null,
+      messageIds: [],
+      failure: null,
+      cancelReason: null,
+      createdAt: at(30),
+      startedAt: null,
+      finishedAt: null,
+      stoppable: false,
       retryable: false,
-    };
-    server.turns.unshift(retried);
-    return json(viewOf(retried), 201);
+    });
+    if (path.endsWith("/cancel")) {
+      server.turn("stopping", { turnId: id, cancelReason: "requested" });
+      return json(view(id, "cancelling"));
+    }
+    server.created(`${id}-retry`, "member-atlas", id);
+    return json(view(`${id}-retry`, "queued"), 201);
   });
-  let view!: ThreadTurnsView;
+  const views = {} as {
+    thread: ReturnType<typeof useThreadConversation>;
+    controls: TurnControls;
+  };
   function Consumer() {
-    view = useThreadTurns("one", "thread");
+    views.thread = useThreadConversation("one", "thread");
+    views.controls = useThreadTurnControls("one", "thread");
     return null;
   }
   render(() => (
@@ -155,87 +216,98 @@ function fixture() {
       </DirectoryProvider>
     </ClientProvider>
   ));
-  return {
-    get view() {
-      return view;
-    },
-    server,
-    writes,
-  };
+  const turns = () =>
+    views.thread.entries().filter((entry): entry is ThreadTurnEntry => entry.kind === "turn");
+  const turn = (id: string) => turns().find((entry) => entry.id === id);
+  return { views, turns, turn, answers, writes };
 }
 
-it("shows each agent's latest turn on a thread, by name, and which are at work", async () => {
+it("shows each agent's turn where it took on the work, until it replies", async () => {
   const f = fixture();
-  expect(f.view.loading()).toBe(true);
-  await waitFor(() => expect(f.view.latest()).toHaveLength(2));
-  await waitFor(() => expect(f.view.latest()[0]?.agent.name).toBe("Scout"));
-  expect(f.view.latest()).toMatchObject([
-    { id: "scout-2", state: "working", stoppable: true, retryable: false, throughSequence: 3 },
+  await waitFor(() => expect(f.turn("atlas-1")?.agent.id).toBe("atlas"));
+  await waitFor(() => expect(f.turn("atlas-1")?.agent.name).toBe("Atlas"));
+  // Scout's first turn replied, so its reply stands for it.
+  expect(
+    f.views.thread
+      .entries()
+      .map((entry) => (entry.kind === "turn" ? `turn ${entry.id}` : entry.id)),
+  ).toEqual(["m1", "turn atlas-1", "reply", "m2", "turn scout-2", "turn echo-1"]);
+  expect(f.turns()).toMatchObject([
     {
       id: "atlas-1",
-      agent: { memberId: "member-atlas", name: "Atlas" },
+      at: new Date(at(3)),
+      agent: { id: "atlas", memberId: "member-atlas", name: "Atlas" },
       state: "failed",
       failure: "Anthropic needs its API key.",
       stoppable: false,
       retryable: true,
     },
+    { id: "scout-2", state: "working", stoppable: true, retryable: false },
+    // The reader may not direct Echo.
+    { id: "echo-1", state: "queued", stoppable: false, retryable: false },
   ]);
-  expect(f.view.latest()[1]?.createdAt).toEqual(new Date("2026-09-28T12:02:00.000Z"));
-  expect(f.view.active().map((turn) => turn.id)).toEqual(["scout-2"]);
-  expect(f.view.failure()).toBeUndefined();
+});
+
+it("offers no retry for an agent that stopped taking part after its turn", async () => {
+  const f = fixture({ atlasLeft: true });
+  await waitFor(() => expect(f.turn("atlas-1")?.agent.id).toBe("atlas"));
+  expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });
 });
 
 it("stops a turn, and retries one with a key it keeps until the retry goes through", async () => {
   const f = fixture();
-  await waitFor(() => expect(f.view.latest()).toHaveLength(2));
+  await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
 
-  expect(f.view.stop("scout-2")).toBe(true);
-  expect(f.view.acting()).toEqual({ kind: "stop", turnId: "scout-2" });
-  await waitFor(() => expect(f.view.latest()[0]).toMatchObject({ state: "stopping" }));
-  await waitFor(() => expect(f.view.acting()).toBeUndefined());
-  expect(f.view.latest()[0]).toMatchObject({ stoppedBy: "request", stoppable: false });
+  expect(f.views.controls.stop("scout-2")).toBe(true);
+  expect(f.views.controls.acting()).toEqual({ kind: "stop", turnId: "scout-2" });
+  await waitFor(() => expect(f.views.controls.acting()).toBeUndefined());
+  // The command answers once the timeline shows the turn stopping.
+  expect(f.turn("scout-2")).toMatchObject({
+    state: "stopping",
+    stoppedBy: "request",
+    stoppable: false,
+  });
 
   // A retry lost in transit asks again with the same key.
-  f.server.answers.push(new Response("unavailable", { status: 502 }));
-  expect(f.view.retry("atlas-1")).toBe(true);
+  f.answers.push(new Response("unavailable", { status: 502 }));
+  expect(f.views.controls.retry("atlas-1")).toBe(true);
   await waitFor(() =>
-    expect(f.view.problem()).toEqual({ turnId: "atlas-1", problem: "retry-failed" }),
+    expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "retry-failed" }),
   );
-  expect(f.view.retry("atlas-1")).toBe(true);
-  await waitFor(() => expect(f.view.acting()).toBeUndefined());
+  expect(f.views.controls.retry("atlas-1")).toBe(true);
+  await waitFor(() => expect(f.views.controls.acting()).toBeUndefined());
   const retries = f.writes.filter((write) => write.path.endsWith("/retry"));
   expect(retries).toHaveLength(2);
   expect(retries[0]?.key).not.toBeNull();
   expect(retries[1]?.key).toBe(retries[0]?.key);
-  expect(f.view.problem()).toBeUndefined();
-  await waitFor(() =>
-    expect(f.view.latest().find((turn) => turn.agent.name === "Atlas")).toMatchObject({
-      id: "atlas-1-retry",
-      state: "queued",
-    }),
-  );
+  expect(f.views.controls.problem()).toBeUndefined();
+  // The failed attempt stays where it was, no longer retryable; the new one follows.
+  expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });
+  expect(f.turns().at(-1)).toMatchObject({ id: "atlas-1-retry", state: "queued", stoppable: true });
 });
 
 it("names why a stop or retry was refused", async () => {
   const f = fixture();
-  await waitFor(() => expect(f.view.latest()).toHaveLength(2));
-  f.server.answers.push(
+  await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
+  f.answers.push(
     json({ _tag: "TurnApplication.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
   );
-  f.view.retry("atlas-1");
+  f.views.controls.retry("atlas-1");
   await waitFor(() =>
-    expect(f.view.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
+    expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
   );
-  f.server.answers.push(
+  f.answers.push(
     json({ _tag: "TurnApplication.NotActive", turnId: "scout-2", status: "completed" }, 409),
   );
-  f.view.stop("scout-2");
-  await waitFor(() => expect(f.view.problem()).toEqual({ turnId: "scout-2", problem: "finished" }));
-  f.view.dismiss();
-  expect(f.view.problem()).toBeUndefined();
+  f.views.controls.stop("scout-2");
+  await waitFor(() =>
+    expect(f.views.controls.problem()).toEqual({ turnId: "scout-2", problem: "finished" }),
+  );
+  f.views.controls.dismiss();
+  expect(f.views.controls.problem()).toBeUndefined();
 });
 
-it("refreshes a thread's turns as its turn facts arrive", () => {
+it("refreshes a turn's log and the active turns as its facts arrive", () => {
   for (const name of [
     "turn.created",
     "turn.retried",
@@ -246,15 +318,16 @@ it("refreshes a thread's turns as its turn facts arrive", () => {
   ])
     expect(
       affectedKeys("one", [{ name, payload: { threadId: "thread", turnId: "turn-1" } }]).toSorted(),
-    ).toEqual([
-      "workspace/one/active-turns",
-      "workspace/one/turn-logs:turn-1",
-      "workspace/one/turns:thread",
-    ]);
-  // An agent that stops taking part can no longer retry its turns there.
+    ).toEqual(["workspace/one/active-turns", "workspace/one/turn-logs:turn-1"]);
+  // A thread's timeline follows the turn activity recorded there.
   expect(
-    affectedKeys("one", [{ name: "thread.participation.ended", payload: { threadId: "thread" } }]),
-  ).toContain("workspace/one/turns:thread");
+    affectedKeys("one", [
+      {
+        name: "thread.activity.recorded",
+        payload: { groupId: "general", activity: { threadId: "thread", kind: "turn.ended" } },
+      },
+    ]),
+  ).toContain("workspace/one/timelines:thread");
 });
 
 it("a turn's log refreshes as it grows", () => {

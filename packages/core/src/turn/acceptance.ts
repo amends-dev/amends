@@ -21,6 +21,8 @@ import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
+import { TurnActivity } from "./activity.ts";
+import { TurnActivityRecorder } from "./activity-recorder.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -44,6 +46,7 @@ export type Error =
   | PlatformError.PlatformError
   | Log.ReadError
   | Log.WriteError
+  | TurnActivityRecorder.Error
   | Projection.Error
   | InvalidResponse;
 
@@ -77,6 +80,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
+  const activity = yield* TurnActivityRecorder.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -218,9 +222,15 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       startedAt: null,
       finishedAt: null,
     };
-    yield* journal.publish(
+    const event = yield* journal.publish(
       TurnFacts.Created,
       Object.assign({}, created, { notificationIds: [head, ...rest] as const }),
+    );
+    yield* activity.record(
+      thread.value,
+      TurnActivity.Created,
+      { turnId: created.id, memberId: agent.memberId, retryOf: null },
+      event,
     );
     return true;
   });
@@ -255,15 +265,35 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
             threadId: turn.threadId,
             turnId: turn.id,
           };
-          yield* journal.publish(
+          const requested = yield* journal.publish(
             TurnFacts.CancelRequested,
             Object.assign({}, where, { reason: "participation-ended" as const, requestedAt: at }),
           );
-          if (found.value.status === "queued")
-            yield* journal.publish(
+          if (found.value.status !== "queued")
+            yield* activity.record(
+              turn.threadId,
+              TurnActivity.Stopping,
+              { turnId: turn.id, cancelReason: "participation-ended" },
+              requested,
+            );
+          else {
+            const event = yield* journal.publish(
               TurnFacts.Cancelled,
               Object.assign({}, where, { finishedAt: at }),
             );
+            yield* activity.record(
+              turn.threadId,
+              TurnActivity.Ended,
+              {
+                turnId: turn.id,
+                outcome: "cancelled",
+                messageIds: [],
+                reason: null,
+                cancelReason: "participation-ended",
+              },
+              event,
+            );
+          }
         }).pipe(journal.commit);
       }
     }

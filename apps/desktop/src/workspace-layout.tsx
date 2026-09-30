@@ -15,7 +15,7 @@ import {
   useAgentStates,
   useConnectionList,
   useEnvironmentList,
-  useThreadTurns,
+  useThreadTurnControls,
   useTurnActivity,
   useWorkspace,
   useDirectMessages,
@@ -727,16 +727,17 @@ function ThreadPanel(props: {
           : "Couldn’t unfollow the thread. Try again.",
       ),
   });
-  const turns = useThreadTurns(props.workspaceId, props.threadId);
-  const agentHref = (agentId: string) => href(paths.agent(props.workspaceId, agentId));
-  // An agent's reply names the turn that posted it, whose log its actions open.
-  const entries = thread.entries;
-  // Each agent's latest turn shows under the messages, unless its reply already stands for it.
-  const inline = () =>
-    turns
-      .latest()
-      .filter((turn) => turn.state !== "done" || turn.replyId === undefined)
-      .map((turn) => ({ ...turn, agentHref: agentHref(turn.agent.id) }));
+  const turns = useThreadTurnControls(props.workspaceId, props.threadId);
+  // An agent's reply names the turn that posted it, whose log its actions open. A turn shows where
+  // its agent took on the work until it replies, with where to fix the agent's setup.
+  const entries = () =>
+    thread
+      .entries()
+      .map((entry) =>
+        entry.kind === "turn" && entry.agent.id !== undefined
+          ? { ...entry, agentHref: href(paths.agent(props.workspaceId, entry.agent.id)) }
+          : entry,
+      );
   return (
     <Show
       when={props.log}
@@ -751,7 +752,6 @@ function ThreadPanel(props: {
           entries={entries()}
           onOpenTurnLog={props.onOpenLog}
           turns={{
-            list: inline(),
             onStop: turns.stop,
             onRetry: turns.retry,
             onOpenLog: props.onOpenLog,

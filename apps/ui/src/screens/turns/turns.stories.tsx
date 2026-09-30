@@ -45,10 +45,11 @@ export const FailedWithRetry = {
     await expect(canvas.getByText("Anthropic needs its API key.")).toBeVisible();
     await expect(canvas.getByRole("link", { name: "Agent settings" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
-    await expect(canvas.getByText(/Previous turn failed/)).toBeVisible();
-    await expect(
-      within(canvas.getByRole("group", { name: "Yumi’s turn" })).getByRole("status"),
-    ).toHaveTextContent("Queued");
+    // The failed attempt stays where it was, and the new one follows it.
+    const [failed, retried] = canvas.getAllByRole("group", { name: "Yumi’s turn" });
+    await expect(within(failed!).getByRole("status")).toHaveTextContent("Failed");
+    await expect(canvas.queryByRole("button", { name: "Retry" })).toBeNull();
+    await expect(within(retried!).getByRole("status")).toHaveTextContent("Queued");
   },
 } satisfies Story;
 

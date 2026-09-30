@@ -358,13 +358,13 @@ roles, suggestions, fitting environments, a refused connection, stale reasoning,
 view. Agents also shows each agent's current activity apart from its setup: nothing while idle,
 or its most pressing turn state with the threads it works in. `agentStatus`,
 `environmentStatus`, and `connectionStatus` word each one's state as a `Status` for the sidebar,
-profile cards, and rows the apps compose; an environment or connection that is ready has none. `ThreadTurns` puts the agents' turns under a
-thread's messages as compact rows, from the Lunacy "Turn activity" frames: the agent, its state,
-View log, and Stop or Retry for a reader who may direct it, with a failure's reason and Agent
-settings, the failed or stopped turn a retry follows, and a refused command worded from its
-`TurnProblem` code; rows key by turn so Stop keeps its focus, and move their actions under the
-name when too narrow. `ThreadPane` takes them as `turns`, and its timeline offers View turn log in
-an agent's reply's actions; a thread's replies and a sidebar group mark where agents work.
+profile cards, and rows the apps compose; an environment or connection that is ready has none. `TurnRow` shows an agent's turn as a compact row,
+from the Lunacy "Turn activity" frames: the agent, its state, View log, and Stop or Retry for a
+reader who may direct it, with a failure's reason and Agent settings, and a refused command worded
+from its `TurnProblem` code; it moves its actions under the name when too narrow. A timeline's
+`turn` entries render as these rows where the agent took on the work, keyed by turn so Stop keeps
+its focus, when the `Timeline` or `ThreadPane` has `turns` controls; the timeline offers View turn
+log in an agent's reply's actions; a thread's replies and a sidebar group mark where agents work.
 `TurnLogPane` shows a turn's log in place of its thread: where and with what it runs, its
 activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
 failure, and a footer that follows live, offers "New activity · Jump to latest" once the reader

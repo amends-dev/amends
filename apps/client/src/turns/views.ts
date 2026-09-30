@@ -3,13 +3,13 @@ import { Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { agentsReads } from "../api/agents.ts";
+import { timelineRead } from "../api/conversations.ts";
 import { useApiClient } from "../api/context.tsx";
 import { draftsAtom, writing } from "../api/drafts.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import {
   activeTurnsRead,
   newTurnRequestKey,
-  threadTurnsRead,
   turnLogRead,
   turnProblem,
   turnsRequest,
@@ -54,8 +54,6 @@ export interface TurnEntry {
   readonly stoppable: boolean;
   /** The reader may run it again now. */
   readonly retryable: boolean;
-  /** The agent's turn before this one on the thread, when it failed or stopped. */
-  readonly previous?: { readonly id: string; readonly state: "failed" | "stopped" } | undefined;
 }
 
 /** A turn's state is active until it finishes. */
@@ -238,47 +236,14 @@ function useControls(
   };
 }
 
-export interface ThreadTurnsView extends TurnControls {
-  /** Each agent's latest turn on the thread, newest first, once loaded. */
-  readonly latest: Accessor<ReadonlyArray<TurnEntry>>;
-  /** The agents at work on the thread now: queued, working, or stopping. */
-  readonly active: Accessor<ReadonlyArray<TurnEntry>>;
-  /** The first read is loading. */
-  readonly loading: Accessor<boolean>;
-  /** Why the latest read failed; the turns shown are the last that loaded. */
-  readonly failure: Accessor<WorkspaceFailure | undefined>;
-}
-
 /**
- * The agents' turns on a thread, live while mounted, with stopping and retrying for readers who
- * may direct their agents.
+ * Stop and retry the agents' turns in a thread, as its timeline shows them. A command's thread
+ * timeline is read again before it answers, so it shows the state the command produced.
  */
-export function useThreadTurns(workspaceId: string, threadId: string): ThreadTurnsView {
-  const read = useRead(threadTurnsRead(useApiClient(), workspaceId, threadId));
-  const entryOf = useEntries(workspaceId);
-  const all = createMemo(() => (read.value() ?? []).map(entryOf));
-  const latest = createMemo(() => {
-    const byAgent = new Map<string, Array<TurnEntry>>();
-    // Newest first for each agent, as the host lists them.
-    for (const turn of all())
-      byAgent.set(turn.agent.memberId, [...(byAgent.get(turn.agent.memberId) ?? []), turn]);
-    return [...byAgent.values()]
-      .map(([current, before]): TurnEntry => {
-        const entry = current!;
-        return before !== undefined && (before.state === "failed" || before.state === "stopped")
-          ? { ...entry, previous: { id: before.id, state: before.state } }
-          : entry;
-      })
-      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
-  });
-  const controls = useControls(workspaceId, threadId, { log: false, refresh: read.refresh });
-  return {
-    latest,
-    active: createMemo(() => latest().filter((turn) => activeState(turn.state))),
-    loading: read.loading,
-    failure: read.failure,
-    ...controls,
-  };
+export function useThreadTurnControls(workspaceId: string, threadId: string): TurnControls {
+  const timeline = timelineRead(useApiClient(), workspaceId, threadId);
+  const refresh = timeline === undefined ? () => {} : useAtomRefresh(() => timeline.atom);
+  return useControls(workspaceId, threadId, { log: false, refresh });
 }
 
 /** One entry of a turn's activity, oldest first, as its log shows it. */

@@ -299,14 +299,22 @@ when its connection has no key. `get` reads the turn, for a run to watch. `draft
 readers more of a response before it completes, as a `TurnDraft` signal, and `report` and
 `interrupted` publish `TurnLogged` after their commits, so readers read the log again.
 
+A turn's changes also show in its thread's timeline, recorded as thread activity in the commits
+that make them (the `TurnActivity` kinds, which `TurnActivityRecorder` records): `turn.created` where the agent took on the work, or where a retry
+asked again (naming the turn it retries), `turn.started`, `turn.stopping` once a working turn is
+asked to stop or its agent stops taking part, and `turn.ended` with its outcome, the replies it
+posted, and why it failed or was stopped. Each carries what its item shows, so `TurnTimeline`
+resolves it without reading anything more. It informs no one and is not new activity; the replies
+are. A client folds a turn's items into one row at its `turn.created` position.
+
 The commit that creates or retries a turn asks `TurnDispatch` to run it, through a journal
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
 the turn. The gateway binds
 `TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
 and environments.
 
-`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, and
-`latestByThread` each agent's latest turn there with the one before it, as `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
+`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, as
+`Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
 (`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. `listActive` gives the
 workspace's active turns in threads the reader may open, among at most `limit` active turns, and
 `log` a turn with its log as its readers see it (`Turn.LogView`): each batch of input taken in,
@@ -385,7 +393,8 @@ such as `message.published`, its `subject`, an `occurrence` key, `newActivity`, 
 `details` in encoded JSON. Storage, facts, and the change feed carry that shape, so a new kind
 changes none of them and needs no migration. The domain that owns a kind defines it next to its
 facts with `ThreadActivityKind.make(name, { details, subject, occurrence?, newActivity })`:
-`ThreadMessageActivity.Published`, and `ThreadParticipationActivity.Followed` and `Ended`.
+`ThreadMessageActivity.Published`, `ThreadParticipationActivity.Followed` and `Ended`, and
+`TurnActivity.Created`, `Started`, `Stopping`, and `Ended`.
 
 - `details` is the kind's schema, encoded to JSON when recorded and decoded when read.
 - `subject` names what the activity is about, derived from its details.
@@ -404,7 +413,8 @@ operation asks for, then runs the domain's step, which publishes the domain fact
 kind, details, and recipients. The activity is recorded at that position, caused by that fact.
 
 A kind appears in timelines through a resolver its domain registers:
-`ThreadMessageTimeline.resolver` and `ThreadParticipationTimeline.resolver`. Each loads what its
+`ThreadMessageTimeline.resolver`, `ThreadParticipationTimeline.resolver`, and
+`TurnTimeline.resolver`. Each loads what its
 kinds reference in one batch per page and returns typed items; each timeline module adds its item
 type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers, and
 `ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new

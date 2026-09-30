@@ -1,12 +1,10 @@
 import { Show } from "solid-js";
-import { IconAlertTriangle, IconMinus } from "@amends/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { TurnStatus, type TurnState } from "../../components/turn-status/index.ts";
-import { Keyed } from "../../internal/keyed.tsx";
 import * as s from "./turns.css.ts";
 
-/** An agent's latest turn on a thread, as its inline row shows it. */
+/** An agent's turn on a thread, as its row shows it where the turn took on its work. */
 export interface ThreadTurn {
   readonly id: string;
   readonly agent: { readonly name: string };
@@ -19,8 +17,6 @@ export interface ThreadTurn {
   readonly stoppable: boolean;
   /** The reader may run it again now. */
   readonly retryable: boolean;
-  /** The agent's turn before this one, when it failed or stopped. */
-  readonly previous?: { readonly id: string; readonly state: "failed" | "stopped" };
   /** Where the agent's setup is fixed, offered with a failure. */
   readonly agentHref?: string;
 }
@@ -76,10 +72,6 @@ export interface ThreadTurnControls {
   readonly problem?: { readonly turnId: string; readonly problem: TurnProblem };
 }
 
-export interface ThreadTurnsProps extends ThreadTurnControls {
-  readonly turns: readonly ThreadTurn[];
-}
-
 /** What a finished turn's row says under it, when it says anything. */
 function detailOf(turn: ThreadTurn): string | undefined {
   if (turn.state === "failed") return turn.failure;
@@ -89,7 +81,7 @@ function detailOf(turn: ThreadTurn): string | undefined {
   return undefined;
 }
 
-/** One agent's turn under a thread's messages: its state, View log, and Stop or Retry. */
+/** One agent's turn in a thread: its state, View log, and Stop or Retry. */
 export function TurnRow(props: { readonly turn: ThreadTurn } & ThreadTurnControls) {
   const acting = () => (props.acting?.turnId === props.turn.id ? props.acting.kind : undefined);
   const problem = () =>
@@ -98,108 +90,60 @@ export function TurnRow(props: { readonly turn: ThreadTurn } & ThreadTurnControl
       : undefined;
   const stopping = () => props.turn.state === "stopping" || acting() === "stop";
   return (
-    <div class={s.row} role="group" aria-label={`${props.turn.agent.name}’s turn`}>
-      <Avatar
-        name={props.turn.agent.name}
-        initials={props.turn.agent.name.trim().charAt(0).toUpperCase()}
-        tone="lilac"
-        size={24}
-        decorative
-      />
-      <span class={s.who}>
-        <span class={s.name}>{props.turn.agent.name}</span>
-        <TurnStatus state={stopping() ? "stopping" : props.turn.state} role="status" />
-      </span>
-      <span class={s.actions}>
-        <Button variant="quiet" onClick={() => props.onOpenLog(props.turn.id)}>
-          View log
-        </Button>
-        <Show when={props.turn.stoppable || props.turn.state === "stopping"}>
-          <Button
-            disabled={stopping()}
-            aria-label={stopping() ? "Stopping" : `Stop ${props.turn.agent.name}`}
-            onClick={() => props.onStop(props.turn.id)}
-          >
-            Stop
+    <div class={s.frame}>
+      <div class={s.row} role="group" aria-label={`${props.turn.agent.name}’s turn`}>
+        <Avatar
+          name={props.turn.agent.name}
+          initials={props.turn.agent.name.trim().charAt(0).toUpperCase()}
+          tone="lilac"
+          size={24}
+          decorative
+        />
+        <span class={s.who}>
+          <span class={s.name}>{props.turn.agent.name}</span>
+          <TurnStatus state={stopping() ? "stopping" : props.turn.state} role="status" />
+        </span>
+        <span class={s.actions}>
+          <Button variant="quiet" onClick={() => props.onOpenLog(props.turn.id)}>
+            View log
           </Button>
-        </Show>
-        <Show when={props.turn.retryable}>
-          <Button disabled={acting() === "retry"} onClick={() => props.onRetry(props.turn.id)}>
-            Retry
-          </Button>
-        </Show>
-      </span>
-      <Show when={detailOf(props.turn)}>
-        {(detail) => (
-          <p class={s.detail}>
-            <span>{detail()}</span>
-            <Show when={props.turn.state === "failed" && props.turn.agentHref}>
-              {(href) => (
-                <a class={s.link} href={href()}>
-                  Agent settings
-                </a>
-              )}
-            </Show>
-          </p>
-        )}
-      </Show>
-      <Show when={problem()}>
-        {(text) => (
-          <p class={s.problem} role="alert">
-            {text()}
-          </p>
-        )}
-      </Show>
-    </div>
-  );
-}
-
-/**
- * The agents' turns on a thread, under its messages: each agent's latest turn as a row, with the
- * failed or stopped turn it follows noted above it.
- */
-export function ThreadTurns(props: ThreadTurnsProps) {
-  return (
-    <Show when={props.turns.length > 0}>
-      <section class={s.turns} aria-label="Agents at work">
-        <Keyed each={props.turns} by={(turn) => turn.id}>
-          {(turn) => (
-            <>
-              <Show when={turn().previous}>
-                {(previous) => (
-                  <p class={s.previous}>
-                    <Show
-                      when={previous().state === "failed"}
-                      fallback={<IconMinus class={s.previousIcon} aria-hidden="true" />}
-                    >
-                      <IconAlertTriangle class={s.previousIcon} aria-hidden="true" />
-                    </Show>
-                    {previous().state === "failed"
-                      ? "Previous turn failed"
-                      : "Previous turn stopped"}
-                    {" · "}
-                    <button
-                      type="button"
-                      class={s.hintLink}
-                      onClick={() => props.onOpenLog(previous().id)}
-                    >
-                      View log
-                    </button>
-                  </p>
+          <Show when={props.turn.stoppable || props.turn.state === "stopping"}>
+            <Button
+              disabled={stopping()}
+              aria-label={stopping() ? "Stopping" : `Stop ${props.turn.agent.name}`}
+              onClick={() => props.onStop(props.turn.id)}
+            >
+              Stop
+            </Button>
+          </Show>
+          <Show when={props.turn.retryable}>
+            <Button disabled={acting() === "retry"} onClick={() => props.onRetry(props.turn.id)}>
+              Retry
+            </Button>
+          </Show>
+        </span>
+        <Show when={detailOf(props.turn)}>
+          {(detail) => (
+            <p class={s.detail}>
+              <span>{detail()}</span>
+              <Show when={props.turn.state === "failed" && props.turn.agentHref}>
+                {(href) => (
+                  <a class={s.link} href={href()}>
+                    Agent settings
+                  </a>
                 )}
               </Show>
-              <TurnRow
-                turn={turn()}
-                onStop={props.onStop}
-                onRetry={props.onRetry}
-                onOpenLog={props.onOpenLog}
-                acting={props.acting}
-                problem={props.problem}
-              />
-            </>
+            </p>
           )}
-        </Keyed>
-      </section>
-    </Show>
+        </Show>
+        <Show when={problem()}>
+          {(text) => (
+            <p class={s.problem} role="alert">
+              {text()}
+            </p>
+          )}
+        </Show>
+      </div>
+    </div>
   );
 }

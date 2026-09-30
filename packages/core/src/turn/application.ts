@@ -15,6 +15,8 @@ import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
+import { TurnActivity } from "./activity.ts";
+import { TurnActivityRecorder } from "./activity-recorder.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -41,7 +43,8 @@ export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
   | Log.WriteError
-  | Projection.Error;
+  | Projection.Error
+  | TurnActivityRecorder.Error;
 export type CancelError = ChangeError | NotActive;
 export type RetryError =
   | ChangeError
@@ -58,13 +61,6 @@ export interface Interface {
   readonly listByThread: (
     threadId: ThreadId.Id,
     limit: number,
-  ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
-  /**
-   * Each agent's latest turn in a thread and the one before it, for a reader who may open the
-   * thread: one agent's after another's, newest first within each.
-   */
-  readonly latestByThread: (
-    threadId: ThreadId.Id,
   ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
   /**
    * The workspace's active turns in threads the reader may open, oldest first, among at most
@@ -109,6 +105,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const receipts = yield* RequestReceipts.Service;
   const members = yield* MemberStore.Service;
+  const activity = yield* TurnActivityRecorder.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const crypto = yield* Crypto.Crypto;
@@ -208,23 +205,6 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     return yield* present(listed, { newestFirst: true });
   });
 
-  const latestByThread = Effect.fn("TurnApplication.latestByThread")(function* (
-    threadId: ThreadId.Id,
-  ) {
-    const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
-    const thread = yield* access
-      .require(id)
-      .pipe(
-        Effect.catchTag("ThreadAccess.NotFound", () =>
-          Effect.fail(new ThreadNotFound({ threadId: id })),
-        ),
-      );
-    const listed = yield* Effect.forEach(yield* turns.latestByThread(thread.id, 2), (turn) =>
-      decode(turn),
-    );
-    return yield* present(listed, { newestFirst: true });
-  });
-
   const bounded = Schema.decodeEffect(
     Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
   );
@@ -291,16 +271,37 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         threadId: turn.threadId,
         turnId: turn.id,
       };
-      yield* journal.publish(
+      const requested = yield* journal.publish(
         TurnFacts.CancelRequested,
         Object.assign({}, where, { reason: "requested" as const, requestedAt: at }),
       );
       if (turn.status === "queued") {
-        yield* journal.publish(TurnFacts.Cancelled, Object.assign({}, where, { finishedAt: at }));
+        const event = yield* journal.publish(
+          TurnFacts.Cancelled,
+          Object.assign({}, where, { finishedAt: at }),
+        );
+        yield* activity.record(
+          turn.threadId,
+          TurnActivity.Ended,
+          {
+            turnId: turn.id,
+            outcome: "cancelled",
+            messageIds: [],
+            reason: null,
+            cancelReason: "requested",
+          },
+          event,
+        );
         return yield* presentOne(
           Turn.change(turn, { status: "cancelled", cancelReason: "requested", finishedAt: at }),
         );
       }
+      yield* activity.record(
+        turn.threadId,
+        TurnActivity.Stopping,
+        { turnId: turn.id, cancelReason: "requested" },
+        requested,
+      );
       return yield* presentOne(
         Turn.change(turn, { status: "cancelling", cancelReason: "requested" }),
       );
@@ -359,7 +360,13 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
             startedAt: null,
             finishedAt: null,
           };
-          yield* journal.publish(TurnFacts.Retried, created);
+          const event = yield* journal.publish(TurnFacts.Retried, created);
+          yield* activity.record(
+            created.threadId,
+            TurnActivity.Created,
+            { turnId: created.id, memberId: created.memberId, retryOf: turn.id },
+            event,
+          );
           // Who asked is the retry's new input, after what the turn it retries left.
           const actor = yield* Actor.Service;
           const asker = yield* members.get(actor.memberId);
@@ -392,7 +399,6 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     workspaceId,
     get,
     listByThread,
-    latestByThread,
     listActive,
     log: readLog,
     cancel,

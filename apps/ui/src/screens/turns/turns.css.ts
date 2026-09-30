@@ -3,13 +3,8 @@ import { vars } from "../../foundations/theme/vars.css.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { fontWeight, monoFamily, typeScale } from "../../foundations/typography/tokens.ts";
 
-// Agents' turns under a thread's messages, each a compact row.
-export const turns = style({
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.75rem",
-  containerType: "inline-size",
-});
+// A turn's row sizes its actions by the width it is given.
+export const frame = style({ containerType: "inline-size" });
 
 /** Too narrow for the actions beside the name, as on the smallest phones. */
 const narrow = "(max-width: 22.5rem)";
@@ -66,17 +61,6 @@ export const problem = style({
   color: vars.color.status.caution.text,
 });
 
-// "Previous turn failed · View log": a quiet line above the attempt that followed it.
-export const previous = style({
-  ...typeScale.hint,
-  display: "flex",
-  alignItems: "center",
-  gap: "0.375rem",
-  color: vars.color.text.secondary,
-});
-
-export const previousIcon = style({ width: "0.875rem", height: "0.875rem", flex: "none" });
-
 // Text links that read as part of a line.
 export const link = style({
   ...typeScale.control,
@@ -92,8 +76,6 @@ export const link = style({
     "&:hover": { color: vars.color.text.primary, textDecoration: "underline" },
   },
 });
-
-export const hintLink = style([link, { ...typeScale.hint }]);
 
 // The log: a summary, the activity, then cards for output and next steps.
 export const log = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });

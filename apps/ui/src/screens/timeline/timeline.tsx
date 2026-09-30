@@ -11,6 +11,7 @@ import {
 import { RichText, type RichTextMention } from "../../components/rich-text/index.ts";
 import type { TaskState } from "../../components/task-status/index.ts";
 import { clockTime, dayLabel, dayOf, fullTime, typingText } from "../../internal/when.ts";
+import { TurnRow, type ThreadTurn, type ThreadTurnControls } from "../turns/turn-row.tsx";
 import * as s from "./timeline.css.ts";
 
 export interface TimelineMessage {
@@ -83,7 +84,22 @@ export interface TimelineNote {
   readonly self?: boolean;
 }
 
-export type TimelineEntry = TimelineMessage | TimelineDivider | TimelineEvent | TimelineNote;
+/**
+ * An agent's turn where it took on the work: working, or how it ended, with stopping, retrying, and
+ * its log. A turn that replied is its reply instead.
+ */
+export interface TimelineTurn extends ThreadTurn {
+  readonly kind: "turn";
+  /** When the agent took the work on: its day seam. */
+  readonly at?: Date;
+}
+
+export type TimelineEntry =
+  | TimelineMessage
+  | TimelineDivider
+  | TimelineEvent
+  | TimelineNote
+  | TimelineTurn;
 
 function noteText(note: TimelineNote) {
   const who = note.self ? "You" : note.who;
@@ -103,7 +119,7 @@ function noteText(note: TimelineNote) {
 }
 
 const atOf = (entry: TimelineEntry) =>
-  entry.kind === "message" || entry.kind === "note" ? entry.at : undefined;
+  entry.kind === "message" || entry.kind === "note" || entry.kind === "turn" ? entry.at : undefined;
 
 /** Entries with a day seam before the first entry of each new local day. */
 function withDays(entries: readonly TimelineEntry[]): readonly TimelineEntry[] {
@@ -170,6 +186,8 @@ export interface TimelineProps {
   readonly focusId?: string;
   /** Opens the log of the turn that posted a message. */
   readonly onOpenTurnLog?: (turnId: string) => void;
+  /** Stopping, retrying, and opening the logs of the turns shown; without them turns are hidden. */
+  readonly turns?: ThreadTurnControls;
 }
 
 /**
@@ -196,6 +214,18 @@ export function Timeline(props: TimelineProps) {
                   <IconMarkNew class={s.eventIcon} />
                   {event().text}
                 </p>
+              )}
+            </Match>
+            <Match when={props.turns && entry().kind === "turn" && (entry() as TimelineTurn)}>
+              {(turn) => (
+                <TurnRow
+                  turn={turn()}
+                  onStop={props.turns!.onStop}
+                  onRetry={props.turns!.onRetry}
+                  onOpenLog={props.turns!.onOpenLog}
+                  acting={props.turns!.acting}
+                  problem={props.turns!.problem}
+                />
               )}
             </Match>
             <Match when={entry().kind === "note" && (entry() as TimelineNote)}>

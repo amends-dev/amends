@@ -1,6 +1,7 @@
 import { Schema } from "effect";
 import { ThreadMessageTimeline } from "./message/timeline.ts";
 import { ThreadParticipationTimeline } from "./participation/timeline.ts";
+import { TurnTimeline } from "../turn/timeline.ts";
 
 /**
  * Every kind of timeline item, for protocols that encode timelines: the schema of
@@ -11,6 +12,10 @@ export const Item = Schema.Union([
   ThreadMessageTimeline.Item,
   ThreadParticipationTimeline.FollowedItem,
   ThreadParticipationTimeline.EndedItem,
+  TurnTimeline.CreatedItem,
+  TurnTimeline.StartedItem,
+  TurnTimeline.StoppingItem,
+  TurnTimeline.EndedItem,
 ]);
 export type Item = typeof Item.Type;
 

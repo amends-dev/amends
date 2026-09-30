@@ -1,5 +1,7 @@
 export { Turn } from "./turn.ts";
 export { TurnAcceptance } from "./acceptance.ts";
+export { TurnActivity } from "./activity.ts";
+export { TurnActivityRecorder } from "./activity-recorder.ts";
 export { TurnApplication } from "./application.ts";
 export { TurnDispatch } from "./dispatch.ts";
 export { TurnErrors } from "./errors.ts";
@@ -9,3 +11,4 @@ export { TurnId } from "./id.ts";
 export { TurnLog } from "./log.ts";
 export { TurnProjection } from "./projection.ts";
 export { TurnStore } from "./store.ts";
+export { TurnTimeline } from "./timeline.ts";

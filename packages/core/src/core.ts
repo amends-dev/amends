@@ -32,6 +32,8 @@ import { ThreadActivityPublisher } from "./thread/activity/publisher.ts";
 import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
+import { TurnActivityRecorder } from "./turn/activity-recorder.ts";
+import { TurnTimeline } from "./turn/timeline.ts";
 import { NotificationSource } from "./notification/source.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
@@ -153,6 +155,7 @@ export const permissions = [
 const activityResolvers = [
   ThreadMessageTimeline.resolver,
   ThreadParticipationTimeline.resolver,
+  TurnTimeline.resolver,
 ] as const;
 
 /**
@@ -188,6 +191,7 @@ const publisher = ThreadActivityPublisher.layer.pipe(
 const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(publisher));
 const groupDeparture = GroupMembershipDeparture.layer;
 const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(publisher));
+const turnActivity = TurnActivityRecorder.layer.pipe(Layer.provide(publisher));
 const threadStart = ThreadStart.layer.pipe(
   Layer.provide(Layer.mergeAll(ThreadCreation.layer, messagePublication)),
 );
@@ -244,6 +248,7 @@ const operations = Layer.mergeAll(
       departures,
       groupDeparture,
       messagePublication,
+      turnActivity,
       RequestReceipts.layer,
     ),
   ),
@@ -256,7 +261,7 @@ const operations = Layer.mergeAll(
 const background = Layer.mergeAll(
   BackgroundRuns.layer(processes).pipe(Layer.provide(TurnAcceptance.layer)),
   TurnExecution.layer.pipe(Layer.provide(messagePublication)),
-).pipe(Layer.provide(Layer.mergeAll(threadAccess, admissions)));
+).pipe(Layer.provide(Layer.mergeAll(threadAccess, admissions, turnActivity)));
 
 /**
  * Complete core for one workspace: application operations, background runs, and turn execution over the

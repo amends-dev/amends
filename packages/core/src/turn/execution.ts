@@ -34,6 +34,8 @@ import { ThreadMessagePublication } from "../thread/message/publication.ts";
 import { ThreadParticipationAdmission } from "../thread/participation/admission.ts";
 import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { NotActive, NotFound } from "./errors.ts";
+import { TurnActivity } from "./activity.ts";
+import { TurnActivityRecorder } from "./activity-recorder.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -54,7 +56,8 @@ export type Error =
   | Projection.Error
   | InvalidResponse
   | NotFound
-  | NotActive;
+  | NotActive
+  | TurnActivityRecorder.Error;
 export type PrepareError =
   | Error
   | AgentStore.Failure
@@ -255,6 +258,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const messages = yield* ThreadMessageStore.Service;
   const members = yield* MemberStore.Service;
   const signals = yield* Signals.Service;
+  const activity = yield* TurnActivityRecorder.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -582,10 +586,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           yield* logOf(turn).appendAll(entries);
         }
         const startedAt = yield* DateTime.now;
-        yield* journal.publish(
+        const event = yield* journal.publish(
           TurnFacts.Started,
           Object.assign(where(turn), { selection: chosen, startedAt }),
         );
+        yield* activity.record(turn.threadId, TurnActivity.Started, { turnId: turn.id }, event);
         return Turn.change(turn, { status: "running", selection: chosen, startedAt });
       }),
     );
@@ -757,16 +762,36 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     outcome: { readonly _tag: "Failed"; readonly reason: string } | { readonly _tag: "Cancelled" },
   ) {
     const finishedAt = yield* DateTime.now;
-    if (outcome._tag === "Cancelled")
-      yield* journal.publish(TurnFacts.Cancelled, Object.assign(where(turn), { finishedAt }));
-    else
-      yield* journal.publish(
-        TurnFacts.Failed,
-        Object.assign(where(turn), {
-          reason: yield* Schema.decodeEffect(Schema.NonEmptyString)(outcome.reason),
-          finishedAt,
-        }),
+    if (outcome._tag === "Cancelled") {
+      const event = yield* journal.publish(
+        TurnFacts.Cancelled,
+        Object.assign(where(turn), { finishedAt }),
       );
+      yield* activity.record(
+        turn.threadId,
+        TurnActivity.Ended,
+        {
+          turnId: turn.id,
+          outcome: "cancelled",
+          messageIds: [],
+          reason: null,
+          cancelReason: turn.cancelReason,
+        },
+        event,
+      );
+      return;
+    }
+    const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(outcome.reason);
+    const event = yield* journal.publish(
+      TurnFacts.Failed,
+      Object.assign(where(turn), { reason, finishedAt }),
+    );
+    yield* activity.record(
+      turn.threadId,
+      TurnActivity.Ended,
+      { turnId: turn.id, outcome: "failed", messageIds: [], reason, cancelReason: null },
+      event,
+    );
   });
 
   const close = Effect.fn("TurnExecution.close")(function* (turnId: Turn.Id) {
@@ -844,9 +869,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             messageIds.push(published.message.id);
           }
         }
-        yield* journal.publish(
+        const event = yield* journal.publish(
           TurnFacts.Completed,
           Object.assign(where(turn), { messageIds, finishedAt: yield* DateTime.now }),
+        );
+        yield* activity.record(
+          turn.threadId,
+          TurnActivity.Ended,
+          { turnId: turn.id, outcome: "completed", messageIds, reason: null, cancelReason: null },
+          event,
         );
         return { _tag: "Closed", messageIds } as const;
       }),

@@ -36,8 +36,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   second. A model that sends nothing for five minutes while a turn waits on it interrupts the run,
   which runs again as other interruptions do, so a turn whose model keeps hanging fails after about
   twenty minutes; no deadline bounds a turn's whole length. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each
-  turn's log; threads have no titles, so the log names a thread by its group. No environment
-  transfer or turn timeline activity exists, and the active turns read covers at most a hundred
+  turn's log; threads have no titles, so the log names a thread by its group. A turn's changes show in its
+  thread's timeline, but inform no one: the design's informational turn activity for participants
+  is not built. No environment transfer exists, and the active turns read covers at most a hundred
   active turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox outside
   the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own

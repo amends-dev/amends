@@ -69,8 +69,8 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useAgentStates(workspaceId)` gives each agent's issues and current activity by member ID, from
   the agents read and the active turns, for the status patches on profile cards and one-to-one
   conversations. The workspace layout mounts it, so every workspace page reads the agents.
-- `useThreadTurns(workspaceId, threadId)` follows the agents' turns on a thread, with stopping and
-  retrying; see [Turns](#turns).
+- `useThreadTurnControls(workspaceId, threadId)` stops and retries the agents' turns a thread's
+  timeline shows; see [Turns](#turns).
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
@@ -267,15 +267,19 @@ reasons it cannot run, or an initial role only the owner gives, each keeping the
 
 ## Turns
 
-`useThreadTurns(workspaceId, threadId)` reads each agent's latest turn in a thread and the one
-before it, and shapes each agent's latest as a `TurnEntry`, newest first: the agent by name, its `state` (`queued`, `working`, `stopping`,
-`done`, `failed`, or `stopped`), its failure as the host worded it, whether a request or the
-agent's departure stopped it, its reply's ID, the timeline position of the latest message it took
-on, its times, whether the reader may stop or retry it now, and the failed or stopped turn it
-follows. `active()` holds the agents at work on the thread. A reply names the turn that posted it
-itself: a thread's message entries carry `turn`, however far back the reader scrolls. The turns keep their own invalidation key per thread, which every turn fact for the thread,
-the agent's departure from it, and access changes refresh. `stop(turnId)` and `retry(turnId)`
-refresh the thread's turns before answering; `acting()` names the one running. A retry reuses its
+A thread's turns are part of its timeline: `useThreadConversation` folds each turn's activity into
+one `ThreadTurnEntry` where the agent took on the work, until the turn replies, when its replies
+stand for it (their message entries carry `turn`). An entry holds the agent by name, with its ID
+when the reader may see it, its `state` (`queued`, `working`, `stopping`, `done`, `failed`, or
+`stopped`), its failure as the host worded it, whether a request or the agent's departure stopped
+it, and whether the reader may stop or retry it now: they may when the agents read says they may
+direct the agent (`usable`); only a failed or requested-stopped turn that is its agent's latest in
+the thread retries, and not once the agent stopped taking part there. Pages read back from the
+newest, so a turn loaded with its start has every later item loaded too.
+
+`useThreadTurnControls(workspaceId, threadId)` stops and retries them: `stop(turnId)` and
+`retry(turnId)` read the thread's timeline again before answering; `acting()` names the one
+running. A retry reuses its
 request key until it goes through, so asking again after a lost answer creates one turn.
 `problem()` reports why one did not go through as a `TurnCommandProblem` code the screens word
 (`stop-failed`, `retry-failed`, `finished`, `still-running`, `replied`, `superseded`, `departed`,

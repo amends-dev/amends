@@ -38,14 +38,6 @@ export interface Interface {
   readonly listActiveByMember: (
     memberId: MemberId.Id,
   ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
-  /**
-   * Each agent's most recent turns on a thread, at most `perAgent` of each: one agent's after
-   * another's, newest first within each.
-   */
-  readonly latestByThread: (
-    threadId: ThreadId.Id,
-    perAgent: number,
-  ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
   /** A thread's turns, newest first, at most `limit`. */
   readonly listByThread: (
     threadId: ThreadId.Id,

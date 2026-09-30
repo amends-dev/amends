@@ -153,7 +153,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
             "Scout, how is the plan going?",
             "The plan is on track.",
           ]);
-          expect(timeline.at(-1)).toMatchObject({
+          // The turn shows where Scout took the question on, and ends with its reply.
+          expect(timeline.map((item) => item.activity.kind)).toEqual([
+            "message.published",
+            "turn.created",
+            "turn.started",
+            "message.published",
+            "turn.ended",
+          ]);
+          const reply = timeline.at(-2);
+          expect(reply).toMatchObject({
             message: { author: { _tag: "Member", memberId: agent.memberId } },
           });
           expect(models.requests).toHaveLength(1);
@@ -169,7 +178,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
             params: { workspaceId, threadId },
             query: { limit: 10 },
           });
-          const reply = timeline.at(-1);
           expect(turn).toMatchObject({
             memberId: agent.memberId,
             status: "completed",

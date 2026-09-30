@@ -1,4 +1,9 @@
+import { useAtomValue } from "@effect/atom-solid";
+import { Option } from "effect";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
+import { agentsReads } from "../api/agents.ts";
+import { useApiClient } from "../api/context.tsx";
 import {
   Group,
   type GroupMembership,
@@ -9,6 +14,7 @@ import {
 } from "../api/conversations.ts";
 import type { WorkspaceFailure } from "../api/failures.ts";
 import { useWorkspace } from "../session/directory.tsx";
+import type { TurnState } from "../turns/views.ts";
 import { useMarkGroupRead, useMarkThreadRead } from "./read.ts";
 import {
   useGroupRoster,
@@ -290,11 +296,91 @@ export interface ThreadNoteEntry {
   /** It happened to the reader. */
   readonly self: boolean;
 }
-export type ThreadEntry = ThreadMessageEntry | ThreadNoteEntry;
+/**
+ * An agent's turn where it took on the work, as it went since: waiting, working, or how it ended.
+ * A turn that replied shows as its replies instead.
+ */
+export interface ThreadTurnEntry {
+  readonly kind: "turn";
+  /** The turn's ID. */
+  readonly id: string;
+  /** When the agent took on the work. */
+  readonly at: Date;
+  /** The agent, with its ID when the reader may see it. */
+  readonly agent: { readonly id?: string; readonly memberId: string; readonly name: string };
+  readonly state: TurnState;
+  /** Why it failed, as the host worded it. */
+  readonly failure?: string;
+  /** Why it stopped or is stopping: someone asked, or its agent stopped taking part. */
+  readonly stoppedBy?: "request" | "departure";
+  /** The reader may ask it to stop now. */
+  readonly stoppable: boolean;
+  /**
+   * The reader may run it again now: it failed or was stopped on request, it is its agent's latest
+   * turn in the thread, and the agent still takes part.
+   */
+  readonly retryable: boolean;
+}
+export type ThreadEntry = ThreadMessageEntry | ThreadNoteEntry | ThreadTurnEntry;
 
 type Published = Extract<ThreadTimeline.Item, { readonly message: unknown }>;
 type Participation = Extract<ThreadTimeline.Item, { readonly participant: unknown }>;
+type TurnItem = Exclude<ThreadTimeline.Item, Published | Participation>;
 const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in item;
+const isParticipation = (item: ThreadTimeline.Item): item is Participation => "participant" in item;
+
+/**
+ * Which agents the reader may see, by member ID, with whether they may direct each, live while
+ * mounted. It shares the Agents page's read.
+ */
+function useAgentAccess(workspaceId: string) {
+  const reads = agentsReads(useApiClient(), workspaceId);
+  const read = reads ? useAtomValue(() => reads.agents) : undefined;
+  const byMember = createMemo(
+    () =>
+      new Map(
+        (read === undefined ? [] : (Option.getOrUndefined(AsyncResult.value(read())) ?? [])).map(
+          (view) => [view.memberId as string, { id: view.id as string, usable: view.usable }],
+        ),
+      ),
+  );
+  return { of: (memberId: string) => byMember().get(memberId) };
+}
+
+/** A turn as its timeline items tell it so far. */
+interface TurnSoFar {
+  readonly id: string;
+  readonly memberId: string;
+  readonly at: Date;
+  readonly sequence: number;
+  state: TurnState;
+  failure?: string;
+  stoppedBy?: "request" | "departure";
+  replied: boolean;
+}
+const stoppedBy = (reason: "requested" | "participation-ended" | null) =>
+  reason === null ? undefined : reason === "participation-ended" ? "departure" : "request";
+
+/** Carry a turn's later item into what it tells so far; its creation began it. */
+function advance(turn: TurnSoFar, item: TurnItem) {
+  const activity = item.activity;
+  if (activity.kind === "turn.started") turn.state = "working";
+  else if (activity.kind === "turn.stopping") {
+    turn.state = "stopping";
+    turn.stoppedBy = stoppedBy(activity.details.cancelReason);
+  } else if (activity.kind === "turn.ended") {
+    const details = activity.details;
+    turn.state =
+      details.outcome === "completed"
+        ? "done"
+        : details.outcome === "failed"
+          ? "failed"
+          : "stopped";
+    turn.failure = details.reason ?? undefined;
+    turn.stoppedBy = stoppedBy(details.cancelReason);
+    turn.replied = details.messageIds.length > 0;
+  }
+}
 const changes = {
   unfollowed: "unfollowed",
   "group-left": "left-group",
@@ -304,7 +390,9 @@ const changes = {
 
 /**
  * One thread's timeline from its newest activity, oldest shown first and live while mounted: its
- * messages, and notes where people followed it or stopped taking part. While mounted and visible
+ * messages, notes where people followed it or stopped taking part, and agents' turns where they
+ * took on work, until they reply. Pages read back from the newest, so a turn loaded with its start
+ * has everything after it loaded too. While mounted and visible
  * it reads the thread through the newest activity shown. Given `focus`, a timeline position such
  * as the message that notified the reader, it reads back until that message is loaded.
  */
@@ -316,6 +404,7 @@ export function useThreadConversation(
   const timeline = useThreadTimeline(workspaceId, threadId);
   const people = usePeople(workspaceId);
   const typing = useTyping(workspaceId);
+  const agents = useAgentAccess(workspaceId);
   const lost = useLostAccess(timeline);
   useMarkThreadRead(workspaceId, threadId, () => timeline.value()?.at(-1)?.activity.sequence);
   const noteOf = (item: Participation): ThreadNoteEntry => {
@@ -338,23 +427,78 @@ export function useThreadConversation(
       self,
     };
   };
-  const entries = createMemo((): ReadonlyArray<ThreadEntry> =>
-    lost()
-      ? []
-      : (timeline.value() ?? []).map((item) =>
-          isMessage(item)
-            ? {
-                kind: "message",
-                id: item.message.id,
-                author: people.authorOf(item.message.author),
-                at: toDate(item.message.publishedAt),
-                text: item.message.text,
-                mentions: people.mentionsOf(item.message.text),
-                ...(item.message.turnId === null ? {} : { turn: { id: item.message.turnId } }),
-              }
-            : noteOf(item),
-        ),
-  );
+  const entries = createMemo((): ReadonlyArray<ThreadEntry> => {
+    if (lost()) return [];
+    const shown: Array<ThreadMessageEntry | ThreadNoteEntry | TurnSoFar> = [];
+    const turns = new Map<string, TurnSoFar>();
+    /** Each agent's latest turn, and the last time it stopped taking part. */
+    const latest = new Map<string, string>();
+    const departed = new Map<string, number>();
+    for (const item of timeline.value() ?? []) {
+      if (isMessage(item))
+        shown.push({
+          kind: "message",
+          id: item.message.id,
+          author: people.authorOf(item.message.author),
+          at: toDate(item.message.publishedAt),
+          text: item.message.text,
+          mentions: people.mentionsOf(item.message.text),
+          ...(item.message.turnId === null ? {} : { turn: { id: item.message.turnId } }),
+        });
+      else if (isParticipation(item)) {
+        const participant = item.participant.participant;
+        if (item.activity.kind !== "participation.followed" && participant._tag === "Member")
+          departed.set(participant.memberId, item.activity.sequence);
+        shown.push(noteOf(item));
+      } else if (item.activity.kind === "turn.created") {
+        const details = item.activity.details;
+        const turn: TurnSoFar = {
+          id: details.turnId,
+          memberId: details.memberId,
+          at: toDate(item.activity.occurredAt),
+          sequence: item.activity.sequence,
+          state: "queued",
+          replied: false,
+        };
+        turns.set(turn.id, turn);
+        latest.set(turn.memberId, turn.id);
+        shown.push(turn);
+      } else {
+        // A turn that began before the pages loaded shows once they reach its start.
+        const turn = turns.get(item.activity.details.turnId);
+        if (turn !== undefined) advance(turn, item);
+      }
+    }
+    return shown.flatMap((entry): ReadonlyArray<ThreadEntry> => {
+      if ("kind" in entry) return [entry];
+      const turn = entry;
+      if (turn.state === "done" && turn.replied) return [];
+      const agent = agents.of(turn.memberId);
+      const usable = agent?.usable === true;
+      return [
+        {
+          kind: "turn",
+          id: turn.id,
+          at: turn.at,
+          agent: {
+            ...(agent === undefined ? {} : { id: agent.id }),
+            memberId: turn.memberId,
+            name: people.name(turn.memberId),
+          },
+          state: turn.state,
+          ...(turn.failure === undefined ? {} : { failure: turn.failure }),
+          ...(turn.stoppedBy === undefined ? {} : { stoppedBy: turn.stoppedBy }),
+          stoppable: usable && (turn.state === "queued" || turn.state === "working"),
+          retryable:
+            usable &&
+            (turn.state === "failed" ||
+              (turn.state === "stopped" && turn.stoppedBy === "request")) &&
+            latest.get(turn.memberId) === turn.id &&
+            (departed.get(turn.memberId) ?? 0) < turn.sequence,
+        },
+      ];
+    });
+  });
   // Read back until the position to show is loaded, one page at a time.
   createEffect(() => {
     const target = focus?.(),

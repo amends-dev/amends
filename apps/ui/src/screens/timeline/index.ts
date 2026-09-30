@@ -7,4 +7,5 @@ export {
   type TimelineMessage,
   type TimelineNote,
   type TimelineProps,
+  type TimelineTurn,
 } from "./timeline.tsx";
