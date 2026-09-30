@@ -7,7 +7,6 @@ import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { ThreadId } from "../id.ts";
-import { Thread } from "../thread.ts";
 import { ThreadStore } from "../store.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadActivityKind } from "../activity/kind.ts";
@@ -17,12 +16,6 @@ import { ThreadMessage } from "./message.ts";
 import { ThreadMessageActivity } from "./activity.ts";
 import { ThreadMessageFacts } from "./facts.ts";
 
-export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
-  "ThreadMessagePublication.InvalidReference",
-  {
-    message: Schema.String,
-  },
-) {}
 export const Input = Schema.Struct({
   /** The caller names the message, so a keyed request can name the same one on its retry. */
   messageId: ThreadMessage.Id,
@@ -45,7 +38,6 @@ export interface Published {
 export type Error =
   | ThreadStore.Failure
   | ThreadActivityPublisher.Error
-  | InvalidReference
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.WriteError
@@ -73,61 +65,46 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
   const publisher = yield* ThreadActivityPublisher.Service;
   const journal = yield* Journal.Service;
   const workspaceId = threads.workspaceId;
-  if (publisher.workspaceId !== workspaceId)
-    return yield* new InvalidReference({
-      message: "Message publication services belong to different workspaces",
-    });
   const publish = Effect.fn("ThreadMessagePublication.publish")(function* (input: Input) {
     yield* Store.Transaction;
-    const request = yield* Schema.decodeEffect(Schema.toType(Input))(input);
-    const selected = new Set(request.participants.map(ThreadParticipation.keyOf));
+    // Recipients come from the selected participants, so an unselected mention would go unheard.
+    const selected = new Set(input.participants.map(ThreadParticipation.keyOf));
     if (
-      !selected.has(ThreadParticipation.keyOf(authorReference(request.author))) ||
-      request.mentions.some(
+      !selected.has(ThreadParticipation.keyOf(authorReference(input.author))) ||
+      input.mentions.some(
         (memberId) => !selected.has(ThreadParticipation.keyOf({ _tag: "Member", memberId })),
       )
     )
-      return yield* new InvalidReference({
-        message: "Author and mentions must be selected participants",
-      });
-    const found = yield* threads.get(request.threadId);
-    if (Option.isNone(found))
-      return yield* new InvalidReference({ message: "Publication thread is missing" });
-    const thread = yield* Schema.decodeEffect(Schema.toType(Thread.Record))(found.value).pipe(
-      Effect.mapError(
-        (cause) => new InvalidReference({ message: `Invalid thread: ${cause.message}` }),
-      ),
-    );
-    if (thread.workspaceId !== workspaceId || thread.id !== request.threadId)
-      return yield* new InvalidReference({
-        message: "Publication references another thread or workspace",
-      });
+      return yield* Effect.die("A message's author and mentions must be selected participants");
+    const found = yield* threads.get(input.threadId);
+    if (Option.isNone(found)) return yield* Effect.die("A published message's thread is missing");
+    const thread = found.value;
     const published = yield* publisher.publish({
       thread,
-      occurredAt: request.occurredAt,
-      admit: request.participants,
+      occurredAt: input.occurredAt,
+      admit: input.participants,
       step: ({ admitted }) =>
         Effect.gen(function* () {
           const message: ThreadMessage.Record = {
-            id: request.messageId,
+            id: input.messageId,
             workspaceId,
             threadId: thread.id,
-            author: request.author,
-            text: request.text,
-            mentions: request.mentions,
-            publishedAt: request.occurredAt,
-            turnId: request.turnId ?? null,
+            author: input.author,
+            text: input.text,
+            mentions: input.mentions,
+            publishedAt: input.occurredAt,
+            turnId: input.turnId ?? null,
           };
           const fact = yield* journal
             .publish(
               ThreadMessageFacts.Published,
               Object.assign({ groupId: thread.groupId }, message),
             )
-            .pipe(Publication.withOccurredAt(request.occurredAt));
+            .pipe(Publication.withOccurredAt(input.occurredAt));
           // Mentions address members; without them the message reaches every selected participant.
           // A message never notifies its own author, and an agent's message asks no work of other
           // agents, so agents cannot keep setting each other to work.
-          const author = ThreadParticipation.keyOf(authorReference(request.author));
+          const author = ThreadParticipation.keyOf(authorReference(input.author));
           const writer = admitted.participants.find(
             (p) => ThreadParticipation.keyOf(p.participant) === author,
           )?.participant;
@@ -137,8 +114,8 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
               if (ThreadParticipation.keyOf(p.participant) === author) return false;
               const memberId = ThreadParticipation.memberOf(p.participant);
               return (
-                request.mentions.length === 0 ||
-                (memberId !== undefined && request.mentions.includes(memberId))
+                input.mentions.length === 0 ||
+                (memberId !== undefined && input.mentions.includes(memberId))
               );
             })
             .map((p) => {
@@ -158,13 +135,8 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
           };
         }),
     });
-    const activity = yield* ThreadActivityKind.decode(
-      ThreadMessageActivity.Published,
-      published.event.payload.activity,
-    ).pipe(
-      Effect.mapError(
-        () => new InvalidReference({ message: "Recorder returned another activity kind" }),
-      ),
+    const activity = yield* Effect.orDie(
+      ThreadActivityKind.decode(ThreadMessageActivity.Published, published.event.payload.activity),
     );
     return { message: published.value, activity };
   });

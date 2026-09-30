@@ -9,7 +9,6 @@ import {
   ThreadActivityPublisher,
   ThreadActivityRecording,
   ThreadApplication,
-  ThreadCreation,
   ThreadMessage,
   ThreadMessageApplication,
   ThreadMessagePublication,
@@ -40,14 +39,11 @@ export const threadStarts = (harness: Harness) => {
     /** The internal start that channel and task workflows will call, built over core's services. */
     const internal = ThreadStart.layer.pipe(
       Layer.provide(
-        Layer.mergeAll(
-          ThreadCreation.layer,
-          ThreadMessagePublication.layer.pipe(
-            Layer.provide(
-              ThreadActivityPublisher.layer.pipe(
-                Layer.provide(
-                  Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
-                ),
+        ThreadMessagePublication.layer.pipe(
+          Layer.provide(
+            ThreadActivityPublisher.layer.pipe(
+              Layer.provide(
+                Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
               ),
             ),
           ),

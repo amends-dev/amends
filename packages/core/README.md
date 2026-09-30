@@ -418,7 +418,6 @@ no action checks of their own; they are excluded from `Core.Operations`:
 | Service                        | Role                                                                                                  |
 | ------------------------------ | ----------------------------------------------------------------------------------------------------- |
 | `ThreadStart`                  | The one start every workflow uses: creates the thread, admits its starters, records the first message |
-| `ThreadCreation`               | Validates and records a new thread for `ThreadStart`                                                  |
 | `ThreadMessagePublication`     | Publishes a message with its admissions, activity, and recipients                                     |
 | `ThreadParticipationAdmission` | Finds eligible members and current participants, and admits new ones                                  |
 | `ThreadParticipationDeparture` | Ends a participation with its activity when its member unfollows the thread                           |
@@ -464,8 +463,13 @@ A kind appears in timelines through a resolver its domain registers:
 kinds reference in one batch per page and returns typed items; each timeline module adds its item
 type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers, and
 `ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new
-kind adds its resolver to the first and its item schema to the second. Reading a kind without a resolver fails the read with
-`ThreadActivityReading.InvalidResponse`.
+kind adds its resolver to the first and its item schema to the second. Reading a kind without a
+resolver is a defect, `ThreadActivityResolvers.Unknown`.
+
+Thread services trust what storage returns: the adapters decode each record and scope it to its
+workspace, and the storage conformance suites check that. So thread services use stored records as
+they come, without decoding or cross-checking them again, and a record core itself wrote that is
+missing is a defect rather than a typed error. Storage failures still reach callers as they are.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without

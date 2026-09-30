@@ -18,12 +18,6 @@ import { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.
 import { Notification } from "../../notification/notification.ts";
 export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "ThreadMessageApplication.InvalidResponse",
-  {
-    message: Schema.String,
-  },
-) {}
 export type Error =
   | ThreadReading.Error
   | Authorization.Error
@@ -32,8 +26,7 @@ export type Error =
   | NotFound
   | ParticipantUnavailable
   | HumanAuthorRequired
-  | ThreadMessageStore.Failure
-  | InvalidResponse;
+  | ThreadMessageStore.Failure;
 export interface Interface {
   readonly workspaceId: ThreadMessage.Record["workspaceId"];
   /**
@@ -58,18 +51,6 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [
-      access.workspaceId,
-      admissions.workspaceId,
-      publication.workspaceId,
-      readings.workspaceId,
-      messages.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({
-      message: "Message services belong to different workspaces",
-    });
   /**
    * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
    * from its author and key, so a retry names the message its first attempt published and returns
@@ -80,21 +61,9 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
     const messageId = ThreadMessage.Id.make(
       yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]),
     );
-    const found = key === undefined ? Option.none() : yield* messages.get(messageId);
-    if (Option.isNone(found)) return { messageId, previous: Option.none<ThreadMessage.Record>() };
-    const message = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Record))(
-      found.value,
-    ).pipe(
-      Effect.mapError(
-        (cause) =>
-          new InvalidResponse({
-            message: `Message storage returned invalid data: ${cause.message}`,
-          }),
-      ),
-    );
-    if (message.workspaceId !== workspaceId || message.id !== messageId)
-      return yield* new InvalidResponse({ message: "Message store returned another message" });
-    return { messageId, previous: Option.some(message) };
+    const previous =
+      key === undefined ? Option.none<ThreadMessage.Record>() : yield* messages.get(messageId);
+    return { messageId, previous };
   });
   const publish = Effect.fn("ThreadMessageApplication.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {

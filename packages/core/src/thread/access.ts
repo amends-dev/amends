@@ -9,20 +9,13 @@ import { ThreadStore } from "./store.ts";
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadAccess.NotFound", {
   threadId: Thread.Id,
 }) {}
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "ThreadAccess.InvalidResponse",
-  {
-    message: Schema.String,
-  },
-) {}
 export type Error =
   | Authorization.Error
   | GroupAudience.InvalidResponse
   | GroupMembershipStore.Failure
   | ThreadStore.Failure
   | Schema.SchemaError
-  | NotFound
-  | InvalidResponse;
+  | NotFound;
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
   /** Audience only. Applications check their action permission separately, inside the commit for writes. */
@@ -36,24 +29,12 @@ export const make = Effect.fn("ThreadAccess.make")(function* () {
   const audience = yield* GroupAudience.Service;
   const threads = yield* ThreadStore.Service;
   const workspaceId = authorization.workspaceId;
-  if (audience.workspaceId !== workspaceId || threads.workspaceId !== workspaceId)
-    return yield* new InvalidResponse({
-      message: "Thread access services belong to different workspaces",
-    });
   const requireAccess = Effect.fn("ThreadAccess.require")(function* (threadId: Thread.Id) {
     const id = yield* Schema.decodeEffect(Thread.Id)(threadId);
     yield* authorization.require([]);
     const found = yield* threads.get(id);
     if (Option.isNone(found)) return yield* new NotFound({ threadId: id });
-    const thread = yield* Schema.decodeEffect(Schema.toType(Thread.Record))(found.value).pipe(
-      Effect.mapError(
-        (cause) => new InvalidResponse({ message: `Invalid thread: ${cause.message}` }),
-      ),
-    );
-    if (thread.workspaceId !== workspaceId || thread.id !== id)
-      return yield* new InvalidResponse({
-        message: "Thread store returned another thread or workspace",
-      });
+    const thread = found.value;
     yield* audience
       .require(thread.groupId)
       .pipe(

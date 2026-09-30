@@ -1035,28 +1035,13 @@ export const threadParticipation = (harness: Harness) => {
       ),
     );
 
-    it.effect("stores and readers reject inconsistent follow records and stale departures", () =>
+    it.effect("stores refuse a second follow activity and stale departures", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
-            const { bound, owner, first, human } = yield* prepare();
+            const { bound, first, human } = yield* prepare();
             yield* grant(bound, humanId, ThreadParticipationPermissions.Follow);
-            const before = yield* snapshot(bound, first.thread.id);
-            const stored = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
-            for (const latest of [
-              Object.assign({}, stored, { threadId: Thread.Id.make("foreign") }),
-              Object.assign({}, stored, { sequence: Number.MAX_SAFE_INTEGER }),
-            ]) {
-              const context = Context.add(bound.context, ThreadActivityStore.Service, {
-                ...bound.activities,
-                latest: () => Effect.succeedSome(latest),
-              });
-              expect(
-                yield* Effect.flip(run({ ...bound, context }, human, follow(first.thread.id))),
-              ).toMatchObject({ _tag: "ThreadActivityRecording.InvalidReference" });
-              expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
-            }
             const participant = yield* run(bound, human, follow(first.thread.id));
             const activity = Option.getOrThrow(yield* bound.activities.latest(first.thread.id));
             if (activity.kind !== ThreadParticipationActivity.Followed.name)
@@ -1089,14 +1074,6 @@ export const threadParticipation = (harness: Harness) => {
                   bound.store.transaction(bound.participations.end(bad, yield* DateTime.now)),
                 ),
               ).toMatchObject({ _tag: "ThreadParticipationStore.Conflict" });
-            const context = Context.add(bound.context, ThreadParticipationStore.Service, {
-              ...bound.participations,
-              get: () => Effect.succeedNone,
-              getMany: () => Effect.succeed([]),
-            });
-            expect(
-              yield* Effect.flip(run({ ...bound, context }, owner, timeline(first.thread.id))),
-            ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
             yield* run(bound, human, unfollow(first.thread.id, participant.id));
             expect(
               yield* Effect.flip(
@@ -1147,7 +1124,7 @@ export const threadParticipation = (harness: Harness) => {
                       // Deliberately address non-message activity to exercise the generic generator.
                       // Production follow/unfollow workflows select an empty recipient list.
                       const followed = yield* recorder.record({
-                        threadId: first.thread.id,
+                        thread: first.thread,
                         sequence,
                         occurredAt,
                         kind: ThreadParticipationActivity.Followed,
@@ -1165,7 +1142,7 @@ export const threadParticipation = (harness: Harness) => {
                         .pipe(Publication.withOccurredAt(occurredAt));
                       const departure = yield* recorder
                         .record({
-                          threadId: first.thread.id,
+                          thread: first.thread,
                           sequence: yield* recorder.nextSequence(first.thread.id),
                           occurredAt,
                           kind: ThreadParticipationActivity.Ended,
@@ -1403,7 +1380,7 @@ export const threadParticipation = (harness: Harness) => {
                         .pipe(Publication.withCause(removed, occurredAt));
                       yield* recorder
                         .record({
-                          threadId: first.thread.id,
+                          thread: first.thread,
                           sequence: yield* recorder.nextSequence(first.thread.id),
                           occurredAt,
                           kind: ThreadParticipationActivity.Ended,
@@ -1516,7 +1493,7 @@ export const threadParticipation = (harness: Harness) => {
                       ).toEqual(pending);
                       yield* recorder
                         .record({
-                          threadId: first.thread.id,
+                          thread: first.thread,
                           sequence: yield* recorder.nextSequence(first.thread.id),
                           occurredAt,
                           kind: ThreadParticipationActivity.Ended,

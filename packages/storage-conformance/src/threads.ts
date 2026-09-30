@@ -28,7 +28,7 @@ import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
   ThreadApplication,
-  ThreadCreation,
+  ThreadStart,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
@@ -174,9 +174,7 @@ export const threads = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
-              expectTypeOf<
-                Extract<Core.Operations, ThreadCreation.Service>
-              >().toEqualTypeOf<never>();
+              expectTypeOf<Extract<Core.Operations, ThreadStart.Service>>().toEqualTypeOf<never>();
               const { bound, owner, group } = yield* prepare();
               yield* TestClock.adjust("5 seconds");
               const before = yield* history(bound);

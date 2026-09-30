@@ -1,19 +1,18 @@
 import { Context, Effect, Layer, Schema } from "effect";
 import { Group } from "../group/group.ts";
 import { Member } from "../workspace/member/member.ts";
+import { Journal } from "../journal/journal.ts";
+import type { Log } from "../journal/log.ts";
+import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import type { Store } from "../journal/store.ts";
 import { Thread } from "./thread.ts";
-import { ThreadCreation } from "./creation.ts";
+import { ThreadFacts } from "./facts.ts";
 import { ThreadMessage } from "./message/message.ts";
 import { ThreadMessageActivity } from "./message/activity.ts";
 import { ThreadMessagePublication } from "./message/publication.ts";
 import { ThreadParticipation } from "./participation/participation.ts";
 
-export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
-  "ThreadStart.InvalidReference",
-  { message: Schema.String },
-) {}
 /** The activity that opens a thread. Task and other opening kinds join this union with their workflows. */
 export const First = Schema.TaggedUnion({
   Message: {
@@ -39,7 +38,7 @@ export interface Input extends Schema.Schema.Type<typeof Input> {}
 export interface Started extends Thread.Started {
   readonly activity: ThreadMessageActivity.Published;
 }
-export type Error = ThreadCreation.Error | ThreadMessagePublication.Error | InvalidReference;
+export type Error = Projection.Error | Log.WriteError | ThreadMessagePublication.Error;
 export interface Interface {
   readonly workspaceId: Thread.Record["workspaceId"];
   /**
@@ -56,23 +55,21 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/start/Service",
 ) {}
 export const make = Effect.fn("ThreadStart.make")(function* () {
-  const creation = yield* ThreadCreation.Service;
+  const journal = yield* Journal.Service;
   const publication = yield* ThreadMessagePublication.Service;
-  const workspaceId = creation.workspaceId;
-  if (publication.workspaceId !== workspaceId)
-    return yield* new InvalidReference({
-      message: "Thread start services belong to different workspaces",
-    });
+  const workspaceId = publication.workspaceId;
   const start = Effect.fn("ThreadStart.start")(function* (input: Input) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Input))(input);
-    const { first } = request;
-    const created = yield* creation.create({
-      id: request.threadId,
-      groupId: request.groupId,
+    const { first, occurredAt } = input;
+    const thread: Thread.Record = {
+      id: input.threadId,
+      workspaceId,
+      groupId: input.groupId,
       createdBy: first.author,
-      createdAt: request.occurredAt,
-    });
-    const thread = created.payload;
+      createdAt: occurredAt,
+    };
+    const created = yield* journal
+      .publish(ThreadFacts.Created, thread)
+      .pipe(Publication.withOccurredAt(occurredAt));
     const published = yield* publication
       .publish({
         messageId: first.messageId,
@@ -80,10 +77,10 @@ export const make = Effect.fn("ThreadStart.make")(function* () {
         author: first.author,
         text: first.text,
         mentions: first.mentions,
-        participants: request.participants,
-        occurredAt: request.occurredAt,
+        participants: input.participants,
+        occurredAt,
       })
-      .pipe(Publication.withCause(created, request.occurredAt));
+      .pipe(Publication.withCause(created, occurredAt));
     return { thread, message: published.message, activity: published.activity };
   });
   return Service.of({ workspaceId, start });

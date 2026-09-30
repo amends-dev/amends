@@ -70,10 +70,6 @@ export const make = Effect.fn("ThreadActivityPublisher.make")(function* () {
   const recording = yield* ThreadActivityRecording.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
   const workspaceId = recording.workspaceId;
-  if (admissions.workspaceId !== workspaceId)
-    return yield* new ThreadActivityRecording.InvalidReference({
-      message: "Activity publisher services belong to different workspaces",
-    });
   const publish = Effect.fn("ThreadActivityPublisher.publish")(function* <
     A,
     K extends ThreadActivityKind.Definition,
@@ -93,7 +89,7 @@ export const make = Effect.fn("ThreadActivityPublisher.make")(function* () {
     const step = yield* input.step({ thread, sequence, admitted });
     const event = yield* recording
       .record({
-        threadId: thread.id,
+        thread,
         sequence,
         occurredAt,
         kind: step.kind,

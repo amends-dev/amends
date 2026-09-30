@@ -15,7 +15,6 @@ import { EnvironmentProjection } from "./environment/projection.ts";
 import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
 import { ThreadApplication } from "./thread/application.ts";
-import { ThreadCreation } from "./thread/creation.ts";
 import { ThreadStart } from "./thread/start.ts";
 import { DirectGroups } from "./group/direct.ts";
 import { ThreadAccess } from "./thread/access.ts";
@@ -194,9 +193,7 @@ const groupDeparture = GroupMembershipDeparture.layer;
 const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(publisher));
 const turnActivity = TurnActivityRecorder.layer.pipe(Layer.provide(publisher));
 const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivity));
-const threadStart = ThreadStart.layer.pipe(
-  Layer.provide(Layer.mergeAll(ThreadCreation.layer, messagePublication)),
-);
+const threadStart = ThreadStart.layer.pipe(Layer.provide(messagePublication));
 const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
 const activityReading = ThreadActivityReading.layer.pipe(
   Layer.provide(Layer.mergeAll(threadAccess, ThreadActivityResolvers.layer(activityResolvers))),

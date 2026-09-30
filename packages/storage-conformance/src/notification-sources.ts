@@ -43,7 +43,6 @@ import {
   boundTo,
   otherWorkspaceId,
   placed,
-  replacing,
   runHost,
   Support,
   testProvenance,
@@ -680,17 +679,6 @@ export const notificationSources = (harness: Harness) => {
                 run({ ...bound, context: missingActivity }, human, resolve(note.id)),
               ),
             ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
-            const wrongMessage = Context.add(bound.context, ThreadMessageStore.Service, {
-              ...bound.messages,
-              ...replacing(
-                bound.messages,
-                first.message.id,
-                Option.some({ ...first.message, threadId: Thread.Id.make("wrong") }),
-              ),
-            });
-            expect(
-              yield* Effect.flip(run({ ...bound, context: wrongMessage }, human, resolve(note.id))),
-            ).toMatchObject({ _tag: "ThreadActivityReading.InvalidResponse" });
           }),
         ),
       ),
@@ -762,7 +750,7 @@ export const notificationSources = (harness: Harness) => {
                         },
                       ];
                       const followed = yield* recorder.record({
-                        threadId: first.thread.id,
+                        thread: first.thread,
                         sequence,
                         occurredAt,
                         kind: ThreadParticipationActivity.Followed,
@@ -779,7 +767,7 @@ export const notificationSources = (harness: Harness) => {
                         })
                         .pipe(Publication.withOccurredAt(occurredAt));
                       const ended = yield* recorder.record({
-                        threadId: first.thread.id,
+                        thread: first.thread,
                         sequence: yield* recorder.nextSequence(first.thread.id),
                         occurredAt,
                         kind: ThreadParticipationActivity.Ended,

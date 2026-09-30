@@ -17,7 +17,7 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 ) {}
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound | ThreadAccess.InvalidResponse>
+  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
   | ThreadNotFound
   | InvalidResponse;
 
@@ -55,14 +55,13 @@ export const make = Effect.fn("SignalApplication.make")(function* () {
   const lastTyping = new Map<string, number>();
 
   const typing = Effect.fn("SignalApplication.typing")(function* (threadId: Thread.Id) {
-    const thread = yield* access.require(threadId).pipe(
-      Effect.catchTags({
-        "ThreadAccess.NotFound": (error) =>
+    const thread = yield* access
+      .require(threadId)
+      .pipe(
+        Effect.catchTag("ThreadAccess.NotFound", (error) =>
           Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
-        "ThreadAccess.InvalidResponse": (error) =>
-          Effect.fail(new InvalidResponse({ message: error.message })),
-      }),
-    );
+        ),
+      );
     yield* authorization.require([
       Requirement.make(ThreadMessagePermissions.Publish, {
         _tag: "Thread",

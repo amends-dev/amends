@@ -1,4 +1,4 @@
-import { DateTime, Effect, Schema } from "effect";
+import { Effect, Schema } from "effect";
 import type { Thread } from "../thread.ts";
 import type { ThreadActivity } from "../activity/activity.ts";
 import { ThreadActivityKind } from "../activity/kind.ts";
@@ -29,68 +29,34 @@ declare module "../activity/kind.ts" {
   }
 }
 
-const invalid = (message: string) => new ThreadActivityResolvers.InvalidResponse({ message });
-const decode = Effect.fnUntraced(
-  function* (
-    activity: ThreadActivity.Record,
-  ): Effect.fn.Return<
-    ThreadParticipationActivity.Followed | ThreadParticipationActivity.Ended,
-    ThreadActivityKind.Mismatch | Schema.SchemaError
-  > {
-    return ThreadActivityKind.is(ThreadParticipationActivity.Followed)(activity)
-      ? yield* ThreadActivityKind.decode(ThreadParticipationActivity.Followed, activity)
-      : yield* ThreadActivityKind.decode(ThreadParticipationActivity.Ended, activity);
-  },
-  Effect.mapError((cause) => invalid(`Invalid participation activity: ${cause.message}`)),
-);
+const decode = (
+  activity: ThreadActivity.Record,
+): Effect.Effect<
+  ThreadParticipationActivity.Followed | ThreadParticipationActivity.Ended,
+  ThreadActivityKind.Mismatch | Schema.SchemaError
+> =>
+  ThreadActivityKind.is(ThreadParticipationActivity.Followed)(activity)
+    ? ThreadActivityKind.decode(ThreadParticipationActivity.Followed, activity)
+    : ThreadActivityKind.decode(ThreadParticipationActivity.Ended, activity);
 
 /** Resolve follows and departures with one read of their participations. @category constructors */
 export const resolver = Effect.gen(function* () {
   const participations = yield* ThreadParticipationStore.Service;
-  const workspaceId = participations.workspaceId;
   const resolve = Effect.fn("ThreadParticipationTimeline.resolve")(function* (
-    thread: Thread.Record,
+    _thread: Thread.Record,
     listed: ReadonlyArray<ThreadActivity.Record>,
   ) {
-    const activities = yield* Effect.forEach(listed, decode);
-    const ids = new Set(activities.map((activity) => activity.details.participationId));
-    const found = new Map<ThreadParticipation.Id, ThreadParticipation.Record>();
+    const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
     const rows = yield* participations
-      .getMany([...ids])
+      .getMany([...new Set(activities.map((activity) => activity.details.participationId))])
       .pipe(Effect.mapError((cause) => new ThreadActivityResolvers.Failure({ cause })));
-    for (const row of rows) {
-      const participant = yield* Schema.decodeEffect(Schema.toType(ThreadParticipation.Record))(
-        row,
-      ).pipe(
-        Effect.mapError((cause) =>
-          invalid(`Thread storage returned invalid data: ${cause.message}`),
-        ),
-      );
-      if (!ids.has(participant.id) || found.has(participant.id))
-        return yield* invalid("Participation store returned another participation");
-      found.set(participant.id, participant);
-    }
+    const found = new Map(rows.map((participant) => [participant.id, participant] as const));
     return yield* Effect.forEach(
       activities,
-      (
-        activity,
-      ): Effect.Effect<FollowedItem | EndedItem, ThreadActivityResolvers.InvalidResponse> => {
+      (activity): Effect.Effect<FollowedItem | EndedItem> => {
         const participant = found.get(activity.details.participationId);
         if (participant === undefined)
-          return Effect.fail(invalid("Participation activity references missing participation"));
-        const consistent =
-          participant.workspaceId === workspaceId &&
-          participant.threadId === thread.id &&
-          (activity.kind === ThreadParticipationActivity.Followed.name
-            ? participant.joinedAtSequence === activity.sequence
-            : participant.joinedAtSequence < activity.sequence &&
-              participant.status === "ended" &&
-              participant.endedAt !== null &&
-              DateTime.formatIso(participant.endedAt) === DateTime.formatIso(activity.occurredAt));
-        if (!consistent)
-          return Effect.fail(
-            invalid("Participation activity references inconsistent participation"),
-          );
+          return Effect.die("A timeline activity's participation is missing");
         const summary = ThreadParticipation.toSummary(participant);
         return Effect.succeed(
           activity.kind === ThreadParticipationActivity.Followed.name
@@ -101,7 +67,6 @@ export const resolver = Effect.gen(function* () {
     );
   });
   return {
-    workspaceId,
     kinds: [ThreadParticipationActivity.Followed, ThreadParticipationActivity.Ended],
     resolve,
   } satisfies ThreadActivityResolvers.Resolver;

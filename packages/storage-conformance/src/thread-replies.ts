@@ -44,9 +44,7 @@ import {
   ThreadMessageStore,
   ThreadParticipation,
   ThreadParticipationAdmission,
-  ThreadParticipationStore,
   ThreadPermissions,
-  ThreadStore,
 } from "@amends/core/thread";
 
 import { Gateway } from "@amends/gateway";
@@ -915,82 +913,24 @@ export const threadReplies = (harness: Harness) => {
       ),
     );
 
-    it.effect("inconsistent stored references fail closed before a reply can commit", () =>
+    it.effect("a storage failure before a reply commits leaves nothing behind", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
             const { bound, owner, first } = yield* prepare();
             const before = yield* snapshot(bound, first.thread.id);
-            const current = (yield* bound.participations.listByThread(first.thread.id))[0];
-            if (current === undefined) return yield* Effect.die("Missing participant");
-            const mistaken = Object.assign({}, current, {
-              participant: {
-                ...memberParticipant(current),
-                identity: { _tag: "Human" as const, id: Identity.HumanId.make("wrong") },
-              },
-            });
-            const stored = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
-            const contexts = [
-              Context.add(bound.context, ThreadStore.Service, {
-                ...bound.threads,
-                get: () => Effect.succeedSome({ ...first.thread, workspaceId: otherWorkspaceId }),
-              }),
-              Context.add(bound.context, ThreadActivityStore.Service, {
-                ...bound.activities,
-                latest: () =>
-                  Effect.succeedSome(
-                    Object.assign({}, stored, { threadId: Thread.Id.make("foreign") }),
-                  ),
-              }),
-              Context.add(bound.context, ThreadActivityStore.Service, {
-                ...bound.activities,
-                latest: () =>
-                  Effect.succeedSome(
-                    Object.assign({}, stored, { sequence: Number.MAX_SAFE_INTEGER }),
-                  ),
-              }),
-              Context.add(bound.context, ThreadActivityStore.Service, {
-                ...bound.activities,
-                latest: () =>
-                  Effect.fail(
-                    new ThreadActivityStore.Failure({ operation: "latest", cause: "injected" }),
-                  ),
-              }),
-              Context.add(bound.context, ThreadParticipationStore.Service, {
-                ...bound.participations,
-                pageActiveByThread: () => Effect.succeed([current, current]),
-              }),
-              Context.add(bound.context, ThreadParticipationStore.Service, {
-                ...bound.participations,
-                pageActiveByThread: () => Effect.succeed([mistaken]),
-              }),
-              // The reply's own lookup of the participants it addresses is checked the same way.
-              Context.add(bound.context, ThreadParticipationStore.Service, {
-                ...bound.participations,
-                findActive: () => Effect.succeed([mistaken]),
-              }),
-              // A participant the reply did not ask about, however valid, is not trusted.
-              Context.add(bound.context, ThreadParticipationStore.Service, {
-                ...bound.participations,
-                findActive: (threadId, participants) =>
-                  Effect.map(bound.participations.findActive(threadId, participants), (rows) => [
-                    ...rows,
-                    Object.assign({}, current, {
-                      id: ThreadParticipation.Id.make("unasked"),
-                      participant: { _tag: "Triage" as const },
-                    }),
-                  ]),
-              }),
-            ];
-            for (const context of contexts) {
-              expect(
-                Exit.isFailure(
-                  yield* Effect.exit(run({ ...bound, context }, owner, reply(first.thread.id))),
+            const context = Context.add(bound.context, ThreadActivityStore.Service, {
+              ...bound.activities,
+              latest: () =>
+                Effect.fail(
+                  new ThreadActivityStore.Failure({ operation: "latest", cause: "injected" }),
                 ),
-              ).toBe(true);
-              expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
-            }
+            });
+            expect(
+              yield* Effect.flip(run({ ...bound, context }, owner, reply(first.thread.id))),
+            ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+            expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
           }),
         ),
       ),

@@ -24,7 +24,7 @@ export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
 ) {}
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound | ThreadAccess.InvalidResponse>
+  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
   | Exclude<GroupAudience.Error, GroupAudience.NotMember>
   | ThreadActivityStore.Failure
   | ThreadReading.Error
@@ -93,14 +93,13 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input);
     const reader = yield* human();
-    const thread = yield* access.require(request.threadId).pipe(
-      Effect.catchTags({
-        "ThreadAccess.NotFound": (error) =>
+    const thread = yield* access
+      .require(request.threadId)
+      .pipe(
+        Effect.catchTag("ThreadAccess.NotFound", (error) =>
           Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
-        "ThreadAccess.InvalidResponse": (error) =>
-          Effect.fail(new InvalidResponse({ message: error.message })),
-      }),
-    );
+        ),
+      );
     yield* authorization.require([
       Requirement.make(ThreadPermissions.Read, {
         _tag: "Thread",
