@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "441a467d-735f-4a9d-b722-cc4eb66e3a74",
+  "id": "f246241d-69ba-4283-9f3a-d6754b4cf353",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -2640,6 +2640,19 @@
       "generated": null,
       "identity": null,
       "name": "published_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_messages"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "turn_id",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_messages"

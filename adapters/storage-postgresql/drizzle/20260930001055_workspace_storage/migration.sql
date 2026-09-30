@@ -297,6 +297,7 @@ CREATE TABLE "thread_messages" (
 	"text" text NOT NULL,
 	"mentions" text[] NOT NULL,
 	"published_at" timestamp with time zone NOT NULL,
+	"turn_id" text,
 	CONSTRAINT "thread_messages_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "thread_message_author" CHECK (("author_kind" = 'Member' AND "author_member_id" IS NOT NULL AND "author_contact_id" IS NULL) OR ("author_kind" = 'Contact' AND "author_member_id" IS NULL AND "author_contact_id" IS NOT NULL))
 );

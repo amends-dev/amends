@@ -267,13 +267,13 @@ reasons it cannot run, or an initial role only the owner gives, each keeping the
 
 ## Turns
 
-`useThreadTurns(workspaceId, threadId)` reads a thread's turns, newest first, and shapes each
-agent's latest as a `TurnEntry`: the agent by name, its `state` (`queued`, `working`, `stopping`,
+`useThreadTurns(workspaceId, threadId)` reads each agent's latest turn in a thread and the one
+before it, and shapes each agent's latest as a `TurnEntry`, newest first: the agent by name, its `state` (`queued`, `working`, `stopping`,
 `done`, `failed`, or `stopped`), its failure as the host worded it, whether a request or the
 agent's departure stopped it, its reply's ID, the timeline position of the latest message it took
 on, its times, whether the reader may stop or retry it now, and the failed or stopped turn it
-follows. `active()` holds the agents at work on the thread, and `replies()` the turn behind each
-reply. The turns keep their own invalidation key per thread, which every turn fact for the thread,
+follows. `active()` holds the agents at work on the thread. A reply names the turn that posted it
+itself: a thread's message entries carry `turn`, however far back the reader scrolls. The turns keep their own invalidation key per thread, which every turn fact for the thread,
 the agent's departure from it, and access changes refresh. `stop(turnId)` and `retry(turnId)`
 refresh the thread's turns before answering; `acting()` names the one running. A retry reuses its
 request key until it goes through, so asking again after a lost answer creates one turn.

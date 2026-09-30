@@ -839,6 +839,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
               mentions: [],
               participants: current.map((p) => ThreadParticipation.referenceOf(p.participant)),
               occurredAt: yield* DateTime.now,
+              turnId: turn.id,
             });
             messageIds.push(published.message.id);
           }

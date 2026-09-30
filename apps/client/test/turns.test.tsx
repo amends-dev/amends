@@ -112,7 +112,8 @@ function fixture() {
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 3 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/threads/thread/turns") return json(server.turns.map(viewOf));
+    if (path === "/workspaces/one/threads/thread/latest-turns")
+      return json(server.turns.map(viewOf));
     if (request.method !== "POST") return json({}, 404);
     writes.push({ path, key: request.headers.get("idempotency-key") });
     const answer = server.answers.shift();

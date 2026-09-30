@@ -6,6 +6,7 @@ import { MemberId } from "../../workspace/member/id.ts";
 import { Identity } from "../../identity/identity.ts";
 import { ThreadMessageActivity } from "./activity.ts";
 import { Text as Characters } from "../../text/text.ts";
+import { TurnId } from "../../turn/id.ts";
 export const Id = ThreadMessageId.Id;
 export type Id = ThreadMessageId.Id;
 /**
@@ -58,6 +59,8 @@ export const Record = Schema.Struct({
   text: Text,
   mentions: Schema.UniqueArray(MemberId.Id),
   publishedAt: Schema.DateTimeUtcFromString,
+  /** For an agent's reply, the turn that posted it, whose log tells how it came about. */
+  turnId: Schema.NullOr(TurnId.Id),
 });
 export interface Record extends Schema.Schema.Type<typeof Record> {}
 export const PublishInput = Schema.Struct({

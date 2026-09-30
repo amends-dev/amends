@@ -68,6 +68,7 @@ const message = (id: string, text: string, mentions: string[]) => ({
   text,
   mentions,
   publishedAt: at(1),
+  turnId: null,
 });
 const notification = (
   id: string,

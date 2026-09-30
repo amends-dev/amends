@@ -97,6 +97,7 @@ const message = (
   text,
   mentions,
   publishedAt: at(1),
+  turnId: null,
 });
 const openings = [
   {
@@ -154,7 +155,7 @@ const timeline = [
   },
   {
     activity: activity(4, "message.published", "message:m2", { messageId: "m2" }),
-    message: message("m2", "t1", "scout", "All clear."),
+    message: { ...message("m2", "t1", "scout", "All clear."), turnId: "turn-9" },
   },
 ];
 const roster = ["owner", "ada"].map((memberId, index) => ({
@@ -277,7 +278,12 @@ it("shows a thread's messages and notes, naming the reader as themself", async (
     who: "ada@example.test",
     self: false,
   });
-  expect(views.thread.entries()[3]).toMatchObject({ author: { name: "Scout", agent: true } });
+  // An agent's reply names the turn that posted it, however long ago; people's messages none.
+  expect(views.thread.entries()[3]).toMatchObject({
+    author: { name: "Scout", agent: true },
+    turn: { id: "turn-9" },
+  });
+  expect(views.thread.entries()[0]).not.toHaveProperty("turn");
   setFocus(4);
   expect(views.thread.focusId()).toBe("m2");
   setFocus(2);

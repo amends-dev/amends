@@ -278,7 +278,8 @@ the log, record a `checkpoint`, record `submitted` batches and what the environm
 `report`, which advances incorporation once a batch is confirmed, and `close` it. Closing requires
 all accepted input taken in and no work still waiting for the agent on the thread, both checked in
 the closing commit; otherwise it reports `InputPending`. It then publishes every answer the turn
-owes, in order, each as the agent's own message to the thread's current participants, verbatim:
+owes, in order, each as the agent's own message to the thread's current participants, verbatim,
+naming the turn that posted it (`turnId` on the message):
 each finished response with text and no tool calls that more input followed, and the last. It
 checks the agent may still open and post in the thread, and records completion with the messages.
 A turn can complete without a reply. `fail` and `stopped` end a turn and publish nothing. `prepare`
@@ -304,8 +305,8 @@ the turn. The gateway binds
 `TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
 and environments.
 
-`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns as
-`Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
+`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, and
+`latestByThread` each agent's latest turn there with the one before it, as `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
 (`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. `listActive` gives the
 workspace's active turns in threads the reader may open, among at most `limit` active turns, and
 `log` a turn with its log as its readers see it (`Turn.LogView`): each batch of input taken in,

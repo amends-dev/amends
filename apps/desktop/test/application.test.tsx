@@ -355,6 +355,7 @@ const message = (id: string, text: string) => ({
   text,
   mentions: [],
   publishedAt: at,
+  turnId: null,
 });
 const item = (sequence: number, id: string, text: string) => ({
   activity: {

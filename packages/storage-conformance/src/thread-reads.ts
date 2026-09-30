@@ -213,6 +213,7 @@ export const threadReads = (harness: Harness) => {
                 text: `Message ${sequence}`,
                 mentions: [],
                 publishedAt: time,
+                turnId: null,
               };
               const record = ThreadActivityKind.makeRecordUnsafe(
                 ThreadMessageActivity.Published,
@@ -732,6 +733,7 @@ export const threadReads = (harness: Harness) => {
                       text: "Staged text",
                       mentions: [],
                       publishedAt: first.message.publishedAt,
+                      turnId: null,
                     };
                     yield* journal.publish(
                       ThreadMessageFacts.Published,

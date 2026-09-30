@@ -12,6 +12,7 @@ import { ThreadStore } from "../store.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadActivityKind } from "../activity/kind.ts";
 import { ThreadActivityPublisher } from "../activity/publisher.ts";
+import { TurnId } from "../../turn/id.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessageActivity } from "./activity.ts";
 import { ThreadMessageFacts } from "./facts.ts";
@@ -30,6 +31,8 @@ export const Input = Schema.Struct({
   /** The author, mentions, and everyone else this message addresses when it has no mentions. */
   participants: Schema.Array(ThreadParticipation.Reference),
   occurredAt: Schema.DateTimeUtcFromString,
+  /** The agent's turn posting it as a reply, if one is. */
+  turnId: Schema.optionalKey(TurnId.Id),
 });
 export interface Input extends Schema.Schema.Type<typeof Input> {}
 export type Error =
@@ -107,6 +110,7 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
             text: request.text,
             mentions: request.mentions,
             publishedAt: request.occurredAt,
+            turnId: request.turnId ?? null,
           };
           const fact = yield* journal
             .publish(

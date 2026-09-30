@@ -682,6 +682,7 @@ export const threadMessages = pgTable(
     text: text("text").notNull(),
     mentions: text("mentions").array().notNull(),
     publishedAt: instant("published_at").notNull(),
+    turnId: text("turn_id"),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),

@@ -9,20 +9,18 @@ import { newWorkspaceRequestKey } from "./workspaces.ts";
 
 export type { Turn };
 
-/** How many of a thread's turns one read holds, newest first: each agent's latest among them. */
-const limit = 50;
-
 /**
- * A thread's turns, newest first, with what the reader may do with each; it follows the thread's
- * turn facts and access changes. Undefined for an invalid workspace or thread ID.
+ * Each agent's latest turn in a thread and the one before it, newest first for each agent, with
+ * what the reader may do with each; it follows the thread's turn facts and access changes.
+ * Replies name their own turns, so older turns are never needed here. Undefined for an invalid
+ * workspace or thread ID.
  */
 export const threadTurnsRead = (client: ApiClient, workspaceId: string, threadId: string) => {
   const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
   const thread = Schema.decodeOption(Thread.Id)(threadId);
   if (Option.isNone(workspace) || Option.isNone(thread)) return undefined;
-  return client.query("turns", "listByThread", {
+  return client.query("turns", "latestByThread", {
     params: { workspaceId: workspace.value, threadId: thread.value },
-    query: { limit },
     reactivityKeys: itemKeys(workspaceId, "turns", threadId),
   });
 };

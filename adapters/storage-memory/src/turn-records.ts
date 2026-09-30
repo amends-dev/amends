@@ -95,6 +95,19 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
         .filter((record) => record.memberId === memberId && Turn.active(record.status))
         .toSorted(byCreated);
     }),
+    latestByThread: Effect.fn("TurnRecords.latestByThread")(function* (threadInput, perAgent) {
+      const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput).pipe(
+        Effect.mapError(storeFailure(TurnStore, "latestByThread")),
+      );
+      const byAgent = new Map<string, Array<Turn.Record>>();
+      for (const record of (yield* all("latestByThread"))
+        .filter((record) => record.threadId === threadId)
+        .toSorted((left, right) => byCreated(right, left)))
+        byAgent.set(record.memberId, [...(byAgent.get(record.memberId) ?? []), record]);
+      return [...byAgent.entries()]
+        .toSorted(([left], [right]) => compareBinary(left, right))
+        .flatMap(([, records]) => records.slice(0, perAgent));
+    }),
     listByThread: Effect.fn("TurnRecords.listByThread")(function* (threadInput, limit) {
       const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput).pipe(
         Effect.mapError(storeFailure(TurnStore, "listByThread")),

@@ -2,7 +2,7 @@ import { Store } from "@amends/core/journal";
 import { Thread } from "@amends/core/thread";
 import { Turn, TurnStore } from "@amends/core/turn";
 import { Member } from "@amends/core/workspace";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
@@ -156,6 +156,36 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
         ).pipe(Effect.flatMap(decode));
       },
       Effect.mapError(storeFailure(TurnStore, "listActiveByMember")),
+    ),
+    latestByThread: Effect.fn("TurnRecords.latestByThread")(
+      function* (threadInput, perAgent) {
+        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        // Each agent's turns ranked newest first, keeping the first `perAgent` of each.
+        const ranked = db
+          .select({
+            id: turns.id,
+            rank: sql<number>`row_number() over (partition by ${turns.memberId} order by ${turns.createdAt} desc, ${turns.acceptedThroughSequence} desc, ${orderedId} desc)`.as(
+              "rank",
+            ),
+          })
+          .from(turns)
+          .where(and(inWorkspace, eq(turns.threadId, threadId)))
+          .as("ranked");
+        return yield* guard(
+          db
+            .select({ turn: turns })
+            .from(turns)
+            .innerJoin(ranked, eq(ranked.id, turns.id))
+            .where(and(inWorkspace, lte(ranked.rank, perAgent)))
+            .orderBy(
+              sql`${turns.memberId} COLLATE "C"`,
+              desc(turns.createdAt),
+              desc(turns.acceptedThroughSequence),
+              desc(orderedId),
+            ),
+        ).pipe(Effect.flatMap((rows) => decode(rows.map((row) => row.turn))));
+      },
+      Effect.mapError(storeFailure(TurnStore, "latestByThread")),
     ),
     listByThread: Effect.fn("TurnRecords.listByThread")(
       function* (threadInput, limit) {

@@ -286,14 +286,16 @@ export const turns = (harness: ConformanceHarness) => {
                   threads.readTimeline(threadId, { limit: 10 }),
                 ),
               );
+              // Each reply names the turn that posted it; people's messages name none.
               expect(timeline.slice(-3)).toMatchObject([
-                { message: { text: "Include the risks too." } },
+                { message: { text: "Include the risks too.", turnId: null } },
                 {
                   activity: { kind: "message.published" },
                   message: {
                     id: closed!.messageIds[0],
                     author: { _tag: "Member", memberId: agent.memberId },
                     text: "An early answer.",
+                    turnId,
                   },
                 },
                 {
@@ -301,6 +303,7 @@ export const turns = (harness: ConformanceHarness) => {
                     id: closed!.messageIds[1],
                     author: { _tag: "Member", memberId: agent.memberId },
                     text: "The plan, with its risks.",
+                    turnId,
                   },
                 },
               ]);
@@ -416,6 +419,18 @@ export const turns = (harness: ConformanceHarness) => {
                 _tag: "TurnApplication.NotActive",
                 status: "failed",
               });
+              // A thread reads each agent's latest turn and the one before it, however many it had.
+              const latest = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(TurnApplication.Service, (turns) => turns.latestByThread(threadId)),
+              );
+              expect(
+                latest.map(({ id, status, retryable }) => ({ id, status, retryable })),
+              ).toEqual([
+                { id: third!.id, status: "failed", retryable: true },
+                { id: second!.id, status: "cancelled", retryable: false },
+              ]);
             }),
           ),
         ),

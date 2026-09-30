@@ -270,6 +270,8 @@ export interface ThreadMessageEntry {
   /** Markdown, whose mentions link to members by id. */
   readonly text: string;
   readonly mentions: ReadonlyArray<MentionedMember>;
+  /** For an agent's reply, the turn that posted it, whose log tells how it came about. */
+  readonly turn?: { readonly id: string };
 }
 /** How someone's part in a thread changed. Joining by writing or a mention shows in the message. */
 export type ParticipationChange =
@@ -348,6 +350,7 @@ export function useThreadConversation(
                 at: toDate(item.message.publishedAt),
                 text: item.message.text,
                 mentions: people.mentionsOf(item.message.text),
+                ...(item.message.turnId === null ? {} : { turn: { id: item.message.turnId } }),
               }
             : noteOf(item),
         ),

@@ -1587,6 +1587,7 @@ export const threadParticipation = (harness: Harness) => {
                 text: "Hello from outside",
                 mentions: [],
                 publishedAt: at,
+                turnId: null,
               } satisfies ThreadMessage.Record;
               yield* facts(
                 bound,

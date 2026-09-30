@@ -230,7 +230,8 @@ is in ascending sequence order: `afterSequence` and `beforeSequence` bound it ex
 `from=newest` takes the page from the newest end of that range, so a view opens at the latest page
 and pages back with `beforeSequence` set to its first item's sequence. Timeline items are
 `{ activity, message }` for messages and `{ activity, participant }` for participants joining or
-leaving, with the activity's `kind` naming which.
+leaving, with the activity's `kind` naming which. A message's `turnId` names the agent's turn that
+posted it, for an agent's reply, and is null otherwise.
 
 Message text keeps its whitespace and must contain a non-space character. Mentions name members
 of the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only
@@ -324,14 +325,15 @@ Turn paths sit under `/workspaces/:workspaceId` and require active membership. A
 attempt at the work asked of it on a thread; the
 [core turns section](../core/README.md#turns) describes the rules.
 
-| Endpoint                        | Operation                                                                                     |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `GET …/threads/:threadId/turns` | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
-| `GET …/active-turns`            | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
-| `GET …/turns/:turnId`           | One turn.                                                                                     |
-| `GET …/turns/:turnId/log`       | The turn with its log: input taken in, responses' text and replies, interruptions, in order.  |
-| `POST …/turns/:turnId/cancel`   | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
-| `POST …/turns/:turnId/retry`    | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
+| Endpoint                               | Operation                                                                                     |
+| -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `GET …/threads/:threadId/turns`        | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
+| `GET …/threads/:threadId/latest-turns` | Each agent's latest turn in the thread and the one before it, newest first for each agent.    |
+| `GET …/active-turns`                   | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
+| `GET …/turns/:turnId`                  | One turn.                                                                                     |
+| `GET …/turns/:turnId/log`              | The turn with its log: input taken in, responses' text and replies, interruptions, in order.  |
+| `POST …/turns/:turnId/cancel`          | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
+| `POST …/turns/:turnId/retry`           | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
 
 A turn reads as `Turn.View`: its status, input positions, the model access and environment it
 started with, where it begins in its agent's log for the thread (`logAfter`) and the checkpoint its

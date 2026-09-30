@@ -729,14 +729,8 @@ function ThreadPanel(props: {
   });
   const turns = useThreadTurns(props.workspaceId, props.threadId);
   const agentHref = (agentId: string) => href(paths.agent(props.workspaceId, agentId));
-  // The agent's reply notes the turn that posted it, whose log it opens.
-  const entries = () => {
-    const replies = turns.replies();
-    return thread.entries().map((entry) => {
-      const turn = entry.kind === "message" ? replies.get(entry.id) : undefined;
-      return turn ? { ...entry, turn: { id: turn.id } } : entry;
-    });
-  };
+  // An agent's reply names the turn that posted it, whose log its actions open.
+  const entries = thread.entries;
   // Each agent's latest turn shows under the messages, unless its reply already stands for it.
   const inline = () =>
     turns

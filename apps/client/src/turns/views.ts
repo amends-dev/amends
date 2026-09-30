@@ -243,8 +243,6 @@ export interface ThreadTurnsView extends TurnControls {
   readonly latest: Accessor<ReadonlyArray<TurnEntry>>;
   /** The agents at work on the thread now: queued, working, or stopping. */
   readonly active: Accessor<ReadonlyArray<TurnEntry>>;
-  /** The turn that posted each reply, by the reply's message ID. */
-  readonly replies: Accessor<ReadonlyMap<string, TurnEntry>>;
   /** The first read is loading. */
   readonly loading: Accessor<boolean>;
   /** Why the latest read failed; the turns shown are the last that loaded. */
@@ -261,24 +259,22 @@ export function useThreadTurns(workspaceId: string, threadId: string): ThreadTur
   const all = createMemo(() => (read.value() ?? []).map(entryOf));
   const latest = createMemo(() => {
     const byAgent = new Map<string, Array<TurnEntry>>();
-    // Newest first, as the host lists them.
+    // Newest first for each agent, as the host lists them.
     for (const turn of all())
       byAgent.set(turn.agent.memberId, [...(byAgent.get(turn.agent.memberId) ?? []), turn]);
-    return [...byAgent.values()].map(([current, before]): TurnEntry => {
-      const entry = current!;
-      return before !== undefined && (before.state === "failed" || before.state === "stopped")
-        ? { ...entry, previous: { id: before.id, state: before.state } }
-        : entry;
-    });
+    return [...byAgent.values()]
+      .map(([current, before]): TurnEntry => {
+        const entry = current!;
+        return before !== undefined && (before.state === "failed" || before.state === "stopped")
+          ? { ...entry, previous: { id: before.id, state: before.state } }
+          : entry;
+      })
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
   });
   const controls = useControls(workspaceId, threadId, { log: false, refresh: read.refresh });
   return {
     latest,
     active: createMemo(() => latest().filter((turn) => activeState(turn.state))),
-    replies: createMemo(
-      () =>
-        new Map(all().flatMap((turn) => turn.replyIds.map((replyId) => [replyId, turn] as const))),
-    ),
     loading: read.loading,
     failure: read.failure,
     ...controls,

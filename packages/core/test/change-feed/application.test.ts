@@ -119,6 +119,7 @@ const message = (id: string, thread: Thread.Id, group: Group.Id) => ({
   text: `Message ${id}`,
   mentions: [],
   publishedAt: at,
+  turnId: null,
 });
 const workspaceGrant = (permission: Permission.Definition) =>
   Assignment.Source.cases.Direct.make({

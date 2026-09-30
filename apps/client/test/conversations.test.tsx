@@ -57,6 +57,7 @@ const message = (id: string, threadId: string, at: string) => ({
   text: `Message ${id}`,
   mentions: [],
   publishedAt: at,
+  turnId: null,
 });
 /** A thread started at the given minute, with its opening message and no replies. */
 const opening = (index: number) => {

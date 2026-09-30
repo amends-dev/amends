@@ -293,6 +293,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         findLatest: unexpected,
         listActive: unexpected,
         listActiveByMember: unexpected,
+        latestByThread: unexpected,
         listByThread: unexpected,
         insert: unexpected,
         update: unexpected,

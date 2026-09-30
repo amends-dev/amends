@@ -60,6 +60,13 @@ export interface Interface {
     limit: number,
   ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
   /**
+   * Each agent's latest turn in a thread and the one before it, for a reader who may open the
+   * thread: one agent's after another's, newest first within each.
+   */
+  readonly latestByThread: (
+    threadId: ThreadId.Id,
+  ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
+  /**
    * The workspace's active turns in threads the reader may open, oldest first, among at most
    * `limit` active turns in the workspace.
    */
@@ -196,6 +203,23 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         ),
       );
     const listed = yield* Effect.forEach(yield* turns.listByThread(thread.id, count), (turn) =>
+      decode(turn),
+    );
+    return yield* present(listed, { newestFirst: true });
+  });
+
+  const latestByThread = Effect.fn("TurnApplication.latestByThread")(function* (
+    threadId: ThreadId.Id,
+  ) {
+    const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
+    const thread = yield* access
+      .require(id)
+      .pipe(
+        Effect.catchTag("ThreadAccess.NotFound", () =>
+          Effect.fail(new ThreadNotFound({ threadId: id })),
+        ),
+      );
+    const listed = yield* Effect.forEach(yield* turns.latestByThread(thread.id, 2), (turn) =>
       decode(turn),
     );
     return yield* present(listed, { newestFirst: true });
@@ -364,7 +388,16 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     journal.commit,
   );
 
-  return Service.of({ workspaceId, get, listByThread, listActive, log: readLog, cancel, retry });
+  return Service.of({
+    workspaceId,
+    get,
+    listByThread,
+    latestByThread,
+    listActive,
+    log: readLog,
+    cancel,
+    retry,
+  });
 });
 
 /** @category layers */
