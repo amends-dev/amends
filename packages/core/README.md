@@ -353,7 +353,8 @@ The commit that creates or retries a turn asks `TurnDispatch` to run it, through
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
 the turn. The gateway binds
 `TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
-and environments.
+and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
+from a person's message through the wake, acceptance, and dispatch to the reply.
 
 `TurnApplication` lets a reader who may read a thread `get` and `listByThread` its turns, as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it

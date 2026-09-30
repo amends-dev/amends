@@ -13,6 +13,7 @@ remaining gaps with links to their owning code.
 | [Workspace workflows](workspace-workflows.md)                                      | Creation, membership, invitations, access, and ownership transfer.                                                  |
 | [Group workflows](group-workflows.md)                                              | Team groups: creation, public groups and joining, reads, membership, and following.                                 |
 | [Thread workflows](thread-workflows.md)                                            | Starts, replies, participation, reads, notifications, read state, and typing.                                       |
+| [Message to reply](agent-message-flow.md)                                          | One path end to end: a person asks an agent, it accepts, runs a turn, and replies.                                  |
 | [Journal and logs](journal.md)                                                     | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
 | [Testing](testing.md)                                                              | Test commands, Effect test APIs, and database fixtures.                                                             |
 | [Shared packages](../packages/README.md)                                           | Package boundaries, names, and construction conventions.                                                            |
