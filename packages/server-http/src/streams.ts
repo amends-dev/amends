@@ -56,7 +56,8 @@ export interface Interface {
   ) => Effect.Effect<void, ApiErrors.TooManyStreams, Scope.Scope>;
   /**
    * End a stream as the server starts shutting down, failing it with `unavailable` so its client
-   * reconnects, and contain its failures: the SSE encoder sends a stream's whole failure cause,
+   * reconnects, while a stream that ends on its own, as a turn's log does, just ends; and contain
+   * its failures: the SSE encoder sends a stream's whole failure cause,
    * defects included, so an unexpected one is logged here and reaches the client as `unavailable`
    * alone.
    */
@@ -113,7 +114,14 @@ export const make = Effect.gen(function* () {
       onSome: (signal) =>
         contained.pipe(
           Stream.interruptWhen(Deferred.await(signal)),
-          Stream.concat(Stream.suspend(() => Stream.fail(unavailable()))),
+          // Only a stream the shutdown cut short tells its client to reconnect.
+          Stream.concat(
+            Stream.unwrap(
+              Effect.map(Deferred.isDone(signal), (drained) =>
+                drained ? Stream.fail(unavailable()) : Stream.empty,
+              ),
+            ),
+          ),
         ),
     });
   };
