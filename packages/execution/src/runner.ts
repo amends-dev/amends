@@ -170,6 +170,8 @@ const words = (problem: HarnessErrors.Problem, named: Named, idle: string): stri
       return `${named.connection} had a problem on its side.`;
     case "model-content-policy":
       return `${named.connection} declined the request under its content policy.`;
+    case "model-context":
+      return `The conversation no longer fits in ${named.model}'s context window.`;
     case "model-request":
       return `${named.connection} rejected the request for ${named.model}.`;
     case "model-output":
@@ -263,11 +265,15 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       yield* running.submit({ id: batchId, items }).pipe(Effect.catchTags(unexpected));
     });
 
-    /** One harness session: from the plan's conversation until the turn closes or can't go on. */
+    /**
+     * One harness session: from the plan's conversation until the turn closes, can't go on, or
+     * its context is full, which a checkpoint then shortens for a new session.
+     */
     const session = Effect.fnUntraced(function* (
       plan: TurnExecution.Plan,
       harness: Harness.Interface<ModelAccess>,
       model: ModelInference.Implementation,
+      budget: number,
     ) {
       const access = yield* Layer.build(
         model.languageModel(
@@ -278,7 +284,12 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const sessionId = `session-${yield* Effect.orDie(crypto.randomUUIDv4)}`;
       const spawned = yield* Environment.spawn(
         { id: Environment.DefinitionId.make(plan.environment.id), harness },
-        { sessionId, instructions: plan.instructions },
+        {
+          sessionId,
+          instructions: plan.instructions,
+          contextLimit: budget,
+          measured: plan.measured,
+        },
       ).pipe(Effect.provideContext(access), Effect.result);
       if (Result.isFailure(spawned)) {
         yield* Effect.logWarning("Turn environment did not start", {
@@ -354,9 +365,9 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         ),
       );
       /**
-       * Record what the harness reports until it is idle. While it waits on the model, a silence
-       * longer than the idle timeout interrupts the run, so a model that stops answering does not
-       * hold the turn.
+       * Record what the harness reports until it is idle or its context is full. While it waits on
+       * the model, a silence longer than the idle timeout interrupts the run, so a model that
+       * stops answering does not hold the turn.
        */
       const untilIdle = Effect.gen(function* () {
         for (;;) {
@@ -387,8 +398,10 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
           if ((yield* Clock.currentTimeMillis) - shownAt >= draftInterval) yield* showDrafts;
           const events = chunk.flatMap(recorded);
           if (events.length > 0) yield* step((execution) => execution.report(turnId, events));
+          if (events.some((item) => item._tag === "Harness" && item.event._tag === "ContextFull"))
+            return "full" as const;
           const last = events.at(-1);
-          if (last?._tag === "Harness" && last.event._tag === "Idle") return;
+          if (last?._tag === "Harness" && last.event._tag === "Idle") return "idle" as const;
         }
       });
 
@@ -399,7 +412,8 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       else working = false;
       let waitingSince: number | undefined;
       for (;;) {
-        if (working) yield* untilIdle;
+        // A full context ends the session without closing: a checkpoint comes first.
+        if (working && (yield* untilIdle) === "full") return again;
         const closing = yield* step((execution) => execution.close(turnId));
         if (closing._tag !== "InputPending") return finished;
         // More input came for the agent: take in what it accepted, or wait while it accepts.
@@ -492,7 +506,8 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
           yield* step((execution) =>
             execution.interrupted(turnId, {
               reason: text,
-              retryable: failure.retryable,
+              // A full context goes on after a checkpoint, however its provider classed it.
+              retryable: failure.retryable || failure.problem === "model-context",
               problem: failure.problem,
             }),
           );
@@ -503,6 +518,11 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
             reason: failure.reason,
             attempt: plan.attempts + 1,
           };
+          // A request longer than the model's window is shortened by a checkpoint, at once.
+          if (failure.problem === "model-context") {
+            yield* Effect.logWarning("Turn context full", detail);
+            return again;
+          }
           if (!failure.retryable) {
             yield* Effect.logWarning("Turn failed", detail);
             return unrunnable(text);
@@ -546,7 +566,12 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         continue;
       }
       // A checkpoint the history needs comes first; either stops the same way when interrupted.
-      const { compaction, budget } = compactionFor(plan, model);
+      // A context that proved full owes a checkpoint however the estimate stands; one that proves
+      // full again before the model answered means even a summary does not make it fit.
+      const tooLong = `The conversation no longer fits in ${plan.selection.model}'s context window, even summarized.`;
+      if (plan.overflow.pending && plan.overflow.count > 1) return yield* fail(tooLong);
+      const { compaction, budget } = compactionFor(plan, model, { force: plan.overflow.pending });
+      if (plan.overflow.pending && compaction === undefined) return yield* fail(tooLong);
       yield* step((execution) =>
         execution.attempt(turnId, compaction === undefined ? "session" : "summary"),
       );
@@ -554,7 +579,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const ending = yield* Effect.suspend(
         (): Effect.Effect<Effect.Success<Work>, Effect.Error<Work>, Effect.Services<Work>> =>
           compaction === undefined
-            ? session(plan, harness, model)
+            ? session(plan, harness, model, budget)
             : checkpoint(plan, model, compaction, budget),
       ).pipe(
         Effect.raceFirst(stopped),

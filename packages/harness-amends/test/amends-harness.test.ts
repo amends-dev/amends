@@ -160,6 +160,50 @@ describe("AmendsHarness", () => {
     }),
   );
 
+  it.effect("reports its context full instead of making a request over its limit", () =>
+    Effect.gen(function* () {
+      const { model, prompts } = yield* scripted([]);
+      const session = yield* start(model, { sessionId: "s1", contextLimit: 10 });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "x".repeat(200)));
+      const events = yield* session.events.pipe(
+        Stream.takeUntil((event) => event._tag === "ContextFull"),
+        Stream.runCollect,
+      );
+
+      expect(events.map((event) => event._tag)).toEqual(["InputIncorporated", "ContextFull"]);
+      expect(events.at(-1)).toMatchObject({ estimatedTokens: 50 });
+      expect(prompts).toEqual([]);
+    }),
+  );
+
+  it.effect("counts what its provider measured, and stops once a result would pass the limit", () =>
+    Effect.gen(function* () {
+      const { model, prompts } = yield* scripted([
+        parts(call("c1", "lookup", { query: "tides" }), finish("tool-calls")),
+      ]);
+      const tools: HarnessTool.Tools = {
+        definitions: [{ name: "lookup", parameters }],
+        invoke: () => Effect.succeed(answer("y".repeat(400))),
+      };
+      // The first request fits; its provider measured 24 tokens, and the result adds about 100.
+      const session = yield* start(model, { sessionId: "s1", tools, contextLimit: 60 });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "When is high tide?"));
+      const events = yield* session.events.pipe(
+        Stream.takeUntil((event) => event._tag === "ContextFull"),
+        Stream.runCollect,
+      );
+
+      expect(prompts).toHaveLength(1);
+      expect(events.slice(-2).map((event) => event._tag)).toEqual([
+        "ToolCallCompleted",
+        "ContextFull",
+      ]);
+      expect(events.at(-1)).toMatchObject({ estimatedTokens: 124 });
+    }),
+  );
+
   it.effect("continues from stored events exactly where a failed session stopped", () =>
     Effect.gen(function* () {
       const signature = { anthropic: { info: { type: "thinking", signature: "sig-1" } } };

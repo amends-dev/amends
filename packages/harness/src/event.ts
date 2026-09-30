@@ -77,6 +77,11 @@ export const Event = Schema.TaggedUnion({
   /** A tool call has its outcome, whether the harness ran it or was given it. */
   ToolCallCompleted: { result: Transcript.ToolResult },
   /**
+   * The next model request would pass the session's context limit, by the harness's estimate, so
+   * the session does nothing more: continuing takes a new session from a shorter transcript.
+   */
+  ContextFull: { estimatedTokens: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)) },
+  /**
    * Nothing is left to do: every input has its response, no tool call is waiting, and nothing
    * submitted is waiting to be taken in.
    */
@@ -114,8 +119,8 @@ export interface TranscriptOptions {
 }
 
 /**
- * The transcript that `history` and then `events` describe. Deltas, starts, and idleness add
- * nothing. A finished response enters with its blocks in order and its results after it. A
+ * The transcript that `history` and then `events` describe. Deltas, starts, a full context, and
+ * idleness add nothing. A finished response enters with its blocks in order and its results after it. A
  * response that stopped before finishing keeps only its completed blocks and the calls that
  * started, each answered as cut short when it has no result; calls that never started did not
  * happen. It stays in the transcript when it holds a started call, or when it ends the events and
@@ -192,6 +197,7 @@ export const transcript = (
       }
       case "TextDelta":
       case "ReasoningDelta":
+      case "ContextFull":
       case "Idle":
         break;
     }

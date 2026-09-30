@@ -141,6 +141,16 @@ export interface Reply {
   readonly text: string;
 }
 
+/**
+ * How often the turn's model context proved full since its last finished response, as its harness
+ * reported or its provider refused, and whether the latest time came after its latest checkpoint,
+ * so a checkpoint is owed before it goes on.
+ */
+export interface Overflow {
+  readonly count: number;
+  readonly pending: boolean;
+}
+
 /** Why execution last stopped short without the turn getting further. */
 export interface Interruption {
   readonly reason: string;
@@ -194,6 +204,8 @@ export interface Reading {
    * process did, rather than stopping short.
    */
   readonly diedLast: boolean;
+  /** How often the turn's context proved full since its last finished response. */
+  readonly overflow: Overflow;
 }
 
 /** Reads one turn's entries as they come: `add` each in order, and `reading` says what they hold. */
@@ -229,6 +241,10 @@ export const reader = (): Reader => {
   let interruption: Interruption | undefined;
   /** Whether the latest attempt recorded why it stopped. */
   let accounted = true;
+  let overflow: Overflow = { count: 0, pending: false };
+  const overflowed = () => {
+    overflow = { count: overflow.count + 1, pending: true };
+  };
   const partsOf = (blocks: Map<number, Transcript.ResponsePart>) =>
     [...blocks.entries()].toSorted(([left], [right]) => left - right);
   /** The turn got further: its attempts so far no longer count against it. */
@@ -255,6 +271,7 @@ export const reader = (): Reader => {
       case "Interrupted":
         interruption = { reason: entry.reason, problem: entry.problem };
         accounted = true;
+        if (entry.problem === "model-context") overflowed();
         items.push({ _tag: "Interrupted", at, reason: entry.reason, retryable: entry.retryable });
         break;
       case "Requested":
@@ -263,6 +280,7 @@ export const reader = (): Reader => {
       case "Checkpoint":
         checkpoint = position;
         progressed();
+        overflow = { ...overflow, pending: false };
         // Input a summary took in counts as taken in, after any answer given before it.
         if (entry.through === null) break;
         through = Math.max(through ?? entry.through, entry.through);
@@ -306,6 +324,7 @@ export const reader = (): Reader => {
           response.item = updated;
         } else if (event._tag === "ResponseFinished") {
           progressed();
+          overflow = { count: 0, pending: false };
           const parts = partsOf(responses.get(event.responseId)?.blocks ?? new Map()).map(
             ([, part]) => part,
           );
@@ -315,6 +334,7 @@ export const reader = (): Reader => {
               ? undefined
               : { responseId: event.responseId, text };
         } else if (event._tag === "ToolCallCompleted") progressed();
+        else if (event._tag === "ContextFull") overflowed();
         break;
       }
     }
@@ -341,6 +361,7 @@ export const reader = (): Reader => {
       attempts,
       interruption,
       diedLast: attempts > 0 && !accounted,
+      overflow,
     };
   };
   return { add, reading };

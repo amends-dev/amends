@@ -6,10 +6,11 @@ import { Turn, TurnErrors, TurnExecution, TurnLog } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { TurnRunner } from "@amends/execution";
 import { Gateway } from "@amends/gateway";
-import type { HarnessEvent, Transcript } from "@amends/harness";
+import type { Harness, HarnessEvent, Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, DateTime, Deferred, Effect, Fiber, Layer, Schema, Stream } from "effect";
+import { Crypto, DateTime, Deferred, Effect, Fiber, Layer, Queue, Schema, Stream } from "effect";
+import type { Cause } from "effect";
 import { TestClock } from "effect/testing";
 import { AiError, LanguageModel, Model } from "effect/unstable/ai";
 import type { Prompt, Response } from "effect/unstable/ai";
@@ -152,6 +153,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       waiting,
       fixed: 0,
       measured: context.measured,
+      overflow: context.own.overflow,
     };
   };
   const execution: TurnExecution.Interface = {
@@ -758,6 +760,117 @@ describe("TurnRunner", () => {
       ]);
       expect(state.steps.at(-1)).toBe(
         "fail: The earlier conversation couldn't be summarized. Test models is limiting requests.",
+      );
+    }),
+  );
+
+  const summarized = (value: string) =>
+    Effect.succeed<Array<Response.PartEncoded>>([
+      { type: "text", text: value },
+      {
+        type: "finish",
+        reason: "stop",
+        usage: { inputTokens: { total: 20 }, outputTokens: { total: 4 } },
+      },
+    ]);
+  const tooLong = failure(
+    new AiError.InvalidRequestError({
+      description: "prompt is too long: 900 tokens > 200 maximum",
+    }),
+  );
+
+  /**
+   * A harness whose first session reports its context full once it takes its input in, as a
+   * harness honoring its context limit does; later sessions are amends's own.
+   */
+  const fillsUp = (): Harness.Interface<TurnRunner.ModelAccess> => {
+    const inner = AmendsHarness.make();
+    let sessions = 0;
+    return {
+      ...inner,
+      start: (options) => {
+        sessions += 1;
+        if (sessions > 1) return inner.start(options);
+        return Effect.map(
+          Queue.unbounded<HarnessEvent.Event, Cause.Done>(),
+          (events): Harness.Session => ({
+            prepare: () => Effect.void,
+            submit: (batch) =>
+              Queue.offerAll(events, [
+                { _tag: "InputIncorporated", batch },
+                { _tag: "ContextFull", estimatedTokens: 999 },
+              ]).pipe(Effect.asVoid),
+            resolve: () => Effect.void,
+            resume: Effect.void,
+            events: Stream.fromQueue(events),
+          }),
+        );
+      },
+    };
+  };
+
+  it.effect("records a checkpoint mid-turn once its context is full, then carries on", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      record({ _tag: "History", turnId, items: [input("How was the launch?")] });
+      const { implementation, prompts } = yield* scripted(
+        [reply("Noon.")],
+        summarized("They asked about the launch."),
+      );
+      const runner = yield* runnerOver(execution, implementation, { harnesses: [fillsUp()] });
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(harnessEvents(state.log)).toContain("ContextFull");
+      // The session ended for a checkpoint rather than closing, then a new one continued.
+      expect(state.steps.filter((step) => step === "close")).toHaveLength(1);
+      expect(state.checkpoints).toHaveLength(1);
+      expect(texts(prompts[0])).toEqual([
+        "Be brief.",
+        "Summary of the earlier conversation: They asked about the launch.",
+        "Alice: What is the tide at noon?",
+      ]);
+      expect(state.replies).toEqual(["Noon."]);
+    }),
+  );
+
+  it.effect(
+    "records a checkpoint when its provider refuses a request too long, then carries on",
+    () =>
+      Effect.gen(function* () {
+        const { state, execution, record } = fakeExecution();
+        record({ _tag: "History", turnId, items: [input("How was the launch?")] });
+        const { implementation, prompts } = yield* scripted(
+          [tooLong, reply("Noon.")],
+          summarized("They asked about the launch."),
+        );
+        const runner = yield* runnerOver(execution, implementation);
+
+        yield* runner.run(workspaceId, turnId);
+
+        expect(state.steps).toContain("interrupted retryable");
+        expect(state.checkpoints).toHaveLength(1);
+        expect(texts(prompts[1])[1]).toBe(
+          "Summary of the earlier conversation: They asked about the launch.",
+        );
+        expect(state.replies).toEqual(["Noon."]);
+      }),
+  );
+
+  it.effect("fails a turn whose context is full again before its model answers", () =>
+    Effect.gen(function* () {
+      const { state, execution, record } = fakeExecution();
+      record({ _tag: "History", turnId, items: [input("How was the launch?")] });
+      const { implementation } = yield* scripted(
+        [tooLong, tooLong],
+        summarized("They asked about the launch."),
+      );
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(state.steps.at(-1)).toBe(
+        "fail: The conversation no longer fits in test-model's context window, even summarized.",
       );
     }),
   );

@@ -41,8 +41,9 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    worth, each reading the summary so far, and the run prepares again. A pass that fails or stays silent past
    `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
    turn; nothing is left out instead.
-5. Spawn the environment with a new session ID and the instructions the turn started with, and prepare the
-   harness with the transcript `prepare` gave, read from the agent's log for the thread, so a run
+5. Spawn the environment with a new session ID, the instructions the turn started with, and the
+   turn's budget as the session's context limit, with what a provider measured of the transcript,
+   and prepare the harness with the transcript `prepare` gave, read from the agent's log for the thread, so a run
    continuing an interrupted turn repeats no input and asks for a fresh response in place of one
    left unfinished.
 6. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
@@ -70,7 +71,15 @@ not hold the turn; time a tool call the harness started spends running does not 
 that stops is recorded as `interrupted` in the turn's log, with its `problem`. When its failure is
 worth retrying, the run prepares again and counts it as above, so a new session continues from the
 log after a wait; otherwise it fails the turn. The count lives in the log, so a restart does not
-reset it, and a turn whose runs keep dying with their process is given up too. Readers are told the failure's `problem` in words that name
+reset it, and a turn whose runs keep dying with their process is given up too.
+
+A turn's context can prove full partway through: the harness reports `ContextFull` before a
+request over its limit, as after a long tool result, or the provider refuses a request longer than
+its model's window (`model-context`), which is recorded as an interruption worth retrying. Either
+ends the session without closing the turn, and the next preparation records a checkpoint whatever
+the estimate says, then continues in a new session. A context that proves full again before the
+model answered, or a checkpoint that would free nothing, fails the turn: the conversation no
+longer fits in the model's context window, even summarized. Readers are told the failure's `problem` in words that name
 the connection and model, such as "Anthropic didn't accept its API key." or "claude-sonnet-5 sent
 nothing for 5 minutes."; a summary that fails says the earlier conversation couldn't be
 summarized, and why. The harness's own reason, and a provider's message, which can name addresses

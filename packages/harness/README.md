@@ -23,6 +23,7 @@ also report:
 | `ResponseFinished`  | The response finished, with its finish reason, model, and usage.               |
 | `ToolCallStarted`   | The harness began running a call, which from now on may have had an effect.    |
 | `ToolCallCompleted` | A tool call's result, whether the session ran the call or was given it.        |
+| `ContextFull`       | The next request would pass the session's context limit; it does no more.      |
 | `Idle`              | Every input has its response, no call waits, and nothing waits to be taken in. |
 
 A harness continues from a `Transcript.Value`: the history the turn chose, then what its events
@@ -79,6 +80,11 @@ connection the host installed, or `Interfaces`, provider interfaces it speaks it
 that live until their scope closes. `R` is what sessions need from their environment, such as model
 access. `StartOptions` carries the session ID, which prefixes the IDs a session assigns so they stay
 unique across the sessions sharing one log, and the agent's instructions and `HarnessTool.Tools`.
+It can also carry a `contextLimit`, the most tokens one model request may carry, with what a
+provider `measured` of the transcript the session is prepared with. A harness that honors the limit
+reports `ContextFull` instead of making a request it estimates over it and does nothing more, so the
+host can shorten the transcript for a new session; one that does not runs until its provider
+refuses.
 
 A `Harness.Session` follows the core model's stages:
 
@@ -96,7 +102,8 @@ A `Harness.Session` follows the core model's stages:
 whether the same work can be retried unchanged, and later operations fail with it too. Its
 `problem` is what the host tells the turn's readers: the model's provider refused the credential,
 ran out of quota, limited requests, could not be reached, failed on its side, declined the content,
-or rejected the request; the model's output could not be used or it went silent; the session ended
+refused a request longer than its model's context window, or rejected the request otherwise; the
+model's output could not be used or it went silent; the session ended
 first; or something unexpected. Its `reason` is the detail for the host's logs only.
 `HarnessErrors.fromModel` builds one from an Effect AI failure, and `modelProblem` names the
 problem such a failure is.

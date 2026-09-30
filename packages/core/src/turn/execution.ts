@@ -130,6 +130,8 @@ export interface Plan {
   readonly fixed: number;
   /** What a provider last measured of the transcript since the latest checkpoint. */
   readonly measured: Transcript.Measured | undefined;
+  /** How often the turn's model context proved full, and whether a checkpoint is owed for it. */
+  readonly overflow: TurnLog.Overflow;
 }
 
 /**
@@ -545,6 +547,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       // What a request asks of the turn itself is always given.
       fixed: Transcript.characters(context.own.requested),
       measured: context.measured,
+      overflow: context.own.overflow,
     };
     return { _tag: "Ready", plan } as const;
   });

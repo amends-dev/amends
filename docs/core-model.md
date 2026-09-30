@@ -1126,9 +1126,15 @@ fails once its retries are spent, rather than leaving anything out. Between chec
 history only grows at its end, so the start of each request stays the same and providers' prompt
 caches keep working. The thread and the logs keep everything a summary replaced.
 
+A turn's context can also prove full partway through its work, as a long tool result arrives: a
+harness that knows its session's limit says so before a request over it, and a provider refuses a
+request longer than its model's window. Either way the turn records a checkpoint then and goes on
+in a new session; when even a summary does not make the conversation fit, the turn fails saying
+so.
+
 Still to come: summarizing in the background after a turn rather than before the next, shortening
-old tool output before summarizing, recovering when a provider reports the context too long
-partway through a turn, and a tool with which an agent recalls exact earlier content.
+old tool output before summarizing, and a tool with which an agent recalls exact earlier
+content.
 
 ### One reading of a turn's entries answers every question
 

@@ -280,7 +280,9 @@ come, and `TurnLog.read` reads them at once: its harness events, how far input i
 transcript and the view it leaves, the replies it owes, input asked of it, the items its readers
 see, what it started with, how it ended, its latest checkpoint's position, and its attempts since it
 last got further (a response finished, a tool call completed, or a checkpoint), with the latest
-interruption and whether the last attempt died without recording one. `TurnLog.context` reads the
+interruption and whether the last attempt died without recording one, and how often its context
+proved full since its last finished response, as its harness reported or its provider refused,
+and whether a checkpoint is owed for it. `TurnLog.context` reads the
 log for a turn from its latest checkpoint: earlier turns as the view each left, without reasoning,
 followed by a note from `TurnLog.noteAuthor` when a turn that started failed or was stopped by
 request, then the turn's own work. The log has begun once a turn recorded the thread's history,

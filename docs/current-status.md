@@ -30,9 +30,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   estimated at four characters a token after it; context windows come from the Anthropic
   connection's model table, or an OpenAI-compatible connection's setting (128,000 tokens without
   one). Summaries happen before a turn rather than in the background after one, which can delay a
-  turn catching up on a long thread; old tool output is not shortened first, a provider that
-  reports the context too long partway through a turn fails it, and no tool lets an agent recall
-  exact earlier content. A stopped response keeps only
+  turn catching up on a long thread; old tool output is not shortened first, and no tool lets an agent recall exact earlier
+  content. A turn whose context proves full partway through records a checkpoint and goes on; a
+  provider's refusal of a request too long is recognized by the words providers use for it. A stopped response keeps only
   the blocks it completed. A reader with a turn's log open follows it as a stream of its items
   and the response being written; the text being written is best effort, and a draft missed while
   reconnecting shows once its block completes. A stop request is noticed by polling, within a

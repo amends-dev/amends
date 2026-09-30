@@ -31,7 +31,8 @@ export class NotPending extends Schema.TaggedError<NotPending>()("Harness.NotPen
  * Why a session stopped, for the host to put in words for the turn's readers. The model's provider
  * refused the credential (`model-access`), has no quota left (`model-quota`), is limiting requests
  * (`model-rate-limit`), could not be reached (`model-unreachable`), failed on its side
- * (`model-provider`), declined the content (`model-content-policy`), or rejected the request
+ * (`model-provider`), declined the content (`model-content-policy`), refused a request longer than
+ * its model's context window (`model-context`), or rejected the request otherwise
  * (`model-request`); the model's output could not be used (`model-output`), or it sent nothing for
  * too long (`model-silent`); the session or what it ran in ended first (`ended`); or something
  * else went wrong (`unexpected`).
@@ -43,6 +44,7 @@ export const Problem = Schema.Literals([
   "model-unreachable",
   "model-provider",
   "model-content-policy",
+  "model-context",
   "model-request",
   "model-output",
   "model-silent",
@@ -63,6 +65,10 @@ export class ExecutionFailed extends Schema.TaggedError<ExecutionFailed>()(
   { reason: Schema.String, retryable: Schema.Boolean, problem: Problem },
 ) {}
 
+/** How providers word refusing a request longer than their model's context window. */
+const overflow =
+  /prompt is too long|context[_ ]length|maximum context|context window|too many (?:input )?tokens|input is too long/iu;
+
 const reasons: {
   readonly [Tag in AiError.AiErrorReason["_tag"]]: (
     reason: Extract<AiError.AiErrorReason, { readonly _tag: Tag }>,
@@ -75,7 +81,10 @@ const reasons: {
     reason.reason === "EncodeError" ? "model-request" : "model-unreachable",
   InternalProviderError: () => "model-provider",
   ContentPolicyError: () => "model-content-policy",
-  InvalidRequestError: () => "model-request",
+  InvalidRequestError: (reason) =>
+    overflow.test([reason.description, reason.constraint, reason.http?.body].join(" "))
+      ? "model-context"
+      : "model-request",
   UnsupportedSchemaError: () => "model-request",
   ToolConfigurationError: () => "model-request",
   ToolkitRequiredError: () => "model-request",

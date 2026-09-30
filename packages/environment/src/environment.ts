@@ -105,6 +105,10 @@ export interface SpawnOptions {
   readonly sessionId: string;
   readonly instructions?: string | undefined;
   readonly tools?: HarnessTool.Tools | undefined;
+  /** The most tokens one model request may carry, for the harness to keep within. */
+  readonly contextLimit?: number | undefined;
+  /** What a provider measured of the transcript the harness is prepared with. */
+  readonly measured?: Transcript.Measured | undefined;
 }
 
 /**
@@ -229,6 +233,8 @@ export const spawn = Effect.fnUntraced(function* <R>(
       sessionId: options.sessionId,
       instructions: options.instructions,
       tools: options.tools,
+      contextLimit: options.contextLimit,
+      measured: options.measured,
     })
     .pipe(
       Scope.provide(sessionScope),

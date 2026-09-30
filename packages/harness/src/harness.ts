@@ -25,6 +25,14 @@ export interface StartOptions {
   readonly sessionId: string;
   readonly instructions?: string | undefined;
   readonly tools?: HarnessTool.Tools | undefined;
+  /**
+   * The most tokens one model request may carry. A harness that honors it reports `ContextFull`
+   * instead of making a request it estimates over the limit, and does nothing more; one that does
+   * not runs until its provider refuses.
+   */
+  readonly contextLimit?: number | undefined;
+  /** What a provider measured of the transcript given to `prepare`, for estimating what follows. */
+  readonly measured?: Transcript.Measured | undefined;
 }
 
 /**

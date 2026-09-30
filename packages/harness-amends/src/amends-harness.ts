@@ -45,6 +45,10 @@ interface State {
   /** Whether `Idle` was reported for the transcript as it stands. */
   readonly idle: boolean;
   readonly stopped: HarnessErrors.ExecutionFailed | undefined;
+  /** What the provider last measured of the transcript, for estimating the next request. */
+  readonly measured: Transcript.Measured | undefined;
+  /** The next request would pass the context limit, so the session does nothing more. */
+  readonly full: boolean;
 }
 
 /** The session only ever extends a valid transcript validly. */
@@ -147,6 +151,8 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     responses: 0,
     idle: false,
     stopped: undefined,
+    measured: options.measured,
+    full: false,
   });
 
   const emit = (event: HarnessEvent.Event) => Queue.offer(events, event).pipe(Effect.asVoid);
@@ -325,6 +331,10 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
           running: new Set([...latest.running, ...calls]),
           responses: latest.responses + 1,
           idle: false,
+          measured:
+            usage?.inputTokens === undefined
+              ? latest.measured
+              : { responseId, tokens: usage.inputTokens + (usage.outputTokens ?? 0) },
         });
         yield* emit({
           _tag: "ResponseFinished",
@@ -364,11 +374,32 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
       Effect.flatMap((outcome) => record(Transcript.toolResult(call, outcome))),
     );
 
+  /**
+   * Whether the next request would pass the session's context limit, by what the provider last
+   * measured and an estimate of what followed: then the session reports its context full, once,
+   * and does nothing more.
+   */
+  const overLimit = Effect.gen(function* () {
+    const current = yield* Ref.get(state);
+    const limit = options.contextLimit;
+    if (limit === undefined) return false;
+    const estimatedTokens = Transcript.estimate(current.transcript, {
+      measured: current.measured,
+      instructions: options.instructions ?? "",
+    });
+    if (estimatedTokens <= limit) return false;
+    yield* Ref.set(state, { ...current, full: true });
+    yield* emit({ _tag: "ContextFull", estimatedTokens });
+    return true;
+  });
+
   /** One pass: take in input, then answer it and run the calls the answer asks for. */
   const step = Effect.gen(function* () {
+    if ((yield* Ref.get(state)).full) return false;
     const summary = yield* lock.withPermit(incorporate);
     if (summary.pending.length > 0) return false;
     if (!summary.awaitsResponse) return yield* lock.withPermit(settle);
+    if (yield* lock.withPermit(overLimit)) return false;
     const response = yield* respond;
     yield* Effect.forEach(
       response.parts.flatMap((part) => (part._tag === "ToolCall" ? [part] : [])),
