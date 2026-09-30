@@ -137,6 +137,57 @@ export const summarize = (items: ReadonlyArray<Item>): Result.Result<Summary, st
   });
 };
 
+/** How many characters a transcript holds as a model reads it. */
+export const characters = (items: ReadonlyArray<Item>): number => {
+  let total = 0;
+  for (const item of items)
+    switch (item._tag) {
+      case "Input":
+        for (const part of item.content) total += part.text.length;
+        break;
+      case "ToolResult":
+        for (const part of item.content) total += part.text.length;
+        if (item.structured !== undefined) total += JSON.stringify(item.structured).length;
+        break;
+      case "Response":
+        for (const part of item.parts)
+          total += part._tag === "ToolCall" ? JSON.stringify(part.params).length : part.text.length;
+        break;
+    }
+  return total;
+};
+
+/**
+ * What a provider reported a model read and wrote for one response: the tokens of every item up to
+ * and including it, with the instructions, as the request carried them.
+ */
+export interface Measured {
+  readonly responseId: ResponseId;
+  readonly tokens: number;
+}
+
+/** About how many characters make a token, for text no provider has counted. */
+export const charactersPerToken = 4;
+
+/**
+ * About how many tokens a model reads for a transcript: exactly what a provider measured through
+ * the response it measured, and a token for every four characters after it, with the instructions
+ * counted too when no measurement covers them.
+ */
+export const estimate = (
+  items: ReadonlyArray<Item>,
+  options: { readonly measured?: Measured | undefined; readonly instructions?: string } = {},
+): number => {
+  const measured = options.measured;
+  const index =
+    measured === undefined
+      ? -1
+      : items.findLastIndex((item) => item._tag === "Response" && item.id === measured.responseId);
+  const unmeasured =
+    characters(items.slice(index + 1)) + (index === -1 ? (options.instructions?.length ?? 0) : 0);
+  return (index === -1 ? 0 : measured!.tokens) + Math.ceil(unmeasured / charactersPerToken);
+};
+
 /**
  * The conversation a harness continues from: the history it was given, then the entries its
  * events recorded. Every harness prepares its native context from this one shape, so a turn can

@@ -13,9 +13,12 @@ import {
   connectionsMessage,
   methodLabels,
   methodsLabel,
+  settingInputType,
+  settingIssueText,
   type ConnectionMethod,
   type ConnectionProviderOption,
   type ConnectionsError,
+  type SettingIssue,
 } from "./wording.tsx";
 import * as s from "./connections.css.ts";
 
@@ -113,7 +116,7 @@ export interface ConfigureConnectionProps {
   readonly value: (key: string) => string;
   readonly onValueChange: (key: string, value: string) => void;
   /** Why a setting's value would be refused, once it has one. */
-  readonly issue?: (key: string) => "url" | undefined;
+  readonly issue?: (key: string) => SettingIssue | undefined;
   readonly method: ConnectionMethod;
   readonly onMethodChange: (method: ConnectionMethod) => void;
   /** The draft has a name and every required, well-formed setting. */
@@ -192,13 +195,11 @@ export function ConfigureConnection(props: ConfigureConnectionProps) {
               {(setting) => (
                 <Field.Root
                   hint={setting.description}
-                  error={
-                    props.issue?.(setting.key) === "url" ? "Enter an http or https URL." : undefined
-                  }
+                  error={settingIssueText(props.issue?.(setting.key))}
                 >
                   <Field.Label>{settingLabel(setting)}</Field.Label>
                   <Input
-                    type={setting.kind === "url" ? "url" : "text"}
+                    type={settingInputType(setting.kind)}
                     value={props.value(setting.key)}
                     onInput={(event) => props.onValueChange(setting.key, event.currentTarget.value)}
                     placeholder={setting.placeholder}

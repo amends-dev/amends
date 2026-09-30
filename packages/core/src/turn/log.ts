@@ -413,6 +413,8 @@ export interface Context {
    * started, or recorded a checkpoint. Until then a turn's history is the thread's.
    */
   readonly begun: boolean;
+  /** The latest response a provider measured since the latest checkpoint, of any turn. */
+  readonly measured: Transcript.Measured | undefined;
 }
 
 /**
@@ -442,8 +444,18 @@ export const context = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Cont
   const own = reader();
   const entries: Array<Recorded> = [];
   let begun = false;
+  let measured: Transcript.Measured | undefined;
   for (const record of records) {
     const entry = record.entry;
+    if (entry._tag === "Checkpoint") measured = undefined;
+    else if (entry._tag === "Harness" && entry.event._tag === "ResponseFinished") {
+      const usage = entry.event.usage;
+      if (usage?.inputTokens !== undefined)
+        measured = {
+          responseId: entry.event.responseId,
+          tokens: usage.inputTokens + (usage.outputTokens ?? 0),
+        };
+    }
     const mine = entry.turnId === turnId;
     if (mine) {
       own.add(record);
@@ -484,48 +496,8 @@ export const context = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Cont
     own: own.reading(),
     entries,
     begun,
+    measured,
   };
-};
-
-/** How much a transcript holds, in characters, as a model reads it. */
-export const size = (items: ReadonlyArray<Transcript.Item>): number => {
-  let total = 0;
-  for (const item of items)
-    switch (item._tag) {
-      case "Input":
-        for (const part of item.content) total += part.text.length;
-        break;
-      case "ToolResult":
-        for (const part of item.content) total += part.text.length;
-        if (item.structured !== undefined) total += JSON.stringify(item.structured).length;
-        break;
-      case "Response":
-        for (const part of item.parts)
-          total += part._tag === "ToolCall" ? JSON.stringify(part.params).length : part.text.length;
-        break;
-    }
-  return total;
-};
-
-/**
- * The newest part of a transcript that fits `budget` characters, starting at an input so that no
- * response is separated from its tool results. The last exchange stays even when it alone is
- * larger.
- */
-export const fit = (
-  items: ReadonlyArray<Transcript.Item>,
-  budget: number,
-): ReadonlyArray<Transcript.Item> => {
-  if (size(items) <= budget) return items;
-  let start: number | undefined;
-  let total = 0;
-  for (let index = items.length - 1; index >= 0; index--) {
-    total += size([items[index]!]);
-    if (items[index]!._tag !== "Input") continue;
-    if (total > budget && start !== undefined) break;
-    start = index;
-  }
-  return start === undefined ? [] : items.slice(start);
 };
 
 /** Thread input a turn has not taken in yet, each piece with the timeline position it came from. */
@@ -536,8 +508,8 @@ export interface Waiting {
 
 /**
  * What a checkpoint would do: summarize the older part of the transcript and the waiting input
- * together, keep the newest history verbatim, and take in the waiting input the summary covers,
- * through `through`, which the rest of that input follows as the turn's next batch.
+ * together, keep the newest history verbatim, without reasoning, and take in the waiting input the
+ * summary covers, through `through`, which the rest of that input follows as the turn's next batch.
  */
 export interface Compaction {
   readonly summarize: ReadonlyArray<Transcript.Item>;
@@ -545,28 +517,83 @@ export interface Compaction {
   readonly through: number | null;
 }
 
+/** How much of a model's context a turn may use before a checkpoint, and what one keeps. */
+export interface Limits {
+  /** Tokens the transcript, the waiting input, and what is always sent may come to. */
+  readonly budget: number;
+  /** Tokens of the newest exchanges a checkpoint keeps verbatim. */
+  readonly keep: number;
+  /** Characters of input always sent and never summarized, such as a retry's request. */
+  readonly fixed?: number | undefined;
+  /** What a provider last measured of the transcript, since the latest checkpoint. */
+  readonly measured?: Transcript.Measured | undefined;
+  /** The instructions every request carries, counted when nothing measured them. */
+  readonly instructions?: string | undefined;
+  /**
+   * Where the turn's own work begins in the transcript: its inputs that a checkpoint summarizes
+   * also stay verbatim ahead of what it keeps, when they fit.
+   */
+  readonly current?: number | undefined;
+  /** Propose a checkpoint however the estimate stands, as when the model's context proved full. */
+  readonly force?: boolean | undefined;
+}
+
+const isSummary = (item: Transcript.Item) =>
+  item._tag === "Input" && item.author.id === checkpointAuthor.id;
+
 /**
- * Whether a transcript and the input waiting for it, with `fixed` characters of input that is
- * always sent, outgrow `budget` characters, and if so what a checkpoint keeps: the newest
- * exchanges within `keep` characters, across history and waiting input alike, so the newest input
- * always stays verbatim. Nothing is proposed when all that would be summarized is an earlier
- * summary, since summarizing it again frees nothing.
+ * Whether a transcript and the input waiting for it outgrow the budget, and if so what a
+ * checkpoint keeps: the newest exchanges within `keep`, across history and waiting input alike,
+ * cut at an input or a response, since a response's tool results follow it at once, and never
+ * between two pieces of one waiting message. The last exchange stays even when it alone is
+ * larger. Nothing is proposed when all that would be summarized is an earlier summary, since
+ * summarizing it again frees nothing.
  */
 export const compaction = (
   transcript: ReadonlyArray<Transcript.Item>,
   waiting: ReadonlyArray<Waiting>,
-  limits: { readonly budget: number; readonly keep: number; readonly fixed?: number | undefined },
+  limits: Limits,
 ): Compaction | undefined => {
   const all = [...transcript, ...waiting.map((piece) => piece.item)];
-  if (size(all) + (limits.fixed ?? 0) <= limits.budget) return undefined;
-  const cut = all.length - fit(all, limits.keep).length;
+  const total =
+    Transcript.estimate(all, { measured: limits.measured, instructions: limits.instructions }) +
+    Math.ceil((limits.fixed ?? 0) / Transcript.charactersPerToken);
+  if (limits.force !== true && total <= limits.budget) return undefined;
+  /** The tokens of everything from each position on, as no provider has measured them. */
+  const tails: Array<number> = [];
+  let characters = 0;
+  for (let index = all.length - 1; index >= 0; index--) {
+    characters += Transcript.characters([all[index]!]);
+    tails[index] = Math.ceil(characters / Transcript.charactersPerToken);
+  }
+  const boundary = (index: number) => {
+    if (all[index]!._tag === "ToolResult") return false;
+    const piece = index - transcript.length;
+    return piece <= 0 || waiting[piece]!.sequence !== waiting[piece - 1]!.sequence;
+  };
+  let cut: number | undefined;
+  for (let index = all.length - 1; index > 0; index--) {
+    if (!boundary(index)) continue;
+    if (cut !== undefined && tails[index]! > limits.keep) break;
+    cut = index;
+  }
+  if (cut === undefined) return undefined;
   const summarize = all.slice(0, cut);
-  if (summarize.every((item) => item._tag === "Input" && item.author.id === checkpointAuthor.id))
-    return undefined;
+  if (summarize.every(isSummary)) return undefined;
   const taken = cut - transcript.length;
+  const tail = taken >= 0 ? [] : transcript.slice(cut);
+  const current = limits.current;
+  const inputs =
+    current === undefined || cut <= current
+      ? []
+      : transcript
+          .slice(current, Math.min(cut, transcript.length))
+          .filter((item) => item._tag === "Input");
+  const pinned =
+    Transcript.estimate(inputs) + Transcript.estimate(tail) <= limits.keep ? inputs : [];
   return {
     summarize,
-    kept: taken >= 0 ? [] : transcript.slice(cut),
+    kept: [...pinned, ...tail].map(withoutReasoning),
     through: taken > 0 ? waiting[taken - 1]!.sequence : null,
   };
 };

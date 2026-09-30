@@ -17,11 +17,26 @@ export type ConnectionMethod = "api-key" | "none";
 export interface ConnectionSettingField {
   readonly key: string;
   readonly label: string;
-  readonly kind: "text" | "url";
+  readonly kind: "text" | "url" | "integer";
   readonly required: boolean;
   readonly description?: string;
   readonly placeholder?: string;
 }
+
+/** What is wrong with a setting's value: not an http or https URL, or not a whole number. */
+export type SettingIssue = "url" | "integer";
+
+/** What a setting's field says about a value it refuses. */
+export const settingIssueText = (issue: SettingIssue | undefined): string | undefined =>
+  issue === "url"
+    ? "Enter an http or https URL."
+    : issue === "integer"
+      ? "Enter a whole number."
+      : undefined;
+
+/** The kind of input a setting's field takes. */
+export const settingInputType = (kind: ConnectionSettingField["kind"]) =>
+  kind === "url" ? "url" : kind === "integer" ? "number" : "text";
 
 /** What a provider's connections give access to: model providers, or sandboxes for environments. */
 export type ConnectionCapability = "model-access" | "sandboxes";

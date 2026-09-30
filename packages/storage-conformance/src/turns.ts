@@ -1134,7 +1134,11 @@ export const turns = (harness: ConformanceHarness) => {
               expect(backlog.plan.pending?.items[0]).toMatchObject({
                 content: [{ text: "Later note 1." }],
               });
-              expect(backlog.plan.compaction).toBeUndefined();
+              // Each waiting message says where it came from, for a checkpoint to take in.
+              expect(backlog.plan.waiting).toHaveLength(120);
+              expect(backlog.plan.waiting.at(-1)?.sequence).toBeGreaterThan(
+                backlog.plan.waiting[0]!.sequence,
+              );
             }),
           ),
         ),

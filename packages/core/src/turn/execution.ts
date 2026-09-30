@@ -79,9 +79,10 @@ export type CloseError =
 /**
  * Everything execution needs to run a turn: the agent's instructions, the model access it runs
  * with and the connection's settings and key to reach it, its environment, the transcript it
- * continues, the input the harness has not taken in yet as one batch, its own entries so far, how
- * its attempts have gone, and a checkpoint to record first when the history has outgrown its
- * budget. The key is only ever handed to execution, redacted.
+ * continues, the input the harness has not taken in yet as one batch and piece by piece, its own
+ * entries so far, how its attempts have gone, and what a provider last measured, from which
+ * execution tells, against its model's limits, whether a checkpoint must come first. The key is
+ * only ever handed to execution, redacted.
  */
 export interface Plan {
   readonly turn: Turn.Record;
@@ -123,8 +124,12 @@ export interface Plan {
   readonly interruption: TurnLog.Interruption | undefined;
   /** The latest attempt died without recording why, as when its process did. */
   readonly diedLast: boolean;
-  /** When the transcript and pending input outgrow the budget: what a checkpoint would do first. */
-  readonly compaction: TurnLog.Compaction | undefined;
+  /** The thread's input the harness has not taken in, piece by piece, with where each came from. */
+  readonly waiting: ReadonlyArray<TurnLog.Waiting>;
+  /** Characters of input asked of the turn itself, which is always given and never summarized. */
+  readonly fixed: number;
+  /** What a provider last measured of the transcript since the latest checkpoint. */
+  readonly measured: Transcript.Measured | undefined;
 }
 
 /**
@@ -139,13 +144,6 @@ export type Preparation =
 
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
-/**
- * How many characters a turn's transcript and waiting input may hold, about 75,000 tokens, before a
- * checkpoint summarizes the older part.
- */
-const historyBudget = 300_000;
-/** How many characters of the newest exchanges a checkpoint keeps verbatim, a quarter of the budget. */
-const keptBudget = 75_000;
 /**
  * How many characters of a message one piece holds: a longer message is given in pieces, so that
  * the older ones can be summarized when not everything fits, rather than the message cut.
@@ -543,13 +541,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       attempts: context.own.attempts,
       interruption: context.own.interruption,
       diedLast: context.own.diedLast,
-      // One budget covers the history and the input waiting for it; what a request asks of the
-      // turn itself is always given.
-      compaction: TurnLog.compaction(transcript, waiting, {
-        budget: historyBudget,
-        keep: keptBudget,
-        fixed: TurnLog.size(context.own.requested),
-      }),
+      waiting,
+      // What a request asks of the turn itself is always given.
+      fixed: Transcript.characters(context.own.requested),
+      measured: context.measured,
     };
     return { _tag: "Ready", plan } as const;
   });
@@ -573,7 +568,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           const items = yield* threadHistory(turn);
           let held: Array<Transcript.Item> = [];
           for (const item of items) {
-            if (held.length > 0 && TurnLog.size([...held, item]) > historyEntrySize) {
+            if (held.length > 0 && Transcript.characters([...held, item]) > historyEntrySize) {
               entries.push({ _tag: "History", turnId: turn.id, items: held });
               held = [];
             }

@@ -7,13 +7,14 @@ export const Id = Schema.NonEmptyString.check(Schema.isPattern(/^[a-z0-9][a-z0-9
 export type Id = typeof Id.Type;
 
 /**
- * A setting a connection of this implementation takes, described so an app can ask for it.
- * Settings are never secret; secrets are credentials.
+ * A setting a connection of this implementation takes, described so an app can ask for it: text,
+ * an http or https URL, or a whole number above zero. Settings are never secret; secrets are
+ * credentials.
  */
 export const Setting = Schema.Struct({
   key: Schema.NonEmptyString,
   label: Schema.NonEmptyString,
-  kind: Schema.Literals(["text", "url"]),
+  kind: Schema.Literals(["text", "url", "integer"]),
   required: Schema.Boolean,
   description: Schema.optionalKey(Schema.String),
   placeholder: Schema.optionalKey(Schema.String),

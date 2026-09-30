@@ -21,8 +21,8 @@ connections against, and an app shows when someone adds a connection:
 | `settings`       | The settings a connection takes, described so an app can ask for them. Never secret.             |
 | `authentication` | The ways a connection may authenticate: `None`, or `ApiKey`, a secret kept in protected storage. |
 
-A setting has a `key`, a `label`, a `kind` (`text` or `url`), whether it is `required`, and an
-optional `description` and `placeholder`. Model inference names the provider `interface` a harness
+A setting has a `key`, a `label`, a `kind` (`text`, `url`, or `integer`, a whole number above
+zero), whether it is `required`, and an optional `description` and `placeholder`. Model inference names the provider `interface` a harness
 must support, such as `anthropic-messages`, and may suggest `models`, each an `id` and a `name`, for
 an app to offer when choosing an agent's model; an agent may still name any other. The sandbox capability names a sandbox provider, such as
 `daytona`, whose account the connection is; environments using that provider run under it, and
@@ -33,11 +33,13 @@ implementations that need them.
 ## Model inference
 
 `@amends/connection/model-inference` holds what an implementation with model inference supplies:
-a `ModelInference.Implementation` with its declaration and `languageModel(access, selection)`.
-`access` is the connection's settings and credential; `selection` is the model an agent chose, by
-the provider's own identifier. It returns Effect AI model access, a `LanguageModel` with its
-provider and model names, which a harness such as [amends's own](../harness-amends/README.md)
-uses. The module is separate so reading declarations never loads Effect AI.
+a `ModelInference.Implementation` with its declaration, `languageModel(access, selection)`, and
+`limits(access, selection)`. `access` is the connection's settings and credential; `selection` is
+the model an agent chose, by the provider's own identifier. `languageModel` returns Effect AI model
+access, a `LanguageModel` with its provider and model names, which a harness such as
+[amends's own](../harness-amends/README.md) uses. `limits` says how much the model takes: its
+context window in tokens, and the most it writes in one response when known, from which
+[execution](../execution/README.md) keeps a conversation within it. The module is separate so reading declarations never loads Effect AI.
 
 Implementations live in adapters, such as
 [`connection-anthropic`](../../adapters/connection-anthropic/README.md) and

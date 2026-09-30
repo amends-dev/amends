@@ -23,13 +23,35 @@ export const declaration = ConnectionImplementation.Declaration.make({
       description: "The API's base URL, before /chat/completions.",
       placeholder: "https://api.openai.com/v1",
     },
+    {
+      key: "contextWindow",
+      label: "Context window",
+      kind: "integer",
+      required: false,
+      description: "The most tokens the model reads at once. Leave empty for 128,000.",
+      placeholder: "128000",
+    },
   ],
   authentication: [{ _tag: "ApiKey", label: "API key" }, { _tag: "None" }],
 });
 
-/** A chat-completions model for a connection's access and an agent's selection, over fetch. */
+/** How many tokens a model reads at once when its connection does not say. */
+export const defaultContextTokens = 128_000;
+
+/**
+ * A chat-completions model for a connection's access and an agent's selection, over fetch. Its
+ * context window is the connection's setting, since servers and models vary.
+ */
 export const modelInference: ModelInference.Implementation = {
   declaration,
+  limits: (access) => {
+    const configured = Number(access.settings["contextWindow"]);
+    return {
+      contextTokens:
+        Number.isSafeInteger(configured) && configured > 0 ? configured : defaultContextTokens,
+      outputTokens: undefined,
+    };
+  },
   languageModel: (access, selection) =>
     OpenAiLanguageModel.model(selection.model).pipe(
       Layer.provide(

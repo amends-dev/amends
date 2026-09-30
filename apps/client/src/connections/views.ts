@@ -35,7 +35,7 @@ export type ConnectionCapability = "model-access" | "sandboxes";
 export interface ConnectionSetting {
   readonly key: string;
   readonly label: string;
-  readonly kind: "text" | "url";
+  readonly kind: "text" | "url" | "integer";
   readonly required: boolean;
   readonly description?: string;
   readonly placeholder?: string;
@@ -105,9 +105,18 @@ export interface ConnectionsDone {
 }
 
 const isUrl = /^https?:\/\/[^\s/?#]+[^\s]*$/;
-/** A value the setting would refuse: a URL that is not http or https. */
-const settingIssue = (setting: ConnectionSetting, value: string) =>
-  setting.kind === "url" && value.trim() !== "" && !isUrl.test(value.trim()) ? "url" : undefined;
+const isWholeNumber = /^[1-9]\d{0,14}$/;
+/**
+ * A value the setting would refuse: a URL that is not http or https, or a count that is not a
+ * whole number above zero.
+ */
+const settingIssue = (setting: ConnectionSetting, value: string): "url" | "integer" | undefined => {
+  const trimmed = value.trim();
+  if (trimmed === "") return undefined;
+  if (setting.kind === "url" && !isUrl.test(trimmed)) return "url";
+  if (setting.kind === "integer" && !isWholeNumber.test(trimmed)) return "integer";
+  return undefined;
+};
 
 const methodOf = (authentication: ConnectionImplementation.Authentication): ConnectionMethod =>
   authentication._tag === "ApiKey" ? "api-key" : "none";

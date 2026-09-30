@@ -23,10 +23,12 @@ import {
   connectionsToast,
   type ConnectionMethod,
   type ConnectionProviderOption,
+  type ConnectionSettingField,
   type ConnectionSummary,
   type ConnectionsAction,
   type ConnectionsError,
   type ConnectionsTab,
+  type SettingIssue,
 } from "./index.ts";
 
 export const sampleProviders: readonly ConnectionProviderOption[] = [
@@ -61,6 +63,14 @@ export const sampleProviders: readonly ConnectionProviderOption[] = [
         required: true,
         description: "Use the base URL before /chat/completions.",
         placeholder: "https://api.openai.com/v1",
+      },
+      {
+        key: "contextWindow",
+        label: "Context window",
+        kind: "integer",
+        required: false,
+        description: "The most tokens the model reads at once. Leave empty for 128,000.",
+        placeholder: "128000",
       },
     ],
   },
@@ -127,8 +137,18 @@ const samples: readonly Sample[] = [
 ];
 
 const isUrl = /^https?:\/\/[^\s/?#]+[^\s]*$/;
-const urlIssue = (value: string) =>
-  value.trim() !== "" && !isUrl.test(value.trim()) ? ("url" as const) : undefined;
+const isWholeNumber = /^[1-9]\d{0,14}$/;
+/** What a setting's field refuses in a value, as the app's client would tell it. */
+const settingIssue = (
+  setting: Pick<ConnectionSettingField, "kind"> | undefined,
+  value: string,
+): SettingIssue | undefined => {
+  const trimmed = value.trim();
+  if (trimmed === "" || setting === undefined) return undefined;
+  if (setting.kind === "url" && !isUrl.test(trimmed)) return "url";
+  if (setting.kind === "integer" && !isWholeNumber.test(trimmed)) return "integer";
+  return undefined;
+};
 
 type Dialog = "choose" | "configure" | "key" | "remove" | "remove-key";
 
@@ -405,12 +425,17 @@ export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
                   [connection().id]: { ...values()[connection().id], [key]: value },
                 })
               }
-              issue={(key) => urlIssue(valueOf(connection().id, key))}
+              issue={(key) =>
+                settingIssue(
+                  connection().settings.find((setting) => setting.key === key),
+                  valueOf(connection().id, key),
+                )
+              }
               settingsChanged={
                 values()[connection().id] !== undefined &&
                 connection().settings.every(
                   (setting) =>
-                    !urlIssue(valueOf(connection().id, setting.key)) &&
+                    !settingIssue(setting, valueOf(connection().id, setting.key)) &&
                     (!setting.required || valueOf(connection().id, setting.key).trim() !== ""),
                 ) &&
                 connection().settings.some(
@@ -475,14 +500,19 @@ export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
         onValueChange={(key, value) =>
           setCreating({ ...creating(), settings: { ...creating().settings, [key]: value } })
         }
-        issue={(key) => urlIssue(creating().settings[key] ?? "")}
+        issue={(key) =>
+          settingIssue(
+            draftProvider().settings.find((setting) => setting.key === key),
+            creating().settings[key] ?? "",
+          )
+        }
         method={creating().method}
         onMethodChange={(method) => setCreating({ ...creating(), method })}
         ready={
           creating().name.trim() !== "" &&
           draftProvider().settings.every(
             (setting) =>
-              !urlIssue(creating().settings[setting.key] ?? "") &&
+              !settingIssue(setting, creating().settings[setting.key] ?? "") &&
               (!setting.required || (creating().settings[setting.key] ?? "").trim() !== ""),
           )
         }

@@ -32,9 +32,13 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    interruption worth retrying, and when a run begins after an attempt that died without recording
    why, as when its process did, wait 2, 4, then 8 seconds first and prepare again. Then record the
    `attempt`, a harness session or a summary.
-4. When `prepare` proposes a checkpoint, record it first: the turn's model summarizes the older
-   history and input (`Compaction.summarize`) in passes of up to 200,000 characters, each reading
-   the summary so far, and the run prepares again. A pass that fails or stays silent past
+4. Tell whether the conversation needs a checkpoint, against the model's limits from its
+   connection (`limits`) and the runner's `context` policy (`defaultContextPolicy`): a turn may use
+   80% of the context window, less the room the model may need to write, up to 32,000 tokens, and
+   at most 200,000 tokens however large the window; a checkpoint keeps 40% of that verbatim. When it
+   does, record it first: the turn's model summarizes the older history and input
+   (`Compaction.summarize`) in passes of up to 200,000 characters, and no more than the budget's
+   worth, each reading the summary so far, and the run prepares again. A pass that fails or stays silent past
    `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
    turn; nothing is left out instead.
 5. Spawn the environment with a new session ID and the instructions the turn started with, and prepare the
@@ -52,7 +56,9 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    drafts: at most every 150 milliseconds, each block's new text in pieces of up to 1,500
    characters, at the offset it continues. A block that completes first replaces its draft, and a
    draft that fails is not retried. Then `close` the turn, which publishes the replies it owes. When closing finds
-   more input, the run submits what the agent accepted and continues in the same session, or
+   more input, the run submits what the agent accepted and continues in the same session, unless
+   that input would take the conversation past its budget, which ends the session for a
+   checkpoint, or
    waits while the agent is still accepting it, checking every second (`checkInterval`) for up to
    a minute (`inputWait`) before failing the turn.
 

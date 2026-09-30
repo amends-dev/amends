@@ -1100,12 +1100,22 @@ full. A message longer than a piece is given in pieces, so that when not everyth
 older pieces are summarized rather than the message cut.
 
 One budget for its model covers the history a turn continues from and the input waiting for it
-together. When they would not fit, the turn records a checkpoint before working: a summary of the
-older part and, verbatim, the newest exchanges that fit a share of the budget, starting at an
-input so that no response is separated from its tool results, and always holding the newest
-input. The older part can include input the turn had not taken in yet, such as a long backlog;
+together. Each connection states its model's context window, and the budget is a share of it,
+leaving room for what the model writes, and capped so that one request's cost stays bounded
+however large the window. Size is measured in tokens: exactly what the provider reported for the
+latest response since the latest checkpoint, and about a token for every four characters after
+it. When the conversation would not fit, the turn records a checkpoint before working: a summary
+of the older part and, verbatim, the newest exchanges that fit a share of the budget, cut at an
+input or at a response, whose tool results follow it at once, so a single long turn can be
+summarized too, and always holding the newest exchange. When the cut falls inside the turn's own
+work, the turn's own input stays verbatim after the summary as well. The exchanges a checkpoint
+keeps lose their reasoning: a provider that binds its reasoning to the conversation that produced
+it refuses reasoning replayed after a summary, and the kept exchanges are stored, so every later
+request sends the same. The older part can include input the turn had not taken in yet, such as a long backlog;
 the checkpoint then records how far through the thread its summary reaches, that input counts as
-taken in, and the rest follows as the turn's next batch. The model writes the summary in passes
+taken in, and the rest follows as the turn's next batch. A cut never falls between two pieces of one
+waiting message, so no message is taken in only in part. Input that arrives while a turn works and
+would take it past its budget waits for a checkpoint too, in a new session. The model writes the summary in passes
 that each fit a request, oldest first, each reading the summary so far with the next part, so a
 thread of any length is summarized rather than truncated. A checkpoint replaces everything before
 it, so each turn reads the log only from the latest checkpoint, which the turn records and the next
@@ -1116,10 +1126,9 @@ fails once its retries are spent, rather than leaving anything out. Between chec
 history only grows at its end, so the start of each request stays the same and providers' prompt
 caches keep working. The thread and the logs keep everything a summary replaced.
 
-Still to come: measuring size with the tokens providers report rather than characters, each model's
-own context window, summarizing in the background after a turn rather than before the next,
-shortening old tool output before summarizing, recovering when a provider reports the context too
-long partway through a turn, and a tool with which an agent recalls exact earlier content.
+Still to come: summarizing in the background after a turn rather than before the next, shortening
+old tool output before summarizing, recovering when a provider reports the context too long
+partway through a turn, and a tool with which an agent recalls exact earlier content.
 
 ### One reading of a turn's entries answers every question
 

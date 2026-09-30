@@ -51,6 +51,11 @@ schema also applies: each response's calls have unique IDs and are answered once
 follow it before any other input or response. Only the last response's calls may be pending. It
 reports those `pending` calls and whether the transcript `awaitsResponse`.
 
+`Transcript.characters` counts what a transcript holds as a model reads it, and
+`Transcript.estimate` how many tokens that is: exactly what a provider measured through the
+response it measured (`Transcript.Measured`), and a token for every four characters after it, with
+the instructions when no measurement covers them.
+
 A part can carry `native` data that only the harness that recorded it can use, keyed by that
 harness's name, such as a provider's signature over its reasoning that the same provider requires
 back. Other harnesses ignore it; what a transcript means never depends on it.

@@ -30,4 +30,5 @@ export {
   type ConnectionSummary,
   type ConnectionsAction,
   type ConnectionsError,
+  type SettingIssue,
 } from "./wording.tsx";

@@ -32,12 +32,22 @@ export const declaration = ConnectionImplementation.Declaration.make({
   authentication: [{ _tag: "ApiKey", label: "API key" }],
 });
 
+/** How much the models Anthropic offers take, as Anthropic documents them. */
+const limits: Readonly<Record<string, ModelInference.Limits>> = {
+  "claude-opus-5-5": { contextTokens: 1_000_000, outputTokens: 128_000 },
+  "claude-sonnet-5": { contextTokens: 1_000_000, outputTokens: 128_000 },
+  "claude-haiku-4-5-20251001": { contextTokens: 200_000, outputTokens: 64_000 },
+};
+/** A model this adapter does not know is taken to have the smallest window of those it does. */
+const unknownLimits: ModelInference.Limits = { contextTokens: 200_000, outputTokens: undefined };
+
 /**
  * An Anthropic model for a connection's access and an agent's selection, requesting over fetch.
  * An empty API URL uses Anthropic's own.
  */
 export const modelInference: ModelInference.Implementation = {
   declaration,
+  limits: (_, selection) => limits[selection.model] ?? unknownLimits,
   languageModel: (access, selection) =>
     AnthropicLanguageModel.model(selection.model).pipe(
       Layer.provide(

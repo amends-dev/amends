@@ -92,8 +92,6 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     steps: [] as Array<string>,
     drafts: [] as Array<{ responseId: string; part: number; offset: number; text: string }>,
     replies: [] as Array<string>,
-    /** A checkpoint the next plan asks for, until one is recorded. */
-    compaction: undefined as TurnLog.Compaction | undefined,
     checkpoints: [] as Array<{
       summary: string;
       kept: ReadonlyArray<Transcript.Item>;
@@ -115,12 +113,16 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       : Effect.fail(new TurnErrors.NotActive({ turnId, status: state.turn.status }));
   const plan = (): TurnExecution.Plan => {
     const after = incorporated();
-    const [first, ...rest] = state.messages
+    const waiting = state.messages
       .filter(
         (message) =>
           message.sequence > after && message.sequence <= state.turn.acceptedThroughSequence,
       )
-      .map((message) => input(message.text));
+      .map((message): TurnLog.Waiting => ({
+        sequence: message.sequence,
+        item: input(message.text),
+      }));
+    const [first, ...rest] = waiting.map(({ item }) => item);
     const context = TurnLog.context(state.log, turnId);
     return {
       turn: state.turn,
@@ -147,7 +149,9 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       attempts: context.own.attempts,
       interruption: context.own.interruption,
       diedLast: context.own.diedLast,
-      compaction: state.compaction,
+      waiting,
+      fixed: 0,
+      measured: context.measured,
     };
   };
   const execution: TurnExecution.Interface = {
@@ -208,7 +212,6 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         state.steps.push("checkpoint");
         state.checkpoints.push({ ...recorded });
         record({ _tag: "Checkpoint", turnId, ...recorded });
-        state.compaction = undefined;
         return Log.Position.make(state.log.length - 1);
       }),
     entries: () => Effect.sync(() => [...state.log]),
@@ -251,6 +254,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
 const scripted = Effect.fnUntraced(function* (
   scripts: ReadonlyArray<Script>,
   summary?: Effect.Effect<Array<Response.PartEncoded>, AiError.AiError>,
+  limits: ModelInference.Limits = { contextTokens: 1_000_000, outputTokens: 128_000 },
 ) {
   const prompts: Array<Prompt.Prompt> = [];
   const summarized: Array<Prompt.Prompt> = [];
@@ -280,6 +284,7 @@ const scripted = Effect.fnUntraced(function* (
         Layer.succeed(Model.ProviderName, "test"),
         Layer.succeed(Model.ModelName, "test-model"),
       ),
+    limits: () => limits,
   };
   return { implementation, prompts, summarized };
 });
@@ -650,10 +655,11 @@ describe("TurnRunner", () => {
 
   it.effect("records a checkpoint with a summary before working when the history is too long", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
-      const older = [input("How was the launch?")];
+      const { state, execution, record } = fakeExecution();
+      // The history outgrows what the model's window allows before the turn's input.
+      const older = [input(`How was the launch? ${"We shipped it. ".repeat(300)}`)];
       const kept = [input("Anything else?")];
-      state.compaction = { summarize: older, kept, through: null };
+      record({ _tag: "History", turnId, items: [...older, ...kept] });
       const { implementation, prompts, summarized } = yield* scripted(
         [reply("Noon is high tide.")],
         Effect.succeed([
@@ -664,6 +670,7 @@ describe("TurnRunner", () => {
             usage: { inputTokens: { total: 20 }, outputTokens: { total: 4 } },
           },
         ]),
+        { contextTokens: 1_000, outputTokens: undefined },
       );
       const runner = yield* runnerOver(execution, implementation);
 
@@ -693,9 +700,9 @@ describe("TurnRunner", () => {
 
   it.effect("summarizes a large history in passes, each reading the summary so far", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, execution, record } = fakeExecution();
       const long = (label: string) => input(`${label} ${"detail ".repeat(20_000)}`);
-      state.compaction = { summarize: [long("First"), long("Second")], kept: [], through: null };
+      record({ _tag: "History", turnId, items: [long("First"), long("Second")] });
       const { implementation, summarized } = yield* scripted(
         [reply("Noon is high tide.")],
         Effect.succeed([
@@ -706,6 +713,7 @@ describe("TurnRunner", () => {
             usage: { inputTokens: { total: 20 }, outputTokens: { total: 4 } },
           },
         ]),
+        { contextTokens: 80_000, outputTokens: undefined },
       );
       const runner = yield* runnerOver(execution, implementation);
 
@@ -720,8 +728,12 @@ describe("TurnRunner", () => {
 
   it.effect("interrupts a run whose summary cannot be written, and fails the turn in the end", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
-      state.compaction = { summarize: [input("How was the launch?")], kept: [], through: null };
+      const { state, execution, record } = fakeExecution();
+      record({
+        _tag: "History",
+        turnId,
+        items: [input(`How was the launch? ${"We shipped it. ".repeat(300)}`), input("And now?")],
+      });
       const { implementation, prompts } = yield* scripted(
         [reply("Noon is high tide.")],
         Effect.fail(
@@ -731,6 +743,7 @@ describe("TurnRunner", () => {
             reason: new AiError.RateLimitError({}),
           }),
         ),
+        { contextTokens: 1_000, outputTokens: undefined },
       );
       const runner = yield* runnerOver(execution, implementation, { retries: 1 });
 

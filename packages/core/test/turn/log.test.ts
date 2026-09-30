@@ -326,6 +326,32 @@ describe("TurnLog.context", () => {
     expect(TurnLog.context(recorded(started(earlier)), turnId).begun).toBe(true);
   });
 
+  it("knows what a provider last measured, until a checkpoint replaces what it measured", () => {
+    const measured = harness(
+      {
+        _tag: "ResponseFinished",
+        responseId: Transcript.ResponseId.make("r0"),
+        finish: "stop",
+        usage: { inputTokens: 900, outputTokens: 100 },
+      },
+      earlier,
+    );
+    expect(TurnLog.context(recorded(tookFor(earlier, "q"), measured), turnId).measured).toEqual({
+      responseId: "r0",
+      tokens: 1_000,
+    });
+    const checkpoint: TurnLog.Entry = {
+      _tag: "Checkpoint",
+      turnId: earlier,
+      summary: "Earlier.",
+      kept: [],
+      through: null,
+    };
+    expect(
+      TurnLog.context(recorded(tookFor(earlier, "q"), measured, checkpoint), turnId).measured,
+    ).toBeUndefined();
+  });
+
   it("finds the log empty before a participation's first turn", () => {
     expect(TurnLog.context([], turnId).begun).toBe(false);
     expect(
@@ -390,30 +416,84 @@ describe("TurnLog.read attempts", () => {
 });
 
 describe("TurnLog.compaction", () => {
-  const exchange = (question: string, answer: string): ReadonlyArray<Transcript.Item> => [
+  // Four characters make about a token, so each of these is one token.
+  const answer = (
+    id: string,
+    ...parts: ReadonlyArray<Transcript.ResponsePart>
+  ): Transcript.Item => ({
+    _tag: "Response",
+    id: Transcript.ResponseId.make(id),
+    parts,
+  });
+  const exchange = (question: string, reply: string): ReadonlyArray<Transcript.Item> => [
     input(question),
-    { _tag: "Response", id: Transcript.ResponseId.make(answer), parts: [text(answer)] },
+    answer(reply, text(reply)),
   ];
   const items = [...exchange("aaaa", "bbbb"), ...exchange("cccc", "dddd")];
-
   const waiting = (sequence: number, value: string): TurnLog.Waiting => ({
     sequence,
     item: input(value),
   });
 
   it("summarizes the older part only once the transcript and waiting input outgrow the budget", () => {
-    expect(TurnLog.compaction(items, [], { budget: 100, keep: 10 })).toBeUndefined();
-    expect(TurnLog.compaction(items, [], { budget: 100, keep: 10, fixed: 90 })).toEqual({
+    expect(TurnLog.compaction(items, [], { budget: 10, keep: 2 })).toBeUndefined();
+    expect(TurnLog.compaction(items, [], { budget: 10, keep: 2, fixed: 40 })).toEqual({
       summarize: items.slice(0, 2),
       kept: items.slice(2),
       through: null,
     });
   });
 
+  it("counts what a provider measured, and the instructions when nothing did", () => {
+    const measured = { responseId: Transcript.ResponseId.make("dddd"), tokens: 50 };
+    expect(TurnLog.compaction(items, [], { budget: 10, keep: 3, measured })).toBeDefined();
+    expect(
+      TurnLog.compaction(items, [], { budget: 10, keep: 3, instructions: "x".repeat(40) }),
+    ).toBeDefined();
+  });
+
+  it("cuts inside one long turn at a response, keeping its inputs and no reasoning", () => {
+    const call = (id: string): Transcript.ToolCall => ({
+      _tag: "ToolCall",
+      id: Transcript.ToolCallId.make(id),
+      name: "search",
+      params: {},
+    });
+    const result = (id: string, value: string): Transcript.ToolResult =>
+      Transcript.toolResult(call(id), { isError: false, content: [{ _tag: "Text", text: value }] });
+    const reasoning: Transcript.ResponsePart = { _tag: "Reasoning", text: "thinking" };
+    const turn: ReadonlyArray<Transcript.Item> = [
+      input("find it"),
+      answer("r1", reasoning, call("c1")),
+      result("c1", "x".repeat(40)),
+      answer("r2", reasoning, call("c2")),
+      result("c2", "yyyy"),
+    ];
+    const found = TurnLog.compaction([...items, ...turn], [], {
+      budget: 10,
+      keep: 6,
+      current: items.length,
+    });
+    expect(found).toEqual({
+      summarize: [...items, ...turn.slice(0, 3)],
+      kept: [input("find it"), answer("r2", call("c2")), result("c2", "yyyy")],
+      through: null,
+    });
+  });
+
   it("summarizes waiting input too when it alone outgrows the budget, keeping the newest", () => {
     const backlog = [waiting(5, "eeee"), waiting(6, "ffff"), waiting(7, "gggg")];
-    expect(TurnLog.compaction(items, backlog, { budget: 20, keep: 8 })).toEqual({
+    expect(TurnLog.compaction(items, backlog, { budget: 5, keep: 2 })).toEqual({
       summarize: [...items, backlog[0]!.item],
+      kept: [],
+      through: 5,
+    });
+  });
+
+  it("never cuts between two pieces of one waiting message", () => {
+    const pieces = [waiting(5, "eeee"), waiting(6, "ffff"), waiting(6, "gggg")];
+    expect(TurnLog.compaction(items, pieces, { budget: 5, keep: 1 })).toEqual({
+      summarize: [...items, pieces[0]!.item],
       kept: [],
       through: 5,
     });
@@ -427,28 +507,15 @@ describe("TurnLog.compaction", () => {
     };
     expect(
       TurnLog.compaction([summary, ...exchange("cccc", "dddd")], [], {
-        budget: 20,
+        budget: 2,
         keep: 10,
-        fixed: 90,
+        force: true,
       }),
     ).toBeUndefined();
   });
 });
 
-describe("TurnLog.fit", () => {
-  const exchange = (question: string, answer: string): ReadonlyArray<Transcript.Item> => [
-    input(question),
-    { _tag: "Response", id: Transcript.ResponseId.make(answer), parts: [text(answer)] },
-  ];
-
-  it("keeps the newest exchanges that fit, starting at an input", () => {
-    const items = [...exchange("aaaa", "bbbb"), ...exchange("cccc", "dddd")];
-    expect(TurnLog.fit(items, 100)).toEqual(items);
-    expect(TurnLog.fit(items, 10)).toEqual(items.slice(2));
-    // The last exchange stays even when it alone is larger.
-    expect(TurnLog.fit(items, 3)).toEqual(items.slice(2));
-  });
-
+describe("TurnLog.pieces", () => {
   it("gives long text in pieces rather than cutting it", () => {
     expect(TurnLog.pieces("short", 10)).toEqual(["short"]);
     expect(TurnLog.pieces("", 10)).toEqual([""]);

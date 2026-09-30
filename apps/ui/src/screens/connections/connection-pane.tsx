@@ -12,11 +12,14 @@ import { Shell } from "../../patterns/shell/index.ts";
 import {
   ConnectionsAlert,
   providerLine,
+  settingInputType,
+  settingIssueText,
   setupNote,
   type ConnectionSettingField,
   type ConnectionSummary,
   type ConnectionsAction,
   type ConnectionsError,
+  type SettingIssue,
 } from "./wording.tsx";
 import * as s from "./connections.css.ts";
 
@@ -44,7 +47,7 @@ export interface ConnectionPaneProps {
   readonly value: (key: string) => string;
   readonly onValueChange: (key: string, value: string) => void;
   /** Why a setting's value would be refused. */
-  readonly issue?: (key: string) => "url" | undefined;
+  readonly issue?: (key: string) => SettingIssue | undefined;
   /** The settings differ from the saved ones and can be saved. */
   readonly settingsChanged: boolean;
   readonly onSaveSettings: () => void;
@@ -192,17 +195,13 @@ export function ConnectionPane(props: ConnectionPaneProps) {
                               ? setting.description
                               : "Provider settings can be edited when it is available again."
                           }
-                          error={
-                            props.issue?.(setting.key) === "url"
-                              ? "Enter an http or https URL."
-                              : undefined
-                          }
+                          error={settingIssueText(props.issue?.(setting.key))}
                         >
                           <Field.Label>
                             {available() ? settingLabel(setting) : `Saved ${setting.label}`}
                           </Field.Label>
                           <Input
-                            type={setting.kind === "url" ? "url" : "text"}
+                            type={settingInputType(setting.kind)}
                             value={props.value(setting.key)}
                             onInput={(event) =>
                               props.onValueChange(setting.key, event.currentTarget.value)

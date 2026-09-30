@@ -138,6 +138,7 @@ export const View = Schema.Struct({
 export interface View extends Schema.Schema.Type<typeof View> {}
 
 const isUrl = /^https?:\/\/[^\s/?#]+[^\s]*$/;
+const isWholeNumber = /^[1-9]\d{0,14}$/;
 
 /**
  * The problems with settings for an implementation: keys it does not declare, required values
@@ -157,6 +158,8 @@ export const settingIssues = (
       if (setting.required) issues.push(`${setting.label} is required.`);
     } else if (setting.kind === "url" && !isUrl.test(value))
       issues.push(`${setting.label} must be an http or https URL.`);
+    else if (setting.kind === "integer" && !isWholeNumber.test(value))
+      issues.push(`${setting.label} must be a whole number above zero.`);
   }
   return issues;
 };

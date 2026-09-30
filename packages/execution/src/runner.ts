@@ -42,7 +42,45 @@ export interface Options {
    * a tool call the harness started spends running does not count.
    */
   readonly idleTimeout?: Duration.Input | undefined;
+  /** How much of its model's context a turn may use before a checkpoint, and what one keeps. */
+  readonly context?: Partial<ContextPolicy> | undefined;
 }
+
+/**
+ * How a turn's conversation is kept within its model's context window. A turn may use `share` of
+ * the window, less the room its model may need to write (at most `outputReserve` tokens), and at
+ * most `cap` tokens, which bounds what one request costs however large the window; a checkpoint
+ * then keeps `keep` of that budget verbatim and summarizes the rest.
+ */
+export interface ContextPolicy {
+  readonly share: number;
+  readonly outputReserve: number;
+  readonly cap: number;
+  readonly keep: number;
+}
+
+/** The context policy a runner applies unless it is given another. */
+export const defaultContextPolicy: ContextPolicy = {
+  share: 0.8,
+  outputReserve: 32_000,
+  cap: 200_000,
+  keep: 0.4,
+};
+
+/** The tokens a turn may use of a model with these limits, and what a checkpoint keeps. */
+export const contextBudget = (limits: ModelInference.Limits, policy: ContextPolicy) => {
+  const budget = Math.max(
+    1,
+    Math.floor(
+      Math.min(
+        policy.cap,
+        limits.contextTokens * policy.share,
+        limits.contextTokens - Math.min(limits.outputTokens ?? 0, policy.outputReserve),
+      ),
+    ),
+  );
+  return { budget, keep: Math.floor(budget * policy.keep) };
+};
 
 /** A step through the gateway failed; the turn stays as its last commit left it. */
 export type Failure =
@@ -145,7 +183,10 @@ const words = (problem: HarnessErrors.Problem, named: Named, idle: string): stri
   }
 };
 
-/** How many characters of conversation one summary request reads. */
+/**
+ * How many characters of conversation one summary request reads at most: less when the model's
+ * budget is smaller, so each request fits its model.
+ */
 const summaryPass = 200_000;
 
 /** How long a turn waits before running again after its `attempt`th failure: 2, 4, then 8 seconds. */
@@ -162,6 +203,32 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
   const inputWait = Duration.fromInputUnsafe(options.inputWait ?? "1 minute");
   const idleTimeout = Duration.fromInputUnsafe(options.idleTimeout ?? "5 minutes");
   const idle = inWords(idleTimeout);
+  const policy: ContextPolicy = { ...defaultContextPolicy, ...options.context };
+  /** Whether the plan's conversation needs a checkpoint before its model reads it, and what. */
+  const compactionFor = (
+    plan: TurnExecution.Plan,
+    model: ModelInference.Implementation,
+    options: { readonly force?: boolean } = {},
+  ) => {
+    const limits = contextBudget(
+      model.limits(
+        { settings: plan.connection.settings, credential: plan.connection.credential },
+        { model: plan.selection.model },
+      ),
+      policy,
+    );
+    return {
+      ...limits,
+      compaction: TurnLog.compaction(plan.transcript, plan.waiting, {
+        ...limits,
+        fixed: plan.fixed,
+        measured: plan.measured,
+        instructions: plan.instructions,
+        current: plan.history.length,
+        force: options.force,
+      }),
+    };
+  };
   const silent = new HarnessErrors.ExecutionFailed({
     reason: `The model sent nothing for ${idle}.`,
     retryable: true,
@@ -339,6 +406,9 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         const next = yield* prepare;
         if (next._tag !== "Ready") return again;
         if (next.plan.pending !== undefined) {
+          // Input that would take the conversation past its budget waits for a checkpoint, in a
+          // new session.
+          if (compactionFor(next.plan, model).compaction !== undefined) return again;
           yield* submit(running, next.plan.pending);
           working = true;
           waitingSince = undefined;
@@ -372,9 +442,10 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       plan: TurnExecution.Plan,
       model: ModelInference.Implementation,
       compaction: TurnLog.Compaction,
+      budget: number,
     ) {
       const summary = yield* Compaction.summarize(compaction.summarize, {
-        passSize: summaryPass,
+        passSize: Math.min(summaryPass, budget * Transcript.charactersPerToken),
         timeout: idleTimeout,
       }).pipe(
         Effect.provide(
@@ -475,7 +546,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         continue;
       }
       // A checkpoint the history needs comes first; either stops the same way when interrupted.
-      const compaction = plan.compaction;
+      const { compaction, budget } = compactionFor(plan, model);
       yield* step((execution) =>
         execution.attempt(turnId, compaction === undefined ? "session" : "summary"),
       );
@@ -484,7 +555,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         (): Effect.Effect<Effect.Success<Work>, Effect.Error<Work>, Effect.Services<Work>> =>
           compaction === undefined
             ? session(plan, harness, model)
-            : checkpoint(plan, model, compaction),
+            : checkpoint(plan, model, compaction, budget),
       ).pipe(
         Effect.raceFirst(stopped),
         Effect.scoped,

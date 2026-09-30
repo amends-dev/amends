@@ -22,13 +22,15 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   given before more input arrived is posted after that input; a turn that fails or is stopped
   posts nothing, even answers it completed. Each turn continues from the agent's log for the thread, read from its latest
   checkpoint, and reads every message it has not seen, however many. When a turn's history and
-  waiting input pass 300,000 characters, the agent's model summarizes the older part in passes
-  before the turn works, keeping the newest 75,000 characters verbatim; a message longer than
-  40,000 characters is given in pieces, whose older ones can be summarized. A summary that cannot
-  be written interrupts the turn, which retries and then fails. Size is counted in characters, not
-  the tokens providers report, and no model's own context window is known, so one budget serves
-  every model. Summaries happen before a turn rather than in the background after one, which can
-  delay a turn catching up on a long thread; old tool output is not shortened first, a provider that
+  waiting input would pass its budget, a share of the model's context window (at most 200,000
+  tokens), the agent's model summarizes the older part in passes before the turn works, keeping
+  the newest exchanges verbatim; a message longer than 40,000 characters is given in pieces, whose
+  older ones can be summarized. A summary that cannot be written interrupts the turn, which retries
+  and then fails. Size is measured with the tokens providers report for the latest response, and
+  estimated at four characters a token after it; context windows come from the Anthropic
+  connection's model table, or an OpenAI-compatible connection's setting (128,000 tokens without
+  one). Summaries happen before a turn rather than in the background after one, which can delay a
+  turn catching up on a long thread; old tool output is not shortened first, a provider that
   reports the context too long partway through a turn fails it, and no tool lets an agent recall
   exact earlier content. A stopped response keeps only
   the blocks it completed. A reader with a turn's log open follows it as a stream of its items

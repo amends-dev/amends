@@ -307,12 +307,16 @@ transcript read from the log, input asked of the turn and the thread's accepted 
 in, all of it however long the backlog, the turn's own entries, and its attempts since it last got
 further. Before the first turn of a participation starts, its history is every thread message
 before its input (the agent's own as responses), which starting records in the log in entries of a
-bounded size. A message longer than 40,000 characters is given in pieces. When the transcript and
-waiting input would exceed 300,000 characters, `prepare` also proposes a checkpoint keeping the
-newest 75,000 characters of exchanges across both, starting at an input, which the runner records
-with a summary of the rest before working; `checkpoint` records it in the log, from which the
-turn's and the next turn's history start, and when the summary covered waiting input, the position
-it reaches, which counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
+bounded size. A message longer than 40,000 characters is given in pieces. `prepare` also gives the
+waiting input piece by piece with where each came from, the size of the input asked of the turn,
+and what a provider last measured since the latest checkpoint, so the runner, which knows the
+model, can tell with `TurnLog.compaction` whether a checkpoint must come first: in tokens against a
+budget, the newest exchanges within what it keeps, cut at an input or a response and never between
+two pieces of one waiting message, with the turn's own input kept verbatim when the cut falls
+inside its work, and everything kept without reasoning. The runner records it with a summary of
+the rest before working; `checkpoint` records it in the log, from which the turn's and the next
+turn's history start, and when the summary covered waiting input, the position it reaches, which
+counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
 when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal.
 

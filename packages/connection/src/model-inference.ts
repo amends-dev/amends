@@ -14,9 +14,19 @@ export interface Selection {
 }
 
 /**
+ * How much a model takes: the most tokens it reads in one request, its context window, and the
+ * most it writes in one response, when known.
+ */
+export interface Limits {
+  readonly contextTokens: number;
+  readonly outputTokens: number | undefined;
+}
+
+/**
  * The code behind an implementation with model inference support. It turns a connection's access
- * and an agent's selection into Effect AI model access, which a harness such as amends's own uses.
- * A request the provider refuses, such as for a missing or wrong key, fails when it is made.
+ * and an agent's selection into Effect AI model access, which a harness such as amends's own uses,
+ * and says how much the selected model takes, so execution keeps a conversation within it. A
+ * request the provider refuses, such as for a missing or wrong key, fails when it is made.
  */
 export interface Implementation {
   readonly declaration: ConnectionImplementation.Declaration;
@@ -24,6 +34,7 @@ export interface Implementation {
     access: Access,
     selection: Selection,
   ) => Layer.Layer<LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName>;
+  readonly limits: (access: Access, selection: Selection) => Limits;
 }
 
 export * as ModelInference from "./model-inference.ts";
