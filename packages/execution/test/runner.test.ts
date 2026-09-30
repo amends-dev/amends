@@ -118,7 +118,12 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       turn: state.turn,
       instructions: "Be brief.",
       selection: state.turn.selection ?? selection,
-      connection: { implementationId: "test", settings: {}, credential: undefined },
+      connection: {
+        name: "Test models",
+        implementationId: "test",
+        settings: {},
+        credential: undefined,
+      },
       environment: environment(options.sandbox ?? false),
       history: context.history,
       transcript: context.transcript,
@@ -568,7 +573,7 @@ describe("TurnRunner", () => {
         "interrupted retryable",
         "interrupted retryable",
       ]);
-      expect(state.steps.at(-1)).toBe("fail: The model sent nothing for 1 minute.");
+      expect(state.steps.at(-1)).toBe("fail: test-model sent nothing for 1 minute.");
       expect(state.turn.status).toBe("failed");
     }),
   );
@@ -666,8 +671,8 @@ describe("TurnRunner", () => {
         "interrupted retryable",
         "interrupted retryable",
       ]);
-      expect(state.steps.at(-1)).toMatch(
-        /^fail: The earlier conversation could not be summarized/u,
+      expect(state.steps.at(-1)).toBe(
+        "fail: The earlier conversation couldn't be summarized. Test models is limiting requests.",
       );
     }),
   );
@@ -682,9 +687,29 @@ describe("TurnRunner", () => {
 
       expect(state.steps.slice(-2)).toEqual([
         "interrupted final",
-        expect.stringMatching(/^fail: /u),
+        "fail: Test models has no quota left for its API key.",
       ]);
       expect(state.turn.status).toBe("failed");
+    }),
+  );
+
+  it.effect("tells readers what went wrong without the provider's own message", () =>
+    Effect.gen(function* () {
+      const { state, execution } = fakeExecution();
+      const { implementation } = yield* scripted([
+        failure(
+          new AiError.AuthenticationError({
+            kind: "InvalidKey",
+            description: "Incorrect API key provided. (POST http://10.0.0.7:8080/v1/chat)",
+          }),
+        ),
+      ]);
+      const runner = yield* runnerOver(execution, implementation);
+
+      yield* runner.run(workspaceId, turnId);
+
+      expect(state.steps.at(-1)).toBe("fail: Test models didn't accept its API key.");
+      expect(state.turn.failure).toBe("Test models didn't accept its API key.");
     }),
   );
 

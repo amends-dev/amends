@@ -57,7 +57,12 @@ counts as the harness stopping, with a failure worth retrying, so a model that s
 not hold the turn; time a tool call the harness started spends running does not count. A harness
 that stops is recorded as `interrupted` in the turn's log. When its failure is worth retrying, the
 runner waits 2, 4, then 8 seconds and runs a new session from the log, up to `retries` (three)
-times; otherwise it fails the turn with the harness's reason. `abandon` fails a
+times; otherwise it fails the turn. Readers are told the failure's `problem` in words that name
+the connection and model, such as "Anthropic didn't accept its API key." or "claude-sonnet-5 sent
+nothing for 5 minutes."; a summary that fails says the earlier conversation couldn't be
+summarized, and why. The harness's own reason, and a provider's message, which can name addresses
+and request details, go to the host's logs only, as do why an environment did not start or a
+transcript was refused. `abandon` fails a
 turn that runs could not finish.
 
 ## Turns on Effect Cluster

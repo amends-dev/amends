@@ -385,9 +385,13 @@ export function useTurnLog(
             ? { kind: "finished", at }
             : { kind: "replied", at, messageId: current.replyId },
         );
-      else if (current.state === "failed")
-        items.push({ kind: "failed", at, reason: current.failure ?? "" });
-      else if (current.state === "stopped")
+      else if (current.state === "failed") {
+        const reason = current.failure ?? "";
+        // The interruption that ended the turn says what its failure says.
+        const last = items.at(-1);
+        if (last?.kind === "interrupted" && last.reason === reason) items.pop();
+        items.push({ kind: "failed", at, reason });
+      } else if (current.state === "stopped")
         items.push({ kind: "stopped", at, by: current.stoppedBy ?? "request" });
     }
     return items;

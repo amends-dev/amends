@@ -10,6 +10,8 @@ import {
   Session,
   useThreadConversation,
   useThreadTurnControls,
+  useTurnLog,
+  WorkspaceFeedProvider,
   type SessionStore,
   type ThreadTurnEntry,
   type TurnControls,
@@ -305,6 +307,81 @@ it("names why a stop or retry was refused", async () => {
   );
   f.views.controls.dismiss();
   expect(f.views.controls.problem()).toBeUndefined();
+});
+
+it("reads a failed turn's log, telling its end once rather than twice", async () => {
+  const turn = {
+    id: "atlas-1",
+    workspaceId: "one",
+    groupId: "general",
+    threadId: "thread",
+    agentId: "atlas",
+    memberId: "member-atlas",
+    participationId: "p-member-atlas",
+    logAfter: null,
+    historyFrom: null,
+    retryOf: null,
+    status: "failed",
+    inputAfterSequence: 0,
+    acceptedThroughSequence: 1,
+    incorporatedThroughSequence: 1,
+    selection: null,
+    messageIds: [],
+    failure: "Anthropic is limiting requests.",
+    cancelReason: null,
+    createdAt: at(1),
+    startedAt: at(2),
+    finishedAt: at(6),
+    stoppable: false,
+    retryable: true,
+  };
+  const items = [
+    { _tag: "InputTaken", at: at(3), messages: 1 },
+    { _tag: "Interrupted", at: at(4), reason: "Anthropic is limiting requests.", retryable: true },
+    { _tag: "Interrupted", at: at(5), reason: "Anthropic is limiting requests.", retryable: true },
+  ];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const path = new URL(new Request(input, init).url).pathname;
+    if (path === "/me/workspaces")
+      return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
+    if (path === "/workspaces/one/members") return json(members);
+    if (path === "/workspaces/one/turns/atlas-1/log") return json({ turn, items });
+    return json({}, 404);
+  });
+  let view!: ReturnType<typeof useTurnLog>;
+  function Consumer() {
+    view = useTurnLog("one", "atlas-1");
+    return null;
+  }
+  render(() => (
+    <ClientProvider
+      apiBaseUrl="https://host.test"
+      sessionStore={store}
+      transport={FetchHttpClient.layer.pipe(
+        Layer.provide(Layer.succeed(FetchHttpClient.Fetch, fetch)),
+      )}
+    >
+      <DirectoryProvider>
+        <WorkspaceFeedProvider workspaceId="one">
+          <Consumer />
+        </WorkspaceFeedProvider>
+      </DirectoryProvider>
+    </ClientProvider>
+  ));
+  await waitFor(() => expect(view.activity().at(-1)?.kind).toBe("failed"));
+  // The interruption the turn ended on says what its failure says, so only the failure shows.
+  expect(view.activity().map((entry) => entry.kind)).toEqual([
+    "accepted",
+    "started",
+    "input",
+    "interrupted",
+    "failed",
+  ]);
+  expect(view.activity()[3]).toMatchObject({
+    reason: "Anthropic is limiting requests.",
+    retrying: false,
+  });
+  expect(view.activity()[4]).toMatchObject({ reason: "Anthropic is limiting requests." });
 });
 
 it("refreshes a turn's log and the active turns as its facts arrive", () => {

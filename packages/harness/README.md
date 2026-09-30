@@ -88,7 +88,13 @@ A `Harness.Session` follows the core model's stages:
 4. `resume` continues a transcript that awaits a response, and reports `Idle` when nothing is owed.
 
 `events` reports everything in order to one consumer. It fails with `ExecutionFailed`, which says
-whether the same work can be retried unchanged, and later operations fail with it too.
+whether the same work can be retried unchanged, and later operations fail with it too. Its
+`problem` is what the host tells the turn's readers: the model's provider refused the credential,
+ran out of quota, limited requests, could not be reached, failed on its side, declined the content,
+or rejected the request; the model's output could not be used or it went silent; the session ended
+first; or something unexpected. Its `reason` is the detail for the host's logs only.
+`HarnessErrors.fromModel` builds one from an Effect AI failure, and `modelProblem` names the
+problem such a failure is.
 
 `Capabilities.transcript` says a harness prepares its context from any valid transcript, including
 another harness's; `pendingToolCalls` says it takes a result for a call an earlier session left

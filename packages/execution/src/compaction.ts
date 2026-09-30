@@ -4,14 +4,18 @@
  * so a long conversation keeps what matters within its budget without leaving anything out.
  */
 import { TurnLog } from "@amends/core/turn";
-import type { Transcript } from "@amends/harness";
+import { HarnessErrors, type Transcript } from "@amends/harness";
 import { Duration, Effect, Schema } from "effect";
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai";
 
-/** The summary could not be written, and whether trying again may help. */
+/**
+ * The summary could not be written, and whether trying again may help: `problem` is what readers
+ * are told, `reason` the detail for the logs.
+ */
 export class Failed extends Schema.TaggedError<Failed>()("Compaction.Failed", {
   reason: Schema.String,
   retryable: Schema.Boolean,
+  problem: HarnessErrors.Problem,
 }) {}
 
 const instructions = `You keep an agent's memory of a long conversation in a team thread. Summarize the conversation you are given so the agent can continue it without the original. Use exactly this Markdown structure, keeping every section, even when empty:
@@ -131,6 +135,7 @@ export const summarize = Effect.fn("Compaction.summarize")(function* (
           new Failed({
             reason: error.message,
             retryable: AiError.isAiError(error) && error.isRetryable,
+            problem: HarnessErrors.modelProblem(error),
           }),
       ),
       Effect.timeoutOrElse({
@@ -140,16 +145,25 @@ export const summarize = Effect.fn("Compaction.summarize")(function* (
             new Failed({
               reason: `The model sent nothing for ${Duration.format(Duration.fromInputUnsafe(options.timeout))}.`,
               retryable: true,
+              problem: "model-silent",
             }),
           ),
       }),
     );
     if (!/\S/u.test(written))
-      return yield* new Failed({ reason: "The model wrote an empty summary.", retryable: true });
+      return yield* new Failed({
+        reason: "The model wrote an empty summary.",
+        retryable: true,
+        problem: "model-output",
+      });
     summary = written;
   }
   if (summary === undefined)
-    return yield* new Failed({ reason: "There was nothing to summarize.", retryable: false });
+    return yield* new Failed({
+      reason: "There was nothing to summarize.",
+      retryable: false,
+      problem: "unexpected",
+    });
   return summary;
 });
 

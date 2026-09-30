@@ -287,7 +287,8 @@ request key until it goes through, so asking again after a lost answer creates o
 
 `useTurnLog(workspaceId, turnId, { retried })` reads one turn's log and shapes its activity, oldest
 first: accepted, started, each batch of input taken in (the first holding the request), each
-response with its text and whether it became the reply, interruptions, and how it ended. `turn()`
+response with its text and whether it became the reply, interruptions, and how it ended; the
+interruption a failed turn ended on shows only as its failure when both say the same. `turn()`
 adds where it ran and the model access and environment it started with, by provider, model, and
 environment name. `draft()` is the response the agent is writing now, from `TurnDraft` signals:
 their text continues each response part at its offset, a repeat adds nothing, and text past a gap

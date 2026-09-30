@@ -101,6 +101,43 @@ const inWords = (duration: Duration.Duration) => {
     : `${seconds} second${seconds === 1 ? "" : "s"}`;
 };
 
+/** What a turn's readers know its model access by: the connection's name, and the model's. */
+interface Named {
+  readonly connection: string;
+  readonly model: string;
+}
+
+/**
+ * Why a run stopped, in words for the turn's readers: its problem, naming the connection and
+ * model, never the provider's own message, which can name addresses they should not see.
+ */
+const words = (problem: HarnessErrors.Problem, named: Named, idle: string): string => {
+  switch (problem) {
+    case "model-access":
+      return `${named.connection} didn't accept its API key.`;
+    case "model-quota":
+      return `${named.connection} has no quota left for its API key.`;
+    case "model-rate-limit":
+      return `${named.connection} is limiting requests.`;
+    case "model-unreachable":
+      return `${named.connection} couldn't be reached.`;
+    case "model-provider":
+      return `${named.connection} had a problem on its side.`;
+    case "model-content-policy":
+      return `${named.connection} declined the request under its content policy.`;
+    case "model-request":
+      return `${named.connection} rejected the request for ${named.model}.`;
+    case "model-output":
+      return `${named.model}'s response couldn't be used.`;
+    case "model-silent":
+      return `${named.model} sent nothing for ${idle}.`;
+    case "ended":
+      return "The agent's environment stopped before the turn finished.";
+    case "unexpected":
+      return "Something unexpected stopped the turn.";
+  }
+};
+
 /** How many characters of conversation one summary request reads. */
 const summaryPass = 200_000;
 
@@ -117,9 +154,11 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
   const retries = options.retries ?? 3;
   const inputWait = Duration.fromInputUnsafe(options.inputWait ?? "1 minute");
   const idleTimeout = Duration.fromInputUnsafe(options.idleTimeout ?? "5 minutes");
+  const idle = inWords(idleTimeout);
   const silent = new HarnessErrors.ExecutionFailed({
-    reason: `The model sent nothing for ${inWords(idleTimeout)}.`,
+    reason: `The model sent nothing for ${idle}.`,
     retryable: true,
+    problem: "model-silent",
   });
 
   const run = Effect.fn("TurnRunner.run")(function* (workspaceId: Workspace.Id, turnId: Turn.Id) {
@@ -160,20 +199,38 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         { id: Environment.DefinitionId.make(plan.environment.id), harness },
         { sessionId, instructions: plan.instructions },
       ).pipe(Effect.provideContext(access), Effect.result);
-      if (Result.isFailure(spawned))
-        return unrunnable(`The environment could not start: ${spawned.failure._tag}.`);
+      if (Result.isFailure(spawned)) {
+        yield* Effect.logWarning("Turn environment did not start", {
+          workspaceId,
+          turnId,
+          failure: spawned.failure,
+        });
+        return unrunnable("The agent's environment couldn't start.");
+      }
       const running = spawned.success;
       yield* Effect.addFinalizer(() => Effect.ignore(running.release));
 
       const transcript = plan.transcript;
       const summary = Transcript.summarize(transcript);
-      if (Result.isFailure(summary))
-        return unrunnable(`The conversation could not be continued: ${summary.failure}`);
+      if (Result.isFailure(summary)) {
+        yield* Effect.logWarning("Turn transcript is invalid", {
+          workspaceId,
+          turnId,
+          reason: summary.failure,
+        });
+        return unrunnable("The agent's conversation so far couldn't be continued.");
+      }
       if (summary.success.pending.length > 0)
         return unrunnable("The turn is waiting on tool calls, which can't run yet.");
       const prepared = yield* Effect.result(running.prepare(transcript));
-      if (Result.isFailure(prepared))
-        return unrunnable(`The conversation could not be continued: ${prepared.failure._tag}.`);
+      if (Result.isFailure(prepared)) {
+        yield* Effect.logWarning("Turn transcript was refused", {
+          workspaceId,
+          turnId,
+          failure: prepared.failure,
+        });
+        return unrunnable("The agent's conversation so far couldn't be continued.");
+      }
 
       const pull = yield* Stream.toPull(running.events);
       /** Text of each response block not yet shown to readers, and how much of it they have. */
@@ -210,6 +267,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
             new HarnessErrors.ExecutionFailed({
               reason: "The environment ended before the turn finished.",
               retryable: true,
+              problem: "ended",
             }),
           ),
         ),
@@ -311,13 +369,6 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
             { model: plan.selection.model },
           ),
         ),
-        Effect.mapError(
-          (failure) =>
-            new HarnessErrors.ExecutionFailed({
-              reason: `The earlier conversation could not be summarized: ${failure.reason}`,
-              retryable: failure.retryable,
-            }),
-        ),
       );
       yield* step((execution) =>
         execution.checkpoint(turnId, {
@@ -339,6 +390,37 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         return yield* step((execution) => execution.fail(turnId, preparation.reason));
       const plan = preparation.plan;
       const fail = (reason: string) => step((execution) => execution.fail(turnId, reason));
+      const named = { connection: plan.connection.name, model: plan.selection.model };
+      /**
+       * Record why the run stopped, in words, and run it again when that may help; the detail goes
+       * to the logs only.
+       */
+      const interrupt = (
+        failure: HarnessErrors.ExecutionFailed | Compaction.Failed,
+        text: string,
+      ) =>
+        Effect.gen(function* () {
+          yield* step((execution) =>
+            execution.interrupted(turnId, { reason: text, retryable: failure.retryable }),
+          );
+          const detail = {
+            workspaceId,
+            turnId,
+            problem: failure.problem,
+            reason: failure.reason,
+          };
+          if (!failure.retryable || retried >= retries) {
+            yield* Effect.logWarning("Turn failed", detail);
+            return unrunnable(text);
+          }
+          retried += 1;
+          yield* Effect.logWarning("Turn interrupted; running it again", {
+            ...detail,
+            attempt: retried,
+          });
+          yield* Effect.sleep(backoff(retried));
+          return again;
+        });
       if (plan.environment.sandbox !== null)
         return yield* fail("Environments with a sandbox can't run turns yet.");
       const harness = harnesses.get(plan.environment.harnessId);
@@ -346,7 +428,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         return yield* fail(`The ${plan.environment.harnessId} harness doesn't run on this server.`);
       const model = models.get(plan.connection.implementationId);
       if (model === undefined)
-        return yield* fail(`${plan.connection.implementationId} models can't run on this server.`);
+        return yield* fail(`${plan.connection.name}'s models can't run on this server.`);
       if (plan.turn.status === "queued") {
         // Starting may record the thread's history in the agent's log, so prepare again after it;
         // a turn stopped before it started is found finished.
@@ -357,33 +439,24 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       }
       // A checkpoint the history needs comes first; either stops the same way when interrupted.
       const compaction = plan.compaction;
-      const ending = yield* Effect.suspend(() =>
-        compaction === undefined
-          ? session(plan, harness, model)
-          : checkpoint(plan, model, compaction),
+      type Work = ReturnType<typeof session> | ReturnType<typeof checkpoint>;
+      const ending = yield* Effect.suspend(
+        (): Effect.Effect<Effect.Success<Work>, Effect.Error<Work>, Effect.Services<Work>> =>
+          compaction === undefined
+            ? session(plan, harness, model)
+            : checkpoint(plan, model, compaction),
       ).pipe(
         Effect.raceFirst(stopped),
         Effect.scoped,
-        Effect.catchTag("Harness.ExecutionFailed", (failure) =>
-          Effect.gen(function* () {
-            yield* step((execution) =>
-              execution.interrupted(turnId, {
-                reason: failure.reason,
-                retryable: failure.retryable,
-              }),
-            );
-            if (!failure.retryable || retried >= retries) return unrunnable(failure.reason);
-            retried += 1;
-            yield* Effect.logWarning("Turn interrupted; running it again", {
-              workspaceId,
-              turnId,
-              attempt: retried,
-              reason: failure.reason,
-            });
-            yield* Effect.sleep(backoff(retried));
-            return again;
-          }),
-        ),
+        Effect.catchTags({
+          "Harness.ExecutionFailed": (failure) =>
+            interrupt(failure, words(failure.problem, named, idle)),
+          "Compaction.Failed": (failure) =>
+            interrupt(
+              failure,
+              `The earlier conversation couldn't be summarized. ${words(failure.problem, named, idle)}`,
+            ),
+        }),
       );
       if (ending._tag === "Finished") return;
       if (ending._tag === "Unrunnable")

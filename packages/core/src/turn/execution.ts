@@ -85,6 +85,8 @@ export interface Plan {
   readonly instructions: string;
   readonly selection: Turn.Selection;
   readonly connection: {
+    /** The name its readers know it by, for wording what went wrong with it. */
+    readonly name: string;
     readonly implementationId: string;
     readonly settings: Readonly<Record<string, string>>;
     readonly credential: Redacted.Redacted<string> | undefined;
@@ -531,6 +533,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       instructions: agent.value.instructions,
       selection,
       connection: {
+        name: connection.value.name,
         implementationId: connection.value.implementationId,
         settings: connection.value.settings,
         credential,

@@ -1,6 +1,6 @@
 import { Cause, Effect, Option, Queue, Ref, Result, Schema, Semaphore, Stream } from "effect";
 import type { JsonSchema } from "effect";
-import { AiError, LanguageModel, Model, Tool } from "effect/unstable/ai";
+import { LanguageModel, Model, Tool } from "effect/unstable/ai";
 import type { Response, Toolkit } from "effect/unstable/ai";
 import {
   Harness,
@@ -54,16 +54,13 @@ const summaryOf = (transcript: ReadonlyArray<Transcript.Item>) =>
     (reason) => new Error(`The amends harness built an invalid transcript: ${reason}`),
   );
 
-const executionFailed = (error: unknown) =>
-  new HarnessErrors.ExecutionFailed({
-    reason: error instanceof Error ? error.message : String(error),
-    retryable: AiError.isAiError(error) && error.isRetryable,
-  });
+const executionFailed = HarnessErrors.fromModel;
 
 const unsupported = (what: string) =>
   new HarnessErrors.ExecutionFailed({
     reason: `The amends harness cannot record ${what}.`,
     retryable: false,
+    problem: "model-output",
   });
 
 /**
@@ -404,7 +401,11 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
       return stop(
         error instanceof HarnessErrors.ExecutionFailed
           ? error
-          : new HarnessErrors.ExecutionFailed({ reason: Cause.pretty(cause), retryable: false }),
+          : new HarnessErrors.ExecutionFailed({
+              reason: Cause.pretty(cause),
+              retryable: false,
+              problem: "unexpected",
+            }),
       );
     }),
     Effect.forkScoped,
