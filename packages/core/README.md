@@ -296,8 +296,22 @@ with a summary of the rest before working; `checkpoint` records it with `TurnFac
 from which the turn's and the next turn's history start, and when the summary covered waiting
 input, the position it reaches, which counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
 when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
-readers more of a response before it completes, as a `TurnDraft` signal, and `report` and
-`interrupted` publish `TurnLogged` after their commits, so readers read the log again.
+readers more of a response before it completes, as a `TurnDraft` signal.
+
+`TurnApplication.watchLog` follows a turn's log for a reader who may open its thread, as a stream
+of `Turn.LogMessage`s. It tails the agent's log with `Log.tail`, from the turn's `logAfter`,
+keeping the turn's entries until another turn's begin, and reads them with `TurnLog.read`, the
+reading `log` returns: `Opened` carries the items as they stand, and `Changed` the items each new
+batch adds or changes, by index. The turn's end is a fact in the workspace journal rather than an
+entry in its agent's log, so it also subscribes to the journal follower the change feed shares,
+`ChangeFeedSource`; on the turn's end it reads the agent's log once more, sends what that adds, and
+sends `Ended`. It passes on the turn's `TurnDraft` signals as `Drafted`, first what the response being written
+holds so far: a draft carries only what follows the text before it, so `TurnDrafts` holds each
+turn's drafts in memory as they reach the process, forgetting a turn's ten minutes after its last,
+and a reader who starts following mid-response begins with them. Both subscriptions
+register before the turn and its log are read, so nothing committed or published in between is
+missed. Each batch checks that the reader still may open the thread; a stream that cannot go on
+fails with `Turn.LogUnavailable`.
 
 A turn's changes also show in its thread's timeline, recorded as thread activity in the commits
 that make them (the `TurnActivity` kinds, which `TurnActivityRecorder` records): `turn.created` where the agent took on the work, or where a retry
@@ -599,11 +613,12 @@ message schemas. Frontend query dependencies belong in the client.
 ## Signals
 
 `@amends/core/signal` holds what is happening now and is never stored: `Signal.Value` is `Typing`,
-`ThreadRead`, `GroupCaughtUp`, `NotificationsSeen`, `TurnDraft`, or `TurnLogged`.
-`Signal.reachOf` gives each its audience, as a fact declares one: typing and turns' progress reach
+`ThreadRead`, `GroupCaughtUp`, `NotificationsSeen`, or `TurnDraft`.
+`Signal.reachOf` gives each its audience, as a fact declares one: typing and a turn's drafts reach
 the thread's group with `thread.read` for the thread, and
 the three read-state signals reach only the member whose private state changed, so their other
-sessions stay current without the journal.
+sessions stay current without the journal. `Signal.inChangeFeed` leaves a turn's drafts out of the
+change feed: they reach only readers following the turn's log.
 
 `Signals.Service` is the workspace's delivery, a required host binding: `publish` offers a signal
 to the subscribers present at that moment, in every process over the same storage, and

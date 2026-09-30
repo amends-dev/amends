@@ -36,21 +36,16 @@ export const workspaceKey = (workspaceId: string, resource: WorkspaceResource) =
 
 /**
  * Reads of one group, thread, or turn: a group's stream or roster, a thread's timeline or
- * participants, or a turn's log. Each registers under its collection and its own
+ * participants, or a turn. Each registers under its collection and its own
  * ID, so one can be invalidated alone and a collection all at once.
  */
-export type WorkspaceCollection =
-  | "streams"
-  | "timelines"
-  | "rosters"
-  | "participants"
-  | "turn-logs";
+export type WorkspaceCollection = "streams" | "timelines" | "rosters" | "participants" | "turns";
 export const workspaceCollections: ReadonlyArray<WorkspaceCollection> = [
   "streams",
   "timelines",
   "rosters",
   "participants",
-  "turn-logs",
+  "turns",
 ];
 export const collectionKey = (workspaceId: string, collection: WorkspaceCollection) =>
   `workspace/${workspaceId}/${collection}`;

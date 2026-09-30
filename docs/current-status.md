@@ -31,8 +31,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   delay a turn catching up on a long thread; old tool output is not shortened first, a provider that
   reports the context too long partway through a turn fails it, and no tool lets an agent recall
   exact earlier content. A stopped response keeps only
-  the blocks it completed. Its text streams to readers as signals, best effort: a draft missed
-  while reconnecting shows once its block completes. A stop request is noticed by polling, within a
+  the blocks it completed. A reader with a turn's log open follows it as a stream of its items
+  and the response being written; the text being written is best effort, and a draft missed while
+  reconnecting shows once its block completes. A stop request is noticed by polling, within a
   second. A model that sends nothing for five minutes while a turn waits on it interrupts the run,
   which runs again as other interruptions do, so a turn whose model keeps hanging fails after about
   twenty minutes; no deadline bounds a turn's whole length. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each

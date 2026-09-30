@@ -214,7 +214,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/settings",
     "workspace/one/streams",
     "workspace/one/timelines",
-    "workspace/one/turn-logs",
+    "workspace/one/turns",
   ]);
   // Reading a thread settles notifications from it.
   expect(signalKeys("one", { _tag: "ThreadRead" })).toEqual([

@@ -28,7 +28,8 @@ states of a turn at work.
   activity with times: work accepted, the turn started, each batch of the thread's input taken in,
   each response, interruptions it recovered from, and how it ended. While the agent writes, its
   reply streams into a draft marked "not posted to the thread yet", which the completed response
-  replaces. The footer follows live; scrolling up keeps the reader where they are and offers "New
+  replaces. The log follows the turn over its own stream, which opens with the log as it stands
+  and carries each change and the text being written until the turn ends. The footer follows live; scrolling up keeps the reader where they are and offers "New
   activity · Jump to latest". While live updates reconnect, the log says so, pauses the draft, and
   shows when it last updated; a failed turn offers Retry turn and the agent's settings, and a
   completed one View reply in thread. On phones the log is full-screen.

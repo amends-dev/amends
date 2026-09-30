@@ -33,6 +33,7 @@ import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
 import { TurnActivityRecorder } from "./turn/activity-recorder.ts";
+import { TurnDrafts } from "./turn/drafts.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { NotificationSource } from "./notification/source.ts";
 import { GroupMembershipDeparture } from "./group/membership/departure.ts";
@@ -201,9 +202,13 @@ const activityReading = ThreadActivityReading.layer.pipe(
 );
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
 const threadReading = ThreadReading.layer;
-/** One journal follower per workspace runtime, shared by its change-feed subscribers. */
+/**
+ * One journal follower per workspace runtime, shared by its change-feed subscribers and by readers
+ * following a turn's log, who learn from it when the turn ends.
+ */
+const changeSource = ChangeFeedSource.layer();
 const changeFeed = ChangeFeedApplication.layer.pipe(
-  Layer.provide(Layer.mergeAll(ChangeFeedSource.layer(), GrantResolver.layer)),
+  Layer.provide(Layer.mergeAll(changeSource, GrantResolver.layer)),
 );
 
 /**
@@ -249,6 +254,8 @@ const operations = Layer.mergeAll(
       groupDeparture,
       messagePublication,
       turnActivity,
+      changeSource,
+      TurnDrafts.layer,
       RequestReceipts.layer,
     ),
   ),

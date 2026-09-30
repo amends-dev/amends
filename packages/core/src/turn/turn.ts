@@ -167,4 +167,38 @@ export type LogItem = typeof LogItem.Type;
 export const LogView = Schema.Struct({ turn: View, items: Schema.Array(LogItem) });
 export interface LogView extends Schema.Schema.Type<typeof LogView> {}
 
+/** An item of a turn's log at its place among the items: new there, or replacing what was. */
+export const LogChange = Schema.Struct({
+  index: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  item: LogItem,
+});
+export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
+
+/**
+ * What following a turn's log delivers, as its agent's log grows. `Opened` starts every
+ * subscription with the items as they stand. `Changed` carries the items later entries added or
+ * changed, each at its index: a response's text grows block by block, and whether it is a reply
+ * can change as input follows it. `Drafted` carries more of the response being written before its
+ * block completes, at `offset` characters into its part; a reader that misses some waits for the
+ * block. `Ended` follows the turn's end, once every item is delivered, and the stream closes.
+ */
+export const LogMessage = Schema.TaggedUnion({
+  Opened: { items: Schema.Array(LogItem) },
+  Changed: { changes: Schema.Array(LogChange) },
+  Drafted: {
+    responseId: Schema.NonEmptyString,
+    part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+    text: Schema.String,
+  },
+  Ended: {},
+}).annotate({ identifier: "TurnLogMessage" });
+export type LogMessage = typeof LogMessage.Type;
+
+/** Following the log stopped short; the reader follows it again from the start. */
+export class LogUnavailable extends Schema.TaggedError<LogUnavailable>()(
+  "Turn.LogUnavailable",
+  {},
+) {}
+
 export * as Turn from "./turn.ts";

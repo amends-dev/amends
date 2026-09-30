@@ -27,7 +27,7 @@ import {
 import { ReadStateApplication } from "@amends/core/attention";
 import { ConnectionApplication } from "@amends/core/connection";
 import { AgentApplication } from "@amends/core/agent";
-import { TurnApplication } from "@amends/core/turn";
+import { Turn, TurnApplication } from "@amends/core/turn";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { SignalApplication } from "@amends/core/signal";
 import { Request } from "@amends/core/request";
@@ -69,6 +69,7 @@ export class InvalidInput extends Schema.TaggedError<InvalidInput>()("Gateway.In
 export const PublicError = Schema.Union([
   WorkspaceSettingsApplication.Changed,
   ChangeFeed.Unavailable,
+  Turn.LogUnavailable,
   NotMember,
   WorkspaceNotFound,
   Request.Reused,

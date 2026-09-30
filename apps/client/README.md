@@ -285,17 +285,22 @@ request key until it goes through, so asking again after a lost answer creates o
 (`stop-failed`, `retry-failed`, `finished`, `still-running`, `replied`, `superseded`, `departed`,
 `denied`, or `gone`), until another command starts or it is dismissed.
 
-`useTurnLog(workspaceId, turnId, { retried })` reads one turn's log and shapes its activity, oldest
-first: accepted, started, each batch of input taken in (the first holding the request), each
+`useTurnLog(workspaceId, turnId, { retried })` reads one turn and follows its log, shaping its
+activity, oldest first: accepted, started, each batch of input taken in (the first holding the request), each
 response with its text and whether it became the reply, interruptions, and how it ended; the
 interruption a failed turn ended on shows only as its failure when both say the same. `turn()`
 adds where it ran and the model access and environment it started with, by provider, model, and
-environment name. `draft()` is the response the agent is writing now, from `TurnDraft` signals:
-their text continues each response part at its offset, a repeat adds nothing, and text past a gap
-marks the draft broken until the completed response in the log replaces it; a turn that ends drops
-its drafts. `reconnecting()` and `updatedAt()` say when live updates are down, and the log's own
-key refreshes on the turn's facts and each `TurnLogged` signal. Its `stop` and `retry` refresh the
-log too, and `retried` receives the turn a retry queued.
+environment name. The turn is a read keyed by the turn, which its facts refresh; the log is
+followed by `turnLogFeed`, one subscription to `GET …/turns/:turnId/log/events` per turn while
+mounted, which opens with the log's items, applies each change in place, and stops once the turn
+ended and its last items arrived. A dropped subscription reconnects with the workspace feed's
+backoff and opens with the items as they stand. `draft()` is the response the agent is writing
+now, from its drafts: their text continues each response part at its offset, a repeat adds
+nothing, and text past a gap marks the draft broken until the completed response in the log
+replaces it; a turn that ends drops its drafts. `reconnecting()` says when the workspace feed or
+the log's subscription has been down for more than two seconds, and `updatedAt()` when the log
+last arrived. Its `stop` and `retry` refresh the turn too, and `retried` receives the turn a retry
+queued.
 
 `useTurnActivity(workspaceId)` reads the workspace's active turns in threads the reader may open,
 for marks where agents are at work: `inThread`, `inGroup` (working, then stopping, then queued),

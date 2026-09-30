@@ -324,15 +324,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       ? Effect.void
       : Effect.fail(new NotActive({ turnId: turn.id, status: turn.status }));
   const submittedKey = (batchId: string) => Log.IdempotencyKey.make(`submitted:${batchId}`);
-  /** Tell the turn's readers its log grew, once the commit that grew it is done. */
-  const logged = (turn: Turn.Record) =>
-    signals.publish({
-      _tag: "TurnLogged",
-      workspaceId,
-      groupId: turn.groupId,
-      threadId: turn.threadId,
-      turnId: turn.id,
-    });
 
   /** Every thread message in a sequence range, oldest first, read a page at a time. */
   const messagesIn = Effect.fnUntraced(function* (
@@ -642,7 +633,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         });
       }),
     );
-    yield* logged(turn);
     return turn;
   });
 
@@ -708,7 +698,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         return Turn.change(turn, { incorporatedThroughSequence: through });
       }),
     );
-    if (events.length > 0) yield* logged(reported);
     return reported;
   });
 
@@ -716,7 +705,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     turnId: Turn.Id,
     stop: { readonly reason: string; readonly retryable: boolean },
   ) {
-    const turn = yield* asAgent(turnId)((turn) =>
+    yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["running", "cancelling"]);
         const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(stop.reason);
@@ -729,7 +718,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         return turn;
       }),
     );
-    yield* logged(turn);
   });
 
   const draft = Effect.fn("TurnExecution.draft")(function* (

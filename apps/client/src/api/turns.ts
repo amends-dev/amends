@@ -24,21 +24,24 @@ export const activeTurnsRead = (client: ApiClient, workspaceId: string) => {
   });
 };
 
-/** A turn with its log, following its facts and its log's growth. Undefined for invalid IDs. */
-export const turnLogRead = (client: ApiClient, workspaceId: string, turnId: string) => {
+/**
+ * A turn as the reader sees it, following its facts: where it stands and what they may do with it.
+ * Its log is followed apart, by `turnLogFeed`. Undefined for invalid IDs.
+ */
+export const turnRead = (client: ApiClient, workspaceId: string, turnId: string) => {
   const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
   const turn = Schema.decodeOption(Turn.Id)(turnId);
   if (Option.isNone(workspace) || Option.isNone(turn)) return undefined;
-  return client.query("turns", "log", {
+  return client.query("turns", "get", {
     params: { workspaceId: workspace.value, turnId: turn.value },
-    reactivityKeys: itemKeys(workspaceId, "turn-logs", turnId),
+    reactivityKeys: itemKeys(workspaceId, "turns", turnId),
   });
 };
 
 /** A new retry attempt; asking again with the same key returns the turn it created. */
 export const newTurnRequestKey = newWorkspaceRequestKey;
 
-/** A stop or retry; `log` also refreshes the turn's log, for a reader who has it open. */
+/** A stop or retry; `log` also refreshes the turn, for a reader who has its log open. */
 export type TurnCommand = (
   | { readonly kind: "stop"; readonly turnId: string }
   | {
@@ -49,7 +52,7 @@ export type TurnCommand = (
 ) & { readonly log?: boolean };
 
 /**
- * Stop or retry a turn, then refresh its thread's timeline, when given, and its log, when asked,
+ * Stop or retry a turn, then refresh its thread's timeline, when given, and the turn, when asked,
  * before answering, so a completed command is followed by the state it produced. Answers with the
  * turn it acted on, or for a retry, the new turn.
  */
@@ -67,8 +70,8 @@ export const turnsRequest = (client: ApiClient, workspace: string, thread: strin
           : yield* api.turns.retry({ params, headers: { "idempotency-key": input.key } });
       const timeline = thread === undefined ? undefined : timelineRead(client, workspace, thread);
       if (timeline !== undefined) yield* Effect.ignore(refreshResult(get, timeline.atom));
-      const log = input.log ? turnLogRead(client, workspace, input.turnId) : undefined;
-      if (log !== undefined) yield* Effect.ignore(refreshResult(get, log));
+      const read = input.log ? turnRead(client, workspace, input.turnId) : undefined;
+      if (read !== undefined) yield* Effect.ignore(refreshResult(get, read));
       return turn;
     }),
   );

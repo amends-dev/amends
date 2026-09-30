@@ -12,8 +12,9 @@ and cache invalidation; apps mount it once per workspace view; features show its
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
    each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`,
    `public-groups`, `inbox`, `permissions`, `connections`, `environments`, and `agents`, and one key
-   per group stream, group roster, thread timeline, thread participants, a thread's agents'
-   turns, and a turn's log within their collections, and `active-turns` for the workspace.
+   per group stream, group roster, thread timeline, thread participants, and turn within their
+   collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
+   follows it by its own stream (see the [turn guide](turns.md)).
 3. Each `Committed` message maps its events to the keys they affect
    (`apps/client/src/api/changes.ts`) and invalidates each once, so every affected read
    refreshes once. A member's rename refreshes the members and the directory. Group creation,
@@ -33,10 +34,10 @@ and cache invalidation; apps mount it once per workspace view; features show its
    account connection. Every `environment.*` fact refreshes the environments and the installed
    harnesses and providers, which share theirs. The agents follow every `agent.*` fact, and the
    connection, environment, membership, and grant facts their readiness, names, and access
-   follow; an agent's environment choices refresh with them. Every `turn.*` fact names its
-   thread and turn, so it refreshes that thread's turns, the turn's log, and the active turns, as
-   an agent leaving the thread refreshes its turns there, since it can no longer retry them; group
-   membership and grant changes refresh every thread's turns and the active turns. A commit that
+   follow; an agent's environment choices refresh with them. Every `turn.*` fact names its turn, so
+   it refreshes that turn and the active turns; a thread's turns show in its timeline, which the
+   turn activity recorded there refreshes. Group membership and grant changes refresh the active
+   turns. A commit that
    carries a notification for the reader refreshes the inbox and the groups' pending counts. Mounted reads
    refetch; unmounted reads refetch when next mounted. A read that loses access keeps its last
    value, so the stream and thread panel replace what they show with an unavailable state once a
@@ -82,8 +83,9 @@ it against the values then shown. Background refreshes never mark settings pendi
   moment each names, or until that member's message is published, and never show the reader. They
   are not replayed, so a reconnect starts with nobody typing. The notifications a commit carries
   refresh the inbox by refetching it rather than being added to it from the message.
-- Each open workspace view holds one HTTP connection. Browsers allow about six per origin over
-  HTTP/1.1, shared across tabs; production should serve the API over HTTP/2.
+- Each open workspace view holds one HTTP connection, and an open turn log one more while it
+  follows the turn. Browsers allow about six per origin over HTTP/1.1, shared across tabs;
+  production should serve the API over HTTP/2.
 - The desktop content security policy already permits the configured API origin for streams.
 
 ## Verification

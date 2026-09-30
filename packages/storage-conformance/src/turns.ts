@@ -18,7 +18,7 @@ import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { HarnessEvent, Transcript } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, Queue, Stream } from "effect";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import { alice, boundTo, Support, testImplementation } from "./support.ts";
@@ -48,6 +48,47 @@ const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
       threads.readTimeline(threadId, { limit: 50 }),
     ),
   );
+/**
+ * Follow a turn's log as alice, for the enclosing scope: each message as it arrives, and whether the
+ * stream has finished.
+ */
+const followLog = (id: Workspace.Id, turnId: Turn.Id) =>
+  Effect.gen(function* () {
+    const gateway = yield* Gateway.Service;
+    const stream = yield* gateway.asMemberScoped(
+      id,
+      alice,
+      Effect.flatMap(TurnApplication.Service, (turns) => turns.watchLog(turnId)),
+    );
+    const queue = yield* Queue.unbounded<Turn.LogMessage | "done">();
+    yield* stream.pipe(
+      Stream.runForEach((message) => Queue.offer(queue, message)),
+      Effect.andThen(Queue.offer(queue, "done")),
+      Effect.forkScoped,
+    );
+    return Queue.take(queue).pipe(Effect.timeout("10 seconds"));
+  });
+/** A log message in brief: its kind, and the items or text it carries. */
+const brief = (message: Turn.LogMessage | "done") => {
+  if (message === "done") return "done";
+  switch (message._tag) {
+    case "Opened":
+      return `opened ${message.items.map((item) => item._tag).join(",")}`;
+    case "Changed":
+      return `changed ${message.changes
+        .map(({ index, item }) =>
+          item._tag === "Responded"
+            ? `${index}:${item.text}${item.reply ? " (reply)" : ""}`
+            : `${index}:${item._tag}`,
+        )
+        .join(",")}`;
+    case "Drafted":
+      return `drafted ${message.text}`;
+    case "Ended":
+      return "ended";
+  }
+};
+
 /** A timeline item in brief: a message's text, or a turn's change. */
 const told = (item: ThreadTimeline.Item) => {
   if ("message" in item) return `message: ${item.message.text}`;
@@ -374,6 +415,74 @@ export const turns = (harness: ConformanceHarness) => {
               yield* accept(workspace.id);
               expect(yield* turnsOf(workspace.id, threadId)).toHaveLength(1);
             }),
+          ),
+        ),
+      60_000,
+    );
+
+    it.effect(
+      "a reader follows a turn's log: its items as they stand, each change, drafts, and its end",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.scoped(
+              Effect.gen(function* () {
+                const { workspace, agent, selection } = yield* workspaceWithAgent;
+                const started = yield* start(workspace.id, "Scout, summarize the plan.", [
+                  agent.memberId,
+                ]);
+                const threadId = started.thread.id;
+                yield* accept(workspace.id);
+                const [queued] = yield* turnsOf(workspace.id, threadId);
+                const turnId = queued!.id;
+                const run = <A, E>(
+                  step: (execution: TurnExecution.Interface) => Effect.Effect<A, E>,
+                ) => execute(workspace.id, Effect.flatMap(TurnExecution.Service, step));
+
+                // A queued turn has written nothing yet.
+                const next = yield* followLog(workspace.id, turnId);
+                expect(brief(yield* next)).toBe("opened ");
+                const first = batch("b1", "Scout, summarize the plan.");
+                yield* run((execution) =>
+                  Effect.gen(function* () {
+                    yield* execution.start(turnId, selection);
+                    yield* execution.submitted(turnId, {
+                      batchId: first.id,
+                      throughSequence: started.activity.sequence,
+                    });
+                    yield* execution.report(turnId, reported(took(first)));
+                  }),
+                );
+                expect(brief(yield* next)).toBe("changed 0:InputTaken");
+                // A response being written reaches the reader before its block completes.
+                yield* run((execution) =>
+                  execution.draft(turnId, { responseId: "r1", part: 0, offset: 0, text: "The " }),
+                );
+                expect(brief(yield* next)).toBe("drafted The ");
+                // A reader who starts following mid-response sees what it has written so far.
+                yield* Effect.yieldNow;
+                const late = yield* followLog(workspace.id, turnId);
+                expect(brief(yield* late)).toBe("opened InputTaken");
+                expect(brief(yield* late)).toBe("drafted The ");
+                yield* run((execution) =>
+                  execution.report(turnId, reported(...answered("r1", "The plan is on track."))),
+                );
+                expect(brief(yield* next)).toBe("changed 1:The plan is on track. (reply)");
+                expect(brief(yield* late)).toBe("changed 1:The plan is on track. (reply)");
+                // Closing records nothing more in the log; the turn's end says every item arrived.
+                yield* run((execution) => execution.close(turnId));
+                expect(brief(yield* next)).toBe("ended");
+                expect(yield* next).toBe("done");
+                expect(brief(yield* late)).toBe("ended");
+
+                // Following a turn that ended opens with its items and ends at once.
+                const again = yield* followLog(workspace.id, turnId);
+                expect(brief(yield* again)).toBe("opened InputTaken,Responded");
+                expect(brief(yield* again)).toBe("ended");
+                expect(yield* again).toBe("done");
+              }),
+            ),
           ),
         ),
       60_000,

@@ -12,9 +12,10 @@ const view = Turn.View.annotate({ identifier: "Turn" });
 
 /**
  * Agents' turns: each agent's attempt at the work asked of it on a thread, which a reader of the
- * thread may follow, with its log. Whoever may direct the agent may stop an active turn, or retry
- * one that failed or stopped; each turn says whether the caller may do either now. The
- * workspace's active turns are those in threads the caller may open.
+ * thread may follow, with its log: read at once, or followed as a stream of its items and the
+ * response being written until the turn ends. Whoever may direct the agent may stop an active
+ * turn, or retry one that failed or stopped; each turn says whether the caller may do either now.
+ * The workspace's active turns are those in threads the caller may open.
  */
 export class TurnsGroup extends HttpApiGroup.make("turns")
   .add(
@@ -39,6 +40,16 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
       params: turn,
       success: Turn.LogView.annotate({ identifier: "TurnLog" }),
       error: [...ApiErrors.member, ApiErrors.TurnNotFound],
+    }),
+    HttpApiEndpoint.get("watchLog", "/turns/:turnId/log/events", {
+      params: turn,
+      success: HttpApiSchema.StreamSse({ data: Turn.LogMessage, error: Turn.LogUnavailable }),
+      error: [
+        ...ApiErrors.member,
+        ApiErrors.TurnNotFound,
+        Turn.LogUnavailable.pipe(HttpApiSchema.status(503)),
+        ApiErrors.TooManyStreams,
+      ],
     }),
     HttpApiEndpoint.post("cancel", "/turns/:turnId/cancel", {
       params: turn,

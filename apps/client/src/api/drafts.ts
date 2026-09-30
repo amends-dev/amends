@@ -1,5 +1,3 @@
-import { Atom } from "effect/unstable/reactivity";
-
 /**
  * Text a response part holds before it completes, as its turn's drafts carried it. A draft that
  * missed some of its text is `broken`: what arrived after the gap is not shown, and the completed
@@ -11,12 +9,8 @@ export interface Draft {
   readonly text: string;
   readonly broken: boolean;
 }
-/** One workspace's drafts: by turn, each response part by `responseId` and `part`. */
+/** Drafts by turn, each response part by `responseId` and `part`. */
 export type Drafts = ReadonlyMap<string, ReadonlyMap<string, Draft>>;
-/** One workspace's drafts in a credential scope, written by its change feed. */
-export const draftsAtom = Atom.family((_workspaceId: string) =>
-  Atom.make<Drafts>(new Map()).pipe(Atom.keepAlive),
-);
 
 /**
  * Add a draft's text where it continues its part. Text already held is not added again; text past
@@ -48,14 +42,6 @@ export const drafted = (
   else return drafts;
   const next = new Map(drafts);
   next.set(signal.turnId, parts);
-  return next;
-};
-
-/** A turn ended: its drafts are done with. */
-export const settled = (drafts: Drafts, turnId: string): Drafts => {
-  if (!drafts.has(turnId)) return drafts;
-  const next = new Map(drafts);
-  next.delete(turnId);
   return next;
 };
 

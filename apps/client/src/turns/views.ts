@@ -1,16 +1,16 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/unstable/reactivity";
-import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
+import { createMemo, createSignal, type Accessor } from "solid-js";
 import { agentsReads } from "../api/agents.ts";
 import { timelineRead } from "../api/conversations.ts";
 import { useApiClient } from "../api/context.tsx";
-import { draftsAtom, writing } from "../api/drafts.ts";
+import { writing } from "../api/drafts.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import {
   activeTurnsRead,
   newTurnRequestKey,
-  turnLogRead,
+  turnRead,
   turnProblem,
   turnsRequest,
   type Turn,
@@ -19,7 +19,8 @@ import {
 import { useMembers } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName, useWorkspaceGroups } from "../conversations/views.ts";
-import { useLiveStatus } from "../live/status.ts";
+import { turnLogFeed } from "../api/turn-log.ts";
+import { useLastingDown, useLiveStatus } from "../live/status.ts";
 import { useRequest } from "../request/use-request.ts";
 
 export type { TurnProblem };
@@ -307,7 +308,10 @@ export interface TurnLogView extends TurnControls {
 
 /**
  * One turn's log, live while mounted: its activity, the response it is writing, and where it runs,
- * with stopping and retrying. `retried` receives the new turn a retry queued, to show its log.
+ * with stopping and retrying. The turn follows its facts through the workspace's changes; its log
+ * is followed by subscribing to it, which delivers its items as its agent's log grows and the
+ * response being written, until the turn ends. `retried` receives the new turn a retry queued, to
+ * show its log.
  */
 export function useTurnLog(
   workspaceId: string,
@@ -315,23 +319,25 @@ export function useTurnLog(
   options: { readonly retried?: (turnId: string) => void } = {},
 ): TurnLogView {
   const client = useApiClient();
-  const read = useRead(turnLogRead(client, workspaceId, turnId));
+  const read = useRead(turnRead(client, workspaceId, turnId));
+  const feedAtom = turnLogFeed(client, workspaceId, turnId);
+  const feedResult = useAtomValue(() => feedAtom);
+  const refollow = useAtomRefresh(() => feedAtom);
+  const feed = () => Option.getOrUndefined(AsyncResult.value(feedResult()));
   const entryOf = useEntries(workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
   const setup = agentsReads(client, workspaceId);
   const connections = useRead(setup?.connections);
   const implementations = useRead(setup?.connectionImplementations);
   const environments = useRead(setup?.environments);
-  const drafts = useAtomValue(() => draftsAtom(workspaceId));
   const live = useLiveStatus();
-  const [updatedAt, setUpdatedAt] = createSignal<Date>();
-  createEffect(on(read.value, (value) => value !== undefined && setUpdatedAt(new Date())));
+  const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
 
   const turn = createMemo((): TurnDetail | undefined => {
-    const log = read.value();
-    if (log === undefined) return undefined;
-    const entry = entryOf(log.turn);
-    const selection = log.turn.selection;
+    const view = read.value();
+    if (view === undefined) return undefined;
+    const entry = entryOf(view);
+    const selection = view.selection;
     const connection = connections.value()?.find((item) => item.id === selection?.connectionId);
     const provider = implementations
       .value()
@@ -347,12 +353,12 @@ export function useTurnLog(
     };
   });
   const activity = createMemo((): ReadonlyArray<TurnActivity> => {
-    const log = read.value();
+    const logged = feed()?.items;
     const current = turn();
-    if (log === undefined || current === undefined) return [];
+    if (logged === undefined || current === undefined) return [];
     const items: Array<TurnActivity> = [{ kind: "accepted", at: current.createdAt }];
     if (current.startedAt !== undefined) items.push({ kind: "started", at: current.startedAt });
-    for (const item of log.items) {
+    for (const item of logged) {
       const at = toDate(item.at);
       if (item._tag === "InputTaken")
         items.push({
@@ -399,17 +405,19 @@ export function useTurnLog(
   const draft = createMemo(() => {
     const current = turn();
     if (current === undefined || current.state !== "working") return undefined;
+    const following = feed();
+    if (following === undefined) return undefined;
     // A block's draft gives way to the block once the log holds it.
     const logged = new Set(
-      (read.value()?.items ?? []).flatMap((item) =>
+      (following.items ?? []).flatMap((item) =>
         item._tag === "Responded"
           ? item.parts.map((part) => `${item.responseId}\u0000${part}`)
           : [],
       ),
     );
-    return writing(drafts(), turnId, logged);
+    return writing(following.drafts, turnId, logged);
   });
-  // Its thread's turns follow the change feed; the log refreshes with each command.
+  // Its thread's turns follow the change feed; the turn refreshes with each command.
   const controls = useControls(workspaceId, undefined, {
     log: true,
     refresh: read.refresh,
@@ -419,11 +427,14 @@ export function useTurnLog(
     turn,
     activity,
     draft,
-    loading: read.loading,
-    failure: read.failure,
-    reconnecting: () => live() !== undefined,
-    updatedAt,
-    refresh: read.refresh,
+    loading: () => read.loading() || (feed()?.items === undefined && feed()?.connection !== "gone"),
+    failure: () => read.failure() ?? (feed()?.connection === "gone" ? "gone" : undefined),
+    reconnecting: () => live() !== undefined || followingDown(),
+    updatedAt: () => feed()?.updatedAt,
+    refresh: () => {
+      read.refresh();
+      refollow();
+    },
     ...controls,
   };
 }

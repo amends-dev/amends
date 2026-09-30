@@ -1,11 +1,11 @@
 import { Api, Authentication, ConnectionImplementation, Environment } from "@amends/api-http";
-import type { ThreadTimeline } from "@amends/api-http";
+import type { ThreadTimeline, Turn } from "@amends/api-http";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
-import { Effect, Layer, Redacted, Schedule } from "effect";
+import { Effect, Fiber, Layer, Redacted, Schedule, Stream } from "effect";
 import { HttpClientRequest, HttpRouter } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
@@ -188,6 +188,48 @@ describe.skipIf(!available)("PostgreSQL", () => {
         }).pipe(Effect.scoped, Effect.provide(server(url))),
       ),
     30_000,
+  );
+
+  it.live(
+    "a reader follows a turn's log over HTTP as its agent answers, until the turn ends",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const release = Promise.withResolvers<void>();
+          const models = yield* fakeModels({
+            hold: release.promise,
+            answer: "The plan is on track.",
+          });
+          const { asAlice, workspaceId, ask } = yield* workspaceWithScout(models.baseUrl);
+          const started = yield* ask("Scout, how is the plan going?");
+          const turnsNow = asAlice.turns.listByThread({
+            params: { workspaceId, threadId: started.thread.id },
+            query: { limit: 10 },
+          });
+          // Follow while the model holds its answer.
+          const [turn] = yield* until(turnsNow, () => models.requests.length === 1);
+          const stream = yield* asAlice.turns.watchLog({
+            params: { workspaceId, turnId: turn!.id },
+          });
+          const following = yield* Effect.forkScoped(Stream.runCollect(stream));
+          release.resolve();
+          const messages = yield* Fiber.join(following);
+
+          // It opens with the log as it stands, carries each change, and closes after the end.
+          expect(messages[0]?._tag).toBe("Opened");
+          expect(messages.at(-1)?._tag).toBe("Ended");
+          let items: Array<Turn.LogItem> = [];
+          for (const message of messages)
+            if (message._tag === "Opened") items = [...message.items];
+            else if (message._tag === "Changed")
+              for (const { index, item } of message.changes) items[index] = item;
+          expect(items).toMatchObject([
+            { _tag: "InputTaken", messages: 1 },
+            { _tag: "Responded", text: "The plan is on track.", reply: true },
+          ]);
+        }).pipe(Effect.scoped, Effect.provide(server(url))),
+      ),
+    40_000,
   );
 
   it.live(

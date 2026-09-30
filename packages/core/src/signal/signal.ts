@@ -49,8 +49,9 @@ export const Value = Schema.TaggedUnion({
   },
   /**
    * More of a response an agent's turn is writing, before it completes: `text` continues the
-   * response's part at `offset` characters. A reader that missed earlier text waits for the
-   * completed response in the turn's log, which replaces the draft.
+   * response's part at `offset` characters. It reaches those following the turn's log, not the
+   * workspace's change feed. A reader that missed earlier text waits for the completed response
+   * in the turn's log, which replaces the draft.
    */
   TurnDraft: {
     workspaceId: WorkspaceId.Id,
@@ -61,13 +62,6 @@ export const Value = Schema.TaggedUnion({
     part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
     text: Schema.String,
-  },
-  /** A turn's log gained entries, such as a completed response, for its readers to read again. */
-  TurnLogged: {
-    workspaceId: WorkspaceId.Id,
-    groupId: GroupId.Id,
-    threadId: ThreadId.Id,
-    turnId: TurnId.Id,
   },
 }).annotate({ identifier: "Signal" });
 export type Value = typeof Value.Type;
@@ -100,7 +94,6 @@ export const reachOf = (signal: Value): Reach =>
   Value.match(signal, {
     Typing: threadReaders,
     TurnDraft: threadReaders,
-    TurnLogged: threadReaders,
     ThreadRead: ({ memberId }): Reach => ({
       audience: [Member.audienceOf(memberId)],
       requirement: undefined,
@@ -114,5 +107,11 @@ export const reachOf = (signal: Value): Reach =>
       requirement: undefined,
     }),
   });
+
+/**
+ * Whether the workspace's change feed carries a signal. A turn's drafts go only to readers
+ * following its log, so a response being written reaches no one else.
+ */
+export const inChangeFeed = (signal: Value): boolean => signal._tag !== "TurnDraft";
 
 export * as Signal from "./signal.ts";

@@ -164,7 +164,9 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
     );
     // Signals follow the reader's current access, reloaded by the commits above.
     const happening = live.pipe(
-      Stream.filter((signal) => reaches(access, Signal.reachOf(signal))),
+      Stream.filter(
+        (signal) => Signal.inChangeFeed(signal) && reaches(access, Signal.reachOf(signal)),
+      ),
       Stream.map((signal) => ChangeFeed.Message.cases.Signal.make({ workspaceId, signal })),
     );
     return Stream.make(ready).pipe(

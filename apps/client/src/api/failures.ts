@@ -102,6 +102,9 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "TurnApplication.NotRetryable": "changed",
   "TurnApplication.NotFound": "gone",
   "TurnApplication.ThreadNotFound": "gone",
+  // Following a turn's log stopped short, or too many streams are open: following again may work.
+  "Turn.LogUnavailable": "failed",
+  "Api.TooManyStreams": "failed",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionApplication.CredentialsUnavailable": "failed",
   "GroupFollowApplication.AgentRequired": "denied",

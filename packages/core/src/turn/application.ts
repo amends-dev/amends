@@ -1,8 +1,9 @@
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer, Option, Schema, Stream } from "effect";
+import type { PlatformError, Scope } from "effect";
 import { AgentPermissions } from "../agent/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
+import { ChangeFeedSource } from "../change-feed/source.ts";
 import { Actor } from "../identity/actor.ts";
 import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
@@ -10,6 +11,8 @@ import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import type { Request } from "../request/request.ts";
 import { RequestReceipts } from "../request/receipts.ts";
+import type { Signal } from "../signal/signal.ts";
+import { Signals } from "../signal/signals.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
@@ -17,6 +20,7 @@ import { MemberStore } from "../workspace/member/store.ts";
 import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnActivityRecorder } from "./activity-recorder.ts";
+import { TurnDrafts } from "./drafts.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -39,6 +43,7 @@ export type ReadError =
 export type ListError = Exclude<ReadError, NotFound> | ThreadNotFound;
 export type ActiveError = Exclude<ReadError, NotFound>;
 export type LogError = ReadError | Log.ReadError;
+export type WatchError = LogError | Turn.LogUnavailable;
 export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
@@ -72,6 +77,20 @@ export interface Interface {
   /** A turn with its log, for a reader who may open its thread. */
   readonly log: (turnId: Turn.Id) => Effect.Effect<Turn.LogView, LogError, Actor.Service>;
   /**
+   * Follow a turn's log, for a reader who may open its thread: its items as they stand, then
+   * those its agent's log adds or changes as the turn works, with the response it is writing, until
+   * the turn ends and every item is delivered. The caller owns the subscription scope. The stream
+   * fails with LogUnavailable when following cannot go on, including once the reader can no longer
+   * open the thread; following again starts from the items as they stand.
+   */
+  readonly watchLog: (
+    turnId: Turn.Id,
+  ) => Effect.Effect<
+    Stream.Stream<Turn.LogMessage, Turn.LogUnavailable>,
+    WatchError,
+    Actor.Service | Scope.Scope
+  >;
+  /**
    * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
    * queued turn stops at once, since nothing runs it yet; a running one stops once execution
    * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
@@ -94,6 +113,15 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/turn/application/Service",
 ) {}
 
+/** The facts that end a turn. */
+const endings: ReadonlySet<string> = new Set([
+  TurnFacts.Completed.name,
+  TurnFacts.Failed.name,
+  TurnFacts.Cancelled.name,
+]);
+/** Batches of a turn's log read at a time. */
+const logPage = 100;
+
 const RetryInput = Schema.Struct({ turnId: Turn.Id });
 const RetryResult = Schema.Struct({ turnId: Turn.Id });
 
@@ -108,6 +136,9 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const activity = yield* TurnActivityRecorder.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
+  const source = yield* ChangeFeedSource.Service;
+  const signals = yield* Signals.Service;
+  const drafts = yield* TurnDrafts.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
   if (
@@ -117,6 +148,8 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       authorization.workspaceId,
       receipts.workspaceId,
       members.workspaceId,
+      signals.workspaceId,
+      drafts.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
@@ -255,6 +288,150 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       turn: yield* presentOne(turn),
       items: TurnLog.read(records).items,
     } satisfies Turn.LogView;
+  });
+
+  const sameItem = Schema.toEquivalence(Turn.LogItem);
+  const unavailable = () => new Turn.LogUnavailable({});
+
+  const watchLog = Effect.fn("TurnApplication.watchLog")(function* (turnId: Turn.Id) {
+    const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
+    // Register for drafts and for the journal before reading, so neither misses what follows:
+    // the turn ends by a fact in the journal, which its agent's log does not record.
+    const live = yield* signals.subscribe;
+    const journalled = yield* source.subscribe(Option.none()).pipe(Effect.mapError(unavailable));
+    const turn = yield* readable(id);
+    const handle = TurnLog.open(log, turn.participationId);
+    // Following outlasts the request that opened it, so its access checks name the reader.
+    const actor = yield* Actor.Service;
+
+    // The turn's entries sit together in its agent's log after `logAfter`: only one turn writes
+    // there at a time, so another turn's entry means this one's are over.
+    const records: Array<TurnLog.Recorded> = [];
+    let after = turn.logAfter ?? undefined;
+    let over = false;
+    const take = (batches: ReadonlyArray<Log.Batch<TurnLog.Entry>>) => {
+      for (const batch of batches) {
+        for (const entry of batch.entries) {
+          if (entry.payload.turnId !== turn.id) {
+            over = true;
+            return;
+          }
+          records.push({ entry: entry.payload, at: entry.recordedAt });
+        }
+        after = batch.position;
+      }
+    };
+    /** Read what the log holds past what was taken, until the turn's entries are over. */
+    const catchUp = Effect.gen(function* () {
+      while (!over) {
+        const batches = yield* handle.read(
+          after === undefined ? { limit: logPage } : { after, limit: logPage },
+        );
+        if (batches.length === 0) return;
+        take(batches);
+      }
+    });
+    // The items as sent, so a change is told apart from what the reader has.
+    let sent: ReadonlyArray<Turn.LogItem> = [];
+    const changes = (): ReadonlyArray<Turn.LogChange> => {
+      const items = TurnLog.read(records).items;
+      const changed = items.flatMap((item, index) => {
+        const before = sent[index];
+        return before !== undefined && sameItem(before, item) ? [] : [{ index, item }];
+      });
+      sent = items;
+      return changed;
+    };
+    const changed = (): ReadonlyArray<Turn.LogMessage> => {
+      const list = changes();
+      return list.length === 0 ? [] : [Turn.LogMessage.cases.Changed.make({ changes: list })];
+    };
+    const ended = Turn.LogMessage.cases.Ended.make({});
+
+    // A turn that never started wrote nothing.
+    if (turn.startedAt !== null) yield* catchUp;
+    sent = TurnLog.read(records).items;
+    const opened = Turn.LogMessage.cases.Opened.make({ items: sent });
+    if (!Turn.active(turn.status)) return Stream.make(opened, ended);
+    // What the response being written holds so far, since drafts carry only what follows it.
+    const written = (yield* drafts.current(turn.id)).map((draft) =>
+      Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
+    );
+
+    type Input =
+      | { readonly _tag: "Logged"; readonly batch: Log.Batch<TurnLog.Entry> }
+      | { readonly _tag: "Finished" }
+      | { readonly _tag: "Drafted"; readonly draft: Turn.LogMessage };
+    const logged = Stream.suspend(() =>
+      handle.tail(after === undefined ? { limit: logPage } : { after, limit: logPage }),
+    ).pipe(
+      Stream.map((batch): Input => ({ _tag: "Logged", batch })),
+      Stream.mapError(unavailable),
+    );
+    const finished = journalled.deliveries.pipe(
+      Stream.filter((delivery) =>
+        delivery.events.some(
+          ({ event }) =>
+            endings.has(event.name) &&
+            typeof event.payload === "object" &&
+            event.payload !== null &&
+            "turnId" in event.payload &&
+            event.payload.turnId === turn.id,
+        ),
+      ),
+      Stream.take(1),
+      Stream.map((): Input => ({ _tag: "Finished" })),
+      Stream.mapError(unavailable),
+    );
+    const drafted = live.pipe(
+      Stream.filter(
+        (signal): signal is Extract<Signal.Value, { readonly _tag: "TurnDraft" }> =>
+          signal._tag === "TurnDraft" && signal.turnId === turn.id,
+      ),
+      Stream.map((signal): Input => ({
+        _tag: "Drafted",
+        draft: Turn.LogMessage.cases.Drafted.make({
+          responseId: signal.responseId,
+          part: signal.part,
+          offset: signal.offset,
+          text: signal.text,
+        }),
+      })),
+    );
+    /** What each input tells the reader, one at a time, so reads and what was sent agree. */
+    const step = (
+      input: Input,
+    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> => {
+      switch (input._tag) {
+        case "Drafted":
+          return Effect.succeed([input.draft]);
+        case "Logged":
+          // The reader still may open the thread, or following ends.
+          return access.require(turn.threadId).pipe(
+            Effect.provideService(Actor.Service, actor),
+            Effect.map(() => {
+              take([input.batch]);
+              return over ? [...changed(), ended] : changed();
+            }),
+            Effect.mapError(unavailable),
+          );
+        case "Finished":
+          // Everything the turn wrote was committed before it ended.
+          return catchUp.pipe(
+            Effect.map(() => [...changed(), ended]),
+            Effect.mapError(unavailable),
+          );
+      }
+    };
+    return Stream.make(opened, ...written).pipe(
+      Stream.concat(
+        Stream.mergeAll([logged, finished, drafted], { concurrency: "unbounded" }).pipe(
+          Stream.mapEffect(step),
+          Stream.flattenIterable,
+          Stream.takeUntil((message) => message._tag === "Ended"),
+        ),
+      ),
+    );
   });
 
   const cancel = Effect.fn("TurnApplication.cancel")(
@@ -401,6 +578,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     listByThread,
     listActive,
     log: readLog,
+    watchLog,
     cancel,
     retry,
   });

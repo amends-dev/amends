@@ -33,14 +33,20 @@ Effect's SSE encoder would send a stream's whole failure cause to the client, de
 so the handler logs an unexpected failure at error level and ends the stream with
 `ChangeFeed.Unavailable` alone.
 
-Each process serves a limited number of streams at once: `ChangesHandlers.StreamLimits`, a
+`TurnsHandlers.watchLog` serves `TurnApplication.watchLog` the same way, ending with
+`Turn.LogUnavailable` where the change feed ends with `ChangeFeed.Unavailable`. Both streams share
+`Streams`: their heartbeats and headers, the containment of unexpected failures, the end as the
+server drains, and the limits below.
+
+Each process serves a limited number of streams at once, change streams and turn logs alike:
+`Streams.Limits`, a
 context reference, allows a thousand per workspace and twenty per member of it by default, and
 a host provides its own to change them. A stream holds its place from before the gateway admits
 it until its response ends; a stream beyond either limit fails with `Api.TooManyStreams` (429),
 naming which limit it met.
 
 `Draining.Service` is the server beginning to shut down. Where a host provides it, open change
-streams end with `ChangeFeed.Unavailable` as it completes, so their clients reconnect, to another
+streams end with `ChangeFeed.Unavailable`, and turn logs with `Turn.LogUnavailable`, as it completes, so their clients reconnect, to another
 process if one runs, and the HTTP server's graceful stop waits only for ordinary requests rather
 than for every open stream. `Draining.layer` creates it, and a host builds
 `Draining.layerOnRelease` after its HTTP server so that releasing it, first, begins the drain.

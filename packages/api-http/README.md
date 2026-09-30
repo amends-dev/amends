@@ -148,10 +148,8 @@ then the stream ends; reconnecting returns 403.
 Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
 `Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
 readers, and `ThreadRead`, `GroupCaughtUp`, and `NotificationsSeen` reach only the caller's own
-sessions after one of them records read state or acknowledges a notification. `TurnDraft`
-(`groupId`, `threadId`, `turnId`, `responseId`, `part`, `offset`, `text`) carries more of a
-response an agent's turn is writing, continuing its part at `offset` characters, and `TurnLogged`
-says a turn's log grew; both reach the thread's readers. Signals have no
+sessions after one of them records read state or acknowledges a notification. A response an
+agent's turn is writing reaches only those following its log (see [Turns](#turns)). Signals have no
 cursor, are never replayed, and may be missed; after reconnecting, refresh read state with the rest
 of the view. Show a typing indicator until `until` unless another `Typing` extends it, and hide the
 caller's own. Send `POST …/threads/:threadId/typing` while the user types; repeats within two
@@ -327,14 +325,26 @@ Turn paths sit under `/workspaces/:workspaceId` and require active membership. A
 attempt at the work asked of it on a thread; the
 [core turns section](../core/README.md#turns) describes the rules.
 
-| Endpoint                        | Operation                                                                                     |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| `GET …/threads/:threadId/turns` | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
-| `GET …/active-turns`            | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
-| `GET …/turns/:turnId`           | One turn.                                                                                     |
-| `GET …/turns/:turnId/log`       | The turn with its log: input taken in, responses' text and replies, interruptions, in order.  |
-| `POST …/turns/:turnId/cancel`   | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
-| `POST …/turns/:turnId/retry`    | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
+| Endpoint                         | Operation                                                                                     |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `GET …/threads/:threadId/turns`  | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
+| `GET …/active-turns`             | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
+| `GET …/turns/:turnId`            | One turn.                                                                                     |
+| `GET …/turns/:turnId/log`        | The turn with its log: input taken in, responses' text and replies, interruptions, in order.  |
+| `GET …/turns/:turnId/log/events` | Follow the turn's log as server-sent events, until the turn ends; see below.                  |
+| `POST …/turns/:turnId/cancel`    | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
+| `POST …/turns/:turnId/retry`     | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
+
+Following a turn's log streams `Turn.LogMessage`s as its agent's log grows, for a caller who may
+open the thread. `Opened` starts every subscription with the log's `items` as they stand, the same
+items `GET …/log` returns. `Changed` carries `changes`, each an `index` and the `item` now there:
+new items, and items that changed, as a response's text grows block by block or whether it is a
+reply changes as input follows it. `Drafted` (`responseId`, `part`, `offset`, `text`) carries more
+of the response being written before its block completes, continuing its part at `offset`
+characters; it may be missed, and the block replaces it. `Ended` follows the turn's end once every
+item is delivered, and the stream closes. A stream that cannot go on, including once the caller can
+no longer open the thread, ends with `Turn.LogUnavailable`, and following again opens with the items
+as they stand. Log streams count within the same limits as change streams.
 
 A turn reads as `Turn.View`: its status, input positions, the model access and environment it
 started with, where it begins in its agent's log for the thread (`logAfter`) and the checkpoint its

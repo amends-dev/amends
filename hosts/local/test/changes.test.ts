@@ -20,7 +20,7 @@ import {
   Scope,
   Stream,
 } from "effect";
-import { ChangesHandlers } from "@amends/server-http";
+import { Streams } from "@amends/server-http";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
@@ -37,7 +37,7 @@ const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(as
  * The HTTP server over a host; the host's gateway stays available to seed what HTTP cannot. Limits
  * on open streams default to the server's own.
  */
-const server = (url: string, limits?: Context.Service.Shape<typeof ChangesHandlers.StreamLimits>) =>
+const server = (url: string, limits?: Context.Service.Shape<typeof Streams.Limits>) =>
   HttpRouter.serve(LocalServer.layerRoutes, {
     disableLogger: true,
     disableListenLog: true,
@@ -46,7 +46,7 @@ const server = (url: string, limits?: Context.Service.Shape<typeof ChangesHandle
       Layer.mergeAll(
         LocalHost.layer(Redacted.make(url)),
         DevelopmentAuthentication.layer().pipe(Layer.provide(BunCrypto.layer)),
-        limits === undefined ? Layer.empty : Layer.succeed(ChangesHandlers.StreamLimits, limits),
+        limits === undefined ? Layer.empty : Layer.succeed(Streams.Limits, limits),
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),

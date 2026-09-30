@@ -2,8 +2,8 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
-import { affectedKeys, signalKeys } from "../src/api/changes.ts";
-import { drafted, settled, writing, type Drafts } from "../src/api/drafts.ts";
+import { affectedKeys } from "../src/api/changes.ts";
+import { drafted, writing, type Drafts } from "../src/api/drafts.ts";
 import {
   ClientProvider,
   DirectoryProvider,
@@ -309,7 +309,39 @@ it("names why a stop or retry was refused", async () => {
   expect(f.views.controls.problem()).toBeUndefined();
 });
 
-it("reads a failed turn's log, telling its end once rather than twice", async () => {
+/** One server-sent event stream the test writes to and ends. */
+function eventStream(request: Request) {
+  const encoder = new TextEncoder();
+  let controller!: ReadableStreamDefaultController<Uint8Array>;
+  const body = new ReadableStream<Uint8Array>({
+    start: (value) => {
+      controller = value;
+    },
+  });
+  request.signal.addEventListener("abort", () => {
+    try {
+      controller.error(request.signal.reason);
+    } catch {
+      /* Already ended. */
+    }
+  });
+  const write = (event: string, data: unknown) =>
+    controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+  return {
+    response: new Response(body, { headers: { "content-type": "text/event-stream" } }),
+    send: (message: unknown) => write("message", message),
+    unavailable: () => {
+      write("effect/httpapi/stream/failure", [
+        { _tag: "Fail", error: { _tag: "Turn.LogUnavailable" } },
+      ]);
+      controller.close();
+    },
+    close: () => controller.close(),
+  };
+}
+
+/** A turn's log followed over its stream, with the turn read beside it. */
+function followed(status: string, failure: string | null = null) {
   const turn = {
     id: "atlas-1",
     workspaceId: "one",
@@ -321,31 +353,33 @@ it("reads a failed turn's log, telling its end once rather than twice", async ()
     logAfter: null,
     historyFrom: null,
     retryOf: null,
-    status: "failed",
+    status,
     inputAfterSequence: 0,
     acceptedThroughSequence: 1,
     incorporatedThroughSequence: 1,
     selection: null,
     messageIds: [],
-    failure: "Anthropic is limiting requests.",
+    failure,
     cancelReason: null,
     createdAt: at(1),
     startedAt: at(2),
-    finishedAt: at(6),
+    finishedAt: status === "failed" ? at(6) : null,
     stoppable: false,
-    retryable: true,
+    retryable: status === "failed",
   };
-  const items = [
-    { _tag: "InputTaken", at: at(3), messages: 1 },
-    { _tag: "Interrupted", at: at(4), reason: "Anthropic is limiting requests.", retryable: true },
-    { _tag: "Interrupted", at: at(5), reason: "Anthropic is limiting requests.", retryable: true },
-  ];
+  const streams: Array<ReturnType<typeof eventStream>> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-    const path = new URL(new Request(input, init).url).pathname;
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/turns/atlas-1/log") return json({ turn, items });
+    if (path === "/workspaces/one/turns/atlas-1") return json(turn);
+    if (path === "/workspaces/one/turns/atlas-1/log/events") {
+      const created = eventStream(request);
+      streams.push(created);
+      return created.response;
+    }
     return json({}, 404);
   });
   let view!: ReturnType<typeof useTurnLog>;
@@ -368,20 +402,105 @@ it("reads a failed turn's log, telling its end once rather than twice", async ()
       </DirectoryProvider>
     </ClientProvider>
   ));
-  await waitFor(() => expect(view.activity().at(-1)?.kind).toBe("failed"));
-  // The interruption the turn ended on says what its failure says, so only the failure shows.
-  expect(view.activity().map((entry) => entry.kind)).toEqual([
-    "accepted",
-    "started",
-    "input",
-    "interrupted",
-    "failed",
-  ]);
-  expect(view.activity()[3]).toMatchObject({
+  return {
+    get view() {
+      return view;
+    },
+    streams,
+    connected: async (index: number) => {
+      await waitFor(() => expect(streams.length).toBeGreaterThan(index), { timeout: 3000 });
+      return streams[index]!;
+    },
+  };
+}
+const kinds = (view: ReturnType<typeof useTurnLog>) => view.activity().map((entry) => entry.kind);
+
+it("follows a turn's log: its items as they change, the reply being written, until the turn ends", async () => {
+  const f = followed("running");
+  const stream = await f.connected(0);
+  stream.send({ _tag: "Opened", items: [{ _tag: "InputTaken", at: at(3), messages: 1 }] });
+  await waitFor(() => expect(kinds(f.view)).toEqual(["accepted", "started", "input"]));
+  expect(f.view.updatedAt()).toBeInstanceOf(Date);
+
+  // The response streams in as drafts until its block arrives in the log.
+  stream.send({ _tag: "Drafted", responseId: "r1", part: 0, offset: 0, text: "Deploy the " });
+  stream.send({ _tag: "Drafted", responseId: "r1", part: 0, offset: 11, text: "API first." });
+  await waitFor(() =>
+    expect(f.view.draft()).toEqual({ text: "Deploy the API first.", broken: false }),
+  );
+  stream.send({
+    _tag: "Changed",
+    changes: [
+      {
+        index: 1,
+        item: {
+          _tag: "Responded",
+          at: at(4),
+          responseId: "r1",
+          text: "Deploy the API first.",
+          parts: [0],
+          reply: true,
+        },
+      },
+    ],
+  });
+  await waitFor(() => expect(kinds(f.view)).toEqual(["accepted", "started", "input", "response"]));
+  expect(f.view.draft()).toBeUndefined();
+
+  // The turn ended: nothing more follows, and following stops rather than reconnecting.
+  stream.send({ _tag: "Ended" });
+  stream.close();
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+  expect(f.streams).toHaveLength(1);
+  expect(f.view.reconnecting()).toBe(false);
+});
+
+it("follows a turn's log again after it drops, opening with the items as they stand", async () => {
+  const f = followed("running");
+  const first = await f.connected(0);
+  first.send({ _tag: "Opened", items: [{ _tag: "InputTaken", at: at(3), messages: 1 }] });
+  await waitFor(() => expect(kinds(f.view)).toEqual(["accepted", "started", "input"]));
+  first.unavailable();
+  const second = await f.connected(1);
+  second.send({
+    _tag: "Opened",
+    items: [
+      { _tag: "InputTaken", at: at(3), messages: 1 },
+      { _tag: "InputTaken", at: at(4), messages: 2 },
+    ],
+  });
+  await waitFor(() => expect(kinds(f.view)).toEqual(["accepted", "started", "input", "input"]));
+});
+
+it("tells a failed turn's end once, rather than as an interruption and again as its failure", async () => {
+  const f = followed("failed", "Anthropic is limiting requests.");
+  const stream = await f.connected(0);
+  stream.send({
+    _tag: "Opened",
+    items: [
+      { _tag: "InputTaken", at: at(3), messages: 1 },
+      {
+        _tag: "Interrupted",
+        at: at(4),
+        reason: "Anthropic is limiting requests.",
+        retryable: true,
+      },
+      {
+        _tag: "Interrupted",
+        at: at(5),
+        reason: "Anthropic is limiting requests.",
+        retryable: true,
+      },
+    ],
+  });
+  stream.send({ _tag: "Ended" });
+  stream.close();
+  await waitFor(() => expect(f.view.activity().at(-1)?.kind).toBe("failed"));
+  expect(kinds(f.view)).toEqual(["accepted", "started", "input", "interrupted", "failed"]);
+  expect(f.view.activity()[3]).toMatchObject({
     reason: "Anthropic is limiting requests.",
     retrying: false,
   });
-  expect(view.activity()[4]).toMatchObject({ reason: "Anthropic is limiting requests." });
 });
 
 it("refreshes a turn's log and the active turns as its facts arrive", () => {
@@ -395,7 +514,7 @@ it("refreshes a turn's log and the active turns as its facts arrive", () => {
   ])
     expect(
       affectedKeys("one", [{ name, payload: { threadId: "thread", turnId: "turn-1" } }]).toSorted(),
-    ).toEqual(["workspace/one/active-turns", "workspace/one/turn-logs:turn-1"]);
+    ).toEqual(["workspace/one/active-turns", "workspace/one/turns:turn-1"]);
   // A thread's timeline follows the turn activity recorded there.
   expect(
     affectedKeys("one", [
@@ -405,12 +524,6 @@ it("refreshes a turn's log and the active turns as its facts arrive", () => {
       },
     ]),
   ).toContain("workspace/one/timelines:thread");
-});
-
-it("a turn's log refreshes as it grows", () => {
-  expect(signalKeys("one", { _tag: "TurnLogged", turnId: "turn-1" } as never)).toEqual([
-    "workspace/one/turn-logs:turn-1",
-  ]);
 });
 
 it("drafts continue their part in order, marking a gap rather than showing text out of place", () => {
@@ -437,9 +550,8 @@ it("drafts continue their part in order, marking a gap rather than showing text 
     text: "Deploy the API first",
     broken: true,
   });
-  // A block the log holds is no longer drafted; nor is anything of a turn that ended.
+  // A block the log holds is no longer drafted.
   expect(writing(drafts, "turn-1", new Set(["r1\u00000"]))).toBeUndefined();
-  expect(writing(settled(drafts, "turn-1"), "turn-1", new Set())).toBeUndefined();
   // Parts of the response being written join in order, leaving out blocks the log holds.
   const two = drafted(drafted(new Map(), draft(0, "b", 1)), draft(0, "a", 0));
   expect(writing(two, "turn-1", new Set())?.text).toBe("ab");
