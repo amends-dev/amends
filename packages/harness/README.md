@@ -52,7 +52,10 @@ schema also applies: each response's calls have unique IDs and are answered once
 follow it before any other input or response. Only the last response's calls may be pending. It
 reports those `pending` calls and whether the transcript `awaitsResponse`.
 
-`Transcript.characters` counts what a transcript holds as a model reads it, and
+A tool result is sent as its `structured` JSON value, or else its text, and past
+`Transcript.resultCharacters` (24,000) as text clipped to its beginning and end, saying how much of
+its middle was left out (`Transcript.sentResult`, `Transcript.clip`); the log keeps it whole.
+`Transcript.characters` counts what a transcript holds as a model reads it, tool results as sent, and
 `Transcript.estimate` how many tokens that is: exactly what a provider measured through the
 response it measured (`Transcript.Measured`), and a token for every four characters after it, with
 the instructions when no measurement covers them.

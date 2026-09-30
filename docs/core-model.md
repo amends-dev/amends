@@ -1086,8 +1086,9 @@ Reading the log for the agent's history interprets its entries once, in order. E
 entries become the transcript they left, with what an unfinished response wrote kept and pending
 calls answered, and without reasoning, which is large, belongs to one provider, and is needed only
 within the turn that produced it. The current turn's entries continue that transcript, as the
-harness transcript rules above describe. Native data is used only by the harness, provider, and
-model that recorded it. The first turn of a participation records the thread's messages from before
+harness transcript rules above describe. Native data is used only by the harness that recorded it,
+keyed by provider, and each provider reads only its own; one that binds data such as a reasoning
+signature to its model ignores it after a model change, so a turn never strips it itself. The first turn of a participation records the thread's messages from before
 its input, others' as input and the agent's own as its responses, so later turns never read them
 from the thread again. A retry records who asked for it as new input in the retrying turn, after
 what the failed or stopped turn left, rather than rewriting that turn's history.
@@ -1124,7 +1125,9 @@ thread's opening request is part of every summary. The model the turn runs with 
 summary; when it fails, the turn is interrupted and runs again like any other interruption, and
 fails once its retries are spent, rather than leaving anything out. Between checkpoints the
 history only grows at its end, so the start of each request stays the same and providers' prompt
-caches keep working. The thread and the logs keep everything a summary replaced.
+caches keep working; for a provider that caches only where it is asked to, each request marks the
+end of its instructions and of its newest message. A tool result longer than 24,000 characters is
+sent with its middle left out, saying how much, and counted as sent; the log keeps it whole. The thread and the logs keep everything a summary replaced.
 
 A turn's context can also prove full partway through its work, as a long tool result arrives: a
 harness that knows its session's limit says so before a request over it, and a provider refuses a

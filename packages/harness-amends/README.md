@@ -37,7 +37,10 @@ result, and the next session receives it through `resolve`. Transfer and recover
 Each request is built from the transcript alone: the instructions as a system message, each input
 as a user message starting with its author's name, each response as an assistant message, and each
 run of tool results as one tool message. A tool result's value is its `structured` JSON, or else its
-text.
+text, clipped past 24,000 characters as `Transcript.sentResult` describes. The system message and the
+newest message carry a cache mark as Anthropic options, so Anthropic caches the prompt through them
+and the next request, which only adds to the end, reads the rest from its cache; other providers
+ignore the mark.
 
 Response parts keep the provider metadata Effect AI attached to them as native data under
 `amends`, and each request returns it as that part's options. Providers need this to continue

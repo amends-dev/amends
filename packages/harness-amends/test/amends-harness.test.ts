@@ -204,6 +204,33 @@ describe("AmendsHarness", () => {
     }),
   );
 
+  it.effect("marks where a provider may cache, and sends a long tool result clipped", () =>
+    Effect.gen(function* () {
+      const { model, prompts } = yield* scripted([
+        parts(call("c1", "lookup", { query: "tides" }), finish("tool-calls")),
+        parts(...text("t1", "Noon."), finish("stop")),
+      ]);
+      const tools: HarnessTool.Tools = {
+        definitions: [{ name: "lookup", parameters }],
+        invoke: () => Effect.succeed(answer("z".repeat(60_000))),
+      };
+      const session = yield* start(model, { sessionId: "s1", instructions: "Be brief.", tools });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "When is high tide?"));
+      yield* untilIdle(session);
+
+      const cache = { anthropic: { cacheControl: { type: "ephemeral" } } };
+      const sent = encoded(prompts[1]!).content;
+      expect(sent[0]).toMatchObject({ role: "system", options: cache });
+      expect(sent.at(-1)).toMatchObject({ role: "tool", options: cache });
+      // Only the newest message carries the mark, so earlier ones stay as they were sent.
+      expect(sent[1]?.options).toEqual({});
+      const result = (sent.at(-1)!.content[0] as { readonly result: unknown }).result;
+      expect(String(result).length).toBeLessThan(25_000);
+      expect(String(result)).toContain("characters left out");
+    }),
+  );
+
   it.effect("continues from stored events exactly where a failed session stopped", () =>
     Effect.gen(function* () {
       const signature = { anthropic: { info: { type: "thinking", signature: "sig-1" } } };

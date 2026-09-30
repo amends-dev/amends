@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { Prompt } from "effect/unstable/ai";
-import type { Transcript } from "@amends/harness";
+import { Transcript } from "@amends/harness";
 
 /** The key under which this harness records its native data: Effect AI's provider metadata. */
 export const nativeKey = "amends";
@@ -23,9 +23,12 @@ export const nativeOf = (metadata: Prompt.ProviderOptions): Transcript.Native | 
 const text = (content: ReadonlyArray<Transcript.Content>): ReadonlyArray<string> =>
   content.map((part) => part.text);
 
-/** A tool result as Effect AI passes it to a provider: its JSON value, or else its text. */
-const resultOf = (item: Transcript.ToolResult): unknown =>
-  item.structured ?? text(item.content).join("\n");
+/**
+ * Where a provider may cache the prompt: after the instructions, and after the newest message, so
+ * the next request, which only adds to the end, reads the rest from the cache. Only Anthropic reads
+ * these options; other providers ignore them.
+ */
+const cached = { anthropic: { cacheControl: { type: "ephemeral" } } } as const;
 
 /**
  * The prompt for the next model request: the agent's instructions, then the transcript in order.
@@ -37,7 +40,7 @@ export const make = (
 ): Prompt.Prompt => {
   const messages: Array<Prompt.Message> = [];
   if (instructions !== undefined && instructions.length > 0)
-    messages.push(Prompt.systemMessage({ content: instructions }));
+    messages.push(Prompt.systemMessage({ content: instructions, options: cached }));
   let results: Array<Prompt.ToolResultPart> = [];
   const flushResults = () => {
     if (results.length > 0) messages.push(Prompt.toolMessage({ content: results }));
@@ -50,7 +53,7 @@ export const make = (
           id: item.callId,
           name: item.name,
           isFailure: item.isError,
-          result: resultOf(item),
+          result: Transcript.sentResult(item),
           providerExecuted: false,
         }),
       );
@@ -92,6 +95,11 @@ export const make = (
     );
   }
   flushResults();
+  const last = messages.at(-1);
+  if (last !== undefined && last.role !== "system")
+    messages[messages.length - 1] = Object.assign({}, last, {
+      options: { ...last.options, ...cached },
+    });
   return Prompt.fromMessages(messages);
 };
 

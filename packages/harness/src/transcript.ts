@@ -137,6 +137,34 @@ export const summarize = (items: ReadonlyArray<Item>): Result.Result<Summary, st
   });
 };
 
+/**
+ * The most characters of one tool result a model is sent. A longer result keeps its beginning and
+ * its end, and says how much of its middle was left out; the log keeps it whole.
+ */
+export const resultCharacters = 24_000;
+
+/** A text of at most `limit` characters: its beginning and end, saying how much was left out. */
+export const clip = (text: string, limit: number): string => {
+  if (text.length <= limit) return text;
+  const head = Math.ceil(limit / 2);
+  const tail = Math.floor(limit / 2);
+  const left = text.length - head - tail;
+  return `${text.slice(0, head)}\n[… ${left} of ${text.length} characters left out …]\n${text.slice(text.length - tail)}`;
+};
+
+/**
+ * A tool result as a model is sent it: its JSON value when it has one, or else its text, and
+ * past `resultCharacters` as clipped text.
+ */
+export const sentResult = (result: ToolResult): unknown => {
+  const text =
+    result.structured === undefined
+      ? result.content.map((part) => part.text).join("\n")
+      : JSON.stringify(result.structured);
+  if (text.length <= resultCharacters) return result.structured ?? text;
+  return clip(text, resultCharacters);
+};
+
 /** How many characters a transcript holds as a model reads it. */
 export const characters = (items: ReadonlyArray<Item>): number => {
   let total = 0;
@@ -145,10 +173,11 @@ export const characters = (items: ReadonlyArray<Item>): number => {
       case "Input":
         for (const part of item.content) total += part.text.length;
         break;
-      case "ToolResult":
-        for (const part of item.content) total += part.text.length;
-        if (item.structured !== undefined) total += JSON.stringify(item.structured).length;
+      case "ToolResult": {
+        const sent = sentResult(item);
+        total += typeof sent === "string" ? sent.length : JSON.stringify(sent).length;
         break;
+      }
       case "Response":
         for (const part of item.parts)
           total += part._tag === "ToolCall" ? JSON.stringify(part.params).length : part.text.length;

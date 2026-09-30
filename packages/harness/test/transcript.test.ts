@@ -221,3 +221,39 @@ describe("HarnessEvent", () => {
     expect(summary([...items, input("next")])).toEqual({ pending: [], awaitsResponse: true });
   });
 });
+
+describe("Transcript sizes", () => {
+  const long = (value: string): Transcript.ToolResult =>
+    Transcript.toolResult(call("c1"), { isError: false, content: [{ _tag: "Text", text: value }] });
+
+  it("clips a long text to its beginning and end, saying how much it left out", () => {
+    expect(Transcript.clip("short", 10)).toBe("short");
+    expect(Transcript.clip("abcdefghij", 4)).toBe("ab\n[… 6 of 10 characters left out …]\nij");
+  });
+
+  it("sends a long tool result clipped, and measures it as sent", () => {
+    const whole = "x".repeat(Transcript.resultCharacters * 2);
+    const sent = Transcript.sentResult(long(whole));
+    expect(typeof sent).toBe("string");
+    expect((sent as string).length).toBeLessThan(Transcript.resultCharacters + 60);
+    expect(sent).toContain(`characters left out`);
+    expect(Transcript.characters([long(whole)])).toBe((sent as string).length);
+    // A structured result is sent as its value while it fits.
+    expect(
+      Transcript.sentResult(
+        Transcript.toolResult(call("c2"), { isError: false, content: [], structured: { a: 1 } }),
+      ),
+    ).toEqual({ a: 1 });
+  });
+
+  it("estimates tokens from what a provider measured, and characters after it", () => {
+    const items = [input("aaaa"), response("r1"), input("x".repeat(40))];
+    expect(Transcript.estimate(items)).toBe(11);
+    expect(
+      Transcript.estimate(items, {
+        measured: { responseId: Transcript.ResponseId.make("r1"), tokens: 100 },
+      }),
+    ).toBe(110);
+    expect(Transcript.estimate(items, { instructions: "y".repeat(8) })).toBe(13);
+  });
+});
