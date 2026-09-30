@@ -57,10 +57,7 @@ export const layer = HttpApiBuilder.group(
           ),
         ).pipe(Streams.withHeartbeats),
       cancel: ({ params }) => asMember(params.workspaceId, (turns) => turns.cancel(params.turnId)),
-      retry: ({ params, headers }) =>
-        asMember(params.workspaceId, (turns) =>
-          turns.retry(params.turnId, { requestKey: headers["idempotency-key"] }),
-        ),
+      retry: ({ params }) => asMember(params.workspaceId, (turns) => turns.retry(params.turnId)),
     });
   }),
 ).pipe(Layer.provide(Streams.layer));

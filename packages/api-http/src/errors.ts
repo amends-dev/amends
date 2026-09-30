@@ -58,8 +58,6 @@ export const WorkspaceChanged = WorkspaceSettingsApplication.Changed.pipe(
   HttpApiSchema.status(409),
 );
 export const WorkspaceNotFound = GatewayErrors.WorkspaceNotFound.pipe(HttpApiSchema.status(404));
-/** The request key was already used for a different request. */
-export const RequestReused = Request.Reused.pipe(HttpApiSchema.status(422));
 /**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.

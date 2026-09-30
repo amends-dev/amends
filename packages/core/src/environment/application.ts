@@ -14,8 +14,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
-import type { Request } from "../request/request.ts";
-import { RequestReceipts } from "../request/receipts.ts";
+import { Request } from "../request/request.ts";
 import { EnvironmentCatalog } from "./catalog.ts";
 import { EnvironmentCompatibility } from "./compatibility.ts";
 import { Environment } from "./environment.ts";
@@ -56,7 +55,6 @@ export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | P
 /** Creating can also meet a harness or provider this host lacks, or a request key used before. */
 export type CreateError =
   | Error
-  | RequestReceipts.Error
   | UnknownHarness
   | UnknownSandboxProvider
   | UnsupportedPlacement
@@ -104,9 +102,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/environment/application/Service",
 ) {}
 
-const CreatedReference = Schema.Struct({ environmentId: Environment.Id });
-type CreatedReference = typeof CreatedReference.Type;
-
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -115,14 +110,9 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   const catalog = yield* EnvironmentCatalog.Service;
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
-  const receipts = yield* RequestReceipts.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [environments.workspaceId, connections.workspaceId, receipts.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
-  )
+  if ([environments.workspaceId, connections.workspaceId].some((id) => id !== workspaceId))
     return yield* new InvalidResponse({
       message: "Environment services belong to different workspaces",
     });
@@ -299,51 +289,47 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     return yield* presented(yield* authorized(id, EnvironmentPermissions.Read));
   });
 
-  const restore = Effect.fnUntraced(function* (reference: CreatedReference) {
-    const found = yield* environments.get(reference.environmentId);
-    if (Option.isNone(found))
-      return yield* new NotFound({ environmentId: reference.environmentId });
+  const restore = Effect.fnUntraced(function* (environmentId: Environment.Id) {
+    const found = yield* environments.get(environmentId);
+    if (Option.isNone(found)) return yield* new NotFound({ environmentId });
     return yield* decoded(found.value);
   });
 
   const create = Effect.fn("EnvironmentApplication.create")(
     function* (input: Environment.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Environment.CreateInput))(input);
-      const record = yield* receipts.once(
-        {
-          operation: "environment.create",
-          key: options.requestKey,
-          input: Environment.CreateInput,
-          value: request,
-          result: CreatedReference,
-          resultOf: (created: Environment.Record) => ({ environmentId: created.id }),
-          restore,
-        },
-        Effect.gen(function* () {
-          yield* authorization.require([
-            Requirement.make(EnvironmentPermissions.Create, { _tag: "Workspace", workspaceId }),
-          ]);
-          const harness = yield* harnessOf(request.harnessId);
-          const placement = request.sandbox?.harness ?? "in-process";
-          if (!harness.placement.includes(placement))
-            return yield* new UnsupportedPlacement({ harnessId: harness.id, placement });
-          if (request.sandbox !== null)
-            yield* checkSandbox(yield* providerOf(request.sandbox.providerId), request.sandbox);
-          const created: Environment.Record = {
-            id: Environment.Id.make(yield* crypto.randomUUIDv4),
-            workspaceId,
-            name: request.name,
-            harnessId: harness.id,
-            sandbox: request.sandbox === null ? null : sandboxOf(request.sandbox, request.sandbox),
-            status: "active",
-            createdBy: (yield* Actor.Service).memberId,
-            createdAt: yield* DateTime.now,
-          };
-          yield* journal.publish(EnvironmentFacts.Created, created);
-          return created;
-        }),
+      yield* authorization.require([
+        Requirement.make(EnvironmentPermissions.Create, { _tag: "Workspace", workspaceId }),
+      ]);
+      const actor = yield* Actor.Service;
+      const environmentId = Environment.Id.make(
+        yield* Request.idFor(options.requestKey, [
+          "environment.create",
+          workspaceId,
+          actor.memberId,
+        ]),
       );
-      return yield* presented(record);
+      // A retry returns the environment its first attempt created.
+      if (options.requestKey !== undefined && Option.isSome(yield* environments.get(environmentId)))
+        return yield* presented(yield* restore(environmentId));
+      const harness = yield* harnessOf(request.harnessId);
+      const placement = request.sandbox?.harness ?? "in-process";
+      if (!harness.placement.includes(placement))
+        return yield* new UnsupportedPlacement({ harnessId: harness.id, placement });
+      if (request.sandbox !== null)
+        yield* checkSandbox(yield* providerOf(request.sandbox.providerId), request.sandbox);
+      const created: Environment.Record = {
+        id: environmentId,
+        workspaceId,
+        name: request.name,
+        harnessId: harness.id,
+        sandbox: request.sandbox === null ? null : sandboxOf(request.sandbox, request.sandbox),
+        status: "active",
+        createdBy: actor.memberId,
+        createdAt: yield* DateTime.now,
+      };
+      yield* journal.publish(EnvironmentFacts.Created, created);
+      return yield* presented(created);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

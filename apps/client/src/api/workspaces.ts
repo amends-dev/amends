@@ -40,12 +40,11 @@ export type WorkspaceRequest =
 
 export function workspaceRejection(
   cause: Cause.Cause<unknown>,
-): "invalid-name" | "denied" | "request-reused" | "request-failed" {
+): "invalid-name" | "denied" | "request-failed" {
   for (const reason of cause.reasons) {
     if (!Cause.isFailReason(reason)) continue;
     if (Schema.is(ApiErrors.InvalidInput)(reason.error)) return "invalid-name";
     if (Schema.is(ApiErrors.HumanRequired)(reason.error)) return "denied";
-    if (Schema.is(ApiErrors.RequestReused)(reason.error)) return "request-reused";
   }
   return "request-failed";
 }

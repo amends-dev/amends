@@ -33,6 +33,7 @@ import {
   boundTo,
   journalLog,
   otherWorkspaceId,
+  placed,
   runHost,
   Support,
   testProvenance,
@@ -142,7 +143,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
             mentions: [owner.memberId, human.memberId, agent.memberId],
             text: "Proposal",
           }),
-        ),
+        ).pipe(Effect.flatMap(placed)),
       );
       const humanNote = (yield* notes(bound, human))[0];
       const agentNote = (yield* notes(bound, agent))[0];

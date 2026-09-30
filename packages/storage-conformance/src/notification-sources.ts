@@ -42,6 +42,7 @@ import {
   type Bound,
   boundTo,
   otherWorkspaceId,
+  placed,
   replacing,
   runHost,
   Support,
@@ -91,11 +92,11 @@ export const notificationSources = (harness: Harness) => {
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(ThreadApplication.Service, (s) =>
         s.startInGroup({ groupId, mentions, text: "Opening" }),
-      );
+      ).pipe(Effect.flatMap(placed));
     const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
       Effect.flatMap(ThreadMessageApplication.Service, (s) =>
         s.publish({ threadId, mentions, text }),
-      );
+      ).pipe(Effect.flatMap((message) => placed({ message })));
     const threadTarget = (threadId: Thread.Id): Target.Reference => ({
       _tag: "Thread",
       workspaceId,

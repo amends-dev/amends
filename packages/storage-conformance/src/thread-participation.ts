@@ -60,6 +60,8 @@ import {
   failingLate,
   journalLog,
   otherWorkspaceId,
+  placed,
+  placedIn,
   runHost,
   Support,
   testProvenance,
@@ -106,14 +108,16 @@ export const threadParticipation = (harness: Harness) => {
       Effect.flatMap(GroupApplication.Service, (s) =>
         s.createTeam({ name: "Engineering", memberIds }),
       );
-    const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+    const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(ThreadApplication.Service, (s) =>
         s.startInGroup({ groupId, mentions, text: "Opening" }),
       );
+    const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+      Effect.flatMap(opening(groupId, mentions), placed);
     const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
       Effect.flatMap(ThreadMessageApplication.Service, (s) =>
         s.publish({ threadId, mentions, text }),
-      );
+      ).pipe(Effect.flatMap((message) => placed({ message })));
     const threadTarget = (threadId: Thread.Id): Target.Reference => ({
       _tag: "Thread",
       workspaceId,
@@ -990,11 +994,9 @@ export const threadParticipation = (harness: Harness) => {
               owner,
               create([workspace.ownerMemberId, humanId]),
             );
-            const first = yield* gateway.asMember(
-              workspace.id,
-              owner,
-              start(group.id, [workspace.ownerMemberId, humanId]),
-            );
+            const first = yield* gateway
+              .asMember(workspace.id, owner, opening(group.id, [workspace.ownerMemberId, humanId]))
+              .pipe(Effect.flatMap(placedIn(bound)));
             const result = yield* gateway.asMember(workspace.id, owner, follow(first.thread.id));
             expect(Object.keys(result).sort()).toEqual([
               "id",

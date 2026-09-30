@@ -838,6 +838,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           // Each answer is its own message, in the order the agent gave them.
           for (const text of texts) {
             const published = yield* publication.publish({
+              messageId: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
               threadId: turn.threadId,
               author: { _tag: "Member", memberId: turn.memberId },
               text,

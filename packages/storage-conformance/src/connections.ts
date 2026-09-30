@@ -345,13 +345,12 @@ export const connections = (harness: Harness) => {
             );
             expect(again).toEqual(first);
             expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([first]);
+            // The key alone names the request: reused with another body, it returns the first.
             expect(
-              yield* Effect.flip(
-                as(workspace.id, alice, (service) =>
-                  service.create(modelsWith({ name: "Different" }), options),
-                ),
+              yield* as(workspace.id, alice, (service) =>
+                service.create(modelsWith({ name: "Different" }), options),
               ),
-            ).toMatchObject({ _tag: "Request.Reused" });
+            ).toEqual(first);
           }),
         ),
       ),

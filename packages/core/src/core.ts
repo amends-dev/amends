@@ -52,7 +52,6 @@ import { Layer } from "effect";
 import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
 import { SignalApplication } from "./signal/application.ts";
-import { RequestReceipts } from "./request/receipts.ts";
 import { GroupApplication } from "./group/application.ts";
 import { GroupAudience } from "./group/audience.ts";
 import { GroupProjection } from "./group/projection.ts";
@@ -258,7 +257,6 @@ const operations = Layer.mergeAll(
       turnActivity,
       turnEnding,
       TurnDrafts.layer,
-      RequestReceipts.layer,
       changeSource,
     ),
   ),

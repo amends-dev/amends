@@ -816,7 +816,6 @@ it("a new thread in a group posts its first message there with a key, then clear
           createdAt: minute(1),
         },
         message: message("m9", "t9", minute(1)),
-        activity: { ...item(1).activity, threadId: "t9" },
       }),
       { status: 201, headers: { "content-type": "application/json" } },
     );
@@ -866,7 +865,6 @@ it("a first direct message starts the conversation and hands over its group", as
           createdAt: minute(1),
         },
         message: message("m9", "t9", minute(1)),
-        activity: { ...item(1).activity, threadId: "t9" },
       }),
       { status: 201, headers: { "content-type": "application/json" } },
     );
@@ -1004,13 +1002,10 @@ it("a reply keeps its draft across remounts, retries with its key, and clears on
       return new Response("Host unavailable", { status: 503 });
     }
     // The contract answers a publication with 201.
-    return new Response(
-      JSON.stringify({
-        message: message("reply", "thread", minute(1)),
-        activity: item(2).activity,
-      }),
-      { status: 201, headers: { "content-type": "application/json" } },
-    );
+    return new Response(JSON.stringify(message("reply", "thread", minute(1))), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
   });
   const [shown, setShown] = createSignal(true);
   let composer!: ComposerController;
@@ -1074,13 +1069,10 @@ it("a send cut off by closing the thread is sent again with its key after reopen
     posts.push({ key: request.headers.get("idempotency-key"), signal: request.signal });
     // The first may have reached the host before the reader closed the thread.
     if (posts.length === 1) return held.promise;
-    return new Response(
-      JSON.stringify({
-        message: message("reply", "thread", minute(1)),
-        activity: item(2).activity,
-      }),
-      { status: 201, headers: { "content-type": "application/json" } },
-    );
+    return new Response(JSON.stringify(message("reply", "thread", minute(1))), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
   });
   const [shown, setShown] = createSignal(true);
   let composer!: ComposerController;
@@ -1126,13 +1118,10 @@ it("a reply sends the members its text links to as its mentions", async () => {
       return new Response(null, { status: 204 });
     }
     bodies.push(await request.json());
-    return new Response(
-      JSON.stringify({
-        message: message("reply", "thread", minute(1)),
-        activity: item(2).activity,
-      }),
-      { status: 201, headers: { "content-type": "application/json" } },
-    );
+    return new Response(JSON.stringify(message("reply", "thread", minute(1))), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
   });
   let composer!: ComposerController;
   function Consumer() {

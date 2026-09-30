@@ -30,8 +30,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
-import type { Request } from "../request/request.ts";
-import { RequestReceipts } from "../request/receipts.ts";
+import { Request } from "../request/request.ts";
 import { MemberApplication } from "../workspace/member/application.ts";
 import { MemberFacts } from "../workspace/member/facts.ts";
 import { Member } from "../workspace/member/member.ts";
@@ -79,12 +78,7 @@ export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | P
 /** Model access or an environment the actor cannot use, or that cannot run together. */
 export type SelectionError = ConnectionUnavailable | EnvironmentUnavailable | Incompatible;
 /** Creating also grants the agent's role, and may meet a request key used before. */
-export type CreateError =
-  | Error
-  | SelectionError
-  | RequestReceipts.Error
-  | Delegation.Error
-  | GroupStore.Failure;
+export type CreateError = Error | SelectionError | Delegation.Error | GroupStore.Failure;
 export type ConfigureError = Error | SelectionError;
 export type RemoveError = Error | MemberApplication.RemoveError;
 /** Choosing concerns no agent yet: only the connection can be unavailable. */
@@ -141,9 +135,6 @@ interface Access {
   readonly usable: boolean;
 }
 
-const CreatedReference = Schema.Struct({ agentId: Agent.Id });
-type CreatedReference = typeof CreatedReference.Type;
-
 /**
  * Reasons that only readiness can clear: the environment or the connection still needs setup.
  * Saving waits for neither; each shows on the agent until resolved.
@@ -167,7 +158,6 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const environmentCatalog = yield* EnvironmentCatalog.Service;
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
-  const receipts = yield* RequestReceipts.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
   if (
@@ -182,7 +172,6 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
       groups.workspaceId,
       environments.workspaceId,
       connections.workspaceId,
-      receipts.workspaceId,
     ].some((id) => id !== workspaceId)
   )
     return yield* new InvalidResponse({ message: "Agent services belong to different workspaces" });
@@ -496,9 +485,9 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     return yield* presented(record, name);
   });
 
-  const restore = Effect.fnUntraced(function* (reference: CreatedReference) {
-    const found = yield* agents.get(reference.agentId);
-    if (Option.isNone(found)) return yield* new NotFound({ agentId: reference.agentId });
+  const restore = Effect.fnUntraced(function* (agentId: Agent.Id) {
+    const found = yield* agents.get(agentId);
+    if (Option.isNone(found)) return yield* new NotFound({ agentId });
     const record = yield* decoded(found.value);
     const { name } = yield* membershipOf(record);
     return { record, name };
@@ -507,65 +496,58 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const create = Effect.fn("AgentApplication.create")(
     function* (input: Agent.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Agent.CreateInput))(input);
-      const { record, name } = yield* receipts.once(
-        {
-          operation: "agent.create",
-          key: options.requestKey,
-          input: Agent.CreateInput,
-          value: request,
-          result: CreatedReference,
-          resultOf: (created: { readonly record: Agent.Record }) => ({
-            agentId: created.record.id,
-          }),
-          restore,
-        },
-        Effect.gen(function* () {
-          yield* authorization.require([
-            Requirement.make(AgentPermissions.Create, { _tag: "Workspace", workspaceId }),
-          ]);
-          yield* delegation.requireGrant(request.roleId);
-          yield* checkConfiguration(request);
-          const createdAt = yield* DateTime.now;
-          const created: Agent.Record = {
-            id: Agent.Id.make(yield* crypto.randomUUIDv4),
-            workspaceId,
-            memberId: Member.Id.make(yield* crypto.randomUUIDv4),
-            instructions: request.instructions,
-            model: request.model,
-            environmentId: request.environmentId,
-            createdBy: (yield* Actor.Service).memberId,
-            createdAt,
-          };
-          yield* journal.publish(MemberFacts.Added, {
-            memberId: created.memberId,
-            workspaceId,
-            identity: Identity.MemberReference.cases.Agent.make({ id: created.id }),
-            name: request.name,
-          });
-          yield* journal.publish(AssignmentFacts.Created, {
-            assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-            workspaceId,
-            memberId: created.memberId,
-            source: Assignment.Source.cases.Role.make({
-              roleId: request.roleId,
-              scope: { _tag: "Workspace", workspaceId },
-            }),
-          });
-          // An agent joins the general group as every member does.
-          if (Option.isSome(yield* groups.get(Group.GeneralId)))
-            yield* journal.publish(GroupMembershipFacts.Added, {
-              id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
-              workspaceId,
-              groupId: Group.GeneralId,
-              memberId: created.memberId,
-              admittedAt: createdAt,
-              status: "active",
-            });
-          yield* journal.publish(AgentFacts.Created, created);
-          return { record: created, name: request.name };
-        }),
+      yield* authorization.require([
+        Requirement.make(AgentPermissions.Create, { _tag: "Workspace", workspaceId }),
+      ]);
+      yield* delegation.requireGrant(request.roleId);
+      const actor = yield* Actor.Service;
+      const agentId = Agent.Id.make(
+        yield* Request.idFor(options.requestKey, ["agent.create", workspaceId, actor.memberId]),
       );
-      return yield* presented(record, name);
+      // A retry returns the agent its first attempt created.
+      if (options.requestKey !== undefined && Option.isSome(yield* agents.get(agentId))) {
+        const { record, name } = yield* restore(agentId);
+        return yield* presented(record, name);
+      }
+      yield* checkConfiguration(request);
+      const createdAt = yield* DateTime.now;
+      const created: Agent.Record = {
+        id: agentId,
+        workspaceId,
+        memberId: Member.Id.make(yield* crypto.randomUUIDv4),
+        instructions: request.instructions,
+        model: request.model,
+        environmentId: request.environmentId,
+        createdBy: actor.memberId,
+        createdAt,
+      };
+      yield* journal.publish(MemberFacts.Added, {
+        memberId: created.memberId,
+        workspaceId,
+        identity: Identity.MemberReference.cases.Agent.make({ id: created.id }),
+        name: request.name,
+      });
+      yield* journal.publish(AssignmentFacts.Created, {
+        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
+        workspaceId,
+        memberId: created.memberId,
+        source: Assignment.Source.cases.Role.make({
+          roleId: request.roleId,
+          scope: { _tag: "Workspace", workspaceId },
+        }),
+      });
+      // An agent joins the general group as every member does.
+      if (Option.isSome(yield* groups.get(Group.GeneralId)))
+        yield* journal.publish(GroupMembershipFacts.Added, {
+          id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
+          workspaceId,
+          groupId: Group.GeneralId,
+          memberId: created.memberId,
+          admittedAt: createdAt,
+          status: "active",
+        });
+      yield* journal.publish(AgentFacts.Created, created);
+      return yield* presented(created, request.name);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

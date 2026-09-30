@@ -262,11 +262,13 @@ an atomic create-or-reuse operation. A fresh generated payload under an old key
 correctly conflicts. This primitive does not make existing HTTP operations or
 external sends automatically idempotent.
 
-Core's request keys follow this pattern. `RequestReceipts.once` looks up a `request.completed`
-receipt, keyed by the operation, the acting member, and the client's key, inside the operation's
-commit. Found, it returns the records the receipt references, provided the input's digest matches;
-otherwise it runs the operation and records the receipt in the same commit. Receipts are internal
-facts: no projection reads them and the change feed does not deliver them.
+Core's request keys follow this pattern. Each creating operation derives the IDs of what it creates
+from the operation, the acting member, and the client's key with `Request.derivedId`, as workspace
+creation derives its workspace's ID; a turn retry derives its turn's ID from the turn it retries.
+Inside the commit, the operation finds those records by ID before generating anything and returns
+them; each creation fact declares the ID as its occurrence, so no second record can take it. No
+separate receipt is recorded. Logs written before this change still hold internal
+`request.completed` facts; no projection or change feed reads them.
 
 ## Event provenance
 

@@ -256,7 +256,7 @@ it("offers no retry for an agent that stopped taking part after its turn", async
   expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });
 });
 
-it("stops a turn, and retries one with a key it keeps until the retry goes through", async () => {
+it("stops a turn, and retries one again when the first answer is lost", async () => {
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
 
@@ -270,7 +270,7 @@ it("stops a turn, and retries one with a key it keeps until the retry goes throu
     stoppable: false,
   });
 
-  // A retry lost in transit asks again with the same key.
+  // A retry lost in transit asks again; a turn is retried once, so asking twice creates one turn.
   f.answers.push(new Response("unavailable", { status: 502 }));
   expect(f.views.controls.retry("atlas-1")).toBe(true);
   await waitFor(() =>
@@ -280,8 +280,7 @@ it("stops a turn, and retries one with a key it keeps until the retry goes throu
   await waitFor(() => expect(f.views.controls.acting()).toBeUndefined());
   const retries = f.writes.filter((write) => write.path.endsWith("/retry"));
   expect(retries).toHaveLength(2);
-  expect(retries[0]?.key).not.toBeNull();
-  expect(retries[1]?.key).toBe(retries[0]?.key);
+  expect(retries.map((write) => write.key)).toEqual([null, null]);
   expect(f.views.controls.problem()).toBeUndefined();
   // The failed attempt stays where it was, no longer retryable; the new one follows.
   expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });

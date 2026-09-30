@@ -53,9 +53,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const workspace = (yield* created.json) as { readonly id: string };
         const retried = yield* post("/workspaces", { name: "Studio" }, "create-1");
         expect(yield* retried.json).toEqual(workspace);
+        // The key alone names the request: reused with another name, it returns the first.
         const reused = yield* post("/workspaces", { name: "Other" }, "create-1");
-        expect(reused.status).toBe(422);
-        expect(yield* reused.json).toMatchObject({ _tag: "Request.Reused" });
+        expect(yield* reused.json).toEqual(workspace);
         const invitation = {
           recipientId: "bob",
           roleId: BuiltinRoles.MemberId,

@@ -30,7 +30,6 @@ import { AgentApplication } from "@amends/core/agent";
 import { Turn, TurnApplication } from "@amends/core/turn";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { SignalApplication } from "@amends/core/signal";
-import { Request } from "@amends/core/request";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -72,7 +71,6 @@ export const PublicError = Schema.Union([
   Turn.LogUnavailable,
   NotMember,
   WorkspaceNotFound,
-  Request.Reused,
   Conflict,
   Uncertain,
   InvalidInput,

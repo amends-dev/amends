@@ -83,8 +83,8 @@ so a client can import the complete contract without loading server code.
 `POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
 `POST …/environments`, both thread
 starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
-same key returns the first attempt's result, and the same key with a different body returns 422
-`Request.Reused`. Clients generating the typed client pass it in `headers`.
+same key returns the first attempt's result, whatever the retry's body. Clients generating the
+typed client pass it in `headers`.
 
 - `notifications`: `GET /workspaces/:workspaceId/notifications` lists the inbox of the
   authenticated human or agent's membership. `GET …/:notificationId` reads one notification. Active
@@ -209,12 +209,12 @@ describe the rules behind each operation.
 | `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                                                                                             |
 | `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                           |
 | `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                        |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread, message, and activity.                                                                                 |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread and its opening message.                                                                                |
 | `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.                                                                          |
 | `GET …/threads/:threadId`                            | One thread.                                                                                                                                                           |
 | `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                                  |
 | `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                       |
-| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message and its activity.                                                                                               |
+| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                                |
 | `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                          |
 | `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                          |
 | `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                     |
@@ -351,8 +351,8 @@ started with, where it begins in its agent's log for the thread (`logAfter`) and
 history starts from (`historyFrom`), the turn it retries (`retryOf`), its replies' `messageIds` in
 order, `failure`, `cancelReason`, and times, with `stoppable` and
 `retryable` for the caller. Stopping and retrying need permission to direct the agent (403
-otherwise). A turn in a thread the caller cannot open answers 404. `retry` takes an
-`Idempotency-Key`, so repeating it returns the turn it created.
+otherwise). A turn in a thread the caller cannot open answers 404. A turn is retried at most once,
+so repeating `retry` returns the turn it created.
 
 ## Authentication
 

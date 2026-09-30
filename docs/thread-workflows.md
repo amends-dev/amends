@@ -26,7 +26,8 @@ const start = (groupId: Group.Id) =>
   });
 ```
 
-The result contains `thread`, `message`, and `activity`. The operation accepts non-whitespace
+The result contains `thread` and `message`; the timeline holds the activity that places the
+message. The operation accepts non-whitespace
 text and preserves it verbatim, including indentation and newlines. NUL characters and unpaired
 surrogate halves, which storage cannot keep as given, are rejected as invalid input. `mentions` is an explicit
 array of distinct workspace-member IDs; text such as `@Reviewer` does not itself address anyone.
@@ -106,7 +107,7 @@ const reply = (threadId: Thread.Id) =>
   });
 ```
 
-The result contains `message` and `activity`. Text and mentions are validated as for starts.
+The result is the published message. Text and mentions are validated as for starts.
 Without a request key, every call publishes a new message; see [retrying safely](#retrying-safely).
 
 The caller must be a human with active workspace membership, current membership in the thread's
@@ -145,10 +146,18 @@ its notifications commit together; the timeline never has gaps or duplicate posi
 Starts (`startInGroup` and `startDirect`) and replies take an optional second argument,
 `{ requestKey }`. A client chooses a new key, such as a UUID, for each message it sends and repeats
 it on every retry. A retry returns the thread or message the first attempt created and records
-nothing more, including when the first attempt committed but its answer was lost. The same key with
-a different input returns `Request.Reused`, and a retry after an attempt that rolled back runs
-again. Keys belong to their member and their operation, so another member's key, or the same key
-on a reply rather than a start, is a separate request. Without a key, every call creates anew.
+nothing more, including when the first attempt committed but its answer was lost. The key alone
+names the request: sent again with different text or mentions, it still returns what the first
+attempt created. A retry after an attempt that rolled back runs again. Keys belong to their member
+and their operation, so another member's key, or the same key on a reply rather than a start, is a
+separate request. Without a key, every call creates anew.
+
+A keyed start derives its thread's and opening message's IDs from the operation, the author, and
+the key (`Request.derivedId`), and a keyed reply derives its message's ID the same way, so a retry
+finds what its first attempt created by those IDs and records no receipt. A retry passes the same
+checks as the first attempt before it looks: for a start, group membership, `thread.start`, and a
+human author, so an author who has since left the group receives `GroupNotFound`; for a reply,
+access to the thread, `thread.publish`, and a human author.
 
 ## Following and unfollowing
 

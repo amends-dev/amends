@@ -12,7 +12,7 @@ import {
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
 import type { TurnExecution } from "@amends/core/turn";
-import { Context, Crypto, Effect, Encoding, Layer, Option, Result, Schema } from "effect";
+import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Cause } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
@@ -39,7 +39,7 @@ export interface Interface {
     options?: Request.Options,
   ) => Effect.Effect<
     Workspace.Record,
-    GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput | Request.Reused
+    GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
   >;
   /**
    * Run core operations in a workspace without an actor: invitation acceptance,
@@ -109,9 +109,6 @@ const stale = (cause: Cause.Cause<unknown>) =>
       (reason._tag === "Fail" && staleError(reason.error)) ||
       (reason._tag === "Die" && staleError(reason.defect)),
   );
-
-/** A string's UTF-8 bytes; hex encoding reads strings as UTF-8, and valid hex always decodes. */
-const utf8 = (text: string) => Result.getOrThrow(Encoding.decodeHex(Encoding.encodeHex(text)));
 
 /**
  * Apply the public error policy once. Schema failures and workspace mismatches
@@ -256,33 +253,14 @@ export const make = Effect.fn("Gateway.make")(function* (
 
   /**
    * A keyed creation's workspace ID, derived from its creator and key: a retry names the same
-   * workspace, and nobody without the key can predict it. Formatted as a UUID (version 8).
+   * workspace, and nobody without the key can predict it.
    */
-  const keyedId = Effect.fnUntraced(function* (creator: Identity.HumanId, key: Request.Key) {
-    const digest = yield* Effect.orDie(
-      cryptography.digest("SHA-256", utf8(JSON.stringify(["workspace.create", creator, key]))),
+  const keyedId = (creator: Identity.HumanId, key: Request.Key) =>
+    Request.derivedId(["workspace.create", creator, key]).pipe(
+      Effect.map((id) => Workspace.Id.make(id)),
+      Effect.provideService(Crypto.Crypto, cryptography),
+      Effect.orDie,
     );
-    const bytes = digest.slice(0, 16);
-    bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
-    bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-    const hex = Encoding.encodeHex(bytes);
-    return Workspace.Id.make(
-      [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join(
-        "-",
-      ),
-    );
-  });
-  /** A retry returns the workspace its first attempt created, when it asked for the same one. */
-  const reuse = (
-    record: Workspace.Record,
-    creator: Identity.HumanId,
-    input: Workspace.CreateInput,
-    key: Request.Key,
-  ) =>
-    record.createdBy === creator && record.name === input.name
-      ? Effect.succeed(record)
-      : Effect.fail(new Request.Reused({ operation: "workspace.create", key }));
-
   const createWorkspace: Interface["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(
     function* (
       creator: Identity.HumanId,
@@ -303,7 +281,7 @@ export const make = Effect.fn("Gateway.make")(function* (
         Effect.orDie,
         Effect.setContext(environment),
       );
-      if (Option.isSome(recorded)) return yield* reuse(recorded.value, creator, input, key);
+      if (Option.isSome(recorded)) return recorded.value;
       return yield* Effect.scoped(
         bind(
           id,
@@ -317,7 +295,7 @@ export const make = Effect.fn("Gateway.make")(function* (
                   Effect.flatMap(
                     Option.match({
                       onNone: () => Effect.die("An initialized workspace has no record"),
-                      onSome: (record) => reuse(record, creator, input, key),
+                      onSome: Effect.succeed,
                     }),
                   ),
                 ),

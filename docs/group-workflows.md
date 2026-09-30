@@ -219,8 +219,8 @@ operation's checks in one commit; a failure leaves nothing behind. Each admissio
 so readmission never revives an old one, and replay applies the recorded history without
 rechecking anyone's current permissions or membership. Recording the same fact again reuses the
 original, but calling `createTeam` again creates another group unless both calls pass the
-same `{ requestKey }`: then the retry returns the first group, and the same key with a different
-input returns `Request.Reused`; see [retrying safely](thread-workflows.md#retrying-safely).
+same `{ requestKey }`: then the retry returns the first group, whatever the second call asks for;
+its ID is derived from the creator and key. See [retrying safely](thread-workflows.md#retrying-safely).
 
 Group, admission, and departure facts reach the group's members with `group.read` over the
 [change feed](../packages/core/README.md#change-feed); admissions and departures also reach the

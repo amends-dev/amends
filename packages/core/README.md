@@ -375,7 +375,7 @@ current configuration. Only the agent's latest turn on
 the thread can be retried, while no other is active and the agent still takes part there;
 otherwise it is `NotRetryable` with the reason (`active`, `completed`, `superseded`, or
 `departed`). A retry is created after the turn it retries, even on a clock that has not moved, and
-takes a request key, so repeating it returns the turn it created. Turn facts reach the thread's
+takes its ID from the turn it retries, so repeating it returns the turn it created. Turn facts reach the thread's
 readers through the change feed; the timeline shows an agent's reply as its message, and no turn
 activity of its own yet.
 
@@ -475,11 +475,13 @@ See [thread workflows](../../docs/thread-workflows.md).
 
 ## Request keys
 
-`@amends/core/request` holds `Request.Key`, the `Request.Options` creating operations accept, and
-`Request.Reused`. Starts, replies, group creation, and invitation issuance pass their decoded input
-through the internal `RequestReceipts.once`, which records a `request.completed` receipt (the input's
-digest and the created records' IDs) in the operation's commit, and on a retry reads those records
-back instead of running again. See [retrying safely](../../docs/thread-workflows.md#retrying-safely).
+`@amends/core/request` holds `Request.Key`, the `Request.Options` creating operations accept,
+`Request.derivedId`, which derives an ID from parts naming an operation, its requester, and a key,
+and `Request.idFor`, a new ID without a key or a derived one with it. Each creating operation names
+what it creates that way, so a retry runs the operation's checks, finds the record by its ID, and
+returns it instead of creating another. The key alone names the request: a retry gets what the key
+created whatever it asks for. A turn retry derives its turn's ID from the turn it retries and
+takes no key. See [retrying safely](../../docs/thread-workflows.md#retrying-safely).
 
 ## Permission declarations and built-in roles
 

@@ -6,9 +6,9 @@ import { Environment } from "@amends/core/environment";
 import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
-import { Request } from "@amends/core/request";
 import {
   ThreadApplication,
+  type ThreadMessage,
   ThreadMessageApplication,
   ThreadParticipationApplication,
   type ThreadTimeline,
@@ -21,7 +21,16 @@ import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Stream } from "effect";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
-import { alice, bob, boundTo, future, request, Support, testImplementation } from "./support.ts";
+import {
+  alice,
+  bob,
+  boundTo,
+  future,
+  placedIn,
+  request,
+  Support,
+  testImplementation,
+} from "./support.ts";
 
 const as = <A, E, R extends Core.Operations | Actor.Service>(
   id: Workspace.Id,
@@ -161,6 +170,11 @@ const revokeRoles = (id: Workspace.Id, memberId: Member.Id) =>
     for (const assignment of access.assignments)
       yield* Operations.revokeAssignment(id, alice, memberId, assignment.id);
   });
+/** A post's result with the activity that placed its message, read through the workspace's stores. */
+const withPlace = <A extends { readonly message: ThreadMessage.Record }>(
+  id: Workspace.Id,
+  result: A,
+) => Effect.flatMap(boundTo(id), (bound) => placedIn(bound)(result));
 const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Turn.Record["memberId"]>) =>
   as(
     id,
@@ -168,7 +182,7 @@ const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Turn.Reco
     Effect.flatMap(ThreadApplication.Service, (threads) =>
       threads.startInGroup({ groupId: Group.GeneralId, text, mentions: [...mentions] }),
     ),
-  );
+  ).pipe(Effect.flatMap((started) => withPlace(id, started)));
 const reply = (id: Workspace.Id, threadId: Turn.Record["threadId"], text: string) =>
   as(
     id,
@@ -176,7 +190,7 @@ const reply = (id: Workspace.Id, threadId: Turn.Record["threadId"], text: string
     Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
       messages.publish({ threadId, text, mentions: [] }),
     ),
-  );
+  ).pipe(Effect.flatMap((message) => withPlace(id, { message })));
 
 const input = (text: string): Transcript.Input => ({
   _tag: "Input",
@@ -678,16 +692,11 @@ export const turns = (harness: ConformanceHarness) => {
                 agent.memberId,
               ]);
               const threadId = started.thread.id;
-              const retry = (turnId: Turn.Id, requestKey?: string) =>
+              const retry = (turnId: Turn.Id) =>
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turns) =>
-                    turns.retry(
-                      turnId,
-                      requestKey === undefined ? {} : { requestKey: Request.Key.make(requestKey) },
-                    ),
-                  ),
+                  Effect.flatMap(TurnApplication.Service, (turns) => turns.retry(turnId)),
                 );
               const flags = (views: ReadonlyArray<Turn.View>) =>
                 views.map(({ status, stoppable, retryable }) => ({ status, stoppable, retryable }));
@@ -724,7 +733,7 @@ export const turns = (harness: ConformanceHarness) => {
 
               // Retrying handles the same input again, continuing from the failed turn with what
               // it took in, so that input is not submitted twice.
-              const retried = yield* retry(failed!.id, "retry-1");
+              const retried = yield* retry(failed!.id);
               expect(retried).toMatchObject({
                 status: "queued",
                 agentId: agent.id,
@@ -739,12 +748,8 @@ export const turns = (harness: ConformanceHarness) => {
                 retryable: false,
               });
               expect(retried.id).not.toBe(failed!.id);
-              // The same request returns the turn it created; another finds the failure superseded.
-              expect((yield* retry(failed!.id, "retry-1")).id).toBe(retried.id);
-              expect(yield* Effect.flip(retry(failed!.id))).toMatchObject({
-                _tag: "TurnApplication.NotRetryable",
-                reason: "superseded",
-              });
+              // A turn is retried once: asking again, by any request, returns that retry.
+              expect((yield* retry(failed!.id)).id).toBe(retried.id);
               expect(flags(yield* turnsOf(workspace.id, threadId))).toEqual([
                 { status: "queued", stoppable: true, retryable: false },
                 { status: "failed", stoppable: false, retryable: false },
@@ -1098,7 +1103,7 @@ export const turns = (harness: ConformanceHarness) => {
                     mentions: [agent.memberId],
                   }),
                 ),
-              );
+              ).pipe(Effect.flatMap((message) => withPlace(workspace.id, { message })));
               yield* accept(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
               const prepare = (turnId: Turn.Id) =>
@@ -1262,7 +1267,7 @@ export const turns = (harness: ConformanceHarness) => {
                     mentions: [agent.memberId],
                   }),
                 ),
-              );
+              ).pipe(Effect.flatMap((message) => withPlace(workspace.id, { message })));
               const bound = yield* boundTo(workspace.id);
               const recipient = Notification.ofMember(agent.memberId, identity);
               const [request] = yield* bound.notifications.listPendingByRecipient(recipient, {

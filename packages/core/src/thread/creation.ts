@@ -1,5 +1,4 @@
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Group } from "../group/group.ts";
 import { GroupStore } from "../group/store.ts";
 import { Member } from "../workspace/member/member.ts";
@@ -18,6 +17,8 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
   { message: Schema.String },
 ) {}
 export const Input = Schema.Struct({
+  /** The caller names the thread, so a keyed request can name the same one on its retry. */
+  id: Thread.Id,
   groupId: Group.Id,
   createdBy: Thread.Record.fields.createdBy,
   createdAt: Schema.DateTimeUtcFromString,
@@ -28,7 +29,6 @@ export type Error =
   | Schema.SchemaError
   | GroupStore.Failure
   | MemberStore.Failure
-  | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error;
 export interface Interface {
@@ -50,7 +50,6 @@ export const make = Effect.fn("ThreadCreation.make")(function* () {
   const groups = yield* GroupStore.Service;
   const members = yield* MemberStore.Service;
   const journal = yield* Journal.Service;
-  const crypto = yield* Crypto.Crypto;
   const workspaceId = groups.workspaceId;
   if (members.workspaceId !== workspaceId)
     return yield* new InvalidReference({
@@ -83,7 +82,7 @@ export const make = Effect.fn("ThreadCreation.make")(function* () {
     }
     return yield* journal
       .publish(ThreadFacts.Created, {
-        id: Thread.Id.make(yield* crypto.randomUUIDv4),
+        id: checked.id,
         workspaceId,
         groupId: group.id,
         createdBy: creator,

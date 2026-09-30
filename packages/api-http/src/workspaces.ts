@@ -55,7 +55,6 @@ export class WorkspacesGroup extends HttpApiGroup.make("workspaces")
         ApiErrors.Conflict,
         ApiErrors.Uncertain,
         ApiErrors.InvalidInput,
-        ApiErrors.RequestReused,
       ],
     }),
     HttpApiEndpoint.get("ownership", "/:workspaceId/ownership", {

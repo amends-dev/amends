@@ -17,6 +17,7 @@ import {
   type ThreadActivity,
   ThreadActivityKind,
   ThreadActivityStore,
+  ThreadMessage,
   ThreadMessageActivity,
   ThreadMessageStore,
   ThreadParticipationStore,
@@ -310,6 +311,30 @@ export const publishedMessage = (activity: ThreadActivity.Record) =>
   ThreadActivityKind.is(ThreadMessageActivity.Published)(activity)
     ? Schema.decodeUnknownSync(ThreadMessageActivity.Published.details)(activity.details).messageId
     : undefined;
+
+/**
+ * A post's result with the timeline activity that placed its message, read back from the store:
+ * starts and replies return what they created, not where it landed in the timeline.
+ */
+export const placed = Effect.fnUntraced(function* <
+  A extends { readonly message: ThreadMessage.Record },
+>(result: A) {
+  const activities = yield* ThreadActivityStore.Service;
+  const found = (yield* activities.listByThread(result.message.threadId)).find(
+    (activity) => publishedMessage(activity) === result.message.id,
+  );
+  if (found === undefined) return yield* Effect.die(new Error("A posted message has no activity"));
+  const activity = yield* Effect.orDie(
+    ThreadActivityKind.decode(ThreadMessageActivity.Published, found),
+  );
+  return Object.assign({}, result, { activity });
+});
+
+/** `placed`, reading a workspace binding's store, for a post made through the gateway. */
+export const placedIn =
+  (bound: Bound) =>
+  <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
+    placed(result).pipe(Effect.provideService(ThreadActivityStore.Service, bound.activities));
 
 /** Attribution for low-level fixture writes outside application operations. */
 export const testProvenance = (id = workspaceId): Event.Provenance => ({

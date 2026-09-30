@@ -24,6 +24,7 @@ import {
   type Bound,
   boundTo,
   otherWorkspaceId,
+  placed,
   runHost,
   Support,
   testProvenance,
@@ -58,11 +59,11 @@ export const readState = (harness: Harness) => {
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(ThreadApplication.Service, (s) =>
         s.startInGroup({ groupId, text: "Opening", mentions }),
-      );
+      ).pipe(Effect.flatMap(placed));
     const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
       Effect.flatMap(ThreadMessageApplication.Service, (s) =>
         s.publish({ threadId, text: "Reply", mentions }),
-      );
+      ).pipe(Effect.flatMap((message) => placed({ message })));
     const markRead = (threadId: Thread.Id, throughSequence: number) =>
       Effect.flatMap(ReadStateApplication.Service, (s) =>
         s.markThreadRead({ threadId, throughSequence }),

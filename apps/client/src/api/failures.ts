@@ -147,7 +147,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // Rejected credentials sign out in the HTTP layer; the rest are transport or host failures.
   "Api.Unauthorized": "failed",
   "Gateway.Uncertain": "failed",
-  "Request.Reused": "failed",
   HttpClientError: "failed",
   // A response that fails its schema; readers' inputs fail as Client.InvalidCommand instead.
   SchemaError: "failed",

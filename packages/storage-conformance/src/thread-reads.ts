@@ -54,6 +54,8 @@ import {
   type Bound,
   boundTo,
   otherWorkspaceId,
+  placed,
+  placedIn,
   replacing,
   runHost,
   Support,
@@ -109,10 +111,12 @@ export const threadReads = (harness: Harness) => {
       Effect.flatMap(GroupApplication.Service, (service) =>
         service.createTeam({ name, memberIds }),
       );
-    const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+    const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(ThreadApplication.Service, (service) =>
         service.startInGroup({ groupId, mentions, text: "Opening proposal" }),
       );
+    const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+      Effect.flatMap(opening(groupId, mentions), placed);
     const threadTarget = (threadId: Thread.Id): Target.Reference => ({
       _tag: "Thread",
       workspaceId,
@@ -907,11 +911,9 @@ export const threadReads = (harness: Harness) => {
                 owner,
                 create([workspace.ownerMemberId, readerId]),
               );
-              const opened = yield* gateway.asMember(
-                workspace.id,
-                owner,
-                start(group.id, [workspace.ownerMemberId]),
-              );
+              const opened = yield* gateway
+                .asMember(workspace.id, owner, opening(group.id, [workspace.ownerMemberId]))
+                .pipe(Effect.flatMap(placedIn(bound)));
               const foreignGroup = yield* gateway.asMember(
                 other.id,
                 foreignOwner,
@@ -920,7 +922,7 @@ export const threadReads = (harness: Harness) => {
               const foreignThread = yield* gateway.asMember(
                 other.id,
                 foreignOwner,
-                start(foreignGroup.id),
+                opening(foreignGroup.id),
               );
               expect(
                 yield* Effect.flip(

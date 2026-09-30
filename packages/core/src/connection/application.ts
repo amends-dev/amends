@@ -9,8 +9,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
-import type { Request } from "../request/request.ts";
-import { RequestReceipts } from "../request/receipts.ts";
+import { Request } from "../request/request.ts";
 import { ConnectionCatalog } from "./catalog.ts";
 import { Connection } from "./connection.ts";
 import { ConnectionCredentialStore } from "./credential-store.ts";
@@ -54,7 +53,6 @@ export type Error =
 /** Creating can also meet an implementation this host lacks, or a request key used before. */
 export type CreateError =
   | Error
-  | RequestReceipts.Error
   | UnknownImplementation
   | InvalidSettings
   | UnsupportedAuthentication;
@@ -107,9 +105,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/connection/application/Service",
 ) {}
 
-const CreatedReference = Schema.Struct({ connectionId: Connection.Id });
-type CreatedReference = typeof CreatedReference.Type;
-
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -117,14 +112,9 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const credentials = yield* ConnectionCredentialStore.Service;
   const catalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
-  const receipts = yield* RequestReceipts.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [connections.workspaceId, credentials.workspaceId, receipts.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
-  )
+  if ([connections.workspaceId, credentials.workspaceId].some((id) => id !== workspaceId))
     return yield* new InvalidResponse({
       message: "Connection services belong to different workspaces",
     });
@@ -234,55 +224,52 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     return yield* presented(yield* authorized(id, ConnectionPermissions.Read));
   });
 
-  const restore = Effect.fnUntraced(function* (reference: CreatedReference) {
-    const found = yield* connections.get(reference.connectionId);
-    if (Option.isNone(found)) return yield* new NotFound({ connectionId: reference.connectionId });
+  const restore = Effect.fnUntraced(function* (connectionId: Connection.Id) {
+    const found = yield* connections.get(connectionId);
+    if (Option.isNone(found)) return yield* new NotFound({ connectionId });
     return yield* decode(found.value);
   });
 
   const create = Effect.fn("ConnectionApplication.create")(
     function* (input: Connection.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Connection.CreateInput))(input);
-      const record = yield* receipts.once(
-        {
-          operation: "connection.create",
-          key: options.requestKey,
-          input: Connection.CreateInput,
-          value: request,
-          result: CreatedReference,
-          resultOf: (created: Connection.Record) => ({ connectionId: created.id }),
-          restore,
-        },
-        Effect.gen(function* () {
-          yield* authorization.require([
-            Requirement.make(ConnectionPermissions.Create, { _tag: "Workspace", workspaceId }),
-          ]);
-          const declaration = yield* installed(request.implementationId);
-          if (!declaration.authentication.some((method) => method._tag === request.authentication))
-            return yield* new UnsupportedAuthentication({
-              implementationId: declaration.id,
-              method: request.authentication,
-            });
-          yield* checkSettings(declaration, request.settings);
-          const created: Connection.Record = {
-            id: Connection.Id.make(yield* crypto.randomUUIDv4),
-            workspaceId,
-            name: request.name,
-            implementationId: declaration.id,
-            settings: request.settings,
-            authentication:
-              request.authentication === "ApiKey"
-                ? { _tag: "ApiKey", credentialId: null }
-                : { _tag: "None" },
-            status: "active",
-            createdBy: (yield* Actor.Service).memberId,
-            createdAt: yield* DateTime.now,
-          };
-          yield* journal.publish(ConnectionFacts.Created, created);
-          return created;
-        }),
+      yield* authorization.require([
+        Requirement.make(ConnectionPermissions.Create, { _tag: "Workspace", workspaceId }),
+      ]);
+      const actor = yield* Actor.Service;
+      const connectionId = Connection.Id.make(
+        yield* Request.idFor(options.requestKey, [
+          "connection.create",
+          workspaceId,
+          actor.memberId,
+        ]),
       );
-      return yield* presented(record);
+      // A retry returns the connection its first attempt created.
+      if (options.requestKey !== undefined && Option.isSome(yield* connections.get(connectionId)))
+        return yield* presented(yield* restore(connectionId));
+      const declaration = yield* installed(request.implementationId);
+      if (!declaration.authentication.some((method) => method._tag === request.authentication))
+        return yield* new UnsupportedAuthentication({
+          implementationId: declaration.id,
+          method: request.authentication,
+        });
+      yield* checkSettings(declaration, request.settings);
+      const created: Connection.Record = {
+        id: connectionId,
+        workspaceId,
+        name: request.name,
+        implementationId: declaration.id,
+        settings: request.settings,
+        authentication:
+          request.authentication === "ApiKey"
+            ? { _tag: "ApiKey", credentialId: null }
+            : { _tag: "None" },
+        status: "active",
+        createdBy: actor.memberId,
+        createdAt: yield* DateTime.now,
+      };
+      yield* journal.publish(ConnectionFacts.Created, created);
+      return yield* presented(created);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

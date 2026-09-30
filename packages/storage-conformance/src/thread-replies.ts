@@ -37,6 +37,7 @@ import {
   ThreadActivityRecording,
   ThreadParticipationDeparture,
   ThreadActivityStore,
+  ThreadMessage,
   ThreadMessageApplication,
   ThreadMessagePermissions,
   ThreadMessagePublication,
@@ -60,6 +61,7 @@ import {
   failingLate,
   journalLog,
   otherWorkspaceId,
+  placed,
   publishedMessage,
   runHost,
   Support,
@@ -107,14 +109,19 @@ export const threadReplies = (harness: Harness) => {
       Effect.flatMap(GroupApplication.Service, (s) =>
         s.createTeam({ name: "Engineering", memberIds }),
       );
-    const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+    const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(ThreadApplication.Service, (s) =>
         s.startInGroup({ groupId, mentions, text: "Opening" }),
       );
-    const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
+    const answer = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
       Effect.flatMap(ThreadMessageApplication.Service, (s) =>
         s.publish({ threadId, mentions, text }),
       );
+    /** A start or reply, with the activity that placed its message, for position assertions. */
+    const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+      Effect.flatMap(opening(groupId, mentions), placed);
+    const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
+      Effect.flatMap(answer(threadId, mentions, text), (message) => placed({ message }));
     const threadTarget = (threadId: Thread.Id): Target.Reference => ({
       _tag: "Thread",
       workspaceId,
@@ -239,7 +246,9 @@ export const threadReplies = (harness: Harness) => {
                 human,
                 reply(first.thread.id, [], "  Reply\nverbatim  "),
               );
-              expect(Object.keys(result).sort()).toEqual(["activity", "message"]);
+              expect(yield* bound.messages.get(result.message.id)).toEqual(
+                Option.some(result.message),
+              );
               expect(result.message).toMatchObject({
                 author: { _tag: "Member", memberId: humanId },
                 text: "  Reply\nverbatim  ",
@@ -875,24 +884,30 @@ export const threadReplies = (harness: Harness) => {
             const first = yield* gateway.asMember(
               workspace.id,
               identity,
-              start(group.id, [workspace.ownerMemberId, humanId]),
+              opening(group.id, [workspace.ownerMemberId, humanId]),
             );
-            const result = yield* gateway.asMember(workspace.id, identity, reply(first.thread.id));
-            expect(Object.keys(result).sort()).toEqual(["activity", "message"]);
-            expect(result.activity.sequence).toBe(2);
+            // A reply returns the message it published, as stored.
+            const result = yield* gateway.asMember(workspace.id, identity, answer(first.thread.id));
+            expect(yield* bound.messages.get(result.id)).toEqual(Option.some(result));
+            expect(
+              Option.getOrThrow(yield* bound.activities.latest(first.thread.id)),
+            ).toMatchObject({
+              sequence: 2,
+              details: { messageId: result.id },
+            });
             expect(
               yield* Effect.flip(
-                gateway.asMember(workspace.id, identity, reply(first.thread.id, [otherId])),
+                gateway.asMember(workspace.id, identity, answer(first.thread.id, [otherId])),
               ),
             ).toMatchObject({ _tag: "ThreadMessageApplication.ParticipantUnavailable" });
             expect(
               yield* Effect.flip(
-                gateway.asMember(workspace.id, identity, reply(Thread.Id.make("missing"))),
+                gateway.asMember(workspace.id, identity, answer(Thread.Id.make("missing"))),
               ),
             ).toMatchObject({ _tag: "ThreadMessageApplication.NotFound" });
             expect(
               yield* Effect.flip(
-                gateway.asMember(workspace.id, identity, reply(first.thread.id, [], " ")),
+                gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
               ),
             ).toMatchObject({ _tag: "Gateway.InvalidInput" });
           }),
@@ -1034,7 +1049,9 @@ export const threadReplies = (harness: Harness) => {
               expect(
                 current === undefined ? undefined : memberParticipant(current).groupMembershipId,
               ).not.toBe(memberParticipant(old).groupMembershipId);
-              expect(current?.joinedAtSequence).toBe(returned.activity.sequence);
+              const own = Option.getOrThrow(yield* bound.activities.latest(first.thread.id));
+              expect(publishedMessage(own)).toBe(returned.id);
+              expect(current?.joinedAtSequence).toBe(own.sequence);
               // Their own reply does not notify them; the next unmentioned reply reaches the fresh participation.
               expect(yield* notifications(bound, humanId)).toEqual([]);
               yield* run(bound, owner, reply(first.thread.id));
@@ -1186,6 +1203,7 @@ export const threadReplies = (harness: Harness) => {
                 const publication = yield* ThreadMessagePublication.Service;
                 yield* journal.commit(
                   publication.publish({
+                    messageId: ThreadMessage.Id.make("done"),
                     threadId: first.thread.id,
                     author: { _tag: "Member", memberId: agentId },
                     text: "Done",

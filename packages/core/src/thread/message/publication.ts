@@ -1,4 +1,4 @@
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
+import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Member } from "../../workspace/member/member.ts";
 import { Journal } from "../../journal/journal.ts";
@@ -24,6 +24,8 @@ export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
   },
 ) {}
 export const Input = Schema.Struct({
+  /** The caller names the message, so a keyed request can name the same one on its retry. */
+  messageId: ThreadMessage.Id,
   threadId: ThreadId.Id,
   author: ThreadMessage.Author,
   text: ThreadMessage.Text,
@@ -35,6 +37,11 @@ export const Input = Schema.Struct({
   turnId: Schema.optionalKey(TurnId.Id),
 });
 export interface Input extends Schema.Schema.Type<typeof Input> {}
+/** A published message and the timeline activity that places it, for the publishing workflow. */
+export interface Published {
+  readonly message: ThreadMessage.Record;
+  readonly activity: ThreadMessageActivity.Published;
+}
 export type Error =
   | ThreadStore.Failure
   | ThreadActivityPublisher.Error
@@ -51,7 +58,7 @@ export interface Interface {
    */
   readonly publish: (
     input: Input,
-  ) => Effect.Effect<ThreadMessage.Published, Error, Store.Transaction | Publication.Service>;
+  ) => Effect.Effect<Published, Error, Store.Transaction | Publication.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/message/publication/Service",
@@ -65,7 +72,6 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
   const threads = yield* ThreadStore.Service;
   const publisher = yield* ThreadActivityPublisher.Service;
   const journal = yield* Journal.Service;
-  const crypto = yield* Crypto.Crypto;
   const workspaceId = threads.workspaceId;
   if (publisher.workspaceId !== workspaceId)
     return yield* new InvalidReference({
@@ -103,7 +109,7 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
       step: ({ admitted }) =>
         Effect.gen(function* () {
           const message: ThreadMessage.Record = {
-            id: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
+            id: request.messageId,
             workspaceId,
             threadId: thread.id,
             author: request.author,

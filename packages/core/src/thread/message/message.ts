@@ -4,7 +4,6 @@ import { ThreadMessageId } from "./id.ts";
 import { WorkspaceId } from "../../workspace/id.ts";
 import { MemberId } from "../../workspace/member/id.ts";
 import { Identity } from "../../identity/identity.ts";
-import { ThreadMessageActivity } from "./activity.ts";
 import { Text as Characters } from "../../text/text.ts";
 import { TurnId } from "../../turn/id.ts";
 export const Id = ThreadMessageId.Id;
@@ -69,10 +68,4 @@ export const PublishInput = Schema.Struct({
   mentions: Schema.UniqueArray(MemberId.Id),
 });
 export interface PublishInput extends Schema.Schema.Type<typeof PublishInput> {}
-/** Publication result excludes internal admission and recipient identity snapshots. */
-export const Published = Schema.Struct({
-  message: Record,
-  activity: ThreadMessageActivity.Published.Activity,
-});
-export interface Published extends Schema.Schema.Type<typeof Published> {}
 export * as ThreadMessage from "./message.ts";

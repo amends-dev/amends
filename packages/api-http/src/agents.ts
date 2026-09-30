@@ -34,13 +34,7 @@ export class AgentsGroup extends HttpApiGroup.make("agents")
       success: Agent.View.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedAgent",
       }),
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.AgentNotFound,
-        ...selection,
-        ...ApiErrors.delegation,
-        ApiErrors.RequestReused,
-      ],
+      error: [...ApiErrors.member, ApiErrors.AgentNotFound, ...selection, ...ApiErrors.delegation],
     }),
     HttpApiEndpoint.get("environmentChoices", "/environment-choices", {
       params: { workspaceId: Workspace.Id },

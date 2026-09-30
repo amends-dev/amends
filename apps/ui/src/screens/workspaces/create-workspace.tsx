@@ -11,15 +11,12 @@ export type CreateWorkspaceError =
   | "invalid-name"
   | "invalid-member-name"
   | "denied"
-  | "request-reused"
   | "request-failed";
 
 const errors: { readonly [Error in CreateWorkspaceError]: string } = {
   "invalid-name": "Use 1 to 80 characters, with no invisible ones.",
   "invalid-member-name": "Use 1 to 80 characters, with no invisible ones.",
   denied: "This identity can’t create workspaces.",
-  "request-reused":
-    "This request was already used for a different name. Close this and start again.",
   "request-failed":
     "We couldn’t confirm creation. Try again with this name to safely check the same request.",
 };

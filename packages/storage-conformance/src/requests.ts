@@ -1,5 +1,4 @@
-import { ChangeFeedApplication } from "@amends/core/change-feed";
-import { GroupApplication } from "@amends/core/group";
+import { GroupApplication, GroupMembershipApplication } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Log, Store } from "@amends/core/journal";
 import { Request } from "@amends/core/request";
@@ -7,7 +6,7 @@ import { ThreadApplication, ThreadMessageApplication } from "@amends/core/thread
 import { InvitationApplication, Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Exit, Fiber, Layer, Queue, Stream } from "effect";
+import { Effect, Exit, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";
 import {
   alice,
@@ -80,16 +79,25 @@ export const requests = (harness: Harness) => {
       ),
     );
 
-    it.effect("a key reused with a different input is refused and records nothing", () =>
+    it.effect("a reused key returns what it created, whatever the retry asks for", () =>
       harness.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, as, start } = yield* world(storage);
-          yield* as(owner, start("Hello"));
+          const first = yield* as(owner, start("Hello"));
           const before = yield* history(bound);
-          expect(yield* Effect.flip(as(owner, start("Goodbye")))).toEqual(
-            new Request.Reused({ operation: "thread.start", key }),
-          );
+          expect(yield* as(owner, start("Goodbye"))).toEqual(first);
           expect(yield* history(bound)).toEqual(before);
+          const direct = (text: string) =>
+            Effect.flatMap(ThreadApplication.Service, (threads) =>
+              threads.startDirect(
+                { memberIds: [other.memberId], text, mentions: [] },
+                { requestKey: key },
+              ),
+            );
+          const opened = yield* as(owner, direct("Hi"));
+          const afterDirect = yield* history(bound);
+          expect(yield* as(owner, direct("Bye"))).toEqual(opened);
+          expect(yield* history(bound)).toEqual(afterDirect);
         }),
       ),
     );
@@ -111,7 +119,29 @@ export const requests = (harness: Harness) => {
               ),
             ),
           );
-          expect(reply.message.id).not.toBe(mine.message.id);
+          expect(reply.id).not.toBe(mine.message.id);
+        }),
+      ),
+    );
+
+    it.effect("a retry passes the start's checks again before it finds the thread", () =>
+      harness.withStorage((storage) =>
+        Effect.gen(function* () {
+          const { bound, group, as, start } = yield* world(storage);
+          yield* as(other, start("Hello"));
+          const admission = yield* bound.groupMemberships.findActive(group.id, other.memberId);
+          yield* as(
+            other,
+            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
+              memberships.leave({
+                groupId: group.id,
+                membershipId: Option.getOrThrow(admission).id,
+              }),
+            ),
+          );
+          expect(yield* Effect.flip(as(other, start("Hello")))).toEqual(
+            new ThreadApplication.GroupNotFound({ groupId: group.id }),
+          );
         }),
       ),
     );
@@ -193,32 +223,18 @@ export const requests = (harness: Harness) => {
       ),
     );
 
-    it.effect("receipts stay out of the change feed", () =>
+    it.effect("a created record's key returns it, whatever the retry asks for", () =>
       harness.withStorage((storage) =>
         Effect.gen(function* () {
-          const { owner, as, start } = yield* world(storage);
-          const names = yield* Effect.scoped(
-            Effect.gen(function* () {
-              const stream = yield* as(
-                other,
-                Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch()),
-              );
-              const queue = yield* Queue.unbounded<string>();
-              const fiber = yield* stream.pipe(
-                Stream.runForEach((message) =>
-                  message._tag === "Committed"
-                    ? Effect.forEach(message.events, (event) => Queue.offer(queue, event.name))
-                    : Effect.void,
-                ),
-                Effect.forkScoped,
-              );
-              yield* as(owner, start("Hello"));
-              yield* Queue.take(queue);
-              yield* Fiber.interrupt(fiber);
-              return yield* Queue.takeAll(queue);
-            }),
-          );
-          expect(names).not.toContain("request.completed");
+          const { bound, owner, as } = yield* world(storage);
+          const create = (name: string) =>
+            Effect.flatMap(GroupApplication.Service, (groups) =>
+              groups.createTeam({ name, memberIds: [] }, { requestKey: key }),
+            );
+          const first = yield* as(owner, create("Second"));
+          const before = yield* history(bound);
+          expect(yield* as(owner, create("Different"))).toEqual(first);
+          expect(yield* history(bound)).toEqual(before);
         }),
       ),
     );
@@ -233,9 +249,7 @@ export const requests = (harness: Harness) => {
             ).pipe(Effect.provide(gateway(host)));
           const first = yield* create("Studio");
           expect(yield* create("Studio")).toEqual(first);
-          expect(yield* Effect.flip(create("Other name"))).toEqual(
-            new Request.Reused({ operation: "workspace.create", key }),
-          );
+          expect(yield* create("Other name")).toEqual(first);
           // Another creator's key names another workspace.
           const theirs = yield* create("Studio", Identity.HumanId.make("bob"));
           expect(theirs.id).not.toBe(first.id);

@@ -10,6 +10,7 @@ import {
   ThreadActivityRecording,
   ThreadApplication,
   ThreadCreation,
+  ThreadMessage,
   ThreadMessageApplication,
   ThreadMessagePublication,
   ThreadParticipation,
@@ -300,10 +301,12 @@ export const threadStarts = (harness: Harness) => {
                     Effect.flatMap(ThreadStart.Service, (starts) =>
                       Effect.flatMap(DateTime.now, (occurredAt) =>
                         starts.start({
+                          threadId: Thread.Id.make("late-order"),
                           groupId: team.id,
                           participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],
                           first: {
                             _tag: "Message",
+                            messageId: ThreadMessage.Id.make("late-order-opening"),
                             author: { _tag: "Contact", contactId },
                             text: "My order is late",
                             mentions: [],
