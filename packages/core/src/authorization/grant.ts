@@ -1,5 +1,6 @@
 import { Schema } from "effect";
 import { Permission } from "./permission.ts";
+import type { Requirement } from "./requirement.ts";
 import { Scope } from "./scope.ts";
 
 /**
@@ -42,5 +43,13 @@ export const makeSchema = (permission: Permission.Definition) => {
  */
 export const make = (permission: Permission.Definition, scope: Scope.Value): Value =>
   makeSchema(permission).make({ permission: permission.name, scope });
+
+/** Whether any of these grants allows a requirement: its permission, in a scope covering its target. */
+export const anyCovers = (grants: ReadonlyArray<Value>, requirement: Requirement.Value) =>
+  grants.some(
+    (grant) =>
+      grant.permission === requirement.permission.name &&
+      Scope.covers(grant.scope, requirement.target),
+  );
 
 export * as Grant from "./grant.ts";

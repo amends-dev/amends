@@ -4,11 +4,11 @@ import { Identity } from "../identity/identity.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 
 import { Workspace } from "../workspace/workspace.ts";
-import type { Grant } from "./grant.ts";
+import { Grant } from "./grant.ts";
 import { GrantResolver } from "./grant-resolver.ts";
 import { PermissionCatalog } from "./permission-catalog.ts";
 import { Requirement } from "./requirement.ts";
-import { Scope } from "./scope.ts";
+
 import { Denied, InvalidActor } from "./errors.ts";
 import { Store } from "../journal/store.ts";
 export { Denied, InvalidActor } from "./errors.ts";
@@ -105,12 +105,6 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     }
     return { actor, checked: requirements };
   });
-  const isCovered = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
-    grants.some(
-      (grant) =>
-        grant.permission === requirement.permission.name &&
-        Scope.covers(grant.scope, requirement.target),
-    );
 
   const requirePermissions = Effect.fn("Authorization.require")(function* (
     requirements: ReadonlyArray<Requirement.Value>,
@@ -119,7 +113,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     if (checked.length === 0) return;
     const grants = yield* grantResolver.resolve(actor.memberId);
     for (const requirement of checked)
-      if (!isCovered(grants, requirement))
+      if (!Grant.anyCovers(grants, requirement))
         return yield* new Denied({ memberId: actor.memberId, requirement });
   });
   const permitted = Effect.fn("Authorization.permitted")(function* (
@@ -128,7 +122,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return [];
     const grants = yield* grantResolver.resolve(actor.memberId);
-    return checked.map((requirement) => isCovered(grants, requirement));
+    return checked.map((requirement) => Grant.anyCovers(grants, requirement));
   });
 
   return Service.of({ require: requirePermissions, permitted });

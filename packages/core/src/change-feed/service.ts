@@ -1,10 +1,9 @@
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
-import type { Grant } from "../authorization/grant.ts";
+import { Grant } from "../authorization/grant.ts";
 import { GrantResolver } from "../authorization/grant-resolver.ts";
 import type { Requirement } from "../authorization/requirement.ts";
-import { Scope as GrantScope } from "../authorization/scope.ts";
 import { Group } from "../group/group.ts";
 import { GroupMembershipStore } from "../group/membership/store.ts";
 import { Actor } from "../identity/actor.ts";
@@ -47,13 +46,6 @@ interface Access {
   readonly grants: ReadonlyArray<Grant.Value>;
 }
 
-const isPermitted = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
-  grants.some(
-    (grant) =>
-      grant.permission === requirement.permission.name &&
-      GrantScope.covers(grant.scope, requirement.target),
-  );
-
 /**
  * Whether a reader with this access holds a scope in the audience and any permission named. The
  * holder of an exempt scope, the member a fact is about, needs no permission.
@@ -68,7 +60,7 @@ const reaches = (
 ) =>
   reach.audience.some((scope) => access.scopes.has(scope)) &&
   (reach.requirement === undefined ||
-    isPermitted(access.grants, reach.requirement) ||
+    Grant.anyCovers(access.grants, reach.requirement) ||
     (reach.exempt !== undefined && access.scopes.has(reach.exempt)));
 
 const isVisibleTo = (access: Access) => (prepared: ChangeFeedEvents.Prepared) =>
