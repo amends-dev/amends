@@ -46,6 +46,7 @@ const wakeIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),
       append: () => Effect.die("Unexpected append"),
+      afterCommit: (effect) => effect,
     }),
   );
 

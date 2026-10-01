@@ -27,7 +27,10 @@ agent examples below illustrate consumers rather than available application oper
 - **Transaction** coordinates implicit and explicit commits, nested calls,
   publication ordering, failure tracking, and transaction lifetime.
 - **Store** is the host-implemented persistence contract. It supplies a native
-  transaction and enlists log writes, domain projection stores, and checkpoint writes.
+  transaction and enlists log writes, domain projection stores, and checkpoint writes. The
+  transaction's `afterCommit(effect)` runs `effect` once it has committed and released what it
+  held, never after a rollback; hosts use it to tell a reader that something the commit stored,
+  such as a Cluster request, can be read now.
 
 The core imports Effect only. Hosts choose storage and provide `Store.Service`,
 `Checkpoint.Service`, and the domain store services used by projection handlers.

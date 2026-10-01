@@ -75,6 +75,8 @@ const wakeIn = (commit: string, at?: DateTime.Utc) =>
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),
       append: () => Effect.die("Unexpected append"),
+      // The test has no commit to wait for.
+      afterCommit: (effect) => effect,
     }),
   );
 

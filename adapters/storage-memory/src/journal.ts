@@ -215,6 +215,7 @@ export const make = Effect.fn("Journal.make")(function* () {
       transaction(program, (session) => ({
         id: session.commit.id,
         append: (request) => append(session, request),
+        afterCommit: (effect) => Binding.afterCommit(session, effect),
       })),
     append: Effect.fn("Journal.appendAlone")(function* (request) {
       if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
@@ -225,7 +226,11 @@ export const make = Effect.fn("Journal.make")(function* () {
       // Its own commit, holding only the log: the workspace's transactions do not wait for it.
       return yield* transaction(
         Effect.flatMap(Store.Transaction, (storeTransaction) => storeTransaction.append(request)),
-        (session) => ({ id: session.commit.id, append: (input) => append(session, input) }),
+        (session) => ({
+          id: session.commit.id,
+          append: (input) => append(session, input),
+          afterCommit: (effect) => Binding.afterCommit(session, effect),
+        }),
         { workspace: false },
       );
     }),

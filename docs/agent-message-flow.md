@@ -73,10 +73,12 @@ has not started.
 
 ## 2. `turn.accept` wakes
 
-Cluster keeps an entity on one runner at a time and serves its messages one at a time. The
-runner that owns the `amends/WorkspaceProcess` entity for this workspace and `turn.accept` picks
-up the stored message when it next reads storage, every `pollInterval` (two seconds by default on
-the local host), and `ClusterBackground.layerWorker` handles it:
+Cluster keeps an entity on one runner at a time and serves its messages one at a time. Once
+commit A is done, its `afterCommit` has the local runner read storage, and the runner that owns
+the `amends/WorkspaceProcess` entity for this workspace and `turn.accept` picks up the stored
+message; `ClusterBackground.layerWorker` handles it. Without that read it would wait for the
+runner's next poll, every `pollInterval` (two seconds by default on the local host), since
+Cluster's own look, made as it stored the message, came before the commit could show it:
 
 1. `gateway.runBackground(workspaceId, "turn.accept")` leases the workspace's prepared runtime,
    booting it if need be.
@@ -200,21 +202,22 @@ followed over its own stream.
 
 ## Timing
 
-Two runs of the local host, each asking an agent in a new thread with a scripted model that
-answers at once, one with the host's default `pollInterval` and one with the host test's 100 ms.
-Times are from the message being published:
+The local host with its default `pollInterval` of two seconds, asking an agent in a new thread
+four times with a scripted model that answers at once. Times are from the message being
+published, before and after the Cluster senders read storage again once their commit is done:
 
-| Step                       | `pollInterval` 100 ms | `pollInterval` 2 s (default) |
-| -------------------------- | --------------------- | ---------------------------- |
-| `turn.created` (commit B)  | 107 ms                | 1.76 s                       |
-| `turn.started` (commit C)  | 203 ms                | 3.78 s                       |
-| Reply published (commit D) | 280 ms                | 3.89 s                       |
+| Step                       | Before         | After        |
+| -------------------------- | -------------- | ------------ |
+| `turn.created` (commit B)  | 30 ms to 1.9 s | 36 to 59 ms  |
+| `turn.started` (commit C)  | 1.9 to 3.9 s   | 68 to 92 ms  |
+| Reply published (commit D) | 2.0 to 4.0 s   | 94 to 193 ms |
 
-In both runs the time before the reply was almost entirely the two Cluster hops, the wake and the
-turn's `Run`, and each took about one poll interval; the steps inside the runner took tens of
-milliseconds. Two measurements do not establish why: Cluster also notifies the runner when it
-stores a message, which the [gateway guide](../packages/gateway/README.md#background-work-on-effect-cluster)
-calls best effort. A real model adds its own time to step 4.
+Before, each Cluster hop, the wake and the turn's `Run`, usually took until the runner's next
+poll. Cluster notifies the runner as it stores a message, but inside the commit's transaction, so
+the runner's read, on another connection, came before the commit and found nothing; it found
+the message only when the commit happened to finish first. Now `afterCommit` has the runner read
+again once the commit is done, and the steps inside the runner take tens of milliseconds. A real
+model adds its own time to step 4.
 
 ## Words that mean several things
 

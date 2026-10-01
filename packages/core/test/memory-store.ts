@@ -172,8 +172,15 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
             }),
           };
 
+          const committed: Array<Effect.Effect<void>> = [];
           const native = Store.Transaction.of({
             id: session.commit.id,
+            afterCommit: (effect) =>
+              session.active
+                ? Effect.sync(() => {
+                    committed.push(effect);
+                  })
+                : Effect.fail(new Store.Failure({ operation: "afterCommit", cause: "closed" })),
             append: Effect.fn("JournalTest.append")(function* (input) {
               if (!session.active)
                 return yield* new Store.Failure({ operation: "append", cause: "closed" });
@@ -314,6 +321,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
               cause: "lost acknowledgment",
             });
           }
+          yield* Store.runAfterCommit(committed);
           return result;
         }),
       ),

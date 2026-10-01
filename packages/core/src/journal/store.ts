@@ -167,6 +167,14 @@ export class Transaction extends Context.Service<
     readonly append: (
       request: AppendInput,
     ) => Effect.Effect<ReadonlyArray<Entry>, Failure | Conflict>;
+    /**
+     * Run `effect` once this transaction has committed, after it releases what it held; never
+     * when it rolls back or its outcome is uncertain. A failure of `effect` is logged and leaves
+     * the commit's outcome as it was. For quick notices that something the commit stored can be
+     * read now, such as a request for a runner, whose readers would otherwise find it later.
+     * Reject expired handles.
+     */
+    readonly afterCommit: (effect: Effect.Effect<void>) => Effect.Effect<void, Failure>;
   }
 >()("@amends/core/journal/store/Transaction") {}
 
@@ -255,5 +263,19 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/journal/store/Service",
 ) {}
+
+/**
+ * Run what a committed transaction's `afterCommit` collected, in order, logging each failure
+ * rather than passing it on: the commit already happened. For storage adapters.
+ */
+export const runAfterCommit = (effects: ReadonlyArray<Effect.Effect<void>>) =>
+  Effect.forEach(
+    effects,
+    (effect) =>
+      effect.pipe(
+        Effect.catchCause((cause) => Effect.logWarning("Work after a commit failed", cause)),
+      ),
+    { discard: true },
+  );
 
 export * as Store from "./store.ts";

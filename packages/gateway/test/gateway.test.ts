@@ -76,6 +76,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           Effect.provideService(Store.Transaction, {
             id: Commit.Id.make("replay"),
             append: unexpected,
+            afterCommit: unexpected,
           }),
         ),
       get: unexpected,
@@ -888,6 +889,7 @@ it.effect(
             Effect.provideService(Store.Transaction, {
               id: Commit.Id.make("request"),
               append: unexpected,
+              afterCommit: unexpected,
             }),
           );
         yield* inRequest(gateway.inWorkspace(workspaceId, Effect.void));

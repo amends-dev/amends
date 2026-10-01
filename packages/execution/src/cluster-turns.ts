@@ -10,7 +10,7 @@ import { TurnDispatch } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { WorkspaceTurnDispatch } from "@amends/gateway";
 import { Cause, DateTime, Duration, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
-import { ClusterSchema, DeliverAt, Entity } from "effect/unstable/cluster";
+import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
 import { TurnRunner } from "./runner.ts";
 
@@ -53,19 +53,22 @@ export const attempts = 8;
 /**
  * Requests stored by Cluster. Sent inside the commit that created the turn, a request shares its
  * transaction when Cluster's message storage uses the same SQL client as the workspace's storage,
- * so it commits or rolls back with the turn; the host composing them owns that.
+ * so it commits or rolls back with the turn; the host composing them owns that. Cluster looks for
+ * the request as it stores it, before the commit can show it, so once the commit is done the
+ * runner reads storage again rather than finding the request at its next poll.
  *
  * @category layers
  */
 export const layerDispatch = Layer.effect(
   WorkspaceTurnDispatch.Service,
   Effect.gen(function* () {
+    const sharding = yield* Sharding.Sharding;
     const clientFor = yield* TurnEntity.client;
     return WorkspaceTurnDispatch.Service.of({
       forWorkspace: (workspaceId) =>
         TurnDispatch.Service.of({
           request: Effect.fnUntraced(function* (turnId) {
-            yield* Store.Transaction;
+            const storeTransaction = yield* Store.Transaction;
             const at = yield* DateTime.now;
             yield* clientFor(entityId(workspaceId, turnId))
               .Run(new Run({ workspaceId, turnId, key: "created", at, attempt: 0 }), {
@@ -74,6 +77,7 @@ export const layerDispatch = Layer.effect(
               .pipe(
                 Effect.mapError((cause) => new Store.Failure({ operation: "dispatch", cause })),
               );
+            yield* storeTransaction.afterCommit(sharding.pollStorage);
           }),
         }),
     });

@@ -61,6 +61,8 @@ const dispatch = Effect.flatMap(WorkspaceTurnDispatch.Service, (workspaceTurnDis
   Effect.provideService(Store.Transaction, {
     id: Commit.Id.make("commit-1"),
     append: () => Effect.die("Unexpected append"),
+    // The test has no commit to wait for.
+    afterCommit: (effect) => effect,
   }),
 );
 

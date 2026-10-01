@@ -21,7 +21,7 @@ import {
   PrimaryKey,
   Schema,
 } from "effect";
-import { ClusterCron, ClusterSchema, DeliverAt, Entity } from "effect/unstable/cluster";
+import { ClusterCron, ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
 import { Gateway } from "./gateway.ts";
 import { WorkspaceWakes } from "./wakes.ts";
@@ -76,13 +76,16 @@ export const unknownAttempts = 10;
 /**
  * Wakes stored by Cluster. Sent inside a commit, a wake shares its transaction when Cluster's
  * message storage uses the same SQL client as the workspace's storage, so it commits or rolls
- * back with the commit; the host composing them owns that.
+ * back with the commit; the host composing them owns that. Cluster looks for the wake as it
+ * stores it, before the commit can show it, so once the commit is done the runner reads storage
+ * again rather than finding the wake at its next poll.
  *
  * @category layers
  */
 export const layerWakes = Layer.effect(
   WorkspaceWakes.Service,
   Effect.gen(function* () {
+    const sharding = yield* Sharding.Sharding;
     const clientFor = yield* WorkspaceProcess.client;
     return WorkspaceWakes.Service.of({
       forWorkspace: (workspaceId) =>
@@ -97,6 +100,7 @@ export const layerWakes = Layer.effect(
             yield* clientFor(entityId(workspaceId, process))
               .Wake(new Wake({ workspaceId, process, key, at, attempt: 0 }), { discard: true })
               .pipe(Effect.mapError((cause) => new Store.Failure({ operation: "wake", cause })));
+            yield* storeTransaction.afterCommit(sharding.pollStorage);
           }),
         }),
     });

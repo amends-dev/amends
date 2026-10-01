@@ -173,7 +173,11 @@ resumes after a restart.
   transaction when Cluster's message storage uses the same SQL client as the workspace's
   storage; the host composing them owns that. Cluster saves such a persisted wake and only
   notifies its runner best-effort, so a shard not yet assigned does not hold up the commit: the
-  runner that takes the shard reads the wake from storage.
+  runner that takes the shard reads the wake from storage. Cluster's own notice comes as it
+  saves the wake, before the commit can show it, so its read finds nothing; `layerWakes`
+  therefore asks the commit's `afterCommit` to have this process's runner read storage again
+  (`Sharding.pollStorage`) once the commit is done. A wake for a workspace another process runs
+  still waits for that process's next read, unless sockets carry it.
 - `layerWorker` registers the entity. When a wake arrives it calls `runBackground`, then asks
   for the next run: at once after `Continue`, at the due time after `At`, and after a backoff
   that doubles from two seconds up to five minutes after a failure. Runs that ask for the same

@@ -72,6 +72,59 @@ describe.skipIf(!available)("background work on the local host", () => {
     30_000,
   );
 
+  // Cluster looks for a wake as it stores it, before the commit can show it. Once the commit is
+  // done the runner reads again, so the wake does not wait for its next poll, here a minute away.
+  it.live(
+    "a committed wake runs at once, not at the runner's next poll",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          let runs = 0;
+          const unexpected = () => Effect.die("Only background runs are expected");
+          const gateway = Gateway.Service.of({
+            createWorkspace: unexpected,
+            inWorkspace: unexpected,
+            asMember: unexpected,
+            asMemberScoped: unexpected,
+            executeTurns: unexpected,
+            runBackground: () =>
+              Effect.sync(() => {
+                runs += 1;
+                return BackgroundProcess.idle;
+              }),
+          });
+          const context = yield* Layer.build(
+            ClusterBackground.layer.pipe(
+              Layer.provide(
+                Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
+              ),
+              Layer.provideMerge(
+                LocalHost.layerDatabase(Redacted.make(url), { pollInterval: "1 minute" }),
+              ),
+            ),
+          );
+          const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
+          const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
+          const wakes = Context.get(context, WorkspaceWakes.Service).forWorkspace(workspaceId);
+          // A commit goes on after it asks for a wake, as a real one does with its later facts
+          // and staged writes, so Cluster's own look comes before the wake is there to find.
+          for (let commit = 1; commit <= 5; commit++) {
+            yield* store.transaction(
+              wakes.request(process).pipe(Effect.andThen(Effect.sleep("100 millis"))),
+            );
+            const committedAt = yield* Clock.currentTimeMillis;
+            while (runs < commit) {
+              if ((yield* Clock.currentTimeMillis) - committedAt > 5_000)
+                return expect.fail(`Wake ${commit} waited for the runner's next poll`);
+              yield* Effect.sleep("10 millis");
+            }
+          }
+          expect(runs).toBe(5);
+        }).pipe(Effect.scoped),
+      ),
+    60_000,
+  );
+
   it.effect("a process refuses to start at a runner address another process holds", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
@@ -146,6 +199,7 @@ describe.skipIf(!available)("background work on the local host", () => {
                     Effect.provideService(Store.Transaction, {
                       id: Commit.Id.make(`${name}:${id}`),
                       append: () => Effect.die("Unexpected append"),
+                      afterCommit: (effect) => effect,
                     }),
                   ),
               { discard: true },

@@ -113,7 +113,23 @@ export interface TransactionState {
    * making every notifying commit on the server wait for the one before it.
    */
   readonly notices: Set<string>;
+  /** What `afterCommit` asked to run once the transaction commits, in order. */
+  readonly afterCommit: Array<Effect.Effect<void>>;
 }
+
+/** Ask for `effect` to run once the session's transaction commits; a closed session's handle is expired. */
+export const afterCommit = (session: TransactionState, effect: Effect.Effect<void>) =>
+  Effect.suspend(() => {
+    if (!session.active)
+      return Effect.fail(
+        new Store.Failure({
+          operation: "afterCommit",
+          cause: "Missing, closed, or foreign workspace transaction",
+        }),
+      );
+    session.afterCommit.push(effect);
+    return Effect.void;
+  });
 
 /** The session a program runs under; statements check it against their own binding. */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
@@ -231,6 +247,7 @@ export const make = Effect.fn("Binding.make")(function* (
       });
     const standalone = options.log !== undefined;
     const held = standalone ? "log" : "workspace";
+    const committed: Array<Effect.Effect<void>> = [];
     const busy = (waitingFor: string) =>
       new Store.Conflict({
         operation: "transaction",
@@ -289,6 +306,7 @@ export const make = Effect.fn("Binding.make")(function* (
             },
             beforeCommit: Effect.void,
             notices: new Set(),
+            afterCommit: committed,
           };
           const exit = yield* Effect.exit(
             restore(
@@ -360,12 +378,15 @@ export const make = Effect.fn("Binding.make")(function* (
     );
     // This process's writers to the workspace, or to a standalone append's log, queue here, so
     // only the one at the front holds a connection while PostgreSQL makes it wait for the lock.
-    return yield* turns.run(
+    const result = yield* turns.run(
       JSON.stringify(standalone ? [workspaceId, options.log] : [workspaceId]),
       lockTimeout,
       () => busy(`this process's other writers to the ${held}`),
       run,
     );
+    // Committed, with its connection back in the pool and the next writer free to go.
+    yield* Store.runAfterCommit(committed);
+    return result;
   });
 
   return Service.of({ workspaceId, database: postgresDatabase, pollInterval, guard, transaction });
