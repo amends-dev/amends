@@ -13,11 +13,6 @@ const change = Effect.fnUntraced(function* (
   apply: (record: Environment.Record) => Environment.Record,
 ) {
   const store = yield* EnvironmentStore.Service;
-  if (store.workspaceId !== payload.workspaceId)
-    return yield* new EnvironmentStore.Conflict({
-      operation: "project",
-      message: "Fact belongs to another workspace",
-    });
   const found = yield* store.get(payload.environmentId);
   if (Option.isNone(found))
     return yield* new EnvironmentStore.Conflict({
@@ -32,11 +27,6 @@ export const definition = Projection.make("environments", { version: 1 })
     EnvironmentFacts.Created,
     Effect.fn("EnvironmentProjection.created")(function* ({ payload }) {
       const store = yield* EnvironmentStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* new EnvironmentStore.Conflict({
-          operation: "project",
-          message: "Fact belongs to another workspace",
-        });
       yield* store.insert(payload);
     }),
   )

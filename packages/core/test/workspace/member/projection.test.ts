@@ -165,62 +165,6 @@ it.effect("replay reconstructs membership history and resumes without reapplying
   }),
 );
 
-it.effect("workspace mismatches reject added and removed facts during publication and replay", () =>
-  Effect.gen(function* () {
-    const fixture = yield* make();
-    const foreign = Workspace.Id.make("another-workspace");
-    const mismatch = {
-      _tag: "Projection.Failure",
-      cause: {
-        _tag: "MemberProjection.WorkspaceMismatch",
-        expectedWorkspaceId: workspaceId,
-        actualWorkspaceId: foreign,
-      },
-    };
-    yield* run(
-      fixture,
-      Effect.gen(function* () {
-        const journal = yield* setup;
-        expect(
-          yield* Effect.flip(
-            journal.publish(MemberFacts.Added, {
-              memberId: firstId,
-              workspaceId: foreign,
-              identity: human,
-            }),
-          ),
-        ).toMatchObject(mismatch);
-        expect((yield* fixture.snapshot).members.size).toBe(0);
-        expect((yield* fixture.snapshot).logs.size).toBe(0);
-        yield* journal.publish(MemberFacts.Added, added(firstId, human));
-        const before = yield* fixture.snapshot;
-        const foreignRemoval = { memberId: firstId, workspaceId: foreign };
-        expect(
-          yield* Effect.flip(journal.publish(MemberFacts.Removed, foreignRemoval)),
-        ).toMatchObject(mismatch);
-        expect((yield* fixture.snapshot).members).toEqual(before.members);
-        expect((yield* fixture.snapshot).checkpoints).toEqual(before.checkpoints);
-      }),
-    );
-    // History written without this projection fails its rebuild at the foreign fact.
-    const history = yield* make();
-    yield* run(
-      history,
-      Effect.gen(function* () {
-        const writer = yield* source;
-        yield* writer.publish(MemberFacts.Added, added(firstId, human));
-        yield* writer.publish(MemberFacts.Removed, { memberId: firstId, workspaceId: foreign });
-        const journal = yield* setup;
-        expect(yield* Effect.flip(journal.replay)).toMatchObject(mismatch);
-        // The step before the foreign fact committed; the rebuild stops there, not live.
-        const members = [...(yield* history.snapshot).members.values()];
-        expect(members.map(({ id, status }) => [id, status])).toEqual([[firstId, "active"]]);
-        expect(yield* history.checkpoints.listLive(logId)).toEqual([]);
-      }),
-    );
-  }),
-);
-
 it.effect(
   "a caught membership conflict rolls back the journal, member records, and checkpoint",
   () =>

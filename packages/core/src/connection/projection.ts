@@ -13,11 +13,6 @@ const change = Effect.fnUntraced(function* (
   apply: (record: Connection.Record) => Connection.Record,
 ) {
   const store = yield* ConnectionStore.Service;
-  if (store.workspaceId !== payload.workspaceId)
-    return yield* new ConnectionStore.Conflict({
-      operation: "project",
-      message: "Fact belongs to another workspace",
-    });
   const found = yield* store.get(payload.connectionId);
   if (Option.isNone(found))
     return yield* new ConnectionStore.Conflict({
@@ -32,11 +27,6 @@ export const definition = Projection.make("connections", { version: 1 })
     ConnectionFacts.Created,
     Effect.fn("ConnectionProjection.created")(function* ({ payload }) {
       const store = yield* ConnectionStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* new ConnectionStore.Conflict({
-          operation: "project",
-          message: "Fact belongs to another workspace",
-        });
       yield* store.insert(payload);
     }),
   )

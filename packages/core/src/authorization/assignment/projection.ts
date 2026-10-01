@@ -1,31 +1,15 @@
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option } from "effect";
 import { Projection } from "../../journal/projection.ts";
-import { Workspace } from "../../workspace/workspace.ts";
+
 import { AssignmentFacts } from "./facts.ts";
 import { AssignmentStore } from "./store.ts";
-
-export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
-  "AssignmentProjection.WorkspaceMismatch",
-  { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
-) {}
-
-const requireStore = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
-  const store = yield* AssignmentStore.Service;
-  if (store.workspaceId !== workspaceId) {
-    return yield* new WorkspaceMismatch({
-      expectedWorkspaceId: store.workspaceId,
-      actualWorkspaceId: workspaceId,
-    });
-  }
-  return store;
-});
 
 /** Projects recorded assignments and revocations without re-evaluating current authority. */
 export const definition = Projection.make("workspace.assignments", { version: 1 })
   .on(
     AssignmentFacts.Created,
     Effect.fn("AssignmentProjection.created")(function* ({ payload }) {
-      const store = yield* requireStore(payload.workspaceId);
+      const store = yield* AssignmentStore.Service;
       yield* store.insert({
         id: payload.assignmentId,
         workspaceId: payload.workspaceId,
@@ -38,7 +22,7 @@ export const definition = Projection.make("workspace.assignments", { version: 1 
   .on(
     AssignmentFacts.Revoked,
     Effect.fn("AssignmentProjection.revoked")(function* ({ payload }) {
-      const store = yield* requireStore(payload.workspaceId);
+      const store = yield* AssignmentStore.Service;
       const recorded = yield* store.get(payload.assignmentId);
       if (Option.isSome(recorded) && recorded.value.memberId !== payload.memberId)
         return yield* new AssignmentStore.Conflict({

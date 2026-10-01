@@ -38,6 +38,7 @@ export { threadStarts } from "./thread-starts.ts";
 export { threads } from "./threads.ts";
 export { transactions } from "./transactions.ts";
 export { turns } from "./turns.ts";
+export { workspaceIsolation } from "./workspace-isolation.ts";
 
 export * as Suites from "./suites.ts";
 export { workspaceSettings } from "./workspace-settings.ts";

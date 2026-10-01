@@ -9,11 +9,6 @@ export const definition = Projection.make("threads", { version: 1 })
     ThreadFacts.Created,
     Effect.fn("ThreadProjection.created")(function* ({ payload }) {
       const store = yield* ThreadStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* new ThreadStore.Conflict({
-          operation: "project",
-          message: "Fact belongs to another workspace",
-        });
       yield* store.insert(payload);
     }),
   )
@@ -21,11 +16,6 @@ export const definition = Projection.make("threads", { version: 1 })
     ThreadActivityFacts.Recorded,
     Effect.fn("ThreadProjection.activity")(function* ({ payload: { activity } }) {
       const store = yield* ThreadStore.Service;
-      if (store.workspaceId !== activity.workspaceId)
-        return yield* new ThreadStore.Conflict({
-          operation: "project",
-          message: "Fact belongs to another workspace",
-        });
       // A thread's latest activity is its latest of a kind that counts as new, such as a message.
       if (!activity.newActivity) return;
       yield* store.recordLatest({

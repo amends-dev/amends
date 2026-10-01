@@ -87,14 +87,6 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
   const resolver = yield* GrantResolver.Service;
   const memberships = yield* GroupMembershipStore.Service;
   const workspaceId = authorization.workspaceId;
-  const mismatched = [resolver.workspaceId, memberships.workspaceId, signals.workspaceId].find(
-    (id) => id !== workspaceId,
-  );
-  if (mismatched !== undefined)
-    return yield* new Authorization.WorkspaceMismatch({
-      expectedWorkspaceId: workspaceId,
-      actualWorkspaceId: mismatched,
-    });
 
   const load = Effect.fnUntraced(function* (actor: Actor.Value) {
     const admissions = yield* memberships.listActiveByMember(actor.memberId);

@@ -12,8 +12,6 @@ const stored = Effect.fnUntraced(function* (payload: {
   readonly turnId: Turn.Id;
 }) {
   const store = yield* TurnStore.Service;
-  if (store.workspaceId !== payload.workspaceId)
-    return yield* conflict("Fact belongs to another workspace");
   const found = yield* store.get(payload.turnId);
   if (Option.isNone(found)) return yield* conflict("Expected a turn in this workspace");
   return { store, turn: found.value };
@@ -24,8 +22,6 @@ export const definition = Projection.make("turns", { version: 3 })
     TurnFacts.Created,
     Effect.fn("TurnProjection.created")(function* ({ payload }) {
       const store = yield* TurnStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* conflict("Fact belongs to another workspace");
       const { notificationIds: _, ...record } = payload;
       yield* store.insert(record);
     }),
@@ -34,8 +30,6 @@ export const definition = Projection.make("turns", { version: 3 })
     TurnFacts.Retried,
     Effect.fn("TurnProjection.retried")(function* ({ payload }) {
       const store = yield* TurnStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* conflict("Fact belongs to another workspace");
       yield* store.insert(payload);
     }),
   )
