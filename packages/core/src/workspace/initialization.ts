@@ -1,10 +1,10 @@
 import { Crypto, DateTime, Effect, Option, Schema } from "effect";
-import { Assignment } from "../authorization/assignment/assignment.ts";
-import { AssignmentFacts } from "../authorization/assignment/facts.ts";
+
 import { PermissionCatalog } from "../authorization/permission-catalog.ts";
 import { BuiltinRoles } from "../authorization/role/builtin.ts";
+import { AssignmentCommand } from "../authorization/assignment/command.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
-import { Scope } from "../authorization/scope.ts";
+
 import { Environment } from "../environment/environment.ts";
 import { EnvironmentFacts } from "../environment/facts.ts";
 import { GroupFacts } from "../group/facts.ts";
@@ -14,6 +14,7 @@ import { GroupMembership } from "../group/membership/membership.ts";
 import { Identity } from "../identity/identity.ts";
 import { Journal } from "../journal/journal.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { WorkspaceFacts } from "./facts.ts";
 import { MemberFacts } from "./member/facts.ts";
 import { Member } from "./member/member.ts";
@@ -43,21 +44,24 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
 ) {
   const createdBy = yield* Schema.decodeEffect(Identity.HumanId)(creator);
   const { name, memberName } = yield* Schema.decodeEffect(Workspace.CreateInput)(input);
-  const workspace = yield* WorkspaceStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
+  const { workspaceId } = yield* Store.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const catalog = yield* PermissionCatalog.Service;
-  const provenance = yield* Publication.make(workspace.workspaceId, {
+  const permissionCatalog = yield* PermissionCatalog.Service;
+  // Creation runs before the workspace's operations exist, so it builds the command it shares.
+  const assignmentCommand = yield* AssignmentCommand.make();
+  const provenance = yield* Publication.make(workspaceId, {
     _tag: "Identity",
     identity: Identity.Reference.cases.Human.make({ id: createdBy }),
   });
   return yield* journal.commit(
     Effect.gen(function* () {
-      if (Option.isSome(yield* workspace.get))
-        return yield* new AlreadyInitialized({ workspaceId: workspace.workspaceId });
+      if (Option.isSome(yield* workspaceStore.get))
+        return yield* new AlreadyInitialized({ workspaceId });
       const ownerMemberId = Member.Id.make(yield* crypto.randomUUIDv4);
       const record = Workspace.Record.make({
-        id: workspace.workspaceId,
+        id: workspaceId,
         name,
         createdBy,
         ownerMemberId,
@@ -69,7 +73,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         identity: Identity.Reference.cases.Human.make({ id: createdBy }),
         ...(memberName === undefined ? {} : { name: memberName }),
       });
-      for (const role of BuiltinRoles.make(record.id, catalog.definitions)) {
+      for (const role of BuiltinRoles.make(record.id, permissionCatalog.definitions)) {
         yield* journal.publish(RoleFacts.Created, {
           roleId: role.id,
           workspaceId: role.workspaceId,
@@ -81,15 +85,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         workspaceId: record.id,
         revision: BuiltinRoles.revision,
       });
-      yield* journal.publish(AssignmentFacts.Created, {
-        workspaceId: record.id,
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        memberId: ownerMemberId,
-        source: Assignment.Source.cases.Role.make({
-          roleId: BuiltinRoles.OwnerId,
-          scope: Scope.Value.cases.Workspace.make({ workspaceId: record.id }),
-        }),
-      });
+      yield* assignmentCommand.assignRole(ownerMemberId, BuiltinRoles.OwnerId);
       const createdAt = yield* DateTime.now;
       yield* journal
         .publish(GroupFacts.Created, {

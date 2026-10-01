@@ -2,24 +2,20 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { MemberStore } from "../workspace/member/store.ts";
-import { Member } from "../workspace/member/member.ts";
+
 import { Workspace } from "../workspace/workspace.ts";
-import type { Grant } from "./grant.ts";
+import { Grant } from "./grant.ts";
 import { GrantResolver } from "./grant-resolver.ts";
 import { PermissionCatalog } from "./permission-catalog.ts";
 import { Requirement } from "./requirement.ts";
-import { Scope } from "./scope.ts";
+
 import { Denied, InvalidActor } from "./errors.ts";
+import { Store } from "../journal/store.ts";
 export { Denied, InvalidActor } from "./errors.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
   "Authorization.WorkspaceMismatch",
   { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
-) {}
-
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "Authorization.InvalidResponse",
-  { message: Schema.String },
 ) {}
 
 export type Error =
@@ -28,11 +24,9 @@ export type Error =
   | PermissionCatalog.Unknown
   | WorkspaceMismatch
   | InvalidActor
-  | InvalidResponse
   | Denied;
 
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
   /**
    * Check the current actor and require every declared permission on its target.
    * Reads check current state without opening a transaction. Write operations
@@ -57,10 +51,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/authorization/authorization/Service",
 ) {}
 
-const decodeActor = Schema.decodeEffect(Actor.Value);
-const decodeMember = Schema.decodeEffect(Member.Record);
-const decodeRequirements = Schema.decodeEffect(Schema.Array(Requirement.Value));
-const decodeRequirement = Schema.decodeEffect(Requirement.Value);
 const sameIdentity = Schema.toEquivalence(Identity.Reference);
 const requireWorkspace = Effect.fnUntraced(function* (
   expectedWorkspaceId: Workspace.Id,
@@ -78,28 +68,25 @@ const requireWorkspace = Effect.fnUntraced(function* (
  */
 export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
   Interface,
-  WorkspaceMismatch,
-  MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service
+  never,
+  MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service | Store.Service
 > {
-  const members = yield* MemberStore.Service;
-  const resolver = yield* GrantResolver.Service;
-  const catalog = yield* PermissionCatalog.Service;
-  const workspaceId = resolver.workspaceId;
-  yield* requireWorkspace(workspaceId, members.workspaceId);
+  const memberStore = yield* MemberStore.Service;
+  const grantResolver = yield* GrantResolver.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
+  const { workspaceId } = yield* Store.Service;
 
-  /** Validate the actor and each requirement's permission and workspace. */
-  const check = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Value>) {
-    const actor = yield* decodeActor(yield* Actor.Service);
+  /** Validate the actor, and that each requirement names a declared permission in this workspace. */
+  const validateRequirements = Effect.fnUntraced(function* (
+    requirements: ReadonlyArray<Requirement.Value>,
+  ) {
+    const actor = yield* Actor.Service;
     yield* requireWorkspace(workspaceId, actor.workspaceId);
-    const found = yield* members.get(actor.memberId);
+    const found = yield* memberStore.get(actor.memberId);
     if (Option.isNone(found)) {
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-missing" });
     }
-    const member = yield* decodeMember(found.value);
-    yield* requireWorkspace(workspaceId, member.workspaceId);
-    if (member.id !== actor.memberId) {
-      return yield* new InvalidResponse({ message: "Member store returned a different member ID" });
-    }
+    const member = found.value;
     if (member.status !== "active") {
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-removed" });
     }
@@ -107,46 +94,38 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "identity-mismatch" });
     }
 
-    const checked: Array<Requirement.Value> = [];
-    for (const requirement of yield* decodeRequirements(requirements)) {
+    for (const requirement of requirements) {
       yield* requireWorkspace(workspaceId, requirement.target.workspaceId);
-      const permission = yield* catalog.get(requirement.permission.name);
-      if (permission.name !== requirement.permission.name) {
-        return yield* new InvalidResponse({
-          message: "Permission catalog returned a different name",
-        });
-      }
-      checked.push(yield* decodeRequirement({ permission, target: requirement.target }));
+      const permission = yield* permissionCatalog.get(requirement.permission.name);
+      // Requirements name permissions as the catalog declares them; another target kind is a bug.
+      if (permission.targetKind !== requirement.target._tag)
+        return yield* Effect.die(
+          `Permission ${permission.name} requires a ${permission.targetKind} target`,
+        );
     }
-    return { actor, checked };
+    return { actor, checked: requirements };
   });
-  const covered = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
-    grants.some(
-      (grant) =>
-        grant.permission === requirement.permission.name &&
-        Scope.covers(grant.scope, requirement.target),
-    );
 
   const requirePermissions = Effect.fn("Authorization.require")(function* (
     requirements: ReadonlyArray<Requirement.Value>,
   ) {
-    const { actor, checked } = yield* check(requirements);
+    const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return;
-    const grants = yield* resolver.resolve(actor.memberId);
+    const grants = yield* grantResolver.resolve(actor.memberId);
     for (const requirement of checked)
-      if (!covered(grants, requirement))
+      if (!Grant.anyCovers(grants, requirement))
         return yield* new Denied({ memberId: actor.memberId, requirement });
   });
   const permitted = Effect.fn("Authorization.permitted")(function* (
     requirements: ReadonlyArray<Requirement.Value>,
   ) {
-    const { actor, checked } = yield* check(requirements);
+    const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return [];
-    const grants = yield* resolver.resolve(actor.memberId);
-    return checked.map((requirement) => covered(grants, requirement));
+    const grants = yield* grantResolver.resolve(actor.memberId);
+    return checked.map((requirement) => Grant.anyCovers(grants, requirement));
   });
 
-  return Service.of({ workspaceId, require: requirePermissions, permitted });
+  return Service.of({ require: requirePermissions, permitted });
 });
 
 /**
@@ -155,5 +134,21 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
  * @category layers
  */
 export const layer = Layer.effect(Service, make());
+
+/**
+ * Require an action on a target the actor may read, in one grant resolution. A target they can't
+ * read fails with `hidden`, so they learn nothing of it; one they can read but not act on is
+ * denied.
+ */
+export const requireVisible = Effect.fnUntraced(function* <E>(
+  authorization: Interface,
+  read: Requirement.Value,
+  action: Requirement.Value,
+  hidden: () => E,
+) {
+  const [readable = false, permitted = false] = yield* authorization.permitted([read, action]);
+  if (!readable) return yield* Effect.fail(hidden());
+  if (!permitted) yield* authorization.require([action]);
+});
 
 export * as Authorization from "./authorization.ts";

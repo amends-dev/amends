@@ -24,8 +24,8 @@ const pools = (url: string) =>
       Effect.flatMap((storage) => storage.forWorkspace(workspaceId)),
       Effect.provide(writer),
     );
-    const appending = Effect.flatMap(Store.Transaction, (transaction) =>
-      transaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
+    const appending = Effect.flatMap(Store.Transaction, (storeTransaction) =>
+      storeTransaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
     );
     const append = writing.store.transaction(appending);
     // Appends, then fails, so the transaction rolls back.

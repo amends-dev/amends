@@ -20,7 +20,7 @@ connection's settings and key.
 through `gateway.executeTurns` as its own commit, attributed to the turn's agent:
 
 1. `prepare` the turn. A finished turn is left as it is, one asked to stop is confirmed
-   `stopped`, and one whose agent, connection, key, or environment is gone is failed with the
+   stopped (`confirmStopped`), and one whose agent, connection, key, or environment is gone is failed with the
    reason `prepare` gives.
 2. Fail the turn if its environment has a sandbox, its harness is not among `harnesses`, or its
    connection's implementation is not among `models`. Otherwise `start` a queued turn with the
@@ -31,7 +31,7 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    (three), fail the turn with its latest interruption, or say it kept stopping. After an
    interruption worth retrying, and when a run begins after an attempt that died without recording
    why, as when its process did, wait 2, 4, then 8 seconds first and prepare again. Then record the
-   `attempt`, a harness session or a summary.
+   attempt (`recordAttempt`), a harness session or a summary.
 4. Tell whether the conversation needs a checkpoint, against the model's limits from its
    connection (`limits`) and the runner's `context` policy (`defaultContextPolicy`): a turn may use
    80% of the context window, less the room the model may need to write, up to 32,000 tokens, and
@@ -47,11 +47,11 @@ through `gateway.executeTurns` as its own commit, attributed to the turn's agent
    continuing an interrupted turn repeats no input and asks for a fresh response in place of one
    left unfinished.
 6. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
-   what it accepted from the thread, as one batch recorded as `submitted` first. A batch is named
+   what it accepted from the thread, as one batch recorded first (`recordSubmission`). A batch is named
    by its turn and the positions it follows and reaches, and its first record stands: submitting
    the same input again after a restart hands the harness the batch as recorded. Without new input, `resume` a conversation that awaits
    a response.
-7. `report` what the environment and its harness report until the harness is idle: each completed
+7. Record what the environment and its harness report (`recordEvents`) until the harness is idle: each completed
    block, finished response, tool start and result, and the environment becoming ready; text and
    reasoning deltas are not recorded. Text deltas are shown to the thread's readers instead, as
    drafts: at most every 150 milliseconds, each block's new text in pieces of up to 1,500
@@ -68,7 +68,7 @@ the turn is no longer running, as when someone asks it to stop; preparing again 
 stop. While the harness waits on its model, a silence longer than `idleTimeout` (five minutes)
 counts as the harness stopping, with a failure worth retrying, so a model that stops answering does
 not hold the turn; time a tool call the harness started spends running does not count. A harness
-that stops is recorded as `interrupted` in the turn's log, with its `problem`. When its failure is
+that stops is recorded as interrupted in the turn's log (`recordInterruption`), with its `problem`. When its failure is
 worth retrying, the run prepares again and counts it as above, so a new session continues from the
 log after a wait; otherwise it fails the turn. The count lives in the log, so a restart does not
 reset it, and a turn whose runs keep dying with their process is given up too.
@@ -104,8 +104,10 @@ restart.
   [background wakes](../gateway/README.md#background-work-on-effect-cluster).
 - `layerWorker` registers the entity over a `TurnRunner.Service`. A run that fails before its
   turn finishes, such as when storage fails, asks to run again after a backoff that doubles from
-  two seconds up to five minutes. After eight failed runs the worker abandons the turn, and a
-  turn whose workspace was never created is dropped. Failures are logged.
+  two seconds up to five minutes. After eight failed runs the worker abandons the turn; while
+  recording that fails too, as when storage stays down, it asks again after the same backoff
+  without running the turn, so a turn is never left active with nothing to run it. A turn whose
+  workspace was never created is dropped. Failures are logged.
 - `layer` provides both. Every runner over the same storage runs the worker.
 
 Handled runs are pruned with background wakes when the host passes `TurnEntity.type` to

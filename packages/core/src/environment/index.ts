@@ -1,5 +1,5 @@
 export { Environment } from "./environment.ts";
-export { EnvironmentApplication } from "./application.ts";
+export { EnvironmentService } from "./service.ts";
 export { EnvironmentCatalog } from "./catalog.ts";
 export { EnvironmentCompatibility } from "./compatibility.ts";
 export { EnvironmentErrors } from "./errors.ts";
@@ -7,4 +7,5 @@ export { EnvironmentFacts } from "./facts.ts";
 export { EnvironmentId } from "./id.ts";
 export { EnvironmentPermissions } from "./permissions.ts";
 export { EnvironmentProjection } from "./projection.ts";
+export { EnvironmentQuery } from "./query.ts";
 export { EnvironmentStore } from "./store.ts";

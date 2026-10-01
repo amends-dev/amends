@@ -64,7 +64,6 @@ export const layerDispatch = Layer.effect(
     return WorkspaceTurns.Service.of({
       forWorkspace: (workspaceId) =>
         TurnDispatch.Service.of({
-          workspaceId,
           request: Effect.fnUntraced(function* (turnId) {
             yield* Store.Transaction;
             const at = yield* DateTime.now;
@@ -83,56 +82,75 @@ export const layerDispatch = Layer.effect(
 
 /**
  * Run each turn when its request arrives. A run that fails before the turn finishes asks to run
- * again after a backoff, and after too many failures gives the turn up as failed. A turn whose
- * workspace is gone is dropped.
+ * again after a backoff, and after too many failures gives the turn up as failed. Until that
+ * failure is recorded, the turn keeps asking to record it, without running again, so it never
+ * stays active with nothing to run it. A turn whose workspace is gone is dropped.
  *
  * @category layers
  */
 export const layerWorker = TurnEntity.toLayer(
   Effect.gen(function* () {
-    const runner = yield* TurnRunner.Service;
+    const turnRunner = yield* TurnRunner.Service;
     const clientFor = yield* TurnEntity.client;
     return TurnEntity.of({
       Run: ({ payload: request }) =>
         Effect.gen(function* () {
-          const exit = yield* Effect.exit(runner.run(request.workspaceId, request.turnId));
+          const where = { workspaceId: request.workspaceId, turnId: request.turnId };
+          /** Try again after the backoff for `attempt`, which gives up from `attempts` on. */
+          const later = Effect.fnUntraced(function* (attempt: number) {
+            const now = yield* DateTime.now;
+            yield* clientFor(entityId(request.workspaceId, request.turnId))
+              .Run(
+                new Run({
+                  workspaceId: request.workspaceId,
+                  turnId: request.turnId,
+                  key: `retry:${attempt}`,
+                  at: DateTime.addDuration(now, backoff(attempt)),
+                  attempt,
+                }),
+                { discard: true },
+              )
+              .pipe(Effect.orDie);
+          });
+          const exit = yield* Effect.exit(
+            request.attempt >= attempts
+              ? turnRunner.abandon(request.workspaceId, request.turnId)
+              : turnRunner.run(request.workspaceId, request.turnId),
+          );
           if (Exit.isSuccess(exit)) return;
           const failure = Option.map(Cause.findErrorOption(exit.cause), (error) => error._tag);
-          const where = { workspaceId: request.workspaceId, turnId: request.turnId };
           if (Option.contains(failure, "Gateway.WorkspaceNotFound")) {
             yield* Effect.logError("Turn dropped: its workspace was not found", where);
             return;
           }
           const attempt = request.attempt + 1;
+          if (request.attempt >= attempts) {
+            yield* Effect.logError("Turn could not be marked failed; trying again later", {
+              ...where,
+              attempt,
+              cause: exit.cause,
+            });
+            return yield* later(attempt);
+          }
           if (attempt >= attempts) {
             yield* Effect.logError("Turn given up after failed runs", { ...where, attempt });
-            yield* runner
-              .abandon(request.workspaceId, request.turnId)
-              .pipe(
-                Effect.catchCause((cause) =>
-                  Effect.logError("Turn could not be marked failed", { ...where, cause }),
-                ),
-              );
-            return;
+            const abandoned = yield* Effect.exit(
+              turnRunner.abandon(request.workspaceId, request.turnId),
+            );
+            if (Exit.isSuccess(abandoned)) return;
+            yield* Effect.logError("Turn could not be marked failed; trying again later", {
+              ...where,
+              attempt,
+              cause: abandoned.cause,
+            });
+            return yield* later(attempt);
           }
           yield* Effect.logWarning("Turn run failed; running it again later", {
             ...where,
             attempt,
             cause: exit.cause,
           });
-          const now = yield* DateTime.now;
-          yield* clientFor(entityId(request.workspaceId, request.turnId))
-            .Run(
-              new Run({
-                workspaceId: request.workspaceId,
-                turnId: request.turnId,
-                key: `retry:${attempt}`,
-                at: DateTime.addDuration(now, backoff(attempt)),
-                attempt,
-              }),
-              { discard: true },
-            )
-            .pipe(Effect.orDie);
+          yield* later(attempt);
         }),
     });
   }),

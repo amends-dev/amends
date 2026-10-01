@@ -479,7 +479,7 @@ export const renameGroupRequest = (client: ApiClient, workspace: string) =>
           })
           .pipe(
             Effect.tapError((error) =>
-              error._tag === "GroupApplication.Changed"
+              error._tag === "GroupService.Changed"
                 ? Reactivity.invalidate([workspaceKey(workspace, "groups")])
                 : Effect.void,
             ),
@@ -545,7 +545,7 @@ export const membershipRequest = (client: ApiClient, workspace: string) =>
               api.groups.addMember({ params, payload: { memberId: id } }),
             ).pipe(
               Effect.asVoid,
-              Effect.catchTag("GroupMembershipApplication.AlreadyMember", () => Effect.void),
+              Effect.catchTag("GroupMembershipService.AlreadyMember", () => Effect.void),
             ),
           ).pipe(Effect.ensuring(invalidate));
           return;

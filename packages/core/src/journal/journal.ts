@@ -77,15 +77,15 @@ export const make = Effect.fn("Journal.make")(function* <
   const Requirements extends ReadonlyArray<unknown>,
   ReactionRequirements = never,
 >(options: Options<Requirements, ReactionRequirements>) {
-  const logs = yield* Log.Service;
+  const log = yield* Log.Service;
   const transaction = yield* Transaction.Service;
-  const checkpoints = yield* Checkpoint.Service;
+  const checkpoint = yield* Checkpoint.Service;
   // Captured outside any transaction; the publishing commit supplies its own.
   const reactionServices = yield* Effect.context<ReactionRequirements>();
   const reactions = new Map<string, Array<Reaction.Definition<ReactionRequirements>>>();
   for (const reaction of options.reactions ?? [])
     reactions.set(reaction.fact, [...(reactions.get(reaction.fact) ?? []), reaction]);
-  const log = logs.open({
+  const journalLog = log.open({
     id: options.logId,
     schema: Event.Envelope,
     storageCodec: Event.storageCodec,
@@ -123,13 +123,15 @@ export const make = Effect.fn("Journal.make")(function* <
   for (const definition of options.projections) {
     if (keys.get(definition.name)?.has(definition.version)) {
       return yield* new Projection.Duplicate({
-        key: { logId: log.id, name: definition.name, version: definition.version },
+        key: { logId: journalLog.id, name: definition.name, version: definition.version },
       });
     }
     const versions = keys.get(definition.name) ?? new Set<number>();
     versions.add(definition.version);
     keys.set(definition.name, versions);
-    runners.push(yield* Projection.makeRunner<unknown, Requirements[number]>({ definition, log }));
+    runners.push(
+      yield* Projection.makeRunner<unknown, Requirements[number]>({ definition, log: journalLog }),
+    );
   }
   // Each fact goes only to the projections that handle its name, in registration order.
   const subscribers = new Map<string, ReadonlyArray<Projection.Runner>>();
@@ -140,10 +142,10 @@ export const make = Effect.fn("Journal.make")(function* <
         runners.filter((runner) => runner.subscribes(fact.name)),
       );
   const registeredVersions = runners.map(({ key }) => ({ name: key.name, version: key.version }));
-  const registered = (live: Checkpoint.LiveVersion) =>
+  const isRegistered = (live: Checkpoint.LiveVersion) =>
     runners.some((runner) => Projection.isVersion(runner.key)(live));
-  const keyOf = (live: Checkpoint.LiveVersion): Checkpoint.Key => ({
-    logId: log.id,
+  const toCheckpointKey = (live: Checkpoint.LiveVersion): Checkpoint.Key => ({
+    logId: journalLog.id,
     name: live.name,
     version: live.version,
   });
@@ -155,20 +157,20 @@ export const make = Effect.fn("Journal.make")(function* <
    */
   const checked = new WeakSet<object>();
   const requireLive = Effect.fnUntraced(function* () {
-    const native = yield* Store.Transaction;
-    if (checked.has(native)) return;
-    const live = yield* checkpoints.listLive(log.id);
+    const storeTransaction = yield* Store.Transaction;
+    if (checked.has(storeTransaction)) return;
+    const live = yield* checkpoint.listLive(journalLog.id);
     const behind = runners.find((runner) => !live.some(Projection.isVersion(runner.key)));
-    const unknown = live.find((version) => !registered(version));
+    const unknown = live.find((version) => !isRegistered(version));
     if (behind !== undefined || unknown !== undefined) {
-      if ((yield* log.read({ limit: 1 })).length > 0) {
+      if ((yield* journalLog.read({ limit: 1 })).length > 0) {
         if (behind !== undefined) return yield* new Projection.Behind({ key: behind.key });
         if (unknown !== undefined)
-          return yield* new Projection.Unregistered({ key: keyOf(unknown) });
+          return yield* new Projection.Unregistered({ key: toCheckpointKey(unknown) });
       }
-      yield* checkpoints.setLive(log.id, registeredVersions);
+      yield* checkpoint.setLive(journalLog.id, registeredVersions);
     }
-    checked.add(native);
+    checked.add(storeTransaction);
   });
 
   const publish = Effect.fn("Journal.publish")(function* <F extends Fact.Definition>(
@@ -203,7 +205,7 @@ export const make = Effect.fn("Journal.make")(function* <
         const appendOptions =
           occurrenceKey === null ? request : { ...request, idempotencyKey: occurrenceKey };
         if (appendOptions.idempotencyKey !== undefined) {
-          const found = yield* log.getAppend(appendOptions.idempotencyKey);
+          const found = yield* journalLog.getAppend(appendOptions.idempotencyKey);
           if (Option.isSome(found)) {
             const entry = found.value[0];
             if (
@@ -224,7 +226,7 @@ export const make = Effect.fn("Journal.make")(function* <
         }
         if (provenance.causedBy !== null) {
           const cause = provenance.causedBy;
-          const source = logs.open({
+          const source = log.open({
             id: cause.logId,
             schema: Event.Envelope,
             storageCodec: Event.storageCodec,
@@ -243,7 +245,7 @@ export const make = Effect.fn("Journal.make")(function* <
             provenance.correlationId,
           );
         }
-        const entry = yield* log.append(
+        const entry = yield* journalLog.append(
           {
             provenance,
             subject,
@@ -255,13 +257,13 @@ export const make = Effect.fn("Journal.make")(function* <
         );
         const event = yield* Event.decode(fact, entry);
         for (const runner of subscribers.get(fact.name) ?? []) yield* runner.apply(entry, event);
-        const native = yield* Store.Transaction;
+        const storeTransaction = yield* Store.Transaction;
         for (const reaction of reactions.get(fact.name) ?? [])
           yield* reaction
             .react(event)
             .pipe(
               Effect.provide(reactionServices),
-              Effect.provideService(Store.Transaction, native),
+              Effect.provideService(Store.Transaction, storeTransaction),
             );
         return event;
       }),
@@ -269,37 +271,48 @@ export const make = Effect.fn("Journal.make")(function* <
   });
 
   const reader: Log.Reader<typeof Event.Envelope> = {
-    id: log.id,
-    schema: log.schema,
-    get: log.get,
-    getEntry: log.getEntry,
-    getAppend: log.getAppend,
-    read: log.read,
-    head: log.head,
-    stream: log.stream,
-    tail: log.tail,
+    id: journalLog.id,
+    schema: journalLog.schema,
+    get: journalLog.get,
+    getEntry: journalLog.getEntry,
+    getAppend: journalLog.getAppend,
+    read: journalLog.read,
+    head: journalLog.head,
+    stream: journalLog.stream,
+    tail: journalLog.tail,
   };
   const replay = Effect.gen(function* () {
-    const live = yield* checkpoints.listLive(log.id);
+    const live = yield* checkpoint.listLive(journalLog.id);
     const pending = runners.filter((runner) => !live.some(Projection.isVersion(runner.key)));
-    if (pending.length === 0 && live.every(registered)) return;
+    if (pending.length === 0 && live.every(isRegistered)) return;
     // An empty log waits for its first commit, which makes the registered projections live;
     // booting a workspace that was never created must leave nothing behind.
-    if ((yield* log.read({ limit: 1 })).length === 0) return;
+    if ((yield* journalLog.read({ limit: 1 })).length === 0) return;
     // Live versions this journal does not run would stop its commits, so they are retired first.
     // Whoever runs a retired version again rebuilds it from the last commit it applied.
-    if (!live.every(registered))
+    if (!live.every(isRegistered))
       yield* transaction.run(
         Effect.gen(function* () {
-          const current = yield* checkpoints.listLive(log.id);
-          if (!current.every(registered))
-            yield* Projection.replaceLive(checkpoints, log, current, current.filter(registered));
+          const current = yield* checkpoint.listLive(journalLog.id);
+          if (!current.every(isRegistered))
+            yield* Projection.replaceLive(
+              checkpoint,
+              journalLog,
+              current,
+              current.filter(isRegistered),
+            );
         }),
       );
     for (const runner of pending) yield* runner.replay;
   }).pipe(Effect.withSpan("Journal.replay"));
 
-  return Service.of({ log: reader, read: log.readFacts, commit: transaction.run, replay, publish });
+  return Service.of({
+    log: reader,
+    read: journalLog.readFacts,
+    commit: transaction.run,
+    replay,
+    publish,
+  });
 });
 
 /**

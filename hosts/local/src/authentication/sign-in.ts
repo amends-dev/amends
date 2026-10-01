@@ -28,10 +28,10 @@ export const codeLifetime = Duration.minutes(10);
 export const make = Effect.fn("DevelopmentSignIn.make")(function* (
   deliver: DeliverCode = logCode,
 ): Effect.fn.Return<SignIn.Interface, never, Crypto.Crypto> {
-  const cryptography = yield* Crypto.Crypto;
+  const crypto = yield* Crypto.Crypto;
   const pending = new Map<SignIn.Email, PendingCode>();
   const start: SignIn.Interface["start"] = Effect.fn("DevelopmentSignIn.start")(function* (email) {
-    const bytes = yield* Effect.orDie(cryptography.randomBytes(4));
+    const bytes = yield* Effect.orDie(crypto.randomBytes(4));
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const code = yield* Schema.decodeEffect(SignIn.Code)(
       String(view.getUint32(0) % 1_000_000).padStart(6, "0"),

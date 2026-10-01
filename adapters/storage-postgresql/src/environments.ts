@@ -79,7 +79,6 @@ export const make = Effect.fn("Environments.make")(function* () {
       return record;
     });
   return EnvironmentStore.Service.of({
-    workspaceId,
     get: Effect.fn("Environments.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Environment.Id)(input);

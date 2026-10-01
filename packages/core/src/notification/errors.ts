@@ -2,23 +2,23 @@ import { Schema } from "effect";
 import { WorkspaceId } from "../workspace/id.ts";
 import { Notification } from "./notification.ts";
 
-/** The outcomes `NotificationApplication` reports that a caller can act on; schemas only, for contracts. */
+/** The outcomes `NotificationService` reports that a caller can act on; schemas only, for contracts. */
 export class AlreadyHandled extends Schema.TaggedError<AlreadyHandled>()(
-  "NotificationApplication.AlreadyHandled",
+  "NotificationService.AlreadyHandled",
   { notificationId: Notification.Id },
 ) {}
 export class HumanRecipientRequired extends Schema.TaggedError<HumanRecipientRequired>()(
-  "NotificationApplication.HumanRecipientRequired",
+  "NotificationService.HumanRecipientRequired",
   {},
 ) {}
 /** Missing and other recipients' notifications deliberately share this outcome. */
-export class NotFound extends Schema.TaggedError<NotFound>()("NotificationApplication.NotFound", {
+export class NotFound extends Schema.TaggedError<NotFound>()("NotificationService.NotFound", {
   workspaceId: WorkspaceId.Id,
   notificationId: Notification.Id,
 }) {}
 /** The caller owns the notification, but its supported source cannot currently be read. */
 export class SourceUnavailable extends Schema.TaggedError<SourceUnavailable>()(
-  "NotificationApplication.SourceUnavailable",
+  "NotificationService.SourceUnavailable",
   { notificationId: Notification.Id },
 ) {}
 

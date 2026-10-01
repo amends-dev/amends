@@ -1,20 +1,20 @@
 import { Notification } from "@amends/core/notification";
 import { describe, expect, it } from "@effect/vitest";
-import { ReadState, ReadStateApplication } from "@amends/core/attention";
+import { ReadState, ReadStateService } from "@amends/core/read-state";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
 import {
   Group,
-  GroupApplication,
-  GroupFollowApplication,
-  GroupMembershipApplication,
+  GroupService,
+  GroupFollowService,
+  GroupMembershipService,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Log, Publication } from "@amends/core/journal";
 import {
   Thread,
-  ThreadApplication,
-  ThreadMessageApplication,
-  ThreadParticipationApplication,
+  ThreadService,
+  ThreadMessageService,
+  ThreadParticipationService,
   ThreadPermissions,
 } from "@amends/core/thread";
 import { Member, MemberFacts } from "@amends/core/workspace";
@@ -24,6 +24,7 @@ import {
   type Bound,
   boundTo,
   otherWorkspaceId,
+  placed,
   runHost,
   Support,
   testProvenance,
@@ -51,24 +52,26 @@ export const readState = (harness: Harness) => {
       program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
     const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startInGroup({ groupId, text: "Opening", mentions }),
-      );
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startInGroup({ groupId, text: "Opening", mentions }),
+      ).pipe(Effect.flatMap(placed));
     const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-        s.publish({ threadId, text: "Reply", mentions }),
-      );
+      Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+        threadMessageService.publish({ threadId, text: "Reply", mentions }),
+      ).pipe(Effect.flatMap((message) => placed({ message })));
     const markRead = (threadId: Thread.Id, throughSequence: number) =>
-      Effect.flatMap(ReadStateApplication.Service, (s) =>
-        s.markThreadRead({ threadId, throughSequence }),
+      Effect.flatMap(ReadStateService.Service, (readStateService) =>
+        readStateService.markThreadRead({ threadId, throughSequence }),
       );
     const markGroupRead = (groupId: Group.Id) =>
-      Effect.flatMap(ReadStateApplication.Service, (s) => s.markGroupRead({ groupId }));
+      Effect.flatMap(ReadStateService.Service, (readStateService) =>
+        readStateService.markGroupRead({ groupId }),
+      );
     const pending = (bound: Bound, memberId: Member.Id) =>
       Effect.map(
         bound.notifications.listPendingByRecipient(
@@ -125,8 +128,8 @@ export const readState = (harness: Harness) => {
       const team = yield* run(
         bound,
         owner,
-        Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createTeam({
+        Effect.flatMap(GroupService.Service, (groupService) =>
+          groupService.createTeam({
             name: "Team",
             memberIds: [owner.memberId, humanId, otherId, plainId, agentId],
           }),
@@ -155,8 +158,8 @@ export const readState = (harness: Harness) => {
             yield* run(
               bound,
               actorFor(otherId),
-              Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-                s.follow(started.thread.id),
+              Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+                threadParticipationService.follow(started.thread.id),
               ),
             );
             expect(yield* bound.threads.getLatest([started.thread.id])).toMatchObject([
@@ -244,7 +247,7 @@ export const readState = (harness: Harness) => {
               expect(yield* positionOf(bound, humanId, threadId)).toEqual([2]);
               expect(yield* pending(bound, humanId)).toEqual([3]);
               expect(yield* Effect.flip(run(bound, human, markRead(threadId, 4)))).toEqual(
-                new ReadStateApplication.BeyondTimeline({
+                new ReadStateService.BeyondTimeline({
                   threadId,
                   throughSequence: 4,
                   latestSequence: 3,
@@ -261,10 +264,10 @@ export const readState = (harness: Harness) => {
               // Only people with current read access keep read state.
               expect(
                 yield* Effect.flip(run(bound, actorFor(agentId), markRead(threadId, 1))),
-              ).toEqual(new ReadStateApplication.HumanRequired({ memberId: agentId }));
+              ).toEqual(new ReadStateService.HumanRequired({ memberId: agentId }));
               expect(
                 yield* Effect.flip(run(bound, actorFor(outsiderId), markRead(threadId, 1))),
-              ).toEqual(new ReadStateApplication.ThreadNotFound({ threadId }));
+              ).toEqual(new ReadStateService.ThreadNotFound({ threadId }));
               expect(
                 yield* Effect.flip(run(bound, actorFor(plainId), markRead(threadId, 1))),
               ).toMatchObject({ _tag: "Authorization.Denied" });
@@ -302,10 +305,10 @@ export const readState = (harness: Harness) => {
             expect(yield* caughtUp).toEqual([second]);
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), markGroupRead(team.id))),
-            ).toEqual(new ReadStateApplication.HumanRequired({ memberId: agentId }));
+            ).toEqual(new ReadStateService.HumanRequired({ memberId: agentId }));
             expect(
               yield* Effect.flip(run(bound, actorFor(outsiderId), markGroupRead(team.id))),
-            ).toEqual(new ReadStateApplication.GroupNotFound({ groupId: team.id }));
+            ).toEqual(new ReadStateService.GroupNotFound({ groupId: team.id }));
           }),
         ),
       ),
@@ -394,7 +397,9 @@ export const readState = (harness: Harness) => {
               run(
                 bound,
                 actor,
-                Effect.flatMap(ThreadApplication.Service, (s) => s.listInGroup(team.id, options)),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.listInGroup(team.id, options),
+                ),
               );
             yield* TestClock.adjust("1 minute");
             const first = yield* run(bound, owner, start(team.id, []));
@@ -431,8 +436,8 @@ export const readState = (harness: Harness) => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                s.add({ groupId: team.id, memberId: outsiderId }),
+              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                groupMembershipService.add({ groupId: team.id, memberId: outsiderId }),
               ),
             );
             const outsider = actorFor(outsiderId);
@@ -472,12 +477,12 @@ export const readState = (harness: Harness) => {
                 run(
                   bound,
                   actorFor(outsiderId),
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.listInGroup(Group.Id.make("missing"), { limit: 1 }),
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                    threadService.listInGroup(Group.Id.make("missing"), { limit: 1 }),
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+            ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
           }),
         ),
       ),
@@ -496,8 +501,8 @@ export const readState = (harness: Harness) => {
                 run(
                   bound,
                   actor,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.listOpenings(team.id, options),
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                    threadService.listOpenings(team.id, options),
                   ),
                 );
               yield* TestClock.adjust("1 minute");
@@ -541,8 +546,8 @@ export const readState = (harness: Harness) => {
               const recent = yield* run(
                 bound,
                 human,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.listInGroup(team.id, { limit: 1 }),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.listInGroup(team.id, { limit: 1 }),
                 ),
               );
               expect(recent.map((item) => item.thread.id)).toEqual([first.thread.id]);
@@ -561,12 +566,12 @@ export const readState = (harness: Harness) => {
                   run(
                     bound,
                     actorFor(outsiderId),
-                    Effect.flatMap(ThreadApplication.Service, (s) =>
-                      s.listOpenings(team.id, { limit: 1 }),
+                    Effect.flatMap(ThreadService.Service, (threadService) =>
+                      threadService.listOpenings(team.id, { limit: 1 }),
                     ),
                   ),
                 ),
-              ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+              ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
             }),
           ),
         ),
@@ -584,8 +589,8 @@ export const readState = (harness: Harness) => {
               const items = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.listOpenings(team.id, { limit: 50 }),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.listOpenings(team.id, { limit: 50 }),
                 ),
               ).pipe(
                 Effect.withTracer(
@@ -636,13 +641,18 @@ export const readState = (harness: Harness) => {
                 run(
                   bound,
                   actor,
-                  Effect.flatMap(GroupApplication.Service, (s) => s.listMine({ limit: 100 })),
+                  Effect.flatMap(GroupService.Service, (groupService) =>
+                    groupService.listMine({ limit: 100 }),
+                  ),
                 );
               const quiet = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  groupService.createTeam({
+                    name: "Quiet",
+                    memberIds: [owner.memberId, humanId],
+                  }),
                 ),
               );
               const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>
@@ -671,8 +681,8 @@ export const readState = (harness: Harness) => {
               yield* run(
                 bound,
                 human,
-                Effect.flatMap(GroupFollowApplication.Service, (s) =>
-                  s.follow({ groupId: team.id, memberId: humanId }),
+                Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+                  groupFollowService.follow({ groupId: team.id, memberId: humanId }),
                 ),
               );
               expect(itemOf(yield* mine(human), team.id)).toMatchObject({

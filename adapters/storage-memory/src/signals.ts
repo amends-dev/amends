@@ -15,23 +15,22 @@ const capacity = 256;
  * @category constructors
  */
 export const make = Effect.fn("MemorySignals.make")(function* () {
-  const database = yield* MemoryDatabase.Service;
+  const memoryDatabase = yield* MemoryDatabase.Service;
   const forWorkspace = (workspaceId: Workspace.Id) =>
     Signals.Service.of({
-      workspaceId,
       publish: (signal) =>
-        Effect.forEach(database.listeners.get(workspaceId) ?? [], (queue) =>
+        Effect.forEach(memoryDatabase.listeners.get(workspaceId) ?? [], (queue) =>
           Queue.offer(queue, signal),
         ).pipe(Effect.asVoid),
       subscribe: Effect.gen(function* () {
         const queue = yield* Queue.sliding<Signal.Value>(capacity);
-        const listeners = database.listeners.get(workspaceId) ?? new Set();
+        const listeners = memoryDatabase.listeners.get(workspaceId) ?? new Set();
         listeners.add(queue);
-        database.listeners.set(workspaceId, listeners);
+        memoryDatabase.listeners.set(workspaceId, listeners);
         yield* Effect.addFinalizer(() =>
           Effect.suspend(() => {
             listeners.delete(queue);
-            if (listeners.size === 0) database.listeners.delete(workspaceId);
+            if (listeners.size === 0) memoryDatabase.listeners.delete(workspaceId);
             return Queue.shutdown(queue);
           }),
         );

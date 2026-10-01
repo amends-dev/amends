@@ -106,8 +106,6 @@ export function Entry(props: EntryProps) {
     setCreatePending(true);
     await wait(300);
     setCreatePending(false);
-    if (workspaces().some((workspace) => workspace.name === created))
-      return setCreateError("request-reused");
     setWorkspaces([
       ...workspaces(),
       {

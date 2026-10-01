@@ -20,8 +20,7 @@ export class Service extends Context.Service<Service, Interface>()(
  * agents still accept their work, which waits queued until something executes it.
  */
 export const idle: Interface = {
-  forWorkspace: (workspaceId) =>
-    TurnDispatch.Service.of({ workspaceId, request: () => Effect.void }),
+  forWorkspace: () => TurnDispatch.Service.of({ request: () => Effect.void }),
 };
 
 /** @category layers */

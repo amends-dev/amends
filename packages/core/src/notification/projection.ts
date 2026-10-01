@@ -8,19 +8,13 @@ import { TurnFacts } from "../turn/facts.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 /** A turn's acceptance settles the notifications it took, in the same commit. */
-const accepted = Effect.fnUntraced(function* (payload: {
-  readonly workspaceId: string;
+const settleAccepted = Effect.fnUntraced(function* (payload: {
   readonly turnId: Parameters<NotificationStore.Interface["accept"]>[1];
   readonly notificationIds: ReadonlyArray<Notification.Id>;
   readonly acceptedAt: Parameters<NotificationStore.Interface["accept"]>[2];
 }) {
-  const notifications = yield* NotificationStore.Service;
-  if (notifications.workspaceId !== payload.workspaceId)
-    return yield* new NotificationStore.Conflict({
-      operation: "project",
-      message: "Acceptance belongs to another workspace",
-    });
-  yield* notifications.accept(payload.notificationIds, payload.turnId, payload.acceptedAt);
+  const notificationStore = yield* NotificationStore.Service;
+  yield* notificationStore.accept(payload.notificationIds, payload.turnId, payload.acceptedAt);
 });
 
 /**
@@ -35,22 +29,17 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("NotificationProjection.activity")(function* (event) {
-      const notifications = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.Service;
       const { activity, recipients } = event.payload;
-      if (notifications.workspaceId !== activity.workspaceId)
-        return yield* new NotificationStore.Conflict({
-          operation: "project",
-          message: "Activity belongs to another workspace",
-        });
       // Settlement is driven by the activity itself, even when no new recipients are selected. The
       // store settles only an agent's notifications, which it recognizes by their recipient.
       if (ThreadActivityKind.is(ThreadParticipationActivity.Ended)(activity)) {
         const ended = yield* ThreadActivityKind.decode(ThreadParticipationActivity.Ended, activity);
-        yield* notifications.discardPendingForParticipation(ended.details.participationId);
+        yield* notificationStore.discardPendingForParticipation(ended.details.participationId);
       }
-      yield* notifications.insertMany(
+      yield* notificationStore.insertMany(
         recipients.map((recipient) =>
-          Notification.generated(
+          Notification.fromActivity(
             event,
             Object.assign({ groupId: event.payload.groupId }, activity),
             recipient,
@@ -66,21 +55,15 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     GroupMembershipFacts.Removed,
     Effect.fn("NotificationProjection.departure")(function* (event) {
-      const notifications = yield* NotificationStore.Service;
-      const { workspaceId, memberId, groupId } = event.payload;
-      if (notifications.workspaceId !== workspaceId)
-        return yield* new NotificationStore.Conflict({
-          operation: "project",
-          message: "Departure belongs to another workspace",
-        });
-      yield* notifications.discardPendingForGroup(memberId, groupId);
+      const notificationStore = yield* NotificationStore.Service;
+      const { memberId, groupId } = event.payload;
+      yield* notificationStore.discardPendingForGroup(memberId, groupId);
     }),
   )
   .on(
     TurnFacts.Created,
     Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
-      yield* accepted({
-        workspaceId: payload.workspaceId,
+      yield* settleAccepted({
         turnId: payload.id,
         notificationIds: payload.notificationIds,
         acceptedAt: payload.createdAt,
@@ -90,7 +73,7 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     TurnFacts.InputAccepted,
     Effect.fn("NotificationProjection.inputAccepted")(function* ({ payload }) {
-      yield* accepted(payload);
+      yield* settleAccepted(payload);
     }),
   );
 export * as NotificationProjection from "./projection.ts";

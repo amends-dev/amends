@@ -1,5 +1,5 @@
 import { ConnectionImplementation } from "@amends/connection";
-import { Connection, ConnectionApplication } from "@amends/core/connection";
+import { Connection, ConnectionService } from "@amends/core/connection";
 import { Actor, type Identity } from "@amends/core/identity";
 import { Journal, Store } from "@amends/core/journal";
 import { Request } from "@amends/core/request";
@@ -24,10 +24,10 @@ import {
 const as = <A, E>(
   workspaceId: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (service: ConnectionApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(workspaceId, identity, Effect.flatMap(ConnectionApplication.Service, use)),
+    gateway.asMember(workspaceId, identity, Effect.flatMap(ConnectionService.Service, use)),
   );
 
 const models: Connection.CreateInput = {
@@ -132,7 +132,7 @@ export const connections = (harness: Harness) => {
                     }),
                   ),
                 ),
-              ).toEqual(new ConnectionApplication.Changed({ connectionId: created.id }));
+              ).toEqual(new ConnectionService.Changed({ connectionId: created.id }));
               const configured = yield* as(workspace.id, alice, (service) =>
                 service.configure({
                   connectionId: created.id,
@@ -165,14 +165,14 @@ export const connections = (harness: Harness) => {
                 modelsWith({ implementationId: ConnectionImplementation.Id.make("not-installed") }),
               ),
             ).toEqual(
-              new ConnectionApplication.UnknownImplementation({
+              new ConnectionService.UnknownImplementation({
                 implementationId: ConnectionImplementation.Id.make("not-installed"),
               }),
             );
             expect(
               yield* create(modelsWith({ settings: { endpoint: "models.example", unknown: "x" } })),
             ).toEqual(
-              new ConnectionApplication.InvalidSettings({
+              new ConnectionService.InvalidSettings({
                 issues: [
                   "unknown is not a setting of Test models.",
                   "Endpoint must be an http or https URL.",
@@ -180,7 +180,7 @@ export const connections = (harness: Harness) => {
               }),
             );
             expect(yield* create(modelsWith({ settings: {} }))).toEqual(
-              new ConnectionApplication.InvalidSettings({ issues: ["Endpoint is required."] }),
+              new ConnectionService.InvalidSettings({ issues: ["Endpoint is required."] }),
             );
             const open = yield* as(workspace.id, alice, (service) =>
               service.create(modelsWith({ name: "Open", authentication: "None" })),
@@ -196,7 +196,7 @@ export const connections = (harness: Harness) => {
                 ),
               ),
             ).toEqual(
-              new ConnectionApplication.UnsupportedAuthentication({
+              new ConnectionService.UnsupportedAuthentication({
                 implementationId: testImplementation.id,
                 method: "None",
               }),
@@ -281,7 +281,7 @@ export const connections = (harness: Harness) => {
               expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([]);
               expect(
                 yield* Effect.flip(as(workspace.id, alice, (service) => service.get(created.id))),
-              ).toEqual(new ConnectionApplication.NotFound({ connectionId: created.id }));
+              ).toEqual(new ConnectionService.NotFound({ connectionId: created.id }));
               expect(
                 Option.map(yield* bound.connections.get(created.id), (record) => record.status),
               ).toEqual(Option.some("removed"));
@@ -307,8 +307,8 @@ export const connections = (harness: Harness) => {
             });
             expect(
               yield* Effect.flip(
-                Effect.flatMap(ConnectionApplication.Service, (service) =>
-                  service.setCredential({
+                Effect.flatMap(ConnectionService.Service, (connectionService) =>
+                  connectionService.setCredential({
                     connectionId: created.id,
                     secret: Redacted.make("sk-rolled-back"),
                   }),
@@ -345,13 +345,12 @@ export const connections = (harness: Harness) => {
             );
             expect(again).toEqual(first);
             expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([first]);
+            // The key alone names the request: reused with another body, it returns the first.
             expect(
-              yield* Effect.flip(
-                as(workspace.id, alice, (service) =>
-                  service.create(modelsWith({ name: "Different" }), options),
-                ),
+              yield* as(workspace.id, alice, (service) =>
+                service.create(modelsWith({ name: "Different" }), options),
               ),
-            ).toMatchObject({ _tag: "Request.Reused" });
+            ).toEqual(first);
           }),
         ),
       ),

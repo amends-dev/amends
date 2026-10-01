@@ -1,10 +1,10 @@
-import { ReadStateApplication } from "@amends/core/attention";
-import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
-import { Group, GroupApplication } from "@amends/core/group";
+import { ReadStateService } from "@amends/core/read-state";
+import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
+import { Group, GroupService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
-import { NotificationApplication } from "@amends/core/notification";
-import { Signal, SignalApplication } from "@amends/core/signal";
-import { Thread, ThreadApplication } from "@amends/core/thread";
+import { NotificationService } from "@amends/core/notification";
+import { Signal, SignalService } from "@amends/core/signal";
+import { Thread, ThreadService } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
 import { SignalHub } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
@@ -101,8 +101,8 @@ export const signals = (harness: Harness) => {
           program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(cores[host]));
       const group = yield* as("first")(
         owner,
-        Effect.flatMap(GroupApplication.Service, (groups) =>
-          groups.createTeam({
+        Effect.flatMap(GroupService.Service, (groupService) =>
+          groupService.createTeam({
             name: "Private",
             memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
           }),
@@ -110,15 +110,21 @@ export const signals = (harness: Harness) => {
       );
       const started = yield* as("first")(
         owner,
-        Effect.flatMap(ThreadApplication.Service, (threads) =>
-          threads.startInGroup({ groupId: group.id, mentions: [reader.memberId], text: "Look" }),
+        Effect.flatMap(ThreadService.Service, (threadService) =>
+          threadService.startInGroup({
+            groupId: group.id,
+            mentions: [reader.memberId],
+            text: "Look",
+          }),
         ),
       );
       /** Subscribe to the change feed as a member on a host, after its opening Ready. */
       const feed = Effect.fnUntraced(function* (host: keyof typeof cores, actor: Actor.Value) {
         const next = yield* as(host)(
           actor,
-          Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch()),
+          Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>
+            changeFeedService.watch(),
+          ),
         ).pipe(Effect.flatMap(buffer));
         expect(yield* next).toMatchObject({ _tag: "Ready", reset: true });
         return signalsOf(next);
@@ -187,7 +193,9 @@ export const signals = (harness: Harness) => {
           const before = yield* DateTime.now;
           yield* as("first")(
             owner,
-            Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(threadId)),
+            Effect.flatMap(SignalService.Service, (signalService) =>
+              signalService.typing(threadId),
+            ),
           );
           const typing = yield* readerFeed;
           expect(typing).toMatchObject({
@@ -219,11 +227,13 @@ export const signals = (harness: Harness) => {
             as("first")(
               actor,
               Effect.flip(
-                Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(thread)),
+                Effect.flatMap(SignalService.Service, (signalService) =>
+                  signalService.typing(thread),
+                ),
               ),
             );
           const notFound = (thread: Thread.Id) =>
-            new SignalApplication.ThreadNotFound({ threadId: thread });
+            new SignalService.ThreadNotFound({ threadId: thread });
           expect(yield* typing(outsider)).toEqual(notFound(threadId));
           const missing = Thread.Id.make("missing");
           expect(yield* typing(reader, missing)).toEqual(notFound(missing));
@@ -241,16 +251,18 @@ export const signals = (harness: Harness) => {
           const ownerFeed = yield* feed("second", owner);
           const [notification] = yield* as("first")(
             reader,
-            Effect.flatMap(NotificationApplication.Service, (n) => n.list({ limit: 10 })),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              notificationService.list({ limit: 10 }),
+            ),
           );
           if (notification === undefined) return yield* Effect.die("Expected a notification");
           yield* as("first")(
             reader,
             Effect.gen(function* () {
-              yield* (yield* NotificationApplication.Service).acknowledge(notification.id);
-              const reading = yield* ReadStateApplication.Service;
-              yield* reading.markThreadRead({ threadId, throughSequence: 1 });
-              yield* reading.markGroupRead({ groupId });
+              yield* (yield* NotificationService.Service).acknowledge(notification.id);
+              const readStateService = yield* ReadStateService.Service;
+              yield* readStateService.markThreadRead({ threadId, throughSequence: 1 });
+              yield* readStateService.markGroupRead({ groupId });
             }),
           );
           for (const next of [elsewhere, sameHost])

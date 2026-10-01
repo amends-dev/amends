@@ -11,9 +11,9 @@ import {
 } from "@amends/core/authorization";
 import {
   Group,
-  GroupApplication,
-  GroupAudience,
-  GroupMembershipApplication,
+  GroupService,
+  GroupQuery,
+  GroupMembershipService,
   GroupMembershipFacts,
   GroupMembershipStore,
   GroupPermissions,
@@ -22,43 +22,40 @@ import {
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
 import { Checkpoint, Fact, Journal, Log, Publication, Store, Subject } from "@amends/core/journal";
-import { Member, MemberApplication, MemberFacts, MemberStore } from "@amends/core/workspace";
+import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
 import {
   Thread,
-  ThreadAccess,
-  ThreadApplication,
+  ThreadService,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
-  ThreadActivityPublisher,
-  ThreadActivityReading,
-  ThreadActivityRecording,
   ThreadActivityResolvers,
   ThreadActivityStore,
   ThreadMessage,
   ThreadMessageActivity,
   ThreadMessageFacts,
-  ThreadMessageStore,
   ThreadMessageTimeline,
   ThreadParticipation,
-  ThreadParticipationAdmission,
-  ThreadParticipationApplication,
-  ThreadParticipationStore,
+  ThreadParticipationService,
   ThreadParticipationTimeline,
   ThreadPermissions,
-  ThreadStore,
+  ThreadCommand,
+  ThreadQuery,
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema } from "effect";
 import {
   type Bound,
   boundTo,
   otherWorkspaceId,
+  placed,
+  placedIn,
   replacing,
   runHost,
   Support,
   testProvenance,
   workspaceId,
+  threadInternals,
 } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -85,34 +82,40 @@ export const threadReads = (harness: Harness) => {
       asActor(effect, actor).pipe(Effect.provide(core(bound)));
     const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const get = (id: Thread.Id) =>
-      Effect.flatMap(ThreadApplication.Service, (service) => service.get(id));
+      Effect.flatMap(ThreadService.Service, (threadService) => threadService.get(id));
     /** Readable threads of a group as records in ID order; listing order has its own test. */
     const list = (id: Group.Id) =>
-      Effect.flatMap(ThreadApplication.Service, (service) =>
-        Effect.map(service.listInGroup(id, { limit: 100 }), (items) =>
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        Effect.map(threadService.listInGroup(id, { limit: 100 }), (items) =>
           items.map((item) => item.thread).toSorted((a, b) => (a.id < b.id ? -1 : 1)),
         ),
       );
     const timeline = (id: Thread.Id, options: ThreadActivityStore.ReadOptions = { limit: 10 }) =>
-      Effect.flatMap(ThreadApplication.Service, (service) => service.readTimeline(id, options));
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.readTimeline(id, options),
+      );
     const participants = (
       id: Thread.Id,
       options: ThreadParticipation.ListOptions = { limit: 100 },
     ) =>
-      Effect.flatMap(ThreadApplication.Service, (service) => service.listParticipants(id, options));
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.listParticipants(id, options),
+      );
     const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name, memberIds }),
+      );
+    const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startInGroup({ groupId, mentions, text: "Opening proposal" }),
       );
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(ThreadApplication.Service, (service) =>
-        service.startInGroup({ groupId, mentions, text: "Opening proposal" }),
-      );
+      Effect.flatMap(opening(groupId, mentions), placed);
     const threadTarget = (threadId: Thread.Id): Target.Reference => ({
       _tag: "Thread",
       workspaceId,
@@ -128,7 +131,7 @@ export const threadReads = (harness: Harness) => {
         bound,
         Effect.flatMap(Journal.Service, (journal) =>
           journal.publish(AssignmentFacts.Created, {
-            workspaceId: bound.workspace.workspaceId,
+            workspaceId: bound.store.workspaceId,
             assignmentId: Assignment.Id.make(
               `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`,
             ),
@@ -138,7 +141,7 @@ export const threadReads = (harness: Harness) => {
               grant: Grant.make(
                 permission,
                 target === undefined
-                  ? { _tag: "Workspace", workspaceId: bound.workspace.workspaceId }
+                  ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
                   : { _tag: "Target", target },
               ),
             },
@@ -153,7 +156,7 @@ export const threadReads = (harness: Harness) => {
             Effect.gen(function* () {
               for (const memberId of [readerId, otherId, agentId])
                 yield* journal.publish(MemberFacts.Added, {
-                  workspaceId: bound.workspace.workspaceId,
+                  workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: identityFor(memberId),
                 });
@@ -393,17 +396,17 @@ export const threadReads = (harness: Harness) => {
                   const calls: ReadonlyArray<
                     Effect.Effect<
                       unknown,
-                      ThreadApplication.ReadError,
-                      ThreadApplication.Service | Actor.Service
+                      ThreadService.ReadError,
+                      ThreadService.Service | Actor.Service
                     >
                   > = [get(id), timeline(id), participants(id)];
                   for (const call of calls)
                     expect(yield* Effect.flip(run(bound, actor, call))).toEqual(
-                      new ThreadApplication.NotFound({ threadId: id }),
+                      new ThreadService.NotFound({ threadId: id }),
                     );
                 }
               expect(yield* Effect.flip(run(bound, owner, list(hidden.id)))).toEqual(
-                new ThreadApplication.GroupNotFound({ groupId: hidden.id }),
+                new ThreadService.GroupNotFound({ groupId: hidden.id }),
               );
               yield* publish(
                 bound,
@@ -567,49 +570,52 @@ export const threadReads = (harness: Harness) => {
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const service = yield* ThreadApplication.Service;
-                  expect(yield* service.get(first.thread.id)).toEqual(first.thread);
+                  const threadService = yield* ThreadService.Service;
+                  expect(yield* threadService.get(first.thread.id)).toEqual(first.thread);
                   const admission = Option.getOrThrow(
                     yield* bound.groupMemberships.findActive(group.id, readerId),
                   );
-                  yield* Effect.flatMap(GroupMembershipApplication.Service, (groups) =>
-                    groups.leave({ groupId: group.id, membershipId: admission.id }),
+                  yield* Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                    groupMembershipService.leave({
+                      groupId: group.id,
+                      membershipId: admission.id,
+                    }),
                   );
-                  expect(yield* Effect.flip(service.get(first.thread.id))).toEqual(
-                    new ThreadApplication.NotFound({ threadId: first.thread.id }),
+                  expect(yield* Effect.flip(threadService.get(first.thread.id))).toEqual(
+                    new ThreadService.NotFound({ threadId: first.thread.id }),
                   );
                   expect(
-                    yield* Effect.flip(service.listInGroup(group.id, { limit: 100 })),
+                    yield* Effect.flip(threadService.listInGroup(group.id, { limit: 100 })),
                   ).toMatchObject({
-                    _tag: "ThreadApplication.GroupNotFound",
+                    _tag: "ThreadService.GroupNotFound",
                   });
                   yield* asActor(
-                    Effect.flatMap(GroupMembershipApplication.Service, (groups) =>
-                      groups.add({ groupId: group.id, memberId: readerId }),
+                    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                      groupMembershipService.add({ groupId: group.id, memberId: readerId }),
                     ),
                     owner,
                   );
-                  expect(yield* service.readTimeline(first.thread.id, { limit: 10 })).toHaveLength(
-                    1,
-                  );
                   expect(
-                    (yield* service.listParticipants(second.thread.id, { limit: 100 })).some(
-                      (p) => ThreadParticipation.memberOf(p.participant) === readerId,
-                    ),
+                    yield* threadService.readTimeline(first.thread.id, { limit: 10 }),
+                  ).toHaveLength(1);
+                  expect(
+                    (yield* threadService.listParticipants(second.thread.id, {
+                      limit: 100,
+                    })).some((p) => ThreadParticipation.memberOf(p.participant) === readerId),
                   ).toBe(false);
                   yield* asActor(
-                    Effect.flatMap(MemberApplication.Service, (members) =>
-                      members.remove(readerId),
+                    Effect.flatMap(MemberService.Service, (memberService) =>
+                      memberService.remove(readerId),
                     ),
                     owner,
                   );
                   const calls: ReadonlyArray<
-                    Effect.Effect<unknown, ThreadApplication.ReadError, Actor.Service>
+                    Effect.Effect<unknown, ThreadService.ReadError, Actor.Service>
                   > = [
-                    service.get(first.thread.id),
-                    service.listInGroup(group.id, { limit: 100 }),
-                    service.readTimeline(first.thread.id, { limit: 10 }),
-                    service.listParticipants(first.thread.id, { limit: 100 }),
+                    threadService.get(first.thread.id),
+                    threadService.listInGroup(group.id, { limit: 100 }),
+                    threadService.readTimeline(first.thread.id, { limit: 10 }),
+                    threadService.listParticipants(first.thread.id, { limit: 100 }),
                   ];
                   for (const call of calls)
                     expect(yield* Effect.flip(call)).toMatchObject({
@@ -671,10 +677,10 @@ export const threadReads = (harness: Harness) => {
                 reader,
                 Effect.gen(function* () {
                   expectTypeOf<
-                    Effect.Services<ReturnType<ThreadApplication.Interface["get"]>>
+                    Effect.Services<ReturnType<ThreadService.Interface["get"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   expectTypeOf<
-                    Effect.Services<ReturnType<ThreadApplication.Interface["readTimeline"]>>
+                    Effect.Services<ReturnType<ThreadService.Interface["readTimeline"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   yield* get(first.thread.id);
                   yield* list(group.id);
@@ -687,7 +693,7 @@ export const threadReads = (harness: Harness) => {
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const service = yield* ThreadApplication.Service;
+                  const threadService = yield* ThreadService.Service;
                   yield* publish(
                     bound,
                     Effect.flatMap(Journal.Service, (journal) =>
@@ -698,10 +704,10 @@ export const threadReads = (harness: Harness) => {
                       }),
                     ),
                   );
-                  expect(yield* Effect.flip(service.get(first.thread.id))).toMatchObject({
+                  expect(yield* Effect.flip(threadService.get(first.thread.id))).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
-                  expect(yield* service.listInGroup(group.id, { limit: 100 })).toEqual([]);
+                  expect(yield* threadService.listInGroup(group.id, { limit: 100 })).toEqual([]);
                 }),
               );
             }),
@@ -777,7 +783,7 @@ export const threadReads = (harness: Harness) => {
                     });
                     expect(yield* Effect.flip(asActor(get(first.thread.id), reader))).toMatchObject(
                       {
-                        _tag: "ThreadApplication.NotFound",
+                        _tag: "ThreadService.NotFound",
                       },
                     );
                     return yield* Effect.fail("rollback");
@@ -815,13 +821,13 @@ export const threadReads = (harness: Harness) => {
               yield* grant(bound, memberId, ThreadPermissions.Read);
               const visitor = Actor.Value.make({ workspaceId, memberId, identity });
               expect(yield* Effect.flip(run(bound, visitor, get(first.thread.id)))).toMatchObject({
-                _tag: "ThreadApplication.NotFound",
+                _tag: "ThreadService.NotFound",
               });
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groups) =>
-                  groups.add({ groupId: group.id, memberId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId }),
                 ),
               );
               expect(yield* run(bound, visitor, timeline(first.thread.id))).toHaveLength(1);
@@ -907,11 +913,9 @@ export const threadReads = (harness: Harness) => {
                 owner,
                 create([workspace.ownerMemberId, readerId]),
               );
-              const opened = yield* gateway.asMember(
-                workspace.id,
-                owner,
-                start(group.id, [workspace.ownerMemberId]),
-              );
+              const opened = yield* gateway
+                .asMember(workspace.id, owner, opening(group.id, [workspace.ownerMemberId]))
+                .pipe(Effect.flatMap(placedIn(bound)));
               const foreignGroup = yield* gateway.asMember(
                 other.id,
                 foreignOwner,
@@ -920,7 +924,7 @@ export const threadReads = (harness: Harness) => {
               const foreignThread = yield* gateway.asMember(
                 other.id,
                 foreignOwner,
-                start(foreignGroup.id),
+                opening(foreignGroup.id),
               );
               expect(
                 yield* Effect.flip(
@@ -944,7 +948,7 @@ export const threadReads = (harness: Harness) => {
               for (const id of [foreignThread.thread.id, Thread.Id.make("missing")])
                 expect(
                   yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, get(id))),
-                ).toEqual(new ThreadApplication.NotFound({ threadId: id }));
+                ).toEqual(new ThreadService.NotFound({ threadId: id }));
               expect(
                 yield* Effect.flip(
                   gateway.asMember(
@@ -959,106 +963,33 @@ export const threadReads = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "timeline reads reject oversized, unordered, mismatched, and orphaned storage results",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, owner, first, second } = yield* prepare();
-              const next = yield* append(bound, first.thread, 2);
-              const before = yield* history(bound);
-              // Storage returns activity in the shape every kind shares.
-              const stored = (id: ThreadActivity.Id) =>
-                Effect.map(bound.activities.get(id), Option.getOrThrow);
-              const firstRow = yield* stored(first.activity.id);
-              const nextRow = yield* stored(next.activity.id);
-              for (const { rows, limit } of [
-                { rows: [firstRow, nextRow], limit: 1 },
-                { rows: [nextRow, firstRow], limit: 2 },
-                { rows: [firstRow, firstRow], limit: 2 },
-                {
-                  rows: [Object.assign({}, firstRow, { workspaceId: otherWorkspaceId })],
-                  limit: 1,
-                },
-                {
-                  rows: [Object.assign({}, firstRow, { threadId: second.thread.id })],
-                  limit: 1,
-                },
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, ThreadActivityStore.Service, {
-                    ...bound.activities,
-                    readPage: () => Effect.succeed(rows),
-                  }),
-                };
-                expect(
-                  yield* Effect.flip(run(broken, owner, timeline(first.thread.id, { limit }))),
-                ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              }
-              const stale = {
-                ...bound,
-                context: Context.add(bound.context, ThreadActivityStore.Service, {
-                  ...bound.activities,
-                  readPage: () => Effect.succeed([firstRow]),
-                }),
-              };
-              expect(
-                yield* Effect.flip(
-                  run(stale, owner, timeline(first.thread.id, { afterSequence: 1, limit: 10 })),
-                ),
-              ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              // An activity at or past the page's upper bound is refused as well.
-              expect(
-                yield* Effect.flip(
-                  run(
-                    stale,
-                    owner,
-                    timeline(first.thread.id, { beforeSequence: 1, limit: 10, from: "newest" }),
+    it.effect("a storage failure reaches a timeline reader as it is, and records nothing", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, first } = yield* prepare();
+            const before = yield* history(bound);
+            const failing = {
+              ...bound,
+              context: Context.add(bound.context, ThreadActivityStore.Service, {
+                ...bound.activities,
+                readPage: () =>
+                  Effect.fail(
+                    new ThreadActivityStore.Failure({
+                      operation: "readPage",
+                      cause: "failed storage",
+                    }),
                   ),
-                ),
-              ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              for (const message of [
-                Option.none<ThreadMessage.Record>(),
-                Option.some(second.message),
-                Option.some(Object.assign({}, first.message, { workspaceId: otherWorkspaceId })),
-                Option.some(Object.assign({}, first.message, { threadId: second.thread.id })),
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, ThreadMessageStore.Service, {
-                    ...bound.messages,
-                    ...replacing(bound.messages, first.message.id, message),
-                  }),
-                };
-                expect(
-                  yield* Effect.flip(run(broken, owner, timeline(first.thread.id))),
-                ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              }
-              const failing = {
-                ...bound,
-                context: Context.add(bound.context, ThreadActivityStore.Service, {
-                  ...bound.activities,
-                  readPage: () =>
-                    Effect.fail(
-                      new ThreadActivityStore.Failure({
-                        operation: "readPage",
-                        cause: "failed storage",
-                      }),
-                    ),
-                }),
-              };
-              expect(
-                yield* Effect.flip(run(failing, owner, timeline(first.thread.id))),
-              ).toMatchObject({
-                _tag: "ThreadActivityStore.Failure",
-              });
-              expect(yield* history(bound)).toEqual(before);
-            }),
-          ),
+              }),
+            };
+            expect(
+              yield* Effect.flip(run(failing, owner, timeline(first.thread.id))),
+            ).toMatchObject({ _tag: "ThreadActivityStore.Failure" });
+            expect(yield* history(bound)).toEqual(before);
+          }),
         ),
+      ),
     );
 
     it.effect("batch reads return each stored record once and omit absent or foreign IDs", () =>
@@ -1199,8 +1130,11 @@ export const threadReads = (harness: Harness) => {
               yield* run(
                 bound,
                 reader,
-                Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-                  s.unfollow({ threadId: second.thread.id, participationId: own.id }),
+                Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+                  threadParticipationService.unfollow({
+                    threadId: second.thread.id,
+                    participationId: own.id,
+                  }),
                 ),
               );
               const active = byId((yield* all()).filter((p) => p.status === "active"));
@@ -1252,8 +1186,11 @@ export const threadReads = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groups) =>
-                  groups.remove({ groupId: group.id, membershipId: admission.id }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.remove({
+                    groupId: group.id,
+                    membershipId: admission.id,
+                  }),
                 ),
               );
               const current = (yield* bound.groupMemberships.listByGroup(group.id)).filter(
@@ -1281,239 +1218,79 @@ export const threadReads = (harness: Harness) => {
         ),
     );
 
-    it.effect(
-      "thread and participation reads reject inconsistent references and duplicate rows",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, owner, group, first, second, secret } = yield* prepare();
-              const before = yield* history(bound);
-              const participant = (yield* bound.participations.listByThread(second.thread.id)).find(
+    it.effect("participant pages skip lapsed admissions yet fill every page", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, group, second } = yield* prepare();
+            const before = yield* history(bound);
+            const admission = Option.getOrThrow(
+              yield* bound.groupMemberships.findActive(group.id, agentId),
+            );
+            const oldAdmission = {
+              ...bound,
+              context: Context.add(bound.context, GroupMembershipStore.Service, {
+                ...bound.groupMemberships,
+                ...replacing(
+                  bound.groupMemberships,
+                  admission.id,
+                  Option.some(Object.assign({}, admission, { status: "removed" as const })),
+                ),
+              }),
+            };
+            expect(
+              (yield* run(oldAdmission, owner, participants(second.thread.id))).some(
                 (p) => ThreadParticipation.memberOf(p.participant) === agentId,
-              );
-              if (participant === undefined) return yield* Effect.die("Missing participant");
-              for (const record of [
-                second.thread,
-                Object.assign({}, first.thread, { workspaceId: otherWorkspaceId }),
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, ThreadStore.Service, {
-                    ...bound.threads,
-                    get: () => Effect.succeedSome(record),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, owner, get(first.thread.id)))).toMatchObject({
-                  _tag: "ThreadApplication.InvalidResponse",
-                });
-              }
-              for (const rows of [[first.thread, first.thread], [secret.thread]]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, ThreadStore.Service, {
-                    ...bound.threads,
-                    listByLatest: () => Effect.succeed(rows),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, owner, list(group.id)))).toMatchObject({
-                  _tag: "ThreadApplication.InvalidResponse",
-                });
-              }
-              // A stream page rejects listings, openings, messages, and counts that do not agree.
-              const openings = Effect.flatMap(ThreadApplication.Service, (service) =>
-                service.listOpenings(group.id, { limit: 100 }),
-              );
-              expect(yield* run(bound, owner, openings)).toHaveLength(2);
-              const opening = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
-              const other = Option.getOrThrow(yield* bound.activities.get(second.activity.id));
-              const count = { threadId: first.thread.id, count: 1 };
-              for (const replace of [
-                { listByStart: () => Effect.succeed([first.thread, first.thread]) },
-                { listByStart: () => Effect.succeed([secret.thread]) },
-              ]
-                .map((stores) =>
-                  Context.add(bound.context, ThreadStore.Service, { ...bound.threads, ...stores }),
-                )
-                .concat(
-                  [
-                    { getFirst: () => Effect.succeed([opening]) },
-                    { getFirst: () => Effect.succeed([opening, opening, other]) },
-                    {
-                      getFirst: () =>
-                        Effect.succeed([opening, Object.assign({}, other, { sequence: 2 })]),
-                    },
-                    { countByKind: () => Effect.succeed([count]) },
-                    {
-                      countByKind: () =>
-                        Effect.succeed([count, count, { ...count, threadId: second.thread.id }]),
-                    },
-                  ].map((stores) =>
-                    Context.add(bound.context, ThreadActivityStore.Service, {
-                      ...bound.activities,
-                      ...stores,
-                    }),
-                  ),
-                )
-                .concat([
-                  Context.add(bound.context, ThreadMessageStore.Service, {
-                    ...bound.messages,
-                    getMany: () =>
-                      Effect.succeed([
-                        Object.assign({}, first.message, { threadId: second.thread.id }),
-                        second.message,
-                      ]),
-                  }),
-                ])) {
-                expect(
-                  yield* Effect.flip(run({ ...bound, context: replace }, owner, openings)),
-                ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              }
-              for (const rows of [
-                [participant, participant],
-                [
-                  participant,
-                  Object.assign({}, participant, { id: ThreadParticipation.Id.make("duplicate") }),
-                ],
-                [Object.assign({}, participant, { threadId: first.thread.id })],
-                [Object.assign({}, participant, { workspaceId: otherWorkspaceId })],
-                [
-                  Object.assign({}, participant, {
-                    status: "ended" as const,
-                    endedAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
-                  }),
-                ],
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, ThreadParticipationStore.Service, {
-                    ...bound.participations,
-                    pageActiveByThread: () => Effect.succeed(rows),
-                  }),
-                };
-                expect(
-                  yield* Effect.flip(run(broken, owner, participants(second.thread.id))),
-                ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              }
-              // A page longer than asked for is refused rather than trusted.
-              let served = false;
-              const overfull = {
-                ...bound,
-                context: Context.add(bound.context, ThreadParticipationStore.Service, {
-                  ...bound.participations,
-                  pageActiveByThread: () =>
-                    Effect.sync(() => {
-                      if (served) return [];
-                      served = true;
-                      return [
-                        participant,
-                        Object.assign({}, participant, {
-                          id: ThreadParticipation.Id.make("another"),
-                          participant: { _tag: "Triage" as const },
-                        }),
-                      ];
-                    }),
-                }),
-              };
-              expect(
-                yield* Effect.flip(
-                  run(overfull, owner, participants(second.thread.id, { limit: 1 })),
+              ),
+            ).toBe(false);
+            // Paging one at a time skips the lapsed participant yet fills every page, so reading
+            // until an empty page still reaches everyone after it.
+            const expected = (yield* run(bound, owner, participants(second.thread.id))).filter(
+              (p) => ThreadParticipation.memberOf(p.participant) !== agentId,
+            );
+            const paged: Array<ThreadParticipation.Summary> = [];
+            for (;;) {
+              const after = paged.at(-1)?.id;
+              const page = yield* run(
+                oldAdmission,
+                owner,
+                participants(
+                  second.thread.id,
+                  after === undefined ? { limit: 1 } : { after, limit: 1 },
                 ),
-              ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              const wrongMember = {
-                ...bound,
-                context: Context.add(bound.context, MemberStore.Service, {
-                  ...bound.members,
-                  ...replacing(bound.members, agentId, yield* bound.members.get(otherId)),
-                }),
-              };
-              expect(
-                yield* Effect.flip(run(wrongMember, owner, participants(second.thread.id))),
-              ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              const admission = Option.getOrThrow(
-                yield* bound.groupMemberships.findActive(group.id, agentId),
               );
-              for (const row of [
-                Option.none<typeof admission>(),
-                Option.some(Object.assign({}, admission, { memberId: otherId })),
-                Option.some(Object.assign({}, admission, { groupId: secret.thread.groupId })),
-                Option.some(Object.assign({}, admission, { workspaceId: otherWorkspaceId })),
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    ...replacing(bound.groupMemberships, admission.id, row),
-                  }),
-                };
-                expect(
-                  yield* Effect.flip(run(broken, owner, participants(second.thread.id))),
-                ).toMatchObject({ _tag: "ThreadApplication.InvalidResponse" });
-              }
-              const oldAdmission = {
-                ...bound,
-                context: Context.add(bound.context, GroupMembershipStore.Service, {
-                  ...bound.groupMemberships,
-                  ...replacing(
-                    bound.groupMemberships,
-                    admission.id,
-                    Option.some(Object.assign({}, admission, { status: "removed" as const })),
-                  ),
-                }),
-              };
-              expect(
-                (yield* run(oldAdmission, owner, participants(second.thread.id))).some(
-                  (p) => ThreadParticipation.memberOf(p.participant) === agentId,
+              if (page.length === 0) break;
+              expect(page).toHaveLength(1);
+              paged.push(...page);
+            }
+            expect(paged).toEqual(expected);
+            // With the first participant lapsed, filling a page reads on and stops at its limit.
+            const everyone = yield* run(bound, owner, participants(second.thread.id));
+            const lapsed = everyone[0];
+            if (lapsed === undefined || lapsed.participant._tag !== "Member")
+              return yield* Effect.die("Expected a member first");
+            const lapsedAdmission = Option.getOrThrow(
+              yield* bound.groupMemberships.findActive(group.id, lapsed.participant.memberId),
+            );
+            const firstLapsed = {
+              ...bound,
+              context: Context.add(bound.context, GroupMembershipStore.Service, {
+                ...bound.groupMemberships,
+                ...replacing(
+                  bound.groupMemberships,
+                  lapsedAdmission.id,
+                  Option.some(Object.assign({}, lapsedAdmission, { status: "removed" as const })),
                 ),
-              ).toBe(false);
-              // Paging one at a time skips the lapsed participant yet fills every page, so reading
-              // until an empty page still reaches everyone after it.
-              const expected = (yield* run(bound, owner, participants(second.thread.id))).filter(
-                (p) => ThreadParticipation.memberOf(p.participant) !== agentId,
-              );
-              const paged: Array<ThreadParticipation.Summary> = [];
-              for (;;) {
-                const after = paged.at(-1)?.id;
-                const page = yield* run(
-                  oldAdmission,
-                  owner,
-                  participants(
-                    second.thread.id,
-                    after === undefined ? { limit: 1 } : { after, limit: 1 },
-                  ),
-                );
-                if (page.length === 0) break;
-                expect(page).toHaveLength(1);
-                paged.push(...page);
-              }
-              expect(paged).toEqual(expected);
-              // With the first participant lapsed, filling a page reads on and stops at its limit.
-              const everyone = yield* run(bound, owner, participants(second.thread.id));
-              const lapsed = everyone[0];
-              if (lapsed === undefined || lapsed.participant._tag !== "Member")
-                return yield* Effect.die("Expected a member first");
-              const lapsedAdmission = Option.getOrThrow(
-                yield* bound.groupMemberships.findActive(group.id, lapsed.participant.memberId),
-              );
-              const firstLapsed = {
-                ...bound,
-                context: Context.add(bound.context, GroupMembershipStore.Service, {
-                  ...bound.groupMemberships,
-                  ...replacing(
-                    bound.groupMemberships,
-                    lapsedAdmission.id,
-                    Option.some(Object.assign({}, lapsedAdmission, { status: "removed" as const })),
-                  ),
-                }),
-              };
-              expect(
-                yield* run(firstLapsed, owner, participants(second.thread.id, { limit: 2 })),
-              ).toEqual(everyone.slice(1, 3));
-              expect(yield* history(bound)).toEqual(before);
-            }),
-          ),
+              }),
+            };
+            expect(
+              yield* run(firstLapsed, owner, participants(second.thread.id, { limit: 2 })),
+            ).toEqual(everyone.slice(1, 3));
+            expect(yield* history(bound)).toEqual(before);
+          }),
         ),
+      ),
     );
 
     it.effect(
@@ -1546,11 +1323,6 @@ export const threadReads = (harness: Harness) => {
                 payload: Schema.String,
                 subject: () => Subject.make("test", "happened"),
               });
-              const publisher = ThreadActivityPublisher.layer.pipe(
-                Layer.provide(
-                  Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
-                ),
-              );
               const record = <K extends ThreadActivityKind.Definition>(
                 kind: K,
                 details: K["details"]["Type"],
@@ -1558,8 +1330,8 @@ export const threadReads = (harness: Harness) => {
               ) =>
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
-                    Effect.flatMap(ThreadActivityPublisher.Service, (activities) =>
-                      activities.publish({
+                    Effect.flatMap(ThreadCommand.Service, (threadCommand) =>
+                      threadCommand.publishActivity({
                         thread: first.thread,
                         occurredAt: DateTime.makeUnsafe("2026-09-24T12:00:00.000Z"),
                         ...(expectedSequence === undefined ? {} : { expectedSequence }),
@@ -1576,7 +1348,7 @@ export const threadReads = (harness: Harness) => {
                   ),
                 ).pipe(
                   Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-                  Effect.provide(publisher.pipe(Layer.provideMerge(core(bound)))),
+                  Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
                 );
               const at = DateTime.makeUnsafe("2026-09-24T11:00:00.000Z");
               const note = { noteId: "note-1", text: "Checked", at, tags: ["a", "b"] };
@@ -1610,14 +1382,13 @@ export const threadReads = (harness: Harness) => {
               ]);
               // An expected position records only there.
               expect(yield* Effect.flip(record(Pinged, { count: 3 }, position + 2))).toMatchObject({
-                _tag: "ThreadActivityPublisher.PositionChanged",
+                _tag: "ThreadCommand.PositionChanged",
                 expected: position + 2,
                 actual: position + 1,
               });
               yield* record(Pinged, { count: 3 }, position + 1);
               // Timelines read it through the resolver its owning domain registers.
               const resolver = Effect.succeed({
-                workspaceId,
                 kinds: [Noted, Pinged],
                 resolve: (_thread: Thread.Record, listed: ReadonlyArray<ThreadActivity.Record>) =>
                   Effect.forEach(listed, (activity) =>
@@ -1628,19 +1399,14 @@ export const threadReads = (harness: Harness) => {
                           : yield* ThreadActivityKind.decode(Pinged, activity);
                       // Items of kinds declared here are not in core's item union.
                       return { activity: decoded } as unknown as ThreadActivityKind.Item;
-                    }).pipe(
-                      Effect.mapError(
-                        (error) =>
-                          new ThreadActivityResolvers.InvalidResponse({ message: error.message }),
-                      ),
-                    ),
+                    }).pipe(Effect.orDie),
                   ),
               } satisfies ThreadActivityResolvers.Resolver);
               // Fresh: core builds its own reader, over only the resolvers core registers.
-              const reading = Layer.fresh(ThreadActivityReading.layer).pipe(
+              const reading = Layer.fresh(ThreadQuery.layer).pipe(
                 Layer.provide(
                   Layer.mergeAll(
-                    ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer)),
+                    GroupQuery.layer,
                     ThreadActivityResolvers.layer([
                       ThreadMessageTimeline.resolver,
                       ThreadParticipationTimeline.resolver,
@@ -1650,8 +1416,8 @@ export const threadReads = (harness: Harness) => {
                 ),
                 Layer.provideMerge(core(bound)),
               );
-              const items = yield* Effect.flatMap(ThreadActivityReading.Service, (timelines) =>
-                timelines.page(first.thread.id, { limit: 10 }),
+              const items = yield* Effect.flatMap(ThreadQuery.Service, (threadQuery) =>
+                threadQuery.readTimeline(first.thread.id, { limit: 10 }),
               ).pipe(Effect.provideService(Actor.Service, owner), Effect.provide(reading));
               expect(items.map((item) => item.activity.kind)).toEqual([
                 ThreadMessageActivity.Published.name,
@@ -1662,12 +1428,10 @@ export const threadReads = (harness: Harness) => {
               ]);
               expect(items[1]?.activity).toMatchObject({ details: note });
               // A host that registers no resolver for a kind says so rather than guessing.
-              expect(
-                yield* Effect.flip(run(bound, owner, timeline(first.thread.id))),
-              ).toMatchObject({
-                _tag: "ThreadApplication.InvalidResponse",
-                message: "No resolver for activity kind test.noted",
-              });
+              const unresolved = yield* Effect.exit(run(bound, owner, timeline(first.thread.id)));
+              expect(Exit.isFailure(unresolved) && Cause.squash(unresolved.cause)).toEqual(
+                new ThreadActivityResolvers.Unknown({ kind: "test.noted" }),
+              );
               // Rebuilding restores the same rows from the recorded facts.
               const rows = yield* bound.activities.listByThread(first.thread.id);
               yield* storage.discardProjections;

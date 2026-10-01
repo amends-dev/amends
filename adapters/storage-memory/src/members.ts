@@ -26,7 +26,6 @@ export const make = Effect.fn("Members.make")(function* () {
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
   return MemberStore.Service.of({
-    workspaceId,
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.members, id)).pipe(
         Effect.mapError(storeFailure(MemberStore, "get")),

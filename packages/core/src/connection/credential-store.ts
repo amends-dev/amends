@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { Connection } from "./connection.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("ConnectionCredentialStore.Failure", {
@@ -32,7 +32,6 @@ export interface Credential {
  * protects secrets at rest as its storage allows; reads return them only to the server.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /** Store a new credential; reusing an ID conflicts. */
   readonly put: (
     credential: Credential,

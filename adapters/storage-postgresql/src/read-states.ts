@@ -1,4 +1,4 @@
-import { ReadState, ReadStateStore } from "@amends/core/attention";
+import { ReadState, ReadStateStore } from "@amends/core/read-state";
 import { Group } from "@amends/core/group";
 import { Thread } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
@@ -27,7 +27,6 @@ export const make = Effect.fn("ReadStates.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   return ReadStateStore.Service.of({
-    workspaceId,
     getThreadPositions: Effect.fn("ReadStates.getThreadPositions")(
       function* (memberInput, threadInput) {
         const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);

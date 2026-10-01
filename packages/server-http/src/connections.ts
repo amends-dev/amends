@@ -1,5 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
-import { ConnectionApplication } from "@amends/core/connection";
+import { ConnectionService } from "@amends/core/connection";
 import type { Actor } from "@amends/core/identity";
 import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
@@ -20,48 +20,61 @@ export const layer = HttpApiBuilder.group(
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
       operation: (
-        connections: ConnectionApplication.Interface,
+        connectionService: ConnectionService.Interface,
       ) => Effect.Effect<A, E, Actor.Service>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
         gateway.asMember(
           workspaceId,
           principal,
-          Effect.flatMap(ConnectionApplication.Service, operation),
+          Effect.flatMap(ConnectionService.Service, operation),
         ),
       );
     return handlers.handleAll({
       implementations: ({ params }) =>
-        asMember(params.workspaceId, (connections) => Effect.succeed(connections.implementations)),
-      list: ({ params }) => asMember(params.workspaceId, (connections) => connections.list),
+        asMember(params.workspaceId, (connectionService) =>
+          Effect.succeed(connectionService.implementations),
+        ),
+      list: ({ params }) =>
+        asMember(params.workspaceId, (connectionService) => connectionService.list),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (connections) => connections.get(params.connectionId)),
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.get(params.connectionId),
+        ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.rename({
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.rename({
             connectionId: params.connectionId,
             name: payload.name,
             expectedName: payload.expectedName,
           }),
         ),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.configure({ connectionId: params.connectionId, settings: payload.settings }),
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.configure({
+            connectionId: params.connectionId,
+            settings: payload.settings,
+          }),
         ),
       setCredential: ({ params, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.setCredential({ connectionId: params.connectionId, secret: payload.secret }),
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.setCredential({
+            connectionId: params.connectionId,
+            secret: payload.secret,
+          }),
         ),
       clearCredential: ({ params }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.clearCredential(params.connectionId),
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.clearCredential(params.connectionId),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (connections) => connections.remove(params.connectionId)),
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.remove(params.connectionId),
+        ),
     });
   }),
 );

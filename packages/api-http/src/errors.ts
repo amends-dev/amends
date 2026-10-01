@@ -1,34 +1,30 @@
 import {
-  AssignmentApplication,
+  AssignmentService,
   Authorization,
   Delegation,
   PermissionCatalog,
 } from "@amends/core/authorization";
 import {
-  InvitationApplication,
-  MemberApplication,
-  OwnershipApplication,
-  WorkspaceSettingsApplication,
+  InvitationService,
+  MemberService,
+  OwnershipService,
+  WorkspaceSettingsService,
 } from "@amends/core/workspace";
 import { GatewayErrors } from "@amends/gateway/errors";
+import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
+import { AgentService } from "@amends/core/agent";
+import { TurnService } from "@amends/core/turn";
+import { ConnectionService } from "@amends/core/connection";
+import { EnvironmentService } from "@amends/core/environment";
+import { NotificationService } from "@amends/core/notification";
+import { ReadStateService } from "@amends/core/read-state";
 import {
-  GroupApplication,
-  GroupFollowApplication,
-  GroupMembershipApplication,
-} from "@amends/core/group";
-import { AgentApplication } from "@amends/core/agent";
-import { TurnApplication } from "@amends/core/turn";
-import { ConnectionApplication } from "@amends/core/connection";
-import { EnvironmentApplication } from "@amends/core/environment";
-import { NotificationApplication } from "@amends/core/notification";
-import { ReadStateApplication } from "@amends/core/attention";
-import {
-  ThreadApplication,
-  ThreadMessageApplication,
-  ThreadParticipationApplication,
+  ThreadService,
+  ThreadMessageService,
+  ThreadParticipationService,
 } from "@amends/core/thread";
 import { Request } from "@amends/core/request";
-import { SignalApplication } from "@amends/core/signal";
+import { SignalService } from "@amends/core/signal";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
 
@@ -54,12 +50,8 @@ export class TooManyStreams extends Schema.TaggedError<TooManyStreams>()(
  * concerns, so the status lives on the contract's view of each error.
  */
 export const NotMember = GatewayErrors.NotMember.pipe(HttpApiSchema.status(403));
-export const WorkspaceChanged = WorkspaceSettingsApplication.Changed.pipe(
-  HttpApiSchema.status(409),
-);
+export const WorkspaceChanged = WorkspaceSettingsService.Changed.pipe(HttpApiSchema.status(409));
 export const WorkspaceNotFound = GatewayErrors.WorkspaceNotFound.pipe(HttpApiSchema.status(404));
-/** The request key was already used for a different request. */
-export const RequestReused = Request.Reused.pipe(HttpApiSchema.status(422));
 /**
  * The request key a creating endpoint accepts: send a new one for each logical request and the
  * same one on every retry of it, and the retry returns the first attempt's result.
@@ -73,32 +65,27 @@ export const InvalidInput = GatewayErrors.InvalidInput.pipe(HttpApiSchema.status
 export const Denied = Authorization.Denied.pipe(HttpApiSchema.status(403));
 export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status(403));
 export const UnknownPermission = PermissionCatalog.Unknown.pipe(HttpApiSchema.status(400));
-export const MemberNotFound = MemberApplication.NotFound.pipe(HttpApiSchema.status(404));
-export const NotificationNotFound = NotificationApplication.NotFound.pipe(
-  HttpApiSchema.status(404),
-);
+export const MemberNotFound = MemberService.NotFound.pipe(HttpApiSchema.status(404));
+export const NotificationNotFound = NotificationService.NotFound.pipe(HttpApiSchema.status(404));
 /** The notification is the caller's, but its source cannot be read now. */
-export const NotificationSourceUnavailable = NotificationApplication.SourceUnavailable.pipe(
+export const NotificationSourceUnavailable = NotificationService.SourceUnavailable.pipe(
   HttpApiSchema.status(404),
 );
 /** Only a person acknowledges a notification; an agent's are handled by its work. */
-export const NotificationHumanRecipientRequired =
-  NotificationApplication.HumanRecipientRequired.pipe(HttpApiSchema.status(403));
-export const NotificationAlreadyHandled = NotificationApplication.AlreadyHandled.pipe(
+export const NotificationHumanRecipientRequired = NotificationService.HumanRecipientRequired.pipe(
+  HttpApiSchema.status(403),
+);
+export const NotificationAlreadyHandled = NotificationService.AlreadyHandled.pipe(
   HttpApiSchema.status(409),
 );
-export const TypingThreadNotFound = SignalApplication.ThreadNotFound.pipe(
-  HttpApiSchema.status(404),
-);
-export const OwnerProtected = MemberApplication.OwnerProtected.pipe(HttpApiSchema.status(409));
-export const AlreadyRemoved = MemberApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409));
-export const InvitationNotFound = InvitationApplication.NotFound.pipe(HttpApiSchema.status(404));
-export const NotRecipient = InvitationApplication.NotRecipient.pipe(HttpApiSchema.status(403));
-export const AlreadyMember = InvitationApplication.AlreadyMember.pipe(HttpApiSchema.status(409));
-export const InvitationUnavailable = InvitationApplication.Unavailable.pipe(
-  HttpApiSchema.status(410),
-);
-export const InvitationInvalidExpiry = InvitationApplication.InvalidExpiry.pipe(
+export const TypingThreadNotFound = SignalService.ThreadNotFound.pipe(HttpApiSchema.status(404));
+export const OwnerProtected = MemberService.OwnerProtected.pipe(HttpApiSchema.status(409));
+export const AlreadyRemoved = MemberService.AlreadyRemoved.pipe(HttpApiSchema.status(409));
+export const InvitationNotFound = InvitationService.NotFound.pipe(HttpApiSchema.status(404));
+export const NotRecipient = InvitationService.NotRecipient.pipe(HttpApiSchema.status(403));
+export const AlreadyMember = InvitationService.AlreadyMember.pipe(HttpApiSchema.status(409));
+export const InvitationUnavailable = InvitationService.Unavailable.pipe(HttpApiSchema.status(410));
+export const InvitationInvalidExpiry = InvitationService.InvalidExpiry.pipe(
   HttpApiSchema.status(400),
 );
 export const delegation = [
@@ -109,17 +96,17 @@ export const delegation = [
 ] as const;
 export const assignment = [
   ...delegation,
-  AssignmentApplication.NotFound.pipe(HttpApiSchema.status(404)),
-  AssignmentApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  AssignmentApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
-  AssignmentApplication.Changed.pipe(HttpApiSchema.status(409)),
+  AssignmentService.NotFound.pipe(HttpApiSchema.status(404)),
+  AssignmentService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  AssignmentService.InactiveMember.pipe(HttpApiSchema.status(409)),
+  AssignmentService.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 export const ownership = [
-  OwnershipApplication.NotOwner.pipe(HttpApiSchema.status(403)),
-  OwnershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  OwnershipApplication.InvalidRecipient.pipe(HttpApiSchema.status(409)),
-  OwnershipApplication.Changed.pipe(HttpApiSchema.status(409)),
+  OwnershipService.NotOwner.pipe(HttpApiSchema.status(403)),
+  OwnershipService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  OwnershipService.InvalidRecipient.pipe(HttpApiSchema.status(409)),
+  OwnershipService.Changed.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /**
@@ -127,29 +114,29 @@ export const ownership = [
  * a named member who cannot take part is a 409, and a fixed direct group refuses changes with 409.
  */
 export const group = [
-  GroupApplication.NotFound.pipe(HttpApiSchema.status(404)),
-  GroupApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  GroupApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
+  GroupService.NotFound.pipe(HttpApiSchema.status(404)),
+  GroupService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  GroupService.InactiveMember.pipe(HttpApiSchema.status(409)),
 ] as const;
 /** A direct group is named by its members and refuses a name with 409. */
-export const NotRenamable = GroupApplication.NotRenamable.pipe(HttpApiSchema.status(409));
+export const NotRenamable = GroupService.NotRenamable.pipe(HttpApiSchema.status(409));
 /** A group renamed since the caller last saw its name refuses another name with 409. */
-export const GroupChanged = GroupApplication.Changed.pipe(HttpApiSchema.status(409));
+export const GroupChanged = GroupService.Changed.pipe(HttpApiSchema.status(409));
 export const groupMembership = [
-  GroupMembershipApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
-  GroupMembershipApplication.MemberNotFound.pipe(HttpApiSchema.status(404)),
-  GroupMembershipApplication.NotFound.pipe(HttpApiSchema.status(404)),
-  GroupMembershipApplication.InactiveMember.pipe(HttpApiSchema.status(409)),
-  GroupMembershipApplication.AlreadyMember.pipe(HttpApiSchema.status(409)),
-  GroupMembershipApplication.AlreadyRemoved.pipe(HttpApiSchema.status(409)),
-  GroupMembershipApplication.FixedMembership.pipe(HttpApiSchema.status(409)),
-  GroupMembershipApplication.GeneralMembership.pipe(HttpApiSchema.status(409)),
+  GroupMembershipService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  GroupMembershipService.MemberNotFound.pipe(HttpApiSchema.status(404)),
+  GroupMembershipService.NotFound.pipe(HttpApiSchema.status(404)),
+  GroupMembershipService.InactiveMember.pipe(HttpApiSchema.status(409)),
+  GroupMembershipService.AlreadyMember.pipe(HttpApiSchema.status(409)),
+  GroupMembershipService.AlreadyRemoved.pipe(HttpApiSchema.status(409)),
+  GroupMembershipService.FixedMembership.pipe(HttpApiSchema.status(409)),
+  GroupMembershipService.GeneralMembership.pipe(HttpApiSchema.status(409)),
 ] as const;
 export const groupFollow = [
-  GroupFollowApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
-  GroupFollowApplication.AgentRequired.pipe(HttpApiSchema.status(403)),
-  GroupFollowApplication.MemberUnavailable.pipe(HttpApiSchema.status(409)),
-  GroupFollowApplication.NotFollowable.pipe(HttpApiSchema.status(409)),
+  GroupFollowService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  GroupFollowService.AgentRequired.pipe(HttpApiSchema.status(403)),
+  GroupFollowService.MemberUnavailable.pipe(HttpApiSchema.status(409)),
+  GroupFollowService.NotFollowable.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /**
@@ -157,93 +144,91 @@ export const groupFollow = [
  * principal writing where only people may is a 403; a named member who cannot take part is a 409.
  */
 export const thread = [
-  ThreadApplication.NotFound.pipe(HttpApiSchema.status(404)),
-  ThreadApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
-  ThreadApplication.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
-  ThreadApplication.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
-  ThreadApplication.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
+  ThreadService.NotFound.pipe(HttpApiSchema.status(404)),
+  ThreadService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  ThreadService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+  ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
 ] as const;
 export const message = [
-  ThreadMessageApplication.NotFound.pipe(HttpApiSchema.status(404)),
-  ThreadMessageApplication.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
-  ThreadMessageApplication.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+  ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404)),
+  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
 export const participation = [
-  ThreadParticipationApplication.ThreadNotFound.pipe(HttpApiSchema.status(404)),
-  ThreadParticipationApplication.NotFound.pipe(HttpApiSchema.status(404)),
-  ThreadParticipationApplication.AlreadyEnded.pipe(HttpApiSchema.status(409)),
-  ThreadParticipationApplication.FixedParticipation.pipe(HttpApiSchema.status(409)),
+  ThreadParticipationService.ThreadNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadParticipationService.NotFound.pipe(HttpApiSchema.status(404)),
+  ThreadParticipationService.AlreadyEnded.pipe(HttpApiSchema.status(409)),
+  ThreadParticipationService.FixedParticipation.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** Read-state outcomes: only people keep it, and a position cannot pass the latest activity. */
 export const readState = [
-  ReadStateApplication.HumanRequired.pipe(HttpApiSchema.status(403)),
-  ReadStateApplication.ThreadNotFound.pipe(HttpApiSchema.status(404)),
-  ReadStateApplication.GroupNotFound.pipe(HttpApiSchema.status(404)),
-  ReadStateApplication.BeyondTimeline.pipe(HttpApiSchema.status(409)),
+  ReadStateService.HumanRequired.pipe(HttpApiSchema.status(403)),
+  ReadStateService.ThreadNotFound.pipe(HttpApiSchema.status(404)),
+  ReadStateService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  ReadStateService.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** A connection the caller may not read answers as missing. */
-export const ConnectionNotFound = ConnectionApplication.NotFound.pipe(HttpApiSchema.status(404));
+export const ConnectionNotFound = ConnectionService.NotFound.pipe(HttpApiSchema.status(404));
 /** A connection renamed since the caller last saw its name refuses another name with 409. */
-export const ConnectionChanged = ConnectionApplication.Changed.pipe(HttpApiSchema.status(409));
+export const ConnectionChanged = ConnectionService.Changed.pipe(HttpApiSchema.status(409));
 /** The implementation is not installed on this host. */
-export const UnknownImplementation = ConnectionApplication.UnknownImplementation.pipe(
+export const UnknownImplementation = ConnectionService.UnknownImplementation.pipe(
   HttpApiSchema.status(422),
 );
 /** The settings are not what the implementation declares. */
-export const InvalidSettings = ConnectionApplication.InvalidSettings.pipe(
-  HttpApiSchema.status(422),
-);
+export const InvalidSettings = ConnectionService.InvalidSettings.pipe(HttpApiSchema.status(422));
 /** The implementation, or the connection, does not authenticate that way. */
-export const UnsupportedAuthentication = ConnectionApplication.UnsupportedAuthentication.pipe(
+export const UnsupportedAuthentication = ConnectionService.UnsupportedAuthentication.pipe(
   HttpApiSchema.status(422),
 );
 /** This host cannot store credentials now. */
-export const CredentialsUnavailable = ConnectionApplication.CredentialsUnavailable.pipe(
+export const CredentialsUnavailable = ConnectionService.CredentialsUnavailable.pipe(
   HttpApiSchema.status(503),
 );
 
 /** An environment the caller may not read answers as missing. */
-export const EnvironmentNotFound = EnvironmentApplication.NotFound.pipe(HttpApiSchema.status(404));
+export const EnvironmentNotFound = EnvironmentService.NotFound.pipe(HttpApiSchema.status(404));
 /** An environment renamed since the caller last saw its name refuses another name with 409. */
-export const EnvironmentChanged = EnvironmentApplication.Changed.pipe(HttpApiSchema.status(409));
+export const EnvironmentChanged = EnvironmentService.Changed.pipe(HttpApiSchema.status(409));
 /** The harness is not installed on this host. */
-export const UnknownHarness = EnvironmentApplication.UnknownHarness.pipe(HttpApiSchema.status(422));
+export const UnknownHarness = EnvironmentService.UnknownHarness.pipe(HttpApiSchema.status(422));
 /** The sandbox provider is not installed on this host. */
-export const UnknownSandboxProvider = EnvironmentApplication.UnknownSandboxProvider.pipe(
+export const UnknownSandboxProvider = EnvironmentService.UnknownSandboxProvider.pipe(
   HttpApiSchema.status(422),
 );
 /** The harness cannot run where the environment asks it to. */
-export const UnsupportedPlacement = EnvironmentApplication.UnsupportedPlacement.pipe(
+export const UnsupportedPlacement = EnvironmentService.UnsupportedPlacement.pipe(
   HttpApiSchema.status(422),
 );
 /** The sandbox settings do not fit the provider, or the environment has no sandbox. */
-export const InvalidSandbox = EnvironmentApplication.InvalidSandbox.pipe(HttpApiSchema.status(422));
+export const InvalidSandbox = EnvironmentService.InvalidSandbox.pipe(HttpApiSchema.status(422));
 
 /** An agent the caller may not read, or whose membership ended, answers as missing. */
-export const AgentNotFound = AgentApplication.NotFound.pipe(HttpApiSchema.status(404));
+export const AgentNotFound = AgentService.NotFound.pipe(HttpApiSchema.status(404));
 /** An agent renamed since the caller last saw its name refuses another name with 409. */
-export const AgentChanged = AgentApplication.Changed.pipe(HttpApiSchema.status(409));
+export const AgentChanged = AgentService.Changed.pipe(HttpApiSchema.status(409));
 /** The agent's connection is gone, or the caller may not read or use it. */
-export const AgentConnectionUnavailable = AgentApplication.ConnectionUnavailable.pipe(
+export const AgentConnectionUnavailable = AgentService.ConnectionUnavailable.pipe(
   HttpApiSchema.status(422),
 );
 /** The agent's environment is gone, or the caller may not read or use it. */
-export const AgentEnvironmentUnavailable = AgentApplication.EnvironmentUnavailable.pipe(
+export const AgentEnvironmentUnavailable = AgentService.EnvironmentUnavailable.pipe(
   HttpApiSchema.status(422),
 );
 /** The environment cannot run the model access, for the reasons given. */
-export const AgentIncompatible = AgentApplication.Incompatible.pipe(HttpApiSchema.status(422));
+export const AgentIncompatible = AgentService.Incompatible.pipe(HttpApiSchema.status(422));
 
 /** A turn the caller may not read, because its thread is closed to them, answers as missing. */
-export const TurnNotFound = TurnApplication.NotFound.pipe(HttpApiSchema.status(404));
+export const TurnNotFound = TurnService.NotFound.pipe(HttpApiSchema.status(404));
 /** A thread the caller may not open answers as missing. */
-export const TurnThreadNotFound = TurnApplication.ThreadNotFound.pipe(HttpApiSchema.status(404));
+export const TurnThreadNotFound = TurnService.ThreadNotFound.pipe(HttpApiSchema.status(404));
 /** The turn has already finished, so there is nothing to stop. */
-export const TurnNotActive = TurnApplication.NotActive.pipe(HttpApiSchema.status(409));
+export const TurnNotActive = TurnService.NotActive.pipe(HttpApiSchema.status(409));
 /** The turn can't run again, for the reason given. */
-export const TurnNotRetryable = TurnApplication.NotRetryable.pipe(HttpApiSchema.status(409));
+export const TurnNotRetryable = TurnService.NotRetryable.pipe(HttpApiSchema.status(409));
 
 /** Outcomes every operation in a workspace shares: authorization, input, and storage. */
 export const workspace = [

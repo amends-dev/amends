@@ -48,7 +48,7 @@ export class GroupsGroup extends HttpApiGroup.make("groups")
       success: Group.Record.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "CreatedGroup",
       }),
-      error: [...ApiErrors.member, ...ApiErrors.group, ApiErrors.RequestReused],
+      error: [...ApiErrors.member, ...ApiErrors.group],
     }),
     HttpApiEndpoint.post("rename", "/:groupId/rename", {
       params: group,

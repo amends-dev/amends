@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { DateTime, Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
-import type { WorkspaceId } from "../../workspace/id.ts";
+
 import type { GroupId } from "../id.ts";
 import type { GroupMembership } from "../membership/membership.ts";
 import type { GroupFollow } from "./follow.ts";
@@ -17,7 +17,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupFollowStore.C
 
 /** Projection storage for group follows. Reads honor the caller transaction; writes require it. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: GroupFollow.Id) => Effect.Effect<Option.Option<GroupFollow.Record>, Failure>;
   /** The active follow of one group admission; None when that admission follows nothing. */
   readonly findActive: (

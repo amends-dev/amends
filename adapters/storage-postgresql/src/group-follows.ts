@@ -24,7 +24,6 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(groupFollows.workspaceId, workspaceId);
   return GroupFollowStore.Service.of({
-    workspaceId,
     get: Effect.fn("GroupFollows.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(GroupFollow.Id)(input);

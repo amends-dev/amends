@@ -4,20 +4,15 @@ import { AgentPermissions } from "@amends/core/agent";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
 import {
   Group,
-  GroupApplication,
+  GroupService,
   GroupFollow,
-  GroupFollowApplication,
-  GroupMembershipApplication,
+  GroupFollowService,
+  GroupMembershipService,
   GroupPermissions,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Log, Publication } from "@amends/core/journal";
-import {
-  Thread,
-  ThreadApplication,
-  ThreadParticipation,
-  ThreadPermissions,
-} from "@amends/core/thread";
+import { Thread, ThreadService, ThreadParticipation, ThreadPermissions } from "@amends/core/thread";
 import { Member, MemberFacts } from "@amends/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import {
@@ -50,17 +45,21 @@ export const groupFollows = (harness: Harness) => {
       program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
     const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
     const follow = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupFollowApplication.Service, (s) => s.follow({ groupId, memberId }));
+      Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+        groupFollowService.follow({ groupId, memberId }),
+      );
     const unfollow = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupFollowApplication.Service, (s) => s.unfollow({ groupId, memberId }));
+      Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+        groupFollowService.unfollow({ groupId, memberId }),
+      );
     const post = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startInGroup({ groupId, text: "Update", mentions }),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startInGroup({ groupId, text: "Update", mentions }),
       );
     const participantsOf = (bound: Bound, started: Thread.Started) =>
       Effect.map(bound.participations.listByThread(started.thread.id), (records) =>
@@ -116,8 +115,8 @@ export const groupFollows = (harness: Harness) => {
       const team = yield* run(
         bound,
         owner,
-        Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createTeam({
+        Effect.flatMap(GroupService.Service, (groupService) =>
+          groupService.createTeam({
             name: "Team",
             memberIds: [owner.memberId, humanId, plainId, agentId],
           }),
@@ -195,7 +194,7 @@ export const groupFollows = (harness: Harness) => {
               const plain = actorFor(plainId);
               const before = yield* history(bound);
               expect(yield* Effect.flip(run(bound, owner, follow(team.id, humanId)))).toEqual(
-                new GroupFollowApplication.AgentRequired({ memberId: humanId }),
+                new GroupFollowService.AgentRequired({ memberId: humanId }),
               );
               expect(yield* Effect.flip(run(bound, plain, follow(team.id, agentId)))).toMatchObject(
                 {
@@ -204,7 +203,7 @@ export const groupFollows = (harness: Harness) => {
                 },
               );
               expect(yield* Effect.flip(run(bound, owner, follow(team.id, outsiderId)))).toEqual(
-                new GroupFollowApplication.MemberUnavailable({ memberId: outsiderId }),
+                new GroupFollowService.MemberUnavailable({ memberId: outsiderId }),
               );
               expect(yield* history(bound)).toEqual(before);
               yield* run(bound, owner, follow(team.id, agentId));
@@ -248,21 +247,23 @@ export const groupFollows = (harness: Harness) => {
               });
               expect(
                 yield* Effect.flip(run(bound, actorFor(outsiderId), follow(team.id, outsiderId))),
-              ).toEqual(new GroupFollowApplication.GroupNotFound({ groupId: team.id }));
+              ).toEqual(new GroupFollowService.GroupNotFound({ groupId: team.id }));
               const direct = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.startDirect({ memberIds: [humanId], text: "Hello", mentions: [] }),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.startDirect({
+                    memberIds: [humanId],
+                    text: "Hello",
+                    mentions: [],
+                  }),
                 ),
               );
               expect(
                 yield* Effect.flip(
                   run(bound, owner, follow(direct.thread.groupId, owner.memberId)),
                 ),
-              ).toEqual(
-                new GroupFollowApplication.NotFollowable({ groupId: direct.thread.groupId }),
-              );
+              ).toEqual(new GroupFollowService.NotFollowable({ groupId: direct.thread.groupId }));
               // Leaving the group ends the follow; joining again does not restore it.
               yield* run(bound, human, follow(team.id, humanId));
               const admission = Option.getOrThrow(
@@ -274,8 +275,11 @@ export const groupFollows = (harness: Harness) => {
               yield* run(
                 bound,
                 human,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.leave({ groupId: team.id, membershipId: admission.id }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.leave({
+                    groupId: team.id,
+                    membershipId: admission.id,
+                  }),
                 ),
               );
               expect(yield* bound.groupFollows.get(followed.id)).toMatchObject({
@@ -284,8 +288,8 @@ export const groupFollows = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.add({ groupId: team.id, memberId: humanId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: team.id, memberId: humanId }),
                 ),
               );
               expect(yield* participantsOf(bound, yield* run(bound, owner, post(team.id)))).toEqual(

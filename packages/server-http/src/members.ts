@@ -1,5 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
-import { MemberApplication } from "@amends/core/workspace";
+import { MemberService } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -20,7 +20,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.list),
+            Effect.flatMap(MemberService.Service, (memberService) => memberService.list),
           ),
         ),
       get: ({ params }) =>
@@ -28,7 +28,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.get(params.memberId)),
+            Effect.flatMap(MemberService.Service, (memberService) =>
+              memberService.get(params.memberId),
+            ),
           ),
         ),
       rename: ({ params, payload }) =>
@@ -36,7 +38,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.rename(payload.name)),
+            Effect.flatMap(MemberService.Service, (memberService) =>
+              memberService.rename(payload.name),
+            ),
           ),
         ),
       remove: ({ params }) =>
@@ -44,7 +48,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.remove(params.memberId)),
+            Effect.flatMap(MemberService.Service, (memberService) =>
+              memberService.remove(params.memberId),
+            ),
           ),
         ),
     });

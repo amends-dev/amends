@@ -18,7 +18,6 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
     return records.filter((record) => record.threadId === threadId).toSorted(bySequence);
   });
   return ThreadActivityStore.Service.of({
-    workspaceId,
     get: Effect.fn("ThreadActivities.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(ThreadActivity.Id)(input);

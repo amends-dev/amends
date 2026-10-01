@@ -2,7 +2,7 @@ import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
 import type { Member } from "../../workspace/member/member.ts";
-import type { Workspace } from "../../workspace/workspace.ts";
+
 import type { Assignment } from "./assignment.ts";
 import type { Role } from "../role/role.ts";
 
@@ -27,11 +27,9 @@ export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Co
  * inserts and revocations. Enforce constraints atomically across concurrent writers.
  * Reject expired or foreign transaction handles and never retry the program internally.
  * Membership, role ownership, permission compatibility, and grant authority are
- * checked by application services before publication.
+ * checked by services before publication.
  */
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
-
   /** Find an active or revoked assignment in this workspace; None if absent. */
   readonly get: (
     assignmentId: Assignment.Id,

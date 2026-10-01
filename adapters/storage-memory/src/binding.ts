@@ -73,8 +73,8 @@ export class Service extends Context.Service<Service, Interface>()(
  * @category constructors
  */
 export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.Id) {
-  const connection = yield* MemoryConnection.Service;
-  const { database, gate } = connection;
+  const memoryConnection = yield* MemoryConnection.Service;
+  const { database, gate } = memoryConnection;
 
   /** The caller's live transaction here, None outside any, or a failure for any other. */
   const session = Effect.gen(function* () {
@@ -85,7 +85,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
       Option.isNone(current) ||
       Option.isNone(native) ||
       !current.value.active ||
-      current.value.connection !== connection ||
+      current.value.connection !== memoryConnection ||
       current.value.workspaceId !== workspaceId ||
       current.value.commit.id !== native.value.id
     )
@@ -123,7 +123,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
         message: "Another host is writing this workspace",
       });
     }
-    database.writers.set(workspaceId, connection);
+    database.writers.set(workspaceId, memoryConnection);
   });
   const release = Effect.suspend(() => {
     database.writers.delete(workspaceId);
@@ -166,7 +166,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
         // This host's writers wait for each other; another host's writer is contention.
         if (exclusive) yield* acquire(restore);
         const state: TransactionState = {
-          connection,
+          connection: memoryConnection,
           workspaceId,
           active: true,
           commit: {
@@ -206,7 +206,15 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
     );
   });
 
-  return Service.of({ workspaceId, connection, read, write, join, exclusive, transaction });
+  return Service.of({
+    workspaceId,
+    connection: memoryConnection,
+    read,
+    write,
+    join,
+    exclusive,
+    transaction,
+  });
 });
 
 /**

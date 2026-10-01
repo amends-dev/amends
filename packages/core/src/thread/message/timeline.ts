@@ -21,47 +21,30 @@ declare module "../activity/kind.ts" {
   }
 }
 
-const invalid = (message: string) => new ThreadActivityResolvers.InvalidResponse({ message });
-
 /** Resolve message publications with one read of their messages. @category constructors */
 export const resolver = Effect.gen(function* () {
-  const messages = yield* ThreadMessageStore.Service;
-  const workspaceId = messages.workspaceId;
+  const threadMessageStore = yield* ThreadMessageStore.Service;
   const resolve = Effect.fn("ThreadMessageTimeline.resolve")(function* (
-    thread: Thread.Record,
+    _thread: Thread.Record,
     listed: ReadonlyArray<ThreadActivity.Record>,
   ) {
-    const activities = yield* Effect.forEach(listed, (activity) =>
-      ThreadActivityKind.decode(ThreadMessageActivity.Published, activity).pipe(
-        Effect.mapError((cause) => invalid(`Invalid message activity: ${cause.message}`)),
+    const activities = yield* Effect.orDie(
+      Effect.forEach(listed, (activity) =>
+        ThreadActivityKind.decode(ThreadMessageActivity.Published, activity),
       ),
     );
-    const ids = new Set(activities.map((activity) => activity.details.messageId));
-    const found = new Map<ThreadMessage.Id, ThreadMessage.Record>();
-    const rows = yield* messages
-      .getMany([...ids])
+    const rows = yield* threadMessageStore
+      .getMany([...new Set(activities.map((activity) => activity.details.messageId))])
       .pipe(Effect.mapError((cause) => new ThreadActivityResolvers.Failure({ cause })));
-    for (const row of rows) {
-      const message = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.Record))(row).pipe(
-        Effect.mapError((cause) =>
-          invalid(`Thread storage returned invalid data: ${cause.message}`),
-        ),
-      );
-      if (!ids.has(message.id) || found.has(message.id))
-        return yield* invalid("Message store returned another message, thread, or workspace");
-      found.set(message.id, message);
-    }
+    const found = new Map(rows.map((message) => [message.id, message] as const));
     return yield* Effect.forEach(activities, (activity) => {
       const message = found.get(activity.details.messageId);
-      if (message === undefined)
-        return Effect.fail(invalid("Timeline activity references a missing message"));
-      if (message.workspaceId !== workspaceId || message.threadId !== thread.id)
-        return Effect.fail(invalid("Message store returned another message, thread, or workspace"));
-      return Effect.succeed({ activity, message } satisfies Item);
+      return message === undefined
+        ? Effect.die("A timeline activity's message is missing")
+        : Effect.succeed({ activity, message } satisfies Item);
     });
   });
   return {
-    workspaceId,
     kinds: [ThreadMessageActivity.Published],
     resolve,
   } satisfies ThreadActivityResolvers.Resolver;

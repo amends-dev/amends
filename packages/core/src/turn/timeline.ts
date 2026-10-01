@@ -3,7 +3,6 @@ import type { Thread } from "../thread/thread.ts";
 import type { ThreadActivity } from "../thread/activity/activity.ts";
 import { ThreadActivityKind } from "../thread/activity/kind.ts";
 import { ThreadActivityResolvers } from "../thread/activity/resolvers.ts";
-import { ThreadStore } from "../thread/store.ts";
 import { TurnActivity } from "./activity.ts";
 
 /** A turn accepted here: where its row shows. */
@@ -32,40 +31,37 @@ declare module "../thread/activity/kind.ts" {
   }
 }
 
-const invalid = (message: string) => new ThreadActivityResolvers.InvalidResponse({ message });
-
 /**
  * Turn activity carries everything its items show, so resolving it reads nothing more: a thread
  * shows each turn where it began, as its later activity says it went.
  *
  * @category constructors
  */
-export const resolver = Effect.gen(function* () {
-  const threads = yield* ThreadStore.Service;
-  const resolve = Effect.fn("TurnTimeline.resolve")(function* (
+export const resolver = Effect.succeed({
+  kinds: [TurnActivity.Created, TurnActivity.Started, TurnActivity.Stopping, TurnActivity.Ended],
+  resolve: Effect.fn("TurnTimeline.resolve")(function* (
     _thread: Thread.Record,
     listed: ReadonlyArray<ThreadActivity.Record>,
   ) {
-    return yield* Effect.forEach(listed, (activity) =>
-      Effect.gen(function* (): Effect.fn.Return<
-        ThreadActivityKind.Item,
-        ThreadActivityKind.Mismatch | Schema.SchemaError
-      > {
-        if (ThreadActivityKind.is(TurnActivity.Created)(activity))
-          return { activity: yield* ThreadActivityKind.decode(TurnActivity.Created, activity) };
-        if (ThreadActivityKind.is(TurnActivity.Started)(activity))
-          return { activity: yield* ThreadActivityKind.decode(TurnActivity.Started, activity) };
-        if (ThreadActivityKind.is(TurnActivity.Stopping)(activity))
-          return { activity: yield* ThreadActivityKind.decode(TurnActivity.Stopping, activity) };
-        return { activity: yield* ThreadActivityKind.decode(TurnActivity.Ended, activity) };
-      }).pipe(Effect.mapError((cause) => invalid(`Invalid turn activity: ${cause.message}`))),
+    return yield* Effect.orDie(
+      Effect.forEach(listed, (activity) =>
+        Effect.gen(function* (): Effect.fn.Return<
+          ThreadActivityKind.Item,
+          ThreadActivityKind.Mismatch | Schema.SchemaError
+        > {
+          if (ThreadActivityKind.is(TurnActivity.Created)(activity))
+            return { activity: yield* ThreadActivityKind.decode(TurnActivity.Created, activity) };
+          if (ThreadActivityKind.is(TurnActivity.Started)(activity))
+            return { activity: yield* ThreadActivityKind.decode(TurnActivity.Started, activity) };
+          if (ThreadActivityKind.is(TurnActivity.Stopping)(activity))
+            return {
+              activity: yield* ThreadActivityKind.decode(TurnActivity.Stopping, activity),
+            };
+          return { activity: yield* ThreadActivityKind.decode(TurnActivity.Ended, activity) };
+        }),
+      ),
     );
-  });
-  return {
-    workspaceId: threads.workspaceId,
-    kinds: [TurnActivity.Created, TurnActivity.Started, TurnActivity.Stopping, TurnActivity.Ended],
-    resolve,
-  } satisfies ThreadActivityResolvers.Resolver;
-});
+  }),
+} satisfies ThreadActivityResolvers.Resolver);
 
 export * as TurnTimeline from "./timeline.ts";

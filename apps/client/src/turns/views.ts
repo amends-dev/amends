@@ -9,7 +9,6 @@ import { writing } from "../api/drafts.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import {
   activeTurnsRead,
-  newTurnRequestKey,
   turnRead,
   turnProblem,
   turnsRequest,
@@ -182,8 +181,9 @@ const commandProblem = (
 };
 
 /**
- * Stop and retry a thread's turns. A retry that failed in transit asks again with the same key,
- * so it creates one turn; a refusal refreshes what the reader sees, as the turn changed meanwhile.
+ * Stop and retry a thread's turns. A turn is retried at most once, so a retry that failed in
+ * transit can simply ask again; a refusal refreshes what the reader sees, as the turn changed
+ * meanwhile.
  */
 function useControls(
   workspaceId: string,
@@ -199,14 +199,10 @@ function useControls(
     { readonly kind: "stop" | "retry"; readonly turnId: string } | undefined
   >();
   const [problem, setProblem] = createSignal<ReturnType<TurnControls["problem"]>>();
-  const keys = new Map<string, ReturnType<typeof newTurnRequestKey>>();
   const request = useRequest(turnsRequest(client, workspaceId, threadId), (exit, command) => {
     setActing(undefined);
     if (Exit.isSuccess(exit)) {
-      if (command.kind === "retry") {
-        keys.delete(command.turnId);
-        options.retried?.(exit.value.id);
-      }
+      if (command.kind === "retry") options.retried?.(exit.value.id);
       return;
     }
     setProblem({
@@ -216,14 +212,7 @@ function useControls(
     options.refresh();
   });
   const start = (kind: "stop" | "retry", turnId: string) => {
-    const key = keys.get(turnId) ?? newTurnRequestKey();
-    const started = request.run(
-      kind === "stop"
-        ? { kind, turnId, log: options.log }
-        : { kind, turnId, key, log: options.log },
-    );
-    if (!started) return false;
-    if (kind === "retry") keys.set(turnId, key);
+    if (!request.run({ kind, turnId, log: options.log })) return false;
     setProblem(undefined);
     setActing({ kind, turnId });
     return true;
@@ -332,10 +321,21 @@ export function useTurnLog(
   const environments = useRead(setup?.environments);
   const live = useLiveStatus();
   const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
+  const failure = (): WorkspaceFailure | undefined => {
+    const connection = feed()?.connection;
+    return (
+      read.failure() ?? (connection === "gone" || connection === "denied" ? connection : undefined)
+    );
+  };
+  /** The turn left the reader's reach: none of it shows, however recently it did. */
+  const lost = () => {
+    const current = failure();
+    return current === "gone" || current === "denied";
+  };
 
   const turn = createMemo((): TurnDetail | undefined => {
     const view = read.value();
-    if (view === undefined) return undefined;
+    if (view === undefined || lost()) return undefined;
     const entry = entryOf(view);
     const selection = view.selection;
     const connection = connections.value()?.find((item) => item.id === selection?.connectionId);
@@ -427,8 +427,8 @@ export function useTurnLog(
     turn,
     activity,
     draft,
-    loading: () => read.loading() || (feed()?.items === undefined && feed()?.connection !== "gone"),
-    failure: () => read.failure() ?? (feed()?.connection === "gone" ? "gone" : undefined),
+    loading: () => !lost() && (read.loading() || feed()?.items === undefined),
+    failure,
     reconnecting: () => live() !== undefined || followingDown(),
     updatedAt: () => feed()?.updatedAt,
     refresh: () => {

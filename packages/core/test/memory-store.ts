@@ -326,7 +326,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
     if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
       return yield* new Store.Failure({ operation: "append", cause: "inside a transaction" });
     return yield* commitWith(
-      Effect.flatMap(Store.Transaction, (native) => native.append(request)),
+      Effect.flatMap(Store.Transaction, (storeTransaction) => storeTransaction.append(request)),
       standalone,
     );
   });
@@ -396,13 +396,13 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
 
   const counter = Counter.of({
     add: Effect.fn("JournalTest.counter.add")(function* (amount) {
-      const native = yield* Store.Transaction;
+      const storeTransaction = yield* Store.Transaction;
       const current = yield* Effect.serviceOption(Current);
       if (
         Option.isNone(current) ||
         current.value.owner !== owner ||
         !current.value.active ||
-        native.id !== current.value.commit.id
+        storeTransaction.id !== current.value.commit.id
       ) {
         return yield* new Store.Failure({ operation: "counter.add", cause: "missing transaction" });
       }
@@ -423,13 +423,13 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       );
     }),
     set: Effect.fn("JournalTest.checkpoint.set")(function* (key, cursor) {
-      const native = yield* Store.Transaction;
+      const storeTransaction = yield* Store.Transaction;
       const current = yield* Effect.serviceOption(Current);
       if (
         Option.isNone(current) ||
         current.value.owner !== owner ||
         !current.value.active ||
-        native.id !== current.value.commit.id
+        storeTransaction.id !== current.value.commit.id
       ) {
         return yield* new Store.Failure({
           operation: "checkpoint.set",
@@ -447,13 +447,13 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       return ((yield* view).live.get(logId) ?? []).map(({ name, version }) => ({ name, version }));
     }),
     setLive: Effect.fn("JournalTest.checkpoint.setLive")(function* (logId, input) {
-      const native = yield* Store.Transaction;
+      const storeTransaction = yield* Store.Transaction;
       const current = yield* Effect.serviceOption(Current);
       if (
         Option.isNone(current) ||
         current.value.owner !== owner ||
         !current.value.active ||
-        native.id !== current.value.commit.id
+        storeTransaction.id !== current.value.commit.id
       ) {
         return yield* new Store.Failure({
           operation: "checkpoint.setLive",
@@ -474,13 +474,13 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
   });
 
   const memberState = Effect.fnUntraced(function* (operation: string) {
-    const native = yield* Store.Transaction;
+    const storeTransaction = yield* Store.Transaction;
     const current = yield* Effect.serviceOption(Current);
     if (
       Option.isNone(current) ||
       current.value.owner !== owner ||
       !current.value.active ||
-      native.id !== current.value.commit.id
+      storeTransaction.id !== current.value.commit.id
     )
       return yield* new MemberStore.Failure({ operation, cause: "missing transaction" });
     return current.value.state;
@@ -488,7 +488,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
   const members = (workspaceId: Workspace.Id): MemberStore.Interface => {
     const keyOf = (id: Member.Id) => JSON.stringify([workspaceId, id]);
     return MemberStore.Service.of({
-      workspaceId,
       get: Effect.fn("JournalTest.members.get")(function* (id) {
         return Option.map(
           Option.fromUndefinedOr((yield* view).members.get(keyOf(id))),
@@ -612,7 +611,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       );
     });
     return RoleStore.Service.of({
-      workspaceId,
       get: Effect.fn("JournalTest.roles.get")(function* (id) {
         return Option.map(
           Option.fromUndefinedOr((yield* read("get")).roles.get(keyOf(id))),
@@ -696,7 +694,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       );
     });
     return AssignmentStore.Service.of({
-      workspaceId,
       get: Effect.fn("JournalTest.assignments.get")(function* (id) {
         return Option.map(
           Option.fromUndefinedOr((yield* read("get")).assignments.get(keyOf(id))),

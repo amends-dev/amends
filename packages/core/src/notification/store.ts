@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { DateTime, Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import { Notification } from "./notification.ts";
 import type { GroupId } from "../group/id.ts";
 import type { MemberId } from "../workspace/member/id.ts";
@@ -59,8 +59,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * counts leave it out.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
-
   /** Find a notification in this workspace; None if absent. */
   readonly get: (id: Notification.Id) => Effect.Effect<Option.Option<Notification.Record>, Failure>;
 

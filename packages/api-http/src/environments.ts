@@ -48,7 +48,6 @@ export class EnvironmentsGroup extends HttpApiGroup.make("environments")
         ApiErrors.UnknownSandboxProvider,
         ApiErrors.UnsupportedPlacement,
         ApiErrors.InvalidSandbox,
-        ApiErrors.RequestReused,
       ],
     }),
     HttpApiEndpoint.get("get", "/:environmentId", {

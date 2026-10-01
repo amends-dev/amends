@@ -103,11 +103,11 @@ interface Follower {
 }
 
 /** How long the follower waits before following again after its reads failed this many times. */
-const backoff = (failures: number) =>
+const backoffAfter = (failures: number) =>
   Duration.millis(Math.min(5_000, 100 * 2 ** Math.min(failures - 1, 6)));
 
-const unavailable = () => new ChangeFeed.Unavailable({});
-const readable = (delivery: Prepared) => delivery.unreadable.length === 0;
+const toUnavailable = () => new ChangeFeed.Unavailable({});
+const isReadable = (delivery: Prepared) => delivery.unreadable.length === 0;
 
 /**
  * Share one follower of the workspace journal among this runtime's subscribers. It starts with
@@ -124,21 +124,21 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
   const { capacity, replayLimit, pageSize } = yield* Schema.decodeEffect(Options)(input);
   const log = (yield* Journal.Service).log;
 
-  const prepare = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
+  const prepareBatch = Effect.fnUntraced(function* (batch: Log.Batch<Event.Envelope>) {
     const events: Array<ChangeFeedEvents.Prepared> = [];
     const unreadable: Array<Unreadable> = [];
     for (const entry of batch.entries) {
-      const skip = (reason: Unreadable["reason"]) =>
+      const skipUnreadable = (reason: Unreadable["reason"]) =>
         Effect.sync(() => {
           const { name, version } = entry.payload;
           unreadable.push({ name, version, reason });
           return Option.none<ChangeFeedEvents.Prepared>();
         });
       const prepared = yield* ChangeFeedEvents.prepare(entry).pipe(
-        Effect.catchTag("ChangeFeedEvents.UnknownVersion", () => skip("unknown-version")),
+        Effect.catchTag("ChangeFeedEvents.UnknownVersion", () => skipUnreadable("unknown-version")),
         Effect.catchTags({
-          SchemaError: () => skip("undecodable"),
-          "Journal.FactMismatch": () => skip("undecodable"),
+          SchemaError: () => skipUnreadable("undecodable"),
+          "Journal.FactMismatch": () => skipUnreadable("undecodable"),
         }),
       );
       if (Option.isSome(prepared)) events.push(prepared.value);
@@ -151,7 +151,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     } satisfies Prepared;
   });
 
-  const follow = Effect.gen(function* () {
+  const startFollower = Effect.gen(function* () {
     const hub = yield* PubSub.sliding<Item>(capacity);
     yield* Effect.addFinalizer(() => PubSub.shutdown(hub));
     const gate = yield* Semaphore.make(1);
@@ -161,7 +161,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
       position: yield* log.head,
     };
     // A commit this host cannot read ends its subscribers' streams, but the follower continues.
-    const pass = Stream.suspend(() =>
+    const tailAndPublish = Stream.suspend(() =>
       log.tail(
         Option.match(state.position, {
           onNone: () => ({ limit: pageSize }),
@@ -169,9 +169,9 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         }),
       ),
     ).pipe(
-      Stream.mapEffect(prepare),
+      Stream.mapEffect(prepareBatch),
       Stream.tap((delivery) =>
-        readable(delivery)
+        isReadable(delivery)
           ? Effect.void
           : Effect.logWarning("Change feed met a commit this host cannot read", {
               position: delivery.position,
@@ -188,19 +188,19 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         ),
       ),
     );
-    const following = Effect.gen(function* () {
+    const followWithRetries = Effect.gen(function* () {
       let failures = 0;
       while (true) {
         const delivered = state.sequence;
-        const exit = yield* Effect.exit(pass);
+        const exit = yield* Effect.exit(tailAndPublish);
         if (Exit.isSuccess(exit) || Cause.hasInterruptsOnly(exit.cause)) return;
         // Reads that delivered something before failing start the backoff over.
         failures = state.sequence === delivered ? failures + 1 : 1;
         yield* Effect.logWarning("Change feed follower failed; following again", exit.cause);
-        yield* Effect.sleep(backoff(failures));
+        yield* Effect.sleep(backoffAfter(failures));
       }
     });
-    yield* following.pipe(
+    yield* followWithRetries.pipe(
       Effect.ensuring(
         gate.withPermits(1)(
           Effect.suspend(() => {
@@ -213,12 +213,12 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     );
     return { hub, gate, state } satisfies Follower;
   });
-  const followers = yield* RcRef.make({ acquire: follow });
+  const followers = yield* RcRef.make({ acquire: startFollower });
 
   const subscribe = Effect.fn("ChangeFeedSource.subscribe")(function* (
     after: Option.Option<Entry.Position>,
   ) {
-    const follower = yield* RcRef.get(followers).pipe(Effect.mapError(unavailable));
+    const follower = yield* RcRef.get(followers).pipe(Effect.mapError(toUnavailable));
     const registered = yield* follower.gate.withPermits(1)(
       Effect.gen(function* () {
         if (follower.state.stopped) return Option.none();
@@ -227,10 +227,10 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
       }),
     );
     // A follower stops only as its runtime closes, so there is no other to follow instead.
-    if (Option.isNone(registered)) return yield* unavailable();
+    if (Option.isNone(registered)) return yield* toUnavailable();
     const { subscription } = registered.value;
     let expected = registered.value.expected;
-    const head = yield* log.head.pipe(Effect.mapError(unavailable));
+    const head = yield* log.head.pipe(Effect.mapError(toUnavailable));
 
     let reset = true;
     let from = head;
@@ -238,9 +238,9 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     if (Option.isSome(after) && Option.isSome(head) && after.value <= head.value) {
       const page = yield* log
         .read({ after: after.value, limit: replayLimit + 1 })
-        .pipe(Effect.flatMap(Effect.forEach(prepare)), Effect.mapError(unavailable));
+        .pipe(Effect.flatMap(Effect.forEach(prepareBatch)), Effect.mapError(toUnavailable));
       // Resuming across a commit this host cannot read would hide what it changed.
-      if (page.length <= replayLimit && page.every(readable)) {
+      if (page.length <= replayLimit && page.every(isReadable)) {
         reset = false;
         from = after;
         history = page;
@@ -249,8 +249,8 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
 
     // Deliveries at or before the last one sent were already covered by history or the head.
     let last = history.at(-1)?.position ?? Option.getOrUndefined(from);
-    const fresh = (delivery: Prepared) => last === undefined || delivery.position > last;
-    const sent = (delivery: Prepared) =>
+    const isFresh = (delivery: Prepared) => last === undefined || delivery.position > last;
+    const markSent = (delivery: Prepared) =>
       Effect.sync(() => {
         last = delivery.position;
       });
@@ -258,18 +258,20 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     const catchUp = Stream.suspend(() =>
       log.stream({ ...(last === undefined ? {} : { after: last }), limit: pageSize }),
     ).pipe(
-      Stream.mapEffect(prepare),
-      Stream.filter(fresh),
-      Stream.tap(sent),
-      Stream.mapError(unavailable),
+      Stream.mapEffect(prepareBatch),
+      Stream.filter(isFresh),
+      Stream.tap(markSent),
+      Stream.mapError(toUnavailable),
     );
     const live = Stream.fromEffectRepeat(PubSub.take(subscription)).pipe(
       Stream.flatMap((item): Stream.Stream<Prepared, ChangeFeed.Unavailable> => {
-        if (item._tag === "Stopped") return Stream.fail(unavailable());
+        if (item._tag === "Stopped") return Stream.fail(toUnavailable());
         const lagged = item.sequence !== expected;
         expected = item.sequence + 1n;
         const current = Stream.suspend(() =>
-          fresh(item.delivery) ? Stream.make(item.delivery).pipe(Stream.tap(sent)) : Stream.empty,
+          isFresh(item.delivery)
+            ? Stream.make(item.delivery).pipe(Stream.tap(markSent))
+            : Stream.empty,
         );
         return lagged ? Stream.concat(catchUp, current) : current;
       }),
@@ -282,9 +284,9 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         // The subscriber reconnects from its last cursor, where this commit makes it reset.
         Stream.mapEffect(
           ({ unreadable, ...delivery }): Effect.Effect<Delivery, ChangeFeed.Unavailable> =>
-            unreadable.length === 0 ? Effect.succeed(delivery) : Effect.fail(unavailable()),
+            unreadable.length === 0 ? Effect.succeed(delivery) : Effect.fail(toUnavailable()),
         ),
-        Stream.mapError(unavailable),
+        Stream.mapError(toUnavailable),
       ),
     } satisfies Subscription;
   });

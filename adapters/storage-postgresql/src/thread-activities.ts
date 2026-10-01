@@ -24,7 +24,6 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(threadActivities.workspaceId, workspaceId);
   return ThreadActivityStore.Service.of({
-    workspaceId,
     get: Effect.fn("ThreadActivities.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(ThreadActivity.Id)(input);

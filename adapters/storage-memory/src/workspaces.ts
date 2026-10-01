@@ -18,7 +18,6 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   const writable = (operation: string) =>
     write.pipe(Effect.mapError(storeFailure(WorkspaceStore, operation)));
   return WorkspaceStore.Service.of({
-    workspaceId,
     get: Effect.flatMap(read, (space) => rows.get(space.records.workspace, workspaceId)).pipe(
       Effect.mapError(storeFailure(WorkspaceStore, "get")),
     ),

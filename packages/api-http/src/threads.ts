@@ -6,7 +6,7 @@ import {
   ThreadParticipation,
   ThreadTimeline,
 } from "@amends/core/thread";
-import { ReadState } from "@amends/core/attention";
+import { ReadState } from "@amends/core/read-state";
 import { Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
@@ -62,14 +62,14 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       headers: ApiErrors.requestKey,
       payload: reply,
       success: started,
-      error: [...ApiErrors.member, ...ApiErrors.thread, ApiErrors.RequestReused],
+      error: [...ApiErrors.member, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.post("startDirect", "/threads", {
       params: { workspaceId: Workspace.Id },
       headers: ApiErrors.requestKey,
       payload: Thread.StartDirectInput,
       success: started,
-      error: [...ApiErrors.member, ...ApiErrors.thread, ApiErrors.RequestReused],
+      error: [...ApiErrors.member, ...ApiErrors.thread],
     }),
     HttpApiEndpoint.get("get", "/threads/:threadId", {
       params: thread,
@@ -102,10 +102,10 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
       params: thread,
       headers: ApiErrors.requestKey,
       payload: reply,
-      success: ThreadMessage.Published.pipe(HttpApiSchema.status(201)).annotate({
+      success: ThreadMessage.Record.pipe(HttpApiSchema.status(201)).annotate({
         identifier: "PublishedMessage",
       }),
-      error: [...ApiErrors.member, ...ApiErrors.message, ApiErrors.RequestReused],
+      error: [...ApiErrors.member, ...ApiErrors.message],
     }),
     HttpApiEndpoint.post("follow", "/threads/:threadId/follow", {
       params: thread,

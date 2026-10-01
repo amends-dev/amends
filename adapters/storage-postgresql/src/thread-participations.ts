@@ -78,7 +78,6 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(threadParticipations.workspaceId, workspaceId);
   return ThreadParticipationStore.Service.of({
-    workspaceId,
     get: Effect.fn("ThreadParticipations.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(ThreadParticipation.Id)(input);

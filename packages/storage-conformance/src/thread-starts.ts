@@ -1,29 +1,33 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
-import { Group, GroupApplication, GroupStore, GroupMembershipStore } from "@amends/core/group";
+import { Group, GroupService, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Journal, Log, Publication } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
-  ThreadActivityPublisher,
-  ThreadActivityRecording,
-  ThreadApplication,
-  ThreadCreation,
-  ThreadMessageApplication,
-  ThreadMessagePublication,
+  ThreadService,
+  ThreadMessage,
+  ThreadMessageService,
   ThreadParticipation,
-  ThreadParticipationAdmission,
-  ThreadParticipationApplication,
-  ThreadStart,
+  ThreadParticipationService,
   ThreadStore,
   ThreadParticipationStore,
   ThreadMessageStore,
   ThreadActivityStore,
+  ThreadCommand,
 } from "@amends/core/thread";
 import { Member, MemberFacts, MemberStore } from "@amends/core/workspace";
 import { DateTime, Effect, Layer, Option, Context } from "effect";
-import { type Bound, boundTo, runHost, Support, testProvenance, workspaceId } from "./support.ts";
+import {
+  type Bound,
+  boundTo,
+  runHost,
+  Support,
+  testProvenance,
+  workspaceId,
+  threadInternals,
+} from "./support.ts";
 import type { Harness } from "./harness.ts";
 
 /** Thread starts and replies make the same store reads at any group size. */
@@ -36,35 +40,18 @@ export const threadStarts = (harness: Harness) => {
     const contactId = Identity.ContactId.make("customer");
     const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
       program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
-    /** The internal start that channel and task workflows will call, built over core's services. */
-    const internal = ThreadStart.layer.pipe(
-      Layer.provide(
-        Layer.mergeAll(
-          ThreadCreation.layer,
-          ThreadMessagePublication.layer.pipe(
-            Layer.provide(
-              ThreadActivityPublisher.layer.pipe(
-                Layer.provide(
-                  Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
     const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
-        Effect.provide(internal.pipe(Layer.provideMerge(core(bound)))),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
+        Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 200 });
     const startDirect = (
       memberIds: ReadonlyArray<Member.Id>,
       mentions: ReadonlyArray<Member.Id> = [],
     ) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startDirect({ memberIds, text: "Hello", mentions }),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startDirect({ memberIds, text: "Hello", mentions }),
       );
     const participantsOf = (bound: Bound, threadId: Thread.Id) =>
       Effect.map(bound.participations.listByThread(threadId), (records) =>
@@ -237,8 +224,8 @@ export const threadStarts = (harness: Harness) => {
               const mentioned = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.startInGroup({
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.startInGroup({
                     groupId: trio.thread.groupId,
                     text: "Just Bob",
                     mentions: [humanId],
@@ -257,18 +244,18 @@ export const threadStarts = (harness: Harness) => {
               expect(
                 yield* Effect.flip(run(bound, owner, startDirect([owner.memberId]))),
               ).toMatchObject({
-                _tag: "ThreadApplication.DirectMembersRequired",
+                _tag: "ThreadService.DirectMembersRequired",
               });
               expect(
                 yield* Effect.flip(run(bound, owner, startDirect([Member.Id.make("missing")]))),
               ).toMatchObject({
-                _tag: "ThreadApplication.ParticipantUnavailable",
+                _tag: "ThreadService.ParticipantUnavailable",
                 memberId: "missing",
               });
               expect(
                 yield* Effect.flip(run(bound, owner, startDirect([humanId], [otherId]))),
               ).toMatchObject({
-                _tag: "ThreadApplication.ParticipantUnavailable",
+                _tag: "ThreadService.ParticipantUnavailable",
                 memberId: otherId,
               });
               expect(yield* history(bound)).toEqual(before);
@@ -288,8 +275,11 @@ export const threadStarts = (harness: Harness) => {
               const team = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createTeam({ name: "Support", memberIds: [owner.memberId, humanId] }),
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  groupService.createTeam({
+                    name: "Support",
+                    memberIds: [owner.memberId, humanId],
+                  }),
                 ),
               );
               const contact: Notification.Recipient = { _tag: "Contact", id: contactId };
@@ -297,13 +287,15 @@ export const threadStarts = (harness: Harness) => {
                 bound,
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
-                    Effect.flatMap(ThreadStart.Service, (starts) =>
+                    Effect.flatMap(ThreadCommand.Service, (threadCommand) =>
                       Effect.flatMap(DateTime.now, (occurredAt) =>
-                        starts.start({
+                        threadCommand.create({
+                          threadId: Thread.Id.make("late-order"),
                           groupId: team.id,
                           participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],
                           first: {
                             _tag: "Message",
+                            messageId: ThreadMessage.Id.make("late-order-opening"),
                             author: { _tag: "Contact", contactId },
                             text: "My order is late",
                             mentions: [],
@@ -331,8 +323,12 @@ export const threadStarts = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: started.thread.id, text: "Looking into it", mentions: [] }),
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({
+                    threadId: started.thread.id,
+                    text: "Looking into it",
+                    mentions: [],
+                  }),
                 ),
               );
               expect(yield* inbox(bound, contact)).toHaveLength(1);
@@ -344,8 +340,12 @@ export const threadStarts = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: started.thread.id, text: "Bob?", mentions: [humanId] }),
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({
+                    threadId: started.thread.id,
+                    text: "Bob?",
+                    mentions: [humanId],
+                  }),
                 ),
               );
               expect(yield* inbox(bound, contact)).toHaveLength(1);
@@ -394,8 +394,8 @@ export const threadStarts = (harness: Harness) => {
                 const team = yield* run(
                   counted.bound,
                   owner,
-                  Effect.flatMap(GroupApplication.Service, (s) =>
-                    s.createTeam({
+                  Effect.flatMap(GroupService.Service, (groupService) =>
+                    groupService.createTeam({
                       name: `Team ${size}`,
                       memberIds: [owner.memberId, ...extra.slice(0, size)],
                     }),
@@ -405,9 +405,9 @@ export const threadStarts = (harness: Harness) => {
                 const started = yield* run(
                   counted.bound,
                   owner,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
                     // Mentioning the members enrolls them, so the participants grow with the group.
-                    s.startInGroup({
+                    threadService.startInGroup({
                       groupId: team.id,
                       text: "Hello",
                       mentions: extra.slice(0, size),
@@ -415,8 +415,12 @@ export const threadStarts = (harness: Harness) => {
                   ),
                 );
                 const start = counted.take();
-                const reply = Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: started.thread.id, text: "Reply", mentions: [] }),
+                const reply = Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({
+                    threadId: started.thread.id,
+                    text: "Reply",
+                    mentions: [],
+                  }),
                 );
                 yield* run(counted.bound, owner, reply);
                 const replied = counted.take();
@@ -426,8 +430,8 @@ export const threadStarts = (harness: Harness) => {
                 const page = yield* run(
                   counted.bound,
                   owner,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.readTimeline(started.thread.id, { limit: 50 }),
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                    threadService.readTimeline(started.thread.id, { limit: 50 }),
                   ),
                 );
                 expect(page).toHaveLength(size + 2);
@@ -474,16 +478,16 @@ export const threadStarts = (harness: Harness) => {
                   identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
                 });
               const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId, text: "Reply", mentions }),
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({ threadId, text: "Reply", mentions }),
                 );
               const counted = countingReads(bound);
               const measure = Effect.fnUntraced(function* (size: number) {
                 const team = yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(GroupApplication.Service, (s) =>
-                    s.createTeam({
+                  Effect.flatMap(GroupService.Service, (groupService) =>
+                    groupService.createTeam({
                       name: `Team ${size}`,
                       memberIds: [owner.memberId, ...extra.slice(0, size)],
                     }),
@@ -492,8 +496,8 @@ export const threadStarts = (harness: Harness) => {
                 const started = yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.startInGroup({
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                    threadService.startInGroup({
                       groupId: team.id,
                       text: "Hello",
                       mentions: extra.slice(0, size),
@@ -510,8 +514,13 @@ export const threadStarts = (harness: Harness) => {
                   yield* run(
                     bound,
                     as(memberId),
-                    Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-                      s.unfollow({ threadId: started.thread.id, participationId: own.id }),
+                    Effect.flatMap(
+                      ThreadParticipationService.Service,
+                      (threadParticipationService) =>
+                        threadParticipationService.unfollow({
+                          threadId: started.thread.id,
+                          participationId: own.id,
+                        }),
                     ),
                   );
                 }

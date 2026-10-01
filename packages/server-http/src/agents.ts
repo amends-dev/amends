@@ -1,5 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
-import { AgentApplication } from "@amends/core/agent";
+import { AgentService } from "@amends/core/agent";
 import type { Actor } from "@amends/core/identity";
 import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
@@ -19,24 +19,20 @@ export const layer = HttpApiBuilder.group(
     /** Run an agent operation as the principal, a member of the workspace. */
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
-      operation: (agents: AgentApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+      operation: (agentService: AgentService.Interface) => Effect.Effect<A, E, Actor.Service>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
-        gateway.asMember(
-          workspaceId,
-          principal,
-          Effect.flatMap(AgentApplication.Service, operation),
-        ),
+        gateway.asMember(workspaceId, principal, Effect.flatMap(AgentService.Service, operation)),
       );
     return handlers.handleAll({
-      list: ({ params }) => asMember(params.workspaceId, (agents) => agents.list),
+      list: ({ params }) => asMember(params.workspaceId, (agentService) => agentService.list),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(params.workspaceId, (agentService) =>
+          agentService.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
       environmentChoices: ({ params, query }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.environmentChoices({
+        asMember(params.workspaceId, (agentService) =>
+          agentService.environmentChoices({
             model: {
               connectionId: query.connectionId,
               model: query.model,
@@ -44,21 +40,22 @@ export const layer = HttpApiBuilder.group(
             },
           }),
         ),
-      get: ({ params }) => asMember(params.workspaceId, (agents) => agents.get(params.agentId)),
+      get: ({ params }) =>
+        asMember(params.workspaceId, (agentService) => agentService.get(params.agentId)),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.configure(Object.assign({ agentId: params.agentId }, payload)),
+        asMember(params.workspaceId, (agentService) =>
+          agentService.configure(Object.assign({ agentId: params.agentId }, payload)),
         ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.rename({
+        asMember(params.workspaceId, (agentService) =>
+          agentService.rename({
             agentId: params.agentId,
             name: payload.name,
             expectedName: payload.expectedName,
           }),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (agents) => agents.remove(params.agentId)),
+        asMember(params.workspaceId, (agentService) => agentService.remove(params.agentId)),
     });
   }),
 );

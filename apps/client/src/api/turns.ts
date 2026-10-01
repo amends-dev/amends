@@ -6,7 +6,6 @@ import { command } from "./failures.ts";
 import { itemKeys, workspaceKey } from "./keys.ts";
 import { refreshResult } from "./refresh.ts";
 import { requestAtom } from "./request.ts";
-import { newWorkspaceRequestKey } from "./workspaces.ts";
 
 export type { Turn };
 
@@ -38,18 +37,12 @@ export const turnRead = (client: ApiClient, workspaceId: string, turnId: string)
   });
 };
 
-/** A new retry attempt; asking again with the same key returns the turn it created. */
-export const newTurnRequestKey = newWorkspaceRequestKey;
-
 /** A stop or retry; `log` also refreshes the turn, for a reader who has its log open. */
-export type TurnCommand = (
-  | { readonly kind: "stop"; readonly turnId: string }
-  | {
-      readonly kind: "retry";
-      readonly turnId: string;
-      readonly key: ReturnType<typeof newTurnRequestKey>;
-    }
-) & { readonly log?: boolean };
+export type TurnCommand = {
+  readonly kind: "stop" | "retry";
+  readonly turnId: string;
+  readonly log?: boolean;
+};
 
 /**
  * Stop or retry a turn, then refresh its thread's timeline, when given, and the turn, when asked,
@@ -67,7 +60,7 @@ export const turnsRequest = (client: ApiClient, workspace: string, thread: strin
       const turn =
         input.kind === "stop"
           ? yield* api.turns.cancel({ params })
-          : yield* api.turns.retry({ params, headers: { "idempotency-key": input.key } });
+          : yield* api.turns.retry({ params });
       const timeline = thread === undefined ? undefined : timelineRead(client, workspace, thread);
       if (timeline !== undefined) yield* Effect.ignore(refreshResult(get, timeline.atom));
       const read = input.log ? turnRead(client, workspace, input.turnId) : undefined;

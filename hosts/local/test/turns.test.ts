@@ -252,11 +252,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
             headers: {},
             payload: { text: "Also, how is the budget?", mentions: [] },
           });
+          const sofar = yield* asAlice.threads.timeline({ params, query: { limit: 50 } });
+          const askedAt = sofar.find((item) => "message" in item && item.message.id === asked.id)!
+            .activity.sequence;
           // Scout takes the new question into the turn it is working on, then finishes the first.
-          yield* until(
-            turnsNow,
-            (turns) => (turns[0]?.acceptedThroughSequence ?? 0) >= asked.activity.sequence,
-          );
+          yield* until(turnsNow, (turns) => (turns[0]?.acceptedThroughSequence ?? 0) >= askedAt);
           release.resolve();
           const [done] = yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
 
@@ -300,7 +300,6 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(failed?.failure).toBeTruthy();
           const retried = yield* asAlice.turns.retry({
             params: { workspaceId, turnId: failed!.id },
-            headers: {},
           });
           expect(retried).toMatchObject({ status: "queued", retryable: false });
           const [replied] = yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
@@ -310,12 +309,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
             "Scout, how is the plan going?",
             "The plan is on track.",
           ]);
-          // The failed turn was superseded by the one that replied.
+          // The failed turn was retried once; asking again returns the retry that replied.
           expect(
-            yield* Effect.flip(
-              asAlice.turns.retry({ params: { workspaceId, turnId: failed!.id }, headers: {} }),
-            ),
-          ).toMatchObject({ _tag: "TurnApplication.NotRetryable", reason: "superseded" });
+            (yield* asAlice.turns.retry({ params: { workspaceId, turnId: failed!.id } })).id,
+          ).toBe(retried.id);
 
           // Asked again, Scout works until stopped; the held answer never becomes a reply.
           const again = yield* ask("Scout, and the budget?");
@@ -340,7 +337,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* Effect.flip(
               asAlice.turns.cancel({ params: { workspaceId, turnId: running!.id } }),
             ),
-          ).toMatchObject({ _tag: "TurnApplication.NotActive", status: "cancelled" });
+          ).toMatchObject({ _tag: "TurnService.NotActive", status: "cancelled" });
         }).pipe(Effect.scoped, Effect.provide(server(url))),
       ),
     40_000,

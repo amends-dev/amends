@@ -21,8 +21,9 @@ curl -X POST -H 'Authorization: Bearer alice' -H 'content-type: application/json
 
 Creation and invitation issuance accept an `Idempotency-Key` header. Send a new key, such as a
 UUID, for each workspace or invitation and the same one on every retry: the retry returns what the
-first attempt created, even if its answer was lost, and the same key with a different body returns
-422 `Request.Reused`. A retried workspace creation keeps its ID, derived from the creator and key.
+first attempt created, even if its answer was lost. The key alone names the request, so reusing it
+returns what it created whatever the body. A retried creation keeps its ID, derived from the
+requester and key.
 
 `GET /me/workspaces` lists the caller's memberships, including ended ones, with each
 workspace's active member count, and the caller's pending invitations. This is host routing
@@ -47,9 +48,9 @@ Removal also, in the same commit and without further grants:
 - ends every active group admission of that workspace member, recording `workspace-removed`
   with the removal as its cause; see [group departures](group-workflows.md#workspace-member-removal).
 
-A failure rolls all of it back. Repeating a removal returns `MemberApplication.AlreadyRemoved`
+A failure rolls all of it back. Repeating a removal returns `MemberService.AlreadyRemoved`
 without recording anything; the caller must still be active and authorized. Missing members
-return `MemberApplication.NotFound`, only after authorization.
+return `MemberService.NotFound`, only after authorization.
 
 The removed membership and its assignments remain historical records that authorized readers can
 inspect. Active-membership checks deny its later operations, including calls with an actor resolved

@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { Environment } from "./environment.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("EnvironmentStore.Failure", {
@@ -15,7 +15,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("EnvironmentStore.C
 
 /** Internal projection storage. Reads honor an existing transaction; writes require one. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Environment.Id) => Effect.Effect<Option.Option<Environment.Record>, Failure>;
   /** Every environment in the workspace, removed ones included, in no particular order. */
   readonly list: Effect.Effect<ReadonlyArray<Environment.Record>, Failure>;

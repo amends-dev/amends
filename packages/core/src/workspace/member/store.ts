@@ -3,7 +3,6 @@ import type { Effect, Option } from "effect";
 import type { Identity } from "../../identity/identity.ts";
 import type { Store } from "../../journal/store.ts";
 import type { Member } from "./member.ts";
-import type { Workspace } from "../workspace.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("MemberStore.Failure", {
   operation: Schema.String,
@@ -25,8 +24,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("MemberStore.Confli
  * expired or foreign transaction handles and never retry the program internally.
  */
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
-
   /** Find an active or removed membership in this workspace; None if absent. */
   readonly get: (memberId: Member.Id) => Effect.Effect<Option.Option<Member.Record>, Failure>;
 

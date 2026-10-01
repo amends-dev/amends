@@ -2,7 +2,7 @@ import { ConnectionPermissions } from "@amends/core/connection";
 import { EnvironmentPermissions } from "@amends/core/environment";
 import { AgentPermissions } from "@amends/core/agent";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
-import { GroupApplication, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
+import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
 import type { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
 import * as Core from "@amends/core";
@@ -12,9 +12,9 @@ import {
   ThreadPermissions,
 } from "@amends/core/thread";
 import {
-  InvitationApplication,
+  InvitationService,
   InvitationPermissions,
-  MemberApplication,
+  MemberService,
   MemberFacts,
   MemberPermissions,
   Invitation,
@@ -82,7 +82,7 @@ export const gateway = (harness: Harness) => {
                   ).toMatchObject({ _tag: "Gateway.NotMember" });
                   expect(
                     yield* Effect.flip(Operations.getMember(a.id, alice, b.ownerMemberId)),
-                  ).toMatchObject({ _tag: "MemberApplication.NotFound" });
+                  ).toMatchObject({ _tag: "MemberService.NotFound" });
                   return [a, b];
                 }),
               ),
@@ -193,18 +193,18 @@ export const gateway = (harness: Harness) => {
             runGateway(
               storage,
               Effect.gen(function* () {
-                const entry = yield* Gateway.Service;
-                const a = yield* entry.createWorkspace(alice.id, { name: "Alice workspace" });
-                const b = yield* entry.createWorkspace(bob.id, { name: "Bob workspace" });
+                const gateway = yield* Gateway.Service;
+                const a = yield* gateway.createWorkspace(alice.id, { name: "Alice workspace" });
+                const b = yield* gateway.createWorkspace(bob.id, { name: "Bob workspace" });
                 const getMember = (
                   workspace: Workspace.Record,
                   identity: Identity.MemberReference,
                 ) =>
-                  entry.asMember(
+                  gateway.asMember(
                     workspace.id,
                     identity,
-                    Effect.flatMap(MemberApplication.Service, (members) =>
-                      members.get(workspace.ownerMemberId),
+                    Effect.flatMap(MemberService.Service, (memberService) =>
+                      memberService.get(workspace.ownerMemberId),
                     ),
                   );
                 yield* Effect.all(
@@ -215,11 +215,11 @@ export const gateway = (harness: Harness) => {
                 );
                 const crossed = yield* Effect.flip(getMember(b, alice));
                 const expiresAt = yield* future;
-                const invitation = yield* entry.asMember(
+                const invitation = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(InvitationApplication.Service, (invitations) =>
-                    invitations.issue({
+                  Effect.flatMap(InvitationService.Service, (invitationService) =>
+                    invitationService.issue({
                       recipientId: bob.id,
                       expiresAt,
                       roleId: BuiltinRoles.MemberId,
@@ -227,27 +227,32 @@ export const gateway = (harness: Harness) => {
                   ),
                 );
                 const listing = yield* (yield* WorkspaceDirectory.Service).list(bob);
-                const joined = yield* entry.inWorkspace(
+                const joined = yield* gateway.inWorkspace(
                   a.id,
-                  Effect.flatMap(InvitationApplication.Service, (invitations) =>
-                    invitations.accept(invitation.details.id, bob.id),
+                  Effect.flatMap(InvitationService.Service, (invitationService) =>
+                    invitationService.accept(invitation.details.id, bob.id),
                   ),
                 );
                 const afterJoin = yield* (yield* WorkspaceDirectory.Service).list(bob);
-                const stored = yield* entry.asMember(
+                const stored = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(InvitationApplication.Service, (invitations) => invitations.list),
+                  Effect.flatMap(
+                    InvitationService.Service,
+                    (invitationService) => invitationService.list,
+                  ),
                 );
-                const removed = yield* entry.asMember(
+                const removed = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(MemberApplication.Service, (members) => members.remove(joined.id)),
+                  Effect.flatMap(MemberService.Service, (memberService) =>
+                    memberService.remove(joined.id),
+                  ),
                 );
-                const members = yield* entry.asMember(
+                const members = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(MemberApplication.Service, (members) => members.list),
+                  Effect.flatMap(MemberService.Service, (memberService) => memberService.list),
                 );
                 return {
                   a,
@@ -331,8 +336,8 @@ export const gateway = (harness: Harness) => {
                 gateway.asMember(
                   workspace.id,
                   alice,
-                  Effect.flatMap(GroupApplication.Service, (groups) =>
-                    groups.createTeam({ name, memberIds: [workspace.ownerMemberId] }),
+                  Effect.flatMap(GroupService.Service, (groupService) =>
+                    groupService.createTeam({ name, memberIds: [workspace.ownerMemberId] }),
                   ),
                 ),
               ).pipe(Effect.provide(host));

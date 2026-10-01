@@ -2,18 +2,18 @@ import { Schema } from "effect";
 import { Member } from "../../workspace/member/member.ts";
 import { ThreadId } from "../id.ts";
 
-/** The outcomes `ThreadMessageApplication` reports that a caller can act on; schemas only, for contracts. */
+/** The outcomes `ThreadMessageService` reports that a caller can act on; schemas only, for contracts. */
 export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>()(
-  "ThreadMessageApplication.HumanAuthorRequired",
+  "ThreadMessageService.HumanAuthorRequired",
   {
     memberId: Member.Id,
   },
 ) {}
-export class NotFound extends Schema.TaggedError<NotFound>()("ThreadMessageApplication.NotFound", {
+export class NotFound extends Schema.TaggedError<NotFound>()("ThreadMessageService.NotFound", {
   threadId: ThreadId.Id,
 }) {}
 export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(
-  "ThreadMessageApplication.ParticipantUnavailable",
+  "ThreadMessageService.ParticipantUnavailable",
   {
     memberId: Member.Id,
   },

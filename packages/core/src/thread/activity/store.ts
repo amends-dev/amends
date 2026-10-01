@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
-import type { WorkspaceId } from "../../workspace/id.ts";
+
 import type { ThreadActivity } from "./activity.ts";
 import { ThreadId } from "../id.ts";
 
@@ -45,7 +45,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadActivityStor
 }) {}
 /** Internal projection storage. Reads honor the caller transaction; writes require it. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (
     id: ThreadActivity.Id,
   ) => Effect.Effect<Option.Option<ThreadActivity.Record>, Failure>;

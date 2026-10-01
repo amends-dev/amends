@@ -167,7 +167,12 @@ const roster = ["owner", "ada"].map((memberId, index) => ({
   status: "active",
 }));
 
-function fixture(options: { readonly stream?: () => Response } = {}) {
+function fixture(
+  options: {
+    readonly stream?: () => Response;
+    readonly timeline?: (query: URLSearchParams) => Response | Promise<Response>;
+  } = {},
+) {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
@@ -177,7 +182,10 @@ function fixture(options: { readonly stream?: () => Response } = {}) {
     if (path === "/workspaces/one/groups/g1/members") return Promise.resolve(json(roster));
     if (path === "/workspaces/one/groups/g1/openings")
       return Promise.resolve(options.stream?.() ?? json(openings));
-    if (path === "/workspaces/one/threads/t1/timeline") return Promise.resolve(json(timeline));
+    if (path === "/workspaces/one/threads/t1/timeline")
+      return Promise.resolve(
+        options.timeline?.(new URL(request.url).searchParams) ?? json(timeline),
+      );
     return Promise.resolve(json({}, 404));
   });
   const [focus, setFocus] = createSignal<number>();
@@ -252,7 +260,7 @@ it("shows a group's threads with their authors, mentions, and replies", async ()
 
 it("says a group is unavailable once its stream is gone, and failed otherwise", async () => {
   const gone = fixture({
-    stream: () => json({ _tag: "ThreadApplication.GroupNotFound", groupId: "g1" }, 404),
+    stream: () => json({ _tag: "ThreadService.GroupNotFound", groupId: "g1" }, 404),
   });
   await waitFor(() => expect(gone.views.stream.status()).toBe("unavailable"));
   cleanup();
@@ -288,6 +296,40 @@ it("shows a thread's messages and notes, naming the reader as themself", async (
   expect(views.thread.focusId()).toBe("m2");
   setFocus(2);
   expect(views.thread.focusId()).toBeUndefined();
+});
+
+it("reads back to the message to show, and after a page fails waits to be asked again", async () => {
+  const said = (sequence: number) => ({
+    activity: activity(sequence, "message.published", `message:m${sequence}`, {
+      messageId: `m${sequence}`,
+    }),
+    message: message(`m${sequence}`, "t1", "ada", `Note ${sequence}`),
+  });
+  const page = (from: number) => Array.from({ length: 50 }, (_, index) => said(from + index));
+  let failing = true;
+  const older: Array<number> = [];
+  const { views, setFocus } = fixture({
+    timeline: (query) => {
+      if (query.get("afterSequence") !== null) return json([]);
+      const before = query.get("beforeSequence");
+      if (before === null) return json(page(51));
+      older.push(Number(before));
+      // Answered on a later task, so reading again at once would not starve the test's timers.
+      return new Promise<Response>((resolve) =>
+        setTimeout(() => resolve(failing ? json({}, 500) : json(page(1))), 0),
+      );
+    },
+  });
+  await waitFor(() => expect(views.thread.entries()).toHaveLength(50));
+  setFocus(10);
+  await waitFor(() => expect(views.thread.earlierFailed()).toBe(true));
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(older).toEqual([51]);
+  // Asked again, it reads the page, and the message to show is there.
+  failing = false;
+  views.thread.loadEarlier();
+  await waitFor(() => expect(views.thread.focusId()).toBe("m10"));
+  expect(older).toEqual([51, 51]);
 });
 
 it("offers the group's other members to mention, and the rest of the workspace to add", async () => {

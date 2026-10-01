@@ -16,7 +16,6 @@ const keyOf = (record: Group.Record) =>
 export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
   return GroupStore.Service.of({
-    workspaceId,
     get: Effect.fn("Groups.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Group.Id)(input);

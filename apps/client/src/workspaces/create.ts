@@ -22,7 +22,6 @@ export type CreateWorkspaceState = Data.TaggedEnum<{
       | "invalid-name"
       | "invalid-member-name"
       | "denied"
-      | "request-reused"
       | "request-failed"
       | undefined;
   };

@@ -1,11 +1,11 @@
 import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
 import { Journal, Publication } from "@amends/core/journal";
-import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
-import { GroupApplication, GroupFacts } from "@amends/core/group";
+import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
+import { GroupService, GroupFacts } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
-import { NotificationApplication } from "@amends/core/notification";
-import { ThreadApplication, ThreadMessageFacts } from "@amends/core/thread";
-import { InvitationApplication, InvitationFacts, Member } from "@amends/core/workspace";
+import { NotificationService } from "@amends/core/notification";
+import { ThreadService, ThreadMessageFacts } from "@amends/core/thread";
+import { InvitationService, InvitationFacts, Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Queue, Stream } from "effect";
@@ -23,7 +23,7 @@ import {
 } from "./support.ts";
 
 const issue = (recipient: Identity.HumanId) =>
-  InvitationApplication.Service.use((invitations) =>
+  InvitationService.Service.use((invitations) =>
     Effect.flatMap(DateTime.now, (now) =>
       invitations.issue({
         recipientId: recipient,
@@ -51,7 +51,9 @@ const committed = (message: ChangeFeed.Message) => {
   return message;
 };
 const watch = (options?: ChangeFeed.WatchOptions) =>
-  Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch(options));
+  Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>
+    changeFeedService.watch(options),
+  );
 const human = (name: string) => Identity.HumanId.make(name);
 const memberActor = (name: string) =>
   Actor.Value.make({
@@ -91,26 +93,30 @@ export const changeFeed = (harness: Harness) => {
           ) => Effect.provide(program, host);
           const workspace = yield* on(
             first,
-            Effect.flatMap(Gateway.Service, (g) => g.createWorkspace(alice.id, { name: "Feed" })),
+            Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.createWorkspace(alice.id, { name: "Feed" }),
+            ),
           );
           const next = yield* on(
             first,
-            Effect.flatMap(Gateway.Service, (g) =>
-              listen(g.asMemberScoped(workspace.id, alice, watch())),
+            Effect.flatMap(Gateway.Service, (gateway) =>
+              listen(gateway.asMemberScoped(workspace.id, alice, watch())),
             ),
           );
           const ready = yield* next;
           expect(ready).toMatchObject({ _tag: "Ready", workspaceId: workspace.id, reset: true });
           yield* on(
             second,
-            Effect.flatMap(Gateway.Service, (g) => g.asMember(workspace.id, alice, issue(bob.id))),
+            Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.asMember(workspace.id, alice, issue(bob.id)),
+            ),
           );
           const fromOther = committed(yield* next);
           expect(fromOther.events.map((e) => e.name)).toEqual([InvitationFacts.Issued.name]);
           yield* on(
             first,
-            Effect.flatMap(Gateway.Service, (g) =>
-              g.asMember(workspace.id, alice, issue(human("carol"))),
+            Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.asMember(workspace.id, alice, issue(human("carol"))),
             ),
           );
           const fromOwn = committed(yield* next);
@@ -127,27 +133,27 @@ export const changeFeed = (harness: Harness) => {
         Effect.gen(function* () {
           const first = yield* storage.connect();
           const second = yield* storage.connect();
-          const workspace = yield* Effect.flatMap(Gateway.Service, (g) =>
-            g.createWorkspace(alice.id, { name: "Resume" }),
+          const workspace = yield* Effect.flatMap(Gateway.Service, (gateway) =>
+            gateway.createWorkspace(alice.id, { name: "Resume" }),
           ).pipe(Effect.provide(gateway(first)));
           const cursor = yield* Effect.scoped(
             Effect.gen(function* () {
-              const g = yield* Gateway.Service;
-              const next = yield* listen(g.asMemberScoped(workspace.id, alice, watch()));
+              const gateway = yield* Gateway.Service;
+              const next = yield* listen(gateway.asMemberScoped(workspace.id, alice, watch()));
               yield* next;
-              yield* g.asMember(workspace.id, alice, issue(bob.id));
+              yield* gateway.asMember(workspace.id, alice, issue(bob.id));
               return committed(yield* next).cursor;
             }).pipe(Effect.provide(gateway(first))),
           );
-          const missed = yield* Effect.flatMap(Gateway.Service, (g) =>
+          const missed = yield* Effect.flatMap(Gateway.Service, (gateway) =>
             Effect.forEach(["carol", "dave"], (name) =>
-              g.asMember(workspace.id, alice, issue(human(name))),
+              gateway.asMember(workspace.id, alice, issue(human(name))),
             ),
           ).pipe(Effect.provide(gateway(first)));
           yield* Effect.gen(function* () {
-            const g = yield* Gateway.Service;
+            const gateway = yield* Gateway.Service;
             const next = yield* listen(
-              g.asMemberScoped(workspace.id, alice, watch({ after: cursor })),
+              gateway.asMemberScoped(workspace.id, alice, watch({ after: cursor })),
             );
             expect(yield* next).toEqual({
               _tag: "Ready",
@@ -190,8 +196,8 @@ export const changeFeed = (harness: Harness) => {
             for (const next of feeds) expect(yield* next).toMatchObject({ reset: true });
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createTeam({
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                groupService.createTeam({
                   name: "Private",
                   memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
                 }),
@@ -199,8 +205,12 @@ export const changeFeed = (harness: Harness) => {
             );
             yield* as(
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.startInGroup({ groupId: group.id, mentions: [], text: "Secret plan" }),
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startInGroup({
+                  groupId: group.id,
+                  mentions: [],
+                  text: "Secret plan",
+                }),
               ),
             );
             // A role every member may see marks the end of what each reader receives.
@@ -244,8 +254,8 @@ export const changeFeed = (harness: Harness) => {
               program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(services));
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createTeam({
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                groupService.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, mentioned.memberId, bystander.memberId],
                 }),
@@ -259,8 +269,8 @@ export const changeFeed = (harness: Harness) => {
             for (const next of [mentionedFeed, bystanderFeed]) yield* next;
             yield* as(
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.startInGroup({
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startInGroup({
                   groupId: group.id,
                   mentions: [mentioned.memberId],
                   text: "Can you look?",
@@ -270,8 +280,8 @@ export const changeFeed = (harness: Harness) => {
             const started = committed(yield* mentionedFeed);
             const inbox = yield* as(
               mentioned,
-              Effect.flatMap(NotificationApplication.Service, (notifications) =>
-                notifications.list({ limit: 10 }),
+              Effect.flatMap(NotificationService.Service, (notificationService) =>
+                notificationService.list({ limit: 10 }),
               ),
             );
             expect(inbox).toHaveLength(1);

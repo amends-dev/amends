@@ -17,7 +17,6 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
   const all = Effect.flatMap(read, (space) => rows.all(space.records.threadParticipations));
 
   return ThreadParticipationStore.Service.of({
-    workspaceId,
     get: Effect.fn("ThreadParticipations.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(ThreadParticipation.Id)(input);

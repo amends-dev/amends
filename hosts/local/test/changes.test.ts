@@ -3,7 +3,7 @@ import { BuiltinRoles } from "@amends/core/authorization";
 import { ChangeFeed } from "@amends/core/change-feed";
 import { GroupFacts } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
-import { Thread, ThreadApplication } from "@amends/core/thread";
+import { Thread, ThreadService } from "@amends/core/thread";
 import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
@@ -247,8 +247,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const started = yield* gateway.asMember(
           workspace.id,
           { _tag: "Human", id: Identity.HumanId.make("alice") },
-          Effect.flatMap(ThreadApplication.Service, (threads) =>
-            threads.startDirect({ memberIds: [member.id], mentions: [], text: "Hello" }),
+          Effect.flatMap(ThreadService.Service, (threadService) =>
+            threadService.startDirect({ memberIds: [member.id], mentions: [], text: "Hello" }),
           ),
         );
         const threadId = started.thread.id;
@@ -266,7 +266,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               params: { workspaceId: workspace.id, threadId: Thread.Id.make("missing") },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "SignalApplication.ThreadNotFound", threadId: "missing" });
+        ).toMatchObject({ _tag: "SignalService.ThreadNotFound", threadId: "missing" });
         const http = yield* HttpClient.HttpClient;
         const path = `/workspaces/${workspace.id}/threads/${threadId}/typing`;
         expect((yield* http.post(path)).status).toBe(401);

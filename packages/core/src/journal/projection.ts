@@ -159,7 +159,7 @@ export interface Runner {
   ) => Effect.Effect<void, Error, Store.Transaction>;
 }
 
-const cursorOf = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
+const toCursor = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
   position: entry.position,
   commitId: entry.commitId,
   index: entry.index,
@@ -172,7 +172,7 @@ const cursorOf = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
  * entry, and rebuilding it later applies only the commits it missed, never earlier ones again.
  */
 export const replaceLive = Effect.fnUntraced(function* (
-  checkpoints: Checkpoint.Interface,
+  checkpoint: Checkpoint.Interface,
   log: Log.Reader<typeof Event.Envelope>,
   current: ReadonlyArray<Checkpoint.LiveVersion>,
   next: ReadonlyArray<Checkpoint.LiveVersion>,
@@ -192,10 +192,10 @@ export const replaceLive = Effect.fnUntraced(function* (
       const key = { logId: log.id, name: version.name, version: version.version };
       if (batch?.position !== head.value || last === undefined)
         return yield* new InvalidCheckpoint({ key, message: "The log's head batch is missing" });
-      yield* checkpoints.set(key, cursorOf(last));
+      yield* checkpoint.set(key, toCursor(last));
     }
   }
-  yield* checkpoints.setLive(log.id, next);
+  yield* checkpoint.setLive(log.id, next);
 });
 
 /**
@@ -209,7 +209,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   readonly definition: Definition<string, number, E, R>;
   readonly log: Log.Reader<typeof Event.Envelope>;
 }) {
-  const checkpoints = yield* Checkpoint.Service;
+  const checkpoint = yield* Checkpoint.Service;
   const transaction = yield* Transaction.Service;
   const services = yield* Effect.context<Transaction.Remaining<R>>();
   const { definition, log } = options;
@@ -233,11 +233,11 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
     versions.set(fact.version, [...handlers, subscription]);
   }
 
-  const checkpoint = checkpoints
+  const progress = checkpoint
     .get(key)
     .pipe(Effect.flatMap(Schema.decodeEffect(Schema.Option(Checkpoint.Cursor))));
-  const next = Effect.fnUntraced(function* (previous: Option.Option<Checkpoint.Cursor>) {
-    const native = yield* Store.Transaction;
+  const readNextEntries = Effect.fnUntraced(function* (previous: Option.Option<Checkpoint.Cursor>) {
+    const storeTransaction = yield* Store.Transaction;
     if (Option.isSome(previous)) {
       const cursor = previous.value;
       const batch = yield* log.get(cursor.commitId);
@@ -253,7 +253,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
       }
       const remaining = batch.value.entries.slice(cursor.index + 1);
       if (remaining.length > 0) {
-        if (batch.value.commit.id !== native.id) {
+        if (batch.value.commit.id !== storeTransaction.id) {
           return yield* new InvalidCheckpoint({
             key,
             message: "Checkpoint splits a committed source batch",
@@ -283,45 +283,46 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
 
   // Supply static requirements only after entering the operation's transaction.
   // The invocation's context must win over any context present during binding.
-  const withServices = Effect.fnUntraced(function* <A, E2>(
+  const provideServices = Effect.fnUntraced(function* <A, E2>(
     program: Effect.Effect<A, E2, R | Store.Transaction>,
   ) {
-    const native = yield* Store.Transaction;
+    const storeTransaction = yield* Store.Transaction;
     return yield* program.pipe(
       Effect.scoped,
-      Effect.provideService(Store.Transaction, native),
+      Effect.provideService(Store.Transaction, storeTransaction),
       Effect.updateContext((current: Context.Context<never>) => Context.merge(services, current)),
     );
   });
-  const failed = (entry: Log.Entry<Event.Envelope>, phase: Failure["phase"]) => (cause: unknown) =>
-    new Failure({ key, cursor: cursorOf(entry), phase, cause });
+  const toFailure =
+    (entry: Log.Entry<Event.Envelope>, phase: Failure["phase"]) => (cause: unknown) =>
+      new Failure({ key, cursor: toCursor(entry), phase, cause });
 
   const apply = Effect.fn("Projection.apply")(function* (
     entry: Log.Entry<Event.Envelope>,
     event: unknown,
   ) {
-    const native = yield* Store.Transaction;
+    const storeTransaction = yield* Store.Transaction;
     yield* transaction.operation(
-      withServices(
+      provideServices(
         Effect.gen(function* () {
-          if (entry.logId !== log.id || entry.commitId !== native.id)
+          if (entry.logId !== log.id || entry.commitId !== storeTransaction.id)
             return yield* new Transaction.Foreign({});
           for (const handler of yield* handlersFor(entry))
-            yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
+            yield* handler.apply(event).pipe(Effect.mapError(toFailure(entry, "apply")));
         }),
       ),
     );
   });
   const step = transaction
     .operation(
-      withServices(
+      provideServices(
         Effect.gen(function* () {
-          const live = yield* checkpoints.listLive(log.id);
+          const live = yield* checkpoint.listLive(log.id);
           if (live.some(isVersion(key))) return Option.none<Checkpoint.Cursor>();
-          const pending = yield* next(yield* checkpoint);
+          const pending = yield* readNextEntries(yield* progress);
           if (Option.isNone(pending)) {
             // Caught up with every commit: from this one on, commits apply the projection.
-            yield* replaceLive(checkpoints, log, live, [
+            yield* replaceLive(checkpoint, log, live, [
               ...live.filter(({ name }) => name !== key.name),
               { name: key.name, version: key.version },
             ]);
@@ -333,17 +334,17 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
             if (Option.isSome(first)) {
               const event = yield* first.value
                 .decode(entry)
-                .pipe(Effect.mapError(failed(entry, "decode")));
+                .pipe(Effect.mapError(toFailure(entry, "decode")));
               for (const handler of handlers)
-                yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
+                yield* handler.apply(event).pipe(Effect.mapError(toFailure(entry, "apply")));
             }
           }
           const last = Array.last(pending.value);
           if (Option.isNone(last)) {
             return yield* new InvalidCheckpoint({ key, message: "Source returned an empty batch" });
           }
-          const cursor = cursorOf(last.value);
-          yield* checkpoints.set(key, cursor);
+          const cursor = toCursor(last.value);
+          yield* checkpoint.set(key, cursor);
           return Option.some(cursor);
         }),
       ),
@@ -358,7 +359,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   const runner: Runner = {
     key,
     subscribes: (name) => byName.has(name),
-    checkpoint,
+    checkpoint: progress,
     step,
     replay,
     apply,

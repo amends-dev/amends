@@ -58,14 +58,8 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
     }),
     HttpApiEndpoint.post("retry", "/turns/:turnId/retry", {
       params: turn,
-      headers: ApiErrors.requestKey,
       success: Turn.View.pipe(HttpApiSchema.status(201)).annotate({ identifier: "RetriedTurn" }),
-      error: [
-        ...ApiErrors.member,
-        ApiErrors.TurnNotFound,
-        ApiErrors.TurnNotRetryable,
-        ApiErrors.RequestReused,
-      ],
+      error: [...ApiErrors.member, ApiErrors.TurnNotFound, ApiErrors.TurnNotRetryable],
     }),
   )
   .middleware(Authentication)

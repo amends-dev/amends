@@ -46,8 +46,8 @@ const process = Effect.fnUntraced(function* (
 /** Append one entry to the workspace's execution log, then run `then` before committing. */
 const append = <E>(bound: Bound, then: Effect.Effect<void, E> = Effect.void) =>
   bound.store.transaction(
-    Effect.flatMap(Store.Transaction, (transaction) =>
-      transaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
+    Effect.flatMap(Store.Transaction, (storeTransaction) =>
+      storeTransaction.append({ logId: execution, entries: [{ payload: new Uint8Array([1]) }] }),
     ).pipe(Effect.andThen(then)),
   );
 

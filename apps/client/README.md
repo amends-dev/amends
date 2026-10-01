@@ -279,8 +279,8 @@ newest, so a turn loaded with its start has every later item loaded too.
 
 `useThreadTurnControls(workspaceId, threadId)` stops and retries them: `stop(turnId)` and
 `retry(turnId)` read the thread's timeline again before answering; `acting()` names the one
-running. A retry reuses its
-request key until it goes through, so asking again after a lost answer creates one turn.
+running. A turn is retried at
+most once, so asking again after a lost answer creates one turn.
 `problem()` reports why one did not go through as a `TurnCommandProblem` code the screens word
 (`stop-failed`, `retry-failed`, `finished`, `still-running`, `replied`, `superseded`, `departed`,
 `denied`, or `gone`), until another command starts or it is dismissed.

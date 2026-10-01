@@ -4,7 +4,6 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { ThreadId } from "./id.ts";
 import { ThreadMessage } from "./message/message.ts";
-import { ThreadMessageActivity } from "./message/activity.ts";
 import type { ThreadActivityKind } from "./activity/kind.ts";
 export const Id = ThreadId.Id;
 export type Id = ThreadId.Id;
@@ -87,10 +86,10 @@ export const StartDirectInput = Schema.Struct({
   mentions: Schema.UniqueArray(MemberId.Id),
 });
 export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectInput> {}
+/** What a start returns: the thread and its opening message. */
 export const Started = Schema.Struct({
   thread: Record,
   message: ThreadMessage.Record,
-  activity: ThreadMessageActivity.Published.Activity,
 });
 export interface Started extends Schema.Schema.Type<typeof Started> {}
 /**

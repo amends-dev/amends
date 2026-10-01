@@ -2,24 +2,24 @@ import { Schema } from "effect";
 import { Identity } from "../../identity/identity.ts";
 import { Invitation } from "./invitation.ts";
 
-/** The outcomes `InvitationApplication` reports that a caller can act on; schemas only, for contracts. */
+/** The outcomes `InvitationService` reports that a caller can act on; schemas only, for contracts. */
 export class AlreadyMember extends Schema.TaggedError<AlreadyMember>()(
-  "InvitationApplication.AlreadyMember",
+  "InvitationService.AlreadyMember",
   { recipientId: Identity.HumanId },
 ) {}
 export class InvalidExpiry extends Schema.TaggedError<InvalidExpiry>()(
-  "InvitationApplication.InvalidExpiry",
+  "InvitationService.InvalidExpiry",
   {},
 ) {}
-export class NotFound extends Schema.TaggedError<NotFound>()("InvitationApplication.NotFound", {
+export class NotFound extends Schema.TaggedError<NotFound>()("InvitationService.NotFound", {
   invitationId: Invitation.Id,
 }) {}
 export class NotRecipient extends Schema.TaggedError<NotRecipient>()(
-  "InvitationApplication.NotRecipient",
+  "InvitationService.NotRecipient",
   { invitationId: Invitation.Id },
 ) {}
 export class Unavailable extends Schema.TaggedError<Unavailable>()(
-  "InvitationApplication.Unavailable",
+  "InvitationService.Unavailable",
   {
     invitationId: Invitation.Id,
     reason: Schema.Literals(["expired", "revoked", "accepted"]),

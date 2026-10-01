@@ -12,32 +12,18 @@ const change = Effect.fnUntraced(function* (
   },
   apply: (record: Connection.Record) => Connection.Record,
 ) {
-  const store = yield* ConnectionStore.Service;
-  if (store.workspaceId !== payload.workspaceId)
-    return yield* new ConnectionStore.Conflict({
-      operation: "project",
-      message: "Fact belongs to another workspace",
-    });
-  const found = yield* store.get(payload.connectionId);
-  if (Option.isNone(found))
-    return yield* new ConnectionStore.Conflict({
-      operation: "project",
-      message: "Expected a connection in this workspace",
-    });
-  yield* store.update(apply(found.value));
+  const connectionStore = yield* ConnectionStore.Service;
+  const found = yield* connectionStore.get(payload.connectionId);
+  if (Option.isNone(found)) return yield* Effect.die("A changed connection is missing");
+  yield* connectionStore.update(apply(found.value));
 });
 
 export const definition = Projection.make("connections", { version: 1 })
   .on(
     ConnectionFacts.Created,
     Effect.fn("ConnectionProjection.created")(function* ({ payload }) {
-      const store = yield* ConnectionStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* new ConnectionStore.Conflict({
-          operation: "project",
-          message: "Fact belongs to another workspace",
-        });
-      yield* store.insert(payload);
+      const connectionStore = yield* ConnectionStore.Service;
+      yield* connectionStore.insert(payload);
     }),
   )
   .on(ConnectionFacts.Renamed, ({ payload }) =>

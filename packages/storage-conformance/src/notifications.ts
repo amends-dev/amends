@@ -2,14 +2,10 @@ import type * as Core from "@amends/core";
 import { describe, expect, it } from "@effect/vitest";
 import { Actor, Identity } from "@amends/core/identity";
 import { Entry, Journal, Store } from "@amends/core/journal";
-import {
-  Notification,
-  NotificationApplication,
-  NotificationStore,
-} from "@amends/core/notification";
+import { Notification, NotificationService, NotificationStore } from "@amends/core/notification";
 import { BuiltinRoles } from "@amends/core/authorization";
-import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
-import { Thread, ThreadApplication, ThreadParticipation } from "@amends/core/thread";
+import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
+import { Thread, ThreadService, ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
 import { Gateway, WorkspaceTurns } from "@amends/gateway";
 import { Array, Context, DateTime, Effect, Layer, Option } from "effect";
@@ -421,8 +417,8 @@ export const notifications = (harness: Harness) => {
               const sourceLog = Entry.LogId.make("notification-source");
               const key = { logId: sourceLog, name: "notification-contract", version: 1 };
               const write = Effect.gen(function* () {
-                const native = yield* Store.Transaction;
-                const [entry] = yield* native.append({
+                const storeTransaction = yield* Store.Transaction;
+                const [entry] = yield* storeTransaction.append({
                   logId: sourceLog,
                   entries: [{ payload: new Uint8Array([1]) }],
                 });
@@ -672,21 +668,21 @@ export const notifications = (harness: Harness) => {
                 workspaceId,
                 humanIdentity,
                 Effect.gen(function* () {
-                  const notifications = yield* NotificationApplication.Service;
-                  expect(yield* notifications.get(first.id)).toEqual(first);
-                  expect(yield* notifications.list({ limit: 1 })).toEqual([first]);
-                  expect(yield* notifications.list(page)).toEqual([first, second]);
-                  expect(yield* notifications.listPending(page)).toEqual([first, second]);
+                  const notificationService = yield* NotificationService.Service;
+                  expect(yield* notificationService.get(first.id)).toEqual(first);
+                  expect(yield* notificationService.list({ limit: 1 })).toEqual([first]);
+                  expect(yield* notificationService.list(page)).toEqual([first, second]);
+                  expect(yield* notificationService.listPending(page)).toEqual([first, second]);
                   const options = {
                     limit: 1,
                     after: { recordedAt: first.recordedAt, id: first.id },
                   };
-                  expect(yield* notifications.list(options)).toEqual([second]);
-                  expect(yield* notifications.listPending(options)).toEqual([second]);
+                  expect(yield* notificationService.list(options)).toEqual([second]);
+                  expect(yield* notificationService.listPending(options)).toEqual([second]);
                 }),
               );
-              const list = Effect.flatMap(NotificationApplication.Service, (notifications) =>
-                notifications.list(page),
+              const list = Effect.flatMap(NotificationService.Service, (notificationService) =>
+                notificationService.list(page),
               );
               expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual([forAgent]);
               expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual([
@@ -698,13 +694,13 @@ export const notifications = (harness: Harness) => {
                 earlier.id,
                 Notification.Id.make("missing"),
               ]) {
-                const get = Effect.flatMap(NotificationApplication.Service, (notifications) =>
-                  notifications.get(id),
+                const get = Effect.flatMap(NotificationService.Service, (notificationService) =>
+                  notificationService.get(id),
                 );
                 expect(
                   yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, get)),
                 ).toMatchObject({
-                  _tag: "NotificationApplication.NotFound",
+                  _tag: "NotificationService.NotFound",
                   workspaceId,
                   notificationId: id,
                 });
@@ -749,27 +745,27 @@ export const notifications = (harness: Harness) => {
                 recipient: Notification.ofMember(actor.memberId, humanIdentity),
               });
               yield* Effect.gen(function* () {
-                const notifications = yield* NotificationApplication.Service;
+                const notificationService = yield* NotificationService.Service;
                 const journal = yield* Journal.Service;
                 expect(
                   yield* Effect.flip(
                     journal.commit(
                       Effect.gen(function* () {
                         yield* bound.notifications.insert(value);
-                        expect(yield* notifications.get(value.id)).toEqual(value);
-                        expect(yield* notifications.list(page)).toEqual([value]);
-                        expect(yield* notifications.listPending(page)).toEqual([value]);
+                        expect(yield* notificationService.get(value.id)).toEqual(value);
+                        expect(yield* notificationService.list(page)).toEqual([value]);
+                        expect(yield* notificationService.listPending(page)).toEqual([value]);
                         return yield* Effect.fail("rollback");
                       }),
                     ),
                   ),
                 ).toBe("rollback");
-                expect(yield* notifications.list(page)).toEqual([]);
-                expect(yield* Effect.flip(notifications.get(value.id))).toMatchObject({
-                  _tag: "NotificationApplication.NotFound",
+                expect(yield* notificationService.list(page)).toEqual([]);
+                expect(yield* Effect.flip(notificationService.get(value.id))).toMatchObject({
+                  _tag: "NotificationService.NotFound",
                 });
                 yield* journal.commit(bound.notifications.insert(value));
-                expect(yield* notifications.get(value.id)).toEqual(value);
+                expect(yield* notificationService.get(value.id)).toEqual(value);
               }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
             }),
           ),
@@ -924,18 +920,18 @@ export const notifications = (harness: Harness) => {
             const member = yield* acceptInvitation(workspace.id, bob.id, invitation.details.id);
             const create = (name: string) =>
               asAlice(
-                GroupApplication.Service.use((groups) =>
+                GroupService.Service.use((groups) =>
                   groups.createTeam({ name, memberIds: [workspace.ownerMemberId, member.id] }),
                 ),
               );
             const mention = (groupId: Group.Id) =>
               asAlice(
-                ThreadApplication.Service.use((threads) =>
+                ThreadService.Service.use((threads) =>
                   threads.startInGroup({ groupId, text: "Bob?", mentions: [member.id] }),
                 ),
               );
             const count = asBob(
-              NotificationApplication.Service.use((notifications) => notifications.countPending),
+              NotificationService.Service.use((notifications) => notifications.countPending),
             );
             const left = yield* create("Left");
             const kept = yield* create("Kept");
@@ -944,19 +940,19 @@ export const notifications = (harness: Harness) => {
             yield* mention(kept.id);
             expect(yield* count).toBe(3);
             const [admission] = (yield* asBob(
-              GroupMembershipApplication.Service.use((memberships) =>
+              GroupMembershipService.Service.use((memberships) =>
                 memberships.listCurrent(left.id, page),
               ),
             )).filter((value) => value.memberId === member.id);
             yield* asBob(
-              GroupMembershipApplication.Service.use((memberships) =>
+              GroupMembershipService.Service.use((memberships) =>
                 memberships.leave({ groupId: left.id, membershipId: admission!.id }),
               ),
             );
             // What he can no longer open stops waiting for him, and stays as history.
             expect(yield* count).toBe(1);
             const all = yield* asBob(
-              NotificationApplication.Service.use((notifications) => notifications.list(page)),
+              NotificationService.Service.use((notifications) => notifications.list(page)),
             );
             const settledIn = (groupId: Group.Id) =>
               all.filter((note) => note.thread?.groupId === groupId).map((note) => note.state);
@@ -997,19 +993,17 @@ export const notifications = (harness: Harness) => {
             });
             const mention = (groupId: Group.Id, memberId: Member.Id) =>
               asAlice(
-                ThreadApplication.Service.use((threads) =>
+                ThreadService.Service.use((threads) =>
                   threads.startInGroup({ groupId, text: "Bob?", mentions: [memberId] }),
                 ),
               );
             const pending = asBob(
-              NotificationApplication.Service.use((notifications) =>
-                notifications.listPending(page),
-              ),
+              NotificationService.Service.use((notifications) => notifications.listPending(page)),
             );
-            const sidebar = asBob(GroupApplication.Service.use((groups) => groups.listMine(page)));
+            const sidebar = asBob(GroupService.Service.use((groups) => groups.listMine(page)));
             const first = yield* join;
             const group = yield* asAlice(
-              GroupApplication.Service.use((groups) =>
+              GroupService.Service.use((groups) =>
                 groups.createTeam({
                   name: "Private",
                   memberIds: [workspace.ownerMemberId, first.id],
@@ -1024,7 +1018,7 @@ export const notifications = (harness: Harness) => {
             expect(second.id).not.toBe(first.id);
             expect(yield* pending).toEqual([]);
             yield* asAlice(
-              GroupMembershipApplication.Service.use((memberships) =>
+              GroupMembershipService.Service.use((memberships) =>
                 memberships.add({ groupId: group.id, memberId: second.id }),
               ),
             );

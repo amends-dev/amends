@@ -4,39 +4,31 @@ import { TurnFacts } from "./facts.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
-const conflict = (message: string) => new TurnStore.Conflict({ operation: "project", message });
-
 /** The stored turn a fact changes, in this workspace. */
 const stored = Effect.fnUntraced(function* (payload: {
   readonly workspaceId: Turn.Record["workspaceId"];
   readonly turnId: Turn.Id;
 }) {
-  const store = yield* TurnStore.Service;
-  if (store.workspaceId !== payload.workspaceId)
-    return yield* conflict("Fact belongs to another workspace");
-  const found = yield* store.get(payload.turnId);
-  if (Option.isNone(found)) return yield* conflict("Expected a turn in this workspace");
-  return { store, turn: found.value };
+  const turnStore = yield* TurnStore.Service;
+  const found = yield* turnStore.get(payload.turnId);
+  if (Option.isNone(found)) return yield* Effect.die("A changed turn is missing");
+  return { store: turnStore, turn: found.value };
 });
 
 export const definition = Projection.make("turns", { version: 3 })
   .on(
     TurnFacts.Created,
     Effect.fn("TurnProjection.created")(function* ({ payload }) {
-      const store = yield* TurnStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* conflict("Fact belongs to another workspace");
+      const turnStore = yield* TurnStore.Service;
       const { notificationIds: _, ...record } = payload;
-      yield* store.insert(record);
+      yield* turnStore.insert(record);
     }),
   )
   .on(
     TurnFacts.Retried,
     Effect.fn("TurnProjection.retried")(function* ({ payload }) {
-      const store = yield* TurnStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* conflict("Fact belongs to another workspace");
-      yield* store.insert(payload);
+      const turnStore = yield* TurnStore.Service;
+      yield* turnStore.insert(payload);
     }),
   )
   .on(

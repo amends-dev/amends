@@ -205,7 +205,7 @@ function fixture() {
     }
     const id = path.split("/")[4];
     const stored = server.agents.find((agent) => agent.id === id);
-    if (!stored) return json({ _tag: "AgentApplication.NotFound", agentId: id }, 404);
+    if (!stored) return json({ _tag: "AgentService.NotFound", agentId: id }, 404);
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/configuration")) Object.assign(stored, body as object);
     if (request.method === "DELETE") {
@@ -339,7 +339,7 @@ it("keeps configuration edits when the host refuses the connection, naming the p
   editor.setInstructions("Review, then summarize.");
   await waitFor(() => expect(f.view.configure.changed("atlas")).toBe(true));
   f.server.answers.push(
-    json({ _tag: "AgentApplication.ConnectionUnavailable", connectionId: "team" }, 422),
+    json({ _tag: "AgentService.ConnectionUnavailable", connectionId: "team" }, 422),
   );
   f.view.configure.save("atlas");
   await waitFor(() =>
@@ -384,7 +384,7 @@ it("keeps a rename draft through a conflict, and refreshes on agent, member, and
   await waitFor(() => expect(f.view.agent("atlas")).toBeDefined());
   f.view.rename.setName("atlas", "Critic");
   f.server.agents[0]!.name = "Atlas two";
-  f.server.answers.push(json({ _tag: "AgentApplication.Changed", agentId: "atlas" }, 409));
+  f.server.answers.push(json({ _tag: "AgentService.Changed", agentId: "atlas" }, 409));
   f.view.rename.save("atlas");
   await waitFor(() =>
     expect(f.view.failure()).toEqual({ action: "rename", error: "changed", problems: [] }),

@@ -83,8 +83,8 @@ so a client can import the complete contract without loading server code.
 `POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
 `POST …/environments`, both thread
 starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
-same key returns the first attempt's result, and the same key with a different body returns 422
-`Request.Reused`. Clients generating the typed client pass it in `headers`.
+same key returns the first attempt's result, whatever the retry's body. Clients generating the
+typed client pass it in `headers`.
 
 - `notifications`: `GET /workspaces/:workspaceId/notifications` lists the inbox of the
   authenticated human or agent's membership. `GET …/:notificationId` reads one notification. Active
@@ -97,7 +97,7 @@ same key returns the first attempt's result, and the same key with a different b
   `POST …/acknowledge` with `{ through: { recordedAt, id } }` marks a person's pending
   notifications seen up to that one, returning `{ acknowledged }`.
   `GET …/:notificationId/source` returns the timeline item the notification points to, under the
-  caller's current access to it (404 `NotificationApplication.SourceUnavailable` without it).
+  caller's current access to it (404 `NotificationService.SourceUnavailable` without it).
   `POST …/:notificationId/acknowledge` records that the person saw it and returns the
   notification; acknowledging again returns the first acknowledgment, an agent's notification
   is a 403, and one an agent's work already settled is a 409.
@@ -193,31 +193,31 @@ group or thread the caller cannot read answers 404 exactly as a missing one does
 [group](../../docs/group-workflows.md) and [thread](../../docs/thread-workflows.md) workflows
 describe the rules behind each operation.
 
-| Endpoint                                             | Operation                                                                                                                                                             |
-| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                        |
-| `POST …/groups`                                      | Create a team from `{ name, memberIds, visibility? }`, private unless `Public`; 201 with the group.                                                                   |
-| `GET …/groups/public?limit&after`                    | Public groups the caller may join, in group-ID order, each with `members` and `joined`.                                                                               |
-| `POST …/groups/:groupId/join`                        | Join a public group as the caller; returns the admission. Private, direct, and missing groups are 404.                                                                |
-| `GET …/groups/:groupId`                              | One group.                                                                                                                                                            |
-| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group, or a name no longer `expectedName` (`GroupApplication.Changed`), is 409. |
-| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                             |
-| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                         |
-| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                           |
-| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                           |
-| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                                   |
-| `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                                                                                             |
-| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                           |
-| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                        |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread, message, and activity.                                                                                 |
-| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.                                                                          |
-| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                           |
-| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                                  |
-| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                       |
-| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message and its activity.                                                                                               |
-| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                          |
-| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                          |
-| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                     |
+| Endpoint                                             | Operation                                                                                                                                                         |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/groups?limit&after`                           | The caller's groups in group-ID order, each with latest activity, new activity, and following.                                                                    |
+| `POST …/groups`                                      | Create a team from `{ name, memberIds, visibility? }`, private unless `Public`; 201 with the group.                                                               |
+| `GET …/groups/public?limit&after`                    | Public groups the caller may join, in group-ID order, each with `members` and `joined`.                                                                           |
+| `POST …/groups/:groupId/join`                        | Join a public group as the caller; returns the admission. Private, direct, and missing groups are 404.                                                            |
+| `GET …/groups/:groupId`                              | One group.                                                                                                                                                        |
+| `POST …/groups/:groupId/rename`                      | Give a team group `{ name, expectedName }` under `group.rename`; returns it. A direct group, or a name no longer `expectedName` (`GroupService.Changed`), is 409. |
+| `GET …/groups/:groupId/members?limit&after`          | Current admissions in admission-ID order.                                                                                                                         |
+| `POST …/groups/:groupId/members`                     | Admit `{ memberId }`; 201 with the admission.                                                                                                                     |
+| `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                       |
+| `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                       |
+| `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                               |
+| `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                                                                                         |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                       |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                    |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread and its opening message.                                                                            |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.                                                                      |
+| `GET …/threads/:threadId`                            | One thread.                                                                                                                                                       |
+| `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                              |
+| `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                   |
+| `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                            |
+| `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                      |
+| `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                      |
+| `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                 |
 
 Every page takes an integer `limit` from 1 to 100 and an exclusive boundary from the last item of
 the previous page; an empty page ends the traversal. Groups, rosters, and participants pass that
@@ -236,7 +236,7 @@ reply, and is null otherwise.
 Message text keeps its whitespace and must contain a non-space character. Mentions name members
 of the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only
 people write messages and keep read positions: an agent principal gets 403. A read position past
-the thread's latest activity is a 409 `ReadStateApplication.BeyondTimeline` carrying the latest
+the thread's latest activity is a 409 `ReadStateService.BeyondTimeline` carrying the latest
 sequence. A direct group's members are fixed and it has nothing to follow, so adding, removing, and
 following there are 409s; unfollowing an ended participation or removing an ended admission is
 also a 409. Positions, caught-up times, and acknowledgments reach the caller's other sessions as
@@ -255,7 +255,7 @@ administrator tier adds, renames, configures, keys, and removes them. The
 | `GET …/connections`                             | The connections the caller may read, by name.                                                                                    |
 | `POST …/connections`                            | Add one from `{ name, implementationId, settings, authentication }`, `ApiKey` or `None`; 201 with it. Its key is set separately. |
 | `GET …/connections/:connectionId`               | One connection.                                                                                                                  |
-| `POST …/connections/:connectionId/rename`       | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionApplication.Changed`.                 |
+| `POST …/connections/:connectionId/rename`       | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionService.Changed`.                     |
 | `PUT …/connections/:connectionId/settings`      | Replace its settings from `{ settings }`.                                                                                        |
 | `PUT …/connections/:connectionId/credential`    | Store `{ secret }` as its key, replacing any earlier one.                                                                        |
 | `DELETE …/connections/:connectionId/credential` | Delete its key.                                                                                                                  |
@@ -282,7 +282,7 @@ the built-in administrator tier adds, renames, configures, and removes them. The
 | `GET …/environments`                        | The environments the caller may read, by name, starting with the in-process one every workspace has.                |
 | `POST …/environments`                       | Add one from `{ name, harnessId, sandbox }`, where `sandbox` is null or its provider, placement, and settings; 201. |
 | `GET …/environments/:environmentId`         | One environment.                                                                                                    |
-| `POST …/environments/:environmentId/rename` | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `EnvironmentApplication.Changed`.   |
+| `POST …/environments/:environmentId/rename` | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `EnvironmentService.Changed`.       |
 | `PUT …/environments/:environmentId/sandbox` | Replace its sandbox settings from `{ sandbox }`: account connection, template, variables, setup, and retention.     |
 | `DELETE …/environments/:environmentId`      | Remove it; 204.                                                                                                     |
 
@@ -307,7 +307,7 @@ provider suggests come with the connection implementations, as
 | `GET …/agents/environment-choices`    | For `?connectionId=&model=&reasoning=`, each environment the caller may use, with whether it can run that model access.     |
 | `GET …/agents/:agentId`               | One agent.                                                                                                                  |
 | `PUT …/agents/:agentId/configuration` | Replace `{ instructions, model, environmentId }`.                                                                           |
-| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentApplication.Changed`.     |
+| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentService.Changed`.         |
 | `DELETE …/agents/:agentId`            | Remove its membership, as removing a member does; 204.                                                                      |
 
 An agent reads as `Agent.View`: its configuration, its membership's `memberId`, name, and role,
@@ -351,8 +351,8 @@ started with, where it begins in its agent's log for the thread (`logAfter`) and
 history starts from (`historyFrom`), the turn it retries (`retryOf`), its replies' `messageIds` in
 order, `failure`, `cancelReason`, and times, with `stoppable` and
 `retryable` for the caller. Stopping and retrying need permission to direct the agent (403
-otherwise). A turn in a thread the caller cannot open answers 404. `retry` takes an
-`Idempotency-Key`, so repeating it returns the turn it created.
+otherwise). A turn in a thread the caller cannot open answers 404. A turn is retried at most once,
+so repeating `retry` returns the turn it created.
 
 ## Authentication
 

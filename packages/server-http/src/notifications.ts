@@ -1,5 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
-import { NotificationApplication } from "@amends/core/notification";
+import { NotificationService } from "@amends/core/notification";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -21,8 +21,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              pendingOnly ? notifications.listPending(options) : notifications.list(options),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              pendingOnly
+                ? notificationService.listPending(options)
+                : notificationService.list(options),
             ),
           ),
         ),
@@ -31,8 +33,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              notifications.inbox(query),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              notificationService.inbox(query),
             ),
           ),
         ),
@@ -41,8 +43,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              Effect.map(notifications.countPending, (pending) => ({ pending })),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              Effect.map(notificationService.countPending, (pending) => ({ pending })),
             ),
           ),
         ),
@@ -51,10 +53,13 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              Effect.map(notifications.acknowledgeThrough(payload.through), (acknowledged) => ({
-                acknowledged,
-              })),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              Effect.map(
+                notificationService.acknowledgeThrough(payload.through),
+                (acknowledged) => ({
+                  acknowledged,
+                }),
+              ),
             ),
           ),
         ),
@@ -63,8 +68,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              notifications.get(params.notificationId),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              notificationService.get(params.notificationId),
             ),
           ),
         ),
@@ -73,8 +78,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              notifications.resolveSource(params.notificationId),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              notificationService.resolveSource(params.notificationId),
             ),
           ),
         ),
@@ -83,8 +88,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(NotificationApplication.Service, (notifications) =>
-              notifications.acknowledge(params.notificationId),
+            Effect.flatMap(NotificationService.Service, (notificationService) =>
+              notificationService.acknowledge(params.notificationId),
             ),
           ),
         ),

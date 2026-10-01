@@ -256,7 +256,7 @@ it("offers no retry for an agent that stopped taking part after its turn", async
   expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });
 });
 
-it("stops a turn, and retries one with a key it keeps until the retry goes through", async () => {
+it("stops a turn, and retries one again when the first answer is lost", async () => {
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
 
@@ -270,7 +270,7 @@ it("stops a turn, and retries one with a key it keeps until the retry goes throu
     stoppable: false,
   });
 
-  // A retry lost in transit asks again with the same key.
+  // A retry lost in transit asks again; a turn is retried once, so asking twice creates one turn.
   f.answers.push(new Response("unavailable", { status: 502 }));
   expect(f.views.controls.retry("atlas-1")).toBe(true);
   await waitFor(() =>
@@ -280,8 +280,7 @@ it("stops a turn, and retries one with a key it keeps until the retry goes throu
   await waitFor(() => expect(f.views.controls.acting()).toBeUndefined());
   const retries = f.writes.filter((write) => write.path.endsWith("/retry"));
   expect(retries).toHaveLength(2);
-  expect(retries[0]?.key).not.toBeNull();
-  expect(retries[1]?.key).toBe(retries[0]?.key);
+  expect(retries.map((write) => write.key)).toEqual([null, null]);
   expect(f.views.controls.problem()).toBeUndefined();
   // The failed attempt stays where it was, no longer retryable; the new one follows.
   expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });
@@ -292,14 +291,14 @@ it("names why a stop or retry was refused", async () => {
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
   f.answers.push(
-    json({ _tag: "TurnApplication.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
+    json({ _tag: "TurnService.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
   );
   f.views.controls.retry("atlas-1");
   await waitFor(() =>
     expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
   );
   f.answers.push(
-    json({ _tag: "TurnApplication.NotActive", turnId: "scout-2", status: "completed" }, 409),
+    json({ _tag: "TurnService.NotActive", turnId: "scout-2", status: "completed" }, 409),
   );
   f.views.controls.stop("scout-2");
   await waitFor(() =>
@@ -340,8 +339,15 @@ function eventStream(request: Request) {
   };
 }
 
-/** A turn's log followed over its stream, with the turn read beside it. */
-function followed(status: string, failure: string | null = null) {
+/**
+ * A turn's log followed over its stream, with the turn read beside it. `refuse` answers a
+ * subscription in place of opening its stream, by how many came before it.
+ */
+function followed(
+  status: string,
+  failure: string | null = null,
+  refuse: (subscription: number) => Response | undefined = () => undefined,
+) {
   const turn = {
     id: "atlas-1",
     workspaceId: "one",
@@ -368,6 +374,7 @@ function followed(status: string, failure: string | null = null) {
     retryable: status === "failed",
   };
   const streams: Array<ReturnType<typeof eventStream>> = [];
+  let subscriptions = 0;
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
@@ -376,6 +383,8 @@ function followed(status: string, failure: string | null = null) {
     if (path === "/workspaces/one/members") return json(members);
     if (path === "/workspaces/one/turns/atlas-1") return json(turn);
     if (path === "/workspaces/one/turns/atlas-1/log/events") {
+      const refused = refuse(subscriptions++);
+      if (refused !== undefined) return refused;
       const created = eventStream(request);
       streams.push(created);
       return created.response;
@@ -471,6 +480,39 @@ it("follows a turn's log again after it drops, opening with the items as they st
   });
   await waitFor(() => expect(kinds(f.view)).toEqual(["accepted", "started", "input", "input"]));
 });
+
+const refusals = {
+  gone: () => json({ _tag: "TurnService.NotFound", turnId: "atlas-1" }, 404),
+  denied: () =>
+    json(
+      {
+        _tag: "Authorization.Denied",
+        memberId: "owner",
+        requirement: {
+          permission: { name: "thread.read", targetKind: "Thread" },
+          target: { _tag: "Thread", workspaceId: "one", threadId: "thread" },
+        },
+      },
+      403,
+    ),
+};
+for (const [failure, refusal] of Object.entries(refusals))
+  it(`shows nothing of a turn it may no longer follow, once refused as ${failure}`, async () => {
+    const f = followed("running", null, (subscription) =>
+      subscription > 0 ? refusal() : undefined,
+    );
+    const stream = await f.connected(0);
+    stream.send({ _tag: "Opened", items: [{ _tag: "InputTaken", at: at(3), messages: 1 }] });
+    stream.send({ _tag: "Drafted", responseId: "r1", part: 0, offset: 0, text: "Deploy the " });
+    await waitFor(() => expect(f.view.draft()).toEqual({ text: "Deploy the ", broken: false }));
+    // Following ends, and subscribing again is refused: what it showed goes, with the turn.
+    stream.unavailable();
+    await waitFor(() => expect(f.view.failure()).toBe(failure), { timeout: 3000 });
+    expect(f.view.turn()).toBeUndefined();
+    expect(f.view.activity()).toEqual([]);
+    expect(f.view.draft()).toBeUndefined();
+    expect(f.view.loading()).toBe(false);
+  });
 
 it("tells a failed turn's end once, rather than as an interruption and again as its failure", async () => {
   const f = followed("failed", "Anthropic is limiting requests.");

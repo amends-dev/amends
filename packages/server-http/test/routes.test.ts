@@ -6,27 +6,27 @@ import type * as Core from "@amends/core";
 import { Authorization, Requirement, Target } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { Entry } from "@amends/core/journal";
-import { Notification, NotificationApplication } from "@amends/core/notification";
+import { Notification, NotificationService } from "@amends/core/notification";
 import {
   Group,
-  GroupApplication,
-  GroupFollowApplication,
+  GroupService,
+  GroupFollowService,
   GroupMembership,
-  GroupMembershipApplication,
+  GroupMembershipService,
 } from "@amends/core/group";
 import {
   Thread,
-  ThreadApplication,
-  ThreadMessageApplication,
+  ThreadService,
+  ThreadMessageService,
   ThreadParticipation,
-  ThreadParticipationApplication,
+  ThreadParticipationService,
 } from "@amends/core/thread";
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateService } from "@amends/core/read-state";
 import {
   Invitation,
-  InvitationApplication,
+  InvitationService,
   Member,
-  MemberApplication,
+  MemberService,
   MemberPermissions,
   Workspace,
 } from "@amends/core/workspace";
@@ -85,58 +85,52 @@ const threadId = Thread.Id.make("thread-one");
 /** Conversation services record their inputs; failures show that each tag keeps its status. */
 const conversations = Layer.mergeAll(
   Layer.succeed(
-    GroupApplication.Service,
-    GroupApplication.Service.of({
-      workspaceId,
+    GroupService.Service,
+    GroupService.Service.of({
       createTeam: record("group.create", () => Effect.succeed(team)),
       rename: record("group.rename", () => Effect.succeed(team)),
-      get: record("group.get", (id) => Effect.fail(new GroupApplication.NotFound({ groupId: id }))),
+      get: record("group.get", (id) => Effect.fail(new GroupService.NotFound({ groupId: id }))),
       listMine: record("group.listMine", () => Effect.succeed([])),
       listPublic: record("group.listPublic", () => Effect.succeed([])),
     }),
   ),
   Layer.succeed(
-    GroupMembershipApplication.Service,
-    GroupMembershipApplication.Service.of({
-      workspaceId,
+    GroupMembershipService.Service,
+    GroupMembershipService.Service.of({
       add: record("group.add", (input) =>
-        Effect.fail(new GroupMembershipApplication.AlreadyMember(input)),
+        Effect.fail(new GroupMembershipService.AlreadyMember(input)),
       ),
       join: record("group.join", (groupId) =>
-        Effect.fail(new GroupMembershipApplication.GroupNotFound({ groupId })),
+        Effect.fail(new GroupMembershipService.GroupNotFound({ groupId })),
       ),
       remove: record("group.remove", (input) =>
-        Effect.fail(new GroupMembershipApplication.FixedMembership({ groupId: input.groupId })),
+        Effect.fail(new GroupMembershipService.FixedMembership({ groupId: input.groupId })),
       ),
       leave: record("group.leave", (input) =>
-        Effect.fail(new GroupMembershipApplication.AlreadyRemoved(input)),
+        Effect.fail(new GroupMembershipService.AlreadyRemoved(input)),
       ),
       listCurrent: record("group.members", () => Effect.succeed([])),
     }),
   ),
   Layer.succeed(
-    GroupFollowApplication.Service,
-    GroupFollowApplication.Service.of({
-      workspaceId,
+    GroupFollowService.Service,
+    GroupFollowService.Service.of({
       follow: record("group.follow", () => Effect.void),
       unfollow: record("group.unfollow", (input) =>
-        Effect.fail(new GroupFollowApplication.NotFollowable({ groupId: input.groupId })),
+        Effect.fail(new GroupFollowService.NotFollowable({ groupId: input.groupId })),
       ),
     }),
   ),
   Layer.succeed(
-    ThreadApplication.Service,
-    ThreadApplication.Service.of({
-      workspaceId,
+    ThreadService.Service,
+    ThreadService.Service.of({
       startInGroup: record("thread.start", () =>
-        Effect.fail(new ThreadApplication.ParticipantUnavailable({ memberId })),
+        Effect.fail(new ThreadService.ParticipantUnavailable({ memberId })),
       ),
       startDirect: record("thread.startDirect", () =>
-        Effect.fail(new ThreadApplication.DirectMembersRequired()),
+        Effect.fail(new ThreadService.DirectMembersRequired()),
       ),
-      get: record("thread.get", (id) =>
-        Effect.fail(new ThreadApplication.NotFound({ threadId: id })),
-      ),
+      get: record("thread.get", (id) => Effect.fail(new ThreadService.NotFound({ threadId: id }))),
       listInGroup: record("thread.list", () => Effect.succeed([])),
       listOpenings: record("thread.openings", () => Effect.succeed([])),
       readTimeline: record("thread.timeline", () => Effect.succeed([])),
@@ -144,33 +138,30 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    ThreadMessageApplication.Service,
-    ThreadMessageApplication.Service.of({
-      workspaceId,
+    ThreadMessageService.Service,
+    ThreadMessageService.Service.of({
       publish: record("thread.publish", () =>
-        Effect.fail(new ThreadMessageApplication.HumanAuthorRequired({ memberId })),
+        Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
       ),
     }),
   ),
   Layer.succeed(
-    ThreadParticipationApplication.Service,
-    ThreadParticipationApplication.Service.of({
-      workspaceId,
+    ThreadParticipationService.Service,
+    ThreadParticipationService.Service.of({
       follow: record("thread.follow", (id) =>
-        Effect.fail(new ThreadParticipationApplication.ThreadNotFound({ threadId: id })),
+        Effect.fail(new ThreadParticipationService.ThreadNotFound({ threadId: id })),
       ),
       unfollow: record("thread.unfollow", (input) =>
-        Effect.fail(new ThreadParticipationApplication.AlreadyEnded(input)),
+        Effect.fail(new ThreadParticipationService.AlreadyEnded(input)),
       ),
     }),
   ),
   Layer.succeed(
-    ReadStateApplication.Service,
-    ReadStateApplication.Service.of({
-      workspaceId,
+    ReadStateService.Service,
+    ReadStateService.Service.of({
       markThreadRead: record("thread.markRead", ({ threadId, throughSequence }) =>
         Effect.fail(
-          new ReadStateApplication.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
+          new ReadStateService.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
         ),
       ),
       markGroupRead: record("group.markRead", () => Effect.void),
@@ -180,19 +171,18 @@ const conversations = Layer.mergeAll(
 const operations = Layer.mergeAll(
   conversations,
   Layer.succeed(
-    NotificationApplication.Service,
-    NotificationApplication.Service.of({
-      workspaceId,
+    NotificationService.Service,
+    NotificationService.Service.of({
       resolveSource: record("notification.resolveSource", (notificationId) =>
-        Effect.fail(new NotificationApplication.SourceUnavailable({ notificationId })),
+        Effect.fail(new NotificationService.SourceUnavailable({ notificationId })),
       ),
       acknowledge: record("notification.acknowledge", (notificationId) =>
-        Effect.fail(new NotificationApplication.AlreadyHandled({ notificationId })),
+        Effect.fail(new NotificationService.AlreadyHandled({ notificationId })),
       ),
       get: record("notification.get", (notificationId) =>
         notificationId === notification.id
           ? Effect.succeed(notification)
-          : Effect.fail(new NotificationApplication.NotFound({ workspaceId, notificationId })),
+          : Effect.fail(new NotificationService.NotFound({ workspaceId, notificationId })),
       ),
       list: record("notification.list", () => Effect.succeed([notification])),
       listPending: record("notification.listPending", () => Effect.succeed([notification])),
@@ -202,13 +192,12 @@ const operations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    MemberApplication.Service,
-    MemberApplication.Service.of({
-      workspaceId,
+    MemberService.Service,
+    MemberService.Service.of({
       get: record("get", (target) =>
         target === memberId
           ? Effect.succeed(member)
-          : Effect.fail(new MemberApplication.NotFound({ workspaceId, memberId: target })),
+          : Effect.fail(new MemberService.NotFound({ workspaceId, memberId: target })),
       ),
       remove: record("remove", () => Effect.fail(denied)),
       rename: record("rename", (name) =>
@@ -224,8 +213,8 @@ const operations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
-    InvitationApplication.Service,
-    InvitationApplication.Service.of({
+    InvitationService.Service,
+    InvitationService.Service.of({
       issue: record("issue", (request) =>
         Effect.succeed({
           details: {
@@ -417,7 +406,7 @@ it.effect("individual notification reads encode records and expose a typed 404",
         .pipe(Effect.flip),
     );
     expect(missing).toMatchObject({
-      _tag: "NotificationApplication.NotFound",
+      _tag: "NotificationService.NotFound",
       workspaceId,
       notificationId: "missing",
     });
@@ -445,7 +434,7 @@ it.effect("domain outcomes keep their tags and statuses", () =>
         .get({ params: { workspaceId, memberId: Member.Id.make("missing") } })
         .pipe(Effect.flip),
     );
-    expect(missing).toMatchObject({ _tag: "MemberApplication.NotFound", memberId: "missing" });
+    expect(missing).toMatchObject({ _tag: "MemberService.NotFound", memberId: "missing" });
     const notMember = yield* run("bob", (client) =>
       client.members.get({ params: { workspaceId, memberId } }).pipe(Effect.flip),
     );

@@ -11,14 +11,13 @@ import {
 
 import {
   Group,
-  GroupApplication,
+  GroupService,
   GroupMembership,
-  GroupMembershipApplication,
+  GroupMembershipService,
   GroupMembershipFacts,
   GroupMembershipPermissions,
   GroupMembershipStore,
   GroupPermissions,
-  GroupStore,
 } from "@amends/core/group";
 
 import { Actor, Identity } from "@amends/core/identity";
@@ -28,10 +27,9 @@ import {
   Invitation,
   InvitationFacts,
   Member,
-  MemberApplication,
+  MemberService,
   MemberFacts,
   MemberPermissions,
-  MemberStore,
 } from "@amends/core/workspace";
 
 import { Gateway } from "@amends/gateway";
@@ -67,18 +65,18 @@ export const groupMemberships = (harness: Harness) => {
       id: Identity.HumanId.make("manager"),
     });
     const add = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.add({ groupId, memberId }),
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.add({ groupId, memberId }),
       );
     const create = (name: string, memberIds: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name, memberIds }),
       );
     const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
     const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(journalId, { limit: 100 });
@@ -100,7 +98,7 @@ export const groupMemberships = (harness: Harness) => {
                 [agentId, { _tag: "Agent", id: Identity.AgentId.make("new-agent") }],
               ] as const)
                 yield* journal.publish(MemberFacts.Added, {
-                  workspaceId: bound.workspace.workspaceId,
+                  workspaceId: bound.store.workspaceId,
                   memberId,
                   identity,
                 });
@@ -134,14 +132,14 @@ export const groupMemberships = (harness: Harness) => {
         bound,
         Effect.flatMap(Journal.Service, (journal) =>
           journal.publish(AssignmentFacts.Created, {
-            workspaceId: bound.workspace.workspaceId,
+            workspaceId: bound.store.workspaceId,
             assignmentId: Assignment.Id.make("group-management"),
             memberId: managerId,
             source: {
               _tag: "Direct",
               grant: Grant.make(GroupMembershipPermissions.Manage, {
                 _tag: "Target",
-                target: { _tag: "Group", workspaceId: bound.workspace.workspaceId, groupId },
+                target: { _tag: "Group", workspaceId: bound.store.workspaceId, groupId },
               }),
             },
           }),
@@ -149,21 +147,21 @@ export const groupMemberships = (harness: Harness) => {
       );
 
     const remove = (membership: GroupMembership.Record) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.remove({
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.remove({
           groupId: membership.groupId,
           membershipId: membership.id,
         }),
       );
     const leave = (membership: GroupMembership.Record) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.leave({
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.leave({
           groupId: membership.groupId,
           membershipId: membership.id,
         }),
       );
     const removeWorkspaceMember = (id: Member.Id) =>
-      Effect.flatMap(MemberApplication.Service, (service) => service.remove(id));
+      Effect.flatMap(MemberService.Service, (memberService) => memberService.remove(id));
     const memberActor = (memberId: Member.Id) =>
       Actor.Value.make({
         workspaceId,
@@ -196,7 +194,7 @@ export const groupMemberships = (harness: Harness) => {
               const own = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(Group.GeneralId, owner.memberId),
               );
-              const refused = new GroupMembershipApplication.GeneralMembership({
+              const refused = new GroupMembershipService.GeneralMembership({
                 groupId: Group.GeneralId,
               });
               // Nobody, person or agent, leaves it or is removed, however broad the authority.
@@ -398,16 +396,12 @@ export const groupMemberships = (harness: Harness) => {
               const membership = yield* run(bound, owner, add(group.id, humanId));
               const before = yield* history(bound);
               for (const [groupId, memberId, tag] of [
-                [Group.Id.make("missing"), humanId, "GroupMembershipApplication.GroupNotFound"],
-                [foreignGroup.id, humanId, "GroupMembershipApplication.GroupNotFound"],
-                [group.id, Member.Id.make("missing"), "GroupMembershipApplication.MemberNotFound"],
-                [
-                  group.id,
-                  otherWorkspace.ownerMemberId,
-                  "GroupMembershipApplication.MemberNotFound",
-                ],
-                [group.id, agentId, "GroupMembershipApplication.InactiveMember"],
-                [group.id, humanId, "GroupMembershipApplication.AlreadyMember"],
+                [Group.Id.make("missing"), humanId, "GroupMembershipService.GroupNotFound"],
+                [foreignGroup.id, humanId, "GroupMembershipService.GroupNotFound"],
+                [group.id, Member.Id.make("missing"), "GroupMembershipService.MemberNotFound"],
+                [group.id, otherWorkspace.ownerMemberId, "GroupMembershipService.MemberNotFound"],
+                [group.id, agentId, "GroupMembershipService.InactiveMember"],
+                [group.id, humanId, "GroupMembershipService.AlreadyMember"],
               ] as const)
                 expect(yield* Effect.flip(run(bound, owner, add(groupId, memberId)))).toMatchObject(
                   {
@@ -449,16 +443,16 @@ export const groupMemberships = (harness: Harness) => {
               );
               const human = memberActor(humanId);
               const createTeam = (name: string, visibility: Group.Visibility) =>
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.createTeam({ name, memberIds: [humanId], visibility }),
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  groupService.createTeam({ name, memberIds: [humanId], visibility }),
                 );
               const flags = (actor: Actor.Value, groupId: Group.Id) =>
                 run(
                   bound,
                   actor,
                   Effect.map(
-                    Effect.flatMap(GroupApplication.Service, (service) =>
-                      service.listMine({ limit: 100 }),
+                    Effect.flatMap(GroupService.Service, (groupService) =>
+                      groupService.listMine({ limit: 100 }),
                     ),
                     (items) => {
                       const item = items.find((listed) => listed.group.id === groupId);
@@ -483,13 +477,13 @@ export const groupMemberships = (harness: Harness) => {
               });
               // The owner moderates, but only from inside the group, which they join first.
               expect(yield* Effect.flip(run(bound, owner, remove(agentThere)))).toMatchObject({
-                _tag: "GroupMembershipApplication.GroupNotFound",
+                _tag: "GroupMembershipService.GroupNotFound",
               });
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-                  service.join(lobby.id),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.join(lobby.id),
                 ),
               );
               expect(yield* flags(owner, lobby.id)).toEqual([true, true, true]);
@@ -531,14 +525,16 @@ export const groupMemberships = (harness: Harness) => {
                 ),
               );
               const createPublic = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.createTeam({ name, memberIds, visibility: "Public" }),
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  groupService.createTeam({ name, memberIds, visibility: "Public" }),
                 );
               const listPublic = (options: Group.ListOptions) =>
-                Effect.flatMap(GroupApplication.Service, (service) => service.listPublic(options));
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  groupService.listPublic(options),
+                );
               const join = (groupId: Group.Id) =>
-                Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-                  service.join(groupId),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.join(groupId),
                 );
               const lobby = yield* run(bound, owner, createPublic("Lobby", [managerId]));
               const quiet = yield* run(bound, owner, createPublic("Quiet", []));
@@ -607,7 +603,7 @@ export const groupMemberships = (harness: Harness) => {
               yield* bound.store.transaction(bound.groups.insert(direct));
               for (const id of [group.id, direct.id, Group.Id.make("missing")])
                 expect(yield* Effect.flip(run(bound, human, join(id)))).toMatchObject({
-                  _tag: "GroupMembershipApplication.GroupNotFound",
+                  _tag: "GroupMembershipService.GroupNotFound",
                   groupId: id,
                 });
               // Someone without group.join neither finds public groups nor joins one.
@@ -707,7 +703,7 @@ export const groupMemberships = (harness: Harness) => {
               ),
             );
             expect(yield* Effect.flip(afterRemoval)).toMatchObject({
-              _tag: "GroupMembershipApplication.InactiveMember",
+              _tag: "GroupMembershipService.InactiveMember",
             });
             expect(yield* history(bound)).toEqual(before);
             expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
@@ -797,10 +793,13 @@ export const groupMemberships = (harness: Harness) => {
                     bound,
                     saved.owner,
                     Effect.gen(function* () {
-                      const service = yield* GroupMembershipApplication.Service;
+                      const groupMembershipService = yield* GroupMembershipService.Service;
                       yield* Deferred.succeed(ready, undefined);
                       yield* Deferred.await(start);
-                      return yield* service.add({ groupId: saved.group.id, memberId: humanId });
+                      return yield* groupMembershipService.add({
+                        groupId: saved.group.id,
+                        memberId: humanId,
+                      });
                     }),
                   );
                 }),
@@ -819,7 +818,7 @@ export const groupMemberships = (harness: Harness) => {
                 _tag: "Some",
                 value: {
                   _tag: expect.stringMatching(
-                    /^(GroupMembershipApplication.AlreadyMember|JournalStore.Conflict)$/,
+                    /^(GroupMembershipService.AlreadyMember|JournalStore.Conflict)$/,
                   ),
                 },
               });
@@ -885,13 +884,13 @@ export const groupMemberships = (harness: Harness) => {
               yield* grant(bound, group.id);
               yield* call(humanId);
               expect(yield* Effect.flip(call(humanId))).toEqual(
-                new GroupMembershipApplication.AlreadyMember({
+                new GroupMembershipService.AlreadyMember({
                   groupId: group.id,
                   memberId: humanId,
                 }),
               );
               expect(yield* Effect.flip(call(Member.Id.make("missing")))).toEqual(
-                new GroupMembershipApplication.MemberNotFound({
+                new GroupMembershipService.MemberNotFound({
                   memberId: Member.Id.make("missing"),
                 }),
               );
@@ -905,14 +904,14 @@ export const groupMemberships = (harness: Harness) => {
                 ),
               );
               expect(yield* Effect.flip(call(agentId))).toEqual(
-                new GroupMembershipApplication.InactiveMember({ memberId: agentId }),
+                new GroupMembershipService.InactiveMember({ memberId: agentId }),
               );
               const missing = Group.Id.make("missing");
               expect(
                 yield* Effect.flip(
                   gateway.asMember(workspace.id, ownerIdentity, add(missing, humanId)),
                 ),
-              ).toEqual(new GroupMembershipApplication.GroupNotFound({ groupId: missing }));
+              ).toEqual(new GroupMembershipService.GroupNotFound({ groupId: missing }));
               yield* publish(
                 bound,
                 Effect.flatMap(Journal.Service, (journal) =>
@@ -929,75 +928,6 @@ export const groupMemberships = (harness: Harness) => {
             }),
           ),
         ),
-    );
-
-    it.effect("inconsistent stores are rejected before a membership can be published", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const { bound, group, otherGroup, owner } = yield* prepare();
-            const before = yield* history(bound);
-            const badGroup = {
-              ...bound,
-              context: Context.add(bound.context, GroupStore.Service, {
-                ...bound.groups,
-                get: () => Effect.succeedSome(otherGroup),
-              }),
-            };
-            expect(yield* Effect.flip(run(badGroup, owner, add(group.id, humanId)))).toMatchObject({
-              _tag: "GroupMembershipApplication.InvalidResponse",
-            });
-            const badMember = {
-              ...bound,
-              context: Context.add(bound.context, MemberStore.Service, {
-                ...bound.members,
-                get: (id) => (id === humanId ? bound.members.get(agentId) : bound.members.get(id)),
-              }),
-            };
-            expect(yield* Effect.flip(run(badMember, owner, add(group.id, humanId)))).toMatchObject(
-              {
-                _tag: "GroupMembershipApplication.InvalidResponse",
-              },
-            );
-            const badMembership = {
-              ...bound,
-              context: Context.add(bound.context, GroupMembershipStore.Service, {
-                ...bound.groupMemberships,
-                // The owner's own admission reads correctly; the human's comes back wrong.
-                findActive: (groupId: Group.Id, memberId: Member.Id) =>
-                  memberId === humanId
-                    ? Effect.succeedSome({
-                        id: GroupMembership.Id.make("wrong-membership"),
-                        workspaceId,
-                        groupId: otherGroup.id,
-                        memberId: humanId,
-                        admittedAt: group.createdAt,
-                        status: "active" as const,
-                      })
-                    : bound.groupMemberships.findActive(groupId, memberId),
-              }),
-            };
-            expect(
-              yield* Effect.flip(run(badMembership, owner, add(group.id, humanId))),
-            ).toMatchObject({ _tag: "GroupMembershipApplication.InvalidResponse" });
-            const foreignStore = {
-              ...bound,
-              context: Context.add(bound.context, GroupMembershipStore.Service, {
-                ...bound.groupMemberships,
-                workspaceId: otherWorkspaceId,
-              }),
-            };
-            expect(
-              yield* Effect.flip(run(foreignStore, owner, add(group.id, humanId))),
-            ).toMatchObject({
-              _tag: "GroupAudience.InvalidResponse",
-            });
-            expect(yield* history(bound)).toEqual(before);
-            expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
-          }),
-        ),
-      ),
     );
 
     it.effect(
@@ -1103,14 +1033,14 @@ export const groupMemberships = (harness: Harness) => {
                   expect(
                     yield* Effect.flip(run(bound, actor, leave(other.admission))),
                   ).toMatchObject({
-                    _tag: "GroupMembershipApplication.NotFound",
+                    _tag: "GroupMembershipService.NotFound",
                   });
                 }
                 expect(yield* run(bound, actor, leave(admission))).toEqual(
                   Object.assign({}, admission, { status: "removed" }),
                 );
                 expect(yield* Effect.flip(run(bound, actor, leave(admission)))).toMatchObject({
-                  _tag: "GroupMembershipApplication.AlreadyRemoved",
+                  _tag: "GroupMembershipService.AlreadyRemoved",
                 });
                 expect(
                   yield* Effect.flip(run(bound, actor, add(group.id, actor.memberId))),
@@ -1255,10 +1185,10 @@ export const groupMemberships = (harness: Harness) => {
               );
               const before = yield* history(bound);
               expect(yield* Effect.flip(run(bound, owner, remove(old)))).toMatchObject({
-                _tag: "GroupMembershipApplication.AlreadyRemoved",
+                _tag: "GroupMembershipService.AlreadyRemoved",
               });
               expect(yield* Effect.flip(run(bound, actor, leave(old)))).toMatchObject({
-                _tag: "GroupMembershipApplication.AlreadyRemoved",
+                _tag: "GroupMembershipService.AlreadyRemoved",
               });
               for (const input of [
                 { groupId: group.id, membershipId: GroupMembership.Id.make("missing") },
@@ -1271,12 +1201,12 @@ export const groupMemberships = (harness: Harness) => {
                       run(
                         bound,
                         operation === "remove" ? owner : actor,
-                        Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-                          service[operation](input),
+                        Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                          groupMembershipService[operation](input),
                         ),
                       ),
                     ),
-                  ).toMatchObject({ _tag: "GroupMembershipApplication.NotFound" });
+                  ).toMatchObject({ _tag: "GroupMembershipService.NotFound" });
                 }
               }
               expect(yield* history(bound)).toEqual(before);
@@ -1407,7 +1337,7 @@ export const groupMemberships = (harness: Harness) => {
               const before = yield* history(bound);
               expect(
                 yield* Effect.flip(run(bound, owner, removeWorkspaceMember(humanId))),
-              ).toMatchObject({ _tag: "MemberApplication.AlreadyRemoved" });
+              ).toMatchObject({ _tag: "MemberService.AlreadyRemoved" });
               expect(yield* history(bound)).toEqual(before);
             }),
           ),
@@ -1665,7 +1595,7 @@ export const groupMemberships = (harness: Harness) => {
               expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                 value: {
                   _tag: expect.stringMatching(
-                    /^(GroupMembershipApplication.AlreadyRemoved|JournalStore.Conflict)$/,
+                    /^(GroupMembershipService.AlreadyRemoved|JournalStore.Conflict)$/,
                   ),
                 },
               });
@@ -1742,7 +1672,7 @@ export const groupMemberships = (harness: Harness) => {
                 expect(Cause.findErrorOption(outcome.cause)).toMatchObject({
                   value: {
                     _tag: expect.stringMatching(
-                      /^(GroupMembershipApplication.InactiveMember|JournalStore.Conflict)$/,
+                      /^(GroupMembershipService.InactiveMember|JournalStore.Conflict)$/,
                     ),
                   },
                 });
@@ -1838,55 +1768,6 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
 
-    it.effect("inconsistent admission responses abort departures and workspace cleanup", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const { bound, group, owner } = yield* prepare();
-            const admission = yield* run(bound, owner, add(group.id, humanId));
-            const before = yield* history(bound);
-            for (const wrong of [
-              Object.assign({}, admission, { id: GroupMembership.Id.make("wrong") }),
-              Object.assign({}, admission, { workspaceId: otherWorkspaceId }),
-            ]) {
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, GroupMembershipStore.Service, {
-                  ...bound.groupMemberships,
-                  get: () => Effect.succeedSome(wrong),
-                }),
-              };
-              expect(yield* Effect.flip(run(broken, owner, remove(admission)))).toMatchObject({
-                _tag: "GroupMembershipApplication.InvalidResponse",
-              });
-            }
-            for (const wrong of [
-              Object.assign({}, admission, { memberId: agentId }),
-              Object.assign({}, admission, { workspaceId: otherWorkspaceId }),
-              Object.assign({}, admission, { status: "removed" as const }),
-            ]) {
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, GroupMembershipStore.Service, {
-                  ...bound.groupMemberships,
-                  listActiveByMember: () => Effect.succeed([wrong]),
-                }),
-              };
-              expect(
-                yield* Effect.flip(run(broken, owner, removeWorkspaceMember(humanId))),
-              ).toMatchObject({ _tag: "MemberApplication.InvalidResponse" });
-            }
-            expect(yield* bound.members.get(humanId)).toMatchObject({
-              value: { status: "active" },
-            });
-            expect(yield* bound.groupMemberships.get(admission.id)).toEqual(Option.some(admission));
-            expect(yield* history(bound)).toEqual(before);
-          }),
-        ),
-      ),
-    );
-
     it.effect(
       "gateway exposes departure outcomes and accepts self-leave with no management grant",
       () =>
@@ -1927,7 +1808,7 @@ export const groupMemberships = (harness: Harness) => {
                   gateway.asMember(workspace.id, managerIdentity, leave(admission)),
                 ),
               ).toEqual(
-                new GroupMembershipApplication.AlreadyRemoved({
+                new GroupMembershipService.AlreadyRemoved({
                   groupId: group.id,
                   membershipId: admission.id,
                 }),
@@ -1943,7 +1824,7 @@ export const groupMemberships = (harness: Harness) => {
                   ),
                 ),
               ).toEqual(
-                new GroupMembershipApplication.NotFound({
+                new GroupMembershipService.NotFound({
                   groupId: group.id,
                   membershipId: GroupMembership.Id.make("missing"),
                 }),
@@ -1952,7 +1833,7 @@ export const groupMemberships = (harness: Harness) => {
                 yield* Effect.flip(
                   gateway.asMember(workspace.id, ownerIdentity, remove(admission)),
                 ),
-              ).toMatchObject({ _tag: "GroupMembershipApplication.AlreadyRemoved" });
+              ).toMatchObject({ _tag: "GroupMembershipService.AlreadyRemoved" });
             }),
           ),
         ),
@@ -2008,7 +1889,7 @@ export const groupMemberships = (harness: Harness) => {
                 yield* Effect.flip(
                   run(bound, { ...actor, memberId: newMemberId }, leave(admission)),
                 ),
-              ).toMatchObject({ _tag: "GroupMembershipApplication.NotFound" });
+              ).toMatchObject({ _tag: "GroupMembershipService.NotFound" });
               expect(yield* bound.groupMemberships.findActive(group.id, newMemberId)).toEqual(
                 Option.some(fresh),
               );

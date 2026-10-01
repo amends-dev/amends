@@ -1,7 +1,7 @@
 # Gateway
 
 `@amends/gateway` is how a host enters core. Core operates within one workspace
-with a trusted actor, and its application services are the operations. The
+with a trusted actor, and its services are the operations. The
 gateway does the two things core cannot do for itself: bootstrap a workspace,
 and bind a workspace's storage and resolve an authenticated identity into the
 actor so those services can run. HTTP, RPC, and MCP all enter the same way and then
@@ -55,7 +55,7 @@ is sufficient to type-check a supplied implementation.
 - `createWorkspace(creator, input, options?)` accepts `Workspace.CreateInput` with a required
   name, allocates a workspace ID, and runs core initialization for the creator. With
   `options.requestKey`, the ID is derived from the creator and key, so a retry returns the
-  workspace its first attempt created, and a different name returns `Request.Reused`.
+  workspace its first attempt created, whatever name the retry gives.
   Core rejects blank or untrimmed names before committing any facts. The caller
   has authenticated the creator and checked entitlement.
 - `asMember(workspaceId, identity, program)` resolves the identity's active membership
@@ -205,7 +205,7 @@ signals.
 Programs fail only with outcomes a caller can act on. Domain errors from core
 pass through unchanged. The gateway adds `NotMember` when the identity has no
 active membership, `WorkspaceNotFound` when invitation acceptance names a workspace that was
-never created, `Request.Reused` when a request key returns for a different request, `Conflict` for retryable storage contention, `Uncertain`
+never created, `Conflict` for retryable storage contention, `Uncertain`
 when a commit's outcome is unknown, and `InvalidInput` when core rejects
 caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its

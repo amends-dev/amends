@@ -224,7 +224,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         });
       // Its own commit, holding only the log: the workspace's transactions do not wait for it.
       return yield* transaction(
-        Effect.flatMap(Store.Transaction, (native) => native.append(request)),
+        Effect.flatMap(Store.Transaction, (storeTransaction) => storeTransaction.append(request)),
         (session) => ({ id: session.commit.id, append: (input) => append(session, input) }),
         { workspace: false },
       );

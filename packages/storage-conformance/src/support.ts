@@ -1,6 +1,6 @@
 /** Fixtures the suites share: identities, bound stores, and cores and gateways over a host. */
 import * as Core from "@amends/core";
-import { ReadStateStore } from "@amends/core/attention";
+import { ReadStateStore } from "@amends/core/read-state";
 import {
   Assignment,
   AssignmentFacts,
@@ -9,17 +9,23 @@ import {
   type Role,
   RoleStore,
 } from "@amends/core/authorization";
-import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
+import { GroupQuery, GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
 import { type Actor, Identity, Performer } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   type ThreadActivity,
   ThreadActivityKind,
+  ThreadActivityResolvers,
   ThreadActivityStore,
+  ThreadCommand,
+  ThreadMessage,
   ThreadMessageActivity,
   ThreadMessageStore,
+  ThreadMessageTimeline,
   ThreadParticipationStore,
+  ThreadParticipationTimeline,
+  ThreadQuery,
   ThreadStore,
 } from "@amends/core/thread";
 import {
@@ -39,7 +45,7 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnDispatch, TurnStore } from "@amends/core/turn";
+import { TurnDispatch, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
@@ -144,8 +150,7 @@ export const installed = {
  * the background process it expects, as a host's runner would.
  */
 export const manualWakes: WorkspaceWakes.Interface = {
-  forWorkspace: (workspaceId) =>
-    BackgroundWakes.Service.of({ workspaceId, request: () => Effect.void }),
+  forWorkspace: () => BackgroundWakes.Service.of({ request: () => Effect.void }),
 };
 export const layerManualWakes = Layer.succeed(WorkspaceWakes.Service, manualWakes);
 
@@ -278,25 +283,25 @@ export const make = (harness: Harness) => {
           Effect.gen(function* () {
             for (const member of members)
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.workspace.workspaceId,
+                workspaceId: bound.store.workspaceId,
                 memberId: member.memberId,
                 identity: member.identity,
               });
             for (const viewer of viewers)
               yield* journal.publish(AssignmentFacts.Created, {
-                workspaceId: bound.workspace.workspaceId,
+                workspaceId: bound.store.workspaceId,
                 assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
                 memberId: viewer.memberId,
                 source: {
                   _tag: "Role",
                   roleId: BuiltinRoles.MemberId,
-                  scope: { _tag: "Workspace", workspaceId: bound.workspace.workspaceId },
+                  scope: { _tag: "Workspace", workspaceId: bound.store.workspaceId },
                 },
               });
           }),
         ),
       ).pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       ),
     /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */
@@ -310,6 +315,48 @@ export const publishedMessage = (activity: ThreadActivity.Record) =>
   ThreadActivityKind.is(ThreadMessageActivity.Published)(activity)
     ? Schema.decodeUnknownSync(ThreadMessageActivity.Published.details)(activity.details).messageId
     : undefined;
+
+/**
+ * A post's result with the timeline activity that placed its message, read back from the store:
+ * starts and replies return what they created, not where it landed in the timeline.
+ */
+export const placed = Effect.fnUntraced(function* <
+  A extends { readonly message: ThreadMessage.Record },
+>(result: A) {
+  const threadActivityStore = yield* ThreadActivityStore.Service;
+  const found = (yield* threadActivityStore.listByThread(result.message.threadId)).find(
+    (activity) => publishedMessage(activity) === result.message.id,
+  );
+  if (found === undefined) return yield* Effect.die(new Error("A posted message has no activity"));
+  const activity = yield* Effect.orDie(
+    ThreadActivityKind.decode(ThreadMessageActivity.Published, found),
+  );
+  return Object.assign({}, result, { activity });
+});
+
+/** `placed`, reading a workspace binding's store, for a post made through the gateway. */
+export const placedIn =
+  (bound: Bound) =>
+  <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
+    placed(result).pipe(Effect.provideService(ThreadActivityStore.Service, bound.activities));
+
+/**
+ * Core's internal thread reads and writes, for fixtures that write what no operation does. Provide
+ * it over a workspace's core; timelines resolve as core registers them.
+ */
+export const threadInternals = ThreadCommand.layer.pipe(
+  Layer.provideMerge(ThreadQuery.layer),
+  Layer.provide(
+    Layer.mergeAll(
+      GroupQuery.layer,
+      ThreadActivityResolvers.layer([
+        ThreadMessageTimeline.resolver,
+        ThreadParticipationTimeline.resolver,
+        TurnTimeline.resolver,
+      ]),
+    ),
+  ),
+);
 
 /** Attribution for low-level fixture writes outside application operations. */
 export const testProvenance = (id = workspaceId): Event.Provenance => ({

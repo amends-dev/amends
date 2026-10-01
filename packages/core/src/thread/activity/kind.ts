@@ -77,15 +77,14 @@ export interface Prepared extends Pick<
 const occurrenceKey = (name: string, parts: ReadonlyArray<string> | null) =>
   parts === null ? null : JSON.stringify([name, ...parts]);
 
-/** Validate a kind's details and derive what the activity records from them. */
+/** Derive what an activity of a kind records from its details. */
 export const prepare = Effect.fn("ThreadActivityKind.prepare")(function* <K extends Definition>(
   kind: K,
-  input: K["details"]["Type"],
+  details: K["details"]["Type"],
 ) {
-  const details = yield* Schema.decodeUnknownEffect(Schema.toType(kind.details))(input);
   return {
     kind: ThreadActivity.Kind.make(kind.name),
-    subject: yield* Schema.decodeEffect(Subject.Value)(kind.subject(details)),
+    subject: kind.subject(details),
     occurrence: occurrenceKey(kind.name, kind.occurrence(details)),
     newActivity: kind.newActivity,
     details: yield* Schema.encodeEffect(kind.details)(details),
@@ -98,27 +97,18 @@ export const is =
   (activity: ThreadActivity.Record): boolean =>
     activity.kind === kind.name;
 
-/**
- * Read an activity as this kind, decoding its details. Its subject, occurrence, and new-activity
- * flag must be what the kind derives from them.
- */
+/** Read an activity as this kind, decoding its details; one of another kind is a Mismatch. */
 export const decode = Effect.fn("ThreadActivityKind.decode")(function* <K extends Definition>(
   kind: K,
   activity: ThreadActivity.Record,
 ) {
-  const details = yield* Schema.decodeEffect(kind.details)(activity.details);
-  const derived = yield* prepare(kind, details);
-  if (
-    activity.kind !== derived.kind ||
-    activity.subject !== derived.subject ||
-    activity.occurrence !== derived.occurrence ||
-    activity.newActivity !== derived.newActivity
-  )
+  if (activity.kind !== kind.name)
     return yield* new Mismatch({ kind: kind.name, activityId: activity.id });
+  const details = yield* Schema.decodeEffect(kind.details)(activity.details);
   return Object.assign({}, activity, { details }) as Activity<K>;
 });
 
-/** An activity whose recorded fields disagree with its kind's definition. */
+/** An activity read as a kind it is not. */
 export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind.Mismatch", {
   kind: Schema.String,
   activityId: ThreadActivity.Id,

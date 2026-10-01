@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
-import type { WorkspaceId } from "../../workspace/id.ts";
+
 import type { MemberId } from "../../workspace/member/id.ts";
 import type { Group } from "../group.ts";
 import type { GroupId } from "../id.ts";
@@ -18,7 +18,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupMembershipSto
 
 /** Projection storage for admissions, retaining their workspace-membership references. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (
     id: GroupMembership.Id,
   ) => Effect.Effect<Option.Option<GroupMembership.Record>, Failure>;

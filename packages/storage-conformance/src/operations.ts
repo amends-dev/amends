@@ -1,12 +1,12 @@
 import { Identity } from "@amends/core/identity";
-import { Assignment, AssignmentApplication } from "@amends/core/authorization";
+import { Assignment, AssignmentService } from "@amends/core/authorization";
 import {
   Invitation,
-  InvitationApplication,
+  InvitationService,
   Member,
-  MemberApplication,
+  MemberService,
   Ownership,
-  OwnershipApplication,
+  OwnershipService,
   Workspace,
 } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
@@ -33,7 +33,7 @@ export const renameMember = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(MemberApplication.Service, (members) => members.rename(name)),
+      Effect.flatMap(MemberService.Service, (memberService) => memberService.rename(name)),
     ),
   );
 
@@ -46,7 +46,7 @@ export const getMember = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(MemberApplication.Service, (members) => members.get(memberId)),
+      Effect.flatMap(MemberService.Service, (memberService) => memberService.get(memberId)),
     ),
   );
 
@@ -59,7 +59,7 @@ export const removeMember = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(MemberApplication.Service, (members) => members.remove(memberId)),
+      Effect.flatMap(MemberService.Service, (memberService) => memberService.remove(memberId)),
     ),
   );
 
@@ -72,7 +72,9 @@ export const invite = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(InvitationApplication.Service, (invitations) => invitations.issue(request)),
+      Effect.flatMap(InvitationService.Service, (invitationService) =>
+        invitationService.issue(request),
+      ),
     ),
   );
 
@@ -85,8 +87,8 @@ export const acceptInvitation = (
   Effect.flatMap(Gateway.Service, (gateway) =>
     gateway.inWorkspace(
       workspaceId,
-      Effect.flatMap(InvitationApplication.Service, (invitations) =>
-        invitations.accept(invitationId, recipient, name === undefined ? {} : { name }),
+      Effect.flatMap(InvitationService.Service, (invitationService) =>
+        invitationService.accept(invitationId, recipient, name === undefined ? {} : { name }),
       ),
     ),
   );
@@ -100,8 +102,8 @@ export const revokeInvitation = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(InvitationApplication.Service, (invitations) =>
-        invitations.revoke(invitationId),
+      Effect.flatMap(InvitationService.Service, (invitationService) =>
+        invitationService.revoke(invitationId),
       ),
     ),
   );
@@ -111,7 +113,7 @@ export const ownership = (workspaceId: Workspace.Id, identity: Identity.MemberRe
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(OwnershipApplication.Service, (service) => service.get),
+      Effect.flatMap(OwnershipService.Service, (ownershipService) => ownershipService.get),
     ),
   );
 export const transferOwnership = (
@@ -123,7 +125,9 @@ export const transferOwnership = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(OwnershipApplication.Service, (service) => service.transfer(input)),
+      Effect.flatMap(OwnershipService.Service, (ownershipService) =>
+        ownershipService.transfer(input),
+      ),
     ),
   );
 
@@ -132,7 +136,10 @@ export const permissions = (workspaceId: Workspace.Id, identity: Identity.Member
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(AssignmentApplication.Service, (service) => service.permissions),
+      Effect.flatMap(
+        AssignmentService.Service,
+        (assignmentService) => assignmentService.permissions,
+      ),
     ),
   );
 export const access = (
@@ -144,7 +151,9 @@ export const access = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(AssignmentApplication.Service, (service) => service.list(memberId)),
+      Effect.flatMap(AssignmentService.Service, (assignmentService) =>
+        assignmentService.list(memberId),
+      ),
     ),
   );
 export const assign = (
@@ -156,7 +165,9 @@ export const assign = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(AssignmentApplication.Service, (service) => service.assign(input)),
+      Effect.flatMap(AssignmentService.Service, (assignmentService) =>
+        assignmentService.assign(input),
+      ),
     ),
   );
 export const change = (
@@ -168,7 +179,9 @@ export const change = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(AssignmentApplication.Service, (service) => service.change(input)),
+      Effect.flatMap(AssignmentService.Service, (assignmentService) =>
+        assignmentService.change(input),
+      ),
     ),
   );
 export const revokeAssignment = (
@@ -181,8 +194,8 @@ export const revokeAssignment = (
     gateway.asMember(
       workspaceId,
       identity,
-      Effect.flatMap(AssignmentApplication.Service, (service) =>
-        service.revoke(memberId, assignmentId),
+      Effect.flatMap(AssignmentService.Service, (assignmentService) =>
+        assignmentService.revoke(memberId, assignmentId),
       ),
     ),
   );

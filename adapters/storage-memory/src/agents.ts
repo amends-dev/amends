@@ -26,7 +26,6 @@ export const make = Effect.fn("Agents.make")(function* () {
       return record;
     });
   return AgentStore.Service.of({
-    workspaceId,
     get: Effect.fn("Agents.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Agent.Id)(input);

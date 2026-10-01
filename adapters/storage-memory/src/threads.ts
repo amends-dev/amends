@@ -24,7 +24,6 @@ export const make = Effect.fn("Threads.make")(function* () {
     return records.filter((record) => record.groupId === groupId);
   });
   return ThreadStore.Service.of({
-    workspaceId,
     get: Effect.fn("Threads.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Thread.Id)(input);

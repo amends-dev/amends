@@ -37,7 +37,7 @@ domains; workspace scoping alone does not make a feature part of workspace
 management.
 
 `@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
-contract, `NotificationApplication`, and the projection that generates notifications. A record
+contract, `NotificationService`, and the projection that generates notifications. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient (one Triage
 recipient per workspace, `{ _tag: "Triage" }`), and is `Pending`, `Discarded` when its agent
 participation ends or its person leaves the source's group, `Acknowledged` once a human saw it, or `Informational` from the start when
@@ -45,14 +45,14 @@ its activity asks an agent for no work, as another agent's message does. Each ac
 records `requestsWork`. A human or agent recipient names the
 membership notified as well as the identity (`Notification.ofMember`), so an inbox belongs to one
 membership: someone who rejoins under a new member ID starts with an empty one.
-`NotificationApplication` serves the acting member's own inbox (`get`, `list`, `listPending`, and
+`NotificationService` serves the acting member's own inbox (`get`, `list`, `listPending`, and
 `inbox`, newest first with each source they can still read), `resolveSource`, and human
 `acknowledge`; contact and triage inboxes are read only through the
 store. `NotificationProjection`
 generates notifications from each recorded thread activity's recipients, and settles pending agent
 input when a participation ends, from the activity and its own notifications alone. A human's `Seen` is private state the store keeps outside the
-journal. Internal `NotificationSource` resolves a notification's recorded activity for
-`resolveSource`. Notifications never create turns, accept their input, or execute work. See
+journal. `resolveSource` and `inbox` read a notification's recorded activity as its timeline
+shows it, under the recipient's current access. Notifications never create turns, accept their input, or execute work. See
 [reading the inbox](../../docs/thread-workflows.md#reading-the-inbox),
 [resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source),
 and [acknowledging a notification](../../docs/thread-workflows.md#acknowledging-a-notification).
@@ -87,7 +87,7 @@ are `InvitationFacts`; their projection is `InvitationProjection.definition`.
 
 Use short filenames within feature directories and descriptive module namespaces:
 `member/store.ts` exports `MemberStore`, and `member/application.ts` exports
-`MemberApplication`. Keep the named domain model file instead of collecting
+`MemberService`. Keep the named domain model file instead of collecting
 unrelated types in a general `schema.ts` or `types.ts` file.
 
 Core tests follow the domain and feature directories under `test/`. Tests that
@@ -113,31 +113,46 @@ build a read screen do not authorize a later write. Stores still require a valid
 workspace transaction for every mutation. A read invoked inside an existing commit
 uses that transaction and sees its staged changes without opening another one.
 
+Core trusts what storage returns: the adapters decode each record and scope it to its workspace,
+and the storage conformance suites check that. Operations use stored records as they come, without
+decoding or cross-checking them again, and a record core itself wrote that is missing is a defect
+rather than a typed error. Storage failures still reach callers as they are. Core validates what
+crosses into it instead: callers' input, an actor or target from another workspace, and what a
+turn's runner or harness reports.
+
+A host binds the journal store to one workspace, and that binding is the only place a service
+learns which workspace it serves: services that need the workspace ID read it from `Store.Service`.
+Projection stores, signals, wakes, and turn dispatch are bound the same way and carry no ID of
+their own.
+
 ## Groups
 
 `@amends/core/group` holds team and direct groups, their admissions, and follows.
-`GroupApplication` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
+`GroupService` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
 `get`);
-`GroupMembershipApplication` adds, removes, and lets members join public groups and leave team
+`GroupMembershipService` adds, removes, and lets members join public groups and leave team
 groups, and reads rosters;
-`GroupFollowApplication` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
+`GroupFollowService` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
 `GroupFollowStore` are required host bindings. A direct group has a fixed set of two or more
 members in `Group.directMembers` order, identified by `Group.directKey` and found in any order
-through `GroupStore.findDirect`; internal `DirectGroups.establish` finds or creates one for
-`ThreadApplication.startDirect`.
+through `GroupStore.findDirect`; `GroupCommand.establishDirect` finds or creates one for
+`ThreadService.startDirect`.
 
-Internal `GroupAudience.require` checks current workspace and group membership, with no action
-permission and no management bypass; each application checks its own action grant alongside it,
-inside its commit for writes. `GroupMembershipDeparture` records a group departure as one fact;
-projections end the member's follow of the group and every thread participation held through the
-admission together, without thread activity. Workspace-member removal uses it for every admission. See
+Groups share their internal reads and writes as one `GroupQuery` and one `GroupCommand`, excluded
+from `Core.Operations` like thread's. `GroupQuery.requireAudience` checks current workspace and
+group membership, with no action permission and no management bypass; each service checks its
+own action grant alongside it, inside its commit for writes. `GroupCommand.admitMember` publishes an
+admission, for team creation, direct groups, adding, and joining alike.
+`GroupCommand.removeMembership` records a group departure as one fact; projections end the
+member's follow of the group and every thread participation held through the admission together,
+without thread activity. Workspace-member removal uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
 
 ## Connections
 
 `@amends/core/connection` holds workspace connections: access to an external system through an
 implementation the host installed, described by the [connection contract](../connection/README.md).
-`ConnectionApplication` lists and reads the connections the actor may read, and creates, renames,
+`ConnectionService` lists and reads the connections the actor may read, and creates, renames,
 configures, sets and clears the credential of, and removes them; `implementations` lists the
 declarations this host installed, which every member may see. Reads return `Connection.View`:
 the record without its credential, whether one is set, whether this host installed the
@@ -176,7 +191,7 @@ its provider has one, a template, non-secret variables, setup commands run in or
 retention, `stop` or `destroy`. Model access, instructions, and toolkits belong to agents, and
 credentials to connections.
 
-`EnvironmentApplication` lists the installed `implementations`, which every member may see, and
+`EnvironmentService` lists the installed `implementations`, which every member may see, and
 lists, reads, creates, renames, configures, and removes environments. Creating checks the harness
 (`UnknownHarness`), that it can run where asked (`UnsupportedPlacement`), the provider
 (`UnknownSandboxProvider`), and the sandbox settings (`InvalidSandbox`, with issue codes): an
@@ -185,7 +200,8 @@ which declares the sandbox capability for this provider, and a template only whe
 takes one. The harness, provider, and placement are fixed once created; `configure` replaces the
 rest of the sandbox settings. Reads return `Environment.View` with `manageable` and readiness,
 `Ready` or `Incomplete` with issue codes, from the catalog and the account connection's own
-readiness; nothing contacts the provider.
+readiness; nothing contacts the provider. `EnvironmentQuery.assessReadiness` is that one
+assessment, which agents read too when they report whether they can run.
 
 Every workspace starts with `Environment.InProcessId`, amends's own harness in process without a
 sandbox, recorded at initialization with no creator. It is an ordinary environment afterwards.
@@ -210,7 +226,7 @@ its model access (a connection, a model identifier, and a reasoning level or nul
 environment it starts in. Credentials stay with the connection, and where and how it runs with the
 environment.
 
-`AgentApplication.create` adds the membership with its name, a workspace-scoped assignment of the
+`AgentService.create` adds the membership with its name, a workspace-scoped assignment of the
 initial role, admission to the general group, and the agent's record, in one commit. It requires
 `agent.create` on the workspace, and the role goes through `Delegation.requireGrant`, so only the
 owner gives an agent Administrator and nobody gives it Owner. The actor must be able to read and
@@ -220,7 +236,7 @@ connection that is not yet ready is saved and shows as the agent's readiness, wh
 model inference, a harness that does not speak the connection's interface, or a reasoning level it
 does not take is refused (`Incompatible`, with the reasons). `configure` replaces the instructions,
 model access, and environment under the same checks, `rename` renames the membership with the
-name it expects (`Changed`), and `remove` removes the membership through `MemberApplication.remove`,
+name it expects (`Changed`), and `remove` removes the membership through `MemberService.remove`,
 with its delegation rules; the record remains for history. `environmentChoices` answers the check
 for each environment the actor may read and use, for choosing where an agent starts.
 
@@ -249,12 +265,14 @@ execution starts, the replies it published, and why it failed or was asked to st
 works, its row changes only with its status and the input it accepts; its progress lives in the
 log.
 
-Agents handle their own notifications as people do theirs. `TurnAcceptance`, the `turn.accept`
-background process, acts as each agent: its pending work notifications on a thread join the
+Agents handle their own notifications as people do theirs. `TurnCommand.acceptWork`, the
+`turn.accept` background process, acts as each agent: its pending work notifications on a thread join the
 active turn there, or start a new one, and the same commit settles them as `Acknowledged` with
-outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, and while
-the agent cannot open the thread. A new turn's input starts where the agent's latest turn in the
-same participation stopped taking input in, as that turn's entries say, so what a cancelled or
+outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, while the
+active turn belongs to a participation that ended, so an agent that left and came back is not
+handed work by the turn being stopped as departed, and while the agent cannot open the thread.
+A new turn's input starts where the agent's latest turn in the same participation stopped taking
+input in, as that turn's entries say, so what a cancelled or
 failed turn accepted but never took in is the next turn's to handle; its entries follow what the
 agent's log holds when it is created, and its history starts from that log's latest checkpoint:
 the latest turn's own, or the one that turn started from. It wakes on activity that requests an agent's
@@ -275,23 +293,23 @@ retry, the thread's `History` before the first turn, `Checkpoint`s that replace 
 them, and its `Ended` with the outcome, the replies, and why it failed or was stopped
 ([core model](../../docs/core-model.md#agreed-an-agents-memory-in-a-thread-is-one-log-of-its-turns)).
 Only one turn writes there at a time, so a turn's entries sit together after its `logAfter`, read
-by `TurnLog.entriesOf`. `TurnLog.reader` is the one reading of a turn's entries, taking them as they
+by `TurnLog.readTurnEntries`. `TurnLog.reader` is the one reading of a turn's entries, taking them as they
 come, and `TurnLog.read` reads them at once: its harness events, how far input is taken in, its
 transcript and the view it leaves, the replies it owes, input asked of it, the items its readers
 see, what it started with, how it ended, its latest checkpoint's position, and its attempts since it
 last got further (a response finished, a tool call completed, or a checkpoint), with the latest
 interruption and whether the last attempt died without recording one, and how often its context
 proved full since its last finished response, as its harness reported or its provider refused,
-and whether a checkpoint is owed for it. `TurnLog.context` reads the
+and whether a checkpoint is owed for it. `TurnLog.buildContext` reads the
 log for a turn from its latest checkpoint: earlier turns as the view each left, without reasoning,
 followed by a note from `TurnLog.noteAuthor` when a turn that started failed or was stopped by
 request, then the turn's own work. The log has begun once a turn recorded the thread's history,
 started, or recorded a checkpoint; a turn that ended before it started does not begin it. `TurnExecution` is what a
 host's runner drives, each step its own commit attributed to the turn's agent: `start` a queued
 turn with its selection and the agent's instructions now, which for a participation's first turn
-records the thread's history in the log first, record each `attempt`, a `checkpoint`, `submitted`
-batches, whose first record stands and is what execution hands the harness, and what the
-environment and harness `report`, where input the harness says it took in must be a batch as
+records the thread's history in the log first, record each attempt (`recordAttempt`), a checkpoint (`recordCheckpoint`), submitted
+batches (`recordSubmission`), whose first record stands and is what execution hands the harness, and what the
+environment and harness report (`recordEvents`), where input the harness says it took in must be a batch as
 recorded, and `close` it. Closing requires
 all accepted input taken in and no work still waiting for the agent on the thread, both checked in
 the closing commit; otherwise it reports `InputPending`. It then publishes every answer the turn
@@ -299,9 +317,9 @@ owes, in order, each as the agent's own message to the thread's current particip
 naming the turn that posted it (`turnId` on the message):
 each finished response with text and no tool calls that more input followed, and the last. It
 checks the agent may still open and post in the thread, and records completion with the messages.
-A turn can complete without a reply. `fail` and `stopped` end a turn and publish nothing. Every way
+A turn can complete without a reply. `fail` and `confirmStopped` end a turn and publish nothing. Every way
 a turn ends, including a queued turn stopped by a reader or because its agent left, goes through
-`TurnEnding`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
+`TurnCommand.endTurn`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
 thread's timeline, and appends `Ended` to its agent's log. `prepare` assembles what a run needs from
 the stores: the agent's instructions and the model access and environment the turn started with
 or, before it starts, the agent's current ones, the connection's settings and key, the history and
@@ -312,31 +330,35 @@ before its input (the agent's own as responses), which starting records in the l
 bounded size. A message longer than 40,000 characters is given in pieces. `prepare` also gives the
 waiting input piece by piece with where each came from, the size of the input asked of the turn,
 and what a provider last measured since the latest checkpoint, so the runner, which knows the
-model, can tell with `TurnLog.compaction` whether a checkpoint must come first: in tokens against a
+model, can tell with `TurnLog.proposeCompaction` whether a checkpoint must come first: in tokens against a
 budget, the newest exchanges within what it keeps, cut at an input or a response and never between
 two pieces of one waiting message, with the turn's own input kept verbatim when the cut falls
 inside its work, and everything kept without reasoning. The runner records it with a summary of
-the rest before working; `checkpoint` records it in the log, from which the turn's and the next
+the rest before working; `recordCheckpoint` records it in the log, from which the turn's and the next
 turn's history start, and when the summary covered waiting input, the position it reaches, which
 counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
-when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
+when its connection has no key. `get` reads the turn, for a run to watch. `showDraft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal.
 
-`TurnApplication.watchLog` follows a turn's log for a reader who may open its thread, as a stream
+`TurnService.watchLog` follows a turn's log for a reader who may read its thread, as a stream
 of `Turn.LogMessage`s. It tails the agent's log with `Log.tail`, from the turn's `logAfter`, taking
 the turn's entries into one `TurnLog.reader` until its `Ended` entry or another turn's, the reading
 `log` returns: `Opened` carries the items as they stand, `Changed` the items each new batch adds or
 changes, by index, and `Ended` follows the turn's end, which its log records in the commit that
 ends it, after everything it wrote. It passes on the turn's `TurnDraft` signals as `Drafted`, first
 what the response being written holds so far: a draft carries only what follows the text before
-it, so `TurnDrafts` holds each turn's drafts in memory as they reach the process, forgetting a
+it, so `TurnQuery` holds each turn's drafts in memory as they reach the process, forgetting a
 turn's ten minutes after its last, and a reader who starts following mid-response begins with
 them. The drafts subscription registers before the turn and its log are read, so nothing published
-in between is missed. Each batch checks that the reader still may open the thread; a stream that cannot go on
-fails with `Turn.LogUnavailable`.
+in between is missed. Each batch checks that the reader still may read the thread, and so does
+each commit that changes the reader's groups or grants, or a role's permissions, which it follows
+through `ChangeFeedSource` as the change feed does; its subscription registers before the turn is
+read too. Drafts are not checked one by one: following ends once the commit that took the
+reader's access is delivered, so a reader who lost it sees at most the drafts sent while that
+delivery was on its way. A stream that cannot go on fails with `Turn.LogUnavailable`.
 
 A turn's changes also show in its thread's timeline, recorded as thread activity in the commits
-that make them (the `TurnActivity` kinds, which `TurnActivityRecorder` records): `turn.created` where the agent took on the work, or where a retry
+that make them (the `TurnActivity` kinds, which `TurnCommand.recordActivity` records): `turn.created` where the agent took on the work, or where a retry
 asked again (naming the turn it retries), `turn.started`, `turn.stopping` once a working turn is
 asked to stop or its agent stops taking part, and `turn.ended` with its outcome, the replies it
 posted, and why it failed or was stopped. Each carries what its item shows, so `TurnTimeline`
@@ -347,12 +369,15 @@ The commit that creates or retries a turn asks `TurnDispatch` to run it, through
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
 the turn. The gateway binds
 `TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
-and environments.
+and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
+from a person's message through the wake, acceptance, and dispatch to the reply.
 
-`TurnApplication` lets a reader who may open a thread `get` and `listByThread` its turns, as
+`TurnService` lets a reader who may read a thread `get` and `listByThread` its turns, as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
-(`retryable`) now. A thread the reader cannot open is `ThreadNotFound`. `listActive` gives the
-workspace's active turns in threads the reader may open, among at most `limit` active turns, and
+(`retryable`) now. Every turn read requires what the thread's timeline does: the group's audience
+and `thread.read` on the thread. A thread outside the reader's audience is `ThreadNotFound`, and
+one they may not read is `Authorization.Denied`. `listActive` gives the workspace's active turns
+in threads the reader may read, among at most `limit` active turns, and
 `log` a turn with its log as its readers see it (`Turn.LogView`): each batch of input taken in,
 each response's text from its text blocks completed so far, with the blocks it holds and whether
 the turn owes it as a reply, and interruptions, with when each was recorded, never reasoning or a
@@ -366,14 +391,19 @@ current configuration. Only the agent's latest turn on
 the thread can be retried, while no other is active and the agent still takes part there;
 otherwise it is `NotRetryable` with the reason (`active`, `completed`, `superseded`, or
 `departed`). A retry is created after the turn it retries, even on a clock that has not moved, and
-takes a request key, so repeating it returns the turn it created. Turn facts reach the thread's
+takes its ID from the turn it retries, so repeating it returns the turn it created. Turn facts reach the thread's
 readers through the change feed; the timeline shows an agent's reply as its message, and no turn
 activity of its own yet.
 
 ## Read state
 
-`@amends/core/attention` holds private read state: `ReadStateApplication.markThreadRead` and
+`@amends/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the required `ReadStateStore` binding, which is kept outside the journal.
+Its internal `ReadStateCommand.markThreadRead` marks the reader's notifications from the thread
+seen and advances their position; marking a thread read, starting one, and replying all use it, so
+an author has read what they posted. It is one part of the
+[attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient): what
+makes ambient activity visible.
 The thread and group projections keep each thread's and group's latest message from recorded
 thread activity, through `ThreadStore.recordLatest` and `GroupStore.recordLatest`, and notifications from thread activity carry their thread and
 sequence, so reading a thread settles exactly its notifications. See
@@ -397,27 +427,28 @@ every thread belongs to one group.
 ## Threads
 
 `@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
-four store contracts. Its operations are `ThreadApplication` (`startInGroup`, `startDirect`, `get`,
-`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageApplication.publish`, and
-`ThreadParticipationApplication` (`follow`, `unfollow`). A participant is a member, a contact, or
+four store contracts. Its operations are `ThreadService` (`startInGroup`, `startDirect`, `get`,
+`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageService.publish`, and
+`ThreadParticipationService` (`follow`, `unfollow`). A participant is a member, a contact, or
 triage: member participation references the exact group admission, while contacts and triage take
 part without group access. A message author is a member or a contact.
 
-Internal services carry the shared work inside the caller's commit and publication context, with
-no action checks of their own; they are excluded from `Core.Operations`:
+Two internal services carry the work operations share, with no action checks of their own; they
+are excluded from `Core.Operations`. `ThreadQuery` holds the reads and `ThreadCommand` the writes,
+which run inside the caller's commit and publication context. A command may read through
+`ThreadQuery`; a query never writes.
 
-| Service                        | Role                                                                                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `ThreadStart`                  | The one start every workflow uses: creates the thread, admits its starters, records the first message |
-| `ThreadCreation`               | Validates and records a new thread for `ThreadStart`                                                  |
-| `ThreadMessagePublication`     | Publishes a message with its admissions, activity, and recipients                                     |
-| `ThreadParticipationAdmission` | Finds eligible members and current participants, and admits new ones                                  |
-| `ThreadParticipationDeparture` | Ends a participation with its activity when its member unfollows the thread                           |
-| `ThreadActivityPublisher`      | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
-| `ThreadActivityRecording`      | Assigns the next timeline position and records `ThreadActivityFacts.Recorded`                         |
-| `ThreadAccess`                 | Checks current group access to a thread, shared by reads and writes                                   |
-| `ThreadActivityReading`        | Resolves timeline subjects under access, for timeline pages and notification sources                  |
-| `ThreadActivityResolvers`      | Routes each activity kind to the resolver its domain registers                                        |
+| Method                                                                    | Role                                                                                                  |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                   |
+| `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                |
+| `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                          |
+| `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                   |
+| `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message |
+| `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients                                     |
+| `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
+
+`ThreadActivityResolvers` routes each activity kind to the resolver its domain registers.
 
 Every activity kind uses `ThreadActivityFacts.Recorded`, carrying an activity and its selected
 recipients; the activity, thread, group, and notification projections each consume that one
@@ -443,8 +474,8 @@ facts with `ThreadActivityKind.make(name, { details, subject, occurrence?, newAc
 `ThreadActivityKind.prepare` derives those fields from the details, and `ThreadActivityKind.decode`
 reads an activity back as its kind, rejecting one whose derived fields disagree.
 
-A domain publishes activity through `ThreadActivityPublisher.publish`, in its operation's commit.
-The publisher takes the thread's next position, failing with `PositionChanged` when an
+A domain publishes activity through `ThreadCommand.publishActivity`, in its operation's commit.
+It takes the thread's next position, failing with `PositionChanged` when an
 `expectedSequence` is given and activity took that position first. It admits the participants the
 operation asks for, then runs the domain's step, which publishes the domain fact and returns the
 kind, details, and recipients. The activity is recorded at that position, caused by that fact.
@@ -455,8 +486,8 @@ A kind appears in timelines through a resolver its domain registers:
 kinds reference in one batch per page and returns typed items; each timeline module adds its item
 type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers, and
 `ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new
-kind adds its resolver to the first and its item schema to the second. Reading a kind without a resolver fails the read with
-`ThreadActivityReading.InvalidResponse`.
+kind adds its resolver to the first and its item schema to the second. Reading a kind without a
+resolver is a defect, `ThreadActivityResolvers.Unknown`.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without
@@ -466,11 +497,13 @@ See [thread workflows](../../docs/thread-workflows.md).
 
 ## Request keys
 
-`@amends/core/request` holds `Request.Key`, the `Request.Options` creating operations accept, and
-`Request.Reused`. Starts, replies, group creation, and invitation issuance pass their decoded input
-through the internal `RequestReceipts.once`, which records a `request.completed` receipt (the input's
-digest and the created records' IDs) in the operation's commit, and on a retry reads those records
-back instead of running again. See [retrying safely](../../docs/thread-workflows.md#retrying-safely).
+`@amends/core/request` holds `Request.Key`, the `Request.Options` creating operations accept,
+`Request.derivedId`, which derives an ID from parts naming an operation, its requester, and a key,
+and `Request.idFor`, a new ID without a key or a derived one with it. Each creating operation names
+what it creates that way, so a retry runs the operation's checks, finds the record by its ID, and
+returns it instead of creating another. The key alone names the request: a retry gets what the key
+created whatever it asks for. A turn retry derives its turn's ID from the turn it retries and
+takes no key. See [retrying safely](../../docs/thread-workflows.md#retrying-safely).
 
 ## Permission declarations and built-in roles
 
@@ -494,7 +527,7 @@ records all three roles and one workspace-scoped Owner assignment for its creato
 The reserved role IDs are stable within each workspace; display names are labels.
 
 Tiers only construct these default bundles. Authorization checks stored permission
-names and scopes, and application services enforce ownership and delegation rules.
+names and scopes, and services enforce ownership and delegation rules.
 `Permission.Reference` retains only the name and target kind used by requirements,
 preserving the HTTP error contract without exposing bundle-construction metadata.
 
@@ -511,15 +544,17 @@ host, grants nothing, since no requirement can name it, and its holder's other g
 Member takes part in conversations and creates, renames, joins, and manages the groups it belongs
 to; Administrator adds people management, invitations, role changes, and `group.moderate` for
 public groups; Owner adds workspace rename and ownership transfer. No role reaches a group from
-outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentApplication` provides listing, assignment,
+outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentService` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
 clients can offer just the actions the member may take. `Delegation` supplies the shared
-rules used by assignments, invitations, and member removal. Role definition editing
+rules used by assignments, invitations, and member removal. `AssignmentCommand.assignRole` and
+`revokeAssignment` record a workspace role's assignment and its end, for assignment changes,
+ownership transfer, accepted invitations, new agents, and workspace creation alike. Role definition editing
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)
 for the implemented bundles and current invitation restrictions.
 
-`OwnershipApplication` coordinates ownership and assignments in one commit. It
+`OwnershipService` coordinates ownership and assignments in one commit. It
 requires the current owner and `OwnershipPermissions.Transfer`, validates another
 active human recipient, and uses the current Owner assignment ID as the expected
 authority for a transfer. The former owner becomes an Administrator. `WorkspaceStore`
@@ -570,7 +605,7 @@ The existing journal log reader and projection replay retain complete-batch read
 ## Change feed
 
 `@amends/core/change-feed` exports the `ChangeFeed` schemas and
-`ChangeFeedApplication.watch(options?)`. The feed reads the workspace journal, so it
+`ChangeFeedService.watch(options?)`. The feed reads the workspace journal, so it
 carries every commit to the journal from any host or process over the same storage,
 including commits whose acknowledgment was lost. Nothing is published from the
 commit path.
@@ -621,7 +656,7 @@ so reconnecting from the last cursor resets. The follower logs it and continues.
 
 Recorded thread activity also carries the notifications its projection creates. Each
 recipient's arrives in the same `Committed` message's `notifications`, derived with
-`Notification.generated` exactly as the projection stores it, so it equals what the inbox
+`Notification.fromActivity` exactly as the projection stores it, so it equals what the inbox
 lists; human and agent recipients receive their own, whether or not they may read the thread,
 and nobody else sees them. A commit with no visible events and no notifications for the reader
 sends nothing, so a reader's cursor only advances with commits it sees.
@@ -649,13 +684,13 @@ to the subscribers present at that moment, in every process over the same storag
 Publishing never fails the operation that publishes, and a subscriber that falls behind, or whose
 process loses its connection to the others, misses signals rather than delaying anyone.
 
-`SignalApplication.typing(threadId)` tells the thread's readers that the acting member is
-composing there until `until`, six seconds later (`SignalApplication.typingFor`). It requires
+`SignalService.typing(threadId)` tells the thread's readers that the acting member is
+composing there until `until`, six seconds later (`SignalService.typingFor`). It requires
 current group access and `thread.publish`, as posting does, and returns `ThreadNotFound` for
 missing and inaccessible threads alike. Repeats from the same member in the same thread within two
 seconds are dropped by the process that receives them, so a client may call it on each keystroke;
-clients hide their own member's typing. `ReadStateApplication` and
-`NotificationApplication.acknowledge` publish the read-state signals after their writes.
+clients hide their own member's typing. `ReadStateService` and
+`NotificationService.acknowledge` publish the read-state signals after their writes.
 
 ## Background work
 
@@ -688,7 +723,7 @@ but not of `Core.Operations`, since no actor runs it. The gateway runs it for ho
 
 ## Module dependencies and exports
 
-Models and ID modules are independent of application services, projections, and
+Models and ID modules are independent of services, projections, and
 storage implementations. Facts depend on models and the fact declaration API.
 Projections depend on facts, store contracts, and projection machinery; they
 replay recorded outcomes without re-evaluating current authority or time.
@@ -708,7 +743,7 @@ names. Avoid importing an aggregate barrel from an internal module.
 import { MemberStore } from "./store.ts";
 
 // From another package:
-import { Member, MemberApplication } from "@amends/core/workspace";
+import { Member, MemberService } from "@amends/core/workspace";
 ```
 
 The domain `index.ts` files define the public package surface. A feature folder
@@ -738,7 +773,7 @@ consistent across modules. Typed errors retain tagged error schemas.
 | `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`, `Store.AppendOptions`.                                                                                                |
 | `State`              | A lifecycle variant with associated data: `Invitation.State`.                                                                                                                   |
 | `Status`             | A simple lifecycle label: `Member.Status`, `Assignment.Status`.                                                                                                                 |
-| `Interface`          | The contract implemented by a context service: `MemberApplication.Interface`, `MemberStore.Interface`.                                                                          |
+| `Interface`          | The contract implemented by a context service: `MemberService.Interface`, `MemberStore.Interface`.                                                                              |
 
 Supporting types name their actual role. `Invitation.Issuance` is the immutable
 issuance record retained through acceptance or revocation. `Event.Envelope`
@@ -848,31 +883,31 @@ meaning rather than using it as a synonym for a constructor.
 
 ## Service boundaries
 
-| Implementation            | Constructor                             | Layer provides                           |
-| ------------------------- | --------------------------------------- | ---------------------------------------- |
-| Transaction               | `Transaction.make()`                    | `Transaction.Service`                    |
-| Log                       | `Log.make()`                            | `Log.Service` and `Transaction.Service`  |
-| Journal                   | `Journal.make(options)`                 | `Journal.Service`                        |
-| Change-feed follower      | `ChangeFeedSource.make(options?)`       | `ChangeFeedSource.Service`               |
-| Permission catalog        | `PermissionCatalog.make(definitions)`   | `PermissionCatalog.Service`              |
-| Grant resolver            | `GrantResolver.make()`                  | `GrantResolver.Service`                  |
-| Authorization             | `Authorization.make()`                  | `Authorization.Service`                  |
-| Member operations         | `MemberApplication.make()`              | `MemberApplication.Service`              |
-| Thread operations         | `ThreadApplication.make()`              | `ThreadApplication.Service`              |
-| Thread participation      | `ThreadParticipationApplication.make()` | `ThreadParticipationApplication.Service` |
-| Human message publication | `ThreadMessageApplication.make()`       | `ThreadMessageApplication.Service`       |
-| Notification reads        | `NotificationApplication.make()`        | `NotificationApplication.Service`        |
-| Team creation and reads   | `GroupApplication.make()`               | `GroupApplication.Service`               |
-| Group membership          | `GroupMembershipApplication.make()`     | `GroupMembershipApplication.Service`     |
-| Group following           | `GroupFollowApplication.make()`         | `GroupFollowApplication.Service`         |
-| Read state                | `ReadStateApplication.make()`           | `ReadStateApplication.Service`           |
-| Group audience policy     | `GroupAudience.make()`                  | `GroupAudience.Service`                  |
-| Assignment operations     | `AssignmentApplication.make()`          | `AssignmentApplication.Service`          |
-| Delegation policy         | `Delegation.make()`                     | `Delegation.Service`                     |
-| Invitation operations     | `InvitationApplication.make()`          | `InvitationApplication.Service`          |
-| Ownership operations      | `OwnershipApplication.make()`           | `OwnershipApplication.Service`           |
-| Change feed               | `ChangeFeedApplication.make()`          | `ChangeFeedApplication.Service`          |
-| Typing signals            | `SignalApplication.make()`              | `SignalApplication.Service`              |
+| Implementation            | Constructor                           | Layer provides                          |
+| ------------------------- | ------------------------------------- | --------------------------------------- |
+| Transaction               | `Transaction.make()`                  | `Transaction.Service`                   |
+| Log                       | `Log.make()`                          | `Log.Service` and `Transaction.Service` |
+| Journal                   | `Journal.make(options)`               | `Journal.Service`                       |
+| Change-feed follower      | `ChangeFeedSource.make(options?)`     | `ChangeFeedSource.Service`              |
+| Permission catalog        | `PermissionCatalog.make(definitions)` | `PermissionCatalog.Service`             |
+| Grant resolver            | `GrantResolver.make()`                | `GrantResolver.Service`                 |
+| Authorization             | `Authorization.make()`                | `Authorization.Service`                 |
+| Member operations         | `MemberService.make()`                | `MemberService.Service`                 |
+| Thread operations         | `ThreadService.make()`                | `ThreadService.Service`                 |
+| Thread participation      | `ThreadParticipationService.make()`   | `ThreadParticipationService.Service`    |
+| Human message publication | `ThreadMessageService.make()`         | `ThreadMessageService.Service`          |
+| Notification reads        | `NotificationService.make()`          | `NotificationService.Service`           |
+| Team creation and reads   | `GroupService.make()`                 | `GroupService.Service`                  |
+| Group membership          | `GroupMembershipService.make()`       | `GroupMembershipService.Service`        |
+| Group following           | `GroupFollowService.make()`           | `GroupFollowService.Service`            |
+| Read state                | `ReadStateService.make()`             | `ReadStateService.Service`              |
+| Group internal reads      | `GroupQuery.make()`                   | `GroupQuery.Service`                    |
+| Assignment operations     | `AssignmentService.make()`            | `AssignmentService.Service`             |
+| Delegation policy         | `Delegation.make()`                   | `Delegation.Service`                    |
+| Invitation operations     | `InvitationService.make()`            | `InvitationService.Service`             |
+| Ownership operations      | `OwnershipService.make()`             | `OwnershipService.Service`              |
+| Change feed               | `ChangeFeedService.make()`            | `ChangeFeedService.Service`             |
+| Typing signals            | `SignalService.make()`                | `SignalService.Service`                 |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
 `Signals.Service` is a host contract too, bound to one workspace like the stores.
@@ -889,7 +924,7 @@ and use those resources within that scope; the corresponding layer owns cleanup.
 
 The root `core.ts` is a composition of these layers, with no separate service
 implementation to construct. `HostServices` remains derived from its input
-requirements and `Operations` from the application services it exposes.
+requirements and `Operations` from the services it exposes.
 
 ## Other construction APIs
 

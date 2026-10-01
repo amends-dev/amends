@@ -39,7 +39,6 @@ export const make = Effect.fn("Members.make")(function* () {
       Effect.mapError(storeFailure(MemberStore, operation)),
     );
   return MemberStore.Service.of({
-    workspaceId,
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(members.id, id))), Array.head),
     getMany: Effect.fn("Members.getMany")(function* (input) {
       const ids = yield* Schema.decodeEffect(Schema.Array(Member.Id))(input).pipe(

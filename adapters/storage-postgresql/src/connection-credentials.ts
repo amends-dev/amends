@@ -26,7 +26,7 @@ const decodeRow = Schema.decodeUnknownEffect(
  */
 export const make = Effect.fn("ConnectionCredentials.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
-  const key = yield* CredentialKey.Service;
+  const credentialKey = yield* CredentialKey.Service;
   const { db } = database;
   /** What each sealed value is bound to: its workspace, its ID, and its connection. */
   const bindingOf = (id: string, connectionId: string) =>
@@ -34,11 +34,10 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
   const inWorkspace = (id: Connection.CredentialId) =>
     and(eq(connectionCredentials.workspaceId, workspaceId), eq(connectionCredentials.id, id));
   return ConnectionCredentialStore.Service.of({
-    workspaceId,
     put: Effect.fn("ConnectionCredentials.put")(function* (credential) {
       yield* Store.Transaction;
-      if (Option.isNone(key)) return yield* unavailable;
-      const sealed = yield* key.value
+      if (Option.isNone(credentialKey)) return yield* unavailable;
+      const sealed = yield* credentialKey.value
         .seal(Redacted.value(credential.secret), bindingOf(credential.id, credential.connectionId))
         .pipe(Effect.mapError(storeFailure(ConnectionCredentialStore, "put")));
       yield* guard(
@@ -52,7 +51,7 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
       ).pipe(Effect.mapError(storeError(ConnectionCredentialStore, "put")));
     }),
     get: Effect.fn("ConnectionCredentials.get")(function* (id) {
-      if (Option.isNone(key)) return yield* unavailable;
+      if (Option.isNone(credentialKey)) return yield* unavailable;
       const rows = yield* guard(
         db.select().from(connectionCredentials).where(inWorkspace(id)),
       ).pipe(Effect.mapError(storeFailure(ConnectionCredentialStore, "get")));
@@ -61,7 +60,7 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
       const row = yield* decodeRow(found.value).pipe(
         Effect.mapError(storeFailure(ConnectionCredentialStore, "get")),
       );
-      const secret = yield* key.value
+      const secret = yield* credentialKey.value
         .open(row.sealed, bindingOf(row.id, row.connectionId))
         .pipe(Effect.mapError(storeFailure(ConnectionCredentialStore, "get")));
       return Option.some({

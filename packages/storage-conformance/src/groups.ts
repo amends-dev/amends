@@ -9,10 +9,10 @@ import {
 } from "@amends/core/authorization";
 import {
   Group,
-  GroupApplication,
+  GroupService,
   GroupFacts,
   GroupMembership,
-  GroupMembershipApplication,
+  GroupMembershipService,
   GroupMembershipFacts,
   GroupMembershipProjection,
   GroupMembershipStore,
@@ -49,8 +49,8 @@ export const groups = (harness: Harness) => {
     const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Value) =>
       program.pipe(Effect.provideService(Actor.Service, actor));
     const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name, memberIds }),
       );
     const prepare = Effect.fnUntraced(function* () {
       const bound = yield* boundTo(workspaceId);
@@ -260,9 +260,9 @@ export const groups = (harness: Harness) => {
             const before = yield* history(bound);
             const footprint = yield* storage.footprint;
             for (const [ids, tag] of [
-              [[memberId, Member.Id.make("absent")], "GroupApplication.MemberNotFound"],
-              [[memberId, other.ownerMemberId], "GroupApplication.MemberNotFound"],
-              [[memberId, agentId], "GroupApplication.InactiveMember"],
+              [[memberId, Member.Id.make("absent")], "GroupService.MemberNotFound"],
+              [[memberId, other.ownerMemberId], "GroupService.MemberNotFound"],
+              [[memberId, agentId], "GroupService.InactiveMember"],
               [[memberId, memberId], "SchemaError"],
             ] as const) {
               expect(
@@ -599,16 +599,16 @@ export const groups = (harness: Harness) => {
             );
             expect(team.kind).toBe("Team");
             const fixed = {
-              _tag: "GroupMembershipApplication.FixedMembership",
+              _tag: "GroupMembershipService.FixedMembership",
               groupId: direct.id,
             };
             const memberships = (
               program: (
-                service: GroupMembershipApplication.Interface,
+                service: GroupMembershipService.Interface,
               ) => Effect.Effect<unknown, unknown, Actor.Service>,
               as: Actor.Value,
             ) =>
-              asActor(Effect.flatMap(GroupMembershipApplication.Service, program), as).pipe(
+              asActor(Effect.flatMap(GroupMembershipService.Service, program), as).pipe(
                 Effect.provide(core(bound)),
                 Effect.flip,
               );
@@ -657,8 +657,8 @@ export const groups = (harness: Harness) => {
               expectedName: string = "Engineering",
             ) =>
               asActor(
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.rename({ groupId, name, expectedName }),
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  groupService.rename({ groupId, name, expectedName }),
                 ),
                 by,
               ).pipe(Effect.provide(core(bound)));
@@ -686,7 +686,7 @@ export const groups = (harness: Harness) => {
             // Another name from a renamer who last saw the old one would replace a rename made
             // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
             expect(yield* Effect.flip(rename(owner, group.id, "Design"))).toMatchObject({
-              _tag: "GroupApplication.Changed",
+              _tag: "GroupService.Changed",
               groupId: group.id,
             });
             expect(yield* history(bound)).toHaveLength(before.length + 1);
@@ -698,7 +698,7 @@ export const groups = (harness: Harness) => {
               expect((yield* Effect.flip(rename(owner, group.id, name)))._tag).toBe("SchemaError");
             expect(
               yield* Effect.flip(rename(owner, Group.Id.make("missing"), "Platform")),
-            ).toMatchObject({ _tag: "GroupApplication.NotFound" });
+            ).toMatchObject({ _tag: "GroupService.NotFound" });
             // A direct group is named by its members.
             const direct = {
               id: Group.Id.make("direct-group"),
@@ -722,7 +722,7 @@ export const groups = (harness: Harness) => {
               ]),
             );
             expect(yield* Effect.flip(rename(owner, direct.id, "Pair"))).toMatchObject({
-              _tag: "GroupApplication.NotRenamable",
+              _tag: "GroupService.NotRenamable",
             });
             expect(
               yield* Effect.flip(

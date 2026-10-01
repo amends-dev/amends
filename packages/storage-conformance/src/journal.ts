@@ -1,11 +1,7 @@
 import { Notification } from "@amends/core/notification";
 import * as Core from "@amends/core";
 import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
-import {
-  GroupApplication,
-  GroupFollowApplication,
-  GroupMembershipApplication,
-} from "@amends/core/group";
+import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import {
   type Checkpoint,
@@ -18,12 +14,12 @@ import {
   Subject,
 } from "@amends/core/journal";
 import {
-  ThreadApplication,
-  ThreadMessageApplication,
+  ThreadService,
+  ThreadMessageService,
   ThreadParticipation,
   ThreadParticipationActivity,
 } from "@amends/core/thread";
-import { InvitationApplication, Member, MemberPermissions } from "@amends/core/workspace";
+import { InvitationService, Member, MemberPermissions } from "@amends/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import type { Harness } from "./harness.ts";
@@ -219,8 +215,8 @@ export const journal = (harness: Harness) => {
             // History that every projection records something from.
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createTeam({
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                groupService.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, human.memberId, agent.memberId],
                 }),
@@ -228,14 +224,14 @@ export const journal = (harness: Harness) => {
             );
             yield* as(
               owner,
-              Effect.flatMap(GroupFollowApplication.Service, (follows) =>
-                follows.follow({ groupId: group.id, memberId: owner.memberId }),
+              Effect.flatMap(GroupFollowService.Service, (groupFollowService) =>
+                groupFollowService.follow({ groupId: group.id, memberId: owner.memberId }),
               ),
             );
             const started = yield* as(
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.startInGroup({
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startInGroup({
                   groupId: group.id,
                   text: "Hello",
                   mentions: [owner.memberId, human.memberId, agent.memberId],
@@ -245,8 +241,12 @@ export const journal = (harness: Harness) => {
             const reply = (mentions: ReadonlyArray<Member.Id>) =>
               as(
                 owner,
-                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-                  messages.publish({ threadId: started.thread.id, text: "Reply", mentions }),
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({
+                    threadId: started.thread.id,
+                    text: "Reply",
+                    mentions,
+                  }),
                 ),
               );
             yield* reply([agent.memberId]);
@@ -255,15 +255,15 @@ export const journal = (harness: Harness) => {
             );
             yield* as(
               agent,
-              Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-                memberships.leave({ groupId: group.id, membershipId: admission.id }),
+              Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                groupMembershipService.leave({ groupId: group.id, membershipId: admission.id }),
               ),
             );
             const expiresAt = yield* future;
             yield* as(
               owner,
-              Effect.flatMap(InvitationApplication.Service, (invitations) =>
-                invitations.issue(request(expiresAt, charlie.id)),
+              Effect.flatMap(InvitationService.Service, (invitationService) =>
+                invitationService.issue(request(expiresAt, charlie.id)),
               ),
             );
             const byId = <A extends { readonly id: string }>(values: ReadonlyArray<A>) =>

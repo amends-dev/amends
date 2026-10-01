@@ -69,8 +69,8 @@ const background = (
 
 /** Ask for the process to run from inside a commit with this ID. */
 const wakeIn = (commit: string, at?: DateTime.Utc) =>
-  Effect.flatMap(WorkspaceWakes.Service, (wakes) =>
-    wakes.forWorkspace(workspaceId).request(process, { at }),
+  Effect.flatMap(WorkspaceWakes.Service, (workspaceWakes) =>
+    workspaceWakes.forWorkspace(workspaceId).request(process, { at }),
   ).pipe(
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),

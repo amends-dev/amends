@@ -38,7 +38,6 @@ export const make = Effect.fn("ThreadMessages.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(threadMessages.workspaceId, workspaceId);
   return ThreadMessageStore.Service.of({
-    workspaceId,
     get: Effect.fn("ThreadMessages.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(ThreadMessage.Id)(input);

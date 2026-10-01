@@ -12,7 +12,6 @@ const rows = Rows.make(Schema.fromJsonString(ThreadMessage.Record));
 export const make = Effect.fn("ThreadMessages.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
   return ThreadMessageStore.Service.of({
-    workspaceId,
     get: Effect.fn("ThreadMessages.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(ThreadMessage.Id)(input);

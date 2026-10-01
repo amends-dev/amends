@@ -1,7 +1,7 @@
-import { Connection, ConnectionApplication } from "@amends/core/connection";
+import { Connection, ConnectionService } from "@amends/core/connection";
 import {
   Environment,
-  EnvironmentApplication,
+  EnvironmentService,
   EnvironmentCompatibility,
 } from "@amends/core/environment";
 import type { Actor, Identity } from "@amends/core/identity";
@@ -27,17 +27,17 @@ import {
 const as = <A, E>(
   id: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (service: EnvironmentApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: EnvironmentService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(id, identity, Effect.flatMap(EnvironmentApplication.Service, use)),
+    gateway.asMember(id, identity, Effect.flatMap(EnvironmentService.Service, use)),
   );
 const connect = <A, E>(
   id: Workspace.Id,
-  use: (service: ConnectionApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(id, alice, Effect.flatMap(ConnectionApplication.Service, use)),
+    gateway.asMember(id, alice, Effect.flatMap(ConnectionService.Service, use)),
   );
 
 /** A workspace owned by alice, in which bob is an ordinary member. */
@@ -146,17 +146,17 @@ export const environments = (harness: ConformanceHarness) => {
                 sandbox: null,
               }),
             ).toEqual(
-              new EnvironmentApplication.UnknownHarness({ harnessId: Harness.Name.make("other") }),
+              new EnvironmentService.UnknownHarness({ harnessId: Harness.Name.make("other") }),
             );
             // Boxed runs only inside a sandbox, and amends only in process.
             expect(yield* create({ name: "Boxed", harnessId: boxed, sandbox: null })).toEqual(
-              new EnvironmentApplication.UnsupportedPlacement({
+              new EnvironmentService.UnsupportedPlacement({
                 harnessId: boxed,
                 placement: "in-process",
               }),
             );
             expect(yield* create(sandboxed({ harness: "in-sandbox" }))).toEqual(
-              new EnvironmentApplication.UnsupportedPlacement({
+              new EnvironmentService.UnsupportedPlacement({
                 harnessId: amends,
                 placement: "in-sandbox",
               }),
@@ -164,22 +164,20 @@ export const environments = (harness: ConformanceHarness) => {
             expect(
               yield* create(sandboxed({ providerId: SandboxImplementation.Id.make("gone") })),
             ).toEqual(
-              new EnvironmentApplication.UnknownSandboxProvider({
+              new EnvironmentService.UnknownSandboxProvider({
                 providerId: SandboxImplementation.Id.make("gone"),
               }),
             );
             expect(yield* create(sandboxed({ providerId: cloud }))).toEqual(
-              new EnvironmentApplication.InvalidSandbox({ issues: ["connection-required"] }),
+              new EnvironmentService.InvalidSandbox({ issues: ["connection-required"] }),
             );
             expect(
               yield* create(sandboxed({ providerId: cloud, connectionId: models.id })),
-            ).toEqual(
-              new EnvironmentApplication.InvalidSandbox({ issues: ["connection-mismatch"] }),
-            );
+            ).toEqual(new EnvironmentService.InvalidSandbox({ issues: ["connection-mismatch"] }));
             expect(
               yield* create(sandboxed({ connectionId: models.id, template: "ubuntu" })),
             ).toEqual(
-              new EnvironmentApplication.InvalidSandbox({
+              new EnvironmentService.InvalidSandbox({
                 issues: ["connection-not-allowed", "template-not-allowed"],
               }),
             );
@@ -243,7 +241,7 @@ export const environments = (harness: ConformanceHarness) => {
                   secret: Redacted.make("cloud-key"),
                 }),
               ).pipe(
-                Effect.catchTag("ConnectionApplication.CredentialsUnavailable", () => Effect.void),
+                Effect.catchTag("ConnectionService.CredentialsUnavailable", () => Effect.void),
               );
               const keyed = yield* connect(workspace.id, (service) => service.get(account.id));
               const read = yield* as(workspace.id, alice, (service) => service.get(box.id));
@@ -291,7 +289,7 @@ export const environments = (harness: ConformanceHarness) => {
                   }),
                 ),
               ),
-            ).toEqual(new EnvironmentApplication.Changed({ environmentId: created.id }));
+            ).toEqual(new EnvironmentService.Changed({ environmentId: created.id }));
             const configured = yield* as(workspace.id, alice, (service) =>
               service.configure({
                 environmentId: created.id,
@@ -313,12 +311,12 @@ export const environments = (harness: ConformanceHarness) => {
                   service.configure({ environmentId: Environment.InProcessId, sandbox: settings }),
                 ),
               ),
-            ).toEqual(new EnvironmentApplication.InvalidSandbox({ issues: ["no-sandbox"] }));
+            ).toEqual(new EnvironmentService.InvalidSandbox({ issues: ["no-sandbox"] }));
 
             yield* as(workspace.id, alice, (service) => service.remove(created.id));
             expect(
               yield* Effect.flip(as(workspace.id, alice, (service) => service.get(created.id))),
-            ).toEqual(new EnvironmentApplication.NotFound({ environmentId: created.id }));
+            ).toEqual(new EnvironmentService.NotFound({ environmentId: created.id }));
             expect(
               (yield* as(workspace.id, alice, (service) => service.list)).map(({ id }) => id),
             ).toEqual([Environment.InProcessId]);

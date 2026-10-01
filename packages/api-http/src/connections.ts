@@ -41,7 +41,6 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
         ApiErrors.UnknownImplementation,
         ApiErrors.InvalidSettings,
         ApiErrors.UnsupportedAuthentication,
-        ApiErrors.RequestReused,
       ],
     }),
     HttpApiEndpoint.get("get", "/:connectionId", {

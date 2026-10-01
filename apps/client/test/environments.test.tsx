@@ -160,7 +160,7 @@ function fixture() {
     }
     const id = path.split("/")[4];
     const stored = server.environments.find((environment) => environment.id === id);
-    if (!stored) return json({ _tag: "EnvironmentApplication.NotFound", environmentId: id }, 404);
+    if (!stored) return json({ _tag: "EnvironmentService.NotFound", environmentId: id }, 404);
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/sandbox") && stored.sandbox)
       stored.sandbox = Object.assign({}, stored.sandbox, (body as { sandbox: object }).sandbox);
@@ -302,10 +302,7 @@ it("keeps sandbox edits when the host refuses an account, naming the problem", a
   f.view.configure.sandbox("review").setRetention("destroy");
   expect(f.view.configure.changed("review")).toBe(true);
   f.server.answers.push(
-    json(
-      { _tag: "EnvironmentApplication.InvalidSandbox", issues: ["connection-unavailable"] },
-      422,
-    ),
+    json({ _tag: "EnvironmentService.InvalidSandbox", issues: ["connection-unavailable"] }, 422),
   );
   f.view.configure.save("review");
   await waitFor(() =>
@@ -339,9 +336,7 @@ it("keeps a rename draft through a conflict, and refreshes on environment and ac
   await waitFor(() => expect(f.view.environment("review")).toBeDefined());
   f.view.rename.setName("review", "Review box");
   f.server.environments[1]!.name = "Reviews";
-  f.server.answers.push(
-    json({ _tag: "EnvironmentApplication.Changed", environmentId: "review" }, 409),
-  );
+  f.server.answers.push(json({ _tag: "EnvironmentService.Changed", environmentId: "review" }, 409));
   f.view.rename.save("review");
   await waitFor(() =>
     expect(f.view.failure()).toEqual({ action: "rename", error: "changed", problems: [] }),

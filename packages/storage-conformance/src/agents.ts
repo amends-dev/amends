@@ -1,10 +1,10 @@
-import { Agent, AgentApplication } from "@amends/core/agent";
+import { Agent, AgentService } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
-import { Connection, ConnectionApplication } from "@amends/core/connection";
-import { Environment, EnvironmentApplication } from "@amends/core/environment";
+import { Connection, ConnectionService } from "@amends/core/connection";
+import { Environment, EnvironmentService } from "@amends/core/environment";
 import type { Actor, Identity } from "@amends/core/identity";
 import { Request } from "@amends/core/request";
-import { MemberApplication, type Workspace } from "@amends/core/workspace";
+import { MemberService, type Workspace } from "@amends/core/workspace";
 import { Harness } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
 import { Gateway } from "@amends/gateway";
@@ -26,32 +26,32 @@ import {
 const as = <A, E>(
   id: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (service: AgentApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: AgentService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(id, identity, Effect.flatMap(AgentApplication.Service, use)),
+    gateway.asMember(id, identity, Effect.flatMap(AgentService.Service, use)),
   );
 const connect = <A, E>(
   id: Workspace.Id,
-  use: (service: ConnectionApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(id, alice, Effect.flatMap(ConnectionApplication.Service, use)),
+    gateway.asMember(id, alice, Effect.flatMap(ConnectionService.Service, use)),
   );
 const environments = <A, E>(
   id: Workspace.Id,
-  use: (service: EnvironmentApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: EnvironmentService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(id, alice, Effect.flatMap(EnvironmentApplication.Service, use)),
+    gateway.asMember(id, alice, Effect.flatMap(EnvironmentService.Service, use)),
   );
 const members = <A, E>(
   id: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (service: MemberApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (service: MemberService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.asMember(id, identity, Effect.flatMap(MemberApplication.Service, use)),
+    gateway.asMember(id, identity, Effect.flatMap(MemberService.Service, use)),
   );
 
 /** A workspace owned by alice, in which bob is an ordinary member, with a ready model connection. */
@@ -248,12 +248,12 @@ export const agents = (harness: ConformanceHarness) => {
                     },
                   }),
                 ),
-              ).toMatchObject({ _tag: "AgentApplication.ConnectionUnavailable" });
+              ).toMatchObject({ _tag: "AgentService.ConnectionUnavailable" });
               expect(yield* create(newAgent(models.id, { environmentId: missing }))).toEqual(
-                new AgentApplication.EnvironmentUnavailable({ environmentId: missing }),
+                new AgentService.EnvironmentUnavailable({ environmentId: missing }),
               );
               expect(yield* create(newAgent(account.id))).toEqual(
-                new AgentApplication.Incompatible({ reasons: [{ _tag: "NoModelInference" }] }),
+                new AgentService.Incompatible({ reasons: [{ _tag: "NoModelInference" }] }),
               );
               // Amends declares no reasoning levels.
               expect(
@@ -263,7 +263,7 @@ export const agents = (harness: ConformanceHarness) => {
                   }),
                 ),
               ).toEqual(
-                new AgentApplication.Incompatible({
+                new AgentService.Incompatible({
                   reasons: [{ _tag: "ReasoningUnsupported", reasoning: "high" }],
                 }),
               );
@@ -356,7 +356,7 @@ export const agents = (harness: ConformanceHarness) => {
                   }),
                 ),
               ),
-            ).toMatchObject({ _tag: "AgentApplication.ConnectionUnavailable" });
+            ).toMatchObject({ _tag: "AgentService.ConnectionUnavailable" });
           }),
         ),
       ),
@@ -420,7 +420,7 @@ export const agents = (harness: ConformanceHarness) => {
                     }),
                   ),
                 ),
-              ).toEqual(new AgentApplication.Changed({ agentId: created.id }));
+              ).toEqual(new AgentService.Changed({ agentId: created.id }));
 
               // Removing what it runs with leaves the agent, which can no longer run.
               yield* environments(workspace.id, (service) => service.remove(scratch.id));
@@ -435,7 +435,7 @@ export const agents = (harness: ConformanceHarness) => {
               yield* as(workspace.id, alice, (service) => service.remove(created.id));
               expect(
                 yield* Effect.flip(as(workspace.id, alice, (service) => service.get(created.id))),
-              ).toEqual(new AgentApplication.NotFound({ agentId: created.id }));
+              ).toEqual(new AgentService.NotFound({ agentId: created.id }));
               expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([]);
               expect(
                 yield* members(workspace.id, alice, (service) => service.get(created.memberId)),

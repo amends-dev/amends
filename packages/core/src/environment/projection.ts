@@ -12,32 +12,18 @@ const change = Effect.fnUntraced(function* (
   },
   apply: (record: Environment.Record) => Environment.Record,
 ) {
-  const store = yield* EnvironmentStore.Service;
-  if (store.workspaceId !== payload.workspaceId)
-    return yield* new EnvironmentStore.Conflict({
-      operation: "project",
-      message: "Fact belongs to another workspace",
-    });
-  const found = yield* store.get(payload.environmentId);
-  if (Option.isNone(found))
-    return yield* new EnvironmentStore.Conflict({
-      operation: "project",
-      message: "Expected an environment in this workspace",
-    });
-  yield* store.update(apply(found.value));
+  const environmentStore = yield* EnvironmentStore.Service;
+  const found = yield* environmentStore.get(payload.environmentId);
+  if (Option.isNone(found)) return yield* Effect.die("A changed environment is missing");
+  yield* environmentStore.update(apply(found.value));
 });
 
 export const definition = Projection.make("environments", { version: 1 })
   .on(
     EnvironmentFacts.Created,
     Effect.fn("EnvironmentProjection.created")(function* ({ payload }) {
-      const store = yield* EnvironmentStore.Service;
-      if (store.workspaceId !== payload.workspaceId)
-        return yield* new EnvironmentStore.Conflict({
-          operation: "project",
-          message: "Fact belongs to another workspace",
-        });
-      yield* store.insert(payload);
+      const environmentStore = yield* EnvironmentStore.Service;
+      yield* environmentStore.insert(payload);
     }),
   )
   .on(EnvironmentFacts.Renamed, ({ payload }) =>

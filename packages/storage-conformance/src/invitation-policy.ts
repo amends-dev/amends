@@ -38,12 +38,12 @@ export const invitationPolicy = (harness: Harness) => {
                 yield* Effect.flip(
                   Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
                 ),
-              ).toMatchObject({ _tag: "InvitationApplication.NotRecipient" });
+              ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
               expect(
                 yield* Effect.flip(
                   Operations.acceptInvitation(b.id, bob.id, invitation.details.id),
                 ),
-              ).toMatchObject({ _tag: "InvitationApplication.NotFound" });
+              ).toMatchObject({ _tag: "InvitationService.NotFound" });
               expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
                 before,
               );
@@ -52,7 +52,7 @@ export const invitationPolicy = (harness: Harness) => {
                 yield* Effect.flip(
                   Operations.acceptInvitation(a.id, charlie.id, invitation.details.id),
                 ),
-              ).toMatchObject({ _tag: "InvitationApplication.NotRecipient" });
+              ).toMatchObject({ _tag: "InvitationService.NotRecipient" });
               expect(yield* (yield* boundTo(b.id)).members.findActive(bob)).toEqual(Option.none());
             }),
           ),
@@ -69,7 +69,7 @@ export const invitationPolicy = (harness: Harness) => {
             const expiresAt = DateTime.add(now, { seconds: 30 });
             expect(
               yield* at(now, Effect.flip(Operations.invite(workspace.id, alice, request(now)))),
-            ).toMatchObject({ _tag: "InvitationApplication.InvalidExpiry" });
+            ).toMatchObject({ _tag: "InvitationService.InvalidExpiry" });
             const invitation = yield* at(
               now,
               Operations.invite(workspace.id, alice, request(expiresAt)),
@@ -81,7 +81,7 @@ export const invitationPolicy = (harness: Harness) => {
                   Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id),
                 ),
               ),
-            ).toMatchObject({ _tag: "InvitationApplication.Unavailable", reason: "expired" });
+            ).toMatchObject({ _tag: "InvitationService.Unavailable", reason: "expired" });
             expect(yield* (yield* boundTo(workspace.id)).members.findActive(bob)).toEqual(
               Option.none(),
             );
@@ -220,7 +220,7 @@ export const invitationPolicy = (harness: Harness) => {
               yield* Effect.flip(
                 Operations.invite(workspace.id, alice, request(yield* future, alice.id)),
               ),
-            ).toMatchObject({ _tag: "InvitationApplication.AlreadyMember" });
+            ).toMatchObject({ _tag: "InvitationService.AlreadyMember" });
           }),
         ),
       ),

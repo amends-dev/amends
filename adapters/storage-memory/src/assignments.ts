@@ -21,7 +21,6 @@ export const make = Effect.fn("Assignments.make")(function* () {
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
   return AssignmentStore.Service.of({
-    workspaceId,
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.assignments, id)).pipe(
         Effect.mapError(storeFailure(AssignmentStore, "get")),

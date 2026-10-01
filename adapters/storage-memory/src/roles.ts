@@ -40,7 +40,6 @@ export const make = Effect.fn("Roles.make")(function* () {
     space.records.roles.set(id, row);
   });
   return RoleStore.Service.of({
-    workspaceId,
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.roles, id)).pipe(
         Effect.mapError(storeFailure(RoleStore, "get")),

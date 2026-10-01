@@ -94,14 +94,14 @@ export const make = Effect.fn("PostgresStorage.make")(function* (options: Option
     options.credentialKey === undefined
       ? Option.none()
       : Option.some(yield* Effect.orDie(CredentialKey.make(options.credentialKey)));
-  const database = yield* PostgresDatabase.Service;
+  const postgresDatabase = yield* PostgresDatabase.Service;
   const forWorkspace: WorkspaceStorage.Interface["forWorkspace"] = Effect.fn(
     "PostgresStorage.forWorkspace",
   )(
     function* (workspaceId: Workspace.Id) {
       return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId, options, credentialKey)));
     },
-    Effect.provideService(PostgresDatabase.Service, database),
+    Effect.provideService(PostgresDatabase.Service, postgresDatabase),
   );
   return WorkspaceStorage.Service.of({ forWorkspace });
 });

@@ -21,8 +21,8 @@ const holding = (bound: Bound, logs: ReadonlyArray<Log.Id>, outcome: "commit" | 
     const fiber = yield* bound.store
       .transaction(
         Effect.gen(function* () {
-          const native = yield* Store.Transaction;
-          for (const logId of logs) yield* native.append({ logId, entries: [entry(0)] });
+          const storeTransaction = yield* Store.Transaction;
+          for (const logId of logs) yield* storeTransaction.append({ logId, entries: [entry(0)] });
           yield* Deferred.succeed(entered, undefined);
           yield* Deferred.await(release);
           if (outcome === "rollback") return yield* Effect.fail("rolled back" as const);
@@ -137,8 +137,8 @@ export const standaloneAppends = (harness: Harness) => {
                   expect(yield* writer.store.getAppend(execution, key)).toEqual(Option.none());
                   yield* Deferred.succeed(looked, undefined);
                   yield* Deferred.await(release);
-                  const native = yield* Store.Transaction;
-                  return yield* native.append({
+                  const storeTransaction = yield* Store.Transaction;
+                  return yield* storeTransaction.append({
                     logId: execution,
                     entries: [entry(1)],
                     idempotencyKey: key,
@@ -181,13 +181,13 @@ export const standaloneAppends = (harness: Harness) => {
               Effect.gen(function* () {
                 yield* Deferred.succeed(entered, undefined);
                 yield* Deferred.await(appended);
-                const native = yield* Store.Transaction;
-                const retried = yield* native.append({
+                const storeTransaction = yield* Store.Transaction;
+                const retried = yield* storeTransaction.append({
                   logId: execution,
                   entries: [entry(3)],
                   idempotencyKey: Store.IdempotencyKey.make("output-2"),
                 });
-                const next = yield* native.append({
+                const next = yield* storeTransaction.append({
                   logId: execution,
                   entries: [entry(4)],
                   expectedAfter: Option.some(Log.Position.make(1)),

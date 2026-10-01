@@ -55,7 +55,6 @@ export const make = Effect.fn("Connections.make")(function* () {
       return record;
     });
   return ConnectionStore.Service.of({
-    workspaceId,
     get: Effect.fn("Connections.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Connection.Id)(input);

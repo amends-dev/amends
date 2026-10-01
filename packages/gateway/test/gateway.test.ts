@@ -9,20 +9,16 @@ import {
   ThreadActivityStore,
 } from "@amends/core/thread";
 import { expect, it } from "@effect/vitest";
-import { ReadStateStore } from "@amends/core/attention";
+import { ReadStateStore } from "@amends/core/read-state";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import { Checkpoint, Commit, Entry, Store } from "@amends/core/journal";
-import {
-  Notification,
-  NotificationApplication,
-  NotificationStore,
-} from "@amends/core/notification";
+import { Notification, NotificationService, NotificationStore } from "@amends/core/notification";
 import {
   InvitationStore,
   Member,
-  MemberApplication,
+  MemberService,
   MemberStore,
   Workspace,
   WorkspaceStore,
@@ -62,7 +58,6 @@ interface BindingOptions {
   readonly read?: Store.Interface["read"];
   readonly head?: Store.Interface["head"];
   readonly listLive?: Checkpoint.Interface["listLive"];
-  readonly memberWorkspaceId?: Workspace.Id;
 }
 
 /**
@@ -104,7 +99,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       WorkspaceStore.Service,
       WorkspaceStore.Service.of({
-        workspaceId: boundWorkspaceId,
         // Booting checks the built-in roles of an initialized workspace; these boot none.
         get: Effect.succeedNone,
         insert: unexpected,
@@ -115,7 +109,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       MemberStore.Service,
       MemberStore.Service.of({
-        workspaceId: options.memberWorkspaceId ?? boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findActive:
@@ -136,7 +129,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       InvitationStore.Service,
       InvitationStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         listPendingByRecipient: unexpected,
@@ -151,7 +143,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         discardPendingForGroup: unexpected,
         markSeen: unexpected,
         accept: unexpected,
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         listByRecipient: unexpected,
         listPendingByRecipient: unexpected,
@@ -165,7 +156,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
     ),
     Context.add(ThreadStore.Service, {
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       listByGroup: unexpected,
       listByLatest: unexpected,
@@ -175,7 +165,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       recordLatest: unexpected,
     }),
     Context.add(ThreadParticipationStore.Service, {
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       getMany: unexpected,
       listByThread: unexpected,
@@ -186,14 +175,12 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       end: unexpected,
     }),
     Context.add(ThreadMessageStore.Service, {
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       getMany: unexpected,
       insert: unexpected,
     }),
     Context.add(ThreadActivityStore.Service, {
       latest: unexpected,
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       listByThread: unexpected,
       getFirst: unexpected,
@@ -204,7 +191,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       GroupStore.Service,
       GroupStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findDirect: unexpected,
@@ -218,7 +204,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       GroupMembershipStore.Service,
       GroupMembershipStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findActive: unexpected,
@@ -235,7 +220,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ReadStateStore.Service,
       ReadStateStore.Service.of({
-        workspaceId: boundWorkspaceId,
         getThreadPositions: unexpected,
         advanceThread: unexpected,
         getGroupsCaughtUp: unexpected,
@@ -245,7 +229,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       GroupFollowStore.Service,
       GroupFollowStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         findActive: unexpected,
         findActiveMany: unexpected,
@@ -257,7 +240,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ConnectionStore.Service,
       ConnectionStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         insert: unexpected,
@@ -267,7 +249,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       EnvironmentStore.Service,
       EnvironmentStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         insert: unexpected,
@@ -277,7 +258,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       AgentStore.Service,
       AgentStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         insert: unexpected,
@@ -287,7 +267,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       TurnStore.Service,
       TurnStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         findActive: unexpected,
         findLatest: unexpected,
@@ -301,7 +280,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ConnectionCredentialStore.Service,
       ConnectionCredentialStore.Service.of({
-        workspaceId: boundWorkspaceId,
         put: unexpected,
         get: unexpected,
         remove: unexpected,
@@ -310,7 +288,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       RoleStore.Service,
       RoleStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         insert: unexpected,
         rename: unexpected,
@@ -322,7 +299,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       AssignmentStore.Service,
       AssignmentStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         listActiveByMember: unexpected,
         listActiveByRole: unexpected,
@@ -426,9 +402,9 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           _tag: "Gateway.InvalidInput",
           message: "Values must belong to workspace workspace",
         });
-        const missing = new MemberApplication.NotFound({ workspaceId, memberId });
+        const missing = new MemberService.NotFound({ workspaceId, memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);
-        const missingNotification = new NotificationApplication.NotFound({
+        const missingNotification = new NotificationService.NotFound({
           workspaceId,
           notificationId: Notification.Id.make("missing"),
         });
@@ -451,15 +427,7 @@ it.effect(
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
         ).toBe(failure);
-        const invalidNotification = new NotificationApplication.InvalidResponse({
-          message: "Invalid stored notification",
-        });
-        expect(
-          defect(
-            yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(invalidNotification))),
-          ),
-        ).toBe(invalidNotification);
-        const malformed = { _tag: "MemberApplication.NotFound", workspaceId, memberId: 42 };
+        const malformed = { _tag: "MemberService.NotFound", workspaceId, memberId: 42 };
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),
         ).toBe(malformed);
@@ -470,17 +438,12 @@ it.effect(
     ),
 );
 
-it.effect("construction and projection replay failures are defects before the operation runs", () =>
+it.effect("projection replay failures are defects before the operation runs", () =>
   Effect.gen(function* () {
     let called = false;
     const operation = Effect.sync(() => {
       called = true;
     });
-    const badBindings = yield* run(
-      (gateway) => Effect.exit(gateway.inWorkspace(workspaceId, operation)),
-      { memberWorkspaceId: Workspace.Id.make("other") },
-    );
-    expect(defect(badBindings)).toMatchObject({ _tag: "Authorization.WorkspaceMismatch" });
     const failure = new Store.Failure({ operation: "read", cause: new Error("unavailable") });
     const badReplay = yield* run(
       (gateway) => Effect.exit(gateway.inWorkspace(workspaceId, operation)),

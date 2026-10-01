@@ -12,9 +12,10 @@ export const layer = HttpApiBuilder.group(
   Api,
   "me",
   Effect.fn(function* (handlers) {
-    const directory = yield* WorkspaceDirectory.Service;
+    const workspaceDirectory = yield* WorkspaceDirectory.Service;
     return handlers.handleAll({
-      workspaces: () => Effect.flatMap(Principal, (principal) => directory.list(principal)),
+      workspaces: () =>
+        Effect.flatMap(Principal, (principal) => workspaceDirectory.list(principal)),
     });
   }),
 );

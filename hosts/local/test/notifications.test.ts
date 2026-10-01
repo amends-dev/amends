@@ -196,7 +196,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           expect(response.status).toBe(404);
           expect(yield* response.json).toEqual({
-            _tag: "NotificationApplication.NotFound",
+            _tag: "NotificationService.NotFound",
             workspaceId: workspace.id,
             notificationId,
           });

@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { Connection } from "./connection.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("ConnectionStore.Failure", {
@@ -15,7 +15,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ConnectionStore.Co
 
 /** Internal projection storage. Reads honor an existing transaction; writes require one. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Connection.Id) => Effect.Effect<Option.Option<Connection.Record>, Failure>;
   /** Every connection in the workspace, removed ones included, in no particular order. */
   readonly list: Effect.Effect<ReadonlyArray<Connection.Record>, Failure>;

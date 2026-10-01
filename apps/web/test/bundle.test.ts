@@ -11,9 +11,8 @@ const serverCode = [
   "Journal.publish",
   "Projection.makeRunner",
   "ChangeFeedSource.make",
-  "RequestReceipts.make",
-  "ThreadApplication.make",
-  "InvitationApplication.issue",
+  "ThreadService.make",
+  "InvitationService.issue",
   "Gateway.make",
 ];
 

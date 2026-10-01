@@ -1,13 +1,12 @@
-import { ChangeFeedApplication } from "@amends/core/change-feed";
-import { GroupApplication } from "@amends/core/group";
+import { GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Log, Store } from "@amends/core/journal";
 import { Request } from "@amends/core/request";
-import { ThreadApplication, ThreadMessageApplication } from "@amends/core/thread";
-import { InvitationApplication, Member } from "@amends/core/workspace";
+import { ThreadService, ThreadMessageService } from "@amends/core/thread";
+import { InvitationService, Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Exit, Fiber, Layer, Queue, Stream } from "effect";
+import { Effect, Exit, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";
 import {
   alice,
@@ -51,13 +50,16 @@ export const requests = (harness: Harness) => {
         program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(on));
       const group = yield* as(
         owner,
-        Effect.flatMap(GroupApplication.Service, (groups) =>
-          groups.createTeam({ name: "Team", memberIds: [owner.memberId, other.memberId] }),
+        Effect.flatMap(GroupService.Service, (groupService) =>
+          groupService.createTeam({
+            name: "Team",
+            memberIds: [owner.memberId, other.memberId],
+          }),
         ),
       );
       const start = (text: string, options: Request.Options = { requestKey: key }) =>
-        Effect.flatMap(ThreadApplication.Service, (threads) =>
-          threads.startInGroup({ groupId: group.id, text, mentions: [] }, options),
+        Effect.flatMap(ThreadService.Service, (threadService) =>
+          threadService.startInGroup({ groupId: group.id, text, mentions: [] }, options),
         );
       return { storage, bound, owner, group, services, as, start };
     });
@@ -80,16 +82,25 @@ export const requests = (harness: Harness) => {
       ),
     );
 
-    it.effect("a key reused with a different input is refused and records nothing", () =>
+    it.effect("a reused key returns what it created, whatever the retry asks for", () =>
       harness.withStorage((storage) =>
         Effect.gen(function* () {
           const { bound, owner, as, start } = yield* world(storage);
-          yield* as(owner, start("Hello"));
+          const first = yield* as(owner, start("Hello"));
           const before = yield* history(bound);
-          expect(yield* Effect.flip(as(owner, start("Goodbye")))).toEqual(
-            new Request.Reused({ operation: "thread.start", key }),
-          );
+          expect(yield* as(owner, start("Goodbye"))).toEqual(first);
           expect(yield* history(bound)).toEqual(before);
+          const direct = (text: string) =>
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.startDirect(
+                { memberIds: [other.memberId], text, mentions: [] },
+                { requestKey: key },
+              ),
+            );
+          const opened = yield* as(owner, direct("Hi"));
+          const afterDirect = yield* history(bound);
+          expect(yield* as(owner, direct("Bye"))).toEqual(opened);
+          expect(yield* history(bound)).toEqual(afterDirect);
         }),
       ),
     );
@@ -104,14 +115,36 @@ export const requests = (harness: Harness) => {
           // The same key names a different request for another operation.
           const reply = yield* as(
             owner,
-            Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-              messages.publish(
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.publish(
                 { threadId: mine.thread.id, text: "Hello", mentions: [] },
                 { requestKey: key },
               ),
             ),
           );
-          expect(reply.message.id).not.toBe(mine.message.id);
+          expect(reply.id).not.toBe(mine.message.id);
+        }),
+      ),
+    );
+
+    it.effect("a retry passes the start's checks again before it finds the thread", () =>
+      harness.withStorage((storage) =>
+        Effect.gen(function* () {
+          const { bound, group, as, start } = yield* world(storage);
+          yield* as(other, start("Hello"));
+          const admission = yield* bound.groupMemberships.findActive(group.id, other.memberId);
+          yield* as(
+            other,
+            Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+              groupMembershipService.leave({
+                groupId: group.id,
+                membershipId: Option.getOrThrow(admission).id,
+              }),
+            ),
+          );
+          expect(yield* Effect.flip(as(other, start("Hello")))).toEqual(
+            new ThreadService.GroupNotFound({ groupId: group.id }),
+          );
         }),
       ),
     );
@@ -161,30 +194,30 @@ export const requests = (harness: Harness) => {
             });
           const requestKey = Request.Key.make("request-2");
           yield* twice(
-            Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-              messages.publish(
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.publish(
                 { threadId: started.thread.id, text: "Reply", mentions: [] },
                 { requestKey },
               ),
             ),
           );
           yield* twice(
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.startDirect(
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.startDirect(
                 { memberIds: [other.memberId], text: "Hi", mentions: [] },
                 { requestKey },
               ),
             ),
           );
           yield* twice(
-            Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
+            Effect.flatMap(GroupService.Service, (groupService) =>
+              groupService.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
             ),
           );
           const expiresAt = yield* future;
           yield* twice(
-            Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.issue(request(expiresAt, Identity.HumanId.make("carol")), {
+            Effect.flatMap(InvitationService.Service, (invitationService) =>
+              invitationService.issue(request(expiresAt, Identity.HumanId.make("carol")), {
                 requestKey,
               }),
             ),
@@ -193,32 +226,18 @@ export const requests = (harness: Harness) => {
       ),
     );
 
-    it.effect("receipts stay out of the change feed", () =>
+    it.effect("a created record's key returns it, whatever the retry asks for", () =>
       harness.withStorage((storage) =>
         Effect.gen(function* () {
-          const { owner, as, start } = yield* world(storage);
-          const names = yield* Effect.scoped(
-            Effect.gen(function* () {
-              const stream = yield* as(
-                other,
-                Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch()),
-              );
-              const queue = yield* Queue.unbounded<string>();
-              const fiber = yield* stream.pipe(
-                Stream.runForEach((message) =>
-                  message._tag === "Committed"
-                    ? Effect.forEach(message.events, (event) => Queue.offer(queue, event.name))
-                    : Effect.void,
-                ),
-                Effect.forkScoped,
-              );
-              yield* as(owner, start("Hello"));
-              yield* Queue.take(queue);
-              yield* Fiber.interrupt(fiber);
-              return yield* Queue.takeAll(queue);
-            }),
-          );
-          expect(names).not.toContain("request.completed");
+          const { bound, owner, as } = yield* world(storage);
+          const create = (name: string) =>
+            Effect.flatMap(GroupService.Service, (groupService) =>
+              groupService.createTeam({ name, memberIds: [] }, { requestKey: key }),
+            );
+          const first = yield* as(owner, create("Second"));
+          const before = yield* history(bound);
+          expect(yield* as(owner, create("Different"))).toEqual(first);
+          expect(yield* history(bound)).toEqual(before);
         }),
       ),
     );
@@ -228,22 +247,20 @@ export const requests = (harness: Harness) => {
         Effect.gen(function* () {
           const host = yield* storage.connect();
           const create = (name: string, creator = alice.id) =>
-            Effect.flatMap(Gateway.Service, (g) =>
-              g.createWorkspace(creator, { name }, { requestKey: key }),
+            Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.createWorkspace(creator, { name }, { requestKey: key }),
             ).pipe(Effect.provide(gateway(host)));
           const first = yield* create("Studio");
           expect(yield* create("Studio")).toEqual(first);
-          expect(yield* Effect.flip(create("Other name"))).toEqual(
-            new Request.Reused({ operation: "workspace.create", key }),
-          );
+          expect(yield* create("Other name")).toEqual(first);
           // Another creator's key names another workspace.
           const theirs = yield* create("Studio", Identity.HumanId.make("bob"));
           expect(theirs.id).not.toBe(first.id);
           // A retry on another host finds it too.
           const elsewhere = yield* storage.connect();
           expect(
-            yield* Effect.flatMap(Gateway.Service, (g) =>
-              g.createWorkspace(alice.id, { name: "Studio" }, { requestKey: key }),
+            yield* Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.createWorkspace(alice.id, { name: "Studio" }, { requestKey: key }),
             ).pipe(Effect.provide(gateway(elsewhere))),
           ).toEqual(first);
         }),

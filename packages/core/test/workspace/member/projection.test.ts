@@ -58,11 +58,11 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const members = yield* MemberStore.Service;
+          const memberStore = yield* MemberStore.Service;
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(MemberFacts.Added, added(firstId, human));
-              expect(yield* members.findActive(human)).toEqual(
+              expect(yield* memberStore.findActive(human)).toEqual(
                 Option.some({
                   id: firstId,
                   workspaceId,
@@ -73,7 +73,7 @@ it.effect(
               yield* journal.publish(MemberFacts.Added, added(agentId, agent));
             }),
           );
-          expect(yield* members.findActive(agent)).toEqual(
+          expect(yield* memberStore.findActive(agent)).toEqual(
             Option.some({
               id: agentId,
               workspaceId,
@@ -84,11 +84,11 @@ it.effect(
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(MemberFacts.Removed, removed(firstId));
-              expect(Option.isNone(yield* members.findActive(human))).toBe(true);
+              expect(Option.isNone(yield* memberStore.findActive(human))).toBe(true);
               yield* journal.publish(MemberFacts.Added, added(secondId, human));
             }),
           );
-          expect(yield* members.get(firstId)).toEqual(
+          expect(yield* memberStore.get(firstId)).toEqual(
             Option.some({
               id: firstId,
               workspaceId,
@@ -96,7 +96,7 @@ it.effect(
               status: "removed",
             }),
           );
-          expect(yield* members.findActive(human)).toEqual(
+          expect(yield* memberStore.findActive(human)).toEqual(
             Option.some({
               id: secondId,
               workspaceId,
@@ -136,8 +136,8 @@ it.effect("replay reconstructs membership history and resumes without reapplying
         );
         expect((yield* fixture.snapshot).members.size).toBe(0);
         yield* (yield* setup).replay;
-        const members = yield* MemberStore.Service;
-        expect(yield* members.get(firstId)).toEqual(
+        const memberStore = yield* MemberStore.Service;
+        expect(yield* memberStore.get(firstId)).toEqual(
           Option.some({
             id: firstId,
             workspaceId,
@@ -145,10 +145,10 @@ it.effect("replay reconstructs membership history and resumes without reapplying
             status: "removed",
           }),
         );
-        expect(Option.map(yield* members.findActive(human), (member) => member.id)).toEqual(
+        expect(Option.map(yield* memberStore.findActive(human), (member) => member.id)).toEqual(
           Option.some(secondId),
         );
-        expect(Option.map(yield* members.findActive(agent), (member) => member.id)).toEqual(
+        expect(Option.map(yield* memberStore.findActive(agent), (member) => member.id)).toEqual(
           Option.some(agentId),
         );
       }),
@@ -160,62 +160,6 @@ it.effect("replay reconstructs membership history and resumes without reapplying
         yield* journal.replay;
         expect((yield* fixture.snapshot).members.size).toBe(3);
         expect(yield* journal.log.read({ limit: 10 })).toHaveLength(2);
-      }),
-    );
-  }),
-);
-
-it.effect("workspace mismatches reject added and removed facts during publication and replay", () =>
-  Effect.gen(function* () {
-    const fixture = yield* make();
-    const foreign = Workspace.Id.make("another-workspace");
-    const mismatch = {
-      _tag: "Projection.Failure",
-      cause: {
-        _tag: "MemberProjection.WorkspaceMismatch",
-        expectedWorkspaceId: workspaceId,
-        actualWorkspaceId: foreign,
-      },
-    };
-    yield* run(
-      fixture,
-      Effect.gen(function* () {
-        const journal = yield* setup;
-        expect(
-          yield* Effect.flip(
-            journal.publish(MemberFacts.Added, {
-              memberId: firstId,
-              workspaceId: foreign,
-              identity: human,
-            }),
-          ),
-        ).toMatchObject(mismatch);
-        expect((yield* fixture.snapshot).members.size).toBe(0);
-        expect((yield* fixture.snapshot).logs.size).toBe(0);
-        yield* journal.publish(MemberFacts.Added, added(firstId, human));
-        const before = yield* fixture.snapshot;
-        const foreignRemoval = { memberId: firstId, workspaceId: foreign };
-        expect(
-          yield* Effect.flip(journal.publish(MemberFacts.Removed, foreignRemoval)),
-        ).toMatchObject(mismatch);
-        expect((yield* fixture.snapshot).members).toEqual(before.members);
-        expect((yield* fixture.snapshot).checkpoints).toEqual(before.checkpoints);
-      }),
-    );
-    // History written without this projection fails its rebuild at the foreign fact.
-    const history = yield* make();
-    yield* run(
-      history,
-      Effect.gen(function* () {
-        const writer = yield* source;
-        yield* writer.publish(MemberFacts.Added, added(firstId, human));
-        yield* writer.publish(MemberFacts.Removed, { memberId: firstId, workspaceId: foreign });
-        const journal = yield* setup;
-        expect(yield* Effect.flip(journal.replay)).toMatchObject(mismatch);
-        // The step before the foreign fact committed; the rebuild stops there, not live.
-        const members = [...(yield* history.snapshot).members.values()];
-        expect(members.map(({ id, status }) => [id, status])).toEqual([[firstId, "active"]]);
-        expect(yield* history.checkpoints.listLive(logId)).toEqual([]);
       }),
     );
   }),

@@ -1,7 +1,7 @@
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Cause, Effect, Exit, Layer } from "effect";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
 import { AssignmentProjection } from "../../src/authorization/assignment/projection.ts";
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
@@ -100,9 +100,7 @@ it.effect("the resolver reads current state without requiring a transaction", ()
     expectTypeOf<Layer.Services<typeof GrantResolver.layer>>().toEqualTypeOf<
       AssignmentStore.Service | RoleStore.Service | PermissionCatalog.Service
     >();
-    expectTypeOf<
-      Layer.Error<typeof GrantResolver.layer>
-    >().toEqualTypeOf<GrantResolver.WorkspaceMismatch>();
+    expectTypeOf<Layer.Error<typeof GrantResolver.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
       Effect.Success<ReturnType<typeof GrantResolver.make>>
     >().toEqualTypeOf<GrantResolver.Interface>();
@@ -118,7 +116,6 @@ it.effect("the resolver reads current state without requiring a transaction", ()
     const resolver = yield* fixture.store
       .transaction(GrantResolver.make())
       .pipe(Effect.provide(dependencies(fixture)));
-    expect(resolver.workspaceId).toBe(workspaceId);
     expect(yield* resolver.resolve(memberId)).toEqual([
       Grant.make(MemberPermissions.Read, memberScope),
     ]);
@@ -168,7 +165,7 @@ it.effect(
       const roleAssignmentId = Assignment.Id.make("role-assignment");
       const directAssignmentId = Assignment.Id.make("direct-assignment");
       yield* Effect.gen(function* () {
-        const resolver = yield* GrantResolver.Service;
+        const grantResolver = yield* GrantResolver.Service;
         const journal = yield* Journal.make({
           logId: Log.Id.make("workspace-one/journal"),
           projections: [RoleProjection.definition, AssignmentProjection.definition],
@@ -199,7 +196,7 @@ it.effect(
                 source: directSource(MemberPermissions.Read.name, memberScope),
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            expect(yield* resolver.resolve(memberId)).toHaveLength(3);
+            expect(yield* grantResolver.resolve(memberId)).toHaveLength(3);
           }),
         );
         yield* journal.commit(
@@ -218,12 +215,12 @@ it.effect(
                 memberId: memberId,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            expect(yield* resolver.resolve(memberId)).toEqual([
+            expect(yield* grantResolver.resolve(memberId)).toEqual([
               Grant.make(MemberPermissions.Read, workspaceScope),
             ]);
           }),
         );
-        expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([
+        expect(yield* journal.commit(grantResolver.resolve(memberId))).toEqual([
           Grant.make(MemberPermissions.Read, workspaceScope),
         ]);
         yield* journal
@@ -233,7 +230,7 @@ it.effect(
             memberId: memberId,
           })
           .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-        expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([]);
+        expect(yield* journal.commit(grantResolver.resolve(memberId))).toEqual([]);
       }).pipe(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
         Effect.provideService(Store.Service, fixture.store),
@@ -255,20 +252,18 @@ it.effect("members without active assignments receive no grants", () =>
   }),
 );
 
-it.effect("a missing role fails the complete resolution even after a valid direct grant", () =>
+it.effect("a missing role is a defect, even after a valid direct grant", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const missing = assigned("missing-role", roleSource());
     yield* seed(
       fixture,
       [],
-      [assigned("valid", directSource(MemberPermissions.Read.name, workspaceScope)), missing],
+      [
+        assigned("valid", directSource(MemberPermissions.Read.name, workspaceScope)),
+        assigned("missing-role", roleSource()),
+      ],
     );
-    expect(yield* run(fixture, Effect.flip(resolve))).toMatchObject({
-      _tag: "GrantResolver.MissingRole",
-      assignmentId: missing.id,
-      roleId,
-    });
+    expect(Exit.hasDies(yield* Effect.exit(run(fixture, resolve)))).toBe(true);
   }),
 );
 
@@ -310,80 +305,20 @@ it.effect("incompatible scopes fail whole role assignments and direct grants", (
           assigned("invalid", source),
         ],
       );
-      const failure = yield* run(fixture, Effect.flip(resolve));
-      expect(failure._tag).toBe("SchemaError");
-      if (failure._tag !== "SchemaError") throw new Error("Expected incompatible scope");
-      expect(failure.message).toContain("requires a Workspace target");
+      // A stored scope that no longer fits its permission is a defect, not the caller's input.
+      const exit = yield* Effect.exit(run(fixture, resolve));
+      expect(Exit.isFailure(exit) && String(Cause.squash(exit.cause))).toContain(
+        "requires a Workspace target",
+      );
     }
   }),
 );
 
-it.effect(
-  "workspace mismatches are rejected in composition and returned assignments and roles",
-  () =>
-    Effect.gen(function* () {
-      const fixture = yield* make();
-      const mismatch = {
-        _tag: "GrantResolver.WorkspaceMismatch",
-        expectedWorkspaceId: workspaceId,
-        actualWorkspaceId: foreignWorkspaceId,
-      };
-      expect(
-        yield* Effect.void.pipe(
-          Effect.provide(configured(fixture, { roles: { workspaceId: foreignWorkspaceId } })),
-          Effect.flip,
-        ),
-      ).toMatchObject(mismatch);
-      const foreignAssignment = Assignment.Record.make({
-        id: Assignment.Id.make("foreign"),
-        workspaceId: foreignWorkspaceId,
-        memberId,
-        status: "active",
-        source: roleSource(Scope.Value.cases.Workspace.make({ workspaceId: foreignWorkspaceId })),
-      });
-      expect(
-        yield* run(fixture, Effect.flip(resolve), {
-          assignments: { listActiveByMember: () => Effect.succeed([foreignAssignment]) },
-        }),
-      ).toMatchObject(mismatch);
-      yield* seed(fixture, [], [assigned("role", roleSource())]);
-      expect(
-        yield* run(fixture, Effect.flip(resolve), {
-          roles: {
-            get: () => Effect.succeedSome({ ...role, workspaceId: foreignWorkspaceId }),
-          },
-        }),
-      ).toMatchObject(mismatch);
-    }),
-);
-
-it.effect("inconsistent or malformed store responses never produce effective grants", () =>
+it.effect("a direct grant scoped to another workspace authorizes nothing here", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
-    const active = assigned("active", directSource(MemberPermissions.Read.name, workspaceScope));
-    const wrongMember = Assignment.Record.make({
-      id: active.id,
-      workspaceId,
-      memberId: Member.Id.make("different"),
-      source: active.source,
-      status: "active",
-    });
-    const revoked = Assignment.Record.make({
-      id: active.id,
-      workspaceId,
-      memberId,
-      source: active.source,
-      status: "revoked",
-    });
-    for (const records of [[wrongMember], [revoked], [active, active]]) {
-      expect(
-        yield* run(fixture, Effect.flip(resolve), {
-          assignments: { listActiveByMember: () => Effect.succeed(records) },
-        }),
-      ).toMatchObject({ _tag: "GrantResolver.InvalidResponse" });
-    }
     const wrongScope = {
-      id: active.id,
+      id: Assignment.Id.make("foreign-scope"),
       workspaceId,
       memberId,
       status: "active",
@@ -392,28 +327,11 @@ it.effect("inconsistent or malformed store responses never produce effective gra
         Scope.Value.cases.Workspace.make({ workspaceId: foreignWorkspaceId }),
       ),
     } satisfies Assignment.Record;
-    expect(
-      yield* run(fixture, Effect.flip(resolve), {
-        assignments: { listActiveByMember: () => Effect.succeed([wrongScope]) },
-      }),
-    ).toMatchObject({ _tag: "SchemaError" });
-    yield* seed(fixture, [], [assigned("role", roleSource())]);
-    expect(
-      yield* run(fixture, Effect.flip(resolve), {
-        roles: { get: () => Effect.succeedSome({ ...role, id: Role.Id.make("different") }) },
-      }),
-    ).toMatchObject({ _tag: "GrantResolver.InvalidResponse" });
-    expect(
-      yield* run(fixture, Effect.flip(resolve), {
-        roles: {
-          get: () =>
-            Effect.succeedSome({
-              ...role,
-              permissions: [MemberPermissions.Read.name, MemberPermissions.Read.name],
-            }),
-        },
-      }),
-    ).toMatchObject({ _tag: "SchemaError" });
+    const grants = yield* run(fixture, resolve, {
+      assignments: { listActiveByMember: () => Effect.succeed([wrongScope]) },
+    });
+    const here = Target.Reference.cases.Workspace.make({ workspaceId });
+    expect(grants.some((grant) => Scope.covers(grant.scope, here))).toBe(false);
   }),
 );
 

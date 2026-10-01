@@ -1,9 +1,9 @@
 import { Api, Principal } from "@amends/api-http";
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateService } from "@amends/core/read-state";
 import {
-  ThreadApplication,
-  ThreadMessageApplication,
-  ThreadParticipationApplication,
+  ThreadService,
+  ThreadMessageService,
+  ThreadParticipationService,
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
@@ -25,8 +25,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.listInGroup(params.groupId, query),
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.listInGroup(params.groupId, query),
             ),
           ),
         ),
@@ -35,8 +35,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.listOpenings(params.groupId, query),
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.listOpenings(params.groupId, query),
             ),
           ),
         ),
@@ -45,8 +45,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.startInGroup(
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.startInGroup(
                 { groupId: params.groupId, ...payload },
                 { requestKey: headers["idempotency-key"] },
               ),
@@ -58,8 +58,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.startDirect(payload, { requestKey: headers["idempotency-key"] }),
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.startDirect(payload, { requestKey: headers["idempotency-key"] }),
             ),
           ),
         ),
@@ -68,7 +68,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) => threads.get(params.threadId)),
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.get(params.threadId),
+            ),
           ),
         ),
       timeline: ({ params, query }) =>
@@ -76,8 +78,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.readTimeline(params.threadId, query),
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.readTimeline(params.threadId, query),
             ),
           ),
         ),
@@ -86,8 +88,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.listParticipants(params.threadId, query),
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.listParticipants(params.threadId, query),
             ),
           ),
         ),
@@ -96,8 +98,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-              messages.publish(
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.publish(
                 { threadId: params.threadId, ...payload },
                 { requestKey: headers["idempotency-key"] },
               ),
@@ -109,8 +111,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadParticipationApplication.Service, (participation) =>
-              participation.follow(params.threadId),
+            Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+              threadParticipationService.follow(params.threadId),
             ),
           ),
         ),
@@ -119,8 +121,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ThreadParticipationApplication.Service, (participation) =>
-              participation.unfollow({
+            Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+              threadParticipationService.unfollow({
                 threadId: params.threadId,
                 participationId: payload.participationId,
               }),
@@ -132,8 +134,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ReadStateApplication.Service, (readState) =>
-              readState.markThreadRead({
+            Effect.flatMap(ReadStateService.Service, (readStateService) =>
+              readStateService.markThreadRead({
                 threadId: params.threadId,
                 throughSequence: payload.throughSequence,
               }),

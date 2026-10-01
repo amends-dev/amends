@@ -16,7 +16,6 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
   const { workspaceId, read, write } = yield* Binding.Service;
   const all = Effect.flatMap(read, (space) => rows.all(space.records.groupMemberships));
   return GroupMembershipStore.Service.of({
-    workspaceId,
     get: Effect.fn("GroupMemberships.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);

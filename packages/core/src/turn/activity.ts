@@ -6,7 +6,7 @@ import { MemberId } from "../workspace/member/id.ts";
 import { TurnId } from "./id.ts";
 import { Turn } from "./turn.ts";
 
-const about = ({ turnId }: { readonly turnId: TurnId.Id }) => Subject.make("turn", turnId);
+const turnSubject = ({ turnId }: { readonly turnId: TurnId.Id }) => Subject.make("turn", turnId);
 
 /**
  * An agent accepted work into a new turn here, or someone asked a failed or stopped one to run
@@ -20,7 +20,7 @@ export const Created = ThreadActivityKind.make("turn.created", {
     memberId: MemberId.Id,
     retryOf: Schema.NullOr(TurnId.Id),
   }),
-  subject: about,
+  subject: turnSubject,
   newActivity: false,
 });
 export type Created = ThreadActivityKind.Activity<typeof Created>;
@@ -28,7 +28,7 @@ export type Created = ThreadActivityKind.Activity<typeof Created>;
 /** Execution took the turn: it is working. */
 export const Started = ThreadActivityKind.make("turn.started", {
   details: Schema.Struct({ turnId: TurnId.Id }),
-  subject: about,
+  subject: turnSubject,
   newActivity: false,
 });
 export type Started = ThreadActivityKind.Activity<typeof Started>;
@@ -36,7 +36,7 @@ export type Started = ThreadActivityKind.Activity<typeof Started>;
 /** Someone asked the working turn to stop, or its agent stopped taking part: it is stopping. */
 export const Stopping = ThreadActivityKind.make("turn.stopping", {
   details: Schema.Struct({ turnId: TurnId.Id, cancelReason: Turn.CancelReason }),
-  subject: about,
+  subject: turnSubject,
   newActivity: false,
 });
 export type Stopping = ThreadActivityKind.Activity<typeof Stopping>;
@@ -53,7 +53,7 @@ export const Ended = ThreadActivityKind.make("turn.ended", {
     reason: Schema.NullOr(Schema.String),
     cancelReason: Schema.NullOr(Turn.CancelReason),
   }),
-  subject: about,
+  subject: turnSubject,
   newActivity: false,
 });
 export type Ended = ThreadActivityKind.Activity<typeof Ended>;

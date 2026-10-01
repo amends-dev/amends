@@ -19,7 +19,6 @@ export const make = Effect.fn("PostgresSignals.make")(function* () {
   const { notices } = yield* PostgresDatabase.Service;
   const forWorkspace = (workspaceId: Workspace.Id) =>
     Signals.Service.of({
-      workspaceId,
       publish: (signal) =>
         encode(signal).pipe(
           Effect.flatMap((encoded) => notices.signal(workspaceId, encoded)),

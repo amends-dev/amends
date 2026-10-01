@@ -11,26 +11,24 @@ import {
 } from "@amends/core/authorization";
 import {
   Group,
-  GroupApplication,
-  GroupAudience,
+  GroupService,
+  GroupQuery,
   GroupMembership,
-  GroupMembershipApplication,
+  GroupMembershipService,
   GroupMembershipPermissions,
-  GroupMembershipStore,
   GroupPermissions,
   GroupStore,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberApplication, MemberFacts, MemberStore } from "@amends/core/workspace";
-import { ThreadApplication } from "@amends/core/thread";
+import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
+import { ThreadService } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Context, Effect, Option } from "effect";
 import {
   type Bound,
   boundTo,
   otherWorkspaceId,
-  replacing,
   runHost,
   Support,
   testProvenance,
@@ -64,43 +62,48 @@ export const groupReads = (harness: Harness) => {
       asActor(effect, actor).pipe(Effect.provide(core(bound)));
     const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const get = (id: Group.Id) =>
-      Effect.flatMap(GroupApplication.Service, (service) => service.get(id));
+      Effect.flatMap(GroupService.Service, (groupService) => groupService.get(id));
     const rename = (id: Group.Id, name: string, expectedName: string) =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.rename({ groupId: id, name, expectedName }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.rename({ groupId: id, name, expectedName }),
       );
-    const publicGroups = Effect.flatMap(GroupApplication.Service, (service) =>
-      service.listPublic({ limit: 100 }),
+    const publicGroups = Effect.flatMap(GroupService.Service, (groupService) =>
+      groupService.listPublic({ limit: 100 }),
     );
     /** The actor's readable groups as records; activity and following have their own tests. */
-    const mine = Effect.flatMap(GroupApplication.Service, (service) =>
-      Effect.map(service.listMine({ limit: 100 }), (items) => items.map((item) => item.group)),
+    const mine = Effect.flatMap(GroupService.Service, (groupService) =>
+      Effect.map(groupService.listMine({ limit: 100 }), (items) => items.map((item) => item.group)),
     );
     const roster = (id: Group.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.listCurrent(id, { limit: 100 }),
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.listCurrent(id, { limit: 100 }),
       );
     const join = (id: Group.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) => service.join(id));
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.join(id),
+      );
     const removeMember = (groupId: Group.Id, membershipId: GroupMembership.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.remove({ groupId, membershipId }),
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.remove({ groupId, membershipId }),
       );
     const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name, memberIds }),
       );
     const add = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.add({ groupId, memberId }),
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.add({ groupId, memberId }),
       );
     const leave = (membership: GroupMembership.Record) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.leave({ groupId: membership.groupId, membershipId: membership.id }),
+      Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+        groupMembershipService.leave({
+          groupId: membership.groupId,
+          membershipId: membership.id,
+        }),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const seed = (bound: Bound) =>
@@ -111,7 +114,7 @@ export const groupReads = (harness: Harness) => {
             Effect.gen(function* () {
               for (const memberId of [readerId, otherId, agentId])
                 yield* journal.publish(MemberFacts.Added, {
-                  workspaceId: bound.workspace.workspaceId,
+                  workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: actorFor(memberId).identity,
                 });
@@ -129,7 +132,7 @@ export const groupReads = (harness: Harness) => {
         bound,
         Effect.flatMap(Journal.Service, (journal) =>
           journal.publish(AssignmentFacts.Created, {
-            workspaceId: bound.workspace.workspaceId,
+            workspaceId: bound.store.workspaceId,
             assignmentId: Assignment.Id.make(
               `${memberId}-${permission.name}-${groupId ?? "workspace"}`,
             ),
@@ -139,10 +142,10 @@ export const groupReads = (harness: Harness) => {
               grant: Grant.make(
                 permission,
                 groupId === undefined
-                  ? { _tag: "Workspace", workspaceId: bound.workspace.workspaceId }
+                  ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
                   : {
                       _tag: "Target",
-                      target: { _tag: "Group", workspaceId: bound.workspace.workspaceId, groupId },
+                      target: { _tag: "Group", workspaceId: bound.store.workspaceId, groupId },
                     },
               ),
             },
@@ -212,10 +215,10 @@ export const groupReads = (harness: Harness) => {
               ]);
               for (const who of [reader, owner])
                 expect(yield* Effect.flip(run(bound, who, get(hidden.id)))).toEqual(
-                  new GroupApplication.NotFound({ groupId: hidden.id }),
+                  new GroupService.NotFound({ groupId: hidden.id }),
                 );
               expect(yield* Effect.flip(run(bound, reader, roster(hidden.id)))).toEqual(
-                new GroupMembershipApplication.GroupNotFound({ groupId: hidden.id }),
+                new GroupMembershipService.GroupNotFound({ groupId: hidden.id }),
               );
               expect(yield* history(bound)).toEqual(before);
             }),
@@ -247,7 +250,7 @@ export const groupReads = (harness: Harness) => {
               });
               yield* grant(bound, readerId, GroupPermissions.Read, hidden.id);
               expect(yield* Effect.flip(run(bound, reader, get(hidden.id)))).toMatchObject({
-                _tag: "GroupApplication.NotFound",
+                _tag: "GroupService.NotFound",
               });
               expect(yield* run(bound, reader, mine)).toEqual([first]);
             }),
@@ -289,24 +292,24 @@ export const groupReads = (harness: Harness) => {
                 expect(yield* run(bound, outsider, mine)).not.toContainEqual(hidden);
                 for (const id of [hidden.id, direct.id]) {
                   expect(yield* Effect.flip(run(bound, outsider, get(id)))).toMatchObject({
-                    _tag: "GroupApplication.NotFound",
+                    _tag: "GroupService.NotFound",
                   });
                   expect(yield* Effect.flip(run(bound, outsider, roster(id)))).toMatchObject({
-                    _tag: "GroupMembershipApplication.GroupNotFound",
+                    _tag: "GroupMembershipService.GroupNotFound",
                   });
                   expect(
                     yield* Effect.flip(run(bound, outsider, add(id, outsider.memberId))),
-                  ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+                  ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
                   expect(yield* Effect.flip(run(bound, outsider, join(id)))).toMatchObject({
-                    _tag: "GroupMembershipApplication.GroupNotFound",
+                    _tag: "GroupMembershipService.GroupNotFound",
                   });
                 }
                 expect(
                   yield* Effect.flip(run(bound, outsider, rename(hidden.id, "Mine", "Private"))),
-                ).toMatchObject({ _tag: "GroupApplication.NotFound" });
+                ).toMatchObject({ _tag: "GroupService.NotFound" });
                 expect(
                   yield* Effect.flip(run(bound, outsider, removeMember(hidden.id, admission!.id))),
-                ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+                ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
                 expect(
                   (yield* run(bound, outsider, publicGroups)).map((item) => item.group.id),
                 ).not.toContain(hidden.id);
@@ -327,27 +330,25 @@ export const groupReads = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
+              expectTypeOf<Extract<Core.Operations, GroupQuery.Service>>().toEqualTypeOf<never>();
               expectTypeOf<
-                Extract<Core.Operations, GroupAudience.Service>
-              >().toEqualTypeOf<never>();
-              expectTypeOf<
-                Effect.Services<ReturnType<GroupAudience.Interface["require"]>>
+                Effect.Services<ReturnType<GroupQuery.Interface["requireAudience"]>>
               >().toEqualTypeOf<Actor.Service>();
               const { bound, reader, owner, first, hidden } = yield* prepare();
               yield* run(
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const audience = yield* GroupAudience.make();
-                  expect(yield* audience.require(first.id)).toEqual(
+                  const groupQuery = yield* GroupQuery.make();
+                  expect(yield* groupQuery.requireAudience(first.id)).toEqual(
                     Option.getOrThrow(yield* bound.groupMemberships.findActive(first.id, readerId)),
                   );
-                  expect(yield* Effect.flip(audience.require(hidden.id))).toEqual(
-                    new GroupAudience.NotMember({ groupId: hidden.id }),
+                  expect(yield* Effect.flip(groupQuery.requireAudience(hidden.id))).toEqual(
+                    new GroupQuery.NotMember({ groupId: hidden.id }),
                   );
-                  expect(yield* Effect.flip(asActor(audience.require(first.id), owner))).toEqual(
-                    new GroupAudience.NotMember({ groupId: first.id }),
-                  );
+                  expect(
+                    yield* Effect.flip(asActor(groupQuery.requireAudience(first.id), owner)),
+                  ).toEqual(new GroupQuery.NotMember({ groupId: first.id }));
                 }),
               );
             }),
@@ -393,16 +394,16 @@ export const groupReads = (harness: Harness) => {
               for (const id of [hidden.id, foreignGroup.id, Group.Id.make("missing")]) {
                 expect(
                   yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, get(id))),
-                ).toEqual(new GroupApplication.NotFound({ groupId: id }));
+                ).toEqual(new GroupService.NotFound({ groupId: id }));
                 expect(
                   yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, roster(id))),
-                ).toEqual(new GroupMembershipApplication.GroupNotFound({ groupId: id }));
+                ).toEqual(new GroupMembershipService.GroupNotFound({ groupId: id }));
               }
               // The owner, outside all three, finds none of them either.
               for (const id of [hidden.id, foreignGroup.id, Group.Id.make("missing")])
                 expect(
                   yield* Effect.flip(gateway.asMember(workspace.id, ownerIdentity, get(id))),
-                ).toEqual(new GroupApplication.NotFound({ groupId: id }));
+                ).toEqual(new GroupService.NotFound({ groupId: id }));
             }),
           ),
         ),
@@ -444,30 +445,35 @@ export const groupReads = (harness: Harness) => {
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const groups = yield* GroupApplication.Service;
-                  const memberships = yield* GroupMembershipApplication.Service;
-                  const members = yield* MemberApplication.Service;
-                  const audience = yield* GroupAudience.make();
+                  const groupService = yield* GroupService.Service;
+                  const groupMembershipService = yield* GroupMembershipService.Service;
+                  const memberService = yield* MemberService.Service;
+                  const groupQuery = yield* GroupQuery.make();
                   const journal = yield* Journal.Service;
-                  const original = yield* audience.require(first.id);
-                  expect(yield* groups.get(first.id)).toEqual(first);
-                  yield* memberships.leave({ groupId: first.id, membershipId: original.id });
-                  expect(
-                    (yield* groups.listMine({ limit: 100 })).map((item) => item.group),
-                  ).toEqual([second]);
-                  expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
-                    _tag: "GroupApplication.NotFound",
+                  const original = yield* groupQuery.requireAudience(first.id);
+                  expect(yield* groupService.get(first.id)).toEqual(first);
+                  yield* groupMembershipService.leave({
+                    groupId: first.id,
+                    membershipId: original.id,
                   });
-                  expect(yield* Effect.flip(audience.require(first.id))).toMatchObject({
-                    _tag: "GroupAudience.NotMember",
+                  expect(
+                    (yield* groupService.listMine({ limit: 100 })).map((item) => item.group),
+                  ).toEqual([second]);
+                  expect(yield* Effect.flip(groupService.get(first.id))).toMatchObject({
+                    _tag: "GroupService.NotFound",
+                  });
+                  expect(yield* Effect.flip(groupQuery.requireAudience(first.id))).toMatchObject({
+                    _tag: "GroupQuery.NotMember",
                   });
                   const fresh = yield* asActor(
-                    memberships.add({ groupId: first.id, memberId: readerId }),
+                    groupMembershipService.add({ groupId: first.id, memberId: readerId }),
                     actorFor(agentId),
                   );
                   expect(fresh.id).not.toBe(original.id);
-                  expect(yield* audience.require(first.id)).toEqual(fresh);
-                  const current = yield* memberships.listCurrent(first.id, { limit: 100 });
+                  expect(yield* groupQuery.requireAudience(first.id)).toEqual(fresh);
+                  const current = yield* groupMembershipService.listCurrent(first.id, {
+                    limit: 100,
+                  });
                   expect(current.some((value) => value.id === original.id)).toBe(false);
                   expect(current.some((value) => value.id === fresh.id)).toBe(true);
                   const permissions = (names: ReadonlyArray<Permission.Name>) =>
@@ -480,32 +486,34 @@ export const groupReads = (harness: Harness) => {
                       .pipe(Publication.withActor);
                   yield* asActor(permissions([]), owner);
                   expect(
-                    (yield* groups.listMine({ limit: 100 })).map((item) => item.group),
+                    (yield* groupService.listMine({ limit: 100 })).map((item) => item.group),
                   ).toEqual([]);
-                  expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
+                  expect(yield* Effect.flip(groupService.get(first.id))).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
                   expect(
-                    yield* Effect.flip(memberships.listCurrent(first.id, { limit: 100 })),
+                    yield* Effect.flip(
+                      groupMembershipService.listCurrent(first.id, { limit: 100 }),
+                    ),
                   ).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
-                  expect(yield* audience.require(first.id)).toEqual(fresh);
+                  expect(yield* groupQuery.requireAudience(first.id)).toEqual(fresh);
                   yield* asActor(permissions([GroupPermissions.Read.name]), owner);
-                  yield* asActor(members.remove(readerId), owner);
+                  yield* asActor(memberService.remove(readerId), owner);
                   const checks: ReadonlyArray<
                     Effect.Effect<
                       unknown,
-                      | GroupApplication.ReadError
-                      | GroupMembershipApplication.ReadError
-                      | GroupAudience.Error,
+                      | GroupService.ReadError
+                      | GroupMembershipService.ReadError
+                      | GroupQuery.AudienceError,
                       Actor.Service
                     >
                   > = [
-                    groups.listMine({ limit: 100 }),
-                    groups.get(first.id),
-                    memberships.listCurrent(first.id, { limit: 100 }),
-                    audience.require(first.id),
+                    groupService.listMine({ limit: 100 }),
+                    groupService.get(first.id),
+                    groupMembershipService.listCurrent(first.id, { limit: 100 }),
+                    groupQuery.requireAudience(first.id),
                   ];
                   for (const effect of checks) {
                     expect(yield* Effect.flip(effect)).toMatchObject({
@@ -547,18 +555,18 @@ export const groupReads = (harness: Harness) => {
                 reader,
                 Effect.gen(function* () {
                   expectTypeOf<
-                    Effect.Services<ReturnType<GroupApplication.Interface["get"]>>
+                    Effect.Services<ReturnType<GroupService.Interface["get"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   expectTypeOf<
-                    Effect.Services<ReturnType<GroupApplication.Interface["listMine"]>>
+                    Effect.Services<ReturnType<GroupService.Interface["listMine"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   expectTypeOf<
-                    Effect.Services<ReturnType<GroupMembershipApplication.Interface["listCurrent"]>>
+                    Effect.Services<ReturnType<GroupMembershipService.Interface["listCurrent"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   yield* get(first.id);
                   yield* mine;
                   yield* roster(first.id);
-                  yield* (yield* GroupAudience.make()).require(first.id);
+                  yield* (yield* GroupQuery.make()).requireAudience(first.id);
                 }),
               );
               expect(yield* history(bound)).toEqual(before);
@@ -592,7 +600,7 @@ export const groupReads = (harness: Harness) => {
                           yield* leave(old);
                           expect(yield* mine).toEqual([second]);
                           expect(yield* Effect.flip(get(first.id))).toMatchObject({
-                            _tag: "GroupApplication.NotFound",
+                            _tag: "GroupService.NotFound",
                           });
                           const fresh = yield* asActor(add(first.id, readerId), actorFor(agentId));
                           expect(yield* get(first.id)).toEqual(first);
@@ -682,8 +690,8 @@ export const groupReads = (harness: Harness) => {
               run(
                 bound,
                 actor,
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  Effect.map(service.listMine({ limit: 100 }), (items) =>
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  Effect.map(groupService.listMine({ limit: 100 }), (items) =>
                     Object.fromEntries(
                       items.map((item) => [
                         item.group.kind === "Team" ? item.group.name : item.group.id,
@@ -704,8 +712,8 @@ export const groupReads = (harness: Harness) => {
             const renamable = run(
               bound,
               reader,
-              Effect.flatMap(GroupApplication.Service, (service) =>
-                Effect.map(service.listMine({ limit: 100 }), (items) =>
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                Effect.map(groupService.listMine({ limit: 100 }), (items) =>
                   items.map((item) => item.renamable),
                 ),
               ),
@@ -717,15 +725,19 @@ export const groupReads = (harness: Harness) => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.startDirect({ memberIds: [readerId], text: "Hello", mentions: [] }),
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startDirect({
+                  memberIds: [readerId],
+                  text: "Hello",
+                  mentions: [],
+                }),
               ),
             );
             const listed = yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupApplication.Service, (service) =>
-                service.listMine({ limit: 100 }),
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                groupService.listMine({ limit: 100 }),
               ),
             );
             // The direct group, then the general group, whose members the owner manages.
@@ -749,9 +761,9 @@ export const groupReads = (harness: Harness) => {
               bound,
               reader,
               Effect.gen(function* () {
-                const groups = yield* GroupApplication.Service;
-                const memberships = yield* GroupMembershipApplication.Service;
-                expect(yield* groups.get(first.id)).toEqual(first);
+                const groupService = yield* GroupService.Service;
+                const groupMembershipService = yield* GroupMembershipService.Service;
+                expect(yield* groupService.get(first.id)).toEqual(first);
                 yield* publish(
                   bound,
                   Effect.flatMap(Journal.Service, (journal) =>
@@ -764,11 +776,11 @@ export const groupReads = (harness: Harness) => {
                     }),
                   ),
                 );
-                expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
+                expect(yield* Effect.flip(groupService.get(first.id))).toMatchObject({
                   _tag: "Authorization.Denied",
                 });
                 expect(
-                  yield* Effect.flip(memberships.listCurrent(first.id, { limit: 100 })),
+                  yield* Effect.flip(groupMembershipService.listCurrent(first.id, { limit: 100 })),
                 ).toMatchObject({ _tag: "Authorization.Denied" });
                 const impostor = Actor.Value.make({
                   workspaceId,
@@ -778,15 +790,15 @@ export const groupReads = (harness: Harness) => {
                 const checks: ReadonlyArray<
                   Effect.Effect<
                     unknown,
-                    | GroupApplication.ReadError
-                    | GroupMembershipApplication.ReadError
-                    | GroupAudience.Error,
+                    | GroupService.ReadError
+                    | GroupMembershipService.ReadError
+                    | GroupQuery.AudienceError,
                     Actor.Service
                   >
                 > = [
-                  groups.listMine({ limit: 100 }),
-                  groups.get(first.id),
-                  memberships.listCurrent(first.id, { limit: 100 }),
+                  groupService.listMine({ limit: 100 }),
+                  groupService.get(first.id),
+                  groupMembershipService.listCurrent(first.id, { limit: 100 }),
                 ];
                 for (const effect of checks) {
                   expect(yield* Effect.flip(asActor(effect, impostor))).toMatchObject({
@@ -796,7 +808,7 @@ export const groupReads = (harness: Harness) => {
                 }
                 expect(
                   yield* Effect.flip(
-                    asActor(groups.get(first.id), actorFor(readerId, otherWorkspaceId)),
+                    asActor(groupService.get(first.id), actorFor(readerId, otherWorkspaceId)),
                   ),
                 ).toMatchObject({ _tag: "Authorization.WorkspaceMismatch" });
               }),
@@ -806,119 +818,35 @@ export const groupReads = (harness: Harness) => {
       ),
     );
 
-    it.effect(
-      "malformed audience, group, and roster responses fail closed instead of widening reads",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, reader, first, second } = yield* prepare();
-              yield* grant(bound, readerId, GroupPermissions.Read);
-              const admission = Option.getOrThrow(
-                yield* bound.groupMemberships.findActive(first.id, readerId),
-              );
-              const before = yield* history(bound);
-              for (const wrong of [
-                Object.assign({}, admission, { groupId: second.id }),
-                Object.assign({}, admission, { workspaceId: otherWorkspaceId }),
-                Object.assign({}, admission, { memberId: otherId }),
-                Object.assign({}, admission, { status: "removed" as const }),
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    findActive: () => Effect.succeedSome(wrong),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, reader, get(first.id)))).toMatchObject({
-                  _tag: "GroupAudience.InvalidResponse",
-                });
-                expect(yield* Effect.flip(run(broken, reader, roster(first.id)))).toMatchObject({
-                  _tag: "GroupAudience.InvalidResponse",
-                });
-              }
-              for (const records of [
-                [Object.assign({}, admission, { memberId: otherId })],
-                [Object.assign({}, admission, { status: "removed" as const })],
-                [Object.assign({}, admission, { workspaceId: otherWorkspaceId })],
-                [admission, admission],
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    listActiveByMember: () => Effect.succeed(records),
-                    pageActiveByMember: () => Effect.succeed(records),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, reader, mine))).toMatchObject({
-                  _tag: "GroupApplication.InvalidResponse",
-                });
-              }
-              const wrongGroup = {
-                ...bound,
-                context: Context.add(bound.context, GroupStore.Service, {
-                  ...bound.groups,
-                  get: () => Effect.succeedSome(second),
-                }),
-              };
-              expect(yield* Effect.flip(run(wrongGroup, reader, get(first.id)))).toMatchObject({
-                _tag: "GroupApplication.InvalidResponse",
-              });
-              for (const records of [
-                [Object.assign({}, admission, { groupId: second.id })],
-                [Object.assign({}, admission, { workspaceId: otherWorkspaceId })],
-                [admission, admission],
-                [
-                  admission,
-                  Object.assign({}, admission, { id: GroupMembership.Id.make("duplicate-active") }),
-                ],
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    listByGroup: () => Effect.succeed(records),
-                    pageActiveByGroup: () => Effect.succeed(records),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, reader, roster(first.id)))).toMatchObject({
-                  _tag: "GroupMembershipApplication.InvalidResponse",
-                });
-              }
-              const wrongMember = {
-                ...bound,
-                context: Context.add(bound.context, MemberStore.Service, {
-                  ...bound.members,
-                  ...replacing(bound.members, agentId, yield* bound.members.get(otherId)),
-                }),
-              };
-              expect(yield* Effect.flip(run(wrongMember, reader, roster(first.id)))).toMatchObject({
-                _tag: "GroupMembershipApplication.InvalidResponse",
-              });
-              const failed = {
-                ...bound,
-                context: Context.add(bound.context, GroupStore.Service, {
-                  ...bound.groups,
-                  get: () =>
-                    Effect.fail(
-                      new GroupStore.Failure({ operation: "get", cause: "failed storage" }),
-                    ),
-                  getMany: () =>
-                    Effect.fail(
-                      new GroupStore.Failure({ operation: "getMany", cause: "failed storage" }),
-                    ),
-                }),
-              };
-              expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({
-                _tag: "GroupStore.Failure",
-              });
-              expect(yield* history(bound)).toEqual(before);
-            }),
-          ),
+    it.effect("a storage failure reaches a group reader as it is, and records nothing", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, reader } = yield* prepare();
+            yield* grant(bound, readerId, GroupPermissions.Read);
+            const before = yield* history(bound);
+            const failed = {
+              ...bound,
+              context: Context.add(bound.context, GroupStore.Service, {
+                ...bound.groups,
+                get: () =>
+                  Effect.fail(
+                    new GroupStore.Failure({ operation: "get", cause: "failed storage" }),
+                  ),
+                getMany: () =>
+                  Effect.fail(
+                    new GroupStore.Failure({ operation: "getMany", cause: "failed storage" }),
+                  ),
+              }),
+            };
+            expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({
+              _tag: "GroupStore.Failure",
+            });
+            expect(yield* history(bound)).toEqual(before);
+          }),
         ),
+      ),
     );
 
     it.effect("group lists and rosters page in ID order and skip what the reader cannot see", () =>
@@ -937,8 +865,10 @@ export const groupReads = (harness: Harness) => {
               run(
                 bound,
                 reader,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  Effect.map(s.listMine(options), (items) => items.map((item) => item.group.id)),
+                Effect.flatMap(GroupService.Service, (groupService) =>
+                  Effect.map(groupService.listMine(options), (items) =>
+                    items.map((item) => item.group.id),
+                  ),
                 ),
               );
             // Only the last group is readable at first; the page reads past the others to fill.
@@ -956,8 +886,8 @@ export const groupReads = (harness: Harness) => {
               run(
                 bound,
                 reader,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  Effect.map(s.listCurrent(third.id, options), (items) =>
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  Effect.map(groupMembershipService.listCurrent(third.id, options), (items) =>
                     items.map((item) => item.id),
                   ),
                 ),
@@ -971,7 +901,9 @@ export const groupReads = (harness: Harness) => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(MemberApplication.Service, (s) => s.remove(otherId)),
+              Effect.flatMap(MemberService.Service, (memberService) =>
+                memberService.remove(otherId),
+              ),
             );
             expect(yield* rosterPage({ limit: 3 })).toEqual(
               admissions

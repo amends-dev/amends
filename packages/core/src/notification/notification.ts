@@ -121,7 +121,7 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
  * activity's journal entry, so replay and the change feed reproduce the record exactly: its ID is
  * the entry and the recipient's participation.
  */
-export const generated = (
+export const fromActivity = (
   entry: { readonly logId: Entry.LogId; readonly id: Entry.Id; readonly recordedAt: DateTime.Utc },
   activity: {
     readonly workspaceId: WorkspaceId.Id;

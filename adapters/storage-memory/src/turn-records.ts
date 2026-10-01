@@ -66,7 +66,6 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
       .toSorted(byCreated);
   });
   return TurnStore.Service.of({
-    workspaceId,
     get: Effect.fn("TurnRecords.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Turn.Id)(input);

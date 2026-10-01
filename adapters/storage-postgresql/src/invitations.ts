@@ -67,7 +67,6 @@ export const make = Effect.fn("Invitations.make")(function* () {
   const read = (operation: string, where: SQL | undefined, order: ReadonlyArray<SQL>) =>
     guard(select(db, where, order)).pipe(Effect.mapError(storeFailure(InvitationStore, operation)));
   return InvitationStore.Service.of({
-    workspaceId,
     get: (id) => Effect.map(read("get", and(inWorkspace, eq(invitations.id, id)), []), Array.head),
     listPendingByRecipient: (recipientId) =>
       read(

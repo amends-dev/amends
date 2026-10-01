@@ -44,10 +44,10 @@ const run = <A, E>(
     Effect.provideService(Checkpoint.Service, fixture.checkpoints),
   );
 const setup = Effect.gen(function* () {
-  const logs = yield* Log.Service;
+  const log = yield* Log.Service;
   const journal = yield* Journal.make({ logId: Log.Id.make("domain"), projections: [projection] });
-  const turn = logs.open({ id: Log.Id.make("turn/one"), schema: Harness });
-  return { logs, journal, turn };
+  const turn = log.open({ id: Log.Id.make("turn/one"), schema: Harness });
+  return { logs: log, journal, turn };
 });
 it.effect(
   "facts and turn output use independent logs; output alone needs no workspace commit",

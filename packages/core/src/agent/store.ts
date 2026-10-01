@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { Agent } from "./agent.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("AgentStore.Failure", {
@@ -15,7 +15,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("AgentStore.Conflic
 
 /** Internal projection storage. Reads honor an existing transaction; writes require one. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Agent.Id) => Effect.Effect<Option.Option<Agent.Record>, Failure>;
   /** Every agent in the workspace, those whose membership ended included, in no particular order. */
   readonly list: Effect.Effect<ReadonlyArray<Agent.Record>, Failure>;
