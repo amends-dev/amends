@@ -1,7 +1,8 @@
 import { BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { ClusterBackground, Gateway, GatewayErrors, WorkspaceWakes } from "@amends/gateway";
+import { ClusterBackground } from "@amends/cluster";
+import { Gateway, GatewayErrors, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";

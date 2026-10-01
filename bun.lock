@@ -78,6 +78,7 @@
       "name": "@amends/storage-postgresql",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/cluster": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@effect/sql-pg": "catalog:",
@@ -205,10 +206,10 @@
       "name": "@amends/host-local",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/cluster": "workspace:*",
         "@amends/connection-anthropic": "workspace:*",
         "@amends/connection-openai-compatible": "workspace:*",
         "@amends/core": "workspace:*",
-        "@amends/execution": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness-amends": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
@@ -235,6 +236,21 @@
         "effect": "catalog:",
       },
     },
+    "packages/cluster": {
+      "name": "@amends/cluster",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection": "workspace:*",
+        "@amends/core": "workspace:*",
+        "@amends/environment": "workspace:*",
+        "@amends/gateway": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@amends/harness-amends": "workspace:*",
+      },
+    },
     "packages/connection": {
       "name": "@amends/connection",
       "version": "0.0.0",
@@ -259,21 +275,6 @@
       "dependencies": {
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
-        "effect": "catalog:",
-      },
-      "devDependencies": {
-        "@amends/harness-amends": "workspace:*",
-      },
-    },
-    "packages/execution": {
-      "name": "@amends/execution",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/environment": "workspace:*",
-        "@amends/gateway": "workspace:*",
-        "@amends/harness": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
@@ -366,6 +367,8 @@
 
     "@amends/client": ["@amends/client@workspace:apps/client"],
 
+    "@amends/cluster": ["@amends/cluster@workspace:packages/cluster"],
+
     "@amends/connection": ["@amends/connection@workspace:packages/connection"],
 
     "@amends/connection-anthropic": ["@amends/connection-anthropic@workspace:adapters/connection-anthropic"],
@@ -377,8 +380,6 @@
     "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
 
     "@amends/environment": ["@amends/environment@workspace:packages/environment"],
-
-    "@amends/execution": ["@amends/execution@workspace:packages/execution"],
 
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 

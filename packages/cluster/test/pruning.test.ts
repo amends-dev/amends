@@ -9,7 +9,7 @@ import {
   Sharding,
   ShardingConfig,
 } from "effect/unstable/cluster";
-import { ClusterPruning } from "../src/cluster-pruning.ts";
+import { ClusterPruning } from "../src/pruning.ts";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */
 const cluster = Sharding.layer.pipe(

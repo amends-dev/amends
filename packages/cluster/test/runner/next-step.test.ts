@@ -8,8 +8,8 @@ import { AmendsHarness } from "@amends/harness-amends";
 import { expect, it } from "@effect/vitest";
 import { Duration, Effect, Layer, Schema } from "effect";
 import { LanguageModel, Model } from "effect/unstable/ai";
-import { NextStep } from "../src/next-step.ts";
-import { RunnerSettings } from "../src/settings.ts";
+import { NextStep } from "../../src/runner/next-step.ts";
+import { RunnerSettings } from "../../src/runner/settings.ts";
 
 const createdAt = "2026-09-28T12:00:00.000Z";
 const selection = Schema.decodeUnknownSync(Turn.Selection)({

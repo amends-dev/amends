@@ -1,7 +1,8 @@
 import { BackgroundProcess } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { ClusterBackground, Gateway, WorkspaceWakes } from "@amends/gateway";
+import { ClusterBackground } from "@amends/cluster";
+import { Gateway, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { PostgresStorage } from "@amends/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";

@@ -39,7 +39,7 @@ the model an agent chose, by the provider's own identifier. `languageModel` retu
 access, a `LanguageModel` with its provider and model names, which a harness such as
 [amends's own](../harness-amends/README.md) uses. `limits` says how much the model takes: its
 context window in tokens, and the most it writes in one response when known, from which
-[execution](../execution/README.md) keeps a conversation within it. The module is separate so reading declarations never loads Effect AI.
+[the turn runner](../cluster/README.md#running-a-turn) keeps a conversation within it. The module is separate so reading declarations never loads Effect AI.
 
 Implementations live in adapters, such as
 [`connection-anthropic`](../../adapters/connection-anthropic/README.md) and

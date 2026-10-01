@@ -11,9 +11,8 @@ import { Workspace } from "@amends/core/workspace";
 import { Cause, Crypto, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
-import { ClusterRetry } from "./cluster-retry.ts";
-import { Gateway } from "./gateway.ts";
-import { WorkspaceWakes } from "./wakes.ts";
+import { Gateway, WorkspaceWakes } from "@amends/gateway";
+import { ClusterRetry } from "./retry.ts";
 
 /**
  * A request for a workspace's process to run at `at`. Its key identifies it among the process's
@@ -175,4 +174,4 @@ export const layerWorker = WorkspaceProcess.toLayer(
 /** Stored wakes and the worker that runs them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerWakes);
 
-export * as ClusterBackground from "./cluster-background.ts";
+export * as ClusterBackground from "./background.ts";

@@ -10,10 +10,10 @@
     "status": "bun run src/status.ts"
   },
   "dependencies": {
+    "@amends/cluster": "workspace:*",
     "@amends/connection-anthropic": "workspace:*",
     "@amends/connection-openai-compatible": "workspace:*",
     "@amends/core": "workspace:*",
-    "@amends/execution": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/harness-amends": "workspace:*",
     "@amends/sandbox-daytona": "workspace:*",

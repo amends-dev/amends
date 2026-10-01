@@ -3,7 +3,7 @@
  * default `cluster` prefix. Cluster never removes a message or its reply, so the host prunes
  * the ones it has handled.
  */
-import { ClusterBackground } from "@amends/gateway";
+import { ClusterBackground } from "@amends/cluster";
 import { Clock, DateTime, Effect, Option, Schema } from "effect";
 import { Snowflake } from "effect/unstable/cluster";
 import { SqlClient } from "effect/unstable/sql";

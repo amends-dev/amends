@@ -1,12 +1,7 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
-import {
-  ClusterBackground,
-  ClusterPruning,
-  Gateway,
-  type WorkspaceDirectory,
-} from "@amends/gateway";
-import { ClusterTurns, TurnRunner } from "@amends/execution";
+import { ClusterBackground, ClusterPruning, ClusterTurns, TurnRunner } from "@amends/cluster";
+import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
 import { LocalSandbox } from "@amends/sandbox-local";
@@ -73,7 +68,7 @@ export const installed = {
 };
 
 /** The code that runs agents' turns: amends's harness in process, with either model connection. */
-export const execution: TurnRunner.Options = {
+export const turnRunnerOptions: TurnRunner.Options = {
   harnesses: [AmendsHarness.make()],
   models: [AnthropicConnection.modelInference, OpenAiCompatibleConnection.modelInference],
 };
@@ -124,7 +119,7 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
       prune: PostgresClusterStorage.prune,
       entityTypes: [ClusterBackground.WorkspaceProcess.type, ClusterTurns.TurnEntity.type],
     }),
-    ClusterTurns.layerWorker.pipe(Layer.provide(TurnRunner.layer(execution))),
+    ClusterTurns.layerWorker.pipe(Layer.provide(TurnRunner.layer(turnRunnerOptions))),
   ).pipe(
     Layer.provideMerge(
       Gateway.layer(installed).pipe(

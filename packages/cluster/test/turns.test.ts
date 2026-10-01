@@ -13,8 +13,8 @@ import {
   Sharding,
   ShardingConfig,
 } from "effect/unstable/cluster";
-import { ClusterTurns } from "../src/cluster-turns.ts";
-import { TurnRunner } from "../src/runner.ts";
+import { ClusterTurns } from "../src/turns.ts";
+import { TurnRunner } from "../src/runner/runner.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const turnId = Turn.Id.make("turn-one");

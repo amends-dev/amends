@@ -12,10 +12,8 @@ import {
   Sharding,
   ShardingConfig,
 } from "effect/unstable/cluster";
-import { ClusterBackground } from "../src/cluster-background.ts";
-import { GatewayErrors } from "../src/errors.ts";
-import { Gateway } from "../src/gateway.ts";
-import { WorkspaceWakes } from "../src/wakes.ts";
+import { Gateway, GatewayErrors, WorkspaceWakes } from "@amends/gateway";
+import { ClusterBackground } from "../src/background.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const process = BackgroundProcess.Name.make("test.work");

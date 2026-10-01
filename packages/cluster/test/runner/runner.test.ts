@@ -4,7 +4,7 @@ import { Environment } from "@amends/core/environment";
 import { Log } from "@amends/core/journal";
 import { Turn, TurnErrors, TurnExecution, TurnLog } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
-import { TurnRunner } from "@amends/execution";
+import { TurnRunner } from "@amends/cluster";
 import { Gateway } from "@amends/gateway";
 import type { Harness, HarnessEvent, Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";

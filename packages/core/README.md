@@ -368,7 +368,7 @@ are. A client folds a turn's items into one row at its `turn.created` position.
 The commit that creates or retries a turn asks `TurnDispatch` to run it, through a journal
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
 the turn. The gateway binds
-`TurnDispatch` to its host's `WorkspaceTurnDispatch`; [execution](../execution/README.md) runs harnesses
+`TurnDispatch` to its host's `WorkspaceTurnDispatch`; [cluster](../cluster/README.md) runs harnesses
 and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
 from a person's message through the wake, acceptance, and dispatch to the reply.
 
@@ -719,7 +719,7 @@ attributed to it as a `System` performer named after it, and returns its outcome
 name fails with `BackgroundRuns.Unknown`, a process's own failure with `BackgroundRuns.Failure`,
 and two processes sharing a name stop the workspace's core from starting. It is part of `Core.layer`
 but not of `Core.Operations`, since no actor runs it. The gateway runs it for hosts through
-[`runBackground`](../gateway/README.md#background-work-on-effect-cluster).
+[`runBackground`](../cluster/README.md#background-work).
 
 ## Module dependencies and exports
 

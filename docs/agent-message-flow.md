@@ -63,7 +63,7 @@ Publishing that fact does two things in the same transaction, in this order
   **persisted Cluster message** for the entity `amends/WorkspaceProcess`, keyed by workspace and
   process name, with the primary key `commit:<commit id>`. The local host gives Cluster and the
   workspace storage one SQL client, so the message is a row written in the commit's own
-  transaction ([gateway](../packages/gateway/README.md#background-work-on-effect-cluster)).
+  transaction ([cluster](../packages/cluster/README.md#background-work)).
 
 The wake is a reaction and not a projection because a projection also runs when a read model is
 rebuilt from the journal, and a rebuild must not ask for work again. A reaction runs only when a
@@ -118,7 +118,7 @@ A second reaction, `TurnDispatch.reactions` on `turn.created` and `turn.retried`
 ## 4. The turn runs
 
 `ClusterTurns.layerWorker` handles the `Run` message on the turn's entity and calls
-`TurnRunner.run` ([execution](../packages/execution/README.md)). Turns are separate entities, so
+`TurnRunner.run` ([cluster](../packages/cluster/README.md#running-a-turn)). Turns are separate entities, so
 different turns run side by side while one turn runs once at a time.
 
 The runner never touches storage. Every step goes through `gateway.executeTurns` to
@@ -198,7 +198,7 @@ followed over its own stream.
 | Commit B fails               | No turn, notifications still pending, no `Run`; the next run accepts them.                                                                                           |
 | A turn's run fails           | The worker stores another `Run` after the same delay; after eight failed runs it stores an `Abandon`, which fails the turn, asking again until that is recorded.     |
 | A turn's run is cut short    | Cluster redelivers it; the runner continues from the log. Interruptions worth retrying count against `retries` (three) in the log, so a restart does not reset them. |
-| Model silent, context full   | The runner records the interruption, and retries or checkpoints; see [execution](../packages/execution/README.md#running-a-turn).                                    |
+| Model silent, context full   | The runner records the interruption, and retries or checkpoints; see [cluster](../packages/cluster/README.md#running-a-turn).                                        |
 
 ## Timing
 
@@ -224,7 +224,7 @@ model adds its own time to step 4.
 | Word      | Meanings                                                                                                                                                                                                                                           |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | run       | `BackgroundRuns.run(name)`, a host running a registered process once; a process's `run` effect; `TurnCommand.acceptWork`, `turn.accept`'s body; the `Run` message that asks a turn's entity to run; `TurnRunner.run`, running one turn to its end. |
-| execution | `TurnExecution` in core, the interface the runner calls through the gateway; and the `@amends/execution` package, which holds `TurnRunner` and `ClusterTurns`.                                                                                     |
+| execution | `TurnExecution` in core, the interface the runner calls through the gateway. The runner itself is `TurnRunner`, in `@amends/cluster`.                                                                                                              |
 | process   | A `BackgroundProcess`: a workspace's sweep such as `turn.accept`. Not an operating system process, which other guides also call a process.                                                                                                         |
 | wake      | A stored request for a `BackgroundProcess` to run (`BackgroundWakes`, the Cluster `Wake` message).                                                                                                                                                 |
 | dispatch  | A stored request for one turn to run (`TurnDispatch`, the Cluster `Run` message).                                                                                                                                                                  |
@@ -232,14 +232,14 @@ model adds its own time to step 4.
 
 ## The two Cluster entities
 
-|                  | `amends/WorkspaceProcess` (`ClusterBackground`, in gateway)      | `amends/Turn` (`ClusterTurns`, in execution)                                 |
-| ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| One entity per   | Workspace and process                                            | Workspace and turn                                                           |
-| Messages         | `Wake`, keyed `commit:<id>` (and the time, for a later wake)     | `Run`, keyed `created` or `retry:<n>`; `Abandon`, keyed `abandon:<n>`        |
-| Runs             | A sweep: never two at once per workspace and process             | A turn: turns in parallel, each once at a time                               |
-| After a run      | Schedules the next from `Idle`, `Continue`, or `At`              | Nothing, unless the run failed                                               |
-| A run that fails | Retries without limit, after `ClusterRetry.delay`                | Retries eight times, then asks to `Abandon` the turn, until that is recorded |
-| Lives in         | Gateway, beside the `WorkspaceWakes` host contract it implements | Execution, since it needs `TurnRunner`, which gateway cannot depend on       |
+|                  | `amends/WorkspaceProcess` (`ClusterBackground`, in gateway)                      | `amends/Turn` (`ClusterTurns`, in execution)                                       |
+| ---------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| One entity per   | Workspace and process                                                            | Workspace and turn                                                                 |
+| Messages         | `Wake`, keyed `commit:<id>` (and the time, for a later wake)                     | `Run`, keyed `created` or `retry:<n>`; `Abandon`, keyed `abandon:<n>`              |
+| Runs             | A sweep: never two at once per workspace and process                             | A turn: turns in parallel, each once at a time                                     |
+| After a run      | Schedules the next from `Idle`, `Continue`, or `At`                              | Nothing, unless the run failed                                                     |
+| A run that fails | Retries without limit, after `ClusterRetry.delay`                                | Retries eight times, then asks to `Abandon` the turn, until that is recorded       |
+| Lives in         | `@amends/cluster` (`background.ts`), implementing the gateway's `WorkspaceWakes` | `@amends/cluster` (`turns.ts`), implementing the gateway's `WorkspaceTurnDispatch` |
 
 ## Where to change things
 
@@ -263,6 +263,6 @@ projections, reactions, the change feed, and `wakesOn` triggers all name it.
   reply, and the timeline's `turn.created`, `turn.started`, reply, `turn.ended`.
 - `hosts/local/test/background.test.ts` checks a wake is stored with its commit and not if the
   commit rolls back.
-- `packages/gateway/test/cluster-background.test.ts` covers wake dedupe, rescheduling, retry
-  delays, and dropping; `cluster-pruning.test.ts` covers pruning.
-- `packages/execution/test/runner.test.ts` runs the runner over turn execution in memory.
+- `packages/cluster/test/background.test.ts` covers wake dedupe, rescheduling, retry
+  delays, and dropping; `pruning.test.ts` covers pruning.
+- `packages/cluster/test/runner/runner.test.ts` runs the runner over turn execution in memory.

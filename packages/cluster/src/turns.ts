@@ -8,11 +8,12 @@ import { Store } from "@amends/core/journal";
 import { Turn } from "@amends/core/turn";
 import { TurnDispatch } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
-import { ClusterRetry, WorkspaceTurnDispatch } from "@amends/gateway";
+import { WorkspaceTurnDispatch } from "@amends/gateway";
 import { Cause, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
-import { TurnRunner } from "./runner.ts";
+import { ClusterRetry } from "./retry.ts";
+import { TurnRunner } from "./runner/runner.ts";
 
 /**
  * A request to run a workspace's turn at `at`. Its key identifies it among the turn's requests:
@@ -201,4 +202,4 @@ export const layerWorker = TurnEntity.toLayer(
 /** Stored requests and the worker that runs them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerDispatch);
 
-export * as ClusterTurns from "./cluster-turns.ts";
+export * as ClusterTurns from "./turns.ts";

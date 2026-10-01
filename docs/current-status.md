@@ -16,7 +16,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
-  local host [runs them](../packages/execution/README.md), each closing with the agent's reply.
+  local host [runs them](../packages/cluster/README.md), each closing with the agent's reply.
   Turns are conversation only: agents have no tools, and environments with a sandbox fail their
   turns. A turn posts every answer it completed when it closes, one message each, so an answer
   given before more input arrived is posted after that input; a turn that fails or is stopped

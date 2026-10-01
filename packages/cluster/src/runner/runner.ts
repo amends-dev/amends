@@ -43,7 +43,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/execution/runner/Service",
+  "@amends/cluster/runner/Service",
 ) {}
 
 /** @category constructors */

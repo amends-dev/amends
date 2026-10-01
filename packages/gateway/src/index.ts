@@ -7,6 +7,3 @@ export { WorkspaceSignals } from "./signals.ts";
 export { WorkspaceStorage } from "./storage.ts";
 export { WorkspaceTurnDispatch } from "./turn-dispatch.ts";
 export { WorkspaceWakes } from "./wakes.ts";
-export { ClusterBackground } from "./cluster-background.ts";
-export { ClusterPruning } from "./cluster-pruning.ts";
-export { ClusterRetry } from "./cluster-retry.ts";
