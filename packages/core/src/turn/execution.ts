@@ -43,6 +43,7 @@ import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
+/** What a turn's runner or harness reported does not fit the turn it reported for. */
 export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
   "TurnExecution.InvalidResponse",
   { message: Schema.String },
@@ -288,33 +289,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const ending = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
-  if (
-    [
-      notifications.workspaceId,
-      agents.workspaceId,
-      connections.workspaceId,
-      credentials.workspaceId,
-      environments.workspaceId,
-      activities.workspaceId,
-      messages.workspaceId,
-      members.workspaceId,
-      access.workspaceId,
-      admissions.workspaceId,
-      publication.workspaceId,
-      authorization.workspaceId,
-      signals.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
 
-  const decodeTurn = Schema.decodeEffect(Schema.toType(Turn.Record));
   const load = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turns.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
-    const turn = yield* decodeTurn(found.value);
-    if (turn.workspaceId !== workspaceId || turn.id !== turnId)
-      return yield* new InvalidResponse({ message: "Turn store returned another turn" });
-    return turn;
+    return found.value;
   });
   const identityOf = (turn: Turn.Record) =>
     Identity.MemberReference.cases.Agent.make({ id: turn.agentId });
@@ -381,7 +360,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           messageId: decoded.details.messageId,
         }),
       ),
-    ).pipe(Effect.mapError((cause) => new InvalidResponse({ message: String(cause) })));
+    ).pipe(Effect.orDie);
     const found = new Map(
       (yield* messages.getMany(ids.map((entry) => entry.messageId))).map((message) => [
         message.id as string,
@@ -561,8 +540,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       Effect.gen(function* () {
         yield* require(turn, ["queued"]);
         const agent = yield* agents.get(turn.agentId);
-        if (Option.isNone(agent))
-          return yield* new InvalidResponse({ message: "The turn's agent no longer exists" });
+        if (Option.isNone(agent)) return yield* Effect.die("A turn's agent is missing");
         // The first turn of a participation records the thread's history before its input, so
         // later turns read it from the agent's log rather than from the thread, in entries of a
         // bounded size however long the thread.

@@ -17,7 +17,7 @@ import { NotificationStore } from "../notification/store.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
-import { ThreadParticipation } from "../thread/participation/participation.ts";
+
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
@@ -28,11 +28,6 @@ import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
-
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "TurnAcceptance.InvalidResponse",
-  { message: Schema.String },
-) {}
 
 export type Error =
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound | Authorization.Denied>
@@ -49,8 +44,7 @@ export type Error =
   | Log.WriteError
   | TurnActivityRecorder.Error
   | TurnEnding.Error
-  | Projection.Error
-  | InvalidResponse;
+  | Projection.Error;
 
 export interface Interface {
   readonly workspaceId: Turn.Record["workspaceId"];
@@ -80,27 +74,12 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   const participations = yield* ThreadParticipationStore.Service;
   const turns = yield* TurnStore.Service;
   const access = yield* ThreadAccess.Service;
-  const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const activity = yield* TurnActivityRecorder.Service;
   const ending = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
-  if (
-    [
-      agents.workspaceId,
-      members.workspaceId,
-      notifications.workspaceId,
-      participations.workspaceId,
-      access.workspaceId,
-      authorization.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
-
-  const decodeNotification = Schema.decodeEffect(Schema.toType(Notification.Record));
-  const decodeParticipation = Schema.decodeEffect(Schema.toType(ThreadParticipation.Record));
 
   /** The agent as the actor and performer of what it does with its own work. */
   const asAgent = (agent: { readonly id: Agent.Id; readonly memberId: Member.Id }) => {
@@ -143,7 +122,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     for (const id of ids) {
       const found = yield* notifications.get(id);
       if (Option.isNone(found)) continue;
-      const record = yield* decodeNotification(found.value);
+      const record = found.value;
       if (
         record.state._tag === "Pending" &&
         record.recipient._tag === "Agent" &&
@@ -199,8 +178,8 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     const participationId = pending.at(-1)!.participationId!;
     const participation = yield* participations.get(participationId);
     if (Option.isNone(participation))
-      return yield* new InvalidResponse({ message: "Notification participation is missing" });
-    const joined = yield* decodeParticipation(participation.value);
+      return yield* Effect.die("A pending notification's participation is missing");
+    const joined = participation.value;
     const latest = yield* turns.findLatest(agent.memberId, threadId);
     const previous = Option.filter(latest, (turn) => turn.participationId === participationId);
     const prior = Option.isSome(previous)

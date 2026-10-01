@@ -28,18 +28,12 @@ import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 export { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "TurnApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type ReadError =
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
   | Exclude<Authorization.Error, Authorization.Denied>
   | TurnStore.Failure
   | ThreadParticipationStore.Failure
   | Schema.SchemaError
-  | InvalidResponse
   | NotFound;
 export type ListError = Exclude<ReadError, NotFound> | ThreadNotFound;
 export type ActiveError = Exclude<ReadError, NotFound>;
@@ -130,19 +124,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const commits = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = turns.workspaceId;
-  if (
-    [
-      participations.workspaceId,
-      access.workspaceId,
-      authorization.workspaceId,
-      members.workspaceId,
-      signals.workspaceId,
-      drafts.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({ message: "Turn services belong to different workspaces" });
 
-  const decode = Schema.decodeEffect(Schema.toType(Turn.Record));
   const readThread = (threadId: ThreadId.Id) =>
     Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
   /**
@@ -158,9 +140,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const readable = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turns.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
-    const turn = yield* decode(found.value);
-    if (turn.workspaceId !== workspaceId || turn.id !== turnId)
-      return yield* new InvalidResponse({ message: "Turn store returned another turn" });
+    const turn = found.value;
     yield* readableThread(turn.threadId).pipe(
       Effect.catchTag("ThreadAccess.NotFound", () => Effect.fail(new NotFound({ turnId }))),
     );
@@ -229,10 +209,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         Effect.fail(new ThreadNotFound({ threadId: id })),
       ),
     );
-    const listed = yield* Effect.forEach(yield* turns.listByThread(thread.id, count), (turn) =>
-      decode(turn),
-    );
-    return yield* present(listed, { newestFirst: true });
+    return yield* present(yield* turns.listByThread(thread.id, count), { newestFirst: true });
   });
 
   const bounded = Schema.decodeEffect(
@@ -240,9 +217,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   );
 
   const listActive = Effect.fn("TurnApplication.listActive")(function* (limit: number) {
-    const active = yield* Effect.forEach(yield* turns.listActive(yield* bounded(limit)), (turn) =>
-      decode(turn),
-    );
+    const active = yield* turns.listActive(yield* bounded(limit));
     // Each thread's audience is checked once, whatever number of its turns are active, then the
     // permission to read the threads in it, together.
     const opened = new Map<ThreadId.Id, boolean>();

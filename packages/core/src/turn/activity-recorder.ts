@@ -1,4 +1,4 @@
-import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Context, DateTime, Effect, Layer, Option } from "effect";
 import type { Event } from "../journal/event.ts";
 import type { Publication } from "../journal/publication.ts";
 import type { Store } from "../journal/store.ts";
@@ -8,11 +8,7 @@ import { ThreadStore } from "../thread/store.ts";
 import { Thread } from "../thread/thread.ts";
 import type { TurnActivity } from "./activity.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "TurnActivityRecorder.InvalidResponse",
-  { message: Schema.String },
-) {}
-export type Error = ThreadActivityPublisher.Error | ThreadStore.Failure | InvalidResponse;
+export type Error = ThreadActivityPublisher.Error | ThreadStore.Failure;
 
 /**
  * Records a turn's changes in its thread's timeline as `TurnActivity`. It lives apart from the
@@ -47,22 +43,10 @@ export const make = Effect.fn("TurnActivityRecorder.make")(function* () {
   const publisher = yield* ThreadActivityPublisher.Service;
   const threads = yield* ThreadStore.Service;
   const workspaceId = publisher.workspaceId;
-  if (threads.workspaceId !== workspaceId)
-    return yield* new InvalidResponse({
-      message: "Turn activity services belong to different workspaces",
-    });
-  const decode = Schema.decodeEffect(Schema.toType(Thread.Record));
   const record: Interface["record"] = Effect.fnUntraced(function* (thread, kind, details, cause) {
     const found =
-      typeof thread === "string"
-        ? yield* Effect.flatMap(threads.get(thread), (row) =>
-            Option.isNone(row)
-              ? Effect.fail(new InvalidResponse({ message: "The turn's thread is missing" }))
-              : decode(row.value).pipe(
-                  Effect.mapError((cause) => new InvalidResponse({ message: cause.message })),
-                ),
-          )
-        : thread;
+      typeof thread === "string" ? Option.getOrUndefined(yield* threads.get(thread)) : thread;
+    if (found === undefined) return yield* Effect.die("A turn's thread is missing");
     const occurredAt = yield* DateTime.now;
     yield* publisher.publish({
       thread: found,
