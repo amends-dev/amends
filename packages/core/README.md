@@ -466,7 +466,7 @@ type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` register
 kind adds its resolver to the first and its item schema to the second. Reading a kind without a
 resolver is a defect, `ThreadActivityResolvers.Unknown`.
 
-Thread, group, notification, turn, workspace, and authorization services trust what storage returns: the adapters decode each record and scope it
+Thread, group, notification, turn, workspace, authorization, attention, and signal services trust what storage returns: the adapters decode each record and scope it
 to its workspace, and the storage conformance suites check that. So these services use stored
 records as they come, without decoding or cross-checking them again, and a record core itself wrote
 that is missing is a defect rather than a typed error. Storage failures still reach callers as they

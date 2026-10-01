@@ -5,7 +5,7 @@ import { GroupAudience } from "../group/audience.ts";
 import { GroupPermissions } from "../group/permissions.ts";
 import { Actor } from "../identity/actor.ts";
 import { ThreadAccess } from "../thread/access.ts";
-import { ThreadActivity } from "../thread/activity/activity.ts";
+
 import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -18,10 +18,6 @@ import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./
 import { Notification } from "../notification/notification.ts";
 export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "ReadStateApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
 export type Error =
   | Authorization.Error
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
@@ -34,8 +30,7 @@ export type Error =
   | HumanRequired
   | ThreadNotFound
   | GroupNotFound
-  | BeyondTimeline
-  | InvalidResponse;
+  | BeyondTimeline;
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   /**
@@ -66,21 +61,6 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const readStates = yield* ReadStateStore.Service;
   const signals = yield* Signals.Service;
   const workspaceId = authorization.workspaceId;
-  if (
-    [
-      access.workspaceId,
-      audience.workspaceId,
-      activities.workspaceId,
-      reading.workspaceId,
-      readStates.workspaceId,
-      signals.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({
-      message: "Read-state services belong to different workspaces",
-    });
-  const invalid = (cause: Schema.SchemaError) =>
-    new InvalidResponse({ message: `Storage returned invalid data: ${cause.message}` });
 
   const human = Effect.fnUntraced(function* () {
     const actor = yield* Actor.Service;
@@ -108,11 +88,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       }),
     ]);
     const found = yield* activities.latest(thread.id);
-    const latest = Option.isNone(found)
-      ? 0
-      : (yield* Schema.decodeEffect(Schema.toType(ThreadActivity.Record))(found.value).pipe(
-          Effect.mapError(invalid),
-        )).sequence;
+    const latest = Option.isNone(found) ? 0 : found.value.sequence;
     if (request.throughSequence > latest)
       return yield* new BeyondTimeline({
         threadId: thread.id,

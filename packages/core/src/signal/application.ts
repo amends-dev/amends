@@ -1,4 +1,4 @@
-import { Context, DateTime, Duration, Effect, Layer, Schema } from "effect";
+import { Context, DateTime, Duration, Effect, Layer } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Actor } from "../identity/actor.ts";
@@ -11,15 +11,10 @@ import { Signals } from "./signals.ts";
 import { ThreadNotFound } from "./errors.ts";
 export { ThreadNotFound } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "SignalApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
 export type Error =
   | Authorization.Error
   | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
-  | ThreadNotFound
-  | InvalidResponse;
+  | ThreadNotFound;
 
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -47,10 +42,6 @@ export const make = Effect.fn("SignalApplication.make")(function* () {
   const access = yield* ThreadAccess.Service;
   const signals = yield* Signals.Service;
   const workspaceId = authorization.workspaceId;
-  if (access.workspaceId !== workspaceId || signals.workspaceId !== workspaceId)
-    return yield* new InvalidResponse({
-      message: "Signal services belong to different workspaces",
-    });
   /** When each member last signalled typing in each thread, in this process. */
   const lastTyping = new Map<string, number>();
 
