@@ -154,7 +154,9 @@ to verify APIs rather than guessing from prior versions or web snippets.
 Name a variable that holds a service after the service, so a call says who it calls:
 `const threadStore = yield* ThreadStore.Service`, `const threadQuery = yield* ThreadQuery.Service`,
 and `(threadApplication) => threadApplication.get(id)` for a callback given one. Effect's platform
-services keep the names Effect gives them, such as `sql` and `fs`.
+services keep the names Effect gives them, such as `sql` and `fs`. Name a function for what it
+does, so a reader needn't open it: `deriveStartIds`, `findRetriedStart`, `authorizeParticipants`,
+not a bare word such as `begin`, `opening`, or `load`.
 
 ## Vendored repositories
 

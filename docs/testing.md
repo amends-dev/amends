@@ -57,6 +57,37 @@ from automatically adding an unresolved setup path when another package installs
 Build the workshop with `bun run --filter @amends/ui build`. The root `vite-node` override keeps vanilla-extract's
 evaluator on its supported Vite 7 line; verify the workshop build before changing it.
 
+## Local runtime and CPU use
+
+`bun run test` runs the complete suite, including PostgreSQL databases, host subprocesses,
+UI stories, and the browser bundle check. Use a file, directory, or project filter while
+iterating; watch mode also reuses Vite's in-memory transforms between edits.
+
+```sh
+bun run test packages/core/test --watch
+bun run test --project @amends/ui
+bun run test --project '!@amends/ui'
+bun run test --maxWorkers=2
+```
+
+The UI project runs the workshop's stories and focused component tests. Excluding it leaves
+the client and app tests, browser bundle check, and all backend integrations enabled.
+It does not remove the cost of creating and migrating PostgreSQL databases for individual
+tests. The two-worker command limits concurrent test processes for lower CPU pressure;
+the default is four, and fewer workers can take longer.
+
+The `backend` and `postgresql` projects reuse Bun worker processes and imported modules
+across files (`isolate: false`). Tests must keep mutable stores, service layers, and
+acquired resources local to their test scope and restore any global state they change.
+Each PostgreSQL test still creates and drops its own database. Frontend projects keep
+file isolation because they use DOM and module state. To compare with fresh processes,
+run `bun run test --isolate`.
+
+Vitest's duration breakdown and per-file times help distinguish test execution from
+import and transform costs. Phase and file totals overlap across workers; they are not
+wall-clock totals. Compare runs without concurrent builds, checks, or IDE indexing before
+attributing a small timing difference to a configuration change.
+
 ## Continuous integration
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on pull requests to `main` and

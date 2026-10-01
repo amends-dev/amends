@@ -155,7 +155,7 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/command/Service",
 ) {}
 /** The participant an author publishes as. */
-const authorReference = (author: ThreadMessage.Author): ThreadParticipation.Reference =>
+const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.Reference =>
   author._tag === "Member"
     ? { _tag: "Member", memberId: author.memberId }
     : { _tag: "Contact", contactId: author.contactId };
@@ -178,7 +178,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
    * Admit participants at a position. Members need a current group admission; contacts and
    * triage take part without one. Current participants are reused.
    */
-  const admit = Effect.fn("ThreadCommand.admit")(function* (
+  const admitParticipants = Effect.fn("ThreadCommand.admitParticipants")(function* (
     thread: Thread.Record,
     requested: ReadonlyArray<ThreadParticipation.Reference>,
     sequence: number,
@@ -240,7 +240,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     return { participants: result, added } satisfies Admitted;
   });
   /** Record an activity of one kind at its position, with the recipients it selects. */
-  const record = Effect.fn("ThreadCommand.record")(function* <
+  const recordActivity = Effect.fn("ThreadCommand.recordActivity")(function* <
     K extends ThreadActivityKind.Definition,
   >(input: {
     readonly thread: Thread.Record;
@@ -281,11 +281,11 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     const admitted: Admitted =
       input.admit === undefined || input.admit.length === 0
         ? { participants: [], added: [] }
-        : yield* admit(thread, input.admit, sequence, occurredAt).pipe(
+        : yield* admitParticipants(thread, input.admit, sequence, occurredAt).pipe(
             Publication.withOccurredAt(occurredAt),
           );
     const step = yield* input.step({ thread, sequence, admitted });
-    const event = yield* record({
+    const event = yield* recordActivity({
       thread,
       sequence,
       occurredAt,
@@ -301,7 +301,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     // Recipients come from the selected participants, so an unselected mention would go unheard.
     const selected = new Set(input.participants.map(ThreadParticipation.keyOf));
     if (
-      !selected.has(ThreadParticipation.keyOf(authorReference(input.author))) ||
+      !selected.has(ThreadParticipation.keyOf(authorAsParticipant(input.author))) ||
       input.mentions.some(
         (memberId) => !selected.has(ThreadParticipation.keyOf({ _tag: "Member", memberId })),
       )
@@ -335,7 +335,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
           // Mentions address members; without them the message reaches every selected participant.
           // A message never notifies its own author, and an agent's message asks no work of other
           // agents, so agents cannot keep setting each other to work.
-          const author = ThreadParticipation.keyOf(authorReference(input.author));
+          const author = ThreadParticipation.keyOf(authorAsParticipant(input.author));
           const writer = admitted.participants.find(
             (p) => ThreadParticipation.keyOf(p.participant) === author,
           )?.participant;

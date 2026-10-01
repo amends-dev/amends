@@ -121,7 +121,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     return thread;
   });
 
-  const membersById = (ids: ReadonlyArray<Member.Id>) =>
+  const getMembersById = (ids: ReadonlyArray<Member.Id>) =>
     Effect.map(
       memberStore.getMany(ids),
       (found) => new Map(found.map((member) => [member.id, member] as const)),
@@ -133,7 +133,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const result = new Map<Member.Id, Eligible>();
     if (memberIds.length === 0) return result;
     const admissions = yield* groupMembershipStore.findActiveMany(groupId, memberIds);
-    const found = yield* membersById(admissions.map((admission) => admission.memberId));
+    const found = yield* getMembersById(admissions.map((admission) => admission.memberId));
     for (const admission of admissions) {
       const member = found.get(admission.memberId);
       if (member?.status === "active") result.set(member.id, { admission, member });
@@ -144,14 +144,16 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
    * The stored active participations still current: contacts and triage take part without group
    * access, and members need their admission and workspace membership to be active.
    */
-  const backed = Effect.fnUntraced(function* (rows: ReadonlyArray<ThreadParticipation.Record>) {
+  const keepCurrent = Effect.fnUntraced(function* (
+    rows: ReadonlyArray<ThreadParticipation.Record>,
+  ) {
     const joined = rows.flatMap((p) => (p.participant._tag === "Member" ? [p.participant] : []));
     const admissions = new Map(
       (yield* groupMembershipStore.getMany(joined.map((p) => p.groupMembershipId))).map(
         (admission) => [admission.id, admission] as const,
       ),
     );
-    const found = yield* membersById(joined.map((p) => p.memberId));
+    const found = yield* getMembersById(joined.map((p) => p.memberId));
     return rows.filter(
       (p) =>
         p.participant._tag !== "Member" ||
@@ -160,14 +162,14 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     );
   });
   /** Read one page of stored active participations: those current, and the cursor after it. */
-  const pageAfter = Effect.fnUntraced(function* (
+  const readParticipationPage = Effect.fnUntraced(function* (
     thread: Thread.Record,
     options: ThreadParticipation.ListOptions,
   ) {
     const rows = yield* threadParticipationStore.pageActiveByThread(thread.id, options);
     const last = rows.at(-1);
     return {
-      participants: yield* backed(rows),
+      participants: yield* keepCurrent(rows),
       next: rows.length < options.limit || last === undefined ? undefined : last.id,
     };
   });
@@ -179,7 +181,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const result: Array<ThreadParticipation.Record> = [];
     let after: ThreadParticipation.Id | undefined;
     do {
-      const read = yield* pageAfter(
+      const read = yield* readParticipationPage(
         thread,
         after === undefined ? { limit: pageSize } : { after, limit: pageSize },
       );
@@ -198,7 +200,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const result: Array<ThreadParticipation.Record> = [];
     let after = options.after;
     do {
-      const read = yield* pageAfter(
+      const read = yield* readParticipationPage(
         thread,
         after === undefined ? { limit: options.limit } : { after, limit: options.limit },
       );
@@ -213,7 +215,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     references: ReadonlyArray<ThreadParticipation.Reference>,
   ) {
     if (references.length === 0) return [];
-    return yield* backed(yield* threadParticipationStore.findActive(thread.id, references));
+    return yield* keepCurrent(yield* threadParticipationStore.findActive(thread.id, references));
   });
 
   /** The thread, under its audience and `thread.read`. */

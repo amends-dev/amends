@@ -51,20 +51,17 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const { workspaceId } = yield* Store.Service;
   /**
    * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
-   * from its author and key, so a retry names the message its first attempt published and returns
-   * it.
+   * from its author and key, so a retry names the message its first attempt published.
    */
-  const replyIds = Effect.fnUntraced(function* (key: Request.Key | undefined) {
+  const deriveReplyId = Effect.fnUntraced(function* (key: Request.Key | undefined) {
     const actor = yield* Actor.Service;
-    const messageId = ThreadMessage.Id.make(
+    return ThreadMessage.Id.make(
       yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]),
     );
-    const previous =
-      key === undefined
-        ? Option.none<ThreadMessage.Record>()
-        : yield* threadMessageStore.get(messageId);
-    return { messageId, previous };
   });
+  /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
+  const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessage.Id) =>
+    key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId);
   const publish = Effect.fn("ThreadMessageApplication.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
@@ -85,8 +82,9 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const { messageId, previous } = yield* replyIds(options.requestKey);
-      if (Option.isSome(previous)) return previous.value;
+      const messageId = yield* deriveReplyId(options.requestKey);
+      const retried = yield* findRetriedReply(options.requestKey, messageId);
+      if (Option.isSome(retried)) return retried.value;
       // Without mentions a reply addresses every current participant, including contacts and
       // triage; with them, only the author and those mentioned are read.
       const current =

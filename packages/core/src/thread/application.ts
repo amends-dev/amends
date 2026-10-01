@@ -158,47 +158,44 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
-  /** A start's thread and opening message, by the IDs its request named; None before it ran. */
-  const opening = Effect.fnUntraced(function* (threadId: Thread.Id, messageId: ThreadMessage.Id) {
-    const thread = yield* threadStore.get(threadId);
+  /**
+   * The IDs a start gives its thread and opening message. Without a key they are new each time. A
+   * keyed start derives them from its author and key, so a retry names what its first attempt
+   * started.
+   */
+  const deriveStartIds = Effect.fnUntraced(function* (
+    operation: string,
+    key: Request.Key | undefined,
+  ) {
+    const actor = yield* Actor.Service;
+    const parts = [operation, workspaceId, actor.memberId];
+    const threadId = Thread.Id.make(yield* Request.idFor(key, [...parts, "thread"]));
+    const messageId = ThreadMessage.Id.make(yield* Request.idFor(key, [...parts, "message"]));
+    return { threadId, messageId };
+  });
+  /** What an earlier attempt of this keyed start created, so a retry returns it; None otherwise. */
+  const findRetriedStart = Effect.fnUntraced(function* (
+    key: Request.Key | undefined,
+    ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id },
+  ) {
+    if (key === undefined) return Option.none<Thread.Started>();
+    const thread = yield* threadStore.get(ids.threadId);
     if (Option.isNone(thread)) return Option.none<Thread.Started>();
-    const message = yield* threadMessageStore.get(messageId);
+    const message = yield* threadMessageStore.get(ids.messageId);
     if (Option.isNone(message))
       return yield* Effect.die("A started thread's opening message is missing");
     return Option.some<Thread.Started>({ thread: thread.value, message: message.value });
   });
   /**
-   * The IDs a start gives its thread and opening message. Without a key they are new each time. A
-   * keyed start derives them from its author and key, so a retry names what its first attempt
-   * started and returns it.
+   * Require every starting participant to be able to take part, and the author's agent-use grant
+   * for each agent the author names. Agents that take part without being named need none.
    */
-  const startIds = Effect.fnUntraced(function* (operation: string, key: Request.Key | undefined) {
-    const actor = yield* Actor.Service;
-    const parts = [operation, workspaceId, actor.memberId];
-    const threadId = Thread.Id.make(yield* Request.idFor(key, [...parts, "thread"]));
-    const messageId = ThreadMessage.Id.make(yield* Request.idFor(key, [...parts, "message"]));
-    const previous =
-      key === undefined ? Option.none<Thread.Started>() : yield* opening(threadId, messageId);
-    return { threadId, messageId, previous };
-  });
-
-  /**
-   * Check the starting participants, authorize the agents the author names, then open the thread
-   * through the shared start. Agents that take part without being named need no agent-use grant.
-   */
-  const begin = Effect.fnUntraced(function* (
-    groupId: Group.Id,
-    selected: ReadonlyArray<Member.Id>,
+  const authorizeParticipants = Effect.fnUntraced(function* (
+    participants: ReadonlyArray<Member.Id>,
     named: ReadonlyArray<Member.Id>,
     eligible: ReadonlyMap<Member.Id, ThreadQuery.Eligible>,
-    message: {
-      readonly text: Thread.StartInGroupInput["text"];
-      readonly mentions: ReadonlyArray<Member.Id>;
-    },
-    ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id },
   ) {
-    const actor = yield* Actor.Service;
-    for (const memberId of selected)
+    for (const memberId of participants)
       if (!eligible.has(memberId)) return yield* new ParticipantUnavailable({ memberId });
     for (const memberId of named) {
       const member = eligible.get(memberId)?.member;
@@ -208,17 +205,27 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
         ]);
     }
-    if (actor.identity._tag !== "Human")
-      return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+  });
+  /** Create the thread with its author's opening message, which the author has then read. */
+  const createThread = Effect.fnUntraced(function* (
+    author: ThreadReading.Reader,
+    groupId: Group.Id,
+    participants: ReadonlyArray<Member.Id>,
+    message: {
+      readonly text: Thread.StartInGroupInput["text"];
+      readonly mentions: ReadonlyArray<Member.Id>;
+    },
+    ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id },
+  ) {
     const started = yield* threadCommand
       .create({
         threadId: ids.threadId,
         groupId,
-        participants: selected.map((memberId) => ({ _tag: "Member" as const, memberId })),
+        participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
         first: {
           _tag: "Message",
           messageId: ids.messageId,
-          author: { _tag: "Member", memberId: actor.memberId },
+          author: { _tag: "Member", memberId: author.memberId },
           text: message.text,
           mentions: message.mentions,
         },
@@ -230,11 +237,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         ),
       );
     // Posting reads the thread through the author's own message.
-    yield* threadReading.markRead(
-      Notification.ofMember(actor.memberId, actor.identity),
-      started.thread,
-      started.activity.sequence,
-    );
+    yield* threadReading.markRead(author, started.thread, started.activity.sequence);
     return { thread: started.thread, message: started.message } satisfies Thread.Started;
   });
   const startDirect = Effect.fn("ThreadApplication.startDirect")(
@@ -244,6 +247,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+      const author = Notification.ofMember(actor.memberId, actor.identity);
       const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
       if (memberIds.length < 2) return yield* new DirectMembersRequired({});
       const missing = request.mentions.find((id) => !memberIds.includes(id));
@@ -262,13 +266,14 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           groupId: group.id,
         }),
       ]);
-      const { previous, ...ids } = yield* startIds("thread.start-direct", options.requestKey);
-      if (Option.isSome(previous)) return previous.value;
+      const ids = yield* deriveStartIds("thread.start-direct", options.requestKey);
+      const retried = yield* findRetriedStart(options.requestKey, ids);
+      if (Option.isSome(retried)) return retried.value;
       const eligible = yield* threadQuery.eligibleMembers(group.id, memberIds);
       // Creating the group gives its agents a place in all of its threads, as making an agent
       // follow a team group does, so it needs agent use on each; later starts name only mentions.
-      const named = created ? memberIds : request.mentions;
-      return yield* begin(group.id, memberIds, named, eligible, request, ids);
+      yield* authorizeParticipants(memberIds, created ? memberIds : request.mentions, eligible);
+      return yield* createThread(author, group.id, memberIds, request, ids);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -294,8 +299,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-      const { previous, ...ids } = yield* startIds("thread.start", options.requestKey);
-      if (Option.isSome(previous)) return previous.value;
+      const author = Notification.ofMember(actor.memberId, actor.identity);
+      const ids = yield* deriveStartIds("thread.start", options.requestKey);
+      const retried = yield* findRetriedStart(options.requestKey, ids);
+      if (Option.isSome(retried)) return retried.value;
       const foundGroup = yield* groupStore.get(request.groupId);
       if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
       const group = foundGroup.value;
@@ -324,9 +331,8 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         group.kind === "Direct"
           ? [...eligible.keys()].sort()
           : [...new Set([actor.memberId, ...request.mentions, ...followers])];
-      const missing = request.mentions.find((id) => !eligible.has(id));
-      if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
-      return yield* begin(request.groupId, selected, request.mentions, eligible, request, ids);
+      yield* authorizeParticipants(selected, request.mentions, eligible);
+      return yield* createThread(author, request.groupId, selected, request, ids);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -355,7 +361,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
    * Fill a page with a group's threads the actor can read, from one store listing, reading further
    * when grants skip some. Each comes with its latest activity and the actor's position.
    */
-  const readablePage = Effect.fnUntraced(function* <Cursor>(
+  const listReadableThreads = Effect.fnUntraced(function* <Cursor>(
     groupId: Group.Id,
     limit: number,
     first: Cursor | undefined,
@@ -421,7 +427,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     input: Thread.ListOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
-    return yield* readablePage(
+    return yield* listReadableThreads(
       groupId,
       options.limit,
       options.before,
@@ -436,13 +442,13 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       }),
     );
   });
-  const published = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
+  const messagePublishedKind = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
   const listOpenings = Effect.fn("ThreadApplication.listOpenings")(function* (
     groupId: Group.Id,
     input: Thread.OpeningOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
-    const items = yield* readablePage(
+    const items = yield* listReadableThreads(
       groupId,
       options.limit,
       options.before,
@@ -469,7 +475,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       ),
     );
     const counts = new Map(
-      (yield* threadActivityStore.countByKind(ids, published)).map(
+      (yield* threadActivityStore.countByKind(ids, messagePublishedKind)).map(
         (value) => [value.threadId, value.count] as const,
       ),
     );

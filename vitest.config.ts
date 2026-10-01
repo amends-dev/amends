@@ -12,6 +12,8 @@ export default defineConfig({
         test: {
           name: "backend",
           environment: "node",
+          // Tests own fresh stores and scoped resources; reuse workers and their module cache.
+          isolate: false,
           // Integration tests share CI's two CPUs with PostgreSQL; the 5 s default is too tight.
           testTimeout: 20_000,
           include: [
@@ -27,6 +29,8 @@ export default defineConfig({
         test: {
           name: "postgresql",
           environment: "node",
+          // Each test still owns its database and pools; only the worker and imports are shared.
+          isolate: false,
           testTimeout: 20_000,
           globalSetup: ["adapters/storage-postgresql/test/global-setup.ts"],
           include: ["adapters/storage-postgresql/test/**/*.test.ts", "hosts/*/test/**/*.test.ts"],
