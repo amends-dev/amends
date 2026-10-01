@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { MemberStore } from "../workspace/member/store.ts";
-import { Member } from "../workspace/member/member.ts";
+
 import { Workspace } from "../workspace/workspace.ts";
 import type { Grant } from "./grant.ts";
 import { GrantResolver } from "./grant-resolver.ts";
@@ -17,18 +17,12 @@ export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
   { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
 ) {}
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "Authorization.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type Error =
   | MemberStore.Failure
   | GrantResolver.Error
   | PermissionCatalog.Unknown
   | WorkspaceMismatch
   | InvalidActor
-  | InvalidResponse
   | Denied;
 
 export interface Interface {
@@ -57,10 +51,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/authorization/authorization/Service",
 ) {}
 
-const decodeActor = Schema.decodeEffect(Actor.Value);
-const decodeMember = Schema.decodeEffect(Member.Record);
-const decodeRequirements = Schema.decodeEffect(Schema.Array(Requirement.Value));
-const decodeRequirement = Schema.decodeEffect(Requirement.Value);
 const sameIdentity = Schema.toEquivalence(Identity.Reference);
 const requireWorkspace = Effect.fnUntraced(function* (
   expectedWorkspaceId: Workspace.Id,
@@ -78,28 +68,23 @@ const requireWorkspace = Effect.fnUntraced(function* (
  */
 export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
   Interface,
-  WorkspaceMismatch,
+  never,
   MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service
 > {
   const members = yield* MemberStore.Service;
   const resolver = yield* GrantResolver.Service;
   const catalog = yield* PermissionCatalog.Service;
   const workspaceId = resolver.workspaceId;
-  yield* requireWorkspace(workspaceId, members.workspaceId);
 
-  /** Validate the actor and each requirement's permission and workspace. */
+  /** Validate the actor, and that each requirement names a declared permission in this workspace. */
   const check = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Value>) {
-    const actor = yield* decodeActor(yield* Actor.Service);
+    const actor = yield* Actor.Service;
     yield* requireWorkspace(workspaceId, actor.workspaceId);
     const found = yield* members.get(actor.memberId);
     if (Option.isNone(found)) {
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-missing" });
     }
-    const member = yield* decodeMember(found.value);
-    yield* requireWorkspace(workspaceId, member.workspaceId);
-    if (member.id !== actor.memberId) {
-      return yield* new InvalidResponse({ message: "Member store returned a different member ID" });
-    }
+    const member = found.value;
     if (member.status !== "active") {
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-removed" });
     }
@@ -107,18 +92,16 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "identity-mismatch" });
     }
 
-    const checked: Array<Requirement.Value> = [];
-    for (const requirement of yield* decodeRequirements(requirements)) {
+    for (const requirement of requirements) {
       yield* requireWorkspace(workspaceId, requirement.target.workspaceId);
       const permission = yield* catalog.get(requirement.permission.name);
-      if (permission.name !== requirement.permission.name) {
-        return yield* new InvalidResponse({
-          message: "Permission catalog returned a different name",
-        });
-      }
-      checked.push(yield* decodeRequirement({ permission, target: requirement.target }));
+      // Requirements name permissions as the catalog declares them; another target kind is a bug.
+      if (permission.targetKind !== requirement.target._tag)
+        return yield* Effect.die(
+          `Permission ${permission.name} requires a ${permission.targetKind} target`,
+        );
     }
-    return { actor, checked };
+    return { actor, checked: requirements };
   });
   const covered = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
     grants.some(

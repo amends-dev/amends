@@ -16,11 +16,6 @@ import { RoleStore } from "./role/store.ts";
 import { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
 export { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "Delegation.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type Error =
   | Authorization.Error
   | WorkspaceStore.Failure
@@ -31,8 +26,7 @@ export type Error =
   | Denied
   | OwnerProtected
   | UnsupportedRole
-  | RoleNotFound
-  | InvalidResponse;
+  | RoleNotFound;
 export interface Interface {
   readonly workspaceId: Workspace.Id;
   readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
@@ -87,7 +81,7 @@ export const recipientDenial = (
 /** @category constructors */
 export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   Interface,
-  InvalidResponse,
+  never,
   | WorkspaceStore.Service
   | AssignmentStore.Service
   | RoleStore.Service
@@ -100,22 +94,10 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   const authorization = yield* Authorization.Service;
   const catalog = yield* PermissionCatalog.Service;
   const workspaceId = workspace.workspaceId;
-  if (
-    [assignments.workspaceId, roles.workspaceId, authorization.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
-  )
-    return yield* new InvalidResponse({
-      message: "Delegation services belong to different workspaces",
-    });
   const owner = Effect.fn("Delegation.owner")(function* () {
     const found = yield* workspace.get;
-    if (Option.isNone(found))
-      return yield* new InvalidResponse({ message: "Workspace metadata is missing" });
-    const record = yield* Schema.decodeEffect(Workspace.Record)(found.value);
-    if (record.id !== workspaceId)
-      return yield* new InvalidResponse({ message: "Workspace metadata is mismatched" });
-    return record.ownerMemberId;
+    if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
+    return found.value.ownerMemberId;
   });
   const loadRole = Effect.fn("Delegation.loadRole")(function* (roleId: Role.Id) {
     const id = yield* Schema.decodeEffect(Role.Id)(roleId);
@@ -123,11 +105,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
       return yield* new UnsupportedRole({ roleId: id });
     const found = yield* roles.get(id);
     if (Option.isNone(found)) return yield* new RoleNotFound({ roleId: id });
-    const role = yield* Schema.decodeEffect(Role.Record)(found.value);
-    if (role.id !== id || role.workspaceId !== workspaceId)
-      return yield* new InvalidResponse({
-        message: "Role store returned a different role or workspace",
-      });
+    const role = found.value;
     // A permission this host does not declare, retired or added by a newer host's bundles, grants
     // nothing here, as in GrantResolver; the role still loads, with every permission it records.
     for (const name of role.permissions) {
@@ -143,25 +121,9 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     }
     return role;
   });
-  const assignmentsFor = Effect.fn("Delegation.assignmentsFor")(function* (memberId: Member.Id) {
-    const records = yield* Schema.decodeEffect(Schema.Array(Assignment.Record))(
-      yield* assignments.listActiveByMember(memberId),
-    );
-    const ids = new Set<Assignment.Id>();
-    for (const record of records) {
-      if (
-        record.workspaceId !== workspaceId ||
-        record.memberId !== memberId ||
-        record.status !== "active" ||
-        ids.has(record.id)
-      )
-        return yield* new InvalidResponse({
-          message: "Assignment store returned an inconsistent membership listing",
-        });
-      ids.add(record.id);
-    }
-    return records;
-  });
+  const assignmentsFor = Effect.fn("Delegation.assignmentsFor")((memberId: Member.Id) =>
+    assignments.listActiveByMember(memberId),
+  );
   const requireGrant = Effect.fn("Delegation.requireGrant")(function* (roleId: Role.Id) {
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId }),

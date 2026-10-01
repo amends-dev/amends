@@ -1,7 +1,7 @@
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Exit, Layer, Option } from "effect";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
 import { AssignmentProjection } from "../../src/authorization/assignment/projection.ts";
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
@@ -148,9 +148,7 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
     expectTypeOf<Layer.Services<typeof Authorization.layer>>().toEqualTypeOf<
       MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service
     >();
-    expectTypeOf<
-      Layer.Error<typeof Authorization.layer>
-    >().toEqualTypeOf<Authorization.WorkspaceMismatch>();
+    expectTypeOf<Layer.Error<typeof Authorization.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
       Effect.Services<ReturnType<Authorization.Interface["require"]>>
     >().toEqualTypeOf<Actor.Service>();
@@ -385,51 +383,32 @@ it.effect("acting identity must match both the membership's identity kind and ID
   }),
 );
 
-it.effect(
-  "workspace guards reject mismatched composition, actors, membership records, and targets",
-  () =>
-    Effect.gen(function* () {
-      const fixture = yield* make();
-      yield* seed(fixture, [alice], [direct("read", alice.memberId, MemberPermissions.Read)]);
-      const mismatch = {
-        _tag: "Authorization.WorkspaceMismatch",
-        expectedWorkspaceId: workspaceId,
-        actualWorkspaceId: foreignWorkspaceId,
-      };
-      expect(
-        yield* Effect.void.pipe(
-          Effect.provide(configured(fixture, { members: { workspaceId: foreignWorkspaceId } })),
-          Effect.flip,
-        ),
-      ).toMatchObject(mismatch);
-      const foreignActor = Actor.Value.make({
+it.effect("an actor or a target from another workspace is refused", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* seed(fixture, [alice], [direct("read", alice.memberId, MemberPermissions.Read)]);
+    const mismatch = {
+      _tag: "Authorization.WorkspaceMismatch",
+      expectedWorkspaceId: workspaceId,
+      actualWorkspaceId: foreignWorkspaceId,
+    };
+    const foreignActor = Actor.Value.make({
+      workspaceId: foreignWorkspaceId,
+      memberId: alice.memberId,
+      identity: alice.identity,
+    });
+    expect(yield* run(fixture, Effect.flip(check([readBob])), foreignActor)).toMatchObject(
+      mismatch,
+    );
+    const foreignRequirement = Requirement.make(
+      MemberPermissions.Read,
+      Target.Reference.cases.Member.make({
         workspaceId: foreignWorkspaceId,
-        memberId: alice.memberId,
-        identity: alice.identity,
-      });
-      expect(yield* run(fixture, Effect.flip(check([readBob])), foreignActor)).toMatchObject(
-        mismatch,
-      );
-      const foreignRequirement = Requirement.make(
-        MemberPermissions.Read,
-        Target.Reference.cases.Member.make({
-          workspaceId: foreignWorkspaceId,
-          memberId: bob.memberId,
-        }),
-      );
-      expect(yield* run(fixture, Effect.flip(check([foreignRequirement])))).toMatchObject(mismatch);
-      const foreignMember = Member.Record.make({
-        id: alice.memberId,
-        workspaceId: foreignWorkspaceId,
-        identity: alice.identity,
-        status: "active",
-      });
-      expect(
-        yield* run(fixture, Effect.flip(check([readBob])), alice, {
-          members: { get: () => Effect.succeedSome(foreignMember) },
-        }),
-      ).toMatchObject(mismatch);
-    }),
+        memberId: bob.memberId,
+      }),
+    );
+    expect(yield* run(fixture, Effect.flip(check([foreignRequirement])))).toMatchObject(mismatch);
+  }),
 );
 
 it.effect("requirements are validated against canonical permission definitions", () =>
@@ -443,21 +422,18 @@ it.effect("requirements are validated against canonical permission definitions",
     expect(
       yield* run(fixture, Effect.flip(check([Requirement.make(unregistered, bobTarget)]))),
     ).toMatchObject({ _tag: "PermissionCatalog.Unknown", name: unregistered.name });
+    // A requirement whose target is not the kind the catalog declares is a bug, not a denial.
     const wrongDefinition = Permission.make(MemberPermissions.Remove.name, {
       targetKind: "Workspace",
       builtinTier: "administrator",
     });
     const wrongKind = Requirement.make(wrongDefinition, workspaceTarget);
-    expect(yield* run(fixture, Effect.flip(check([wrongKind])))).toMatchObject({
-      _tag: "SchemaError",
-    });
     const malformed: Requirement.Value = {
       permission: MemberPermissions.Remove,
       target: workspaceTarget,
     };
-    expect(yield* run(fixture, Effect.flip(check([malformed])))).toMatchObject({
-      _tag: "SchemaError",
-    });
+    for (const requirement of [wrongKind, malformed])
+      expect(Exit.hasDies(yield* Effect.exit(run(fixture, check([requirement]))))).toBe(true);
   }),
 );
 
@@ -603,7 +579,7 @@ it.effect(
     }),
 );
 
-it.effect("malformed membership responses and storage failures fail authorization", () =>
+it.effect("a membership storage failure fails authorization", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [alice], [direct("read", alice.memberId, MemberPermissions.Read)]);
@@ -613,24 +589,6 @@ it.effect("malformed membership responses and storage failures fail authorizatio
         members: { get: () => Effect.fail(failure) },
       }),
     ).toBe(failure);
-    const wrongMember = Member.Record.make({
-      id: bob.memberId,
-      workspaceId,
-      identity: alice.identity,
-      status: "active",
-    });
-    expect(
-      yield* run(fixture, Effect.flip(check([readBob])), alice, {
-        members: { get: () => Effect.succeedSome(wrongMember) },
-      }),
-    ).toMatchObject({ _tag: "Authorization.InvalidResponse" });
-    const malformed = membership(alice);
-    Reflect.set(malformed, "status", "unknown");
-    expect(
-      yield* run(fixture, Effect.flip(check([readBob])), alice, {
-        members: { get: () => Effect.succeedSome(malformed) },
-      }),
-    ).toMatchObject({ _tag: "SchemaError" });
   }),
 );
 
@@ -639,28 +597,23 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
-      const missingRoleId = Role.Id.make("missing");
       yield* seed(
         fixture,
         [alice],
         [
           direct("read", alice.memberId, MemberPermissions.Read),
           Assignment.Record.make({
-            id: Assignment.Id.make("missing-role"),
+            id: Assignment.Id.make("by-role"),
             workspaceId,
             memberId: alice.memberId,
             status: "active",
             source: Assignment.Source.cases.Role.make({
-              roleId: missingRoleId,
+              roleId: BuiltinRoles.MemberId,
               scope: workspaceScope,
             }),
           }),
         ],
       );
-      expect(yield* run(fixture, Effect.flip(check([readBob])))).toMatchObject({
-        _tag: "GrantResolver.MissingRole",
-        roleId: missingRoleId,
-      });
       const failure = new RoleStore.Failure({ operation: "get", cause: "unavailable" });
       expect(
         yield* run(fixture, Effect.flip(check([readBob])), alice, {

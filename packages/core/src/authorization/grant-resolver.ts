@@ -2,36 +2,15 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";
 import { AssignmentStore } from "./assignment/store.ts";
-import { Assignment } from "./assignment/assignment.ts";
+
 import { Grant } from "./grant.ts";
 import { PermissionCatalog } from "./permission-catalog.ts";
 import type { Permission } from "./permission.ts";
 import { RoleStore } from "./role/store.ts";
-import { Role } from "./role/role.ts";
+
 import type { Scope } from "./scope.ts";
 
-export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
-  "GrantResolver.WorkspaceMismatch",
-  { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
-) {}
-
-export class MissingRole extends Schema.TaggedError<MissingRole>()("GrantResolver.MissingRole", {
-  assignmentId: Assignment.Id,
-  roleId: Role.Id,
-}) {}
-
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "GrantResolver.InvalidResponse",
-  { message: Schema.String },
-) {}
-
-export type Error =
-  | AssignmentStore.Failure
-  | RoleStore.Failure
-  | Schema.SchemaError
-  | WorkspaceMismatch
-  | MissingRole
-  | InvalidResponse;
+export type Error = AssignmentStore.Failure | RoleStore.Failure | Schema.SchemaError;
 
 export interface Interface {
   readonly workspaceId: Workspace.Id;
@@ -49,17 +28,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/authorization/grant-resolver/Service",
 ) {}
 
-const requireWorkspace = Effect.fnUntraced(function* (
-  expectedWorkspaceId: Workspace.Id,
-  actualWorkspaceId: Workspace.Id,
-) {
-  if (expectedWorkspaceId !== actualWorkspaceId) {
-    return yield* new WorkspaceMismatch({ expectedWorkspaceId, actualWorkspaceId });
-  }
-});
-const decodeAssignments = Schema.decodeEffect(Schema.Array(Assignment.Record));
-const decodeRole = Schema.decodeEffect(Role.Record);
-
 /**
  * Construct a resolver from workspace stores and metadata; read assignments and roles per call.
  *
@@ -67,14 +35,13 @@ const decodeRole = Schema.decodeEffect(Role.Record);
  */
 export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Return<
   Interface,
-  WorkspaceMismatch,
+  never,
   AssignmentStore.Service | RoleStore.Service | PermissionCatalog.Service
 > {
   const assignments = yield* AssignmentStore.Service;
   const roles = yield* RoleStore.Service;
   const catalog = yield* PermissionCatalog.Service;
   const workspaceId = assignments.workspaceId;
-  yield* requireWorkspace(workspaceId, roles.workspaceId);
 
   /** A retired permission grants nothing, rather than failing every grant its holder has. */
   const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
@@ -89,37 +56,15 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   });
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
-    const records = yield* decodeAssignments(yield* assignments.listActiveByMember(memberId));
     const grants: Array<Grant.Value> = [];
-    const seen = new Set<Assignment.Id>();
-    for (const assignment of records) {
-      yield* requireWorkspace(workspaceId, assignment.workspaceId);
-      if (assignment.memberId !== memberId || assignment.status !== "active") {
-        return yield* new InvalidResponse({
-          message: "Expected an active assignment for the requested member",
-        });
-      }
-      if (seen.has(assignment.id)) {
-        return yield* new InvalidResponse({
-          message: "Assignment store returned a duplicate assignment ID",
-        });
-      }
-      seen.add(assignment.id);
-
+    for (const assignment of yield* assignments.listActiveByMember(memberId)) {
       const source = assignment.source;
       if (source._tag === "Direct") {
         grants.push(...(yield* resolveGrant(source.grant.permission, source.grant.scope)));
       } else {
-        const found = yield* roles.get(source.roleId);
-        if (Option.isNone(found)) {
-          return yield* new MissingRole({ assignmentId: assignment.id, roleId: source.roleId });
-        }
-        const role = yield* decodeRole(found.value);
-        yield* requireWorkspace(workspaceId, role.workspaceId);
-        if (role.id !== source.roleId) {
-          return yield* new InvalidResponse({ message: "Role store returned a different role ID" });
-        }
-        for (const name of role.permissions) {
+        const role = yield* roles.get(source.roleId);
+        if (Option.isNone(role)) return yield* Effect.die("An assignment's role is missing");
+        for (const name of role.value.permissions) {
           grants.push(...(yield* resolveGrant(name, source.scope)));
         }
       }

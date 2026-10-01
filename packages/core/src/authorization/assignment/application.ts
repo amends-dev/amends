@@ -63,7 +63,7 @@ export class Service extends Context.Service<Service, Interface>()(
 /** @category constructors */
 export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect.fn.Return<
   Interface,
-  Delegation.InvalidResponse,
+  never,
   | AssignmentStore.Service
   | MemberStore.Service
   | Authorization.Service
@@ -80,14 +80,6 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   const crypto = yield* Crypto.Crypto;
   const catalog = yield* PermissionCatalog.Service;
   const workspaceId = authorization.workspaceId;
-  if (
-    [assignments.workspaceId, members.workspaceId, delegation.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
-  )
-    return yield* new Delegation.InvalidResponse({
-      message: "Assignment services belong to different workspaces",
-    });
   const manage = Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId });
   const workspaceWide = catalog.definitions.filter(
     (permission) => permission.targetKind === "Workspace",
@@ -109,12 +101,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
     const found = yield* members.get(id);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId: id });
-    const record = yield* Schema.decodeEffect(Member.Record)(found.value);
-    if (record.id !== id || record.workspaceId !== workspaceId)
-      return yield* new Delegation.InvalidResponse({
-        message: "Member store returned a different member or workspace",
-      });
-    return record;
+    return found.value;
   });
   const recipient = Effect.fn("AssignmentApplication.recipient")(function* (memberId: Member.Id) {
     yield* authorization.require([manage]);
@@ -199,11 +186,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
       const found = yield* assignments.get(id);
       if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
-      const record = yield* Schema.decodeEffect(Assignment.Record)(found.value);
-      if (record.workspaceId !== workspaceId || record.id !== id)
-        return yield* new Delegation.InvalidResponse({
-          message: "Assignment store returned a different assignment or workspace",
-        });
+      const record = found.value;
       if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
       if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
       if (record.status === "revoked") return record;
@@ -212,7 +195,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
         assignmentId: id,
         memberId: record.memberId,
       });
-      return { ...record, status: "revoked" } satisfies Assignment.Record;
+      return Object.assign({}, record, { status: "revoked" as const }) satisfies Assignment.Record;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

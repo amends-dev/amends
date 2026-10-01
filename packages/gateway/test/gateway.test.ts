@@ -62,7 +62,6 @@ interface BindingOptions {
   readonly read?: Store.Interface["read"];
   readonly head?: Store.Interface["head"];
   readonly listLive?: Checkpoint.Interface["listLive"];
-  readonly memberWorkspaceId?: Workspace.Id;
 }
 
 /**
@@ -115,7 +114,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       MemberStore.Service,
       MemberStore.Service.of({
-        workspaceId: options.memberWorkspaceId ?? boundWorkspaceId,
+        workspaceId: boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findActive:
@@ -462,17 +461,12 @@ it.effect(
     ),
 );
 
-it.effect("construction and projection replay failures are defects before the operation runs", () =>
+it.effect("projection replay failures are defects before the operation runs", () =>
   Effect.gen(function* () {
     let called = false;
     const operation = Effect.sync(() => {
       called = true;
     });
-    const badBindings = yield* run(
-      (gateway) => Effect.exit(gateway.inWorkspace(workspaceId, operation)),
-      { memberWorkspaceId: Workspace.Id.make("other") },
-    );
-    expect(defect(badBindings)).toMatchObject({ _tag: "Authorization.WorkspaceMismatch" });
     const failure = new Store.Failure({ operation: "read", cause: new Error("unavailable") });
     const badReplay = yield* run(
       (gateway) => Effect.exit(gateway.inWorkspace(workspaceId, operation)),

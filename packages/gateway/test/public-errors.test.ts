@@ -50,7 +50,6 @@ type Internal = {
     | `Projection.${string}`
     | "JournalStore.CommitUncertain"
     | "Journal.FactMismatch"
-    | "GrantResolver.MissingRole"
     | "ThreadActivityKind.Mismatch"
     | "SchemaError"
     | "PlatformError"
