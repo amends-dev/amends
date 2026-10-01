@@ -4,8 +4,6 @@ import { TurnFacts } from "./facts.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
-const conflict = (message: string) => new TurnStore.Conflict({ operation: "project", message });
-
 /** The stored turn a fact changes, in this workspace. */
 const stored = Effect.fnUntraced(function* (payload: {
   readonly workspaceId: Turn.Record["workspaceId"];
@@ -13,7 +11,7 @@ const stored = Effect.fnUntraced(function* (payload: {
 }) {
   const store = yield* TurnStore.Service;
   const found = yield* store.get(payload.turnId);
-  if (Option.isNone(found)) return yield* conflict("Expected a turn in this workspace");
+  if (Option.isNone(found)) return yield* Effect.die("A changed turn is missing");
   return { store, turn: found.value };
 });
 

@@ -14,11 +14,7 @@ const change = Effect.fnUntraced(function* (
 ) {
   const store = yield* ConnectionStore.Service;
   const found = yield* store.get(payload.connectionId);
-  if (Option.isNone(found))
-    return yield* new ConnectionStore.Conflict({
-      operation: "project",
-      message: "Expected a connection in this workspace",
-    });
+  if (Option.isNone(found)) return yield* Effect.die("A changed connection is missing");
   yield* store.update(apply(found.value));
 });
 

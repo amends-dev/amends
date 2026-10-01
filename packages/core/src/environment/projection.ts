@@ -14,11 +14,7 @@ const change = Effect.fnUntraced(function* (
 ) {
   const store = yield* EnvironmentStore.Service;
   const found = yield* store.get(payload.environmentId);
-  if (Option.isNone(found))
-    return yield* new EnvironmentStore.Conflict({
-      operation: "project",
-      message: "Expected an environment in this workspace",
-    });
+  if (Option.isNone(found)) return yield* Effect.die("A changed environment is missing");
   yield* store.update(apply(found.value));
 });
 

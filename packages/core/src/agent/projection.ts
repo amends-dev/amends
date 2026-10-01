@@ -17,11 +17,7 @@ export const definition = Projection.make("agents", { version: 1 })
     Effect.fn("AgentProjection.configured")(function* ({ payload }) {
       const store = yield* AgentStore.Service;
       const found = yield* store.get(payload.agentId);
-      if (Option.isNone(found))
-        return yield* new AgentStore.Conflict({
-          operation: "project",
-          message: "Expected an agent in this workspace",
-        });
+      if (Option.isNone(found)) return yield* Effect.die("A configured agent is missing");
       yield* store.update(
         Agent.change(found.value, {
           instructions: payload.instructions,
