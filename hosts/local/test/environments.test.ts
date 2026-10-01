@@ -120,7 +120,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               })
               .pipe(Effect.flip),
           ).toMatchObject({
-            _tag: "EnvironmentApplication.InvalidSandbox",
+            _tag: "EnvironmentService.InvalidSandbox",
             issues: ["connection-required"],
           });
           const box = yield* asAlice.environments.create({
@@ -173,10 +173,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* asAlice.environments
               .rename({ params, payload: { name: "Other", expectedName: "Somebody's" } })
               .pipe(Effect.flip),
-          ).toMatchObject({ _tag: "EnvironmentApplication.Changed" });
+          ).toMatchObject({ _tag: "EnvironmentService.Changed" });
           yield* asAlice.environments.remove({ params });
           expect(yield* asBob.environments.get({ params }).pipe(Effect.flip)).toMatchObject({
-            _tag: "EnvironmentApplication.NotFound",
+            _tag: "EnvironmentService.NotFound",
           });
           expect(
             (yield* asAlice.environments.list({ params: { workspaceId } })).map(({ id }) => id),

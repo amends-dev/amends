@@ -548,7 +548,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         // Starting may record the thread's history in the agent's log, so prepare again after it;
         // a turn stopped before it started is found finished.
         yield* step((turnExecution) => turnExecution.start(turnId, plan.selection)).pipe(
-          Effect.catchTag("TurnApplication.NotActive", () => Effect.void),
+          Effect.catchTag("TurnService.NotActive", () => Effect.void),
         );
         continue;
       }
@@ -563,7 +563,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         });
         return yield* fail(
           plan.interruption?.reason ?? "The turn kept stopping before it got anywhere.",
-        ).pipe(Effect.catchTag("TurnApplication.NotActive", () => Effect.void));
+        ).pipe(Effect.catchTag("TurnService.NotActive", () => Effect.void));
       }
       const waits = rest ?? plan.diedLast;
       rest = false;
@@ -609,7 +609,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       rest = ending._tag === "Interrupted";
       if (ending._tag === "Unrunnable")
         return yield* fail(ending.reason).pipe(
-          Effect.catchTag("TurnApplication.NotActive", () => Effect.void),
+          Effect.catchTag("TurnService.NotActive", () => Effect.void),
         );
     }
   });
@@ -625,7 +625,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
           turnExecution.fail(turnId, "The turn could not run."),
         ),
       )
-      .pipe(Effect.catchTag("TurnApplication.NotActive", () => Effect.void));
+      .pipe(Effect.catchTag("TurnService.NotActive", () => Effect.void));
   });
 
   return Service.of({ run, abandon });

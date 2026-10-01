@@ -38,7 +38,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/change-feed/application/Service",
+  "@amends/core/change-feed/service/Service",
 ) {}
 
 /** What one reader may see: their delivery scopes and resolved grants. */
@@ -80,7 +80,7 @@ const changes = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
   (prepared.access.memberId === undefined || prepared.access.memberId === actor.memberId);
 
 /** Capture the shared source and the reader's policy; authenticate the actor per subscription. @category constructors */
-export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
+export const make = Effect.fn("ChangeFeedService.make")(function* () {
   const changeFeedSource = yield* ChangeFeedSource.Service;
   const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
@@ -102,7 +102,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
     return { scopes, grants } satisfies Access;
   });
 
-  const watch = Effect.fn("ChangeFeedApplication.watch")(function* (
+  const watch = Effect.fn("ChangeFeedService.watch")(function* (
     input: ChangeFeed.WatchOptions = {},
   ) {
     const options = yield* Schema.decodeEffect(ChangeFeed.WatchOptions)(input);
@@ -171,4 +171,4 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
 /** Provide the workspace change-feed application. @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as ChangeFeedApplication from "./application.ts";
+export * as ChangeFeedService from "./service.ts";

@@ -171,7 +171,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(outcome.outsider).toMatchObject({ _tag: "Gateway.NotMember" });
           expect(outcome.invitation.state).toEqual({ _tag: "Pending" });
           expect(outcome.wrongRecipient).toMatchObject({
-            _tag: "InvitationApplication.NotRecipient",
+            _tag: "InvitationService.NotRecipient",
           });
           expect(outcome.joined).toMatchObject({
             identity: { _tag: "Human", id: bob },

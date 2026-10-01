@@ -1,19 +1,19 @@
 import type * as Core from "@amends/core";
-import { AgentApplication } from "@amends/core/agent";
+import { AgentService } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
-import { ConnectionApplication } from "@amends/core/connection";
+import { ConnectionService } from "@amends/core/connection";
 import { Environment } from "@amends/core/environment";
-import { Group, GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
 import {
-  ThreadApplication,
+  ThreadService,
   type ThreadMessage,
-  ThreadMessageApplication,
-  ThreadParticipationApplication,
+  ThreadMessageService,
+  ThreadParticipationService,
   type ThreadTimeline,
 } from "@amends/core/thread";
-import { Turn, TurnApplication, TurnExecution, TurnLog } from "@amends/core/turn";
+import { Turn, TurnService, TurnExecution, TurnLog } from "@amends/core/turn";
 import type { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { HarnessEvent, Transcript } from "@amends/harness";
@@ -41,9 +41,7 @@ const turnsOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,
     alice,
-    Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-      turnApplication.listByThread(threadId, 10),
-    ),
+    Effect.flatMap(TurnService.Service, (turnService) => turnService.listByThread(threadId, 10)),
   );
 const execute = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, TurnExecution.Service>) =>
   Effect.flatMap(Gateway.Service, (gateway) => gateway.executeTurns(id, program));
@@ -55,8 +53,8 @@ const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,
     alice,
-    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-      threadApplication.readTimeline(threadId, { limit: 50 }),
+    Effect.flatMap(ThreadService.Service, (threadService) =>
+      threadService.readTimeline(threadId, { limit: 50 }),
     ),
   );
 /**
@@ -69,9 +67,7 @@ const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberRef
     const stream = yield* gateway.asMemberScoped(
       id,
       reader,
-      Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-        turnApplication.watchLog(turnId),
-      ),
+      Effect.flatMap(TurnService.Service, (turnService) => turnService.watchLog(turnId)),
     );
     const queue = yield* Queue.unbounded<Turn.LogMessage | "done" | "unavailable">();
     yield* stream.pipe(
@@ -130,8 +126,8 @@ const workspaceWithAgent = Effect.gen(function* () {
   const models = yield* as(
     workspace.id,
     alice,
-    Effect.flatMap(ConnectionApplication.Service, (connectionApplication) =>
-      connectionApplication.create({
+    Effect.flatMap(ConnectionService.Service, (connectionService) =>
+      connectionService.create({
         name: "Models",
         implementationId: testImplementation.id,
         settings: { endpoint: "https://models.example" },
@@ -142,8 +138,8 @@ const workspaceWithAgent = Effect.gen(function* () {
   const agent = yield* as(
     workspace.id,
     alice,
-    Effect.flatMap(AgentApplication.Service, (agentApplication) =>
-      agentApplication.create({
+    Effect.flatMap(AgentService.Service, (agentService) =>
+      agentService.create({
         name: "Scout",
         instructions: "Help the team.",
         model: { connectionId: models.id, model: "model-x", reasoning: null },
@@ -183,16 +179,16 @@ const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Turn.Reco
   as(
     id,
     alice,
-    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-      threadApplication.startInGroup({ groupId: Group.GeneralId, text, mentions: [...mentions] }),
+    Effect.flatMap(ThreadService.Service, (threadService) =>
+      threadService.startInGroup({ groupId: Group.GeneralId, text, mentions: [...mentions] }),
     ),
   ).pipe(Effect.flatMap((started) => withPlace(id, started)));
 const reply = (id: Workspace.Id, threadId: Turn.Record["threadId"], text: string) =>
   as(
     id,
     alice,
-    Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
-      threadMessageApplication.publish({ threadId, text, mentions: [] }),
+    Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+      threadMessageService.publish({ threadId, text, mentions: [] }),
     ),
   ).pipe(Effect.flatMap((message) => withPlace(id, { message })));
 
@@ -314,8 +310,8 @@ export const turns = (harness: ConformanceHarness) => {
               const [queued] = yield* turnsOf(workspace.id, threadId);
               const turnId = queued!.id;
               const readTurns = <A, E>(
-                read: (turns: TurnApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
-              ) => as(workspace.id, alice, Effect.flatMap(TurnApplication.Service, read));
+                read: (turns: TurnService.Interface) => Effect.Effect<A, E, Actor.Service>,
+              ) => as(workspace.id, alice, Effect.flatMap(TurnService.Service, read));
               // The workspace's active turns include it until it ends.
               expect(
                 (yield* readTurns((turns) => turns.listActive(10))).map(({ id }) => id),
@@ -574,8 +570,8 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-                  turnApplication.cancel(queued!.id),
+                Effect.flatMap(TurnService.Service, (turnService) =>
+                  turnService.cancel(queued!.id),
                 ),
               );
               // Its end is in its agent's log, which is all a reader follows.
@@ -603,9 +599,7 @@ export const turns = (harness: ConformanceHarness) => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-                    turnApplication.cancel(turnId),
-                  ),
+                  Effect.flatMap(TurnService.Service, (turnService) => turnService.cancel(turnId)),
                 );
               yield* accept(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
@@ -684,7 +678,7 @@ export const turns = (harness: ConformanceHarness) => {
                 failure: "The model provider is unavailable.",
               });
               expect(yield* Effect.flip(cancel(third!.id))).toMatchObject({
-                _tag: "TurnApplication.NotActive",
+                _tag: "TurnService.NotActive",
                 status: "failed",
               });
               // The thread tells each turn where the agent took on the work, and how it went.
@@ -724,9 +718,7 @@ export const turns = (harness: ConformanceHarness) => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-                    turnApplication.retry(turnId),
-                  ),
+                  Effect.flatMap(TurnService.Service, (turnService) => turnService.retry(turnId)),
                 );
               const flags = (views: ReadonlyArray<Turn.View>) =>
                 views.map(({ status, stoppable, retryable }) => ({ status, stoppable, retryable }));
@@ -736,7 +728,7 @@ export const turns = (harness: ConformanceHarness) => {
                 { status: "queued", stoppable: true, retryable: false },
               ]);
               expect(yield* Effect.flip(retry(queued!.id))).toMatchObject({
-                _tag: "TurnApplication.NotRetryable",
+                _tag: "TurnService.NotRetryable",
                 reason: "active",
               });
               // The turn takes its input in, then fails.
@@ -842,7 +834,7 @@ export const turns = (harness: ConformanceHarness) => {
                 ),
               );
               expect(yield* Effect.flip(retry(retried.id))).toMatchObject({
-                _tag: "TurnApplication.NotRetryable",
+                _tag: "TurnService.NotRetryable",
                 reason: "completed",
               });
             }),
@@ -965,8 +957,8 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-                  turnApplication.cancel(second!.id),
+                Effect.flatMap(TurnService.Service, (turnService) =>
+                  turnService.cancel(second!.id),
                 ),
               );
               yield* execute(
@@ -1085,9 +1077,7 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-                  turnApplication.cancel(first!.id),
-                ),
+                Effect.flatMap(TurnService.Service, (turnService) => turnService.cancel(first!.id)),
               );
               // A hundred messages ask for the agent's work while its turn is still stopping.
               yield* Effect.forEach(
@@ -1136,8 +1126,8 @@ export const turns = (harness: ConformanceHarness) => {
               const asked = yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
-                  threadMessageApplication.publish({
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({
                     threadId,
                     text: "Scout, catch up and summarize.",
                     mentions: [agent.memberId],
@@ -1218,8 +1208,8 @@ export const turns = (harness: ConformanceHarness) => {
             const participants = yield* as(
               workspace.id,
               identity,
-              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                threadApplication.listParticipants(threadId, { limit: 10 }),
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.listParticipants(threadId, { limit: 10 }),
               ),
             );
             const mine = participants.find(
@@ -1230,10 +1220,8 @@ export const turns = (harness: ConformanceHarness) => {
             yield* as(
               workspace.id,
               identity,
-              Effect.flatMap(
-                ThreadParticipationApplication.Service,
-                (threadParticipationApplication) =>
-                  threadParticipationApplication.unfollow({ threadId, participationId: mine!.id }),
+              Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+                threadParticipationService.unfollow({ threadId, participationId: mine!.id }),
               ),
             );
             // Taking work in does not look for departures; the process that stops them does.
@@ -1258,12 +1246,12 @@ export const turns = (harness: ConformanceHarness) => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turnApplication) =>
-                    turnApplication.retry(stopped!.id),
+                  Effect.flatMap(TurnService.Service, (turnService) =>
+                    turnService.retry(stopped!.id),
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "TurnApplication.NotRetryable", reason: "departed" });
+            ).toMatchObject({ _tag: "TurnService.NotRetryable", reason: "departed" });
           }),
         ),
       ),
@@ -1286,8 +1274,8 @@ export const turns = (harness: ConformanceHarness) => {
               const participants = yield* as(
                 workspace.id,
                 identity,
-                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                  threadApplication.listParticipants(threadId, { limit: 10 }),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.listParticipants(threadId, { limit: 10 }),
                 ),
               );
               const mine = participants.find(
@@ -1298,21 +1286,19 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 identity,
-                Effect.flatMap(
-                  ThreadParticipationApplication.Service,
-                  (threadParticipationApplication) =>
-                    threadParticipationApplication.unfollow({
-                      threadId,
-                      participationId: mine!.id,
-                    }),
+                Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+                  threadParticipationService.unfollow({
+                    threadId,
+                    participationId: mine!.id,
+                  }),
                 ),
               );
               // Asked again before its turn there is stopped, the agent takes part anew.
               const asked = yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
-                  threadMessageApplication.publish({
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.publish({
                     threadId,
                     text: "Scout, come back to this.",
                     mentions: [agent.memberId],
@@ -1375,7 +1361,7 @@ export const turns = (harness: ConformanceHarness) => {
               const [queued] = yield* turnsOf(workspace.id, threadId);
               const turnId = queued!.id;
               const reads: ReadonlyArray<
-                (turns: TurnApplication.Interface) => Effect.Effect<unknown, unknown, Actor.Service>
+                (turns: TurnService.Interface) => Effect.Effect<unknown, unknown, Actor.Service>
               > = [
                 (turns) => turns.get(turnId),
                 (turns) => turns.listByThread(threadId, 10),
@@ -1383,8 +1369,8 @@ export const turns = (harness: ConformanceHarness) => {
                 (turns) => Effect.scoped(turns.watchLog(turnId)),
               ];
               const asBob = <A, E>(
-                read: (turns: TurnApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
-              ) => as(workspace.id, bob, Effect.flatMap(TurnApplication.Service, read));
+                read: (turns: TurnService.Interface) => Effect.Effect<A, E, Actor.Service>,
+              ) => as(workspace.id, bob, Effect.flatMap(TurnService.Service, read));
               for (const read of reads) yield* asBob(read);
               expect(
                 (yield* asBob((turns) => turns.listActive(10))).map((turn) => turn.id),
@@ -1397,8 +1383,8 @@ export const turns = (harness: ConformanceHarness) => {
                   as(
                     workspace.id,
                     bob,
-                    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                      threadApplication.readTimeline(threadId, { limit: 50 }),
+                    Effect.flatMap(ThreadService.Service, (threadService) =>
+                      threadService.readTimeline(threadId, { limit: 50 }),
                     ),
                   ),
                 ),
@@ -1427,8 +1413,8 @@ export const turns = (harness: ConformanceHarness) => {
                 alice,
                 Effect.gen(function* () {
                   const { memberId } = yield* Actor.Service;
-                  const groupApplication = yield* GroupApplication.Service;
-                  return yield* groupApplication.createTeam({
+                  const groupService = yield* GroupService.Service;
+                  return yield* groupService.createTeam({
                     name: "Planning",
                     memberIds: [memberId, reader.id, agent.memberId],
                   });
@@ -1439,8 +1425,8 @@ export const turns = (harness: ConformanceHarness) => {
                 const started = yield* as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                    threadApplication.startInGroup({
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                    threadService.startInGroup({
                       groupId,
                       text: "Scout, draft the plan.",
                       mentions: [agent.memberId],
@@ -1475,15 +1461,15 @@ export const turns = (harness: ConformanceHarness) => {
               const [membership] = (yield* as(
                 workspace.id,
                 bob,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.listCurrent(team.id, { limit: 10 }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.listCurrent(team.id, { limit: 10 }),
                 ),
               )).filter((admission) => admission.memberId === reader.id);
               yield* as(
                 workspace.id,
                 bob,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.leave({
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.leave({
                     groupId: team.id,
                     membershipId: membership!.id,
                   }),

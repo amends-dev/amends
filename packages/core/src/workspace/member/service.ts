@@ -82,7 +82,7 @@ const decodeId = Schema.decodeEffect(Member.Id);
  *
  * @category constructors
  */
-export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Return<
   Interface,
   never,
   | MemberStore.Service
@@ -113,7 +113,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     return found.value;
   });
 
-  const get = Effect.fn("MemberApplication.get")(function* (memberId: Member.Id) {
+  const get = Effect.fn("MemberService.get")(function* (memberId: Member.Id) {
     const id = yield* decodeId(memberId);
     yield* authorization.require([
       Requirement.make(
@@ -137,9 +137,9 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       ),
     );
     return all.filter((_, index) => allowed[index]);
-  }).pipe(Effect.withSpan("MemberApplication.list"));
+  }).pipe(Effect.withSpan("MemberService.list"));
 
-  const remove = Effect.fn("MemberApplication.remove")(
+  const remove = Effect.fn("MemberService.remove")(
     function* (memberId: Member.Id) {
       const id = yield* decodeId(memberId);
       yield* authorization.require([
@@ -192,7 +192,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     journal.commit,
   );
 
-  const rename = Effect.fn("MemberApplication.rename")(
+  const rename = Effect.fn("MemberService.rename")(
     function* (input: Member.Name) {
       const name = yield* Schema.decodeEffect(Member.NewName)(input);
       yield* authorization.require([]);
@@ -216,4 +216,4 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
  */
 export const layer = Layer.effect(Service, make());
 
-export * as MemberApplication from "./application.ts";
+export * as MemberService from "./service.ts";

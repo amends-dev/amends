@@ -28,7 +28,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/signal/application/Service",
+  "@amends/core/signal/service/Service",
 ) {}
 
 /** How long readers show a typing indicator without a repeat. */
@@ -37,7 +37,7 @@ export const typingFor = Duration.seconds(6);
 const typingEvery = Duration.seconds(2);
 
 /** Capture the workspace's signals and thread access; authorize each signal as its actor. @category constructors */
-export const make = Effect.fn("SignalApplication.make")(function* () {
+export const make = Effect.fn("SignalService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const signals = yield* Signals.Service;
@@ -45,7 +45,7 @@ export const make = Effect.fn("SignalApplication.make")(function* () {
   /** When each member last signalled typing in each thread, in this process. */
   const lastTyping = new Map<string, number>();
 
-  const typing = Effect.fn("SignalApplication.typing")(function* (threadId: Thread.Id) {
+  const typing = Effect.fn("SignalService.typing")(function* (threadId: Thread.Id) {
     const thread = yield* threadQuery
       .requireAccess(threadId)
       .pipe(
@@ -87,4 +87,4 @@ export const make = Effect.fn("SignalApplication.make")(function* () {
 /** Provide signal operations over the workspace's services. @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as SignalApplication from "./application.ts";
+export * as SignalService from "./service.ts";

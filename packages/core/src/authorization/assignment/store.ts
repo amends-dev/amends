@@ -27,7 +27,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("AssignmentStore.Co
  * inserts and revocations. Enforce constraints atomically across concurrent writers.
  * Reject expired or foreign transaction handles and never retry the program internally.
  * Membership, role ownership, permission compatibility, and grant authority are
- * checked by application services before publication.
+ * checked by services before publication.
  */
 export interface Interface {
   /** Find an active or revoked assignment in this workspace; None if absent. */

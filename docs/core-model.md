@@ -15,17 +15,17 @@ Workspace management, the generic journal, notification storage and inbox reads,
 and live changes read from the journal are implemented. Core and the storage adapters also implement
 private team-group creation, membership admission/departure, workspace-removal cleanup,
 authorized group reads, and a shared group-audience check. Direct groups (DMs and group DMs) are
-established and reused by member set, with their first thread, through `ThreadApplication.startDirect`.
+established and reused by member set, with their first thread, through `ThreadService.startDirect`.
 Every thread opens through one internal thread start that creates the thread, admits its starting
 participants, and records its first message activity and pending notifications atomically; see
 [thread workflows](thread-workflows.md). Participants and message authors can be members,
 contacts, or triage. Authorized group-thread discovery,
 metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
-`ThreadMessageApplication`, admitting the author and eligible mentions in the same commit.
-`ThreadParticipationApplication` implements self-follow/unfollow, quiet follow activity, and pending
-agent-input settlement. `NotificationApplication.resolveSource` resolves owned notifications under
+`ThreadMessageService`, admitting the author and eligible mentions in the same commit.
+`ThreadParticipationService` implements self-follow/unfollow, quiet follow activity, and pending
+agent-input settlement. `NotificationService.resolveSource` resolves owned notifications under
 current thread access, without acknowledgment or participation changes. Human acknowledgment is
-implemented through `NotificationApplication.acknowledge`, as private `Seen` state outside the
+implemented through `NotificationService.acknowledge`, as private `Seen` state outside the
 journal. Agents accept their work notifications into turns, one active turn per agent per
 thread, and a turn closes by publishing the agent's reply from its log; see
 [core's turns](../packages/core/README.md#turns). Other participation management, the task and
@@ -702,7 +702,7 @@ and group departures and invitation revocations share one journal commit. The me
 assignments remain for history. Subsequent authorization rejects that membership,
 including an actor resolved before removal. Other workspace memberships are unchanged.
 Authorized readers may still inspect the historical record. Repeating removal of
-the same member returns `MemberApplication.AlreadyRemoved` without another fact.
+the same member returns `MemberService.AlreadyRemoved` without another fact.
 
 For humans, an old accepted invitation remains a receipt and cannot restore access.
 Rejoining requires a fresh invitation and member ID with newly authorized grants.
@@ -2615,7 +2615,7 @@ permission and cannot be used to remove someone else. Humans and agents follow t
 rule. Being the group's creator or the workspace owner does not prevent leaving a group;
 workspace ownership and membership remain unchanged.
 
-For private team groups, `GroupMembershipApplication.remove` and `leave` address a specific
+For private team groups, `GroupMembershipService.remove` and `leave` address a specific
 `{ groupId, membershipId }`. Removal requires `group.membership.manage` on that group;
 self-leave verifies the admission belongs to the caller. A successful departure records
 `group.membership.removed` and ends that admission without deleting it. The payload records
@@ -2633,8 +2633,8 @@ members.
 For implemented private team groups, ordinary metadata and current-roster reads require
 `group.read` on the group as well as current workspace and group membership. The permission
 is included in every built-in bundle; role names themselves confer no authority.
-`GroupApplication.listMine` includes only current readable memberships. `get` and
-`GroupMembershipApplication.listCurrent` return metadata and active admission records,
+`GroupService.listMine` includes only current readable memberships. `get` and
+`GroupMembershipService.listCurrent` return metadata and active admission records,
 without exposing historical admissions or member profiles. Missing and outside-audience
 groups share the same not-found outcome.
 
@@ -2672,13 +2672,13 @@ not bypass the audience requirement; workspace ownership or an administrator rol
 implicitly make someone a member of every conversation. Any broader inspection policy
 requires an explicit future design.
 
-For implemented group threads, `ThreadApplication.get`, `listInGroup`, `listOpenings`,
+For implemented group threads, `ThreadService.get`, `listInGroup`, `listOpenings`,
 `readTimeline`, and `listParticipants` enforce current group access and `thread.read` on the Thread target.
 Discovery filters unreadable threads. Timeline pages follow an exclusive sequence cursor and
 resolve message content or a historical follow summary under the same check. Participant summaries expose member references
 and joining details, while routing identities and ended participation remain internal.
 Reading requires no participation, creates none, and neither acknowledges input nor requests work.
-`NotificationApplication.resolveSource` applies the same current group access and `thread.read`
+`NotificationService.resolveSource` applies the same current group access and `thread.read`
 after checking notification ownership and historical source references. It returns the same typed
 timeline item without acknowledging input or changing participation. Historical notifications,
 including discarded agent input, remain readable after unfollowing while access permits; group

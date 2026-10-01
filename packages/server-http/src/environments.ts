@@ -1,5 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
-import { EnvironmentApplication } from "@amends/core/environment";
+import { EnvironmentService } from "@amends/core/environment";
 import type { Actor } from "@amends/core/identity";
 import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
@@ -20,49 +20,49 @@ export const layer = HttpApiBuilder.group(
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
       operation: (
-        environmentApplication: EnvironmentApplication.Interface,
+        environmentService: EnvironmentService.Interface,
       ) => Effect.Effect<A, E, Actor.Service>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
         gateway.asMember(
           workspaceId,
           principal,
-          Effect.flatMap(EnvironmentApplication.Service, operation),
+          Effect.flatMap(EnvironmentService.Service, operation),
         ),
       );
     return handlers.handleAll({
       implementations: ({ params }) =>
-        asMember(params.workspaceId, (environmentApplication) =>
-          Effect.succeed(environmentApplication.implementations),
+        asMember(params.workspaceId, (environmentService) =>
+          Effect.succeed(environmentService.implementations),
         ),
       list: ({ params }) =>
-        asMember(params.workspaceId, (environmentApplication) => environmentApplication.list),
+        asMember(params.workspaceId, (environmentService) => environmentService.list),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (environmentApplication) =>
-          environmentApplication.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(params.workspaceId, (environmentService) =>
+          environmentService.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (environmentApplication) =>
-          environmentApplication.get(params.environmentId),
+        asMember(params.workspaceId, (environmentService) =>
+          environmentService.get(params.environmentId),
         ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (environmentApplication) =>
-          environmentApplication.rename({
+        asMember(params.workspaceId, (environmentService) =>
+          environmentService.rename({
             environmentId: params.environmentId,
             name: payload.name,
             expectedName: payload.expectedName,
           }),
         ),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (environmentApplication) =>
-          environmentApplication.configure({
+        asMember(params.workspaceId, (environmentService) =>
+          environmentService.configure({
             environmentId: params.environmentId,
             sandbox: payload.sandbox,
           }),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (environmentApplication) =>
-          environmentApplication.remove(params.environmentId),
+        asMember(params.workspaceId, (environmentService) =>
+          environmentService.remove(params.environmentId),
         ),
     });
   }),

@@ -368,7 +368,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         );
         expect(revoked.status).toBe(410);
         expect(revoked.body).toMatchObject({
-          _tag: "InvitationApplication.Unavailable",
+          _tag: "InvitationService.Unavailable",
           reason: "revoked",
         });
         expect((await call(bob.id, "DELETE", owner)).status).toBe(403);

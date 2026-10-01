@@ -1,7 +1,7 @@
 import { AssignmentFacts, Role, RoleFacts } from "@amends/core/authorization";
 import { Actor } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
-import { MemberApplication, MemberPermissions } from "@amends/core/workspace";
+import { MemberService, MemberPermissions } from "@amends/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import type { Harness } from "./harness.ts";
@@ -61,7 +61,7 @@ export const authorization = (harness: Harness) => {
                 identity: alice,
               });
               expect(
-                yield* (yield* MemberApplication.Service)
+                yield* (yield* MemberService.Service)
                   .get(workspace.ownerMemberId)
                   .pipe(Effect.provideService(Actor.Service, actor), Effect.flip),
               ).toMatchObject({ _tag: "Authorization.Denied" });

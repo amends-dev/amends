@@ -1,6 +1,6 @@
 import { Api, ApiErrors, Principal } from "@amends/api-http";
 import { Gateway } from "@amends/gateway";
-import { OwnershipApplication, WorkspaceSettingsApplication } from "@amends/core/workspace";
+import { OwnershipService, WorkspaceSettingsService } from "@amends/core/workspace";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
@@ -21,8 +21,8 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(
-              WorkspaceSettingsApplication.Service,
-              (workspaceSettingsApplication) => workspaceSettingsApplication.get,
+              WorkspaceSettingsService.Service,
+              (workspaceSettingsService) => workspaceSettingsService.get,
             ),
           ),
         ),
@@ -32,8 +32,8 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(
-              WorkspaceSettingsApplication.Service,
-              (workspaceSettingsApplication) => workspaceSettingsApplication.members,
+              WorkspaceSettingsService.Service,
+              (workspaceSettingsService) => workspaceSettingsService.members,
             ),
           ),
         ),
@@ -42,8 +42,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(WorkspaceSettingsApplication.Service, (workspaceSettingsApplication) =>
-              workspaceSettingsApplication.rename(payload),
+            Effect.flatMap(WorkspaceSettingsService.Service, (workspaceSettingsService) =>
+              workspaceSettingsService.rename(payload),
             ),
           ),
         ),
@@ -52,10 +52,7 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(
-              OwnershipApplication.Service,
-              (ownershipApplication) => ownershipApplication.get,
-            ),
+            Effect.flatMap(OwnershipService.Service, (ownershipService) => ownershipService.get),
           ),
         ),
       transferOwnership: ({ params, payload }) =>
@@ -65,8 +62,8 @@ export const layer = HttpApiBuilder.group(
           return yield* gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(OwnershipApplication.Service, (ownershipApplication) =>
-              ownershipApplication.transfer(payload),
+            Effect.flatMap(OwnershipService.Service, (ownershipService) =>
+              ownershipService.transfer(payload),
             ),
           );
         }),

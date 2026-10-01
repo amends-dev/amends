@@ -337,7 +337,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* Effect.flip(
               asAlice.turns.cancel({ params: { workspaceId, turnId: running!.id } }),
             ),
-          ).toMatchObject({ _tag: "TurnApplication.NotActive", status: "cancelled" });
+          ).toMatchObject({ _tag: "TurnService.NotActive", status: "cancelled" });
         }).pipe(Effect.scoped, Effect.provide(server(url))),
       ),
     40_000,

@@ -32,7 +32,7 @@ import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
-import { MemberApplication } from "../workspace/member/application.ts";
+import { MemberService } from "../workspace/member/service.ts";
 import { MemberFacts } from "../workspace/member/facts.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberPermissions } from "../workspace/member/permissions.ts";
@@ -75,7 +75,7 @@ export type SelectionError = ConnectionUnavailable | EnvironmentUnavailable | In
 /** Creating also grants the agent's role, and may meet a request key used before. */
 export type CreateError = Error | SelectionError | Delegation.Error | GroupStore.Failure;
 export type ConfigureError = Error | SelectionError;
-export type RemoveError = Error | MemberApplication.RemoveError;
+export type RemoveError = Error | MemberService.RemoveError;
 /** Choosing concerns no agent yet: only the connection can be unavailable. */
 export type ChoicesError = Exclude<ReadError, NotFound> | ConnectionUnavailable;
 
@@ -118,7 +118,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/agent/application/Service",
+  "@amends/core/agent/service/Service",
 ) {}
 
 /** What the reader may do with an agent, and the role it holds when they may read its access. */
@@ -137,12 +137,12 @@ const pending = (reason: EnvironmentCompatibility.Reason) =>
   reason._tag === "EnvironmentNotReady" || reason._tag === "ConnectionNotReady";
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
-export const make = Effect.fn("AgentApplication.make")(function* () {
+export const make = Effect.fn("AgentService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const agentStore = yield* AgentStore.Service;
   const memberStore = yield* MemberStore.Service;
-  const memberApplication = yield* MemberApplication.Service;
+  const memberService = yield* MemberService.Service;
   const assignmentStore = yield* AssignmentStore.Service;
   const roleStore = yield* RoleStore.Service;
   const workspaceStore = yield* WorkspaceStore.Service;
@@ -425,9 +425,9 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
           : 1
         : left.name.localeCompare(right.name),
     );
-  }).pipe(Effect.withSpan("AgentApplication.list"));
+  }).pipe(Effect.withSpan("AgentService.list"));
 
-  const get = Effect.fn("AgentApplication.get")(function* (agentId: Agent.Id) {
+  const get = Effect.fn("AgentService.get")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);
     const { record, name } = yield* authorized(id, AgentPermissions.Read);
     return yield* presented(record, name);
@@ -440,7 +440,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     return { record: found.value, name };
   });
 
-  const create = Effect.fn("AgentApplication.create")(
+  const create = Effect.fn("AgentService.create")(
     function* (input: Agent.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Agent.CreateInput))(input);
       yield* authorization.require([
@@ -501,9 +501,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     journal.commit,
   );
 
-  const configure = Effect.fn("AgentApplication.configure")(function* (
-    input: Agent.ConfigureInput,
-  ) {
+  const configure = Effect.fn("AgentService.configure")(function* (input: Agent.ConfigureInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Agent.ConfigureInput))(input);
     return yield* Effect.gen(function* () {
       const { record, name } = yield* authorized(request.agentId, AgentPermissions.Configure);
@@ -532,7 +530,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const rename = Effect.fn("AgentApplication.rename")(function* (input: Agent.RenameInput) {
+  const rename = Effect.fn("AgentService.rename")(function* (input: Agent.RenameInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Agent.RenameInput))(input);
     return yield* Effect.gen(function* () {
       const { record, name } = yield* authorized(request.agentId, AgentPermissions.Configure);
@@ -547,13 +545,13 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const remove = Effect.fn("AgentApplication.remove")(function* (agentId: Agent.Id) {
+  const remove = Effect.fn("AgentService.remove")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);
     const { record } = yield* authorized(id, AgentPermissions.Configure);
-    yield* memberApplication.remove(record.memberId);
+    yield* memberService.remove(record.memberId);
   });
 
-  const environmentChoices = Effect.fn("AgentApplication.environmentChoices")(function* (
+  const environmentChoices = Effect.fn("AgentService.environmentChoices")(function* (
     input: ChoicesInput,
   ) {
     const model = yield* Schema.decodeEffect(Schema.toType(Agent.ModelSelection))(input.model);
@@ -603,4 +601,4 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
 /** @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as AgentApplication from "./application.ts";
+export * as AgentService from "./service.ts";

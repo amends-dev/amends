@@ -11,9 +11,9 @@ import {
 } from "@amends/core/authorization";
 import {
   Group,
-  GroupApplication,
+  GroupService,
   GroupQuery,
-  GroupMembershipApplication,
+  GroupMembershipService,
   GroupMembershipFacts,
   GroupMembershipStore,
   GroupPermissions,
@@ -22,10 +22,10 @@ import {
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
 import { Checkpoint, Fact, Journal, Log, Publication, Store, Subject } from "@amends/core/journal";
-import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
 import {
   Thread,
-  ThreadApplication,
+  ThreadService,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
@@ -36,7 +36,7 @@ import {
   ThreadMessageFacts,
   ThreadMessageTimeline,
   ThreadParticipation,
-  ThreadParticipationApplication,
+  ThreadParticipationService,
   ThreadParticipationTimeline,
   ThreadPermissions,
   ThreadCommand,
@@ -87,32 +87,32 @@ export const threadReads = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const get = (id: Thread.Id) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) => threadApplication.get(id));
+      Effect.flatMap(ThreadService.Service, (threadService) => threadService.get(id));
     /** Readable threads of a group as records in ID order; listing order has its own test. */
     const list = (id: Group.Id) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-        Effect.map(threadApplication.listInGroup(id, { limit: 100 }), (items) =>
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        Effect.map(threadService.listInGroup(id, { limit: 100 }), (items) =>
           items.map((item) => item.thread).toSorted((a, b) => (a.id < b.id ? -1 : 1)),
         ),
       );
     const timeline = (id: Thread.Id, options: ThreadActivityStore.ReadOptions = { limit: 10 }) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-        threadApplication.readTimeline(id, options),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.readTimeline(id, options),
       );
     const participants = (
       id: Thread.Id,
       options: ThreadParticipation.ListOptions = { limit: 100 },
     ) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-        threadApplication.listParticipants(id, options),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.listParticipants(id, options),
       );
     const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
-      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-        groupApplication.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name, memberIds }),
       );
     const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-        threadApplication.startInGroup({ groupId, mentions, text: "Opening proposal" }),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startInGroup({ groupId, mentions, text: "Opening proposal" }),
       );
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(opening(groupId, mentions), placed);
@@ -396,17 +396,17 @@ export const threadReads = (harness: Harness) => {
                   const calls: ReadonlyArray<
                     Effect.Effect<
                       unknown,
-                      ThreadApplication.ReadError,
-                      ThreadApplication.Service | Actor.Service
+                      ThreadService.ReadError,
+                      ThreadService.Service | Actor.Service
                     >
                   > = [get(id), timeline(id), participants(id)];
                   for (const call of calls)
                     expect(yield* Effect.flip(run(bound, actor, call))).toEqual(
-                      new ThreadApplication.NotFound({ threadId: id }),
+                      new ThreadService.NotFound({ threadId: id }),
                     );
                 }
               expect(yield* Effect.flip(run(bound, owner, list(hidden.id)))).toEqual(
-                new ThreadApplication.GroupNotFound({ groupId: hidden.id }),
+                new ThreadService.GroupNotFound({ groupId: hidden.id }),
               );
               yield* publish(
                 bound,
@@ -570,56 +570,52 @@ export const threadReads = (harness: Harness) => {
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const threadApplication = yield* ThreadApplication.Service;
-                  expect(yield* threadApplication.get(first.thread.id)).toEqual(first.thread);
+                  const threadService = yield* ThreadService.Service;
+                  expect(yield* threadService.get(first.thread.id)).toEqual(first.thread);
                   const admission = Option.getOrThrow(
                     yield* bound.groupMemberships.findActive(group.id, readerId),
                   );
-                  yield* Effect.flatMap(
-                    GroupMembershipApplication.Service,
-                    (groupMembershipApplication) =>
-                      groupMembershipApplication.leave({
-                        groupId: group.id,
-                        membershipId: admission.id,
-                      }),
+                  yield* Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                    groupMembershipService.leave({
+                      groupId: group.id,
+                      membershipId: admission.id,
+                    }),
                   );
-                  expect(yield* Effect.flip(threadApplication.get(first.thread.id))).toEqual(
-                    new ThreadApplication.NotFound({ threadId: first.thread.id }),
+                  expect(yield* Effect.flip(threadService.get(first.thread.id))).toEqual(
+                    new ThreadService.NotFound({ threadId: first.thread.id }),
                   );
                   expect(
-                    yield* Effect.flip(threadApplication.listInGroup(group.id, { limit: 100 })),
+                    yield* Effect.flip(threadService.listInGroup(group.id, { limit: 100 })),
                   ).toMatchObject({
-                    _tag: "ThreadApplication.GroupNotFound",
+                    _tag: "ThreadService.GroupNotFound",
                   });
                   yield* asActor(
-                    Effect.flatMap(
-                      GroupMembershipApplication.Service,
-                      (groupMembershipApplication) =>
-                        groupMembershipApplication.add({ groupId: group.id, memberId: readerId }),
+                    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                      groupMembershipService.add({ groupId: group.id, memberId: readerId }),
                     ),
                     owner,
                   );
                   expect(
-                    yield* threadApplication.readTimeline(first.thread.id, { limit: 10 }),
+                    yield* threadService.readTimeline(first.thread.id, { limit: 10 }),
                   ).toHaveLength(1);
                   expect(
-                    (yield* threadApplication.listParticipants(second.thread.id, {
+                    (yield* threadService.listParticipants(second.thread.id, {
                       limit: 100,
                     })).some((p) => ThreadParticipation.memberOf(p.participant) === readerId),
                   ).toBe(false);
                   yield* asActor(
-                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                      memberApplication.remove(readerId),
+                    Effect.flatMap(MemberService.Service, (memberService) =>
+                      memberService.remove(readerId),
                     ),
                     owner,
                   );
                   const calls: ReadonlyArray<
-                    Effect.Effect<unknown, ThreadApplication.ReadError, Actor.Service>
+                    Effect.Effect<unknown, ThreadService.ReadError, Actor.Service>
                   > = [
-                    threadApplication.get(first.thread.id),
-                    threadApplication.listInGroup(group.id, { limit: 100 }),
-                    threadApplication.readTimeline(first.thread.id, { limit: 10 }),
-                    threadApplication.listParticipants(first.thread.id, { limit: 100 }),
+                    threadService.get(first.thread.id),
+                    threadService.listInGroup(group.id, { limit: 100 }),
+                    threadService.readTimeline(first.thread.id, { limit: 10 }),
+                    threadService.listParticipants(first.thread.id, { limit: 100 }),
                   ];
                   for (const call of calls)
                     expect(yield* Effect.flip(call)).toMatchObject({
@@ -681,10 +677,10 @@ export const threadReads = (harness: Harness) => {
                 reader,
                 Effect.gen(function* () {
                   expectTypeOf<
-                    Effect.Services<ReturnType<ThreadApplication.Interface["get"]>>
+                    Effect.Services<ReturnType<ThreadService.Interface["get"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   expectTypeOf<
-                    Effect.Services<ReturnType<ThreadApplication.Interface["readTimeline"]>>
+                    Effect.Services<ReturnType<ThreadService.Interface["readTimeline"]>>
                   >().toEqualTypeOf<Actor.Service>();
                   yield* get(first.thread.id);
                   yield* list(group.id);
@@ -697,7 +693,7 @@ export const threadReads = (harness: Harness) => {
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const threadApplication = yield* ThreadApplication.Service;
+                  const threadService = yield* ThreadService.Service;
                   yield* publish(
                     bound,
                     Effect.flatMap(Journal.Service, (journal) =>
@@ -708,12 +704,10 @@ export const threadReads = (harness: Harness) => {
                       }),
                     ),
                   );
-                  expect(yield* Effect.flip(threadApplication.get(first.thread.id))).toMatchObject({
+                  expect(yield* Effect.flip(threadService.get(first.thread.id))).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
-                  expect(yield* threadApplication.listInGroup(group.id, { limit: 100 })).toEqual(
-                    [],
-                  );
+                  expect(yield* threadService.listInGroup(group.id, { limit: 100 })).toEqual([]);
                 }),
               );
             }),
@@ -789,7 +783,7 @@ export const threadReads = (harness: Harness) => {
                     });
                     expect(yield* Effect.flip(asActor(get(first.thread.id), reader))).toMatchObject(
                       {
-                        _tag: "ThreadApplication.NotFound",
+                        _tag: "ThreadService.NotFound",
                       },
                     );
                     return yield* Effect.fail("rollback");
@@ -827,13 +821,13 @@ export const threadReads = (harness: Harness) => {
               yield* grant(bound, memberId, ThreadPermissions.Read);
               const visitor = Actor.Value.make({ workspaceId, memberId, identity });
               expect(yield* Effect.flip(run(bound, visitor, get(first.thread.id)))).toMatchObject({
-                _tag: "ThreadApplication.NotFound",
+                _tag: "ThreadService.NotFound",
               });
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.add({ groupId: group.id, memberId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId }),
                 ),
               );
               expect(yield* run(bound, visitor, timeline(first.thread.id))).toHaveLength(1);
@@ -954,7 +948,7 @@ export const threadReads = (harness: Harness) => {
               for (const id of [foreignThread.thread.id, Thread.Id.make("missing")])
                 expect(
                   yield* Effect.flip(gateway.asMember(workspace.id, readerIdentity, get(id))),
-                ).toEqual(new ThreadApplication.NotFound({ threadId: id }));
+                ).toEqual(new ThreadService.NotFound({ threadId: id }));
               expect(
                 yield* Effect.flip(
                   gateway.asMember(
@@ -1136,13 +1130,11 @@ export const threadReads = (harness: Harness) => {
               yield* run(
                 bound,
                 reader,
-                Effect.flatMap(
-                  ThreadParticipationApplication.Service,
-                  (threadParticipationApplication) =>
-                    threadParticipationApplication.unfollow({
-                      threadId: second.thread.id,
-                      participationId: own.id,
-                    }),
+                Effect.flatMap(ThreadParticipationService.Service, (threadParticipationService) =>
+                  threadParticipationService.unfollow({
+                    threadId: second.thread.id,
+                    participationId: own.id,
+                  }),
                 ),
               );
               const active = byId((yield* all()).filter((p) => p.status === "active"));
@@ -1194,8 +1186,8 @@ export const threadReads = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.remove({
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.remove({
                     groupId: group.id,
                     membershipId: admission.id,
                   }),

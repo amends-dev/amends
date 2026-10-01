@@ -1,26 +1,26 @@
-import { AgentApplication } from "./agent/application.ts";
+import { AgentService } from "./agent/service.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
-import { TurnApplication } from "./turn/application.ts";
+import { TurnService } from "./turn/service.ts";
 import { TurnDispatch } from "./turn/dispatch.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import { TurnProjection } from "./turn/projection.ts";
-import { ConnectionApplication } from "./connection/application.ts";
+import { ConnectionService } from "./connection/service.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
-import { EnvironmentApplication } from "./environment/application.ts";
+import { EnvironmentService } from "./environment/service.ts";
 import { EnvironmentPermissions } from "./environment/permissions.ts";
 import { EnvironmentProjection } from "./environment/projection.ts";
 import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
-import { ThreadApplication } from "./thread/application.ts";
+import { ThreadService } from "./thread/service.ts";
 import { ThreadCommand } from "./thread/command.ts";
 import { GroupCommand } from "./group/command.ts";
 import { ThreadQuery } from "./thread/query.ts";
-import { ThreadMessageApplication } from "./thread/message/application.ts";
+import { ThreadMessageService } from "./thread/message/service.ts";
 import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
-import { ThreadParticipationApplication } from "./thread/participation/application.ts";
+import { ThreadParticipationService } from "./thread/participation/service.ts";
 import { ThreadParticipationPermissions } from "./thread/participation/permissions.ts";
 import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
@@ -38,22 +38,22 @@ import { ThreadActivityProjection } from "./thread/activity/projection.ts";
  * runs the application operations.
  */
 import { Layer } from "effect";
-import { ChangeFeedApplication } from "./change-feed/application.ts";
+import { ChangeFeedService } from "./change-feed/service.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
-import { SignalApplication } from "./signal/application.ts";
-import { GroupApplication } from "./group/application.ts";
+import { SignalService } from "./signal/service.ts";
+import { GroupService } from "./group/service.ts";
 import { GroupQuery } from "./group/query.ts";
 import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
-import { GroupFollowApplication } from "./group/follow/application.ts";
+import { GroupFollowService } from "./group/follow/service.ts";
 import { GroupFollowProjection } from "./group/follow/projection.ts";
-import { ReadStateApplication } from "./read-state/application.ts";
+import { ReadStateService } from "./read-state/service.ts";
 import { ReadStateCommand } from "./read-state/command.ts";
-import { GroupMembershipApplication } from "./group/membership/application.ts";
+import { GroupMembershipService } from "./group/membership/service.ts";
 import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
 import { AssignmentProjection } from "./authorization/assignment/projection.ts";
-import { AssignmentApplication } from "./authorization/assignment/application.ts";
+import { AssignmentService } from "./authorization/assignment/service.ts";
 import { AssignmentPermissions } from "./authorization/assignment/permissions.ts";
 import { Delegation } from "./authorization/delegation.ts";
 import { Authorization } from "./authorization/authorization.ts";
@@ -63,18 +63,18 @@ import { RoleProjection } from "./authorization/role/projection.ts";
 import { Journal } from "./journal/journal.ts";
 import type { Reaction } from "./journal/reaction.ts";
 import { Log } from "./journal/log.ts";
-import { NotificationApplication } from "./notification/application.ts";
+import { NotificationService } from "./notification/service.ts";
 import { NotificationProjection } from "./notification/projection.ts";
-import { InvitationApplication } from "./workspace/invitation/application.ts";
+import { InvitationService } from "./workspace/invitation/service.ts";
 import { InvitationPermissions } from "./workspace/invitation/permissions.ts";
 import { InvitationProjection } from "./workspace/invitation/projection.ts";
-import { MemberApplication } from "./workspace/member/application.ts";
+import { MemberService } from "./workspace/member/service.ts";
 import { MemberPermissions } from "./workspace/member/permissions.ts";
 import { MemberProjection } from "./workspace/member/projection.ts";
 import { WorkspaceProjection } from "./workspace/projection.ts";
-import { OwnershipApplication } from "./workspace/ownership/application.ts";
+import { OwnershipService } from "./workspace/ownership/service.ts";
 import { OwnershipPermissions } from "./workspace/ownership/permissions.ts";
-import { WorkspaceSettingsApplication } from "./workspace/settings/application.ts";
+import { WorkspaceSettingsService } from "./workspace/settings/service.ts";
 import { WorkspaceSettingsPermissions } from "./workspace/settings/permissions.ts";
 
 /**
@@ -190,7 +190,7 @@ const readStateCommand = ReadStateCommand.layer;
  * following a turn's log, who stop when their access changes.
  */
 const changeFeedSource = ChangeFeedSource.layer();
-const changeFeedApplication = ChangeFeedApplication.layer.pipe(
+const changeFeedService = ChangeFeedService.layer.pipe(
   Layer.provide(Layer.mergeAll(changeFeedSource, GrantResolver.layer)),
 );
 
@@ -199,27 +199,27 @@ const changeFeedApplication = ChangeFeedApplication.layer.pipe(
  * are what hosts and protocols call; stores and the journal stay internal.
  */
 const operations = Layer.mergeAll(
-  WorkspaceSettingsApplication.layer.pipe(
-    Layer.provide(Layer.mergeAll(MemberApplication.layer, AssignmentApplication.layer)),
+  WorkspaceSettingsService.layer.pipe(
+    Layer.provide(Layer.mergeAll(MemberService.layer, AssignmentService.layer)),
   ),
-  MemberApplication.layer,
-  InvitationApplication.layer,
-  AssignmentApplication.layer,
-  OwnershipApplication.layer,
-  NotificationApplication.layer,
-  changeFeedApplication,
-  GroupApplication.layer,
-  GroupMembershipApplication.layer,
-  GroupFollowApplication.layer,
-  ThreadApplication.layer,
-  ReadStateApplication.layer,
-  ThreadMessageApplication.layer,
-  ThreadParticipationApplication.layer,
-  SignalApplication.layer,
-  ConnectionApplication.layer,
-  EnvironmentApplication.layer,
-  AgentApplication.layer.pipe(Layer.provide(MemberApplication.layer)),
-  TurnApplication.layer,
+  MemberService.layer,
+  InvitationService.layer,
+  AssignmentService.layer,
+  OwnershipService.layer,
+  NotificationService.layer,
+  changeFeedService,
+  GroupService.layer,
+  GroupMembershipService.layer,
+  GroupFollowService.layer,
+  ThreadService.layer,
+  ReadStateService.layer,
+  ThreadMessageService.layer,
+  ThreadParticipationService.layer,
+  SignalService.layer,
+  ConnectionService.layer,
+  EnvironmentService.layer,
+  AgentService.layer.pipe(Layer.provide(MemberService.layer)),
+  TurnService.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
@@ -266,7 +266,7 @@ export const layer = Layer.mergeAll(operations, background).pipe(
 export type HostServices = Layer.Services<typeof layer>;
 
 /**
- * The application services a host runs for an actor. Programs a gateway
+ * The services a host runs for an actor. Programs a gateway
  * accepts may require only these, so they cannot bypass the membership and
  * permission checks each operation performs.
  *

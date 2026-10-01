@@ -77,23 +77,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const outside = { workspaceId, groupId: mine.id };
         expect(yield* asAlice.groups.get({ params: outside }).pipe(Effect.flip)).toMatchObject({
-          _tag: "GroupApplication.NotFound",
+          _tag: "GroupService.NotFound",
         });
         expect(
           yield* asAlice.groups
             .addMember({ params: outside, payload: { memberId: aliceId } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
         expect(
           yield* asAlice.groups
             .rename({ params: outside, payload: { name: "Ours", expectedName: "Mine" } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupApplication.NotFound" });
+        ).toMatchObject({ _tag: "GroupService.NotFound" });
         expect(
           yield* asAlice.groups
             .members({ params: outside, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
         // Bob leaves his group again; the rest of the conversation happens in Design.
         const [kept] = yield* asBob.groups.members({ params: outside, query: { limit: 10 } });
         yield* asBob.groups.leave({ params: { ...outside, membershipId: kept!.id } });
@@ -144,7 +144,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { name: "Plans", expectedName: "Design" },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupApplication.Changed", groupId: group.id });
+        ).toMatchObject({ _tag: "GroupService.Changed", groupId: group.id });
         yield* asAlice.groups.rename({
           params: { workspaceId, groupId: group.id },
           payload: { name: "Design", expectedName: "Product design" },
@@ -297,7 +297,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { throughSequence: latest + 1 },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ReadStateApplication.BeyondTimeline", latestSequence: latest });
+        ).toMatchObject({ _tag: "ReadStateService.BeyondTimeline", latestSequence: latest });
         yield* asBob.groups.markRead({ params: { workspaceId, groupId } });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({ newActivity: false });
@@ -316,7 +316,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.threads
             .unfollow({ params: { workspaceId, threadId }, payload: { participationId: own.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadParticipationApplication.AlreadyEnded" });
+        ).toMatchObject({ _tag: "ThreadParticipationService.AlreadyEnded" });
         const followed = yield* asBob.threads.follow({ params: { workspaceId, threadId } });
         expect(followed.participant).toEqual({ _tag: "Member", memberId: bobId });
         expect(followed.id).not.toBe(own.id);
@@ -341,7 +341,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asAlice.groups
             .follow({ params: { workspaceId, groupId }, payload: { memberId: bobId } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupFollowApplication.AgentRequired" });
+        ).toMatchObject({ _tag: "GroupFollowService.AgentRequired" });
 
         // Leaving the group ends Bob's access to it and its threads.
         const admission = roster.find((entry) => entry.memberId === bobId)!;
@@ -409,7 +409,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.threads
             .list({ params: { workspaceId, groupId }, query: { limit: 10 } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+        ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
         // Joining admits him, once; he then reads its threads like any member.
         const joined = yield* asBob.groups.join({ params: { workspaceId, groupId } });
         expect(joined).toMatchObject({ groupId, memberId: bobId, status: "active" });
@@ -428,7 +428,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asBob.groups
             .join({ params: { workspaceId, groupId: secret.id } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "GroupMembershipApplication.GroupNotFound" });
+        ).toMatchObject({ _tag: "GroupMembershipService.GroupNotFound" });
       }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );
@@ -466,7 +466,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { participationId: own.id },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ThreadParticipationApplication.FixedParticipation" });
+        ).toMatchObject({ _tag: "ThreadParticipationService.FixedParticipation" });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({
           group: { id: groupId, kind: "Direct", memberIds: [aliceId, bobId].sort() },

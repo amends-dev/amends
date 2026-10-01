@@ -1,11 +1,11 @@
 import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
 import { Journal, Publication } from "@amends/core/journal";
-import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
-import { GroupApplication, GroupFacts } from "@amends/core/group";
+import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
+import { GroupService, GroupFacts } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
-import { NotificationApplication } from "@amends/core/notification";
-import { ThreadApplication, ThreadMessageFacts } from "@amends/core/thread";
-import { InvitationApplication, InvitationFacts, Member } from "@amends/core/workspace";
+import { NotificationService } from "@amends/core/notification";
+import { ThreadService, ThreadMessageFacts } from "@amends/core/thread";
+import { InvitationService, InvitationFacts, Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Queue, Stream } from "effect";
@@ -23,7 +23,7 @@ import {
 } from "./support.ts";
 
 const issue = (recipient: Identity.HumanId) =>
-  InvitationApplication.Service.use((invitations) =>
+  InvitationService.Service.use((invitations) =>
     Effect.flatMap(DateTime.now, (now) =>
       invitations.issue({
         recipientId: recipient,
@@ -51,8 +51,8 @@ const committed = (message: ChangeFeed.Message) => {
   return message;
 };
 const watch = (options?: ChangeFeed.WatchOptions) =>
-  Effect.flatMap(ChangeFeedApplication.Service, (changeFeedApplication) =>
-    changeFeedApplication.watch(options),
+  Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>
+    changeFeedService.watch(options),
   );
 const human = (name: string) => Identity.HumanId.make(name);
 const memberActor = (name: string) =>
@@ -196,8 +196,8 @@ export const changeFeed = (harness: Harness) => {
             for (const next of feeds) expect(yield* next).toMatchObject({ reset: true });
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-                groupApplication.createTeam({
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                groupService.createTeam({
                   name: "Private",
                   memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
                 }),
@@ -205,8 +205,8 @@ export const changeFeed = (harness: Harness) => {
             );
             yield* as(
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                threadApplication.startInGroup({
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startInGroup({
                   groupId: group.id,
                   mentions: [],
                   text: "Secret plan",
@@ -254,8 +254,8 @@ export const changeFeed = (harness: Harness) => {
               program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(services));
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-                groupApplication.createTeam({
+              Effect.flatMap(GroupService.Service, (groupService) =>
+                groupService.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, mentioned.memberId, bystander.memberId],
                 }),
@@ -269,8 +269,8 @@ export const changeFeed = (harness: Harness) => {
             for (const next of [mentionedFeed, bystanderFeed]) yield* next;
             yield* as(
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                threadApplication.startInGroup({
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startInGroup({
                   groupId: group.id,
                   mentions: [mentioned.memberId],
                   text: "Can you look?",
@@ -280,8 +280,8 @@ export const changeFeed = (harness: Harness) => {
             const started = committed(yield* mentionedFeed);
             const inbox = yield* as(
               mentioned,
-              Effect.flatMap(NotificationApplication.Service, (notificationApplication) =>
-                notificationApplication.list({ limit: 10 }),
+              Effect.flatMap(NotificationService.Service, (notificationService) =>
+                notificationService.list({ limit: 10 }),
               ),
             );
             expect(inbox).toHaveLength(1);

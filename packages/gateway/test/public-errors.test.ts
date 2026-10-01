@@ -1,24 +1,20 @@
-import type { AssignmentApplication } from "@amends/core/authorization";
-import type { ReadStateApplication } from "@amends/core/read-state";
-import type { ChangeFeedApplication } from "@amends/core/change-feed";
-import type { ConnectionApplication } from "@amends/core/connection";
+import type { AssignmentService } from "@amends/core/authorization";
+import type { ReadStateService } from "@amends/core/read-state";
+import type { ChangeFeedService } from "@amends/core/change-feed";
+import type { ConnectionService } from "@amends/core/connection";
+import type { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
+import type { NotificationService } from "@amends/core/notification";
+import type { SignalService } from "@amends/core/signal";
 import type {
-  GroupApplication,
-  GroupFollowApplication,
-  GroupMembershipApplication,
-} from "@amends/core/group";
-import type { NotificationApplication } from "@amends/core/notification";
-import type { SignalApplication } from "@amends/core/signal";
-import type {
-  ThreadApplication,
-  ThreadMessageApplication,
-  ThreadParticipationApplication,
+  ThreadService,
+  ThreadMessageService,
+  ThreadParticipationService,
 } from "@amends/core/thread";
 import type {
-  InvitationApplication,
-  MemberApplication,
-  OwnershipApplication,
-  WorkspaceSettingsApplication,
+  InvitationService,
+  MemberService,
+  OwnershipService,
+  WorkspaceSettingsService,
 } from "@amends/core/workspace";
 import { expectTypeOf, it } from "@effect/vitest";
 import type { Effect } from "effect";
@@ -61,20 +57,20 @@ type Unclassified<Service> = Exclude<ErrorsOf<Service>, GatewayErrors.PublicErro
 
 it("every error a core operation can fail with is public or internal, so none becomes a 500 unseen", () => {
   // A new domain outcome must join GatewayErrors.PublicError, or be named internal above.
-  expectTypeOf<Unclassified<AssignmentApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ReadStateApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ChangeFeedApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ConnectionApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<GroupApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<GroupFollowApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<GroupMembershipApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<NotificationApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<SignalApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ThreadApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ThreadMessageApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ThreadParticipationApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<InvitationApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<MemberApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<OwnershipApplication.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<WorkspaceSettingsApplication.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<AssignmentService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ReadStateService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ChangeFeedService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ConnectionService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<GroupService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<GroupFollowService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<GroupMembershipService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<NotificationService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<SignalService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ThreadService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ThreadMessageService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<ThreadParticipationService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<InvitationService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<MemberService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<OwnershipService.Interface>>().toEqualTypeOf<never>();
+  expectTypeOf<Unclassified<WorkspaceSettingsService.Interface>>().toEqualTypeOf<never>();
 });

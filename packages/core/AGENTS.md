@@ -5,7 +5,7 @@ module dependencies, schema names, and construction conventions.
 
 - Group each feature's model, operations, store contract, facts, projection, and
   permissions in its own directory. Add only the modules the feature needs.
-- Keep models independent of application services and projections. Separate fact
+- Keep models independent of services and projections. Separate fact
   declarations from projection handlers and application workflows.
 - Import owning leaf modules inside core. Public domain barrels relay canonical
   module namespaces; internal modules do not import through those barrels.

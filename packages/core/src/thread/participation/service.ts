@@ -40,9 +40,9 @@ export interface Interface {
   ) => Effect.Effect<void, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/participation/application/Service",
+  "@amends/core/thread/participation/service/Service",
 ) {}
-export const make = Effect.fn("ThreadParticipationApplication.make")(function* () {
+export const make = Effect.fn("ThreadParticipationService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
@@ -59,7 +59,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
           Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
         ),
       );
-  const follow = Effect.fn("ThreadParticipationApplication.follow")(
+  const follow = Effect.fn("ThreadParticipationService.follow")(
     function* (threadId: Thread.Id) {
       const thread = yield* requireAccess(threadId);
       yield* authorization.require([
@@ -98,7 +98,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const unfollow = Effect.fn("ThreadParticipationApplication.unfollow")(
+  const unfollow = Effect.fn("ThreadParticipationService.unfollow")(
     function* (input: ThreadParticipation.UnfollowInput) {
       const request = yield* Schema.decodeEffect(ThreadParticipation.UnfollowInput)(input);
       const thread = yield* requireAccess(request.threadId);
@@ -154,4 +154,4 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
   return Service.of({ follow, unfollow });
 });
 export const layer = Layer.effect(Service, make());
-export * as ThreadParticipationApplication from "./application.ts";
+export * as ThreadParticipationService from "./service.ts";

@@ -93,11 +93,11 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/environment/application/Service",
+  "@amends/core/environment/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
-export const make = Effect.fn("EnvironmentApplication.make")(function* () {
+export const make = Effect.fn("EnvironmentService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const environmentStore = yield* EnvironmentStore.Service;
   const connectionStore = yield* ConnectionStore.Service;
@@ -258,7 +258,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     );
   });
 
-  const get = Effect.fn("EnvironmentApplication.get")(function* (environmentId: Environment.Id) {
+  const get = Effect.fn("EnvironmentService.get")(function* (environmentId: Environment.Id) {
     const id = yield* Schema.decodeEffect(Environment.Id)(environmentId);
     return yield* presented(yield* authorized(id, EnvironmentPermissions.Read));
   });
@@ -269,7 +269,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     return found.value;
   });
 
-  const create = Effect.fn("EnvironmentApplication.create")(
+  const create = Effect.fn("EnvironmentService.create")(
     function* (input: Environment.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Environment.CreateInput))(input);
       yield* authorization.require([
@@ -313,9 +313,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     journal.commit,
   );
 
-  const rename = Effect.fn("EnvironmentApplication.rename")(function* (
-    input: Environment.RenameInput,
-  ) {
+  const rename = Effect.fn("EnvironmentService.rename")(function* (input: Environment.RenameInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Environment.RenameInput))(input);
     return yield* Effect.gen(function* () {
       const record = yield* authorized(request.environmentId, EnvironmentPermissions.Manage);
@@ -331,7 +329,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const configure = Effect.fn("EnvironmentApplication.configure")(function* (
+  const configure = Effect.fn("EnvironmentService.configure")(function* (
     input: Environment.ConfigureInput,
   ) {
     const request = yield* Schema.decodeEffect(Schema.toType(Environment.ConfigureInput))(input);
@@ -349,9 +347,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const remove = Effect.fn("EnvironmentApplication.remove")(function* (
-    environmentId: Environment.Id,
-  ) {
+  const remove = Effect.fn("EnvironmentService.remove")(function* (environmentId: Environment.Id) {
     const id = yield* Schema.decodeEffect(Environment.Id)(environmentId);
     return yield* Effect.gen(function* () {
       yield* authorized(id, EnvironmentPermissions.Manage);
@@ -376,4 +372,4 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
 /** @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as EnvironmentApplication from "./application.ts";
+export * as EnvironmentService from "./service.ts";

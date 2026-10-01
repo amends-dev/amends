@@ -3,27 +3,27 @@ import { SandboxImplementation } from "@amends/sandbox";
 import { Schema } from "effect";
 import { Environment } from "./environment.ts";
 
-/** The outcomes `EnvironmentApplication` reports that a caller can act on; schemas only. */
+/** The outcomes `EnvironmentService` reports that a caller can act on; schemas only. */
 
 /** Missing, removed, and unreadable environments share this outcome. */
-export class NotFound extends Schema.TaggedError<NotFound>()("EnvironmentApplication.NotFound", {
+export class NotFound extends Schema.TaggedError<NotFound>()("EnvironmentService.NotFound", {
   environmentId: Environment.Id,
 }) {}
 
 /** The environment's name is no longer the one expected: someone renamed it meanwhile. */
-export class Changed extends Schema.TaggedError<Changed>()("EnvironmentApplication.Changed", {
+export class Changed extends Schema.TaggedError<Changed>()("EnvironmentService.Changed", {
   environmentId: Environment.Id,
 }) {}
 
 /** This host has not installed the harness. */
 export class UnknownHarness extends Schema.TaggedError<UnknownHarness>()(
-  "EnvironmentApplication.UnknownHarness",
+  "EnvironmentService.UnknownHarness",
   { harnessId: Harness.Name },
 ) {}
 
 /** This host has not installed the sandbox provider. */
 export class UnknownSandboxProvider extends Schema.TaggedError<UnknownSandboxProvider>()(
-  "EnvironmentApplication.UnknownSandboxProvider",
+  "EnvironmentService.UnknownSandboxProvider",
   { providerId: SandboxImplementation.Id },
 ) {}
 
@@ -32,7 +32,7 @@ export class UnknownSandboxProvider extends Schema.TaggedError<UnknownSandboxPro
  * when it runs only in process or none was given.
  */
 export class UnsupportedPlacement extends Schema.TaggedError<UnsupportedPlacement>()(
-  "EnvironmentApplication.UnsupportedPlacement",
+  "EnvironmentService.UnsupportedPlacement",
   { harnessId: Harness.Name, placement: HarnessImplementation.Placement },
 ) {}
 
@@ -52,7 +52,7 @@ export const SandboxIssue = Schema.Literals([
 export type SandboxIssue = typeof SandboxIssue.Type;
 
 export class InvalidSandbox extends Schema.TaggedError<InvalidSandbox>()(
-  "EnvironmentApplication.InvalidSandbox",
+  "EnvironmentService.InvalidSandbox",
   { issues: Schema.NonEmptyArray(SandboxIssue) },
 ) {}
 

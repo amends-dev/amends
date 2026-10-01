@@ -44,7 +44,7 @@ export interface Interface {
   /**
    * Run core operations in a workspace without an actor: invitation acceptance,
    * where the recipient is not yet a member. Programs may require only core's
-   * application services, never its stores or journal. A workspace that was never
+   * services, never its stores or journal. A workspace that was never
    * created returns WorkspaceNotFound without being prepared.
    */
   readonly inWorkspace: <A, E, R extends Core.Operations>(
@@ -86,7 +86,7 @@ export interface Interface {
   ) => Effect.Effect<A, E | GatewayErrors.WorkspaceNotFound>;
 }
 
-/** Workspace bootstrap and entry; core's application services are the operations. */
+/** Workspace bootstrap and entry; core's services are the operations. */
 export class Service extends Context.Service<Service, Interface>()("@amends/gateway/Service") {}
 
 const isPublic = Schema.is(GatewayErrors.PublicError);

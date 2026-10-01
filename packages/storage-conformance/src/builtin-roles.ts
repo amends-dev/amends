@@ -2,7 +2,7 @@ import * as Core from "@amends/core";
 import { AgentPermissions } from "@amends/core/agent";
 import {
   Assignment,
-  AssignmentApplication,
+  AssignmentService,
   AssignmentFacts,
   BuiltinRoles,
   BuiltinRoleUpgrade,
@@ -13,7 +13,7 @@ import {
 import { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
 import {
-  InvitationApplication,
+  InvitationService,
   Member,
   MemberFacts,
   MemberPermissions,
@@ -191,8 +191,8 @@ export const builtinRoles = (harness: Harness) => {
                 workspaceId,
                 alice,
                 Effect.flatMap(
-                  AssignmentApplication.Service,
-                  (assignmentApplication) => assignmentApplication.roles,
+                  AssignmentService.Service,
+                  (assignmentService) => assignmentService.roles,
                 ),
               ),
             ).pipe(Effect.provide(gateway(yield* storage.connect())));
@@ -253,8 +253,8 @@ export const builtinRoles = (harness: Harness) => {
               workspaceId,
               alice,
               Effect.gen(function* () {
-                const choices = yield* (yield* AssignmentApplication.Service).roles;
-                const invitation = yield* (yield* InvitationApplication.Service).issue({
+                const choices = yield* (yield* AssignmentService.Service).roles;
+                const invitation = yield* (yield* InvitationService.Service).issue({
                   recipientId: Identity.HumanId.make("recipient"),
                   roleId: BuiltinRoles.MemberId,
                   expiresAt: DateTime.add(yield* DateTime.now, { hours: 1 }),

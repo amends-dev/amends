@@ -16,7 +16,7 @@ import { Journal } from "../../src/journal/journal.ts";
 import { Log } from "../../src/journal/log.ts";
 import { Store } from "../../src/journal/store.ts";
 import { Notification } from "../../src/notification/notification.ts";
-import { NotificationApplication } from "../../src/notification/application.ts";
+import { NotificationService } from "../../src/notification/service.ts";
 import { NotificationStore } from "../../src/notification/store.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { MemberFacts } from "../../src/workspace/member/facts.ts";
@@ -112,7 +112,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provide(Log.layer),
   );
   const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
-  return NotificationApplication.layer.pipe(
+  return NotificationService.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provideMerge(host))),
     Layer.provide(notifications),
     Layer.provide(
@@ -140,7 +140,7 @@ const run = <A, E>(
   program: Effect.Effect<
     A,
     E,
-    NotificationApplication.Service | Journal.Service | Authorization.Service | Actor.Service
+    NotificationService.Service | Journal.Service | Authorization.Service | Actor.Service
   >,
   actor = alice,
   overrides: Partial<NotificationStore.Interface> = {},
@@ -153,7 +153,7 @@ it.effect(
   "notification reads require the current actor, need no role grant, and leave the journal unchanged",
   () =>
     Effect.gen(function* () {
-      expectTypeOf<Layer.Services<typeof NotificationApplication.layer>>().toEqualTypeOf<
+      expectTypeOf<Layer.Services<typeof NotificationService.layer>>().toEqualTypeOf<
         | NotificationStore.Service
         | Authorization.Service
         | Journal.Service
@@ -162,7 +162,7 @@ it.effect(
         | Store.Service
       >();
       expectTypeOf<
-        Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>
+        Effect.Services<ReturnType<NotificationService.Interface["get"]>>
       >().toEqualTypeOf<Actor.Service>();
       const fixture = yield* make(workspaceId);
       yield* seed(fixture);
@@ -170,10 +170,10 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationApplication = yield* NotificationApplication.Service;
-          expect(yield* notificationApplication.get(mine.id)).toEqual(mine);
-          expect(yield* notificationApplication.list(page)).toEqual([mine]);
-          expect(yield* notificationApplication.listPending(page)).toEqual([mine]);
+          const notificationService = yield* NotificationService.Service;
+          expect(yield* notificationService.get(mine.id)).toEqual(mine);
+          expect(yield* notificationService.list(page)).toEqual([mine]);
+          expect(yield* notificationService.listPending(page)).toEqual([mine]);
           expect(yield* (yield* Journal.Service).log.read({ limit: 10 })).toEqual([]);
         }),
       );
@@ -190,24 +190,24 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationApplication = yield* NotificationApplication.Service;
+          const notificationService = yield* NotificationService.Service;
           for (const [actor, expected] of [
             [alice, mine],
             [agent, agents],
             [bob, theirs],
           ] as const) {
             expect(
-              yield* notificationApplication
+              yield* notificationService
                 .get(expected.id)
                 .pipe(Effect.provideService(Actor.Service, actor)),
             ).toEqual(expected);
             expect(
-              yield* notificationApplication
+              yield* notificationService
                 .list(page)
                 .pipe(Effect.provideService(Actor.Service, actor)),
             ).toEqual([expected]);
             expect(
-              yield* notificationApplication
+              yield* notificationService
                 .listPending(page)
                 .pipe(Effect.provideService(Actor.Service, actor)),
             ).toEqual([expected]);
@@ -226,10 +226,10 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationApplication = yield* NotificationApplication.Service;
+          const notificationService = yield* NotificationService.Service;
           for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
-            expect(yield* Effect.flip(notificationApplication.get(id))).toEqual(
-              new NotificationApplication.NotFound({
+            expect(yield* Effect.flip(notificationService.get(id))).toEqual(
+              new NotificationService.NotFound({
                 workspaceId,
                 notificationId: id,
               }),
@@ -256,11 +256,11 @@ it.effect(
         yield* run(
           fixture,
           Effect.gen(function* () {
-            const notificationApplication = yield* NotificationApplication.Service;
+            const notificationService = yield* NotificationService.Service;
             for (const operation of [
-              notificationApplication.get(mine.id).pipe(Effect.asVoid),
-              notificationApplication.list(page).pipe(Effect.asVoid),
-              notificationApplication.listPending(page).pipe(Effect.asVoid),
+              notificationService.get(mine.id).pipe(Effect.asVoid),
+              notificationService.list(page).pipe(Effect.asVoid),
+              notificationService.listPending(page).pipe(Effect.asVoid),
             ]) {
               const error = yield* Effect.flip(operation);
               expect(error._tag).toBe(
@@ -284,18 +284,18 @@ it.effect("notification reads join an outer commit and observe staged membership
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notificationApplication = yield* NotificationApplication.Service;
+        const notificationService = yield* NotificationService.Service;
         const journal = yield* Journal.Service;
         const error = yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
               const storeTransaction = yield* Store.Transaction;
-              expect(yield* notificationApplication.get(mine.id)).toEqual(mine);
+              expect(yield* notificationService.get(mine.id)).toEqual(mine);
               expect((yield* Store.Transaction).id).toBe(storeTransaction.id);
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
                 .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-              return yield* notificationApplication.listPending(page);
+              return yield* notificationService.listPending(page);
             }),
           ),
         );
@@ -303,7 +303,7 @@ it.effect("notification reads join an outer commit and observe staged membership
           _tag: "Authorization.InvalidActor",
           reason: "membership-removed",
         });
-        expect(yield* notificationApplication.listPending(page)).toEqual([mine]);
+        expect(yield* notificationService.listPending(page)).toEqual([mine]);
         expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
       }),
       alice,
@@ -343,10 +343,10 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notificationApplication = yield* NotificationApplication.Service;
+          const notificationService = yield* NotificationService.Service;
           const input = { ...options, recipient: bob.identity };
-          expect(yield* notificationApplication.list(input)).toEqual([mine]);
-          expect(yield* notificationApplication.listPending(input)).toEqual([mine]);
+          expect(yield* notificationService.list(input)).toEqual([mine]);
+          expect(yield* notificationService.listPending(input)).toEqual([mine]);
         }),
         alice,
         { listByRecipient: list(false), listPendingByRecipient: list(true) },
@@ -371,15 +371,11 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notificationApplication = yield* NotificationApplication.Service;
-        expect((yield* Effect.flip(notificationApplication.get(invalid.id)))._tag).toBe(
-          "SchemaError",
-        );
+        const notificationService = yield* NotificationService.Service;
+        expect((yield* Effect.flip(notificationService.get(invalid.id)))._tag).toBe("SchemaError");
         for (const options of [{ limit: 0 }, { limit: -1 }, { limit: 1.5 }, { limit: 1, after }]) {
-          expect((yield* Effect.flip(notificationApplication.list(options)))._tag).toBe(
-            "SchemaError",
-          );
-          expect((yield* Effect.flip(notificationApplication.listPending(options)))._tag).toBe(
+          expect((yield* Effect.flip(notificationService.list(options)))._tag).toBe("SchemaError");
+          expect((yield* Effect.flip(notificationService.listPending(options)))._tag).toBe(
             "SchemaError",
           );
         }
@@ -399,10 +395,10 @@ it.effect("notification storage failures retain their cause", () =>
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notificationApplication = yield* NotificationApplication.Service;
-        expect(yield* Effect.flip(notificationApplication.get(mine.id))).toBe(failure);
-        expect(yield* Effect.flip(notificationApplication.list(page))).toBe(failure);
-        expect(yield* Effect.flip(notificationApplication.listPending(page))).toBe(failure);
+        const notificationService = yield* NotificationService.Service;
+        expect(yield* Effect.flip(notificationService.get(mine.id))).toBe(failure);
+        expect(yield* Effect.flip(notificationService.list(page))).toBe(failure);
+        expect(yield* Effect.flip(notificationService.listPending(page))).toBe(failure);
       }),
       alice,
       { get: fail, listByRecipient: fail, listPendingByRecipient: fail },

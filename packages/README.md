@@ -93,7 +93,7 @@ when an implementation reaches it.
 composition: `layer` builds the application operations over the journal,
 authorization, and permission catalog. `HostServices` describes the storage,
 signals, and cryptography a host must supply, derived from that layer.
-`Operations` is the set of application services a gateway may run, and `journalLog` names the
+`Operations` is the set of services a gateway may run, and `journalLog` names the
 workspace journal's log, whose history shows whether a workspace was ever created. Domains are subpath exports:
 `@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
 `@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/signal`, `@amends/core/read-state`,
@@ -102,9 +102,9 @@ workspace journal's log, whose history shows whether a workspace was ever create
 `@amends/core/agent`, and `@amends/core/workspace`, each exposing the records, facts, stores, projections,
 and operations it implements. The thread surface implements private-group starts with initial
 participation, a text message, ordered activity, and notification generation.
-`ThreadMessageApplication.publish` adds human replies under `thread.publish`; starts and replies
+`ThreadMessageService.publish` adds human replies under `thread.publish`; starts and replies
 reuse internal admission and publication services without requiring each other’s action grants.
-`ThreadParticipationApplication` implements self-follow/unfollow. Following adds quiet timeline
+`ThreadParticipationService` implements self-follow/unfollow. Following adds quiet timeline
 activity; unfollow ends one participation while retaining group access. Its authorized
 reads provide group discovery, metadata, timeline pages, and current participant summaries,
 with group audience and `thread.read` checked independently of participation. Agent-use permission
@@ -117,16 +117,16 @@ outside it. Self-leave needs no management grant; workspace removal also settles
 admissions. The notification surface includes its record, store contract,
 authorized inbox and source reads, human acknowledgment, activity-driven generation, and pending-agent-input settlement.
 Notification reads derive the recipient from the current actor and require active membership.
-`NotificationApplication.resolveSource` returns a typed timeline item after ownership, historical
+`NotificationService.resolveSource` returns a typed timeline item after ownership, historical
 reference validation, and current group access plus `thread.read` checks. It makes no state changes;
-its HTTP/UI integration remains pending. `NotificationApplication.acknowledge` records human `Seen`
+its HTTP/UI integration remains pending. `NotificationService.acknowledge` records human `Seen`
 as private state outside the journal. Its HTTP/UI action and other recipients' outcomes remain
 pending. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 
 `@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one
 workspace's storage, resolves an authenticated identity into the actor, and runs
-core's application services with only public outcomes. It also holds the host
+core's services with only public outcomes. It also holds the host
 contracts: workspace storage, sign-in, credential resolution, and the workspace
 directory. `@amends/api-http` declares the HTTP contract shared by servers and
 browser clients, and `@amends/server-http` implements it over the gateway,

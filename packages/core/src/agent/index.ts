@@ -1,5 +1,5 @@
 export { Agent } from "./agent.ts";
-export { AgentApplication } from "./application.ts";
+export { AgentService } from "./service.ts";
 export { AgentErrors } from "./errors.ts";
 export { AgentFacts } from "./facts.ts";
 export { AgentPermissions } from "./permissions.ts";

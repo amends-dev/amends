@@ -8,7 +8,7 @@ describe("workspaceFailure", () => {
     expect(failure("WorkspaceSettings.Changed")).toBe("changed");
     expect(failure("Gateway.Conflict")).toBe("changed");
     expect(failure("Authorization.Denied")).toBe("denied");
-    expect(failure("MemberApplication.AlreadyRemoved")).toBe("gone");
+    expect(failure("MemberService.AlreadyRemoved")).toBe("gone");
     expect(failure("Gateway.InvalidInput")).toBe("invalid");
     expect(workspaceFailure(Cause.fail(new InvalidCommand({ message: "Expected a string" })))).toBe(
       "invalid",

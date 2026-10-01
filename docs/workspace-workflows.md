@@ -48,9 +48,9 @@ Removal also, in the same commit and without further grants:
 - ends every active group admission of that workspace member, recording `workspace-removed`
   with the removal as its cause; see [group departures](group-workflows.md#workspace-member-removal).
 
-A failure rolls all of it back. Repeating a removal returns `MemberApplication.AlreadyRemoved`
+A failure rolls all of it back. Repeating a removal returns `MemberService.AlreadyRemoved`
 without recording anything; the caller must still be active and authorized. Missing members
-return `MemberApplication.NotFound`, only after authorization.
+return `MemberService.NotFound`, only after authorization.
 
 The removed membership and its assignments remain historical records that authorized readers can
 inspect. Active-membership checks deny its later operations, including calls with an actor resolved

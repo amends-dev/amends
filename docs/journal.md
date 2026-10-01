@@ -301,7 +301,7 @@ correlation ID and the clock for the occurrence time. Nested operations reuse
 the existing context, including any explicit overrides. Publishing another fact
 does not regenerate the correlation or timestamp.
 
-Application services capture cryptography during construction and provide it to
+Services capture cryptography during construction and provide it to
 the wrapper; identity is resolved when the operation runs. `Publication.Service`
 belongs around the operation's effect, never in a shared application layer.
 `Journal.make` and `Journal.layer` do not capture it. A direct publication without

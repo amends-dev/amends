@@ -140,7 +140,7 @@ function fixture() {
       server.connections.push(created);
       return json(viewOf(created), 201);
     }
-    if (!stored) return json({ _tag: "ConnectionApplication.NotFound", connectionId: id }, 404);
+    if (!stored) return json({ _tag: "ConnectionService.NotFound", connectionId: id }, 404);
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/settings"))
       stored.settings = (body as { settings: Record<string, string> }).settings;
@@ -261,10 +261,7 @@ it("tells a host without credential storage apart from other failures, keeping t
   await waitFor(() => expect(f.view.connection("local")).toBeDefined());
   f.view.key.setSecret("sk-local");
   f.server.answers.push(
-    json(
-      { _tag: "ConnectionApplication.CredentialsUnavailable", reason: "No credential key" },
-      503,
-    ),
+    json({ _tag: "ConnectionService.CredentialsUnavailable", reason: "No credential key" }, 503),
   );
   f.view.key.save("local");
   await waitFor(() =>
@@ -285,7 +282,7 @@ it("keeps a rename draft through a conflict and saves it against the name review
   expect(f.view.rename.changed("team")).toBe(true);
   // Someone renamed it meanwhile.
   f.server.connections[0]!.name = "Team models";
-  f.server.answers.push(json({ _tag: "ConnectionApplication.Changed", connectionId: "team" }, 409));
+  f.server.answers.push(json({ _tag: "ConnectionService.Changed", connectionId: "team" }, 409));
   f.view.rename.save("team");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "rename", error: "changed" }));
   expect(f.view.stale()).toBe(true);

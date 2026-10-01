@@ -14,7 +14,7 @@ import {
   Member,
   MemberFacts,
   MemberPermissions,
-  OwnershipApplication,
+  OwnershipService,
   OwnershipPermissions,
 } from "@amends/core/workspace";
 
@@ -133,7 +133,7 @@ export const ownership = (harness: Harness) => {
               expect((yield* Operations.ownership(workspace.id, bob)).canTransfer).toBe(true);
               expect(
                 yield* Effect.flip(Operations.removeMember(workspace.id, alice, recipient.id)),
-              ).toMatchObject({ _tag: "MemberApplication.OwnerProtected" });
+              ).toMatchObject({ _tag: "MemberService.OwnerProtected" });
               expect(
                 yield* Effect.flip(
                   Operations.assign(workspace.id, alice, {
@@ -172,10 +172,10 @@ export const ownership = (harness: Harness) => {
               const elsewhere = yield* Operations.createWorkspace(alice.id);
               const before = yield* bound.store.read(journalLog, { limit: 30 });
               for (const [memberId, tag] of [
-                [workspace.ownerMemberId, "OwnershipApplication.InvalidRecipient"],
-                [other.id, "OwnershipApplication.InvalidRecipient"],
-                [agentId, "OwnershipApplication.InvalidRecipient"],
-                [elsewhere.ownerMemberId, "OwnershipApplication.MemberNotFound"],
+                [workspace.ownerMemberId, "OwnershipService.InvalidRecipient"],
+                [other.id, "OwnershipService.InvalidRecipient"],
+                [agentId, "OwnershipService.InvalidRecipient"],
+                [elsewhere.ownerMemberId, "OwnershipService.MemberNotFound"],
               ] as const) {
                 expect(
                   yield* Effect.flip(
@@ -222,7 +222,7 @@ export const ownership = (harness: Harness) => {
                     expectedOwnerAssignmentId: view.ownerAssignmentId,
                   }),
                 ),
-              ).toMatchObject({ _tag: "OwnershipApplication.NotOwner" });
+              ).toMatchObject({ _tag: "OwnershipService.NotOwner" });
               yield* Effect.flatMap(Journal.Service, (journal) =>
                 journal
                   .publish(RoleFacts.PermissionsChanged, {
@@ -282,7 +282,7 @@ export const ownership = (harness: Harness) => {
                     expectedOwnerAssignmentId: view.ownerAssignmentId,
                   }),
                 ),
-              ).toMatchObject({ _tag: "OwnershipApplication.Changed" });
+              ).toMatchObject({ _tag: "OwnershipService.Changed" });
               expect(yield* bound.store.read(journalLog, { limit: 30 })).toEqual(before);
               expect(
                 (yield* bound.assignments.listActiveByRole(BuiltinRoles.OwnerId))[0]?.memberId,
@@ -307,8 +307,8 @@ export const ownership = (harness: Harness) => {
             });
             const broken = failingLate(bound, failure);
             expect(
-              yield* Effect.flatMap(OwnershipApplication.Service, (ownershipApplication) =>
-                ownershipApplication.transfer({
+              yield* Effect.flatMap(OwnershipService.Service, (ownershipService) =>
+                ownershipService.transfer({
                   memberId: recipient.id,
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),

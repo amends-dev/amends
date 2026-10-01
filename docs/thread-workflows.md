@@ -1,9 +1,9 @@
 # Thread workflows
 
 Conversations in groups: starting them, replying, following, reading, and the notifications and
-read state around them. The operations are `ThreadApplication`, `ThreadMessageApplication`,
-`ThreadParticipationApplication`, `NotificationApplication`, `ReadStateApplication`, and
-`SignalApplication` in a workspace context, such as `Gateway.asMember`. The gateway preserves the
+read state around them. The operations are `ThreadService`, `ThreadMessageService`,
+`ThreadParticipationService`, `NotificationService`, `ReadStateService`, and
+`SignalService` in a workspace context, such as `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
 failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
@@ -12,12 +12,12 @@ each operation under `/workspaces/:workspaceId`, with the status each outcome re
 
 ```ts
 import { Group } from "@amends/core/group";
-import { ThreadApplication } from "@amends/core/thread";
+import { ThreadService } from "@amends/core/thread";
 import { Effect } from "effect";
 
 const start = (groupId: Group.Id) =>
   Effect.gen(function* () {
-    const threads = yield* ThreadApplication.Service;
+    const threads = yield* ThreadService.Service;
     return yield* threads.startInGroup({
       groupId,
       text: "Here's the proposal",
@@ -45,20 +45,20 @@ their mention link.
 Authorization and validation run in the same commit as the start:
 
 - The caller must be a human with active workspace and group membership and `thread.start` on
-  the group. An agent caller receives `ThreadApplication.HumanAuthorRequired`.
+  the group. An agent caller receives `ThreadService.HumanAuthorRequired`.
 - Each mentioned agent requires `agent.use` on it. Agents that are not mentioned need no
   authority, including the agents of a direct group. Missing authority rejects the whole
   operation; recipients are never silently dropped.
 - Mentioned members must currently belong to the group and the workspace. A mention cannot admit
   an outsider; missing, foreign, inactive, and outside-group mentions return
-  `ThreadApplication.ParticipantUnavailable`.
+  `ThreadService.ParticipantUnavailable`.
 
 Starting needs no `group.read`, `group.create`, or membership-management grant. Missing and
-inaccessible groups share `ThreadApplication.GroupNotFound`.
+inaccessible groups share `ThreadService.GroupNotFound`.
 
 ## Starting a direct group
 
-`ThreadApplication.startDirect({ memberIds, text, mentions })` starts a thread in the direct group
+`ThreadService.startDirect({ memberIds, text, mentions })` starts a thread in the direct group
 of the author and `memberIds`. The same members, in any order and whether or not the author is
 listed, always reuse one direct group; a different set gets a different group. The first start
 establishes the group and one admission per member in the same commit. The caller needs active
@@ -67,8 +67,8 @@ creates the group also needs `agent.use` for each agent member, since the group 
 place in every thread, as making an agent follow a team group does; later starts, through either
 operation, need it only for mentioned agents. Every member takes part in the thread, and mentions,
 which must name members, only narrow notification. Fewer than two distinct members returns
-`ThreadApplication.DirectMembersRequired`; a missing or inactive member, or a mention outside the
-group, returns `ThreadApplication.ParticipantUnavailable`. Later threads in the same direct group
+`ThreadService.DirectMembersRequired`; a missing or inactive member, or a mention outside the
+group, returns `ThreadService.ParticipantUnavailable`. Later threads in the same direct group
 can also start with `startInGroup`.
 
 ## Participation and recipients
@@ -97,12 +97,12 @@ start. Notifications to agents are pending input for them to handle; no agent wo
 ## Replying to a conversation
 
 ```ts
-import { Thread, ThreadMessageApplication } from "@amends/core/thread";
+import { Thread, ThreadMessageService } from "@amends/core/thread";
 import { Effect } from "effect";
 
 const reply = (threadId: Thread.Id) =>
   Effect.gen(function* () {
-    const messages = yield* ThreadMessageApplication.Service;
+    const messages = yield* ThreadMessageService.Service;
     return yield* messages.publish({ threadId, text: "Here's my feedback", mentions: [] });
   });
 ```
@@ -134,11 +134,11 @@ message asks every agent it reaches, whose notification stays `Pending` until a 
 An agent's message asks no other agent, so agents cannot keep setting each other to work: their
 notifications are created settled as `Informational`, never pending. People are told, never
 asked; their notifications are pending until they see them, whoever wrote. Only people can reply
-through `ThreadMessageApplication` today, so agents' messages will come from their turns.
+through `ThreadMessageService` today, so agents' messages will come from their turns.
 
-Missing, foreign, and outside-audience threads share `ThreadMessageApplication.NotFound`.
-Ineligible mentions return `ThreadMessageApplication.ParticipantUnavailable`, and agent callers get
-`ThreadMessageApplication.HumanAuthorRequired`. Admission, the message, its timeline activity, and
+Missing, foreign, and outside-audience threads share `ThreadMessageService.NotFound`.
+Ineligible mentions return `ThreadMessageService.ParticipantUnavailable`, and agent callers get
+`ThreadMessageService.HumanAuthorRequired`. Admission, the message, its timeline activity, and
 its notifications commit together; the timeline never has gaps or duplicate positions.
 
 ## Retrying safely
@@ -161,7 +161,7 @@ access to the thread, `thread.publish`, and a human author.
 
 ## Following and unfollowing
 
-`ThreadParticipationApplication.follow(threadId)` joins the acting human or agent and returns a
+`ThreadParticipationService.follow(threadId)` joins the acting human or agent and returns a
 public `ThreadParticipation.Summary`. It requires active workspace and group membership and
 `thread.follow` on the thread. A new follow records a quiet `participation.followed` timeline
 activity at the next position, with no message and no notifications. Following while already
@@ -170,10 +170,10 @@ participating returns the existing summary and records nothing.
 `unfollow({ threadId, participationId })` returns no value and ends only the actor's addressed
 participation. It requires current workspace and group membership but no action grant, so a member
 can unfollow after losing the follow permission. Other members' IDs, another thread's IDs, and
-missing participations share `ThreadParticipationApplication.NotFound`; one's own ended
+missing participations share `ThreadParticipationService.NotFound`; one's own ended
 participation returns `AlreadyEnded`. An inaccessible or missing thread returns
-`ThreadParticipationApplication.ThreadNotFound`. Everyone in a direct conversation takes part in
-all of its threads, so unfollowing one returns `ThreadParticipationApplication.FixedParticipation`
+`ThreadParticipationService.ThreadNotFound`. Everyone in a direct conversation takes part in
+all of its threads, so unfollowing one returns `ThreadParticipationService.FixedParticipation`
 and records nothing.
 
 Unfollowing records a `participation.ended` activity with reason `unfollowed` and keeps the
@@ -211,8 +211,8 @@ A nonparticipant with group access and the grant can read the whole earlier conv
 creates no participation, acknowledges nothing, and requests no agent work. Later group members
 can read earlier history without retroactive notifications.
 
-Missing, foreign, and outside-audience threads share `ThreadApplication.NotFound`, and an
-inaccessible group list returns `ThreadApplication.GroupNotFound`. A member of the audience without
+Missing, foreign, and outside-audience threads share `ThreadService.NotFound`, and an
+inaccessible group list returns `ThreadService.GroupNotFound`. A member of the audience without
 the grant receives `Authorization.Denied` for a single thread; lists omit unreadable threads.
 Reads follow core's [read boundaries](../packages/core/README.md#read-and-write-boundaries).
 
@@ -252,7 +252,7 @@ reading until it holds `limit` of them or the thread has no more; an empty page 
 
 ## Reading the inbox
 
-`NotificationApplication.inbox({ limit, before?, pendingOnly? })` lists the acting human or agent's
+`NotificationService.inbox({ limit, before?, pendingOnly? })` lists the acting human or agent's
 notifications newest first, by recorded time then ID in descending binary order, all of them or
 only those still pending. `before` is the last listed `{ recordedAt, id }`, an exclusive boundary.
 Each item carries its notification and, as `source`, the timeline item that resolving it returns;
@@ -263,7 +263,7 @@ acting identity, from any source, including threads they can no longer read.
 
 ## Seeing everything at once
 
-`NotificationApplication.acknowledgeThrough({ recordedAt, id })` records `Seen` for every
+`NotificationService.acknowledgeThrough({ recordedAt, id })` records `Seen` for every
 notification still pending for the acting human up to and including that position in inbox
 order, typically the newest one they are shown, so a notification that arrives meanwhile stays
 pending. It marks them in batches of 100, each written as `acknowledge` writes one and heard by
@@ -274,22 +274,22 @@ again without those, up to twice. Agents receive `HumanRecipientRequired`.
 
 ## Resolving a notification source
 
-`NotificationApplication.resolveSource(notificationId)` returns the source's `Thread.TimelineItem`
+`NotificationService.resolveSource(notificationId)` returns the source's `Thread.TimelineItem`
 for the acting human or agent. It first checks active workspace membership and that the caller owns
 the notification: missing IDs and other recipients' notifications both return
-`NotificationApplication.NotFound`, before any source lookup. It then checks current group access
+`NotificationService.NotFound`, before any source lookup. It then checks current group access
 and `thread.read` on the source thread, as timeline reads do, and returns the activity with its
 message or participation summary.
 
 Owning a notification does not grant access to its source. Missing or unsupported sources, and
-sources outside current access, return `NotificationApplication.SourceUnavailable`. Unfollowing
+sources outside current access, return `NotificationService.SourceUnavailable`. Unfollowing
 keeps group access, so earlier sources stay readable with `thread.read`; leaving the group or
 losing the grant blocks resolution, and readmission restores it without reviving the old
 participation. Pending and discarded agent notifications both resolve. Resolving changes nothing.
 
 ## Acknowledging a notification
 
-`NotificationApplication.acknowledge(notificationId)` records that the acting human saw their
+`NotificationService.acknowledge(notificationId)` records that the acting human saw their
 notification and returns the updated `Notification.Record`. It requires active workspace
 membership and ownership, but no action grant or thread access: a person can clear an old
 notification after leaving its group or losing `thread.read`. It does not resolve the source,
@@ -298,7 +298,7 @@ rejoin participation, or mark the conversation read.
 The state becomes `{ _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt }`. The
 notification stays in inbox history and leaves pending results and counts. Repeating it returns
 the first time stored, including when two devices acknowledge at once. Missing and other
-recipients' IDs return `NotificationApplication.NotFound`; an agent's notification returns
+recipients' IDs return `NotificationService.NotFound`; an agent's notification returns
 `HumanRecipientRequired`, and a discarded one `AlreadyHandled`, including one that leaving its
 group settles while it is being acknowledged.
 
@@ -310,10 +310,10 @@ recorded by those workflows, not by acknowledgment.
 
 ## Marking conversations read
 
-`ReadStateApplication.markThreadRead({ threadId, throughSequence })` records that the acting
+`ReadStateService.markThreadRead({ threadId, throughSequence })` records that the acting
 person has read a thread through a timeline position. It requires a human actor, current group
 access, and `thread.read`: missing and inaccessible threads return
-`ReadStateApplication.ThreadNotFound`, an agent returns `HumanRequired`, and a position past the
+`ReadStateService.ThreadNotFound`, an agent returns `HumanRequired`, and a position past the
 latest activity returns `BeyondTimeline`. The position only moves forward. The reader's pending
 notifications from the thread up to that position become `Seen`. Reading a timeline does not mark
 it read; clients call this for what they have shown.
@@ -332,7 +332,7 @@ messages count as new activity, not quiet participation changes.
 
 ## Typing
 
-`SignalApplication.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
+`SignalService.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
 over HTTP, tells the thread's readers that the acting member is composing there. It needs the same
 current group access and `thread.publish` as posting, and returns `ThreadNotFound` for missing and
 inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's

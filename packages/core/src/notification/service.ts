@@ -75,7 +75,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/notification/application/Service",
+  "@amends/core/notification/service/Service",
 ) {}
 
 const decodeOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
@@ -104,7 +104,7 @@ const seenBatch = 100;
  *
  * @category constructors
  */
-export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("NotificationService.make")(function* (): Effect.fn.Return<
   Interface,
   never,
   | NotificationStore.Service
@@ -128,7 +128,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     return Notification.ofMember(actor.memberId, actor.identity);
   });
 
-  const get = Effect.fn("NotificationApplication.get")(function* (notificationId: Notification.Id) {
+  const get = Effect.fn("NotificationService.get")(function* (notificationId: Notification.Id) {
     const target = yield* requireRecipient();
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId);
     const found = yield* notificationStore.get(id);
@@ -149,10 +149,10 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       : notificationStore.listByRecipient(target, request);
   });
 
-  const list = Effect.fn("NotificationApplication.list")((options: NotificationStore.ReadOptions) =>
+  const list = Effect.fn("NotificationService.list")((options: NotificationStore.ReadOptions) =>
     listForRecipient(options, false),
   );
-  const listPending = Effect.fn("NotificationApplication.listPending")(
+  const listPending = Effect.fn("NotificationService.listPending")(
     (options: NotificationStore.ReadOptions) => listForRecipient(options, true),
   );
 
@@ -186,7 +186,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       }),
     );
   });
-  const resolveSource = Effect.fn("NotificationApplication.resolveSource")(function* (
+  const resolveSource = Effect.fn("NotificationService.resolveSource")(function* (
     notificationId: Notification.Id,
   ) {
     const notification = yield* get(notificationId);
@@ -195,7 +195,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       return yield* new SourceUnavailable({ notificationId: notification.id });
     return found.value;
   });
-  const inbox = Effect.fn("NotificationApplication.inbox")(function* (
+  const inbox = Effect.fn("NotificationService.inbox")(function* (
     options: NotificationInbox.Options,
   ) {
     const target = yield* requireRecipient();
@@ -216,7 +216,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       { concurrency: 4 },
     );
   });
-  const acknowledge = Effect.fn("NotificationApplication.acknowledge")(function* (
+  const acknowledge = Effect.fn("NotificationService.acknowledge")(function* (
     notificationId: Notification.Id,
   ) {
     const notification = yield* get(notificationId);
@@ -245,7 +245,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     );
     return seen;
   });
-  const acknowledgeThrough = Effect.fn("NotificationApplication.acknowledgeThrough")(function* (
+  const acknowledgeThrough = Effect.fn("NotificationService.acknowledgeThrough")(function* (
     input: NotificationStore.Cursor,
   ) {
     const target = yield* requireRecipient();
@@ -289,7 +289,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   const countPending = Effect.gen(function* () {
     const target = yield* requireRecipient();
     return yield* notificationStore.countPendingByRecipient(target);
-  }).pipe(Effect.withSpan("NotificationApplication.countPending"));
+  }).pipe(Effect.withSpan("NotificationService.countPending"));
   return Service.of({
     get,
     list,
@@ -309,4 +309,4 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
  */
 export const layer = Layer.effect(Service, make());
 
-export * as NotificationApplication from "./application.ts";
+export * as NotificationService from "./service.ts";

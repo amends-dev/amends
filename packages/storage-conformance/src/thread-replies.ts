@@ -15,8 +15,8 @@ import {
 
 import {
   Group,
-  GroupApplication,
-  GroupMembershipApplication,
+  GroupService,
+  GroupMembershipService,
   GroupCommand,
   GroupQuery,
   GroupMembershipFacts,
@@ -25,17 +25,17 @@ import {
 import { Actor, Identity } from "@amends/core/identity";
 
 import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
 
 import { Notification, NotificationStore } from "@amends/core/notification";
 
 import {
   Thread,
-  ThreadApplication,
+  ThreadService,
   ThreadActivityFacts,
   ThreadActivityStore,
   ThreadMessage,
-  ThreadMessageApplication,
+  ThreadMessageService,
   ThreadMessagePermissions,
   ThreadMessageStore,
   ThreadParticipation,
@@ -102,16 +102,16 @@ export const threadReplies = (harness: Harness) => {
         limit: 100,
       });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-        groupApplication.createTeam({ name: "Engineering", memberIds }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name: "Engineering", memberIds }),
       );
     const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-        threadApplication.startInGroup({ groupId, mentions, text: "Opening" }),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startInGroup({ groupId, mentions, text: "Opening" }),
       );
     const answer = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
-      Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
-        threadMessageApplication.publish({ threadId, mentions, text }),
+      Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+        threadMessageService.publish({ threadId, mentions, text }),
       );
     /** A start or reply, with the activity that placed its message, for position assertions. */
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
@@ -218,8 +218,8 @@ export const threadReplies = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.add({ groupId: group.id, memberId: otherId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: otherId }),
                 ),
               );
               yield* grant(
@@ -287,8 +287,8 @@ export const threadReplies = (harness: Harness) => {
               const page = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                  threadApplication.readTimeline(first.thread.id, { afterSequence: 1, limit: 1 }),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.readTimeline(first.thread.id, { afterSequence: 1, limit: 1 }),
                 ),
               );
               expect(page).toEqual([result]);
@@ -341,8 +341,8 @@ export const threadReplies = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.add({ groupId: group.id, memberId: otherId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: otherId }),
                 ),
               );
               yield* grant(
@@ -483,7 +483,7 @@ export const threadReplies = (harness: Harness) => {
               for (const memberId of [otherId, Member.Id.make("missing")])
                 expect(
                   yield* Effect.flip(run(bound, owner, reply(first.thread.id, [memberId]))),
-                ).toEqual(new ThreadMessageApplication.ParticipantUnavailable({ memberId }));
+                ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId }));
               for (const operation of [
                 reply(first.thread.id, [], " \n"),
                 reply(first.thread.id, [humanId, humanId]),
@@ -492,7 +492,7 @@ export const threadReplies = (harness: Harness) => {
                   _tag: "SchemaError",
                 });
               expect(yield* Effect.flip(run(bound, agent, reply(first.thread.id)))).toEqual(
-                new ThreadMessageApplication.HumanAuthorRequired({ memberId: agentId }),
+                new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
               );
               expect(
                 yield* Effect.flip(
@@ -504,7 +504,7 @@ export const threadReplies = (harness: Harness) => {
               const secret = yield* run(bound, actorFor(otherId), start(hidden.id));
               for (const id of [secret.thread.id, Thread.Id.make("missing")])
                 expect(yield* Effect.flip(run(bound, owner, reply(id)))).toEqual(
-                  new ThreadMessageApplication.NotFound({ threadId: id }),
+                  new ThreadMessageService.NotFound({ threadId: id }),
                 );
               const foreign = yield* boundTo(otherWorkspaceId);
               const foreignWorkspace = yield* initialized(foreign);
@@ -515,7 +515,7 @@ export const threadReplies = (harness: Harness) => {
               });
               expect(
                 yield* Effect.flip(run(foreign, foreignOwner, reply(first.thread.id))),
-              ).toEqual(new ThreadMessageApplication.NotFound({ threadId: first.thread.id }));
+              ).toEqual(new ThreadMessageService.NotFound({ threadId: first.thread.id }));
               expect(yield* messages(bound, first.thread.id)).toEqual(before.messages);
               expect(yield* bound.participations.listByThread(first.thread.id)).toEqual(
                 before.participants,
@@ -523,13 +523,13 @@ export const threadReplies = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                  memberApplication.remove(humanId),
+                Effect.flatMap(MemberService.Service, (memberService) =>
+                  memberService.remove(humanId),
                 ),
               );
               expect(
                 yield* Effect.flip(run(bound, owner, reply(first.thread.id, [humanId]))),
-              ).toEqual(new ThreadMessageApplication.ParticipantUnavailable({ memberId: humanId }));
+              ).toEqual(new ThreadMessageService.ParticipantUnavailable({ memberId: humanId }));
               expect(yield* Effect.flip(run(bound, human, reply(first.thread.id)))).toMatchObject({
                 _tag: "Authorization.InvalidActor",
               });
@@ -561,8 +561,8 @@ export const threadReplies = (harness: Harness) => {
               yield* run(
                 bound,
                 agent,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.leave({
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.leave({
                     groupId: group.id,
                     membershipId: memberParticipant(old).groupMembershipId,
                   }),
@@ -572,8 +572,8 @@ export const threadReplies = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.add({ groupId: group.id, memberId: agentId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: agentId }),
                 ),
               );
               yield* run(bound, owner, reply(first.thread.id));
@@ -814,17 +814,15 @@ export const threadReplies = (harness: Harness) => {
                   yield* run(
                     bound,
                     owner,
-                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                      memberApplication.remove(agentId),
+                    Effect.flatMap(MemberService.Service, (memberService) =>
+                      memberService.remove(agentId),
                     ),
                   );
                   yield* run(
                     bound,
                     owner,
-                    Effect.flatMap(
-                      GroupMembershipApplication.Service,
-                      (groupMembershipApplication) =>
-                        groupMembershipApplication.add({ groupId: group.id, memberId: otherId }),
+                    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                      groupMembershipService.add({ groupId: group.id, memberId: otherId }),
                     ),
                   );
                   yield* facts(
@@ -899,12 +897,12 @@ export const threadReplies = (harness: Harness) => {
               yield* Effect.flip(
                 gateway.asMember(workspace.id, identity, answer(first.thread.id, [otherId])),
               ),
-            ).toMatchObject({ _tag: "ThreadMessageApplication.ParticipantUnavailable" });
+            ).toMatchObject({ _tag: "ThreadMessageService.ParticipantUnavailable" });
             expect(
               yield* Effect.flip(
                 gateway.asMember(workspace.id, identity, answer(Thread.Id.make("missing"))),
               ),
-            ).toMatchObject({ _tag: "ThreadMessageApplication.NotFound" });
+            ).toMatchObject({ _tag: "ThreadMessageService.NotFound" });
             expect(
               yield* Effect.flip(
                 gateway.asMember(workspace.id, identity, answer(first.thread.id, [], " ")),
@@ -947,9 +945,7 @@ export const threadReplies = (harness: Harness) => {
             Effect.gen(function* () {
               const { bound, owner, group, first, human } = yield* prepare();
               yield* grant(bound, humanId, ThreadMessagePermissions.Publish);
-              const service = yield* ThreadMessageApplication.Service.pipe(
-                Effect.provide(core(bound)),
-              );
+              const service = yield* ThreadMessageService.Service.pipe(Effect.provide(core(bound)));
               const ownReply = service.publish({
                 threadId: first.thread.id,
                 text: "My reply",
@@ -963,21 +959,21 @@ export const threadReplies = (harness: Harness) => {
               yield* run(
                 bound,
                 human,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.leave({
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.leave({
                     groupId: group.id,
                     membershipId: memberParticipant(old).groupMembershipId,
                   }),
                 ),
               );
               expect(yield* Effect.flip(asActor(ownReply, human))).toEqual(
-                new ThreadMessageApplication.NotFound({ threadId: first.thread.id }),
+                new ThreadMessageService.NotFound({ threadId: first.thread.id }),
               );
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.add({ groupId: group.id, memberId: humanId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: humanId }),
                 ),
               );
               yield* run(bound, owner, reply(first.thread.id));
@@ -1028,8 +1024,8 @@ export const threadReplies = (harness: Harness) => {
                       Effect.gen(function* () {
                         if (index === 0) yield* reply(saved.first.thread.id, [agentId]);
                         else
-                          yield* Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                            memberApplication.remove(agentId),
+                          yield* Effect.flatMap(MemberService.Service, (memberService) =>
+                            memberService.remove(agentId),
                           );
                       }),
                     );
@@ -1046,7 +1042,7 @@ export const threadReplies = (harness: Harness) => {
                 expect(Cause.findErrorOption(result.cause)).toMatchObject({
                   value: {
                     _tag: expect.stringMatching(
-                      /^(JournalStore.Conflict|ThreadMessageApplication.ParticipantUnavailable)$/,
+                      /^(JournalStore.Conflict|ThreadMessageService.ParticipantUnavailable)$/,
                     ),
                   },
                 });
@@ -1059,8 +1055,8 @@ export const threadReplies = (harness: Harness) => {
                     yield* run(
                       bound,
                       saved.owner,
-                      Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                        memberApplication.remove(agentId),
+                      Effect.flatMap(MemberService.Service, (memberService) =>
+                        memberService.remove(agentId),
                       ),
                     );
                   expect(
@@ -1081,7 +1077,7 @@ export const threadReplies = (harness: Harness) => {
                     yield* Effect.flip(
                       run(bound, saved.owner, reply(saved.first.thread.id, [agentId])),
                     ),
-                  ).toMatchObject({ _tag: "ThreadMessageApplication.ParticipantUnavailable" });
+                  ).toMatchObject({ _tag: "ThreadMessageService.ParticipantUnavailable" });
                   expect(yield* snapshot(bound, saved.first.thread.id)).toEqual(before);
                 }),
               ),

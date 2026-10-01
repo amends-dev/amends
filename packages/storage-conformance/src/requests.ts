@@ -1,9 +1,9 @@
-import { GroupApplication, GroupMembershipApplication } from "@amends/core/group";
+import { GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Log, Store } from "@amends/core/journal";
 import { Request } from "@amends/core/request";
-import { ThreadApplication, ThreadMessageApplication } from "@amends/core/thread";
-import { InvitationApplication, Member } from "@amends/core/workspace";
+import { ThreadService, ThreadMessageService } from "@amends/core/thread";
+import { InvitationService, Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Layer, Option } from "effect";
@@ -50,16 +50,16 @@ export const requests = (harness: Harness) => {
         program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(on));
       const group = yield* as(
         owner,
-        Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-          groupApplication.createTeam({
+        Effect.flatMap(GroupService.Service, (groupService) =>
+          groupService.createTeam({
             name: "Team",
             memberIds: [owner.memberId, other.memberId],
           }),
         ),
       );
       const start = (text: string, options: Request.Options = { requestKey: key }) =>
-        Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-          threadApplication.startInGroup({ groupId: group.id, text, mentions: [] }, options),
+        Effect.flatMap(ThreadService.Service, (threadService) =>
+          threadService.startInGroup({ groupId: group.id, text, mentions: [] }, options),
         );
       return { storage, bound, owner, group, services, as, start };
     });
@@ -91,8 +91,8 @@ export const requests = (harness: Harness) => {
           expect(yield* as(owner, start("Goodbye"))).toEqual(first);
           expect(yield* history(bound)).toEqual(before);
           const direct = (text: string) =>
-            Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-              threadApplication.startDirect(
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.startDirect(
                 { memberIds: [other.memberId], text, mentions: [] },
                 { requestKey: key },
               ),
@@ -115,8 +115,8 @@ export const requests = (harness: Harness) => {
           // The same key names a different request for another operation.
           const reply = yield* as(
             owner,
-            Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
-              threadMessageApplication.publish(
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.publish(
                 { threadId: mine.thread.id, text: "Hello", mentions: [] },
                 { requestKey: key },
               ),
@@ -135,15 +135,15 @@ export const requests = (harness: Harness) => {
           const admission = yield* bound.groupMemberships.findActive(group.id, other.memberId);
           yield* as(
             other,
-            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-              groupMembershipApplication.leave({
+            Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+              groupMembershipService.leave({
                 groupId: group.id,
                 membershipId: Option.getOrThrow(admission).id,
               }),
             ),
           );
           expect(yield* Effect.flip(as(other, start("Hello")))).toEqual(
-            new ThreadApplication.GroupNotFound({ groupId: group.id }),
+            new ThreadService.GroupNotFound({ groupId: group.id }),
           );
         }),
       ),
@@ -194,30 +194,30 @@ export const requests = (harness: Harness) => {
             });
           const requestKey = Request.Key.make("request-2");
           yield* twice(
-            Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
-              threadMessageApplication.publish(
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.publish(
                 { threadId: started.thread.id, text: "Reply", mentions: [] },
                 { requestKey },
               ),
             ),
           );
           yield* twice(
-            Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-              threadApplication.startDirect(
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.startDirect(
                 { memberIds: [other.memberId], text: "Hi", mentions: [] },
                 { requestKey },
               ),
             ),
           );
           yield* twice(
-            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-              groupApplication.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
+            Effect.flatMap(GroupService.Service, (groupService) =>
+              groupService.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
             ),
           );
           const expiresAt = yield* future;
           yield* twice(
-            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
-              invitationApplication.issue(request(expiresAt, Identity.HumanId.make("carol")), {
+            Effect.flatMap(InvitationService.Service, (invitationService) =>
+              invitationService.issue(request(expiresAt, Identity.HumanId.make("carol")), {
                 requestKey,
               }),
             ),
@@ -231,8 +231,8 @@ export const requests = (harness: Harness) => {
         Effect.gen(function* () {
           const { bound, owner, as } = yield* world(storage);
           const create = (name: string) =>
-            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-              groupApplication.createTeam({ name, memberIds: [] }, { requestKey: key }),
+            Effect.flatMap(GroupService.Service, (groupService) =>
+              groupService.createTeam({ name, memberIds: [] }, { requestKey: key }),
             );
           const first = yield* as(owner, create("Second"));
           const before = yield* history(bound);

@@ -2,7 +2,7 @@ import { ConnectionPermissions } from "@amends/core/connection";
 import { EnvironmentPermissions } from "@amends/core/environment";
 import { AgentPermissions } from "@amends/core/agent";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
-import { GroupApplication, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
+import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
 import type { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
 import * as Core from "@amends/core";
@@ -12,9 +12,9 @@ import {
   ThreadPermissions,
 } from "@amends/core/thread";
 import {
-  InvitationApplication,
+  InvitationService,
   InvitationPermissions,
-  MemberApplication,
+  MemberService,
   MemberFacts,
   MemberPermissions,
   Invitation,
@@ -82,7 +82,7 @@ export const gateway = (harness: Harness) => {
                   ).toMatchObject({ _tag: "Gateway.NotMember" });
                   expect(
                     yield* Effect.flip(Operations.getMember(a.id, alice, b.ownerMemberId)),
-                  ).toMatchObject({ _tag: "MemberApplication.NotFound" });
+                  ).toMatchObject({ _tag: "MemberService.NotFound" });
                   return [a, b];
                 }),
               ),
@@ -203,8 +203,8 @@ export const gateway = (harness: Harness) => {
                   gateway.asMember(
                     workspace.id,
                     identity,
-                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                      memberApplication.get(workspace.ownerMemberId),
+                    Effect.flatMap(MemberService.Service, (memberService) =>
+                      memberService.get(workspace.ownerMemberId),
                     ),
                   );
                 yield* Effect.all(
@@ -218,8 +218,8 @@ export const gateway = (harness: Harness) => {
                 const invitation = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
-                    invitationApplication.issue({
+                  Effect.flatMap(InvitationService.Service, (invitationService) =>
+                    invitationService.issue({
                       recipientId: bob.id,
                       expiresAt,
                       roleId: BuiltinRoles.MemberId,
@@ -229,8 +229,8 @@ export const gateway = (harness: Harness) => {
                 const listing = yield* (yield* WorkspaceDirectory.Service).list(bob);
                 const joined = yield* gateway.inWorkspace(
                   a.id,
-                  Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
-                    invitationApplication.accept(invitation.details.id, bob.id),
+                  Effect.flatMap(InvitationService.Service, (invitationService) =>
+                    invitationService.accept(invitation.details.id, bob.id),
                   ),
                 );
                 const afterJoin = yield* (yield* WorkspaceDirectory.Service).list(bob);
@@ -238,24 +238,21 @@ export const gateway = (harness: Harness) => {
                   a.id,
                   alice,
                   Effect.flatMap(
-                    InvitationApplication.Service,
-                    (invitationApplication) => invitationApplication.list,
+                    InvitationService.Service,
+                    (invitationService) => invitationService.list,
                   ),
                 );
                 const removed = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                    memberApplication.remove(joined.id),
+                  Effect.flatMap(MemberService.Service, (memberService) =>
+                    memberService.remove(joined.id),
                   ),
                 );
                 const members = yield* gateway.asMember(
                   a.id,
                   alice,
-                  Effect.flatMap(
-                    MemberApplication.Service,
-                    (memberApplication) => memberApplication.list,
-                  ),
+                  Effect.flatMap(MemberService.Service, (memberService) => memberService.list),
                 );
                 return {
                   a,
@@ -339,8 +336,8 @@ export const gateway = (harness: Harness) => {
                 gateway.asMember(
                   workspace.id,
                   alice,
-                  Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-                    groupApplication.createTeam({ name, memberIds: [workspace.ownerMemberId] }),
+                  Effect.flatMap(GroupService.Service, (groupService) =>
+                    groupService.createTeam({ name, memberIds: [workspace.ownerMemberId] }),
                   ),
                 ),
               ).pipe(Effect.provide(host));

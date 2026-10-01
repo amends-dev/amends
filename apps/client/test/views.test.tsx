@@ -260,7 +260,7 @@ it("shows a group's threads with their authors, mentions, and replies", async ()
 
 it("says a group is unavailable once its stream is gone, and failed otherwise", async () => {
   const gone = fixture({
-    stream: () => json({ _tag: "ThreadApplication.GroupNotFound", groupId: "g1" }, 404),
+    stream: () => json({ _tag: "ThreadService.GroupNotFound", groupId: "g1" }, 404),
   });
   await waitFor(() => expect(gone.views.stream.status()).toBe("unavailable"));
   cleanup();

@@ -50,11 +50,11 @@ export interface Interface {
   readonly unfollow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/follow/application/Service",
+  "@amends/core/group/follow/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
-export const make = Effect.fn("GroupFollowApplication.make")(function* () {
+export const make = Effect.fn("GroupFollowService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const groupQuery = yield* GroupQuery.Service;
   const groupStore = yield* GroupStore.Service;
@@ -111,7 +111,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
     return admission.value;
   });
 
-  const follow = Effect.fn("GroupFollowApplication.follow")(
+  const follow = Effect.fn("GroupFollowService.follow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* authorizeFollowChange(input, true);
       if (Option.isSome(yield* groupFollowStore.findActive(admission.id))) return;
@@ -133,7 +133,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const unfollow = Effect.fn("GroupFollowApplication.unfollow")(
+  const unfollow = Effect.fn("GroupFollowService.unfollow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* authorizeFollowChange(input, false);
       const existing = yield* groupFollowStore.findActive(admission.id);
@@ -153,4 +153,4 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
 });
 /** @category layers */
 export const layer = Layer.effect(Service, make());
-export * as GroupFollowApplication from "./application.ts";
+export * as GroupFollowService from "./service.ts";

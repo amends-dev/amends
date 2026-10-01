@@ -99,11 +99,11 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/application/Service",
+  "@amends/core/group/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority and member eligibility inside each commit. @category constructors */
-export const make = Effect.fn("GroupApplication.make")(function* () {
+export const make = Effect.fn("GroupService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const memberStore = yield* MemberStore.Service;
   const groupStore = yield* GroupStore.Service;
@@ -121,7 +121,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
-  const createTeam = Effect.fn("GroupApplication.createTeam")(
+  const createTeam = Effect.fn("GroupService.createTeam")(
     function* (input: Group.CreateTeamInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input);
       yield* authorization.require([createGroupRequirement]);
@@ -171,7 +171,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     if (Option.isNone(found)) return yield* new NotFound({ groupId });
     return found.value;
   });
-  const get = Effect.fn("GroupApplication.get")(function* (groupId: Group.Id) {
+  const get = Effect.fn("GroupService.get")(function* (groupId: Group.Id) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
     yield* groupQuery
       .requireAudience(id)
@@ -183,7 +183,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     ]);
     return yield* requireGroup(id);
   });
-  const rename = Effect.fn("GroupApplication.rename")(
+  const rename = Effect.fn("GroupService.rename")(
     function* (input: Group.RenameInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.RenameInput))(input);
       yield* authorization.require([
@@ -296,7 +296,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     }
     return items;
   });
-  const listMine = Effect.fn("GroupApplication.listMine")(function* (input: Group.ListOptions) {
+  const listMine = Effect.fn("GroupService.listMine")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
     yield* authorization.require([]);
     const actor = yield* Actor.Service;
@@ -320,7 +320,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     }
     return items;
   });
-  const listPublic = Effect.fn("GroupApplication.listPublic")(function* (input: Group.ListOptions) {
+  const listPublic = Effect.fn("GroupService.listPublic")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
     yield* authorization.require([]);
     const actor = yield* Actor.Service;
@@ -373,4 +373,4 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
 /** Provide group creation and authorized reads over the workspace's services. @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as GroupApplication from "./application.ts";
+export * as GroupService from "./service.ts";

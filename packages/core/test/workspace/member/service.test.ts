@@ -23,7 +23,7 @@ import { Journal } from "../../../src/journal/journal.ts";
 import { Log } from "../../../src/journal/log.ts";
 import { Store } from "../../../src/journal/store.ts";
 import { InvitationStore } from "../../../src/workspace/invitation/store.ts";
-import { MemberApplication } from "../../../src/workspace/member/application.ts";
+import { MemberService } from "../../../src/workspace/member/service.ts";
 import { MemberFacts } from "../../../src/workspace/member/facts.ts";
 import { MemberPermissions } from "../../../src/workspace/member/permissions.ts";
 import { MemberProjection } from "../../../src/workspace/member/projection.ts";
@@ -128,7 +128,7 @@ const configured = (
     Layer.provide(Layer.mergeAll(services, workspace, host)),
   );
   // Keep the journal available to exercise reads inside an outer application commit.
-  return MemberApplication.layer.pipe(
+  return MemberService.layer.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
         services,
@@ -148,17 +148,17 @@ const configured = (
   );
 };
 const get = Effect.fn("MemberApplicationTest.get")(function* (id: Member.Id) {
-  return yield* (yield* MemberApplication.Service).get(id);
+  return yield* (yield* MemberService.Service).get(id);
 });
 const remove = Effect.fn("MemberApplicationTest.remove")(function* (id: Member.Id) {
-  return yield* (yield* MemberApplication.Service).remove(id);
+  return yield* (yield* MemberService.Service).remove(id);
 });
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
     A,
     E,
-    | MemberApplication.Service
+    | MemberService.Service
     | Journal.Service
     | Authorization.Service
     | Delegation.Service
@@ -196,7 +196,7 @@ const seed = (fixture: Fixture, assignments: ReadonlyArray<Assignment.Record> = 
   );
 it.effect("member reads require only the current actor and leave the journal unchanged", () =>
   Effect.gen(function* () {
-    expectTypeOf<Layer.Services<typeof MemberApplication.layer>>().toEqualTypeOf<
+    expectTypeOf<Layer.Services<typeof MemberService.layer>>().toEqualTypeOf<
       | MemberStore.Service
       | WorkspaceStore.Service
       | InvitationStore.Service
@@ -208,13 +208,13 @@ it.effect("member reads require only the current actor and leave the journal unc
       | Crypto.Crypto
       | Store.Service
     >();
-    expectTypeOf<Layer.Error<typeof MemberApplication.layer>>().toEqualTypeOf<never>();
+    expectTypeOf<Layer.Error<typeof MemberService.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
-      Effect.Services<ReturnType<MemberApplication.Interface["get"]>>
+      Effect.Services<ReturnType<MemberService.Interface["get"]>>
     >().toEqualTypeOf<Actor.Service>();
     expectTypeOf<
-      Effect.Error<ReturnType<MemberApplication.Interface["get"]>>
-    >().toEqualTypeOf<MemberApplication.Error>();
+      Effect.Error<ReturnType<MemberService.Interface["get"]>>
+    >().toEqualTypeOf<MemberService.Error>();
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
     const before = yield* fixture.snapshot;
@@ -256,7 +256,7 @@ it.effect(
           .insert(assignment("read-workspace", Scope.Value.cases.Workspace.make({ workspaceId }))),
       );
       expect(yield* run(fixture, get(missingId).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberApplication.NotFound",
+        _tag: "MemberService.NotFound",
         workspaceId,
         memberId: missingId,
       });
@@ -267,7 +267,7 @@ it.effect("a shared member application uses each call's actor and current member
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const application = yield* run(fixture, MemberApplication.Service);
+    const application = yield* run(fixture, MemberService.Service);
     const read = application.get(bob.id);
     expect(yield* read.pipe(Effect.provideService(Actor.Service, alice))).toEqual(bob);
     expect(
@@ -295,7 +295,7 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* Journal.Service;
-          const memberApplication = yield* MemberApplication.Service;
+          const memberService = yield* MemberService.Service;
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal
@@ -309,7 +309,7 @@ it.effect(
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: bob.id })
                 .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-              expect(yield* memberApplication.get(bob.id)).toMatchObject({
+              expect(yield* memberService.get(bob.id)).toMatchObject({
                 id: bob.id,
                 status: "removed",
               });
@@ -336,7 +336,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
       fixture,
       Effect.gen(function* () {
         const journal = yield* Journal.Service;
-        const memberApplication = yield* MemberApplication.Service;
+        const memberService = yield* MemberService.Service;
         return yield* journal.commit(
           Effect.gen(function* () {
             yield* journal
@@ -346,7 +346,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
                 memberId: alice.memberId,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            return yield* memberApplication.get(bob.id);
+            return yield* memberService.get(bob.id);
           }),
         );
       }).pipe(Effect.flip),
@@ -393,11 +393,11 @@ it.effect(
   () =>
     Effect.gen(function* () {
       expectTypeOf<
-        Effect.Services<ReturnType<MemberApplication.Interface["remove"]>>
+        Effect.Services<ReturnType<MemberService.Interface["remove"]>>
       >().toEqualTypeOf<Actor.Service>();
       const fixture = yield* make();
       yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
-      const application = yield* run(fixture, MemberApplication.Service);
+      const application = yield* run(fixture, MemberService.Service);
       expect(yield* run(fixture, get(bob.id).pipe(Effect.flip))).toMatchObject({
         _tag: "Authorization.Denied",
       });
@@ -427,7 +427,7 @@ it.effect(
       });
       const beforeRepeat = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(bob.id).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberApplication.AlreadyRemoved",
+        _tag: "MemberService.AlreadyRemoved",
       });
       expect(yield* fixture.snapshot).toEqual(beforeRepeat);
     }),
@@ -463,11 +463,11 @@ it.effect(
       );
       const authorized = yield* fixture.snapshot;
       expect(yield* run(fixture, remove(missingId).pipe(Effect.flip))).toMatchObject({
-        _tag: "MemberApplication.NotFound",
+        _tag: "MemberService.NotFound",
       });
       for (const actor of [alice, agent]) {
         expect(yield* run(fixture, remove(alice.memberId).pipe(Effect.flip), actor)).toMatchObject({
-          _tag: "MemberApplication.OwnerProtected",
+          _tag: "MemberService.OwnerProtected",
           workspaceId,
           memberId: alice.memberId,
         });
@@ -509,7 +509,7 @@ it.effect(
       const granted = assignment("remove-bob", bobScope, MemberPermissions.Remove);
       const program = Effect.gen(function* () {
         const journal = yield* Journal.Service;
-        const memberApplication = yield* MemberApplication.Service;
+        const memberService = yield* MemberService.Service;
         return yield* journal.commit(
           Effect.gen(function* () {
             yield* journal
@@ -520,7 +520,7 @@ it.effect(
                 source: granted.source,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            return yield* memberApplication.remove(bob.id);
+            return yield* memberService.remove(bob.id);
           }),
         );
       });
@@ -553,10 +553,7 @@ it.effect(
   "listing returns the memberships the actor may read, including removed ones, and nothing more",
   () =>
     Effect.gen(function* () {
-      const list = Effect.flatMap(
-        MemberApplication.Service,
-        (memberApplication) => memberApplication.list,
-      );
+      const list = Effect.flatMap(MemberService.Service, (memberService) => memberService.list);
       const fixture = yield* make();
       yield* seed(fixture, [assignment("read-bob")]);
       // An exact grant sees that member only; the actor's own record needs its own grant.

@@ -4,7 +4,7 @@ import { Actor, Identity } from "@amends/core/identity";
 
 import { Journal, Publication, Store } from "@amends/core/journal";
 
-import { InvitationApplication, MemberApplication } from "@amends/core/workspace";
+import { InvitationService, MemberService } from "@amends/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 
@@ -54,9 +54,8 @@ export const invitationReplay = (harness: Harness) => {
               });
               const broken = failingLate(bound, error);
               const failure = yield* Effect.flatMap(
-                InvitationApplication.Service,
-                (invitationApplication) =>
-                  invitationApplication.accept(invitation.details.id, bob.id),
+                InvitationService.Service,
+                (invitationService) => invitationService.accept(invitation.details.id, bob.id),
               ).pipe(Effect.provide(core(broken)), Effect.flip);
               expect(failure).toBe(error);
               expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
@@ -116,9 +115,8 @@ export const invitationReplay = (harness: Harness) => {
                 cause: "injected late failure",
               });
               const broken = failingLate(bound, error);
-              const failure = yield* Effect.flatMap(
-                MemberApplication.Service,
-                (memberApplication) => memberApplication.remove(member.id),
+              const failure = yield* Effect.flatMap(MemberService.Service, (memberService) =>
+                memberService.remove(member.id),
               ).pipe(
                 Effect.provide(core(broken)),
                 Effect.provideService(Actor.Service, {
@@ -141,7 +139,7 @@ export const invitationReplay = (harness: Harness) => {
                 yield* Effect.flip(
                   Operations.removeMember(workspace.id, alice, other.ownerMemberId),
                 ),
-              ).toMatchObject({ _tag: "MemberApplication.NotFound" });
+              ).toMatchObject({ _tag: "MemberService.NotFound" });
               const results = yield* Effect.forEach(
                 [1, 2],
                 () => Operations.removeMember(workspace.id, alice, member.id).pipe(Effect.result),
@@ -150,7 +148,7 @@ export const invitationReplay = (harness: Harness) => {
               expect(results.filter((result) => result._tag === "Success")).toHaveLength(1);
               expect(results.find((result) => result._tag === "Failure")).toMatchObject({
                 _tag: "Failure",
-                failure: { _tag: "MemberApplication.AlreadyRemoved" },
+                failure: { _tag: "MemberService.AlreadyRemoved" },
               });
               const after = yield* bound.store.read(journalLog, { limit: 20 });
               expect(after).toHaveLength(before.length + 1);
@@ -166,7 +164,7 @@ export const invitationReplay = (harness: Harness) => {
                     Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
                   ),
                 ).toMatchObject({
-                  _tag: "InvitationApplication.Unavailable",
+                  _tag: "InvitationService.Unavailable",
                   reason: "revoked",
                 });
               }
@@ -206,7 +204,7 @@ export const invitationReplay = (harness: Harness) => {
                     Operations.acceptInvitation(workspace.id, bob.id, record.details.id),
                   ),
                 ).toMatchObject({
-                  _tag: "InvitationApplication.Unavailable",
+                  _tag: "InvitationService.Unavailable",
                   reason: "revoked",
                 });
             }),

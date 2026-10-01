@@ -32,7 +32,7 @@ import { PermissionCatalog } from "../../src/authorization/permission-catalog.ts
 import type { Permission } from "../../src/authorization/permission.ts";
 import { RoleStore } from "../../src/authorization/role/store.ts";
 import { Scope as GrantScope } from "../../src/authorization/scope.ts";
-import { ChangeFeedApplication } from "../../src/change-feed/application.ts";
+import { ChangeFeedService } from "../../src/change-feed/service.ts";
 import { ChangeFeed } from "../../src/change-feed/change-feed.ts";
 import { ChangeFeedSource } from "../../src/change-feed/source.ts";
 import { Actor } from "../../src/identity/actor.ts";
@@ -179,7 +179,7 @@ const racing = () => {
   };
 };
 type Services =
-  | ChangeFeedApplication.Service
+  | ChangeFeedService.Service
   | Journal.Service
   | Signals.Service
   | Actor.Service
@@ -261,7 +261,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       Authorization.layer.pipe(Layer.provide(GrantResolver.layer)),
       GrantResolver.layer,
     ).pipe(Layer.provideMerge(host));
-    const configured = ChangeFeedApplication.layer.pipe(
+    const configured = ChangeFeedService.layer.pipe(
       Layer.provide(ChangeFeedSource.layer(options.source)),
       Layer.provideMerge(services),
     );
@@ -288,7 +288,7 @@ const publish = <F extends Fact.Definition>(fact: F, payload: Fact.Payload<NoInf
 
 /** Open a subscription and buffer its messages; the stream's end shows in its fiber. */
 const listen = Effect.fnUntraced(function* (options?: ChangeFeed.WatchOptions) {
-  const stream = yield* (yield* ChangeFeedApplication.Service).watch(options);
+  const stream = yield* (yield* ChangeFeedService.Service).watch(options);
   const queue = yield* Queue.unbounded<ChangeFeed.Message>();
   const fiber = yield* stream.pipe(
     Stream.runForEach((message) => Queue.offer(queue, message)),
@@ -420,10 +420,10 @@ it.effect("a cursor past the head, or further behind than the replay limit, rese
 it.effect("invalid cursors are rejected before subscribing", () =>
   run(() =>
     Effect.gen(function* () {
-      const changeFeedApplication = yield* ChangeFeedApplication.Service;
+      const changeFeedService = yield* ChangeFeedService.Service;
       for (const after of ["-1", "01", "1.5", "x", "9007199254740993"]) {
         const error = yield* Effect.flip(
-          changeFeedApplication.watch({ after: after as ChangeFeed.Cursor }),
+          changeFeedService.watch({ after: after as ChangeFeed.Cursor }),
         );
         expect(Schema.isSchemaError(error)).toBe(true);
       }
@@ -993,8 +993,8 @@ it.effect("a slow subscriber catches up from the journal instead of losing commi
   run(
     () =>
       Effect.gen(function* () {
-        const changeFeedApplication = yield* ChangeFeedApplication.Service;
-        const slow = yield* changeFeedApplication.watch();
+        const changeFeedService = yield* ChangeFeedService.Service;
+        const slow = yield* changeFeedService.watch();
         const fast = yield* listen();
         yield* fast.next;
         for (const id of ["a", "b", "c", "d", "e"])
@@ -1092,7 +1092,7 @@ it.effect("a removed member cannot subscribe", () =>
   run(({ fixture }) =>
     Effect.gen(function* () {
       yield* fixture.store.transaction(fixture.members(workspaceId).markRemoved(actor.memberId));
-      const error = yield* Effect.flip((yield* ChangeFeedApplication.Service).watch());
+      const error = yield* Effect.flip((yield* ChangeFeedService.Service).watch());
       expect(error).toMatchObject({ _tag: "Authorization.InvalidActor" });
     }),
   ),

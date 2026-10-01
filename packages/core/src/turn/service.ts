@@ -100,14 +100,14 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/application/Service",
+  "@amends/core/turn/service/Service",
 ) {}
 
 /** Batches of a turn's log read at a time. */
 const logPage = 100;
 
 /** @category constructors */
-export const make = Effect.fn("TurnApplication.make")(function* () {
+export const make = Effect.fn("TurnService.make")(function* () {
   const turnStore = yield* TurnStore.Service;
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
@@ -191,11 +191,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const toView = (turn: Turn.Record) =>
     Effect.map(toViews([turn]), (views) => views[0] as Turn.View);
 
-  const get = Effect.fn("TurnApplication.get")(function* (turnId: Turn.Id) {
+  const get = Effect.fn("TurnService.get")(function* (turnId: Turn.Id) {
     return yield* toView(yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId)));
   });
 
-  const listByThread = Effect.fn("TurnApplication.listByThread")(function* (
+  const listByThread = Effect.fn("TurnService.listByThread")(function* (
     threadId: ThreadId.Id,
     limit: number,
   ) {
@@ -213,7 +213,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
   );
 
-  const listActive = Effect.fn("TurnApplication.listActive")(function* (limit: number) {
+  const listActive = Effect.fn("TurnService.listActive")(function* (limit: number) {
     const active = yield* turnStore.listActive(yield* decodeLimit(limit));
     // Each thread's audience is checked once, whatever number of its turns are active, then the
     // permission to read the threads in it, together.
@@ -235,7 +235,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
   });
 
-  const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
+  const readLog = Effect.fn("TurnService.log")(function* (turnId: Turn.Id) {
     const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
     return {
       turn: yield* toView(turn),
@@ -246,7 +246,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const isSameItem = Schema.toEquivalence(Turn.LogItem);
   const toLogUnavailable = () => new Turn.LogUnavailable({});
 
-  const watchLog = Effect.fn("TurnApplication.watchLog")(function* (turnId: Turn.Id) {
+  const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: Turn.Id) {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
     // Register for drafts and commits before reading, so none that follows is missed: a change to
     // the reader's access committed after the read below is delivered, and rechecked.
@@ -392,7 +392,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     );
   });
 
-  const cancel = Effect.fn("TurnApplication.cancel")(
+  const cancel = Effect.fn("TurnService.cancel")(
     function* (turnId: Turn.Id) {
       const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
       yield* authorization.require([directAgentRequirement(turn)]);
@@ -406,7 +406,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     journal.commit,
   );
 
-  const retry = Effect.fn("TurnApplication.retry")(
+  const retry = Effect.fn("TurnService.retry")(
     function* (turnId: Turn.Id) {
       const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
       const turn = yield* requireReadableTurn(id);
@@ -496,4 +496,4 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 /** @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as TurnApplication from "./application.ts";
+export * as TurnService from "./service.ts";

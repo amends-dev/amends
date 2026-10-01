@@ -111,14 +111,14 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/membership/application/Service",
+  "@amends/core/group/membership/service/Service",
 ) {}
 
 const decodeInput = Schema.decodeEffect(GroupMembership.AddInput);
 const decodeRemovalInput = Schema.decodeEffect(GroupMembership.RemoveInput);
 
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
-export const make = Effect.fn("GroupMembershipApplication.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("GroupMembershipService.make")(function* (): Effect.fn.Return<
   Interface,
   never,
   | Authorization.Service
@@ -173,7 +173,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     const admitted = yield* groupCommand.admitMember(groupId, memberId, yield* DateTime.now);
     return admitted.membership;
   });
-  const add = Effect.fn("GroupMembershipApplication.add")(
+  const add = Effect.fn("GroupMembershipService.add")(
     function* (input: GroupMembership.AddInput) {
       const { groupId, memberId } = yield* decodeInput(input);
       yield* requireManagement(groupId);
@@ -190,7 +190,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const join = Effect.fn("GroupMembershipApplication.join")(
+  const join = Effect.fn("GroupMembershipService.join")(
     function* (input: Group.Id) {
       const groupId = yield* Schema.decodeEffect(Group.Id)(input);
       yield* authorization.require([
@@ -249,7 +249,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       status: "removed",
     } satisfies GroupMembership.Record;
   });
-  const remove = Effect.fn("GroupMembershipApplication.remove")(
+  const remove = Effect.fn("GroupMembershipService.remove")(
     function* (input: GroupMembership.RemoveInput) {
       const checked = yield* decodeRemovalInput(input);
       yield* requireManagement(checked.groupId);
@@ -271,7 +271,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const leave = Effect.fn("GroupMembershipApplication.leave")(
+  const leave = Effect.fn("GroupMembershipService.leave")(
     function* (input: GroupMembership.LeaveInput) {
       const checked = yield* decodeRemovalInput(input);
       yield* authorization.require([]);
@@ -318,7 +318,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     }
     return active;
   });
-  const listCurrent = Effect.fn("GroupMembershipApplication.listCurrent")(function* (
+  const listCurrent = Effect.fn("GroupMembershipService.listCurrent")(function* (
     groupId: Group.Id,
     options: GroupMembership.ListOptions,
   ) {
@@ -347,4 +347,4 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
 /** Provide membership operations over the workspace's existing stores and journal. @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as GroupMembershipApplication from "./application.ts";
+export * as GroupMembershipService from "./service.ts";

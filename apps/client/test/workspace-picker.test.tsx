@@ -172,7 +172,7 @@ it("reports a refused invitation and sends no name when none is given", async ()
   const accept = await f.at(1);
   expect(await accept.request.json()).toEqual({});
   accept.resolve(
-    json({ _tag: "InvitationApplication.NotFound", invitationId: "invitation-quiet" }, 404),
+    json({ _tag: "InvitationService.NotFound", invitationId: "invitation-quiet" }, 404),
   );
   await waitFor(() =>
     expect(f.picker.accepting()).toMatchObject({ error: "gone", joined: false, pending: false }),

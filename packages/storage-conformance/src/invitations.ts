@@ -2,7 +2,7 @@ import { BuiltinRoles } from "@amends/core/authorization";
 import { Group } from "@amends/core/group";
 import { Actor } from "@amends/core/identity";
 import { Journal, Log } from "@amends/core/journal";
-import { Invitation, InvitationApplication, Member } from "@amends/core/workspace";
+import { Invitation, InvitationService, Member } from "@amends/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";
@@ -115,10 +115,10 @@ export const invitations = (harness: Harness) => {
         harness.withStorage((storage) =>
           Effect.gen(function* () {
             expectTypeOf<
-              Effect.Services<ReturnType<InvitationApplication.Interface["accept"]>>
+              Effect.Services<ReturnType<InvitationService.Interface["accept"]>>
             >().toEqualTypeOf<never>();
             expectTypeOf<
-              Effect.Services<ReturnType<InvitationApplication.Interface["issue"]>>
+              Effect.Services<ReturnType<InvitationService.Interface["issue"]>>
             >().toEqualTypeOf<Actor.Service>();
             yield* Effect.scoped(
               runGateway(
@@ -239,7 +239,7 @@ export const invitations = (harness: Harness) => {
                         saved.invitation.details.id,
                       ),
                     ),
-                  ).toMatchObject({ _tag: "InvitationApplication.Unavailable", reason: "revoked" });
+                  ).toMatchObject({ _tag: "InvitationService.Unavailable", reason: "revoked" });
                   const replacement = yield* Operations.invite(
                     saved.workspace.id,
                     alice,
@@ -259,7 +259,7 @@ export const invitations = (harness: Harness) => {
                       ),
                     ),
                   ).toMatchObject({
-                    _tag: "InvitationApplication.Unavailable",
+                    _tag: "InvitationService.Unavailable",
                     reason: "accepted",
                   });
                 }),
@@ -291,7 +291,7 @@ export const invitations = (harness: Harness) => {
               const failure = results.find((value) => value._tag === "Failure");
               expect(failure).toMatchObject({
                 _tag: "Failure",
-                failure: { _tag: "InvitationApplication.AlreadyMember" },
+                failure: { _tag: "InvitationService.AlreadyMember" },
               });
               const bound = yield* boundTo(workspace.id);
               const member = yield* bound.members.findActive(bob);

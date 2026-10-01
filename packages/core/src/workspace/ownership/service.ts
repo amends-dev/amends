@@ -46,7 +46,7 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 /** Construct ownership operations over one workspace's journal and access policy. @category constructors */
-export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.Return<
   Interface,
   never,
   | WorkspaceStore.Service
@@ -70,7 +70,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
     _tag: "Workspace",
     workspaceId,
   });
-  const loadMember = Effect.fn("OwnershipApplication.loadMember")(function* (memberId: Member.Id) {
+  const loadMember = Effect.fn("OwnershipService.loadMember")(function* (memberId: Member.Id) {
     const found = yield* memberStore.get(memberId);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
     return found.value;
@@ -110,9 +110,9 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
       canTransfer,
       candidates,
     });
-  }).pipe(Effect.withSpan("OwnershipApplication.get"));
+  }).pipe(Effect.withSpan("OwnershipService.get"));
   const builtins = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
-  const createAssignment = Effect.fn("OwnershipApplication.createAssignment")(function* (
+  const createAssignment = Effect.fn("OwnershipService.createAssignment")(function* (
     memberId: Member.Id,
     roleId: Role.Id,
   ) {
@@ -126,7 +126,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
       }),
     });
   });
-  const transfer = Effect.fn("OwnershipApplication.transfer")(
+  const transfer = Effect.fn("OwnershipService.transfer")(
     function* (input: Ownership.TransferInput) {
       yield* authorization.require([requirement]);
       const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
@@ -183,4 +183,4 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
 
 /** @category layers */
 export const layer = Layer.effect(Service, make());
-export * as OwnershipApplication from "./application.ts";
+export * as OwnershipService from "./service.ts";

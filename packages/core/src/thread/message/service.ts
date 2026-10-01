@@ -38,9 +38,9 @@ export interface Interface {
   ) => Effect.Effect<ThreadMessage.Record, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/message/application/Service",
+  "@amends/core/thread/message/service/Service",
 ) {}
-export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
+export const make = Effect.fn("ThreadMessageService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
@@ -62,7 +62,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
   const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessage.Id) =>
     key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId);
-  const publish = Effect.fn("ThreadMessageApplication.publish")(
+  const publish = Effect.fn("ThreadMessageService.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
       const thread = yield* threadQuery
@@ -158,4 +158,4 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   return Service.of({ publish });
 });
 export const layer = Layer.effect(Service, make());
-export * as ThreadMessageApplication from "./application.ts";
+export * as ThreadMessageService from "./service.ts";

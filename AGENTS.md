@@ -34,8 +34,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   besides `@effect/vitest` for test suites a package ships from the root catalog.
   They may depend on other shared packages with `workspace:*`, but never hosts or
   apps. This applies to all dependency sections; development tools live at the root.
-  `core` operates within one workspace with a trusted actor; its application
-  services are the operations. `gateway` is how a host enters core: it bootstraps
+  `core` operates within one workspace with a trusted actor; its services are the
+  operations. Each core feature keeps the operations actors call in `service.ts`, the
+  internal writes other operations share in one `command.ts` service, and the internal
+  reads in one `query.ts` service; a command may read through the query, a query never
+  writes, and a step with one caller stays a private function of that caller. `gateway` is how a host enters core: it bootstraps
   a workspace and resolves an authenticated identity into the actor, and it holds
   the host contracts for storage, sign-in, credential resolution, and the workspace
   directory. `api-http` is the HTTP contract shared by servers and clients, and
@@ -153,7 +156,7 @@ to verify APIs rather than guessing from prior versions or web snippets.
 
 Name a variable that holds a service after the service, so a call says who it calls:
 `const threadStore = yield* ThreadStore.Service`, `const threadQuery = yield* ThreadQuery.Service`,
-and `(threadApplication) => threadApplication.get(id)` for a callback given one. Effect's platform
+and `(threadService) => threadService.get(id)` for a callback given one. Effect's platform
 services keep the names Effect gives them, such as `sql` and `fs`. Name a function for what it
 does, so a reader needn't open it: `deriveStartIds`, `findRetriedStart`, `authorizeParticipants`,
 not a bare word such as `begin`, `opening`, or `load`.

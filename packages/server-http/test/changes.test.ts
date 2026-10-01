@@ -1,6 +1,6 @@
 import { Api, Authentication } from "@amends/api-http";
 import type * as Core from "@amends/core";
-import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
+import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
 import { Actor, Identity } from "@amends/core/identity";
 import { Member, Workspace } from "@amends/core/workspace";
 import { Credentials, Gateway, type GatewayErrors } from "@amends/gateway";
@@ -22,8 +22,8 @@ const secret = "connect ECONNREFUSED 10.0.0.5:5432 password=hunter2";
 
 /** A change feed that opens, then fails in a way no client should learn the details of. */
 const failing = Layer.succeed(
-  ChangeFeedApplication.Service,
-  ChangeFeedApplication.Service.of({
+  ChangeFeedService.Service,
+  ChangeFeedService.Service.of({
     watch: () =>
       Effect.succeed(
         Stream.make(

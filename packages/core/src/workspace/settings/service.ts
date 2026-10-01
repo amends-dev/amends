@@ -1,7 +1,7 @@
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { AssignmentApplication } from "../../authorization/assignment/application.ts";
+import { AssignmentService } from "../../authorization/assignment/service.ts";
 import { AssignmentPermissions } from "../../authorization/assignment/permissions.ts";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
@@ -12,7 +12,7 @@ import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Store } from "../../journal/store.ts";
-import { MemberApplication } from "../member/application.ts";
+import { MemberService } from "../member/service.ts";
 import { MemberPermissions } from "../member/permissions.ts";
 import { InvitationPermissions } from "../invitation/permissions.ts";
 import { WorkspaceStore } from "../store.ts";
@@ -23,8 +23,8 @@ import { WorkspaceSettingsPermissions } from "./permissions.ts";
 import { Changed } from "./errors.ts";
 export { Changed } from "./errors.ts";
 export type Error =
-  | AssignmentApplication.Error
-  | MemberApplication.Error
+  | AssignmentService.Error
+  | MemberService.Error
   | WorkspaceStore.Failure
   | Schema.SchemaError
   | Changed
@@ -50,8 +50,8 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   const workspaceStore = yield* WorkspaceStore.Service,
     authorization = yield* Authorization.Service,
     delegation = yield* Delegation.Service,
-    assignmentApplication = yield* AssignmentApplication.Service,
-    memberApplication = yield* MemberApplication.Service,
+    assignmentService = yield* AssignmentService.Service,
+    memberService = yield* MemberService.Service,
     journal = yield* Journal.Service,
     crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -74,7 +74,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   });
   const get = Effect.gen(function* () {
     yield* authorization.require([]);
-    const roles = yield* assignmentApplication.roles;
+    const roles = yield* assignmentService.roles;
     const canReadInvitations = yield* allowed(
       authorization.require([
         Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId }),
@@ -89,7 +89,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     };
   });
   const listing = Effect.gen(function* () {
-    const visible = yield* memberApplication.list;
+    const visible = yield* memberService.list;
     const workspace = yield* load;
     const actorId = (yield* Actor.Service).memberId;
     // One grant resolution answers every permission, and role choices load once, so the reads
@@ -101,7 +101,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
         Requirement.make(MemberPermissions.Remove, { _tag: "Member", workspaceId, memberId }),
       ]),
     ]);
-    const roles = yield* assignmentApplication.roles;
+    const roles = yield* assignmentService.roles;
     return yield* Effect.forEach(visible, (member, index) =>
       Effect.gen(function* () {
         const readable = permissions[index * 2] ?? false,
@@ -161,4 +161,4 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
 });
 /** @category layers */
 export const layer = Layer.effect(Service, make());
-export * as WorkspaceSettingsApplication from "./application.ts";
+export * as WorkspaceSettingsService from "./service.ts";

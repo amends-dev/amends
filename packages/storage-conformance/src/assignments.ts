@@ -1,4 +1,4 @@
-import { AssignmentApplication, BuiltinRoles, Role } from "@amends/core/authorization";
+import { AssignmentService, BuiltinRoles, Role } from "@amends/core/authorization";
 
 import { Actor, Identity } from "@amends/core/identity";
 
@@ -58,7 +58,7 @@ export const assignments = (harness: Harness) => {
                   roleId: BuiltinRoles.MemberId,
                 }),
               ),
-            ).toMatchObject({ _tag: "AssignmentApplication.MemberNotFound" });
+            ).toMatchObject({ _tag: "AssignmentService.MemberNotFound" });
             expect(yield* Effect.flip(Operations.access(other.id, bob, viewer.id))).toMatchObject({
               _tag: "Gateway.NotMember",
             });
@@ -66,7 +66,7 @@ export const assignments = (harness: Harness) => {
               yield* Effect.flip(
                 Operations.revokeAssignment(workspace.id, alice, admin.id, first.id),
               ),
-            ).toMatchObject({ _tag: "AssignmentApplication.NotFound" });
+            ).toMatchObject({ _tag: "AssignmentService.NotFound" });
             expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(before);
             expect(yield* otherBound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
               otherBefore,
@@ -251,7 +251,7 @@ export const assignments = (harness: Harness) => {
                     roleId: BuiltinRoles.MemberId,
                   }),
                 ),
-              ).toMatchObject({ _tag: "AssignmentApplication.InactiveMember" });
+              ).toMatchObject({ _tag: "AssignmentService.InactiveMember" });
             }),
           ),
         ),
@@ -281,7 +281,7 @@ export const assignments = (harness: Harness) => {
                   expect(results.filter(({ _tag }) => _tag === "Success")).toHaveLength(1);
                   const rejected = results.find((result) => result._tag === "Failure");
                   // A writer that waited sees the winner's change; one that gave up reports contention.
-                  expect(["AssignmentApplication.Changed", "Gateway.Conflict"]).toContain(
+                  expect(["AssignmentService.Changed", "Gateway.Conflict"]).toContain(
                     rejected?._tag === "Failure" ? rejected.failure._tag : undefined,
                   );
                   expect(yield* bound.assignments.listActiveByMember(viewer.id)).toHaveLength(1);
@@ -324,14 +324,12 @@ export const assignments = (harness: Harness) => {
               cause: "injected late failure",
             });
             const broken = failingLate(bound, failure);
-            const rejected = yield* Effect.flatMap(
-              AssignmentApplication.Service,
-              (assignmentApplication) =>
-                assignmentApplication.change({
-                  memberId: viewer.id,
-                  roleId: BuiltinRoles.AdministratorId,
-                  expectedAssignmentIds: active.map(({ id }) => id),
-                }),
+            const rejected = yield* Effect.flatMap(AssignmentService.Service, (assignmentService) =>
+              assignmentService.change({
+                memberId: viewer.id,
+                roleId: BuiltinRoles.AdministratorId,
+                expectedAssignmentIds: active.map(({ id }) => id),
+              }),
             ).pipe(
               Effect.provide(core(broken)),
               Effect.provideService(Actor.Service, {

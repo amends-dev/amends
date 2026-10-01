@@ -140,10 +140,10 @@ export interface Interface {
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Summary>, ReadError, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/application/Service",
+  "@amends/core/thread/service/Service",
 ) {}
 /** Capture bound services; authorize the complete requested conversation inside its commit. @category constructors */
-export const make = Effect.fn("ThreadApplication.make")(function* () {
+export const make = Effect.fn("ThreadService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const groupQuery = yield* GroupQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
@@ -241,7 +241,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     yield* readStateCommand.markThreadRead(author, started.thread, started.activity.sequence);
     return { thread: started.thread, message: started.message } satisfies Thread.Started;
   });
-  const startDirect = Effect.fn("ThreadApplication.startDirect")(
+  const startDirect = Effect.fn("ThreadService.startDirect")(
     function* (input: Thread.StartDirectInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartDirectInput)(input);
       yield* authorization.require([]);
@@ -280,7 +280,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const startInGroup = Effect.fn("ThreadApplication.startInGroup")(
+  const startInGroup = Effect.fn("ThreadService.startInGroup")(
     function* (input: Thread.StartInGroupInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input);
       yield* groupQuery
@@ -341,7 +341,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   );
   // All read entry points use this check before exposing conversation data. It is deliberately
   // outside journal.commit; an enclosing caller transaction remains authoritative when present.
-  const get = Effect.fn("ThreadApplication.get")(function* (threadId: Thread.Id) {
+  const get = Effect.fn("ThreadService.get")(function* (threadId: Thread.Id) {
     const thread = yield* threadQuery
       .requireAccess(threadId)
       .pipe(
@@ -423,7 +423,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     }
     return items;
   });
-  const listInGroup = Effect.fn("ThreadApplication.listInGroup")(function* (
+  const listInGroup = Effect.fn("ThreadService.listInGroup")(function* (
     groupId: Group.Id,
     input: Thread.ListOptions,
   ) {
@@ -444,7 +444,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     );
   });
   const messagePublishedKind = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
-  const listOpenings = Effect.fn("ThreadApplication.listOpenings")(function* (
+  const listOpenings = Effect.fn("ThreadService.listOpenings")(function* (
     groupId: Group.Id,
     input: Thread.OpeningOptions,
   ) {
@@ -498,7 +498,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     }
     return result;
   });
-  const readTimeline = Effect.fn("ThreadApplication.readTimeline")(
+  const readTimeline = Effect.fn("ThreadService.readTimeline")(
     (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>
       threadQuery
         .readTimeline(threadId, options)
@@ -508,7 +508,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
           ),
         ),
   );
-  const listParticipants = Effect.fn("ThreadApplication.listParticipants")(function* (
+  const listParticipants = Effect.fn("ThreadService.listParticipants")(function* (
     threadId: Thread.Id,
     options: ThreadParticipation.ListOptions,
   ) {
@@ -527,6 +527,6 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     listParticipants,
   });
 });
-/** Provide opening-message workflows and authorized reads; replies use ThreadMessageApplication. @category layers */
+/** Provide opening-message workflows and authorized reads; replies use ThreadMessageService. @category layers */
 export const layer = Layer.effect(Service, make());
-export * as ThreadApplication from "./application.ts";
+export * as ThreadService from "./service.ts";

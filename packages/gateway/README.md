@@ -1,7 +1,7 @@
 # Gateway
 
 `@amends/gateway` is how a host enters core. Core operates within one workspace
-with a trusted actor, and its application services are the operations. The
+with a trusted actor, and its services are the operations. The
 gateway does the two things core cannot do for itself: bootstrap a workspace,
 and bind a workspace's storage and resolve an authenticated identity into the
 actor so those services can run. HTTP, RPC, and MCP all enter the same way and then

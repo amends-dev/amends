@@ -142,7 +142,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "AgentApplication.Incompatible",
+          _tag: "AgentService.Incompatible",
           reasons: [{ _tag: "ReasoningUnsupported", reasoning: "high" }],
         });
         const configured = yield* asAlice.agents.configure({
@@ -165,7 +165,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         ).toBe("Critic");
         yield* asAlice.agents.remove({ params });
         expect(yield* asBob.agents.get({ params }).pipe(Effect.flip)).toMatchObject({
-          _tag: "AgentApplication.NotFound",
+          _tag: "AgentService.NotFound",
         });
         expect(yield* asAlice.agents.list({ params: { workspaceId } })).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(server(url, credentialKey))),

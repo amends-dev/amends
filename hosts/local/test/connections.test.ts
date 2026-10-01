@@ -110,13 +110,13 @@ describe.skipIf(!available)("PostgreSQL", () => {
               },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ConnectionApplication.UnknownImplementation" });
+        ).toMatchObject({ _tag: "ConnectionService.UnknownImplementation" });
         expect(
           yield* asAlice.connections
             .configure({ params, payload: { settings: { baseUrl: "not a url" } } })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "ConnectionApplication.InvalidSettings",
+          _tag: "ConnectionService.InvalidSettings",
           issues: ["API URL must be an http or https URL."],
         });
 
@@ -145,14 +145,14 @@ describe.skipIf(!available)("PostgreSQL", () => {
           yield* asAlice.connections
             .rename({ params, payload: { name: "Other", expectedName: "Anthropic" } })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ConnectionApplication.Changed" });
+        ).toMatchObject({ _tag: "ConnectionService.Changed" });
 
         expect(yield* asAlice.connections.clearCredential({ params })).toMatchObject({
           authentication: { _tag: "ApiKey", configured: false },
         });
         yield* asAlice.connections.remove({ params });
         expect(yield* asBob.connections.get({ params }).pipe(Effect.flip)).toMatchObject({
-          _tag: "ConnectionApplication.NotFound",
+          _tag: "ConnectionService.NotFound",
         });
         expect(yield* asBob.connections.list({ params: { workspaceId } })).toEqual([]);
       }).pipe(Effect.scoped, Effect.provide(server(url, credentialKey))),
@@ -180,7 +180,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
               payload: { secret: Redacted.make(secret) },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "ConnectionApplication.CredentialsUnavailable" });
+        ).toMatchObject({ _tag: "ConnectionService.CredentialsUnavailable" });
       }).pipe(Effect.scoped, Effect.provide(server(url, undefined))),
     ),
   );

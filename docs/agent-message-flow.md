@@ -36,7 +36,7 @@ agent, so agents do not wake one another.
 ## 1. The request (commit A)
 
 `ThreadsHandlers` (`start` for a new thread, `publish` for a reply) enter the workspace through
-`gateway.asMember` and call `ThreadApplication.startInGroup` or `ThreadMessageApplication.publish`
+`gateway.asMember` and call `ThreadService.startInGroup` or `ThreadMessageService.publish`
 ([server-http](../packages/server-http/README.md), [thread workflows](thread-workflows.md)).
 Both end in `ThreadCommand.publishMessage`, inside one `journal.commit`:
 
@@ -178,13 +178,13 @@ followed over its own stream.
 
 ## Other ways through
 
-| Situation                                | What happens                                                                                                                                                                                                         |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Another message while the turn works     | Steps 1 to 3 run again; `turn.input-accepted` extends the running turn, and `close` returns `InputPending` for what it has not taken in.                                                                             |
-| Stop                                     | `TurnApplication.cancel` publishes `turn.cancel-requested`. A queued turn ends at once; a running one is noticed by the runner, which checks every `checkInterval` (one second), and confirms with `confirmStopped`. |
-| Retry                                    | `TurnApplication.retry` publishes `turn.retried` for a new queued turn, and the dispatch reaction stores its `Run`.                                                                                                  |
-| The agent leaves the thread or the group | `turn.stop-departed` wakes on the departure facts and stops the agent's active turns there.                                                                                                                          |
-| An agent posts a message                 | Its recipients are informational for agents, so nothing wakes another agent.                                                                                                                                         |
+| Situation                                | What happens                                                                                                                                                                                                     |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Another message while the turn works     | Steps 1 to 3 run again; `turn.input-accepted` extends the running turn, and `close` returns `InputPending` for what it has not taken in.                                                                         |
+| Stop                                     | `TurnService.cancel` publishes `turn.cancel-requested`. A queued turn ends at once; a running one is noticed by the runner, which checks every `checkInterval` (one second), and confirms with `confirmStopped`. |
+| Retry                                    | `TurnService.retry` publishes `turn.retried` for a new queued turn, and the dispatch reaction stores its `Run`.                                                                                                  |
+| The agent leaves the thread or the group | `turn.stop-departed` wakes on the departure facts and stops the agent's active turns there.                                                                                                                      |
+| An agent posts a message                 | Its recipients are informational for agents, so nothing wakes another agent.                                                                                                                                     |
 
 ## Failure and recovery
 

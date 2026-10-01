@@ -291,14 +291,14 @@ it("names why a stop or retry was refused", async () => {
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
   f.answers.push(
-    json({ _tag: "TurnApplication.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
+    json({ _tag: "TurnService.NotRetryable", turnId: "atlas-1", reason: "superseded" }, 409),
   );
   f.views.controls.retry("atlas-1");
   await waitFor(() =>
     expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "superseded" }),
   );
   f.answers.push(
-    json({ _tag: "TurnApplication.NotActive", turnId: "scout-2", status: "completed" }, 409),
+    json({ _tag: "TurnService.NotActive", turnId: "scout-2", status: "completed" }, 409),
   );
   f.views.controls.stop("scout-2");
   await waitFor(() =>
@@ -482,7 +482,7 @@ it("follows a turn's log again after it drops, opening with the items as they st
 });
 
 const refusals = {
-  gone: () => json({ _tag: "TurnApplication.NotFound", turnId: "atlas-1" }, 404),
+  gone: () => json({ _tag: "TurnService.NotFound", turnId: "atlas-1" }, 404),
   denied: () =>
     json(
       {

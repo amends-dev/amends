@@ -1,5 +1,5 @@
 export { Connection } from "./connection.ts";
-export { ConnectionApplication } from "./application.ts";
+export { ConnectionService } from "./service.ts";
 export { ConnectionCatalog } from "./catalog.ts";
 export { ConnectionCredentialStore } from "./credential-store.ts";
 export { ConnectionErrors } from "./errors.ts";

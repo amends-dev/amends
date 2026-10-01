@@ -1,9 +1,9 @@
 import { describe, it, expect } from "@effect/vitest";
 import { PgClient } from "@effect/sql-pg";
-import { GroupApplication } from "@amends/core/group";
+import { GroupService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Fact, Journal, Publication, Subject } from "@amends/core/journal";
-import { ThreadApplication } from "@amends/core/thread";
+import { ThreadService } from "@amends/core/thread";
 import { Notification } from "@amends/core/notification";
 import { Member, MemberFacts } from "@amends/core/workspace";
 import { Array, DateTime, Effect, Option, Redacted, Schema } from "effect";
@@ -172,16 +172,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 ),
               )
               .pipe(Effect.provideService(Publication.Service, testProvenance()));
-            const groupApplication = yield* GroupApplication.Service;
-            const threadApplication = yield* ThreadApplication.Service;
+            const groupService = yield* GroupService.Service;
+            const threadService = yield* ThreadService.Service;
             return yield* Effect.forEach([memberIds.slice(0, 10), memberIds.slice(10)], (members) =>
               Effect.gen(function* () {
-                const group = yield* groupApplication.createTeam({
+                const group = yield* groupService.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, ...members],
                 });
                 return yield* Effect.forEach(Array.range(1, 6), () =>
-                  threadApplication.startInGroup({
+                  threadService.startInGroup({
                     groupId: group.id,
                     text: "Hello",
                     mentions: members,

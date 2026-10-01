@@ -13,21 +13,21 @@ import {
 
 import {
   Group,
-  GroupApplication,
-  GroupMembershipApplication,
+  GroupService,
+  GroupMembershipService,
   GroupMembershipFacts,
 } from "@amends/core/group";
 
 import { Actor, Identity } from "@amends/core/identity";
 
 import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
+import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
 
 import { Notification, NotificationStore } from "@amends/core/notification";
 
 import {
   Thread,
-  ThreadApplication,
+  ThreadService,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
@@ -94,8 +94,8 @@ export const threads = (harness: Harness) => {
       mentions: ReadonlyArray<Member.Id> = [],
       text = "Here's the proposal",
     ) =>
-      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-        threadApplication.startInGroup({ groupId, mentions, text }),
+      Effect.flatMap(ThreadService.Service, (threadService) =>
+        threadService.startInGroup({ groupId, mentions, text }),
       );
     // Inspect persisted participation through the internal test binding, not the public result.
     const start = Effect.fnUntraced(function* (
@@ -113,8 +113,8 @@ export const threads = (harness: Harness) => {
       });
     });
     const create = (members: ReadonlyArray<Member.Id>, name = "Engineering") =>
-      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
-        groupApplication.createTeam({ name, memberIds: members }),
+      Effect.flatMap(GroupService.Service, (groupService) =>
+        groupService.createTeam({ name, memberIds: members }),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const seed = (bound: Bound) =>
@@ -278,7 +278,7 @@ export const threads = (harness: Harness) => {
               const before = yield* history(bound);
               for (const id of [otherId, Member.Id.make("missing")])
                 expect(yield* Effect.flip(run(bound, owner, start(group.id, [id])))).toEqual(
-                  new ThreadApplication.ParticipantUnavailable({ memberId: id }),
+                  new ThreadService.ParticipantUnavailable({ memberId: id }),
                 );
               expect(
                 yield* Effect.flip(run(bound, owner, start(group.id, [humanId, humanId]))),
@@ -308,11 +308,11 @@ export const threads = (harness: Harness) => {
                 requirement: { permission: { name: ThreadPermissions.Start.name } },
               });
               expect(yield* Effect.flip(run(bound, owner, start(hidden.id)))).toEqual(
-                new ThreadApplication.GroupNotFound({ groupId: hidden.id }),
+                new ThreadService.GroupNotFound({ groupId: hidden.id }),
               );
               expect(
                 yield* Effect.flip(run(bound, owner, start(Group.Id.make("missing")))),
-              ).toMatchObject({ _tag: "ThreadApplication.GroupNotFound" });
+              ).toMatchObject({ _tag: "ThreadService.GroupNotFound" });
               expect(yield* history(bound)).toEqual(before);
               yield* publish(
                 bound,
@@ -380,7 +380,7 @@ export const threads = (harness: Harness) => {
                 ),
               );
               expect(yield* Effect.flip(run(bound, agent, start(group.id)))).toMatchObject({
-                _tag: "ThreadApplication.HumanAuthorRequired",
+                _tag: "ThreadService.HumanAuthorRequired",
               });
               yield* publish(
                 bound,
@@ -412,8 +412,8 @@ export const threads = (harness: Harness) => {
                 memberIds: ReadonlyArray<Member.Id>,
                 mentions: ReadonlyArray<Member.Id> = [],
               ) =>
-                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
-                  threadApplication.startDirect({ memberIds, text: "Hello", mentions }),
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.startDirect({ memberIds, text: "Hello", mentions }),
                 );
               // The human may start threads anywhere, but may not use the agent.
               yield* publish(
@@ -531,8 +531,8 @@ export const threads = (harness: Harness) => {
               yield* run(
                 bound,
                 agent,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.leave({
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.leave({
                     groupId: group.id,
                     membershipId: memberParticipant(participant).groupMembershipId,
                   }),
@@ -554,8 +554,8 @@ export const threads = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
-                  groupMembershipApplication.add({ groupId: group.id, memberId: agentId }),
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: agentId }),
                 ),
               );
               expect(yield* bound.participations.get(participant.id)).toMatchObject({
@@ -573,8 +573,8 @@ export const threads = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                  memberApplication.remove(agentId),
+                Effect.flatMap(MemberService.Service, (memberService) =>
+                  memberService.remove(agentId),
                 ),
               );
               expect(
@@ -656,7 +656,7 @@ export const threads = (harness: Harness) => {
                   ),
                 ),
               ),
-            ).toMatchObject({ _tag: "ThreadApplication.ParticipantUnavailable" });
+            ).toMatchObject({ _tag: "ThreadService.ParticipantUnavailable" });
             expect(yield* history(bound)).toEqual(before);
             expect(yield* bound.threads.listByGroup(group.id)).toEqual([]);
           }),
@@ -682,17 +682,15 @@ export const threads = (harness: Harness) => {
                   yield* run(
                     bound,
                     owner,
-                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                      memberApplication.remove(agentId),
+                    Effect.flatMap(MemberService.Service, (memberService) =>
+                      memberService.remove(agentId),
                     ),
                   );
                   yield* run(
                     bound,
                     owner,
-                    Effect.flatMap(
-                      GroupMembershipApplication.Service,
-                      (groupMembershipApplication) =>
-                        groupMembershipApplication.add({ groupId: group.id, memberId: otherId }),
+                    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                      groupMembershipService.add({ groupId: group.id, memberId: otherId }),
                     ),
                   );
                   yield* publish(
@@ -788,7 +786,7 @@ export const threads = (harness: Harness) => {
                 yield* Effect.flip(
                   gateway.asMember(workspace.id, owner, startOnly(group.id, [otherId])),
                 ),
-              ).toMatchObject({ _tag: "ThreadApplication.ParticipantUnavailable" });
+              ).toMatchObject({ _tag: "ThreadService.ParticipantUnavailable" });
               expect(
                 yield* Effect.flip(
                   gateway.asMember(workspace.id, owner, startOnly(group.id, [], " ")),
@@ -900,8 +898,8 @@ export const threads = (harness: Harness) => {
                         yield* Deferred.succeed(ready, undefined);
                         yield* Deferred.await(startGate);
                         if (remove) {
-                          yield* Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                            memberApplication.remove(agentId),
+                          yield* Effect.flatMap(MemberService.Service, (memberService) =>
+                            memberService.remove(agentId),
                           );
                         } else {
                           yield* start(saved.group.id, [agentId]);
@@ -923,7 +921,7 @@ export const threads = (harness: Harness) => {
                 expect(Cause.findErrorOption(result.cause)).toMatchObject({
                   value: {
                     _tag: expect.stringMatching(
-                      /^(JournalStore.Conflict|ThreadApplication.ParticipantUnavailable)$/,
+                      /^(JournalStore.Conflict|ThreadService.ParticipantUnavailable)$/,
                     ),
                   },
                 });
@@ -937,8 +935,8 @@ export const threads = (harness: Harness) => {
                     yield* run(
                       bound,
                       saved.owner,
-                      Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                        memberApplication.remove(agentId),
+                      Effect.flatMap(MemberService.Service, (memberService) =>
+                        memberService.remove(agentId),
                       ),
                     );
                   for (const thread of yield* bound.threads.listByGroup(saved.group.id))
@@ -1008,13 +1006,11 @@ export const threads = (harness: Harness) => {
                   run(
                     failing,
                     agent,
-                    Effect.flatMap(
-                      GroupMembershipApplication.Service,
-                      (groupMembershipApplication) =>
-                        groupMembershipApplication.leave({
-                          groupId: group.id,
-                          membershipId: memberParticipant(participation).groupMembershipId,
-                        }),
+                    Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                      groupMembershipService.leave({
+                        groupId: group.id,
+                        membershipId: memberParticipant(participation).groupMembershipId,
+                      }),
                     ),
                   ),
                 ),

@@ -48,11 +48,11 @@ export interface Interface {
   ) => Effect.Effect<void, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/read-state/application/Service",
+  "@amends/core/read-state/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority per operation. @category constructors */
-export const make = Effect.fn("ReadStateApplication.make")(function* () {
+export const make = Effect.fn("ReadStateService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const groupQuery = yield* GroupQuery.Service;
@@ -69,7 +69,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       return yield* new HumanRequired({ memberId: actor.memberId });
     return Notification.ofMember(actor.memberId, actor.identity) satisfies ReadState.Reader;
   });
-  const markThreadRead = Effect.fn("ReadStateApplication.markThreadRead")(function* (
+  const markThreadRead = Effect.fn("ReadStateService.markThreadRead")(function* (
     input: ReadState.MarkThreadReadInput,
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input);
@@ -115,7 +115,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     );
   });
 
-  const markGroupRead = Effect.fn("ReadStateApplication.markGroupRead")(function* (
+  const markGroupRead = Effect.fn("ReadStateService.markGroupRead")(function* (
     input: ReadState.MarkGroupReadInput,
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input);
@@ -155,4 +155,4 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
 });
 /** @category layers */
 export const layer = Layer.effect(Service, make());
-export * as ReadStateApplication from "./application.ts";
+export * as ReadStateService from "./service.ts";

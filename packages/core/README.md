@@ -37,7 +37,7 @@ domains; workspace scoping alone does not make a feature part of workspace
 management.
 
 `@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
-contract, `NotificationApplication`, and the projection that generates notifications. A record
+contract, `NotificationService`, and the projection that generates notifications. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient (one Triage
 recipient per workspace, `{ _tag: "Triage" }`), and is `Pending`, `Discarded` when its agent
 participation ends or its person leaves the source's group, `Acknowledged` once a human saw it, or `Informational` from the start when
@@ -45,7 +45,7 @@ its activity asks an agent for no work, as another agent's message does. Each ac
 records `requestsWork`. A human or agent recipient names the
 membership notified as well as the identity (`Notification.ofMember`), so an inbox belongs to one
 membership: someone who rejoins under a new member ID starts with an empty one.
-`NotificationApplication` serves the acting member's own inbox (`get`, `list`, `listPending`, and
+`NotificationService` serves the acting member's own inbox (`get`, `list`, `listPending`, and
 `inbox`, newest first with each source they can still read), `resolveSource`, and human
 `acknowledge`; contact and triage inboxes are read only through the
 store. `NotificationProjection`
@@ -87,7 +87,7 @@ are `InvitationFacts`; their projection is `InvitationProjection.definition`.
 
 Use short filenames within feature directories and descriptive module namespaces:
 `member/store.ts` exports `MemberStore`, and `member/application.ts` exports
-`MemberApplication`. Keep the named domain model file instead of collecting
+`MemberService`. Keep the named domain model file instead of collecting
 unrelated types in a general `schema.ts` or `types.ts` file.
 
 Core tests follow the domain and feature directories under `test/`. Tests that
@@ -128,19 +128,19 @@ their own.
 ## Groups
 
 `@amends/core/group` holds team and direct groups, their admissions, and follows.
-`GroupApplication` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
+`GroupService` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
 `get`);
-`GroupMembershipApplication` adds, removes, and lets members join public groups and leave team
+`GroupMembershipService` adds, removes, and lets members join public groups and leave team
 groups, and reads rosters;
-`GroupFollowApplication` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
+`GroupFollowService` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
 `GroupFollowStore` are required host bindings. A direct group has a fixed set of two or more
 members in `Group.directMembers` order, identified by `Group.directKey` and found in any order
 through `GroupStore.findDirect`; `GroupCommand.establishDirect` finds or creates one for
-`ThreadApplication.startDirect`.
+`ThreadService.startDirect`.
 
 Groups share their internal reads and writes as one `GroupQuery` and one `GroupCommand`, excluded
 from `Core.Operations` like thread's. `GroupQuery.requireAudience` checks current workspace and
-group membership, with no action permission and no management bypass; each application checks its
+group membership, with no action permission and no management bypass; each service checks its
 own action grant alongside it, inside its commit for writes. `GroupCommand.admitMember` publishes an
 admission, for team creation, direct groups, adding, and joining alike.
 `GroupCommand.removeMembership` records a group departure as one fact; projections end the
@@ -152,7 +152,7 @@ without thread activity. Workspace-member removal uses it for every admission. S
 
 `@amends/core/connection` holds workspace connections: access to an external system through an
 implementation the host installed, described by the [connection contract](../connection/README.md).
-`ConnectionApplication` lists and reads the connections the actor may read, and creates, renames,
+`ConnectionService` lists and reads the connections the actor may read, and creates, renames,
 configures, sets and clears the credential of, and removes them; `implementations` lists the
 declarations this host installed, which every member may see. Reads return `Connection.View`:
 the record without its credential, whether one is set, whether this host installed the
@@ -191,7 +191,7 @@ its provider has one, a template, non-secret variables, setup commands run in or
 retention, `stop` or `destroy`. Model access, instructions, and toolkits belong to agents, and
 credentials to connections.
 
-`EnvironmentApplication` lists the installed `implementations`, which every member may see, and
+`EnvironmentService` lists the installed `implementations`, which every member may see, and
 lists, reads, creates, renames, configures, and removes environments. Creating checks the harness
 (`UnknownHarness`), that it can run where asked (`UnsupportedPlacement`), the provider
 (`UnknownSandboxProvider`), and the sandbox settings (`InvalidSandbox`, with issue codes): an
@@ -225,7 +225,7 @@ its model access (a connection, a model identifier, and a reasoning level or nul
 environment it starts in. Credentials stay with the connection, and where and how it runs with the
 environment.
 
-`AgentApplication.create` adds the membership with its name, a workspace-scoped assignment of the
+`AgentService.create` adds the membership with its name, a workspace-scoped assignment of the
 initial role, admission to the general group, and the agent's record, in one commit. It requires
 `agent.create` on the workspace, and the role goes through `Delegation.requireGrant`, so only the
 owner gives an agent Administrator and nobody gives it Owner. The actor must be able to read and
@@ -235,7 +235,7 @@ connection that is not yet ready is saved and shows as the agent's readiness, wh
 model inference, a harness that does not speak the connection's interface, or a reasoning level it
 does not take is refused (`Incompatible`, with the reasons). `configure` replaces the instructions,
 model access, and environment under the same checks, `rename` renames the membership with the
-name it expects (`Changed`), and `remove` removes the membership through `MemberApplication.remove`,
+name it expects (`Changed`), and `remove` removes the membership through `MemberService.remove`,
 with its delegation rules; the record remains for history. `environmentChoices` answers the check
 for each environment the actor may read and use, for choosing where an agent starts.
 
@@ -339,7 +339,7 @@ counts that input as taken in. It reports instead that the turn finished, is sto
 when its connection has no key. `get` reads the turn, for a run to watch. `showDraft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal.
 
-`TurnApplication.watchLog` follows a turn's log for a reader who may read its thread, as a stream
+`TurnService.watchLog` follows a turn's log for a reader who may read its thread, as a stream
 of `Turn.LogMessage`s. It tails the agent's log with `Log.tail`, from the turn's `logAfter`, taking
 the turn's entries into one `TurnLog.reader` until its `Ended` entry or another turn's, the reading
 `log` returns: `Opened` carries the items as they stand, `Changed` the items each new batch adds or
@@ -371,7 +371,7 @@ the turn. The gateway binds
 and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
 from a person's message through the wake, acceptance, and dispatch to the reply.
 
-`TurnApplication` lets a reader who may read a thread `get` and `listByThread` its turns, as
+`TurnService` lets a reader who may read a thread `get` and `listByThread` its turns, as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
 (`retryable`) now. Every turn read requires what the thread's timeline does: the group's audience
 and `thread.read` on the thread. A thread outside the reader's audience is `ThreadNotFound`, and
@@ -396,7 +396,7 @@ activity of its own yet.
 
 ## Read state
 
-`@amends/core/read-state` holds private read state: `ReadStateApplication.markThreadRead` and
+`@amends/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the required `ReadStateStore` binding, which is kept outside the journal.
 Its internal `ReadStateCommand.markThreadRead` marks the reader's notifications from the thread
 seen and advances their position; marking a thread read, starting one, and replying all use it, so
@@ -426,9 +426,9 @@ every thread belongs to one group.
 ## Threads
 
 `@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
-four store contracts. Its operations are `ThreadApplication` (`startInGroup`, `startDirect`, `get`,
-`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageApplication.publish`, and
-`ThreadParticipationApplication` (`follow`, `unfollow`). A participant is a member, a contact, or
+four store contracts. Its operations are `ThreadService` (`startInGroup`, `startDirect`, `get`,
+`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageService.publish`, and
+`ThreadParticipationService` (`follow`, `unfollow`). A participant is a member, a contact, or
 triage: member participation references the exact group admission, while contacts and triage take
 part without group access. A message author is a member or a contact.
 
@@ -526,7 +526,7 @@ records all three roles and one workspace-scoped Owner assignment for its creato
 The reserved role IDs are stable within each workspace; display names are labels.
 
 Tiers only construct these default bundles. Authorization checks stored permission
-names and scopes, and application services enforce ownership and delegation rules.
+names and scopes, and services enforce ownership and delegation rules.
 `Permission.Reference` retains only the name and target kind used by requirements,
 preserving the HTTP error contract without exposing bundle-construction metadata.
 
@@ -543,7 +543,7 @@ host, grants nothing, since no requirement can name it, and its holder's other g
 Member takes part in conversations and creates, renames, joins, and manages the groups it belongs
 to; Administrator adds people management, invitations, role changes, and `group.moderate` for
 public groups; Owner adds workspace rename and ownership transfer. No role reaches a group from
-outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentApplication` provides listing, assignment,
+outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentService` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
 clients can offer just the actions the member may take. `Delegation` supplies the shared
@@ -551,7 +551,7 @@ rules used by assignments, invitations, and member removal. Role definition edit
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)
 for the implemented bundles and current invitation restrictions.
 
-`OwnershipApplication` coordinates ownership and assignments in one commit. It
+`OwnershipService` coordinates ownership and assignments in one commit. It
 requires the current owner and `OwnershipPermissions.Transfer`, validates another
 active human recipient, and uses the current Owner assignment ID as the expected
 authority for a transfer. The former owner becomes an Administrator. `WorkspaceStore`
@@ -602,7 +602,7 @@ The existing journal log reader and projection replay retain complete-batch read
 ## Change feed
 
 `@amends/core/change-feed` exports the `ChangeFeed` schemas and
-`ChangeFeedApplication.watch(options?)`. The feed reads the workspace journal, so it
+`ChangeFeedService.watch(options?)`. The feed reads the workspace journal, so it
 carries every commit to the journal from any host or process over the same storage,
 including commits whose acknowledgment was lost. Nothing is published from the
 commit path.
@@ -681,13 +681,13 @@ to the subscribers present at that moment, in every process over the same storag
 Publishing never fails the operation that publishes, and a subscriber that falls behind, or whose
 process loses its connection to the others, misses signals rather than delaying anyone.
 
-`SignalApplication.typing(threadId)` tells the thread's readers that the acting member is
-composing there until `until`, six seconds later (`SignalApplication.typingFor`). It requires
+`SignalService.typing(threadId)` tells the thread's readers that the acting member is
+composing there until `until`, six seconds later (`SignalService.typingFor`). It requires
 current group access and `thread.publish`, as posting does, and returns `ThreadNotFound` for
 missing and inaccessible threads alike. Repeats from the same member in the same thread within two
 seconds are dropped by the process that receives them, so a client may call it on each keystroke;
-clients hide their own member's typing. `ReadStateApplication` and
-`NotificationApplication.acknowledge` publish the read-state signals after their writes.
+clients hide their own member's typing. `ReadStateService` and
+`NotificationService.acknowledge` publish the read-state signals after their writes.
 
 ## Background work
 
@@ -720,7 +720,7 @@ but not of `Core.Operations`, since no actor runs it. The gateway runs it for ho
 
 ## Module dependencies and exports
 
-Models and ID modules are independent of application services, projections, and
+Models and ID modules are independent of services, projections, and
 storage implementations. Facts depend on models and the fact declaration API.
 Projections depend on facts, store contracts, and projection machinery; they
 replay recorded outcomes without re-evaluating current authority or time.
@@ -740,7 +740,7 @@ names. Avoid importing an aggregate barrel from an internal module.
 import { MemberStore } from "./store.ts";
 
 // From another package:
-import { Member, MemberApplication } from "@amends/core/workspace";
+import { Member, MemberService } from "@amends/core/workspace";
 ```
 
 The domain `index.ts` files define the public package surface. A feature folder
@@ -770,7 +770,7 @@ consistent across modules. Typed errors retain tagged error schemas.
 | `<Operation>Options` | Parameters controlling an operation: `Store.ReadOptions`, `Store.AppendOptions`.                                                                                                |
 | `State`              | A lifecycle variant with associated data: `Invitation.State`.                                                                                                                   |
 | `Status`             | A simple lifecycle label: `Member.Status`, `Assignment.Status`.                                                                                                                 |
-| `Interface`          | The contract implemented by a context service: `MemberApplication.Interface`, `MemberStore.Interface`.                                                                          |
+| `Interface`          | The contract implemented by a context service: `MemberService.Interface`, `MemberStore.Interface`.                                                                              |
 
 Supporting types name their actual role. `Invitation.Issuance` is the immutable
 issuance record retained through acceptance or revocation. `Event.Envelope`
@@ -880,31 +880,31 @@ meaning rather than using it as a synonym for a constructor.
 
 ## Service boundaries
 
-| Implementation            | Constructor                             | Layer provides                           |
-| ------------------------- | --------------------------------------- | ---------------------------------------- |
-| Transaction               | `Transaction.make()`                    | `Transaction.Service`                    |
-| Log                       | `Log.make()`                            | `Log.Service` and `Transaction.Service`  |
-| Journal                   | `Journal.make(options)`                 | `Journal.Service`                        |
-| Change-feed follower      | `ChangeFeedSource.make(options?)`       | `ChangeFeedSource.Service`               |
-| Permission catalog        | `PermissionCatalog.make(definitions)`   | `PermissionCatalog.Service`              |
-| Grant resolver            | `GrantResolver.make()`                  | `GrantResolver.Service`                  |
-| Authorization             | `Authorization.make()`                  | `Authorization.Service`                  |
-| Member operations         | `MemberApplication.make()`              | `MemberApplication.Service`              |
-| Thread operations         | `ThreadApplication.make()`              | `ThreadApplication.Service`              |
-| Thread participation      | `ThreadParticipationApplication.make()` | `ThreadParticipationApplication.Service` |
-| Human message publication | `ThreadMessageApplication.make()`       | `ThreadMessageApplication.Service`       |
-| Notification reads        | `NotificationApplication.make()`        | `NotificationApplication.Service`        |
-| Team creation and reads   | `GroupApplication.make()`               | `GroupApplication.Service`               |
-| Group membership          | `GroupMembershipApplication.make()`     | `GroupMembershipApplication.Service`     |
-| Group following           | `GroupFollowApplication.make()`         | `GroupFollowApplication.Service`         |
-| Read state                | `ReadStateApplication.make()`           | `ReadStateApplication.Service`           |
-| Group internal reads      | `GroupQuery.make()`                     | `GroupQuery.Service`                     |
-| Assignment operations     | `AssignmentApplication.make()`          | `AssignmentApplication.Service`          |
-| Delegation policy         | `Delegation.make()`                     | `Delegation.Service`                     |
-| Invitation operations     | `InvitationApplication.make()`          | `InvitationApplication.Service`          |
-| Ownership operations      | `OwnershipApplication.make()`           | `OwnershipApplication.Service`           |
-| Change feed               | `ChangeFeedApplication.make()`          | `ChangeFeedApplication.Service`          |
-| Typing signals            | `SignalApplication.make()`              | `SignalApplication.Service`              |
+| Implementation            | Constructor                           | Layer provides                          |
+| ------------------------- | ------------------------------------- | --------------------------------------- |
+| Transaction               | `Transaction.make()`                  | `Transaction.Service`                   |
+| Log                       | `Log.make()`                          | `Log.Service` and `Transaction.Service` |
+| Journal                   | `Journal.make(options)`               | `Journal.Service`                       |
+| Change-feed follower      | `ChangeFeedSource.make(options?)`     | `ChangeFeedSource.Service`              |
+| Permission catalog        | `PermissionCatalog.make(definitions)` | `PermissionCatalog.Service`             |
+| Grant resolver            | `GrantResolver.make()`                | `GrantResolver.Service`                 |
+| Authorization             | `Authorization.make()`                | `Authorization.Service`                 |
+| Member operations         | `MemberService.make()`                | `MemberService.Service`                 |
+| Thread operations         | `ThreadService.make()`                | `ThreadService.Service`                 |
+| Thread participation      | `ThreadParticipationService.make()`   | `ThreadParticipationService.Service`    |
+| Human message publication | `ThreadMessageService.make()`         | `ThreadMessageService.Service`          |
+| Notification reads        | `NotificationService.make()`          | `NotificationService.Service`           |
+| Team creation and reads   | `GroupService.make()`                 | `GroupService.Service`                  |
+| Group membership          | `GroupMembershipService.make()`       | `GroupMembershipService.Service`        |
+| Group following           | `GroupFollowService.make()`           | `GroupFollowService.Service`            |
+| Read state                | `ReadStateService.make()`             | `ReadStateService.Service`              |
+| Group internal reads      | `GroupQuery.make()`                   | `GroupQuery.Service`                    |
+| Assignment operations     | `AssignmentService.make()`            | `AssignmentService.Service`             |
+| Delegation policy         | `Delegation.make()`                   | `Delegation.Service`                    |
+| Invitation operations     | `InvitationService.make()`            | `InvitationService.Service`             |
+| Ownership operations      | `OwnershipService.make()`             | `OwnershipService.Service`              |
+| Change feed               | `ChangeFeedService.make()`            | `ChangeFeedService.Service`             |
+| Typing signals            | `SignalService.make()`                | `SignalService.Service`                 |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
 `Signals.Service` is a host contract too, bound to one workspace like the stores.
@@ -921,7 +921,7 @@ and use those resources within that scope; the corresponding layer owns cleanup.
 
 The root `core.ts` is a composition of these layers, with no separate service
 implementation to construct. `HostServices` remains derived from its input
-requirements and `Operations` from the application services it exposes.
+requirements and `Operations` from the services it exposes.
 
 ## Other construction APIs
 

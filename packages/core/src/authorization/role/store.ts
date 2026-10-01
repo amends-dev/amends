@@ -23,7 +23,7 @@ export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict
  * checkpoints. Enforce constraints atomically across concurrent writers. Reject
  * expired or foreign transaction handles and never retry the program internally.
  * Permission definitions, affected assignments, and grant authority are checked
- * by application services before publication.
+ * by services before publication.
  */
 export interface Interface {
   /** Find a role in this workspace; None if absent. */

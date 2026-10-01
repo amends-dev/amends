@@ -96,11 +96,11 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/connection/application/Service",
+  "@amends/core/connection/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
-export const make = Effect.fn("ConnectionApplication.make")(function* () {
+export const make = Effect.fn("ConnectionService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const connectionStore = yield* ConnectionStore.Service;
   const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
@@ -185,7 +185,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
       );
   });
 
-  const get = Effect.fn("ConnectionApplication.get")(function* (connectionId: Connection.Id) {
+  const get = Effect.fn("ConnectionService.get")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     return yield* presented(yield* authorized(id, ConnectionPermissions.Read));
   });
@@ -196,7 +196,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     return found.value;
   });
 
-  const create = Effect.fn("ConnectionApplication.create")(
+  const create = Effect.fn("ConnectionService.create")(
     function* (input: Connection.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Connection.CreateInput))(input);
       yield* authorization.require([
@@ -245,9 +245,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     journal.commit,
   );
 
-  const rename = Effect.fn("ConnectionApplication.rename")(function* (
-    input: Connection.RenameInput,
-  ) {
+  const rename = Effect.fn("ConnectionService.rename")(function* (input: Connection.RenameInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.RenameInput))(input);
     return yield* Effect.gen(function* () {
       const record = yield* authorized(request.connectionId, ConnectionPermissions.Manage);
@@ -263,7 +261,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const configure = Effect.fn("ConnectionApplication.configure")(function* (
+  const configure = Effect.fn("ConnectionService.configure")(function* (
     input: Connection.ConfigureInput,
   ) {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.ConfigureInput))(input);
@@ -279,7 +277,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const setCredential = Effect.fn("ConnectionApplication.setCredential")(function* (
+  const setCredential = Effect.fn("ConnectionService.setCredential")(function* (
     input: Connection.SetCredentialInput,
   ) {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.SetCredentialInput))(input);
@@ -315,7 +313,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const clearCredential = Effect.fn("ConnectionApplication.clearCredential")(function* (
+  const clearCredential = Effect.fn("ConnectionService.clearCredential")(function* (
     connectionId: Connection.Id,
   ) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
@@ -337,7 +335,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     }).pipe(committed);
   });
 
-  const remove = Effect.fn("ConnectionApplication.remove")(function* (connectionId: Connection.Id) {
+  const remove = Effect.fn("ConnectionService.remove")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     return yield* Effect.gen(function* () {
       const record = yield* authorized(id, ConnectionPermissions.Manage);
@@ -363,4 +361,4 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
 /** @category layers */
 export const layer = Layer.effect(Service, make());
 
-export * as ConnectionApplication from "./application.ts";
+export * as ConnectionService from "./service.ts";

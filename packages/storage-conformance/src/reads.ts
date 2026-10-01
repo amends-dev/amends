@@ -1,13 +1,8 @@
-import { AssignmentApplication } from "@amends/core/authorization";
-import { ChangeFeedApplication } from "@amends/core/change-feed";
+import { AssignmentService } from "@amends/core/authorization";
+import { ChangeFeedService } from "@amends/core/change-feed";
 import { Log, Store } from "@amends/core/journal";
-import { Notification, NotificationApplication } from "@amends/core/notification";
-import {
-  InvitationApplication,
-  Member,
-  MemberApplication,
-  OwnershipApplication,
-} from "@amends/core/workspace";
+import { Notification, NotificationService } from "@amends/core/notification";
+import { InvitationService, Member, MemberService, OwnershipService } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
@@ -56,29 +51,27 @@ export const reads = (harness: Harness) => {
                     expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(
                       true,
                     );
-                    const memberApplication = yield* MemberApplication.Service;
+                    const memberService = yield* MemberService.Service;
+                    expect((yield* memberService.get(workspace.ownerMemberId)).identity).toEqual(
+                      alice,
+                    );
+                    expect(yield* memberService.list).toHaveLength(1);
+                    expect(yield* (yield* InvitationService.Service).list).toEqual([]);
+                    const assignmentService = yield* AssignmentService.Service;
+                    expect(yield* assignmentService.roles).toHaveLength(3);
                     expect(
-                      (yield* memberApplication.get(workspace.ownerMemberId)).identity,
-                    ).toEqual(alice);
-                    expect(yield* memberApplication.list).toHaveLength(1);
-                    expect(yield* (yield* InvitationApplication.Service).list).toEqual([]);
-                    const assignmentApplication = yield* AssignmentApplication.Service;
-                    expect(yield* assignmentApplication.roles).toHaveLength(3);
-                    expect(
-                      (yield* assignmentApplication.list(workspace.ownerMemberId)).assignments,
+                      (yield* assignmentService.list(workspace.ownerMemberId)).assignments,
                     ).toHaveLength(1);
-                    expect((yield* (yield* OwnershipApplication.Service).get).workspace).toEqual(
+                    expect((yield* (yield* OwnershipService.Service).get).workspace).toEqual(
                       workspace,
                     );
-                    const notificationApplication = yield* NotificationApplication.Service;
-                    expect(yield* notificationApplication.list({ limit: 10 })).toEqual([]);
-                    expect(yield* notificationApplication.listPending({ limit: 10 })).toEqual([]);
+                    const notificationService = yield* NotificationService.Service;
+                    expect(yield* notificationService.list({ limit: 10 })).toEqual([]);
+                    expect(yield* notificationService.listPending({ limit: 10 })).toEqual([]);
                     expect(
-                      yield* Effect.flip(
-                        notificationApplication.get(Notification.Id.make("missing")),
-                      ),
-                    ).toMatchObject({ _tag: "NotificationApplication.NotFound" });
-                    const stream = yield* (yield* ChangeFeedApplication.Service).watch();
+                      yield* Effect.flip(notificationService.get(Notification.Id.make("missing"))),
+                    ).toMatchObject({ _tag: "NotificationService.NotFound" });
+                    const stream = yield* (yield* ChangeFeedService.Service).watch();
                     expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
                       { _tag: "Ready", workspaceId: workspace.id, reset: true },
                     ]);
@@ -90,8 +83,8 @@ export const reads = (harness: Harness) => {
                     gateway.asMember(
                       workspace.id,
                       alice,
-                      Effect.flatMap(MemberApplication.Service, (memberApplication) =>
-                        memberApplication.remove(Member.Id.make("missing")),
+                      Effect.flatMap(MemberService.Service, (memberService) =>
+                        memberService.remove(Member.Id.make("missing")),
                       ),
                     ),
                   ),

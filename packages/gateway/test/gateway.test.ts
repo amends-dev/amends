@@ -14,15 +14,11 @@ import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authoriz
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
 import { Checkpoint, Commit, Entry, Store } from "@amends/core/journal";
-import {
-  Notification,
-  NotificationApplication,
-  NotificationStore,
-} from "@amends/core/notification";
+import { Notification, NotificationService, NotificationStore } from "@amends/core/notification";
 import {
   InvitationStore,
   Member,
-  MemberApplication,
+  MemberService,
   MemberStore,
   Workspace,
   WorkspaceStore,
@@ -406,9 +402,9 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           _tag: "Gateway.InvalidInput",
           message: "Values must belong to workspace workspace",
         });
-        const missing = new MemberApplication.NotFound({ workspaceId, memberId });
+        const missing = new MemberService.NotFound({ workspaceId, memberId });
         expect(yield* Effect.flip(enter(Effect.fail(missing)))).toBe(missing);
-        const missingNotification = new NotificationApplication.NotFound({
+        const missingNotification = new NotificationService.NotFound({
           workspaceId,
           notificationId: Notification.Id.make("missing"),
         });
@@ -431,7 +427,7 @@ it.effect(
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
         ).toBe(failure);
-        const malformed = { _tag: "MemberApplication.NotFound", workspaceId, memberId: 42 };
+        const malformed = { _tag: "MemberService.NotFound", workspaceId, memberId: 42 };
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),
         ).toBe(malformed);

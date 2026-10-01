@@ -62,7 +62,7 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 /** @category constructors */
-export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.Return<
   Interface,
   never,
   | AssignmentStore.Service
@@ -98,14 +98,14 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     return workspaceWide
       .filter((_, index) => covered[index] === true)
       .map((permission) => permission.name);
-  }).pipe(Effect.withSpan("AssignmentApplication.permissions"));
-  const member = Effect.fn("AssignmentApplication.member")(function* (memberId: Member.Id) {
+  }).pipe(Effect.withSpan("AssignmentService.permissions"));
+  const member = Effect.fn("AssignmentService.member")(function* (memberId: Member.Id) {
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
     const found = yield* memberStore.get(id);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId: id });
     return found.value;
   });
-  const recipient = Effect.fn("AssignmentApplication.recipient")(function* (memberId: Member.Id) {
+  const recipient = Effect.fn("AssignmentService.recipient")(function* (memberId: Member.Id) {
     yield* authorization.require([manage]);
     const record = yield* member(memberId);
     if (record.status !== "active") return yield* new InactiveMember({ memberId });
@@ -130,7 +130,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
         }),
     );
   });
-  const list = Effect.fn("AssignmentApplication.list")(function* (memberId: Member.Id) {
+  const list = Effect.fn("AssignmentService.list")(function* (memberId: Member.Id) {
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId }),
     ]);
@@ -141,9 +141,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
       canManage: record.status === "active" && (yield* allowed(recipient(memberId))),
     });
   });
-  const create = Effect.fn("AssignmentApplication.create")(function* (
-    input: Assignment.AssignInput,
-  ) {
+  const create = Effect.fn("AssignmentService.create")(function* (input: Assignment.AssignInput) {
     const record = Assignment.Record.make({
       id: Assignment.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
@@ -164,7 +162,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   });
   const workspaceRole = (record: Assignment.Record) =>
     record.source._tag === "Role" && record.source.scope._tag === "Workspace";
-  const assign = Effect.fn("AssignmentApplication.assign")(
+  const assign = Effect.fn("AssignmentService.assign")(
     function* (input: Assignment.AssignInput) {
       const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input);
       yield* recipient(request.memberId);
@@ -182,7 +180,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const revoke = Effect.fn("AssignmentApplication.revoke")(
+  const revoke = Effect.fn("AssignmentService.revoke")(
     function* (memberId: Member.Id, assignmentId: Assignment.Id) {
       yield* recipient(memberId);
       const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
@@ -203,7 +201,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const change = Effect.fn("AssignmentApplication.change")(
+  const change = Effect.fn("AssignmentService.change")(
     function* (input: Assignment.ChangeInput) {
       const request = yield* Schema.decodeEffect(Assignment.ChangeInput)(input);
       yield* recipient(request.memberId);
@@ -238,4 +236,4 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
 
 /** @category layers */
 export const layer = Layer.effect(Service, make());
-export * as AssignmentApplication from "./application.ts";
+export * as AssignmentService from "./service.ts";

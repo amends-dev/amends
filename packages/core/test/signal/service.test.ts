@@ -6,7 +6,7 @@ import type { Requirement } from "../../src/authorization/requirement.ts";
 import { Group } from "../../src/group/group.ts";
 import { Actor } from "../../src/identity/actor.ts";
 import { Identity } from "../../src/identity/identity.ts";
-import { SignalApplication } from "../../src/signal/application.ts";
+import { SignalService } from "../../src/signal/service.ts";
 import { Signal } from "../../src/signal/signal.ts";
 import { Signals } from "../../src/signal/signals.ts";
 import { Store } from "../../src/journal/store.ts";
@@ -36,7 +36,7 @@ const readable = new Set(["open", "other"]);
 const run = <A, E>(
   use: (
     published: ReadonlyArray<Signal.Value>,
-  ) => Effect.Effect<A, E, SignalApplication.Service | Actor.Service>,
+  ) => Effect.Effect<A, E, SignalService.Service | Actor.Service>,
   options: { readonly deny?: boolean } = {},
 ) =>
   Effect.gen(function* () {
@@ -76,7 +76,7 @@ const run = <A, E>(
     });
     const result = yield* use(published).pipe(
       Effect.provide(
-        SignalApplication.layer.pipe(
+        SignalService.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
               Layer.succeed(ThreadQuery.Service, threadQuery),
@@ -92,8 +92,8 @@ const run = <A, E>(
     return { result, requirements };
   });
 const typing = (threadId: string) =>
-  Effect.flatMap(SignalApplication.Service, (signalApplication) =>
-    signalApplication.typing(Thread.Id.make(threadId)),
+  Effect.flatMap(SignalService.Service, (signalService) =>
+    signalService.typing(Thread.Id.make(threadId)),
   );
 
 it.effect(
@@ -141,7 +141,7 @@ it.effect("inaccessible threads and missing permission publish nothing", () =>
     yield* run((published) =>
       Effect.gen(function* () {
         expect(yield* Effect.flip(typing("hidden"))).toEqual(
-          new SignalApplication.ThreadNotFound({ threadId: Thread.Id.make("hidden") }),
+          new SignalService.ThreadNotFound({ threadId: Thread.Id.make("hidden") }),
         );
         expect(published).toEqual([]);
       }),

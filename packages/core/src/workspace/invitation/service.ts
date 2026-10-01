@@ -71,7 +71,7 @@ export class Service extends Context.Service<Service, Interface>()(
  *
  * @category constructors
  */
-export const make = Effect.fn("InvitationApplication.make")(function* (): Effect.fn.Return<
+export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.Return<
   Interface,
   never,
   | InvitationStore.Service
@@ -96,7 +96,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
-  const authorizeAccess = Effect.fn("InvitationApplication.authorizeAccess")(function* (
+  const authorizeAccess = Effect.fn("InvitationService.authorizeAccess")(function* (
     input: Invitation.IssueInput,
   ) {
     yield* authorization.require([manage]);
@@ -118,7 +118,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       return yield* new AlreadyMember({ recipientId });
   });
 
-  const issue = Effect.fn("InvitationApplication.issue")(
+  const issue = Effect.fn("InvitationService.issue")(
     function* (input: Invitation.IssueInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input);
       const actor = yield* authorizeAccess(request);
@@ -153,7 +153,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     journal.commit,
   );
 
-  const accept = Effect.fn("InvitationApplication.accept")(function* (
+  const accept = Effect.fn("InvitationService.accept")(function* (
     id: Invitation.Id,
     authenticated: Identity.HumanId,
     options: { readonly name?: Member.Name } = {},
@@ -247,7 +247,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     }).pipe(Effect.provideService(Publication.Service, provenance));
   }, journal.commit);
 
-  const revoke = Effect.fn("InvitationApplication.revoke")(
+  const revoke = Effect.fn("InvitationService.revoke")(
     function* (id: Invitation.Id) {
       yield* authorization.require([manage]);
       const invitation = yield* load(id);
@@ -272,7 +272,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   const list = Effect.gen(function* () {
     yield* authorization.require([manage]);
     return yield* invitationStore.list;
-  }).pipe(Effect.withSpan("InvitationApplication.list"));
+  }).pipe(Effect.withSpan("InvitationService.list"));
 
   return Service.of({ issue, accept, revoke, list });
 });
@@ -284,4 +284,4 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
  */
 export const layer = Layer.effect(Service, make());
 
-export * as InvitationApplication from "./application.ts";
+export * as InvitationService from "./service.ts";

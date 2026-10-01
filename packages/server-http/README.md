@@ -11,20 +11,20 @@ points; credential verification belongs to the authentication middleware, and
 domain rules belong to core.
 
 Notification handlers enter through `Gateway.asMember` and call
-`NotificationApplication.get`, `list`, `listPending`, `inbox`, `resolveSource`, or `acknowledge`. The
+`NotificationService.get`, `list`, `listPending`, `inbox`, `resolveSource`, or `acknowledge`. The
 contract decodes the page size, cursor, and optional pending-only filter; core derives the
 recipient from the actor and checks active membership and recipient ownership. The HTTP layer adds
 no notification generation or delivery.
 
-Group and thread handlers enter through `Gateway.asMember` and call one of `GroupApplication`,
-`GroupMembershipApplication`, `GroupFollowApplication`, `ThreadApplication`,
-`ThreadMessageApplication`, `ThreadParticipationApplication`, or `ReadStateApplication`. They
+Group and thread handlers enter through `Gateway.asMember` and call one of `GroupService`,
+`GroupMembershipService`, `GroupFollowService`, `ThreadService`,
+`ThreadMessageService`, `ThreadParticipationService`, or `ReadStateService`. They
 combine the path's group or thread ID with the body into the operation's input and pass the
 `Idempotency-Key` header as its request key; core authorizes, validates, and chooses who takes
 part. Management reads of groups the caller does not belong to are not exposed.
 
 `ChangesHandlers.watch` enters through `Gateway.asMemberScoped` and calls
-`ChangeFeedApplication.watch`. Effect's HTTP server transfers the request scope
+`ChangeFeedService.watch`. Effect's HTTP server transfers the request scope
 to the response stream, keeping the workspace services and subscription alive until
 completion or disconnect. The `after` query resumes from a cursor. HTTP owns SSE
 encoding, cache headers, and comment heartbeats; core owns the Ready/Committed schemas,
@@ -33,7 +33,7 @@ Effect's SSE encoder would send a stream's whole failure cause to the client, de
 so the handler logs an unexpected failure at error level and ends the stream with
 `ChangeFeed.Unavailable` alone.
 
-`TurnsHandlers.watchLog` serves `TurnApplication.watchLog` the same way, ending with
+`TurnsHandlers.watchLog` serves `TurnService.watchLog` the same way, ending with
 `Turn.LogUnavailable` where the change feed ends with `ChangeFeed.Unavailable`. Both streams share
 `Streams`: their heartbeats and headers, the containment of unexpected failures, the end as the
 server drains, and the limits below.

@@ -1,5 +1,5 @@
 import { Api, ApiErrors, Principal } from "@amends/api-http";
-import { InvitationApplication } from "@amends/core/workspace";
+import { InvitationService } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -21,8 +21,8 @@ export const layer = HttpApiBuilder.group(
             params.workspaceId,
             principal,
             Effect.flatMap(
-              InvitationApplication.Service,
-              (invitationApplication) => invitationApplication.list,
+              InvitationService.Service,
+              (invitationService) => invitationService.list,
             ),
           ),
         ),
@@ -31,8 +31,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
-              invitationApplication.issue(payload, { requestKey: headers["idempotency-key"] }),
+            Effect.flatMap(InvitationService.Service, (invitationService) =>
+              invitationService.issue(payload, { requestKey: headers["idempotency-key"] }),
             ),
           ),
         ),
@@ -42,8 +42,8 @@ export const layer = HttpApiBuilder.group(
           if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
           return yield* gateway.inWorkspace(
             params.workspaceId,
-            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
-              invitationApplication.accept(params.invitationId, principal.id, payload ?? {}),
+            Effect.flatMap(InvitationService.Service, (invitationService) =>
+              invitationService.accept(params.invitationId, principal.id, payload ?? {}),
             ),
           );
         }),
@@ -52,8 +52,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
-              invitationApplication.revoke(params.invitationId),
+            Effect.flatMap(InvitationService.Service, (invitationService) =>
+              invitationService.revoke(params.invitationId),
             ),
           ),
         ),
