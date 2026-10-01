@@ -113,11 +113,15 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
         Effect.asSome,
         Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
       );
+      // A role whose permission no longer fits a workspace-wide grant is stored state core
+      // can't use, not something the caller sent.
       if (Option.isSome(definition))
-        yield* Schema.decodeEffect(Grant.makeSchema(definition.value))({
-          permission: name,
-          scope: { _tag: "Workspace", workspaceId },
-        });
+        yield* Effect.orDie(
+          Schema.decodeEffect(Grant.makeSchema(definition.value))({
+            permission: name,
+            scope: { _tag: "Workspace", workspaceId },
+          }),
+        );
     }
     return role;
   });

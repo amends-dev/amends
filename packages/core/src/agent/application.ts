@@ -337,9 +337,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
         const mayRemove = configurable === true && memberRemovable === true;
         const assigned =
           accessReadable || (mayRemove && Delegation.recipientNeedsAssignments(removal))
-            ? yield* Schema.decodeEffect(Schema.Array(Schema.toType(Assignment.Record)))(
-                yield* assignments.listActiveByMember(record.memberId),
-              )
+            ? yield* assignments.listActiveByMember(record.memberId)
             : [];
         const access: Access = {
           role: accessReadable ? yield* roleOf(assigned) : null,

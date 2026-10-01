@@ -112,8 +112,9 @@ const stale = (cause: Cause.Cause<unknown>) =>
 
 /**
  * Apply the public error policy once. Schema failures and workspace mismatches
- * are reported as invalid input: during operations they arise only from
- * validating caller-supplied values such as invitation grants.
+ * are reported as invalid input: core trusts what storage returns, so during
+ * operations they arise only from validating caller-supplied values such as
+ * invitation grants. Stored state core can't use is a defect, a server error.
  */
 const expose = <A, E, R>(
   workspaceId: Workspace.Id,

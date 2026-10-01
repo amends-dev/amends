@@ -50,8 +50,11 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
       Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
     );
     if (Option.isNone(permission)) return [];
+    // A stored grant that no longer fits its permission is state core can't use, not caller input.
     return [
-      yield* Schema.decodeEffect(Grant.makeSchema(permission.value))({ permission: name, scope }),
+      yield* Effect.orDie(
+        Schema.decodeEffect(Grant.makeSchema(permission.value))({ permission: name, scope }),
+      ),
     ];
   });
 

@@ -1,7 +1,7 @@
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
-import { Effect, Exit, Layer } from "effect";
+import { Cause, Effect, Exit, Layer } from "effect";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
 import { AssignmentProjection } from "../../src/authorization/assignment/projection.ts";
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
@@ -306,10 +306,11 @@ it.effect("incompatible scopes fail whole role assignments and direct grants", (
           assigned("invalid", source),
         ],
       );
-      const failure = yield* run(fixture, Effect.flip(resolve));
-      expect(failure._tag).toBe("SchemaError");
-      if (failure._tag !== "SchemaError") throw new Error("Expected incompatible scope");
-      expect(failure.message).toContain("requires a Workspace target");
+      // A stored scope that no longer fits its permission is a defect, not the caller's input.
+      const exit = yield* Effect.exit(run(fixture, resolve));
+      expect(Exit.isFailure(exit) && String(Cause.squash(exit.cause))).toContain(
+        "requires a Workspace target",
+      );
     }
   }),
 );

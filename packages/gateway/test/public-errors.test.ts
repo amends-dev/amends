@@ -42,9 +42,7 @@ type Internal = {
   readonly _tag:
     | `${string}.Failure`
     | `${string}Store.Conflict`
-    | `${string}.InvalidReference`
     | `${string}.InvalidResponse`
-    | `${string}.InvalidState`
     | `${string}.WorkspaceMismatch`
     | `Commit.${string}`
     | `Projection.${string}`
