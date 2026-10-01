@@ -21,9 +21,7 @@ import {
 import {
   Thread,
   ThreadApplication,
-  ThreadActivity,
   ThreadActivityRecording,
-  ThreadActivityStore,
   ThreadActivityReading,
   ThreadMessageStore,
   ThreadMessageApplication,
@@ -32,7 +30,6 @@ import {
   ThreadParticipationFacts,
   ThreadParticipationActivity,
   ThreadParticipationApplication,
-  ThreadParticipationStore,
   ThreadPermissions,
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
@@ -566,122 +563,6 @@ export const notificationSources = (harness: Harness) => {
             }),
           ),
         ),
-    );
-
-    it.effect(
-      "notification recipient selection, participation, and source metadata must agree",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, human } = yield* prepare();
-              yield* grant(bound, humanId, ThreadPermissions.Read);
-              const note = yield* noteFor(bound, humanId);
-              const agentNote = yield* noteFor(bound, agentId);
-              const badNotes: Array<Notification.Record> = [
-                changed(note, { participationId: agentNote.participationId }),
-                changed(note, { participationId: ThreadParticipation.Id.make("missing") }),
-                changed(note, { recordedAt: DateTime.makeUnsafe(123456) }),
-              ];
-              const { participationId: _ignored, ...withoutParticipation } = note;
-              badNotes.push(withoutParticipation);
-              for (const bad of badNotes)
-                expect(
-                  yield* Effect.flip(run(withNote(bound, bad), human, resolve(note.id))),
-                ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
-              const original = Option.getOrThrow(
-                yield* bound.participations.get(
-                  note.participationId ?? ThreadParticipation.Id.make("missing"),
-                ),
-              );
-              for (const participant of [
-                changed(original, { id: ThreadParticipation.Id.make("wrong") }),
-                changed(original, { workspaceId: otherWorkspaceId }),
-                changed(original, { threadId: Thread.Id.make("wrong") }),
-                changed(original, { joinedAtSequence: 999 }),
-                changed(original, {
-                  participant: { ...memberParticipant(original), identity: identityFor(agentId) },
-                }),
-              ]) {
-                const context = Context.add(bound.context, ThreadParticipationStore.Service, {
-                  ...bound.participations,
-                  get: () => Effect.succeedSome(participant),
-                });
-                expect(
-                  yield* Effect.flip(run({ ...bound, context }, human, resolve(note.id))),
-                ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
-              }
-              const context = Context.add(bound.context, ThreadParticipationStore.Service, {
-                ...bound.participations,
-                get: () => Effect.succeedNone,
-              });
-              expect(
-                yield* Effect.flip(run({ ...bound, context }, human, resolve(note.id))),
-              ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
-            }),
-          ),
-        ),
-    );
-
-    it.effect("malformed journal entries and divergent timeline records fail closed", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const { bound, first, human } = yield* prepare();
-            yield* grant(bound, humanId, ThreadPermissions.Read);
-            const note = yield* noteFor(bound, humanId);
-            const entry = Option.getOrThrow(
-              yield* bound.store.getEntry(note.source.logId, note.source.entryId),
-            );
-            const header = entry.fact;
-            if (!header) return yield* Effect.die("Missing fact header");
-            for (const bad of [
-              changed(entry, { id: Entry.Id.make("wrong") }),
-              changed(entry, { logId: Log.Id.make("wrong") }),
-              changed(entry, { payload: new Uint8Array([255]) }),
-              changed(entry, {
-                fact: changed(header, {
-                  provenance: changed(header.provenance, { workspaceId: otherWorkspaceId }),
-                }),
-              }),
-            ]) {
-              const context = Context.add(bound.context, Store.Service, {
-                ...bound.store,
-                getEntry: () => Effect.succeedSome(bad),
-              });
-              expect(
-                yield* Effect.flip(run({ ...bound, context }, human, resolve(note.id))),
-              ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
-            }
-            const stored = Option.getOrThrow(yield* bound.activities.get(first.activity.id));
-            for (const activity of [
-              Object.assign({}, stored, { id: ThreadActivity.Id.make("wrong") }),
-              Object.assign({}, stored, { sequence: 2 }),
-            ]) {
-              const context = Context.add(bound.context, ThreadActivityStore.Service, {
-                ...bound.activities,
-                get: () => Effect.succeedSome(activity),
-              });
-              const error = yield* Effect.flip(run({ ...bound, context }, human, resolve(note.id)));
-              expect([
-                "NotificationApplication.InvalidResponse",
-                "ThreadActivityReading.InvalidResponse",
-              ]).toContain(error._tag);
-            }
-            const missingActivity = Context.add(bound.context, ThreadActivityStore.Service, {
-              ...bound.activities,
-              get: () => Effect.succeedNone,
-            });
-            expect(
-              yield* Effect.flip(
-                run({ ...bound, context: missingActivity }, human, resolve(note.id)),
-              ),
-            ).toMatchObject({ _tag: "NotificationApplication.InvalidResponse" });
-          }),
-        ),
-      ),
     );
 
     it.effect("source failures remain failures and a denied read never loads message content", () =>

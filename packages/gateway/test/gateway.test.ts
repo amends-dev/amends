@@ -451,14 +451,6 @@ it.effect(
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(failure)))),
         ).toBe(failure);
-        const invalidNotification = new NotificationApplication.InvalidResponse({
-          message: "Invalid stored notification",
-        });
-        expect(
-          defect(
-            yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(invalidNotification))),
-          ),
-        ).toBe(invalidNotification);
         const malformed = { _tag: "MemberApplication.NotFound", workspaceId, memberId: 42 };
         expect(
           defect(yield* Effect.exit(gateway.inWorkspace(workspaceId, Effect.fail(malformed)))),

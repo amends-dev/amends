@@ -851,37 +851,26 @@ export const notificationAcknowledgment = (harness: Harness) => {
         ),
     );
 
-    it.effect("acknowledgment rejects malformed internal records without writing", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const p = yield* prepare();
-            const before = yield* snapshot(p);
-            for (const [record, tag] of [
-              [
-                changed(p.humanNote, { id: Notification.Id.make("wrong") }),
-                "NotificationApplication.InvalidResponse",
-              ],
-              [
-                changed(p.humanNote, { workspaceId: otherWorkspaceId }),
-                "NotificationApplication.WorkspaceMismatch",
-              ],
-              // Another recipient's notification under the requested ID reads as missing.
-              [changed(p.agentNote, { id: p.humanNote.id }), "NotificationApplication.NotFound"],
-            ] as const) {
+    it.effect(
+      "acknowledging another recipient's notification reads as missing and writes nothing",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const p = yield* prepare();
+              const before = yield* snapshot(p);
               const context = Context.add(p.bound.context, NotificationStore.Service, {
                 ...p.bound.notifications,
-                get: () => Effect.succeedSome(record),
+                get: () => Effect.succeedSome(changed(p.agentNote, { id: p.humanNote.id })),
               });
               expect(
                 yield* Effect.flip(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
-              ).toMatchObject({ _tag: tag });
+              ).toMatchObject({ _tag: "NotificationApplication.NotFound" });
               expect(yield* snapshot(p)).toEqual(before);
-            }
-          }),
+            }),
+          ),
         ),
-      ),
     );
 
     it.effect(

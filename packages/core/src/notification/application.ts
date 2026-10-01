@@ -12,36 +12,14 @@ import { Signals } from "../signal/signals.ts";
 import { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
 export { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
 
-export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
-  "NotificationApplication.WorkspaceMismatch",
-  { expectedWorkspaceId: WorkspaceId.Id, actualWorkspaceId: WorkspaceId.Id },
-) {}
-
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "NotificationApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
-export type Error =
-  | Authorization.Error
-  | NotificationStore.Failure
-  | Schema.SchemaError
-  | NotFound
-  | WorkspaceMismatch
-  | InvalidResponse;
+export type Error = Authorization.Error | NotificationStore.Failure | Schema.SchemaError | NotFound;
 export type ResolveError =
   | Error
-  | Exclude<
-      NotificationSource.Error,
-      NotificationSource.Unavailable | NotificationSource.InvalidReference
-    >
+  | Exclude<NotificationSource.Error, NotificationSource.Unavailable>
   | SourceUnavailable;
 export type InboxError =
   | Exclude<Error, NotFound>
-  | Exclude<
-      NotificationSource.Error,
-      NotificationSource.Unavailable | NotificationSource.InvalidReference
-    >;
+  | Exclude<NotificationSource.Error, NotificationSource.Unavailable>;
 export type AcknowledgeError =
   | Error
   | NotificationStore.Conflict
@@ -97,8 +75,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/notification/application/Service",
 ) {}
 
-const decodeRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
-const decodeRecords = Schema.decodeEffect(Schema.Array(Schema.toType(Notification.Record)));
 const decodeOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));
 const sameRecipient = Schema.toEquivalence(Notification.Recipient);
@@ -119,15 +95,6 @@ const atOrBefore = (record: Notification.Record, cursor: NotificationStore.Curso
 };
 /** How many seen notifications one write records, and one signal names. */
 const seenBatch = 100;
-const invalidRecord = (cause: Schema.SchemaError) =>
-  new InvalidResponse({ message: `Notification store returned invalid data: ${cause.message}` });
-const requireWorkspace = Effect.fnUntraced(function* (
-  expectedWorkspaceId: WorkspaceId.Id,
-  actualWorkspaceId: WorkspaceId.Id,
-) {
-  if (expectedWorkspaceId !== actualWorkspaceId)
-    return yield* new WorkspaceMismatch({ expectedWorkspaceId, actualWorkspaceId });
-});
 
 /**
  * Capture workspace dependencies; resolve the actor and current membership per operation.
@@ -136,7 +103,7 @@ const requireWorkspace = Effect.fnUntraced(function* (
  */
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
-  WorkspaceMismatch,
+  never,
   NotificationStore.Service | Authorization.Service | NotificationSource.Service | Signals.Service
 > {
   const notifications = yield* NotificationStore.Service;
@@ -144,9 +111,6 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   const authorization = yield* Authorization.Service;
   const source = yield* NotificationSource.Service;
   const workspaceId = authorization.workspaceId;
-  yield* requireWorkspace(workspaceId, notifications.workspaceId);
-  yield* requireWorkspace(workspaceId, source.workspaceId);
-  yield* requireWorkspace(workspaceId, signals.workspaceId);
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
@@ -158,55 +122,21 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     const target = yield* recipient();
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId);
     const found = yield* notifications.get(id);
-    if (Option.isNone(found)) return yield* new NotFound({ workspaceId, notificationId: id });
-    const record = yield* decodeRecord(found.value).pipe(Effect.mapError(invalidRecord));
-    yield* requireWorkspace(workspaceId, record.workspaceId);
-    if (record.id !== id)
-      return yield* new InvalidResponse({ message: "Notification store returned a different ID" });
-    if (!sameRecipient(record.recipient, target))
+    // Another recipient's notification reads as missing.
+    if (Option.isNone(found) || !sameRecipient(found.value.recipient, target))
       return yield* new NotFound({ workspaceId, notificationId: id });
-    return record;
+    return found.value;
   });
 
-  /** A page the store returned for this recipient, checked against what was asked. */
-  const checked = Effect.fnUntraced(function* (
-    target: Notification.Recipient,
-    readPage: Effect.Effect<ReadonlyArray<Notification.Record>, NotificationStore.Failure>,
-    limit: number,
-    pendingOnly: boolean,
-  ) {
-    const records = yield* decodeRecords(yield* readPage).pipe(Effect.mapError(invalidRecord));
-    if (records.length > limit)
-      return yield* new InvalidResponse({
-        message: "Notification page exceeds the requested limit",
-      });
-    const seen = new Set<Notification.Id>();
-    for (const record of records) {
-      yield* requireWorkspace(workspaceId, record.workspaceId);
-      if (!sameRecipient(record.recipient, target))
-        return yield* new InvalidResponse({
-          message: "Notification store returned a different recipient",
-        });
-      if (pendingOnly && record.state._tag !== "Pending")
-        return yield* new InvalidResponse({
-          message: "Pending notification page contains a handled notification",
-        });
-      if (seen.has(record.id))
-        return yield* new InvalidResponse({ message: "Notification page contains duplicate IDs" });
-      seen.add(record.id);
-    }
-    return records;
-  });
   const read = Effect.fnUntraced(function* (
     options: NotificationStore.ReadOptions,
     pendingOnly: boolean,
   ) {
     const target = yield* recipient();
     const request = yield* decodeOptions(options);
-    const readPage = pendingOnly
+    return yield* pendingOnly
       ? notifications.listPendingByRecipient(target, request)
       : notifications.listByRecipient(target, request);
-    return yield* checked(target, readPage, request.limit, pendingOnly);
   });
 
   const list = Effect.fn("NotificationApplication.list")((options: NotificationStore.ReadOptions) =>
@@ -220,11 +150,9 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   const sourceOf = (notification: Notification.Record) =>
     source.resolve(notification).pipe(
       Effect.asSome,
-      Effect.catchTags({
-        "NotificationSource.Unavailable": () => Effect.succeed(Option.none<Thread.TimelineItem>()),
-        "NotificationSource.InvalidReference": (error) =>
-          Effect.fail(new InvalidResponse({ message: error.message })),
-      }),
+      Effect.catchTag("NotificationSource.Unavailable", () =>
+        Effect.succeed(Option.none<Thread.TimelineItem>()),
+      ),
     );
   const resolveSource = Effect.fn("NotificationApplication.resolveSource")(function* (
     notificationId: Notification.Id,
@@ -240,14 +168,9 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   ) {
     const target = yield* recipient();
     const { pendingOnly = false, ...request } = yield* decodeInboxOptions(options);
-    const records = yield* checked(
-      target,
-      pendingOnly
-        ? notifications.listLatestPendingByRecipient(target, request)
-        : notifications.listLatestByRecipient(target, request),
-      request.limit,
-      pendingOnly,
-    );
+    const records = yield* pendingOnly
+      ? notifications.listLatestPendingByRecipient(target, request)
+      : notifications.listLatestByRecipient(target, request);
     return yield* Effect.forEach(
       records,
       (notification) =>
@@ -279,7 +202,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     if (seen.state._tag === "Discarded")
       return yield* new AlreadyHandled({ notificationId: notification.id });
     if (seen.state._tag !== "Acknowledged")
-      return yield* new InvalidResponse({ message: "Seen notification still reads as unseen" });
+      return yield* Effect.die("A seen notification still reads as unseen");
     // The recipient's other sessions hear of it as a signal.
     yield* signals.publish(
       Signal.Value.cases.NotificationsSeen.make({
@@ -299,14 +222,9 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     const memberId = (yield* Actor.Service).memberId;
     /** One page marked: what it listed and how many of them were due. */
     const markPage = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
-      const page = yield* checked(
+      const page = yield* notifications.listPendingByRecipient(
         target,
-        notifications.listPendingByRecipient(
-          target,
-          after === undefined ? { limit: seenBatch } : { limit: seenBatch, after },
-        ),
-        seenBatch,
-        true,
+        after === undefined ? { limit: seenBatch } : { limit: seenBatch, after },
       );
       const due = page.filter((record) => atOrBefore(record, through));
       const [first, ...rest] = due.map((record) => record.id);
