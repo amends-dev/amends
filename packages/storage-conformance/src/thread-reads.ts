@@ -12,7 +12,7 @@ import {
 import {
   Group,
   GroupApplication,
-  GroupAudience,
+  GroupQuery,
   GroupMembershipApplication,
   GroupMembershipFacts,
   GroupMembershipStore,
@@ -1414,7 +1414,7 @@ export const threadReads = (harness: Harness) => {
               const reading = Layer.fresh(ThreadQuery.layer).pipe(
                 Layer.provide(
                   Layer.mergeAll(
-                    GroupAudience.layer,
+                    GroupQuery.layer,
                     ThreadActivityResolvers.layer([
                       ThreadMessageTimeline.resolver,
                       ThreadParticipationTimeline.resolver,

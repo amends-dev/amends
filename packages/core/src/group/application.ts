@@ -12,12 +12,13 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { Group } from "./group.ts";
-import { GroupAudience } from "./audience.ts";
+import { GroupCommand } from "./command.ts";
+import { GroupQuery } from "./query.ts";
 import { GroupStore } from "./store.ts";
 import { GroupFacts } from "./facts.ts";
 import { GroupPermissions } from "./permissions.ts";
 import { GroupMembership } from "./membership/membership.ts";
-import { GroupMembershipFacts } from "./membership/facts.ts";
+
 import { GroupMembershipPermissions } from "./membership/permissions.ts";
 import { GroupMembershipStore } from "./membership/store.ts";
 import { GroupFollowStore } from "./follow/store.ts";
@@ -107,14 +108,15 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   const memberStore = yield* MemberStore.Service;
   const groupStore = yield* GroupStore.Service;
   const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const groupAudience = yield* GroupAudience.Service;
+  const groupQuery = yield* GroupQuery.Service;
+  const groupCommand = yield* GroupCommand.Service;
   const groupFollowStore = yield* GroupFollowStore.Service;
   const readStateStore = yield* ReadStateStore.Service;
   const notificationStore = yield* NotificationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
-  const create = Requirement.make(
+  const createGroupRequirement = Requirement.make(
     GroupPermissions.Create,
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
@@ -122,14 +124,14 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   const createTeam = Effect.fn("GroupApplication.createTeam")(
     function* (input: Group.CreateTeamInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input);
-      yield* authorization.require([create]);
+      yield* authorization.require([createGroupRequirement]);
       const actor = yield* Actor.Service;
       const groupId = Group.Id.make(
         yield* Request.idFor(options.requestKey, ["group.create", workspaceId, actor.memberId]),
       );
       // A retry returns the group its first attempt created.
       if (options.requestKey !== undefined && Option.isSome(yield* groupStore.get(groupId)))
-        return yield* load(groupId);
+        return yield* requireGroup(groupId);
       const found = new Map(
         (yield* memberStore.getMany(request.memberIds)).map(
           (member) => [member.id, member] as const,
@@ -153,42 +155,33 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       const created = yield* journal
         .publish(GroupFacts.Created, group)
         .pipe(Publication.withOccurredAt(createdAt));
-      for (const memberId of request.memberIds) {
-        yield* journal
-          .publish(GroupMembershipFacts.Added, {
-            id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
-            workspaceId,
-            groupId: group.id,
-            memberId,
-            admittedAt: createdAt,
-            status: "active",
-          })
+      for (const memberId of request.memberIds)
+        yield* groupCommand
+          .admitMember(group.id, memberId, createdAt)
           .pipe(Publication.withCause(created, createdAt));
-      }
       return group;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  const load = Effect.fnUntraced(function* (groupId: Group.Id) {
+  /** The group, or NotFound when it is not stored. */
+  const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const found = yield* groupStore.get(groupId);
     if (Option.isNone(found)) return yield* new NotFound({ groupId });
     return found.value;
   });
   const get = Effect.fn("GroupApplication.get")(function* (groupId: Group.Id) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* groupAudience
-      .require(id)
+    yield* groupQuery
+      .requireAudience(id)
       .pipe(
-        Effect.catchTag("GroupAudience.NotMember", () =>
-          Effect.fail(new NotFound({ groupId: id })),
-        ),
+        Effect.catchTag("GroupQuery.NotMember", () => Effect.fail(new NotFound({ groupId: id }))),
       );
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);
-    return yield* load(id);
+    return yield* requireGroup(id);
   });
   const rename = Effect.fn("GroupApplication.rename")(
     function* (input: Group.RenameInput) {
@@ -201,14 +194,14 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         }),
       ]);
       // Only its members may rename a group; to anyone else it is missing.
-      yield* groupAudience
-        .require(request.groupId)
+      yield* groupQuery
+        .requireAudience(request.groupId)
         .pipe(
-          Effect.catchTag("GroupAudience.NotMember", () =>
+          Effect.catchTag("GroupQuery.NotMember", () =>
             Effect.fail(new NotFound({ groupId: request.groupId })),
           ),
         );
-      const group = yield* load(request.groupId);
+      const group = yield* requireGroup(request.groupId);
       if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
       if (group.name === request.name) return group;
       if (group.name !== request.expectedName) return yield* new Changed({ groupId: group.id });
@@ -223,8 +216,8 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  /** Describe one page of the actor's admissions, keyed by group, in a fixed number of reads. */
-  const describe = Effect.fnUntraced(function* (
+  /** List items for one page of the actor's admissions, keyed by group, in a fixed number of reads. */
+  const buildListItems = Effect.fnUntraced(function* (
     actor: Actor.Value,
     admissions: ReadonlyMap<Group.Id, GroupMembership.Record>,
   ) {
@@ -243,12 +236,13 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         Requirement.make(GroupPermissions.Moderate, { _tag: "Group", workspaceId, groupId }),
       ]),
     );
-    const granted = (offset: number) =>
+    /** The groups whose requirement at this offset, of the four asked for each, is permitted. */
+    const permittedGroups = (offset: number) =>
       new Set(candidates.filter((_, index) => allowed[index * 4 + offset] === true));
-    const ids = [...granted(0)];
-    const managed = granted(1),
-      renamers = granted(2),
-      moderators = granted(3);
+    const ids = [...permittedGroups(0)];
+    const managed = permittedGroups(1),
+      renamers = permittedGroups(2),
+      moderators = permittedGroups(3);
     const records = new Map(
       (yield* groupStore.getMany(ids)).map((group) => [group.id, group] as const),
     );
@@ -319,7 +313,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         )).map((membership) => [membership.groupId, membership] as const),
       );
       if (admissions.size === 0) break;
-      for (const item of yield* describe(actor, admissions))
+      for (const item of yield* buildListItems(actor, admissions))
         if (items.length < options.limit) items.push(item);
       after = [...admissions.keys()].at(-1);
       if (admissions.size < options.limit) break;

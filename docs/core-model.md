@@ -2638,7 +2638,7 @@ is included in every built-in bundle; role names themselves confer no authority.
 without exposing historical admissions or member profiles. Missing and outside-audience
 groups share the same not-found outcome.
 
-There is no management read of a group from outside it. The shared `GroupAudience.require` policy verifies active workspace and group membership
+There is no management read of a group from outside it. The shared `GroupQuery.requireAudience` policy verifies active workspace and group membership
 without a management bypass; callers check their action permission separately. It opens no
 transaction, honors a caller's staged changes, and must run inside the commit for future
 thread writes. Current read operations do not promise a shared snapshot.

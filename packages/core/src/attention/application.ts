@@ -1,7 +1,7 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
-import { GroupAudience } from "../group/audience.ts";
+import { GroupQuery } from "../group/query.ts";
 import { GroupPermissions } from "../group/permissions.ts";
 import { Actor } from "../identity/actor.ts";
 import { ThreadQuery } from "../thread/query.ts";
@@ -22,7 +22,7 @@ export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./
 export type Error =
   | Authorization.Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
-  | Exclude<GroupAudience.Error, GroupAudience.NotMember>
+  | Exclude<GroupQuery.AudienceError, GroupQuery.NotMember>
   | ThreadActivityStore.Failure
   | ThreadReading.Error
   | ReadStateStore.Failure
@@ -55,7 +55,7 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
-  const groupAudience = yield* GroupAudience.Service;
+  const groupQuery = yield* GroupQuery.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
   const threadReading = yield* ThreadReading.Service;
   const readStateStore = yield* ReadStateStore.Service;
@@ -119,10 +119,10 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input);
     const reader = yield* human();
-    yield* groupAudience
-      .require(request.groupId)
+    yield* groupQuery
+      .requireAudience(request.groupId)
       .pipe(
-        Effect.catchTag("GroupAudience.NotMember", () =>
+        Effect.catchTag("GroupQuery.NotMember", () =>
           Effect.fail(new GroupNotFound({ groupId: request.groupId })),
         ),
       );

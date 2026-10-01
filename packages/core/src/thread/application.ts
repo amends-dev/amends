@@ -5,7 +5,7 @@ import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Actor } from "../identity/actor.ts";
 import { Group } from "../group/group.ts";
-import { GroupAudience } from "../group/audience.ts";
+import { GroupQuery } from "../group/query.ts";
 import { GroupMembershipStore } from "../group/membership/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
@@ -18,7 +18,7 @@ import { Thread } from "./thread.ts";
 import { ThreadStore } from "./store.ts";
 import { ThreadCommand } from "./command.ts";
 import { GroupStore } from "../group/store.ts";
-import { DirectGroups } from "../group/direct.ts";
+import { GroupCommand } from "../group/command.ts";
 import { GroupFollowStore } from "../group/follow/store.ts";
 import { ThreadQuery } from "./query.ts";
 import { ThreadPermissions } from "./permissions.ts";
@@ -52,7 +52,7 @@ export {
 export type Error =
   | Authorization.Error
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
-  | Exclude<DirectGroups.Error, DirectGroups.Unavailable>
+  | Exclude<GroupCommand.EstablishError, GroupCommand.Unavailable>
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
@@ -144,10 +144,10 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture bound services; authorize the complete requested conversation inside its commit. @category constructors */
 export const make = Effect.fn("ThreadApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const groupAudience = yield* GroupAudience.Service;
+  const groupQuery = yield* GroupQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
   const groupStore = yield* GroupStore.Service;
-  const directGroups = yield* DirectGroups.Service;
+  const groupCommand = yield* GroupCommand.Service;
   const groupFollowStore = yield* GroupFollowStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadStore = yield* ThreadStore.Service;
@@ -252,10 +252,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       if (memberIds.length < 2) return yield* new DirectMembersRequired({});
       const missing = request.mentions.find((id) => !memberIds.includes(id));
       if (missing !== undefined) return yield* new ParticipantUnavailable({ memberId: missing });
-      const { group, created } = yield* directGroups
-        .establish(memberIds, actor.memberId, yield* DateTime.now)
+      const { group, created } = yield* groupCommand
+        .establishDirect(memberIds, actor.memberId, yield* DateTime.now)
         .pipe(
-          Effect.catchTag("DirectGroups.Unavailable", (error) =>
+          Effect.catchTag("GroupCommand.Unavailable", (error) =>
             Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
           ),
         );
@@ -282,10 +282,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const startInGroup = Effect.fn("ThreadApplication.startInGroup")(
     function* (input: Thread.StartInGroupInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input);
-      yield* groupAudience
-        .require(request.groupId)
+      yield* groupQuery
+        .requireAudience(request.groupId)
         .pipe(
-          Effect.catchTag("GroupAudience.NotMember", () =>
+          Effect.catchTag("GroupQuery.NotMember", () =>
             Effect.fail(new GroupNotFound({ groupId: request.groupId })),
           ),
         );
@@ -372,10 +372,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     cursorOf: (thread: Thread.Record, latest: Thread.Latest) => Cursor,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    const admission = yield* groupAudience
-      .require(id)
+    const admission = yield* groupQuery
+      .requireAudience(id)
       .pipe(
-        Effect.catchTag("GroupAudience.NotMember", () =>
+        Effect.catchTag("GroupQuery.NotMember", () =>
           Effect.fail(new GroupNotFound({ groupId: id })),
         ),
       );

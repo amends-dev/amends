@@ -12,7 +12,7 @@ import {
 import {
   Group,
   GroupApplication,
-  GroupAudience,
+  GroupQuery,
   GroupMembership,
   GroupMembershipApplication,
   GroupMembershipPermissions,
@@ -332,27 +332,25 @@ export const groupReads = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
+              expectTypeOf<Extract<Core.Operations, GroupQuery.Service>>().toEqualTypeOf<never>();
               expectTypeOf<
-                Extract<Core.Operations, GroupAudience.Service>
-              >().toEqualTypeOf<never>();
-              expectTypeOf<
-                Effect.Services<ReturnType<GroupAudience.Interface["require"]>>
+                Effect.Services<ReturnType<GroupQuery.Interface["requireAudience"]>>
               >().toEqualTypeOf<Actor.Service>();
               const { bound, reader, owner, first, hidden } = yield* prepare();
               yield* run(
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const audience = yield* GroupAudience.make();
-                  expect(yield* audience.require(first.id)).toEqual(
+                  const groupQuery = yield* GroupQuery.make();
+                  expect(yield* groupQuery.requireAudience(first.id)).toEqual(
                     Option.getOrThrow(yield* bound.groupMemberships.findActive(first.id, readerId)),
                   );
-                  expect(yield* Effect.flip(audience.require(hidden.id))).toEqual(
-                    new GroupAudience.NotMember({ groupId: hidden.id }),
+                  expect(yield* Effect.flip(groupQuery.requireAudience(hidden.id))).toEqual(
+                    new GroupQuery.NotMember({ groupId: hidden.id }),
                   );
-                  expect(yield* Effect.flip(asActor(audience.require(first.id), owner))).toEqual(
-                    new GroupAudience.NotMember({ groupId: first.id }),
-                  );
+                  expect(
+                    yield* Effect.flip(asActor(groupQuery.requireAudience(first.id), owner)),
+                  ).toEqual(new GroupQuery.NotMember({ groupId: first.id }));
                 }),
               );
             }),
@@ -452,9 +450,9 @@ export const groupReads = (harness: Harness) => {
                   const groupApplication = yield* GroupApplication.Service;
                   const groupMembershipApplication = yield* GroupMembershipApplication.Service;
                   const memberApplication = yield* MemberApplication.Service;
-                  const audience = yield* GroupAudience.make();
+                  const groupQuery = yield* GroupQuery.make();
                   const journal = yield* Journal.Service;
-                  const original = yield* audience.require(first.id);
+                  const original = yield* groupQuery.requireAudience(first.id);
                   expect(yield* groupApplication.get(first.id)).toEqual(first);
                   yield* groupMembershipApplication.leave({
                     groupId: first.id,
@@ -466,15 +464,15 @@ export const groupReads = (harness: Harness) => {
                   expect(yield* Effect.flip(groupApplication.get(first.id))).toMatchObject({
                     _tag: "GroupApplication.NotFound",
                   });
-                  expect(yield* Effect.flip(audience.require(first.id))).toMatchObject({
-                    _tag: "GroupAudience.NotMember",
+                  expect(yield* Effect.flip(groupQuery.requireAudience(first.id))).toMatchObject({
+                    _tag: "GroupQuery.NotMember",
                   });
                   const fresh = yield* asActor(
                     groupMembershipApplication.add({ groupId: first.id, memberId: readerId }),
                     actorFor(agentId),
                   );
                   expect(fresh.id).not.toBe(original.id);
-                  expect(yield* audience.require(first.id)).toEqual(fresh);
+                  expect(yield* groupQuery.requireAudience(first.id)).toEqual(fresh);
                   const current = yield* groupMembershipApplication.listCurrent(first.id, {
                     limit: 100,
                   });
@@ -502,7 +500,7 @@ export const groupReads = (harness: Harness) => {
                   ).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
-                  expect(yield* audience.require(first.id)).toEqual(fresh);
+                  expect(yield* groupQuery.requireAudience(first.id)).toEqual(fresh);
                   yield* asActor(permissions([GroupPermissions.Read.name]), owner);
                   yield* asActor(memberApplication.remove(readerId), owner);
                   const checks: ReadonlyArray<
@@ -510,14 +508,14 @@ export const groupReads = (harness: Harness) => {
                       unknown,
                       | GroupApplication.ReadError
                       | GroupMembershipApplication.ReadError
-                      | GroupAudience.Error,
+                      | GroupQuery.AudienceError,
                       Actor.Service
                     >
                   > = [
                     groupApplication.listMine({ limit: 100 }),
                     groupApplication.get(first.id),
                     groupMembershipApplication.listCurrent(first.id, { limit: 100 }),
-                    audience.require(first.id),
+                    groupQuery.requireAudience(first.id),
                   ];
                   for (const effect of checks) {
                     expect(yield* Effect.flip(effect)).toMatchObject({
@@ -570,7 +568,7 @@ export const groupReads = (harness: Harness) => {
                   yield* get(first.id);
                   yield* mine;
                   yield* roster(first.id);
-                  yield* (yield* GroupAudience.make()).require(first.id);
+                  yield* (yield* GroupQuery.make()).requireAudience(first.id);
                 }),
               );
               expect(yield* history(bound)).toEqual(before);
@@ -798,7 +796,7 @@ export const groupReads = (harness: Harness) => {
                     unknown,
                     | GroupApplication.ReadError
                     | GroupMembershipApplication.ReadError
-                    | GroupAudience.Error,
+                    | GroupQuery.AudienceError,
                     Actor.Service
                   >
                 > = [

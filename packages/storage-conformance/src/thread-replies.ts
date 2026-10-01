@@ -17,7 +17,8 @@ import {
   Group,
   GroupApplication,
   GroupMembershipApplication,
-  GroupMembershipDeparture,
+  GroupCommand,
+  GroupQuery,
   GroupMembershipFacts,
 } from "@amends/core/group";
 
@@ -207,7 +208,10 @@ export const threadReplies = (harness: Harness) => {
               expectTypeOf<
                 Extract<
                   Core.Operations,
-                  ThreadQuery.Service | ThreadCommand.Service | GroupMembershipDeparture.Service
+                  | ThreadQuery.Service
+                  | ThreadCommand.Service
+                  | GroupQuery.Service
+                  | GroupCommand.Service
                 >
               >().toEqualTypeOf<never>();
               const { bound, owner, group, first, human } = yield* prepare();

@@ -1,4 +1,4 @@
-import { GroupMembershipDeparture } from "@amends/core/group";
+import { GroupCommand } from "@amends/core/group";
 import { Publication } from "../../../src/journal/publication.ts";
 import { GroupMembershipStore } from "../../../src/group/membership/store.ts";
 import { testCrypto, testProvenance } from "../../publication.ts";
@@ -137,8 +137,10 @@ const configured = (
         groupMemberships,
         delegation,
         Layer.succeed(Store.Service, fixture.store),
-        Layer.succeed(GroupMembershipDeparture.Service, {
-          remove: () => Effect.die("These member tests have no group admissions"),
+        Layer.succeed(GroupCommand.Service, {
+          admitMember: () => Effect.die("These member tests admit no one to a group"),
+          removeMembership: () => Effect.die("These member tests have no group admissions"),
+          establishDirect: () => Effect.die("These member tests start no direct groups"),
         }),
       ),
     ),
@@ -163,7 +165,7 @@ const run = <A, E>(
     | WorkspaceStore.Service
     | InvitationStore.Service
     | GroupMembershipStore.Service
-    | GroupMembershipDeparture.Service
+    | GroupCommand.Service
     | Actor.Service
     | Crypto.Crypto
   >,
@@ -199,7 +201,7 @@ it.effect("member reads require only the current actor and leave the journal unc
       | WorkspaceStore.Service
       | InvitationStore.Service
       | GroupMembershipStore.Service
-      | GroupMembershipDeparture.Service
+      | GroupCommand.Service
       | Authorization.Service
       | Delegation.Service
       | Journal.Service

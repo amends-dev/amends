@@ -16,7 +16,7 @@ import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
 import { ThreadApplication } from "./thread/application.ts";
 import { ThreadCommand } from "./thread/command.ts";
-import { DirectGroups } from "./group/direct.ts";
+import { GroupCommand } from "./group/command.ts";
 import { ThreadQuery } from "./thread/query.ts";
 import { ThreadMessageApplication } from "./thread/message/application.ts";
 import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
@@ -30,7 +30,6 @@ import { TurnDrafts } from "./turn/drafts.ts";
 import { TurnEnding } from "./turn/ending.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { NotificationSource } from "./notification/source.ts";
-import { GroupMembershipDeparture } from "./group/membership/departure.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
 import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
@@ -46,7 +45,7 @@ import { ChangeFeedApplication } from "./change-feed/application.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
 import { SignalApplication } from "./signal/application.ts";
 import { GroupApplication } from "./group/application.ts";
-import { GroupAudience } from "./group/audience.ts";
+import { GroupQuery } from "./group/query.ts";
 import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
 import { GroupFollowApplication } from "./group/follow/application.ts";
@@ -177,14 +176,13 @@ const journal = Journal.layer({
 /** Authorization for the acting member, with its grant resolution. */
 const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
 
-/** A thread's internal reads and writes, which other domains share. */
+/** The internal reads and writes of groups and threads, which other domains share. */
+const groupQuery = GroupQuery.layer;
+const groupCommand = GroupCommand.layer;
 const threadQuery = ThreadQuery.layer.pipe(
-  Layer.provide(
-    Layer.mergeAll(GroupAudience.layer, ThreadActivityResolvers.layer(activityResolvers)),
-  ),
+  Layer.provide(Layer.mergeAll(groupQuery, ThreadActivityResolvers.layer(activityResolvers))),
 );
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
-const groupMembershipDeparture = GroupMembershipDeparture.layer;
 const turnActivityRecorder = TurnActivityRecorder.layer.pipe(Layer.provide(threadCommand));
 const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivityRecorder));
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(threadQuery));
@@ -228,13 +226,12 @@ const operations = Layer.mergeAll(
   Layer.provide(
     Layer.mergeAll(
       Delegation.layer,
-      GroupAudience.layer,
-      DirectGroups.layer,
+      groupQuery,
+      groupCommand,
       threadQuery,
       threadCommand,
       notificationSource,
       threadReading,
-      groupMembershipDeparture,
       turnActivityRecorder,
       turnEnding,
       TurnDrafts.layer,

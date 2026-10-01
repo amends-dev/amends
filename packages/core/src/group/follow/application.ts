@@ -11,7 +11,7 @@ import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
 
 import { MemberStore } from "../../workspace/member/store.ts";
-import { GroupAudience } from "../audience.ts";
+import { GroupQuery } from "../query.ts";
 import { GroupPermissions } from "../permissions.ts";
 import { GroupStore } from "../store.ts";
 import { GroupMembershipStore } from "../membership/store.ts";
@@ -56,7 +56,7 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
 export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const groupAudience = yield* GroupAudience.Service;
+  const groupQuery = yield* GroupQuery.Service;
   const groupStore = yield* GroupStore.Service;
   const groupMembershipStore = yield* GroupMembershipStore.Service;
   const memberStore = yield* MemberStore.Service;
@@ -66,12 +66,15 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const { workspaceId } = yield* Store.Service;
 
   /** The admission whose follow changes, after the checks that apply to the actor and target. */
-  const resolve = Effect.fnUntraced(function* (input: GroupFollow.Input, following: boolean) {
+  const authorizeFollowChange = Effect.fnUntraced(function* (
+    input: GroupFollow.Input,
+    following: boolean,
+  ) {
     const request = yield* Schema.decodeEffect(GroupFollow.Input)(input);
-    const own = yield* groupAudience
-      .require(request.groupId)
+    const own = yield* groupQuery
+      .requireAudience(request.groupId)
       .pipe(
-        Effect.catchTag("GroupAudience.NotMember", () =>
+        Effect.catchTag("GroupQuery.NotMember", () =>
           Effect.fail(new GroupNotFound({ groupId: request.groupId })),
         ),
       );
@@ -110,7 +113,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
 
   const follow = Effect.fn("GroupFollowApplication.follow")(
     function* (input: GroupFollow.Input) {
-      const admission = yield* resolve(input, true);
+      const admission = yield* authorizeFollowChange(input, true);
       if (Option.isSome(yield* groupFollowStore.findActive(admission.id))) return;
       const followedAt = yield* DateTime.now;
       yield* journal
@@ -132,7 +135,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   );
   const unfollow = Effect.fn("GroupFollowApplication.unfollow")(
     function* (input: GroupFollow.Input) {
-      const admission = yield* resolve(input, false);
+      const admission = yield* authorizeFollowChange(input, false);
       const existing = yield* groupFollowStore.findActive(admission.id);
       if (Option.isNone(existing)) return;
       yield* journal.publish(GroupFollowFacts.Ended, {

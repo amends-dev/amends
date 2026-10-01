@@ -9,12 +9,7 @@ import {
   type Role,
   RoleStore,
 } from "@amends/core/authorization";
-import {
-  GroupAudience,
-  GroupFollowStore,
-  GroupMembershipStore,
-  GroupStore,
-} from "@amends/core/group";
+import { GroupQuery, GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
 import { type Actor, Identity, Performer } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
@@ -353,7 +348,7 @@ export const threadInternals = ThreadCommand.layer.pipe(
   Layer.provideMerge(ThreadQuery.layer),
   Layer.provide(
     Layer.mergeAll(
-      GroupAudience.layer,
+      GroupQuery.layer,
       ThreadActivityResolvers.layer([
         ThreadMessageTimeline.resolver,
         ThreadParticipationTimeline.resolver,

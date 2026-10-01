@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Group } from "../group/group.ts";
-import { GroupAudience } from "../group/audience.ts";
+import { GroupQuery } from "../group/query.ts";
 import { GroupMembership } from "../group/membership/membership.ts";
 import { GroupMembershipStore } from "../group/membership/store.ts";
 import type { Actor } from "../identity/actor.ts";
@@ -96,7 +96,7 @@ export class Service extends Context.Service<Service, Interface>()(
 /** @category constructors */
 export const make = Effect.fn("ThreadQuery.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const groupAudience = yield* GroupAudience.Service;
+  const groupQuery = yield* GroupQuery.Service;
   const threadStore = yield* ThreadStore.Service;
   const groupMembershipStore = yield* GroupMembershipStore.Service;
   const memberStore = yield* MemberStore.Service;
@@ -111,12 +111,10 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const found = yield* threadStore.get(id);
     if (Option.isNone(found)) return yield* new NotFound({ threadId: id });
     const thread = found.value;
-    yield* groupAudience
-      .require(thread.groupId)
+    yield* groupQuery
+      .requireAudience(thread.groupId)
       .pipe(
-        Effect.catchTag("GroupAudience.NotMember", () =>
-          Effect.fail(new NotFound({ threadId: id })),
-        ),
+        Effect.catchTag("GroupQuery.NotMember", () => Effect.fail(new NotFound({ threadId: id }))),
       );
     return thread;
   });

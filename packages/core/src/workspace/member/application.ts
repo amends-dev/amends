@@ -6,7 +6,7 @@ import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
 
-import { GroupMembershipDeparture } from "../../group/membership/departure.ts";
+import { GroupCommand } from "../../group/command.ts";
 import { GroupMembershipStore } from "../../group/membership/store.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
@@ -29,7 +29,7 @@ export type Error = Authorization.Error | MemberStore.Failure | Schema.SchemaErr
 
 export type RenameError = Error | Projection.Error | Log.WriteError | PlatformError.PlatformError;
 export type RemoveError =
-  | GroupMembershipDeparture.Error
+  | GroupCommand.RemoveError
   | Error
   | PlatformError.PlatformError
   | Delegation.Error
@@ -89,7 +89,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | WorkspaceStore.Service
   | InvitationStore.Service
   | GroupMembershipStore.Service
-  | GroupMembershipDeparture.Service
+  | GroupCommand.Service
   | Authorization.Service
   | Delegation.Service
   | Journal.Service
@@ -100,7 +100,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const workspaceStore = yield* WorkspaceStore.Service;
   const invitationStore = yield* InvitationStore.Service;
   const groupMembershipStore = yield* GroupMembershipStore.Service;
-  const groupMembershipDeparture = yield* GroupMembershipDeparture.Service;
+  const groupCommand = yield* GroupCommand.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -159,7 +159,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       const removed = yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
       yield* Effect.gen(function* () {
         for (const membership of yield* groupMembershipStore.listActiveByMember(id))
-          yield* groupMembershipDeparture.remove(
+          yield* groupCommand.removeMembership(
             {
               workspaceId,
               groupId: membership.groupId,

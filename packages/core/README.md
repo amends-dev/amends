@@ -135,14 +135,17 @@ groups, and reads rosters;
 `GroupFollowApplication` follows and unfollows. `GroupStore`, `GroupMembershipStore`, and
 `GroupFollowStore` are required host bindings. A direct group has a fixed set of two or more
 members in `Group.directMembers` order, identified by `Group.directKey` and found in any order
-through `GroupStore.findDirect`; internal `DirectGroups.establish` finds or creates one for
+through `GroupStore.findDirect`; `GroupCommand.establishDirect` finds or creates one for
 `ThreadApplication.startDirect`.
 
-Internal `GroupAudience.require` checks current workspace and group membership, with no action
-permission and no management bypass; each application checks its own action grant alongside it,
-inside its commit for writes. `GroupMembershipDeparture` records a group departure as one fact;
-projections end the member's follow of the group and every thread participation held through the
-admission together, without thread activity. Workspace-member removal uses it for every admission. See
+Groups share their internal reads and writes as one `GroupQuery` and one `GroupCommand`, excluded
+from `Core.Operations` like thread's. `GroupQuery.requireAudience` checks current workspace and
+group membership, with no action permission and no management bypass; each application checks its
+own action grant alongside it, inside its commit for writes. `GroupCommand.admitMember` publishes an
+admission, for team creation, direct groups, adding, and joining alike.
+`GroupCommand.removeMembership` records a group departure as one fact; projections end the
+member's follow of the group and every thread participation held through the admission together,
+without thread activity. Workspace-member removal uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
 
 ## Connections
@@ -890,7 +893,7 @@ meaning rather than using it as a synonym for a constructor.
 | Group membership          | `GroupMembershipApplication.make()`     | `GroupMembershipApplication.Service`     |
 | Group following           | `GroupFollowApplication.make()`         | `GroupFollowApplication.Service`         |
 | Read state                | `ReadStateApplication.make()`           | `ReadStateApplication.Service`           |
-| Group audience policy     | `GroupAudience.make()`                  | `GroupAudience.Service`                  |
+| Group internal reads      | `GroupQuery.make()`                     | `GroupQuery.Service`                     |
 | Assignment operations     | `AssignmentApplication.make()`          | `AssignmentApplication.Service`          |
 | Delegation policy         | `Delegation.make()`                     | `Delegation.Service`                     |
 | Invitation operations     | `InvitationApplication.make()`          | `InvitationApplication.Service`          |
