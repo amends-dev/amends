@@ -208,9 +208,7 @@ it.effect("member reads require only the current actor and leave the journal unc
       | Journal.Service
       | Crypto.Crypto
     >();
-    expectTypeOf<
-      Layer.Error<typeof MemberApplication.layer>
-    >().toEqualTypeOf<MemberApplication.WorkspaceMismatch>();
+    expectTypeOf<Layer.Error<typeof MemberApplication.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
       Effect.Services<ReturnType<MemberApplication.Interface["get"]>>
     >().toEqualTypeOf<Actor.Service>();
@@ -362,22 +360,10 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
   }),
 );
 
-it.effect("member application rejects mismatched workspace composition and callers", () =>
+it.effect("member reads refuse an actor from another workspace", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
-    const failure = yield* run(
-      fixture,
-      MemberApplication.make().pipe(
-        Effect.provideService(MemberStore.Service, fixture.members(foreignWorkspaceId)),
-        Effect.flip,
-      ),
-    );
-    expect(failure).toMatchObject({
-      _tag: "MemberApplication.WorkspaceMismatch",
-      expectedWorkspaceId: workspaceId,
-      actualWorkspaceId: foreignWorkspaceId,
-    });
     const foreignActor = Actor.Value.make({
       workspaceId: foreignWorkspaceId,
       memberId: alice.memberId,
@@ -389,56 +375,18 @@ it.effect("member application rejects mismatched workspace composition and calle
   }),
 );
 
-it.effect(
-  "member reads preserve storage failures and reject records outside the authorized target",
-  () =>
-    Effect.gen(function* () {
-      const fixture = yield* make();
-      yield* seed(fixture, [assignment("read-bob")]);
-      const storageFailure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
-      expect(
-        yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
-          get: (id) =>
-            id === bob.id ? Effect.fail(storageFailure) : fixture.members(workspaceId).get(id),
-        }),
-      ).toBe(storageFailure);
-      const responses = [
-        {
-          record: { id: agent.memberId, workspaceId, identity: bob.identity, status: bob.status },
-          tag: "MemberApplication.InvalidResponse",
-        },
-        {
-          record: {
-            id: bob.id,
-            workspaceId: foreignWorkspaceId,
-            identity: bob.identity,
-            status: bob.status,
-          },
-          tag: "MemberApplication.WorkspaceMismatch",
-        },
-      ];
-      for (const { record, tag } of responses) {
-        expect(
-          yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
-            get: (id) =>
-              id === bob.id ? Effect.succeedSome(record) : fixture.members(workspaceId).get(id),
-          }),
-        ).toMatchObject({ _tag: tag });
-      }
-      const invalid = Member.Record.make({
-        id: bob.id,
-        workspaceId,
-        identity: bob.identity,
-        status: "active",
-      });
-      Object.assign(invalid, { status: "unknown" });
-      expect(
-        yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
-          get: (id) =>
-            id === bob.id ? Effect.succeedSome(invalid) : fixture.members(workspaceId).get(id),
-        }),
-      ).toMatchObject({ _tag: "SchemaError" });
-    }),
+it.effect("member reads pass storage failures through", () =>
+  Effect.gen(function* () {
+    const fixture = yield* make();
+    yield* seed(fixture, [assignment("read-bob")]);
+    const storageFailure = new MemberStore.Failure({ operation: "get", cause: "unavailable" });
+    expect(
+      yield* run(fixture, get(bob.id).pipe(Effect.flip), alice, {
+        get: (id) =>
+          id === bob.id ? Effect.fail(storageFailure) : fixture.members(workspaceId).get(id),
+      }),
+    ).toBe(storageFailure);
+  }),
 );
 
 it.effect(
@@ -534,55 +482,22 @@ it.effect(
     }),
 );
 
-it.effect("removal fails closed when ownership cannot be read reliably", () =>
+it.effect("removal passes a failure reading ownership through and writes nothing", () =>
   Effect.gen(function* () {
     const fixture = yield* make();
     yield* seed(fixture, [assignment("remove-bob", bobScope, MemberPermissions.Remove)]);
     const before = yield* fixture.snapshot;
-    const responses: ReadonlyArray<{ get: WorkspaceStore.Interface["get"]; tag: string }> = [
-      { get: Effect.succeedNone, tag: "MemberApplication.InvalidResponse" },
-      {
-        get: Effect.succeedSome({
-          id: foreignWorkspaceId,
-          createdBy: Identity.HumanId.make("alice"),
-          name: "Test workspace",
-          ownerMemberId: alice.memberId,
-        }),
-        tag: "MemberApplication.WorkspaceMismatch",
-      },
-      {
-        get: Effect.fail(new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" })),
-        tag: "WorkspaceStore.Failure",
-      },
-    ];
-    for (const { get: readWorkspace, tag } of responses) {
-      expect(
-        yield* run(fixture, remove(bob.id).pipe(Effect.flip), alice, {}, { get: readWorkspace }),
-      ).toMatchObject({ _tag: tag });
-      expect(yield* fixture.snapshot).toEqual(before);
-    }
-    const composition = yield* run(
-      fixture,
-      MemberApplication.make().pipe(
-        Effect.provide(
-          Layer.mergeAll(
-            Layer.succeed(MemberStore.Service, fixture.members(workspaceId)),
-            Layer.succeed(WorkspaceStore.Service, {
-              workspaceId: foreignWorkspaceId,
-              get: Effect.succeedNone,
-              insert: () => Effect.die("Unexpected workspace insertion"),
-              rename: () => Effect.die("Unexpected workspace rename"),
-              transferOwnership: () => Effect.die("Unexpected ownership transfer"),
-            }),
-          ),
-        ),
-        Effect.flip,
+    const failure = new WorkspaceStore.Failure({ operation: "get", cause: "unavailable" });
+    expect(
+      yield* run(
+        fixture,
+        remove(bob.id).pipe(Effect.flip),
+        alice,
+        {},
+        { get: Effect.fail(failure) },
       ),
-    );
-    expect(composition).toMatchObject({
-      _tag: "MemberApplication.WorkspaceMismatch",
-      actualWorkspaceId: foreignWorkspaceId,
-    });
+    ).toBe(failure);
+    expect(yield* fixture.snapshot).toEqual(before);
   }),
 );
 

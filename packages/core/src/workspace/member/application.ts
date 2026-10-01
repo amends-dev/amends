@@ -5,14 +5,14 @@ import { Delegation } from "../../authorization/delegation.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Actor } from "../../identity/actor.ts";
-import { GroupMembership } from "../../group/membership/membership.ts";
+
 import { GroupMembershipDeparture } from "../../group/membership/departure.ts";
 import { GroupMembershipStore } from "../../group/membership/store.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
-import { Invitation } from "../invitation/invitation.ts";
+
 import { InvitationFacts } from "../invitation/facts.ts";
 import { InvitationStore } from "../invitation/store.ts";
 import { MemberFacts } from "./facts.ts";
@@ -24,23 +24,7 @@ import { Workspace } from "../workspace.ts";
 import { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
 export { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
 
-export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
-  "MemberApplication.WorkspaceMismatch",
-  { expectedWorkspaceId: Workspace.Id, actualWorkspaceId: Workspace.Id },
-) {}
-
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "MemberApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
-export type Error =
-  | Authorization.Error
-  | MemberStore.Failure
-  | Schema.SchemaError
-  | NotFound
-  | WorkspaceMismatch
-  | InvalidResponse;
+export type Error = Authorization.Error | MemberStore.Failure | Schema.SchemaError | NotFound;
 
 export type RenameError = Error | Projection.Error | Log.WriteError | PlatformError.PlatformError;
 export type RemoveError =
@@ -92,15 +76,6 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 const decodeId = Schema.decodeEffect(Member.Id);
-const decodeMember = Schema.decodeEffect(Member.Record);
-const requireWorkspace = Effect.fnUntraced(function* (
-  expectedWorkspaceId: Workspace.Id,
-  actualWorkspaceId: Workspace.Id,
-) {
-  if (expectedWorkspaceId !== actualWorkspaceId) {
-    return yield* new WorkspaceMismatch({ expectedWorkspaceId, actualWorkspaceId });
-  }
-});
 
 /**
  * Construct member operations from workspace services; the caller supplies Actor.Service per call.
@@ -109,7 +84,7 @@ const requireWorkspace = Effect.fnUntraced(function* (
  */
 export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.Return<
   Interface,
-  WorkspaceMismatch,
+  never,
   | MemberStore.Service
   | WorkspaceStore.Service
   | InvitationStore.Service
@@ -130,22 +105,11 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  yield* requireWorkspace(workspaceId, members.workspaceId);
-  yield* requireWorkspace(workspaceId, workspace.workspaceId);
-  yield* requireWorkspace(workspaceId, invitations.workspaceId);
-  yield* requireWorkspace(workspaceId, groupMemberships.workspaceId);
-  yield* requireWorkspace(workspaceId, groupDeparture.workspaceId);
-  yield* requireWorkspace(workspaceId, delegation.workspaceId);
 
   const load = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* members.get(id);
     if (Option.isNone(found)) return yield* new NotFound({ workspaceId, memberId: id });
-    const member = yield* decodeMember(found.value);
-    yield* requireWorkspace(workspaceId, member.workspaceId);
-    if (member.id !== id) {
-      return yield* new InvalidResponse({ message: "Member store returned a different member ID" });
-    }
-    return member;
+    return found.value;
   });
 
   const get = Effect.fn("MemberApplication.get")(function* (memberId: Member.Id) {
@@ -161,12 +125,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const all: Array<Member.Record> = [];
-    for (const found of yield* members.list) {
-      const member = yield* decodeMember(found);
-      yield* requireWorkspace(workspaceId, member.workspaceId);
-      all.push(member);
-    }
+    const all = yield* members.list;
     // One grant resolution decides every member, rather than one per member.
     const allowed = yield* authorization.permitted(
       all.map((member) =>
@@ -190,29 +149,15 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       ]);
       const member = yield* load(id);
       const found = yield* workspace.get;
-      if (Option.isNone(found))
-        return yield* new InvalidResponse({ message: "Workspace metadata is missing" });
-      const record = yield* Schema.decodeEffect(Workspace.Record)(found.value);
-      yield* requireWorkspace(workspaceId, record.id);
-      if (record.ownerMemberId === id)
+      if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
+      if (found.value.ownerMemberId === id)
         return yield* new OwnerProtected({ workspaceId, memberId: id });
       if (member.status === "removed")
         return yield* new AlreadyRemoved({ workspaceId, memberId: id });
       yield* delegation.requireRemoval(id);
       const removed = yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
       yield* Effect.gen(function* () {
-        for (const found of yield* groupMemberships.listActiveByMember(id)) {
-          const membership = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
-            found,
-          );
-          if (
-            membership.workspaceId !== workspaceId ||
-            membership.memberId !== id ||
-            membership.status !== "active"
-          )
-            return yield* new InvalidResponse({
-              message: "Group membership store returned another member, workspace, or state",
-            });
+        for (const membership of yield* groupMemberships.listActiveByMember(id))
           yield* groupDeparture.remove(
             {
               workspaceId,
@@ -223,25 +168,13 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
             },
             removed.provenance.occurredAt,
           );
-        }
       }).pipe(Publication.withCause(removed, removed.provenance.occurredAt));
       if (member.identity._tag === "Human") {
         const recipientId = member.identity.id;
         const actor = yield* Actor.Service;
         const revokedAt = yield* DateTime.now;
         yield* Effect.gen(function* () {
-          for (const pending of yield* invitations.listPendingByRecipient(recipientId)) {
-            const invitation = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(
-              pending,
-            );
-            if (
-              invitation.details.workspaceId !== workspaceId ||
-              invitation.details.recipientId !== member.identity.id ||
-              invitation.state._tag !== "Pending"
-            )
-              return yield* new InvalidResponse({
-                message: "Invitation store returned a different recipient, workspace, or state",
-              });
+          for (const invitation of yield* invitations.listPendingByRecipient(recipientId))
             yield* journal.publish(InvitationFacts.Revoked, {
               workspaceId,
               invitationId: invitation.details.id,
@@ -249,10 +182,9 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
               revokedBy: actor.memberId,
               revokedAt,
             });
-          }
         }).pipe(Publication.withCause(removed, revokedAt));
       }
-      return { ...member, status: "removed" } satisfies Member.Record;
+      return Object.assign({}, member, { status: "removed" as const }) satisfies Member.Record;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -266,7 +198,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       const member = yield* load((yield* Actor.Service).memberId);
       if (member.name === name) return member;
       yield* journal.publish(MemberFacts.Renamed, { workspaceId, memberId: member.id, name });
-      return { ...member, name } satisfies Member.Record;
+      return Object.assign({}, member, { name }) satisfies Member.Record;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

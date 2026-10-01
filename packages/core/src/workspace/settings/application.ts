@@ -19,15 +19,14 @@ import { WorkspaceFacts } from "../facts.ts";
 import { Workspace } from "../workspace.ts";
 import { WorkspaceSettings } from "./settings.ts";
 import { WorkspaceSettingsPermissions } from "./permissions.ts";
-import { Changed, InvalidState } from "./errors.ts";
-export { Changed, InvalidState } from "./errors.ts";
+import { Changed } from "./errors.ts";
+export { Changed } from "./errors.ts";
 export type Error =
   | AssignmentApplication.Error
   | MemberApplication.Error
   | WorkspaceStore.Failure
   | Schema.SchemaError
   | Changed
-  | InvalidState
   | Projection.Error
   | Log.WriteError
   | PlatformError.PlatformError;
@@ -55,12 +54,6 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     journal = yield* Journal.Service,
     crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [store.workspaceId, members.workspaceId, delegation.workspaceId].some(
-      (id) => id !== workspaceId,
-    )
-  )
-    return yield* new InvalidState({ message: "Services belong to different workspaces" });
   const allowed = <A, R>(effect: Effect.Effect<A, Error, R>) =>
     effect.pipe(
       Effect.as(true),
@@ -71,14 +64,8 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     );
   const load = Effect.gen(function* () {
     const value = yield* store.get;
-    if (Option.isNone(value))
-      return yield* new InvalidState({ message: "Workspace metadata is missing" });
-    const workspace = yield* Schema.decodeEffect(Workspace.Record)(value.value);
-    if (workspace.id !== workspaceId)
-      return yield* new InvalidState({
-        message: "Workspace metadata belongs to another workspace",
-      });
-    return workspace;
+    if (Option.isNone(value)) return yield* Effect.die("A workspace's record is missing");
+    return value.value;
   });
   const renamePermission = Requirement.make(WorkspaceSettingsPermissions.Rename, {
     _tag: "Workspace",
@@ -163,7 +150,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
         previousName: workspace.name,
         name: request.name,
       });
-      return { ...workspace, name: request.name };
+      return Object.assign({}, workspace, { name: request.name });
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

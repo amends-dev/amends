@@ -27,11 +27,6 @@ import { MemberStore } from "../member/store.ts";
 import { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
 export { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "InvitationApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type Error =
   | Authorization.Error
   | Delegation.Error
@@ -45,8 +40,7 @@ export type Error =
   | NotRecipient
   | AlreadyMember
   | Unavailable
-  | InvalidExpiry
-  | InvalidResponse;
+  | InvalidExpiry;
 
 export interface Interface {
   readonly issue: (
@@ -78,7 +72,7 @@ export class Service extends Context.Service<Service, Interface>()(
  */
 export const make = Effect.fn("InvitationApplication.make")(function* (): Effect.fn.Return<
   Interface,
-  InvalidResponse,
+  never,
   | InvitationStore.Service
   | MemberStore.Service
   | GroupStore.Service
@@ -95,18 +89,6 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = invitations.workspaceId;
-  if (
-    [
-      invitations.workspaceId,
-      members.workspaceId,
-      groups.workspaceId,
-      authorization.workspaceId,
-      delegation.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({
-      message: "Invitation services belong to different workspaces",
-    });
   const manage = Requirement.make(
     InvitationPermissions.Manage,
     Target.Reference.cases.Workspace.make({ workspaceId }),
@@ -123,12 +105,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
     const found = yield* invitations.get(validId);
     if (Option.isNone(found)) return yield* new NotFound({ invitationId: id });
-    const record = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(found.value);
-    if (record.details.id !== id || record.details.workspaceId !== workspaceId)
-      return yield* new InvalidResponse({
-        message: "Invitation store returned a different invitation or workspace",
-      });
-    return record;
+    return found.value;
   });
   const requireUnjoined = Effect.fnUntraced(function* (recipientId: Identity.HumanId) {
     if (
@@ -188,16 +165,8 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     // or reactivating a membership that has since been removed.
     if (state._tag === "Accepted") {
       const member = yield* members.get(state.memberId);
-      if (
-        Option.isNone(member) ||
-        member.value.id !== state.memberId ||
-        member.value.workspaceId !== workspaceId ||
-        member.value.identity._tag !== "Human" ||
-        member.value.identity.id !== recipient
-      )
-        return yield* new InvalidResponse({
-          message: "Accepted invitation has no matching membership",
-        });
+      if (Option.isNone(member))
+        return yield* Effect.die("An accepted invitation's member is missing");
       return member.value;
     }
     if (state._tag === "Revoked")
@@ -297,16 +266,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
 
   const list = Effect.gen(function* () {
     yield* authorization.require([manage]);
-    const records: Array<Invitation.Record> = [];
-    for (const found of yield* invitations.list) {
-      const record = yield* Schema.decodeEffect(Schema.toType(Invitation.Record))(found);
-      if (record.details.workspaceId !== workspaceId)
-        return yield* new InvalidResponse({
-          message: "Invitation store returned another workspace's invitation",
-        });
-      records.push(record);
-    }
-    return records;
+    return yield* invitations.list;
   }).pipe(Effect.withSpan("InvitationApplication.list"));
 
   return Service.of({ issue, accept, revoke, list });

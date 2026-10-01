@@ -23,10 +23,6 @@ import { OwnershipPermissions } from "./permissions.ts";
 import { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./errors.ts";
 export { Changed, InvalidRecipient, MemberNotFound, NotOwner } from "./errors.ts";
 
-export class InvalidState extends Schema.TaggedError<InvalidState>()(
-  "OwnershipApplication.InvalidState",
-  { message: Schema.String },
-) {}
 export type Error =
   | Delegation.Error
   | WorkspaceStore.Failure
@@ -37,8 +33,7 @@ export type Error =
   | NotOwner
   | MemberNotFound
   | InvalidRecipient
-  | Changed
-  | InvalidState;
+  | Changed;
 export interface Interface {
   readonly get: Effect.Effect<Ownership.View, Error, Actor.Service>;
   readonly transfer: (
@@ -52,7 +47,7 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Construct ownership operations over one workspace's journal and access policy. @category constructors */
 export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.fn.Return<
   Interface,
-  InvalidState,
+  never,
   | WorkspaceStore.Service
   | MemberStore.Service
   | AssignmentStore.Service
@@ -69,17 +64,6 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = workspace.workspaceId;
-  if (
-    [
-      members.workspaceId,
-      assignments.workspaceId,
-      authorization.workspaceId,
-      delegation.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidState({
-      message: "Ownership services belong to different workspaces",
-    });
   const requirement = Requirement.make(OwnershipPermissions.Transfer, {
     _tag: "Workspace",
     workspaceId,
@@ -87,45 +71,16 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   const loadMember = Effect.fn("OwnershipApplication.loadMember")(function* (memberId: Member.Id) {
     const found = yield* members.get(memberId);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
-    const member = yield* Schema.decodeEffect(Member.Record)(found.value);
-    if (member.id !== memberId || member.workspaceId !== workspaceId)
-      return yield* new InvalidState({
-        message: "Member store returned a different member or workspace",
-      });
-    return member;
+    return found.value;
   });
   const current = Effect.gen(function* () {
     const found = yield* workspace.get;
-    if (Option.isNone(found))
-      return yield* new InvalidState({ message: "Workspace metadata is missing" });
-    const record = yield* Schema.decodeEffect(Workspace.Record)(found.value);
-    if (record.id !== workspaceId)
-      return yield* new InvalidState({ message: "Workspace metadata is mismatched" });
-    const owner = yield* loadMember(record.ownerMemberId).pipe(
-      Effect.catchTag("OwnershipApplication.MemberNotFound", () =>
-        Effect.fail(new InvalidState({ message: "Owner membership is missing" })),
-      ),
-    );
-    if (owner.status !== "active" || owner.identity._tag !== "Human")
-      return yield* new InvalidState({ message: "The owner must be an active human member" });
-    const records = yield* Schema.decodeEffect(Schema.Array(Assignment.Record))(
-      yield* assignments.listActiveByRole(BuiltinRoles.OwnerId),
-    );
-    const assignment = records[0];
-    if (
-      records.length !== 1 ||
-      assignment === undefined ||
-      assignment.workspaceId !== workspaceId ||
-      assignment.memberId !== owner.id ||
-      assignment.status !== "active" ||
-      assignment.source._tag !== "Role" ||
-      assignment.source.roleId !== BuiltinRoles.OwnerId ||
-      assignment.source.scope._tag !== "Workspace"
-    )
-      return yield* new InvalidState({
-        message: "Ownership requires exactly one matching workspace Owner assignment",
-      });
-    return { workspace: record, owner, assignment };
+    if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
+    const owner = yield* members.get(found.value.ownerMemberId);
+    const [assignment] = yield* assignments.listActiveByRole(BuiltinRoles.OwnerId);
+    if (Option.isNone(owner) || assignment === undefined)
+      return yield* Effect.die("A workspace's owner or its Owner assignment is missing");
+    return { workspace: found.value, owner: owner.value, assignment };
   });
   const get = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -138,22 +93,14 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
         Effect.as(true),
         Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
       ));
-    const candidates: Array<Member.Record> = [];
-    if (canTransfer) {
-      const seen = new Set<Member.Id>();
-      for (const input of yield* members.list) {
-        const member = yield* Schema.decodeEffect(Member.Record)(input);
-        if (member.workspaceId !== workspaceId || seen.has(member.id))
-          return yield* new InvalidState({ message: "Member listing is inconsistent" });
-        seen.add(member.id);
-        if (
-          member.status === "active" &&
-          member.identity._tag === "Human" &&
-          member.id !== state.owner.id
+    const candidates = canTransfer
+      ? (yield* members.list).filter(
+          (member) =>
+            member.status === "active" &&
+            member.identity._tag === "Human" &&
+            member.id !== state.owner.id,
         )
-          candidates.push(member);
-      }
-    }
+      : [];
     return Ownership.View.make({
       workspace: state.workspace,
       owner: state.owner,
@@ -197,20 +144,10 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
       const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
       yield* delegation.loadRole(BuiltinRoles.AdministratorId);
       if (!ownerRole.permissions.includes(OwnershipPermissions.Transfer.name))
-        return yield* new InvalidState({
-          message: "The Owner role must retain ownership-transfer permission",
-        });
+        return yield* Effect.die("The Owner role must keep the ownership-transfer permission");
       // Replace built-in workspace roles only. Direct grants and scoped assignments retain their identity.
       const previousAssignments = yield* delegation.assignmentsFor(state.owner.id);
       const recipientAssignments = yield* delegation.assignmentsFor(recipient.id);
-      const sameAssignment = Schema.toEquivalence(Assignment.Record);
-      if (
-        !previousAssignments.some((record) => sameAssignment(record, state.assignment)) ||
-        recipientAssignments.some(
-          ({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId,
-        )
-      )
-        return yield* new InvalidState({ message: "Owner assignment listings disagree" });
       for (const records of [previousAssignments, recipientAssignments]) {
         for (const assignment of records) {
           const source = assignment.source;
@@ -233,16 +170,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
         previousOwnerMemberId: state.owner.id,
         ownerMemberId: recipient.id,
       });
-      const updated = yield* current;
-      if (
-        updated.owner.id !== recipient.id ||
-        updated.workspace.name !== state.workspace.name ||
-        updated.workspace.createdBy !== state.workspace.createdBy
-      )
-        return yield* new InvalidState({
-          message: "Ownership transfer changed unrelated metadata or the wrong owner",
-        });
-      return updated.workspace;
+      return (yield* current).workspace;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

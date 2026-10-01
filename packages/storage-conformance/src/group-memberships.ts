@@ -1767,40 +1767,6 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
 
-    it.effect("inconsistent admission responses abort workspace cleanup", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const { bound, group, owner } = yield* prepare();
-            const admission = yield* run(bound, owner, add(group.id, humanId));
-            const before = yield* history(bound);
-            for (const wrong of [
-              Object.assign({}, admission, { memberId: agentId }),
-              Object.assign({}, admission, { workspaceId: otherWorkspaceId }),
-              Object.assign({}, admission, { status: "removed" as const }),
-            ]) {
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, GroupMembershipStore.Service, {
-                  ...bound.groupMemberships,
-                  listActiveByMember: () => Effect.succeed([wrong]),
-                }),
-              };
-              expect(
-                yield* Effect.flip(run(broken, owner, removeWorkspaceMember(humanId))),
-              ).toMatchObject({ _tag: "MemberApplication.InvalidResponse" });
-            }
-            expect(yield* bound.members.get(humanId)).toMatchObject({
-              value: { status: "active" },
-            });
-            expect(yield* bound.groupMemberships.get(admission.id)).toEqual(Option.some(admission));
-            expect(yield* history(bound)).toEqual(before);
-          }),
-        ),
-      ),
-    );
-
     it.effect(
       "gateway exposes departure outcomes and accepts self-leave with no management grant",
       () =>
