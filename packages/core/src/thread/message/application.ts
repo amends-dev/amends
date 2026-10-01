@@ -6,12 +6,11 @@ import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
-import { ThreadAccess } from "../access.ts";
-import { ThreadParticipationAdmission } from "../participation/admission.ts";
+import { ThreadCommand } from "../command.ts";
+import { ThreadQuery } from "../query.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessagePermissions } from "./permissions.ts";
-import { ThreadMessagePublication } from "./publication.ts";
 import { ThreadReading } from "../../attention/reading.ts";
 import { Request } from "../../request/request.ts";
 import { ThreadMessageStore } from "./store.ts";
@@ -22,8 +21,8 @@ export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.
 export type Error =
   | ThreadReading.Error
   | Authorization.Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
-  | Exclude<ThreadMessagePublication.Error, ThreadParticipationAdmission.Unavailable>
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | NotFound
   | ParticipantUnavailable
   | HumanAuthorRequired
@@ -43,9 +42,8 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const access = yield* ThreadAccess.Service;
-  const admissions = yield* ThreadParticipationAdmission.Service;
-  const publication = yield* ThreadMessagePublication.Service;
+  const threadQuery = yield* ThreadQuery.Service;
+  const threadCommand = yield* ThreadCommand.Service;
   const readings = yield* ThreadReading.Service;
   const messages = yield* ThreadMessageStore.Service;
   const journal = yield* Journal.Service;
@@ -68,10 +66,10 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const publish = Effect.fn("ThreadMessageApplication.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
-      const thread = yield* access
-        .require(request.threadId)
+      const thread = yield* threadQuery
+        .requireAccess(request.threadId)
         .pipe(
-          Effect.catchTag("ThreadAccess.NotFound", (error) =>
+          Effect.catchTag("ThreadQuery.NotFound", (error) =>
             Effect.fail(new NotFound({ threadId: error.threadId })),
           ),
         );
@@ -89,7 +87,8 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       if (Option.isSome(previous)) return previous.value;
       // Without mentions a reply addresses every current participant, including contacts and
       // triage; with them, only the author and those mentioned are read.
-      const current = request.mentions.length === 0 ? yield* admissions.current(thread) : [];
+      const current =
+        request.mentions.length === 0 ? yield* threadQuery.currentParticipants(thread) : [];
       const author: ThreadParticipation.Reference = {
         _tag: "Member",
         memberId: actor.memberId,
@@ -115,7 +114,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
           ? [reference.memberId]
           : [],
       );
-      const eligible = yield* admissions.eligible(thread.groupId, joining);
+      const eligible = yield* threadQuery.eligibleMembers(thread.groupId, joining);
       for (const reference of selected) {
         if (reference._tag !== "Member" || participating.has(reference.memberId)) continue;
         const entry = eligible.get(reference.memberId);
@@ -131,8 +130,8 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
             }),
           ]);
       }
-      const published = yield* publication
-        .publish({
+      const published = yield* threadCommand
+        .publishMessage({
           ...request,
           messageId,
           author: { _tag: "Member", memberId: actor.memberId },
@@ -140,7 +139,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
           occurredAt: yield* DateTime.now,
         })
         .pipe(
-          Effect.catchTag("ThreadParticipationAdmission.Unavailable", (error) =>
+          Effect.catchTag("ThreadCommand.Unavailable", (error) =>
             Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
           ),
         );

@@ -53,8 +53,8 @@ type Internal = {
     | "PlatformError"
     // Shared publishing declares these, but these operations never raise them: none asks for a
     // timeline position, and departures and self-follows admit only current members.
-    | "ThreadActivityPublisher.PositionChanged"
-    | "ThreadParticipationAdmission.Unavailable";
+    | "ThreadCommand.PositionChanged"
+    | "ThreadCommand.Unavailable";
 };
 /** An error that is neither: it would reach callers as a server error without anyone deciding so. */
 type Unclassified<Service> = Exclude<ErrorsOf<Service>, GatewayErrors.PublicError | Internal>;

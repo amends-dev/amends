@@ -31,20 +31,16 @@ import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
   ThreadApplication,
-  ThreadAccess,
   ThreadActivityFacts,
-  ThreadActivityPublisher,
-  ThreadActivityRecording,
-  ThreadParticipationDeparture,
   ThreadActivityStore,
   ThreadMessage,
   ThreadMessageApplication,
   ThreadMessagePermissions,
-  ThreadMessagePublication,
   ThreadMessageStore,
   ThreadParticipation,
-  ThreadParticipationAdmission,
   ThreadPermissions,
+  ThreadCommand,
+  ThreadQuery,
 } from "@amends/core/thread";
 
 import { Gateway } from "@amends/gateway";
@@ -65,6 +61,7 @@ import {
   Support,
   testProvenance,
   workspaceId,
+  threadInternals,
 } from "./support.ts";
 
 import type { Harness } from "./harness.ts";
@@ -210,12 +207,7 @@ export const threadReplies = (harness: Harness) => {
               expectTypeOf<
                 Extract<
                   Core.Operations,
-                  | ThreadAccess.Service
-                  | ThreadParticipationAdmission.Service
-                  | ThreadMessagePublication.Service
-                  | ThreadActivityRecording.Service
-                  | ThreadParticipationDeparture.Service
-                  | GroupMembershipDeparture.Service
+                  ThreadQuery.Service | ThreadCommand.Service | GroupMembershipDeparture.Service
                 >
               >().toEqualTypeOf<never>();
               const { bound, owner, group, first, human } = yield* prepare();
@@ -1126,23 +1118,11 @@ export const threadReplies = (harness: Harness) => {
                   return memberId === undefined ? [] : [{ _tag: "Member" as const, memberId }];
                 });
               // Agents cannot reply through the application yet; their turns will publish this way.
-              const internal = ThreadMessagePublication.layer.pipe(
-                Layer.provide(
-                  ThreadActivityPublisher.layer.pipe(
-                    Layer.provide(
-                      Layer.mergeAll(
-                        ThreadParticipationAdmission.layer,
-                        ThreadActivityRecording.layer,
-                      ),
-                    ),
-                  ),
-                ),
-              );
               yield* Effect.gen(function* () {
                 const journal = yield* Journal.Service;
-                const publication = yield* ThreadMessagePublication.Service;
+                const threadCommand = yield* ThreadCommand.Service;
                 yield* journal.commit(
-                  publication.publish({
+                  threadCommand.publishMessage({
                     messageId: ThreadMessage.Id.make("done"),
                     threadId: first.thread.id,
                     author: { _tag: "Member", memberId: agentId },
@@ -1154,7 +1134,7 @@ export const threadReplies = (harness: Harness) => {
                 );
               }).pipe(
                 Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-                Effect.provide(internal.pipe(Layer.provideMerge(core(bound)))),
+                Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
               );
               const inbox = Effect.fnUntraced(function* (
                 memberId: Member.Id,

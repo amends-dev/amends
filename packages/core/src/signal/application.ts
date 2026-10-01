@@ -2,7 +2,7 @@ import { Context, DateTime, Duration, Effect, Layer } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Actor } from "../identity/actor.ts";
-import { ThreadAccess } from "../thread/access.ts";
+import { ThreadQuery } from "../thread/query.ts";
 import { ThreadMessagePermissions } from "../thread/message/permissions.ts";
 import { Thread } from "../thread/thread.ts";
 
@@ -14,7 +14,7 @@ export { ThreadNotFound } from "./errors.ts";
 
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | ThreadNotFound;
 
 export interface Interface {
@@ -39,17 +39,17 @@ const typingEvery = Duration.seconds(2);
 /** Capture the workspace's signals and thread access; authorize each signal as its actor. @category constructors */
 export const make = Effect.fn("SignalApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const access = yield* ThreadAccess.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const signals = yield* Signals.Service;
   const { workspaceId } = yield* Store.Service;
   /** When each member last signalled typing in each thread, in this process. */
   const lastTyping = new Map<string, number>();
 
   const typing = Effect.fn("SignalApplication.typing")(function* (threadId: Thread.Id) {
-    const thread = yield* access
-      .require(threadId)
+    const thread = yield* threadQuery
+      .requireAccess(threadId)
       .pipe(
-        Effect.catchTag("ThreadAccess.NotFound", (error) =>
+        Effect.catchTag("ThreadQuery.NotFound", (error) =>
           Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
         ),
       );

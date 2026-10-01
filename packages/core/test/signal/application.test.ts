@@ -10,7 +10,7 @@ import { SignalApplication } from "../../src/signal/application.ts";
 import { Signal } from "../../src/signal/signal.ts";
 import { Signals } from "../../src/signal/signals.ts";
 import { Store } from "../../src/journal/store.ts";
-import { ThreadAccess } from "../../src/thread/access.ts";
+import { ThreadQuery } from "../../src/thread/query.ts";
 import { Thread } from "../../src/thread/thread.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
@@ -42,11 +42,18 @@ const run = <A, E>(
   Effect.gen(function* () {
     const published: Array<Signal.Value> = [];
     const requirements: Array<Requirement.Value> = [];
-    const access = ThreadAccess.Service.of({
-      require: (threadId) =>
+    const unexpected = () => Effect.die("Typing reads nothing but thread access");
+    const threadQuery = ThreadQuery.Service.of({
+      requireAccess: (threadId) =>
         readable.has(threadId)
           ? Effect.succeed(thread(threadId))
-          : Effect.fail(new ThreadAccess.NotFound({ threadId })),
+          : Effect.fail(new ThreadQuery.NotFound({ threadId })),
+      eligibleMembers: unexpected,
+      currentParticipants: unexpected,
+      pageParticipants: unexpected,
+      findParticipants: unexpected,
+      readTimeline: unexpected,
+      readTimelineItem: unexpected,
     });
     const authorization = Authorization.Service.of({
       require: (needed) =>
@@ -72,7 +79,7 @@ const run = <A, E>(
         SignalApplication.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
-              Layer.succeed(ThreadAccess.Service, access),
+              Layer.succeed(ThreadQuery.Service, threadQuery),
               Layer.succeed(Authorization.Service, authorization),
               Layer.succeed(Signals.Service, signals),
               Layer.succeed(Store.Service, (yield* make(workspaceId)).store),

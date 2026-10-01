@@ -4,7 +4,7 @@ import { Requirement } from "../authorization/requirement.ts";
 import { GroupAudience } from "../group/audience.ts";
 import { GroupPermissions } from "../group/permissions.ts";
 import { Actor } from "../identity/actor.ts";
-import { ThreadAccess } from "../thread/access.ts";
+import { ThreadQuery } from "../thread/query.ts";
 
 import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
@@ -21,7 +21,7 @@ export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./
 
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | Exclude<GroupAudience.Error, GroupAudience.NotMember>
   | ThreadActivityStore.Failure
   | ThreadReading.Error
@@ -54,7 +54,7 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture workspace dependencies; resolve authority per operation. @category constructors */
 export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const access = yield* ThreadAccess.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const audience = yield* GroupAudience.Service;
   const activities = yield* ThreadActivityStore.Service;
   const reading = yield* ThreadReading.Service;
@@ -73,10 +73,10 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input);
     const reader = yield* human();
-    const thread = yield* access
-      .require(request.threadId)
+    const thread = yield* threadQuery
+      .requireAccess(request.threadId)
       .pipe(
-        Effect.catchTag("ThreadAccess.NotFound", (error) =>
+        Effect.catchTag("ThreadQuery.NotFound", (error) =>
           Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
         ),
       );

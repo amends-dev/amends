@@ -25,14 +25,10 @@ import { Checkpoint, Fact, Journal, Log, Publication, Store, Subject } from "@am
 import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 import {
   Thread,
-  ThreadAccess,
   ThreadApplication,
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
-  ThreadActivityPublisher,
-  ThreadActivityReading,
-  ThreadActivityRecording,
   ThreadActivityResolvers,
   ThreadActivityStore,
   ThreadMessage,
@@ -40,10 +36,11 @@ import {
   ThreadMessageFacts,
   ThreadMessageTimeline,
   ThreadParticipation,
-  ThreadParticipationAdmission,
   ThreadParticipationApplication,
   ThreadParticipationTimeline,
   ThreadPermissions,
+  ThreadCommand,
+  ThreadQuery,
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema } from "effect";
@@ -58,6 +55,7 @@ import {
   Support,
   testProvenance,
   workspaceId,
+  threadInternals,
 } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -1312,11 +1310,6 @@ export const threadReads = (harness: Harness) => {
                 payload: Schema.String,
                 subject: () => Subject.make("test", "happened"),
               });
-              const publisher = ThreadActivityPublisher.layer.pipe(
-                Layer.provide(
-                  Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
-                ),
-              );
               const record = <K extends ThreadActivityKind.Definition>(
                 kind: K,
                 details: K["details"]["Type"],
@@ -1324,8 +1317,8 @@ export const threadReads = (harness: Harness) => {
               ) =>
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
-                    Effect.flatMap(ThreadActivityPublisher.Service, (activities) =>
-                      activities.publish({
+                    Effect.flatMap(ThreadCommand.Service, (threadCommand) =>
+                      threadCommand.publishActivity({
                         thread: first.thread,
                         occurredAt: DateTime.makeUnsafe("2026-09-24T12:00:00.000Z"),
                         ...(expectedSequence === undefined ? {} : { expectedSequence }),
@@ -1342,7 +1335,7 @@ export const threadReads = (harness: Harness) => {
                   ),
                 ).pipe(
                   Effect.provideService(Publication.Service, testProvenance(workspaceId)),
-                  Effect.provide(publisher.pipe(Layer.provideMerge(core(bound)))),
+                  Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
                 );
               const at = DateTime.makeUnsafe("2026-09-24T11:00:00.000Z");
               const note = { noteId: "note-1", text: "Checked", at, tags: ["a", "b"] };
@@ -1376,7 +1369,7 @@ export const threadReads = (harness: Harness) => {
               ]);
               // An expected position records only there.
               expect(yield* Effect.flip(record(Pinged, { count: 3 }, position + 2))).toMatchObject({
-                _tag: "ThreadActivityPublisher.PositionChanged",
+                _tag: "ThreadCommand.PositionChanged",
                 expected: position + 2,
                 actual: position + 1,
               });
@@ -1397,10 +1390,10 @@ export const threadReads = (harness: Harness) => {
                   ),
               } satisfies ThreadActivityResolvers.Resolver);
               // Fresh: core builds its own reader, over only the resolvers core registers.
-              const reading = Layer.fresh(ThreadActivityReading.layer).pipe(
+              const reading = Layer.fresh(ThreadQuery.layer).pipe(
                 Layer.provide(
                   Layer.mergeAll(
-                    ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer)),
+                    GroupAudience.layer,
                     ThreadActivityResolvers.layer([
                       ThreadMessageTimeline.resolver,
                       ThreadParticipationTimeline.resolver,
@@ -1410,8 +1403,8 @@ export const threadReads = (harness: Harness) => {
                 ),
                 Layer.provideMerge(core(bound)),
               );
-              const items = yield* Effect.flatMap(ThreadActivityReading.Service, (timelines) =>
-                timelines.page(first.thread.id, { limit: 10 }),
+              const items = yield* Effect.flatMap(ThreadQuery.Service, (threadQuery) =>
+                threadQuery.readTimeline(first.thread.id, { limit: 10 }),
               ).pipe(Effect.provideService(Actor.Service, owner), Effect.provide(reading));
               expect(items.map((item) => item.activity.kind)).toEqual([
                 ThreadMessageActivity.Published.name,

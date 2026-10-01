@@ -13,7 +13,7 @@ import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import type { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
-import { ThreadAccess } from "../thread/access.ts";
+import { ThreadQuery } from "../thread/query.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
@@ -30,7 +30,7 @@ import { Turn } from "./turn.ts";
 export { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 
 export type ReadError =
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | Exclude<Authorization.Error, Authorization.Denied>
   | TurnStore.Failure
   | ThreadParticipationStore.Failure
@@ -112,7 +112,7 @@ const logPage = 100;
 export const make = Effect.fn("TurnApplication.make")(function* () {
   const turns = yield* TurnStore.Service;
   const participations = yield* ThreadParticipationStore.Service;
-  const access = yield* ThreadAccess.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const authorization = yield* Authorization.Service;
   const members = yield* MemberStore.Service;
   const activity = yield* TurnActivityRecorder.Service;
@@ -132,7 +132,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
    * its turns checks this. Outside its audience, it is missing to them.
    */
   const readableThread = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
-    const thread = yield* access.require(threadId);
+    const thread = yield* threadQuery.requireAccess(threadId);
     yield* authorization.require([readThread(thread.id)]);
     return thread;
   });
@@ -142,7 +142,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
     const turn = found.value;
     yield* readableThread(turn.threadId).pipe(
-      Effect.catchTag("ThreadAccess.NotFound", () => Effect.fail(new NotFound({ turnId }))),
+      Effect.catchTag("ThreadQuery.NotFound", () => Effect.fail(new NotFound({ turnId }))),
     );
     return turn;
   });
@@ -205,7 +205,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
     const count = yield* bounded(limit);
     const thread = yield* readableThread(id).pipe(
-      Effect.catchTag("ThreadAccess.NotFound", () =>
+      Effect.catchTag("ThreadQuery.NotFound", () =>
         Effect.fail(new ThreadNotFound({ threadId: id })),
       ),
     );
@@ -223,10 +223,10 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const opened = new Map<ThreadId.Id, boolean>();
     for (const turn of active) {
       if (opened.has(turn.threadId)) continue;
-      const may = yield* access.require(turn.threadId).pipe(
+      const may = yield* threadQuery.requireAccess(turn.threadId).pipe(
         Effect.as(true),
         Effect.catchTags({
-          "ThreadAccess.NotFound": () => Effect.succeed(false),
+          "ThreadQuery.NotFound": () => Effect.succeed(false),
           "Authorization.Denied": () => Effect.succeed(false),
         }),
       );

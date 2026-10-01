@@ -6,8 +6,7 @@ import { Event } from "../journal/event.ts";
 import type { Log } from "../journal/log.ts";
 import { Thread } from "../thread/thread.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
-import type { ThreadAccess } from "../thread/access.ts";
-import { ThreadActivityReading } from "../thread/activity/reading.ts";
+import { ThreadQuery } from "../thread/query.ts";
 import { Notification } from "./notification.ts";
 
 export class Unavailable extends Schema.TaggedError<Unavailable>()(
@@ -16,10 +15,7 @@ export class Unavailable extends Schema.TaggedError<Unavailable>()(
 ) {}
 /** Losing access to the source, or a source that is not thread activity, surfaces as Unavailable. */
 export type Error =
-  | Exclude<
-      ThreadActivityReading.Error,
-      ThreadAccess.NotFound | Authorization.Denied | ThreadActivityReading.NotFound
-    >
+  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
   | Log.ReadError
   | Unavailable;
 export interface Interface {
@@ -34,7 +30,7 @@ export class Service extends Context.Service<Service, Interface>()(
 /** @category constructors */
 export const make = Effect.fn("NotificationSource.make")(function* () {
   const journal = yield* Journal.Service;
-  const reading = yield* ThreadActivityReading.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const resolve = Effect.fn("NotificationSource.resolve")(function* (
     notification: Notification.Record,
   ) {
@@ -55,12 +51,10 @@ export const make = Effect.fn("NotificationSource.make")(function* () {
       return yield* new Unavailable({});
     const event = yield* Effect.orDie(Event.decode(ThreadActivityFacts.Recorded, entry));
     // Current source access is independent of historical selection or notification state.
-    return yield* reading.get(event.payload.activity.id).pipe(
+    return yield* threadQuery.readTimelineItem(event.payload.activity.id).pipe(
       Effect.catchTags({
-        "ThreadAccess.NotFound": () => Effect.fail(new Unavailable({})),
+        "ThreadQuery.NotFound": () => Effect.fail(new Unavailable({})),
         "Authorization.Denied": () => Effect.fail(new Unavailable({})),
-        "ThreadActivityReading.NotFound": () =>
-          Effect.die("A recorded activity is missing from the timeline"),
       }),
     );
   });

@@ -6,13 +6,12 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
 import { Thread } from "../thread.ts";
-import { ThreadAccess } from "../access.ts";
-import { ThreadActivityPublisher } from "../activity/publisher.ts";
+import { ThreadCommand } from "../command.ts";
+import { ThreadQuery } from "../query.ts";
 import { ThreadParticipationActivity } from "./activity.ts";
 import { ThreadParticipation } from "./participation.ts";
 import { ThreadParticipationStore } from "./store.ts";
-import { ThreadParticipationAdmission } from "./admission.ts";
-import { ThreadParticipationDeparture } from "./departure.ts";
+import { ThreadParticipationFacts } from "./facts.ts";
 import { ThreadParticipationPermissions } from "./permissions.ts";
 import { GroupStore } from "../../group/store.ts";
 import { AlreadyEnded, FixedParticipation, NotFound, ThreadNotFound } from "./errors.ts";
@@ -20,10 +19,8 @@ export { AlreadyEnded, FixedParticipation, NotFound, ThreadNotFound } from "./er
 
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound>
-  | ThreadParticipationAdmission.Error
-  | ThreadActivityPublisher.Error
-  | ThreadParticipationDeparture.Error
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | ThreadCommand.Error
   | GroupStore.Failure
   | ThreadNotFound
   | NotFound
@@ -47,20 +44,18 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 export const make = Effect.fn("ThreadParticipationApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const access = yield* ThreadAccess.Service;
-  const admissions = yield* ThreadParticipationAdmission.Service;
+  const threadQuery = yield* ThreadQuery.Service;
+  const threadCommand = yield* ThreadCommand.Service;
   const participations = yield* ThreadParticipationStore.Service;
-  const publisher = yield* ThreadActivityPublisher.Service;
-  const departures = yield* ThreadParticipationDeparture.Service;
   const groups = yield* GroupStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
   const requireAccess = (threadId: Thread.Id) =>
-    access
-      .require(threadId)
+    threadQuery
+      .requireAccess(threadId)
       .pipe(
-        Effect.catchTag("ThreadAccess.NotFound", (error) =>
+        Effect.catchTag("ThreadQuery.NotFound", (error) =>
           Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
         ),
       );
@@ -75,11 +70,11 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
         }),
       ]);
       const actor = yield* Actor.Service;
-      const [current] = yield* admissions.find(thread, [
+      const [current] = yield* threadQuery.findParticipants(thread, [
         { _tag: "Member", memberId: actor.memberId },
       ]);
       if (current !== undefined) return ThreadParticipation.toSummary(current);
-      const followed = yield* publisher.publish({
+      const followed = yield* threadCommand.publishActivity({
         thread,
         occurredAt: yield* DateTime.now,
         admit: [{ _tag: "Member", memberId: actor.memberId }],
@@ -123,7 +118,34 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
       )
         return yield* new NotFound(request);
       if (participant.status === "ended") return yield* new AlreadyEnded(request);
-      yield* departures.end(participant, thread, yield* DateTime.now);
+      // Unfollowing ends the participation quietly in the timeline. Leaving or being removed from
+      // the group ends participations with the departure instead, all together and without
+      // thread activity.
+      const occurredAt = yield* DateTime.now;
+      const reason: ThreadParticipation.EndReason = "unfollowed";
+      yield* threadCommand.publishActivity({
+        thread,
+        occurredAt,
+        step: () =>
+          Effect.map(
+            journal
+              .publish(ThreadParticipationFacts.Ended, {
+                workspaceId,
+                threadId: thread.id,
+                participationId: participant.id,
+                groupId: thread.groupId,
+                reason,
+              })
+              .pipe(Publication.withOccurredAt(occurredAt)),
+            (ended) => ({
+              value: undefined,
+              kind: ThreadParticipationActivity.Ended,
+              details: { participationId: participant.id, reason },
+              recipients: [],
+              cause: ended,
+            }),
+          ),
+      });
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

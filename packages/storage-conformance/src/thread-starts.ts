@@ -6,24 +6,28 @@ import { Journal, Log, Publication } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   Thread,
-  ThreadActivityPublisher,
-  ThreadActivityRecording,
   ThreadApplication,
   ThreadMessage,
   ThreadMessageApplication,
-  ThreadMessagePublication,
   ThreadParticipation,
-  ThreadParticipationAdmission,
   ThreadParticipationApplication,
-  ThreadStart,
   ThreadStore,
   ThreadParticipationStore,
   ThreadMessageStore,
   ThreadActivityStore,
+  ThreadCommand,
 } from "@amends/core/thread";
 import { Member, MemberFacts, MemberStore } from "@amends/core/workspace";
 import { DateTime, Effect, Layer, Option, Context } from "effect";
-import { type Bound, boundTo, runHost, Support, testProvenance, workspaceId } from "./support.ts";
+import {
+  type Bound,
+  boundTo,
+  runHost,
+  Support,
+  testProvenance,
+  workspaceId,
+  threadInternals,
+} from "./support.ts";
 import type { Harness } from "./harness.ts";
 
 /** Thread starts and replies make the same store reads at any group size. */
@@ -36,24 +40,10 @@ export const threadStarts = (harness: Harness) => {
     const contactId = Identity.ContactId.make("customer");
     const run = <A, E, R>(bound: Bound, actor: Actor.Value, program: Effect.Effect<A, E, R>) =>
       program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
-    /** The internal start that channel and task workflows will call, built over core's services. */
-    const internal = ThreadStart.layer.pipe(
-      Layer.provide(
-        ThreadMessagePublication.layer.pipe(
-          Layer.provide(
-            ThreadActivityPublisher.layer.pipe(
-              Layer.provide(
-                Layer.mergeAll(ThreadParticipationAdmission.layer, ThreadActivityRecording.layer),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
     const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
         Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
-        Effect.provide(internal.pipe(Layer.provideMerge(core(bound)))),
+        Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 200 });
     const startDirect = (
@@ -294,9 +284,9 @@ export const threadStarts = (harness: Harness) => {
                 bound,
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
-                    Effect.flatMap(ThreadStart.Service, (starts) =>
+                    Effect.flatMap(ThreadCommand.Service, (threadCommand) =>
                       Effect.flatMap(DateTime.now, (occurredAt) =>
-                        starts.start({
+                        threadCommand.create({
                           threadId: Thread.Id.make("late-order"),
                           groupId: team.id,
                           participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],

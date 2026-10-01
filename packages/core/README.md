@@ -424,20 +424,22 @@ four store contracts. Its operations are `ThreadApplication` (`startInGroup`, `s
 triage: member participation references the exact group admission, while contacts and triage take
 part without group access. A message author is a member or a contact.
 
-Internal services carry the shared work inside the caller's commit and publication context, with
-no action checks of their own; they are excluded from `Core.Operations`:
+Two internal services carry the work operations share, with no action checks of their own; they
+are excluded from `Core.Operations`. `ThreadQuery` holds the reads and `ThreadCommand` the writes,
+which run inside the caller's commit and publication context. A command may read through
+`ThreadQuery`; a query never writes.
 
-| Service                        | Role                                                                                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `ThreadStart`                  | The one start every workflow uses: creates the thread, admits its starters, records the first message |
-| `ThreadMessagePublication`     | Publishes a message with its admissions, activity, and recipients                                     |
-| `ThreadParticipationAdmission` | Finds eligible members and current participants, and admits new ones                                  |
-| `ThreadParticipationDeparture` | Ends a participation with its activity when its member unfollows the thread                           |
-| `ThreadActivityPublisher`      | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
-| `ThreadActivityRecording`      | Assigns the next timeline position and records `ThreadActivityFacts.Recorded`                         |
-| `ThreadAccess`                 | Checks current group access to a thread, shared by reads and writes                                   |
-| `ThreadActivityReading`        | Resolves timeline subjects under access, for timeline pages and notification sources                  |
-| `ThreadActivityResolvers`      | Routes each activity kind to the resolver its domain registers                                        |
+| Method                                                                    | Role                                                                                                  |
+| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                   |
+| `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                |
+| `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                          |
+| `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                   |
+| `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message |
+| `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients                                     |
+| `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
+
+`ThreadActivityResolvers` routes each activity kind to the resolver its domain registers.
 
 Every activity kind uses `ThreadActivityFacts.Recorded`, carrying an activity and its selected
 recipients; the activity, thread, group, and notification projections each consume that one
@@ -463,8 +465,8 @@ facts with `ThreadActivityKind.make(name, { details, subject, occurrence?, newAc
 `ThreadActivityKind.prepare` derives those fields from the details, and `ThreadActivityKind.decode`
 reads an activity back as its kind, rejecting one whose derived fields disagree.
 
-A domain publishes activity through `ThreadActivityPublisher.publish`, in its operation's commit.
-The publisher takes the thread's next position, failing with `PositionChanged` when an
+A domain publishes activity through `ThreadCommand.publishActivity`, in its operation's commit.
+It takes the thread's next position, failing with `PositionChanged` when an
 `expectedSequence` is given and activity took that position first. It admits the participants the
 operation asks for, then runs the domain's step, which publishes the domain fact and returns the
 kind, details, and recipients. The activity is recorded at that position, caused by that fact.

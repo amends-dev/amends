@@ -31,7 +31,6 @@ import {
   ThreadFacts,
   ThreadActivityFacts,
   ThreadActivityKind,
-  ThreadActivityRecording,
   ThreadActivityStore,
   ThreadMessage,
   ThreadMessageActivity,
@@ -40,17 +39,17 @@ import {
   ThreadMessagePermissions,
   ThreadParticipation,
   ThreadParticipationActivity,
-  ThreadParticipationAdmission,
   ThreadParticipationFacts,
   ThreadParticipationApplication,
   ThreadParticipationPermissions,
   ThreadParticipationStore,
   ThreadPermissions,
+  ThreadCommand,
 } from "@amends/core/thread";
 
 import { Gateway } from "@amends/gateway";
 
-import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
+import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
 
 import { TestClock } from "effect/testing";
 
@@ -66,6 +65,7 @@ import {
   Support,
   testProvenance,
   workspaceId,
+  threadInternals,
 } from "./support.ts";
 
 import type { Harness } from "./harness.ts";
@@ -97,7 +97,7 @@ export const threadParticipation = (harness: Harness) => {
     const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
         Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
-        Effect.provide(core(bound)),
+        Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
@@ -1102,18 +1102,8 @@ export const threadParticipation = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
-                      const recorder = yield* ThreadActivityRecording.make();
-                      const admissions = yield* ThreadParticipationAdmission.make();
+                      const threadCommand = yield* ThreadCommand.Service;
                       const occurredAt = yield* DateTime.now;
-                      const sequence = yield* recorder.nextSequence(first.thread.id);
-                      const admitted = yield* admissions.ensure(
-                        first.thread,
-                        [{ _tag: "Member", memberId: humanId }],
-                        sequence,
-                        occurredAt,
-                      );
-                      const participant = admitted.participants[0];
-                      if (!participant) return yield* Effect.die("Missing fixture participant");
                       const recipients = [
                         {
                           participationId: ownerPart.id,
@@ -1123,34 +1113,52 @@ export const threadParticipation = (harness: Harness) => {
                       ];
                       // Deliberately address non-message activity to exercise the generic generator.
                       // Production follow/unfollow workflows select an empty recipient list.
-                      const followed = yield* recorder.record({
+                      const followed = yield* threadCommand.publishActivity({
                         thread: first.thread,
-                        sequence,
                         occurredAt,
-                        kind: ThreadParticipationActivity.Followed,
-                        details: { participationId: participant.id },
-                        recipients,
+                        admit: [{ _tag: "Member", memberId: humanId }],
+                        step: ({ admitted }) => {
+                          const [participant] = admitted.participants;
+                          const [added] = admitted.added;
+                          if (participant === undefined || added === undefined)
+                            return Effect.die("Missing fixture participant");
+                          return Effect.succeed({
+                            value: participant,
+                            kind: ThreadParticipationActivity.Followed,
+                            details: { participationId: participant.id },
+                            recipients,
+                            cause: added,
+                          });
+                        },
                       });
-                      const ended = yield* journal
-                        .publish(ThreadParticipationFacts.Ended, {
-                          workspaceId,
-                          groupId: first.thread.groupId,
-                          threadId: first.thread.id,
-                          participationId: participant.id,
-                          reason: "unfollowed",
-                        })
-                        .pipe(Publication.withOccurredAt(occurredAt));
-                      const departure = yield* recorder
-                        .record({
-                          thread: first.thread,
-                          sequence: yield* recorder.nextSequence(first.thread.id),
-                          occurredAt,
-                          kind: ThreadParticipationActivity.Ended,
-                          details: { participationId: participant.id, reason: "unfollowed" },
-                          recipients,
-                        })
-                        .pipe(Publication.withCause(ended, occurredAt));
-                      return [followed, departure];
+                      const participant = followed.value;
+                      const departure = yield* threadCommand.publishActivity({
+                        thread: first.thread,
+                        occurredAt,
+                        step: () =>
+                          Effect.map(
+                            journal
+                              .publish(ThreadParticipationFacts.Ended, {
+                                workspaceId,
+                                groupId: first.thread.groupId,
+                                threadId: first.thread.id,
+                                participationId: participant.id,
+                                reason: "unfollowed",
+                              })
+                              .pipe(Publication.withOccurredAt(occurredAt)),
+                            (ended) => ({
+                              value: undefined,
+                              kind: ThreadParticipationActivity.Ended,
+                              details: {
+                                participationId: participant.id,
+                                reason: "unfollowed" as const,
+                              },
+                              recipients,
+                              cause: ended,
+                            }),
+                          ),
+                      });
+                      return [followed.event, departure.event];
                     }),
                   ),
                 ),
@@ -1358,36 +1366,43 @@ export const threadParticipation = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
-                      const recorder = yield* ThreadActivityRecording.make();
+                      const threadCommand = yield* ThreadCommand.Service;
                       const occurredAt = yield* DateTime.now;
-                      const removed = yield* journal
-                        .publish(GroupMembershipFacts.Removed, {
-                          workspaceId,
-                          groupId: group.id,
-                          membershipId: memberParticipant(participant).groupMembershipId,
-                          memberId: agentId,
-                          reason: "left",
-                        })
-                        .pipe(Publication.withOccurredAt(occurredAt));
-                      const ended = yield* journal
-                        .publish(ThreadParticipationFacts.Ended, {
-                          workspaceId,
-                          groupId: group.id,
-                          threadId: first.thread.id,
-                          participationId: participant.id,
-                          reason: "group-left",
-                        })
-                        .pipe(Publication.withCause(removed, occurredAt));
-                      yield* recorder
-                        .record({
-                          thread: first.thread,
-                          sequence: yield* recorder.nextSequence(first.thread.id),
-                          occurredAt,
-                          kind: ThreadParticipationActivity.Ended,
-                          details: { participationId: participant.id, reason: "group-left" },
-                          recipients: [],
-                        })
-                        .pipe(Publication.withCause(ended, occurredAt));
+                      yield* threadCommand.publishActivity({
+                        thread: first.thread,
+                        occurredAt,
+                        step: () =>
+                          Effect.gen(function* () {
+                            const removed = yield* journal
+                              .publish(GroupMembershipFacts.Removed, {
+                                workspaceId,
+                                groupId: group.id,
+                                membershipId: memberParticipant(participant).groupMembershipId,
+                                memberId: agentId,
+                                reason: "left",
+                              })
+                              .pipe(Publication.withOccurredAt(occurredAt));
+                            const ended = yield* journal
+                              .publish(ThreadParticipationFacts.Ended, {
+                                workspaceId,
+                                groupId: group.id,
+                                threadId: first.thread.id,
+                                participationId: participant.id,
+                                reason: "group-left",
+                              })
+                              .pipe(Publication.withCause(removed, occurredAt));
+                            return {
+                              value: undefined,
+                              kind: ThreadParticipationActivity.Ended,
+                              details: {
+                                participationId: participant.id,
+                                reason: "group-left" as const,
+                              },
+                              recipients: [],
+                              cause: ended,
+                            };
+                          }),
+                      });
                     }),
                   ),
                 ),
@@ -1469,38 +1484,45 @@ export const threadParticipation = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
-                      const recorder = yield* ThreadActivityRecording.make();
+                      const threadCommand = yield* ThreadCommand.Service;
                       const occurredAt = yield* DateTime.now;
-                      const ended = yield* journal
-                        .publish(ThreadParticipationFacts.Ended, {
-                          workspaceId,
-                          groupId: first.thread.groupId,
-                          threadId: first.thread.id,
-                          participationId: participant.id,
-                          reason: "unfollowed",
-                        })
-                        .pipe(Publication.withOccurredAt(occurredAt));
-                      expect(yield* bound.participations.get(participant.id)).toMatchObject({
-                        value: { status: "ended" },
+                      yield* threadCommand.publishActivity({
+                        thread: first.thread,
+                        occurredAt,
+                        step: () =>
+                          Effect.gen(function* () {
+                            const ended = yield* journal
+                              .publish(ThreadParticipationFacts.Ended, {
+                                workspaceId,
+                                groupId: first.thread.groupId,
+                                threadId: first.thread.id,
+                                participationId: participant.id,
+                                reason: "unfollowed",
+                              })
+                              .pipe(Publication.withOccurredAt(occurredAt));
+                            expect(yield* bound.participations.get(participant.id)).toMatchObject({
+                              value: { status: "ended" },
+                            });
+                            expect(
+                              yield* bound.notifications.listPendingByRecipient(
+                                Notification.ofMember(agent.memberId, agent.identity),
+                                {
+                                  limit: 100,
+                                },
+                              ),
+                            ).toEqual(pending);
+                            return {
+                              value: undefined,
+                              kind: ThreadParticipationActivity.Ended,
+                              details: {
+                                participationId: participant.id,
+                                reason: "unfollowed" as const,
+                              },
+                              recipients: [],
+                              cause: ended,
+                            };
+                          }),
                       });
-                      expect(
-                        yield* bound.notifications.listPendingByRecipient(
-                          Notification.ofMember(agent.memberId, agent.identity),
-                          {
-                            limit: 100,
-                          },
-                        ),
-                      ).toEqual(pending);
-                      yield* recorder
-                        .record({
-                          thread: first.thread,
-                          sequence: yield* recorder.nextSequence(first.thread.id),
-                          occurredAt,
-                          kind: ThreadParticipationActivity.Ended,
-                          details: { participationId: participant.id, reason: "unfollowed" },
-                          recipients: [],
-                        })
-                        .pipe(Publication.withCause(ended, occurredAt));
                       expect(
                         yield* bound.notifications.listPendingByRecipient(
                           Notification.ofMember(agent.memberId, agent.identity),

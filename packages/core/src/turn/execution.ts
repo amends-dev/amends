@@ -29,11 +29,10 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
-import { ThreadAccess } from "../thread/access.ts";
+import { ThreadQuery } from "../thread/query.ts";
 import { ThreadMessage } from "../thread/message/message.ts";
 import { ThreadMessagePermissions } from "../thread/message/permissions.ts";
-import { ThreadMessagePublication } from "../thread/message/publication.ts";
-import { ThreadParticipationAdmission } from "../thread/participation/admission.ts";
+import { ThreadCommand } from "../thread/command.ts";
 import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { NotActive, NotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
@@ -74,9 +73,9 @@ export type PrepareError =
   | MemberStore.Failure;
 export type CloseError =
   | Error
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound | Authorization.Denied>
-  | ThreadParticipationAdmission.ReadError
-  | ThreadMessagePublication.Error;
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
+  | ThreadQuery.ParticipantsError
+  | ThreadCommand.Error;
 
 /**
  * Everything execution needs to run a turn: the agent's instructions, the model access it runs
@@ -270,9 +269,8 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("TurnExecution.make")(function* () {
   const turns = yield* TurnStore.Service;
   const notifications = yield* NotificationStore.Service;
-  const access = yield* ThreadAccess.Service;
-  const admissions = yield* ThreadParticipationAdmission.Service;
-  const publication = yield* ThreadMessagePublication.Service;
+  const threadQuery = yield* ThreadQuery.Service;
+  const threadCommand = yield* ThreadCommand.Service;
   const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
@@ -778,10 +776,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
               yield* ending.end(turn, { outcome: "failed", reason });
               return { _tag: "Failed", reason } as const;
             });
-          const thread = yield* access.require(turn.threadId).pipe(
+          const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
             Effect.asSome,
             Effect.catchTags({
-              "ThreadAccess.NotFound": () => Effect.succeedNone,
+              "ThreadQuery.NotFound": () => Effect.succeedNone,
               "Authorization.Denied": () => Effect.succeedNone,
             }),
           );
@@ -796,7 +794,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           ]);
           if (permitted[0] !== true)
             return yield* unable("The agent may no longer post in this thread.");
-          const current = yield* admissions.current(thread.value);
+          const current = yield* threadQuery.currentParticipants(thread.value);
           const agent: ThreadParticipation.Reference = { _tag: "Member", memberId: turn.memberId };
           if (
             !current.some(
@@ -815,7 +813,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           }
           // Each answer is its own message, in the order the agent gave them.
           for (const text of texts) {
-            const published = yield* publication.publish({
+            const published = yield* threadCommand.publishMessage({
               messageId: ThreadMessage.Id.make(yield* crypto.randomUUIDv4),
               threadId: turn.threadId,
               author: { _tag: "Member", memberId: turn.memberId },

@@ -21,19 +21,18 @@ import {
 import {
   Thread,
   ThreadApplication,
-  ThreadActivityRecording,
-  ThreadActivityReading,
   ThreadMessageStore,
   ThreadMessageApplication,
   ThreadParticipation,
-  ThreadParticipationAdmission,
   ThreadParticipationFacts,
   ThreadParticipationActivity,
   ThreadParticipationApplication,
   ThreadPermissions,
+  ThreadCommand,
+  ThreadQuery,
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
-import { Context, DateTime, Effect, Option } from "effect";
+import { Context, DateTime, Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
 import {
   type Bound,
@@ -44,6 +43,7 @@ import {
   Support,
   testProvenance,
   workspaceId,
+  threadInternals,
 } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -74,7 +74,7 @@ export const notificationSources = (harness: Harness) => {
     const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
         Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
-        Effect.provide(core(bound)),
+        Effect.provide(threadInternals.pipe(Layer.provideMerge(core(bound)))),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
@@ -196,7 +196,7 @@ export const notificationSources = (harness: Harness) => {
             storage,
             Effect.gen(function* () {
               expectTypeOf<
-                Extract<Core.Operations, NotificationSource.Service | ThreadActivityReading.Service>
+                Extract<Core.Operations, NotificationSource.Service | ThreadQuery.Service>
               >().toEqualTypeOf<never>();
               const { bound, owner, first, human, agent } = yield* prepare();
               for (const actor of [human, agent])
@@ -611,18 +611,8 @@ export const notificationSources = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) =>
                   journal.commit(
                     Effect.gen(function* () {
-                      const recorder = yield* ThreadActivityRecording.make();
-                      const admissions = yield* ThreadParticipationAdmission.make();
+                      const threadCommand = yield* ThreadCommand.Service;
                       const occurredAt = yield* DateTime.now;
-                      const sequence = yield* recorder.nextSequence(first.thread.id);
-                      const admitted = yield* admissions.ensure(
-                        first.thread,
-                        [{ _tag: "Member", memberId: humanId }],
-                        sequence,
-                        occurredAt,
-                      );
-                      const participant = admitted.participants[0];
-                      if (!participant) return yield* Effect.die("Missing participant");
                       const recipients = [
                         {
                           participationId: ownerPart.id,
@@ -630,32 +620,54 @@ export const notificationSources = (harness: Harness) => {
                           requestsWork: false,
                         },
                       ];
-                      const followed = yield* recorder.record({
+                      // Deliberately address non-message activity to exercise the generic generator.
+                      // Production follow/unfollow workflows select an empty recipient list.
+                      const followed = yield* threadCommand.publishActivity({
                         thread: first.thread,
-                        sequence,
                         occurredAt,
-                        kind: ThreadParticipationActivity.Followed,
-                        details: { participationId: participant.id },
-                        recipients,
+                        admit: [{ _tag: "Member", memberId: humanId }],
+                        step: ({ admitted }) => {
+                          const [participant] = admitted.participants;
+                          const [added] = admitted.added;
+                          if (participant === undefined || added === undefined)
+                            return Effect.die("Missing fixture participant");
+                          return Effect.succeed({
+                            value: participant,
+                            kind: ThreadParticipationActivity.Followed,
+                            details: { participationId: participant.id },
+                            recipients,
+                            cause: added,
+                          });
+                        },
                       });
-                      yield* journal
-                        .publish(ThreadParticipationFacts.Ended, {
-                          workspaceId,
-                          groupId: first.thread.groupId,
-                          threadId: first.thread.id,
-                          participationId: participant.id,
-                          reason: "unfollowed",
-                        })
-                        .pipe(Publication.withOccurredAt(occurredAt));
-                      const ended = yield* recorder.record({
+                      const participant = followed.value;
+                      const departure = yield* threadCommand.publishActivity({
                         thread: first.thread,
-                        sequence: yield* recorder.nextSequence(first.thread.id),
                         occurredAt,
-                        kind: ThreadParticipationActivity.Ended,
-                        details: { participationId: participant.id, reason: "unfollowed" },
-                        recipients,
+                        step: () =>
+                          Effect.map(
+                            journal
+                              .publish(ThreadParticipationFacts.Ended, {
+                                workspaceId,
+                                groupId: first.thread.groupId,
+                                threadId: first.thread.id,
+                                participationId: participant.id,
+                                reason: "unfollowed",
+                              })
+                              .pipe(Publication.withOccurredAt(occurredAt)),
+                            (ended) => ({
+                              value: undefined,
+                              kind: ThreadParticipationActivity.Ended,
+                              details: {
+                                participationId: participant.id,
+                                reason: "unfollowed" as const,
+                              },
+                              recipients,
+                              cause: ended,
+                            }),
+                          ),
                       });
-                      return [followed, ended];
+                      return [followed.event, departure.event];
                     }),
                   ),
                 ),

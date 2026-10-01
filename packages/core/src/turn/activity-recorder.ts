@@ -2,13 +2,13 @@ import { Context, DateTime, Effect, Layer, Option } from "effect";
 import type { Event } from "../journal/event.ts";
 import type { Publication } from "../journal/publication.ts";
 import type { Store } from "../journal/store.ts";
-import { ThreadActivityPublisher } from "../thread/activity/publisher.ts";
+import { ThreadCommand } from "../thread/command.ts";
 import type { ThreadId } from "../thread/id.ts";
 import { ThreadStore } from "../thread/store.ts";
 import { Thread } from "../thread/thread.ts";
 import type { TurnActivity } from "./activity.ts";
 
-export type Error = ThreadActivityPublisher.Error | ThreadStore.Failure;
+export type Error = ThreadCommand.Error | ThreadStore.Failure;
 
 /**
  * Records a turn's changes in its thread's timeline as `TurnActivity`. It lives apart from the
@@ -39,14 +39,14 @@ export class Service extends Context.Service<Service, Interface>()(
 
 /** @category constructors */
 export const make = Effect.fn("TurnActivityRecorder.make")(function* () {
-  const publisher = yield* ThreadActivityPublisher.Service;
+  const threadCommand = yield* ThreadCommand.Service;
   const threads = yield* ThreadStore.Service;
   const record: Interface["record"] = Effect.fnUntraced(function* (thread, kind, details, cause) {
     const found =
       typeof thread === "string" ? Option.getOrUndefined(yield* threads.get(thread)) : thread;
     if (found === undefined) return yield* Effect.die("A turn's thread is missing");
     const occurredAt = yield* DateTime.now;
-    yield* publisher.publish({
+    yield* threadCommand.publishActivity({
       thread: found,
       occurredAt,
       step: () => Effect.succeed({ value: undefined, kind, details, recipients: [], cause }),

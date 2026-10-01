@@ -38,17 +38,17 @@ agent, so agents do not wake one another.
 `ThreadsHandlers` (`start` for a new thread, `publish` for a reply) enter the workspace through
 `gateway.asMember` and call `ThreadApplication.startInGroup` or `ThreadMessageApplication.publish`
 ([server-http](../packages/server-http/README.md), [thread workflows](thread-workflows.md)).
-Both end in `ThreadMessagePublication.publish`, inside one `journal.commit`:
+Both end in `ThreadCommand.publishMessage`, inside one `journal.commit`:
 
 1. The application authorizes the request. A message with no mentions addresses every current
    participant; with mentions, only the author and those mentioned. Mentioning an agent needs
    the author's `agent.use`; replying where it already takes part does not.
-2. `ThreadActivityPublisher` takes the thread's next position and admits the participants the
-   message selects, then runs the step `ThreadMessagePublication` supplies: it publishes
+2. `ThreadCommand.publishActivity` takes the thread's next position and admits the participants
+   the message selects, then runs the step `publishMessage` supplies: it publishes
    `thread.message.published` and chooses the **recipients** of the activity, with one flag each,
    `requestsWork`. That flag is true for an agent recipient of a message whose author is not an
    agent. This is the one place the rule is decided.
-3. `ThreadActivityRecording` publishes `thread.activity.recorded`, carrying the recipients.
+3. The activity is recorded: `thread.activity.recorded`, carrying the recipients.
 
 Publishing that fact does two things in the same transaction, in this order
 ([journal](journal.md#live-projections)):
@@ -154,7 +154,7 @@ on the thread; otherwise it returns `InputPending` and the runner submits the re
 commit:
 
 1. Each reply the log says the turn owes is published as the agent's own message through the same
-   `ThreadMessagePublication` as step 1, with the turn's ID on the message. Its recipients are the
+   `ThreadCommand.publishMessage` as step 1, with the turn's ID on the message. Its recipients are the
    thread's other participants, and none of the agents among them is asked for work.
 2. `TurnEnding.end` publishes `turn.completed`, records the `turn.ended` activity in the thread,
    and appends `Ended` to the agent's log.
@@ -240,16 +240,16 @@ calls best effort. A real model adds its own time to step 4.
 
 ## Where to change things
 
-| To change                                     | Look at                                                                                               |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Which messages ask an agent for work          | `requestsWork` in `ThreadMessagePublication`; how it becomes a notification, `Notification.generated` |
-| When a process wakes                          | `wakesOn` in `TurnAcceptance.process`; processes are registered in `Core.processes`                   |
-| How work is accepted into turns               | `acceptThread` in `TurnAcceptance`                                                                    |
-| Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                     |
-| How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                            |
-| How the reply is published, and the turn ends | `TurnExecution.close`, `TurnEnding`                                                                   |
-| Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                   |
-| What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                 |
+| To change                                     | Look at                                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Which messages ask an agent for work          | `requestsWork` in `ThreadCommand.publishMessage`; how it becomes a notification, `Notification.generated` |
+| When a process wakes                          | `wakesOn` in `TurnAcceptance.process`; processes are registered in `Core.processes`                       |
+| How work is accepted into turns               | `acceptThread` in `TurnAcceptance`                                                                        |
+| Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                         |
+| How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                |
+| How the reply is published, and the turn ends | `TurnExecution.close`, `TurnEnding`                                                                       |
+| Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                       |
+| What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                     |
 
 To find what reacts to a fact, find references to its constant, such as `ThreadActivityFacts.Recorded`:
 projections, reactions, the change feed, and `wakesOn` triggers all name it.

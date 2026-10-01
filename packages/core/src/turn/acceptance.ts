@@ -15,7 +15,7 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
-import { ThreadAccess } from "../thread/access.ts";
+import { ThreadQuery } from "../thread/query.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
 import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
 
@@ -31,7 +31,7 @@ import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
 export type Error =
-  | Exclude<ThreadAccess.Error, ThreadAccess.NotFound | Authorization.Denied>
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
   | AgentStore.Failure
   | MemberStore.Failure
   | NotificationStore.Failure
@@ -73,7 +73,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   const notifications = yield* NotificationStore.Service;
   const participations = yield* ThreadParticipationStore.Service;
   const turns = yield* TurnStore.Service;
-  const access = yield* ThreadAccess.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const activity = yield* TurnActivityRecorder.Service;
@@ -136,10 +136,10 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     if (first === undefined || recipient._tag !== "Agent") return false;
     // The agent must still be able to open the thread; otherwise its work waits, as a person's
     // notification waits in their inbox, until its access or participation is settled.
-    const thread = yield* access.require(threadId).pipe(
+    const thread = yield* threadQuery.requireAccess(threadId).pipe(
       Effect.asSome,
       Effect.catchTags({
-        "ThreadAccess.NotFound": () => Effect.succeedNone,
+        "ThreadQuery.NotFound": () => Effect.succeedNone,
         "Authorization.Denied": () => Effect.succeedNone,
       }),
     );

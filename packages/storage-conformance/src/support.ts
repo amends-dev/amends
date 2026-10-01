@@ -9,18 +9,28 @@ import {
   type Role,
   RoleStore,
 } from "@amends/core/authorization";
-import { GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
+import {
+  GroupAudience,
+  GroupFollowStore,
+  GroupMembershipStore,
+  GroupStore,
+} from "@amends/core/group";
 import { type Actor, Identity, Performer } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
 import { NotificationStore } from "@amends/core/notification";
 import {
   type ThreadActivity,
   ThreadActivityKind,
+  ThreadActivityResolvers,
   ThreadActivityStore,
+  ThreadCommand,
   ThreadMessage,
   ThreadMessageActivity,
   ThreadMessageStore,
+  ThreadMessageTimeline,
   ThreadParticipationStore,
+  ThreadParticipationTimeline,
+  ThreadQuery,
   ThreadStore,
 } from "@amends/core/thread";
 import {
@@ -40,7 +50,7 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnDispatch, TurnStore } from "@amends/core/turn";
+import { TurnDispatch, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
@@ -334,6 +344,24 @@ export const placedIn =
   (bound: Bound) =>
   <A extends { readonly message: ThreadMessage.Record }>(result: A) =>
     placed(result).pipe(Effect.provideService(ThreadActivityStore.Service, bound.activities));
+
+/**
+ * Core's internal thread reads and writes, for fixtures that write what no operation does. Provide
+ * it over a workspace's core; timelines resolve as core registers them.
+ */
+export const threadInternals = ThreadCommand.layer.pipe(
+  Layer.provideMerge(ThreadQuery.layer),
+  Layer.provide(
+    Layer.mergeAll(
+      GroupAudience.layer,
+      ThreadActivityResolvers.layer([
+        ThreadMessageTimeline.resolver,
+        ThreadParticipationTimeline.resolver,
+        TurnTimeline.resolver,
+      ]),
+    ),
+  ),
+);
 
 /** Attribution for low-level fixture writes outside application operations. */
 export const testProvenance = (id = workspaceId): Event.Provenance => ({

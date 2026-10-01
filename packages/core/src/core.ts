@@ -15,19 +15,13 @@ import { EnvironmentProjection } from "./environment/projection.ts";
 import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
 import { ThreadApplication } from "./thread/application.ts";
-import { ThreadStart } from "./thread/start.ts";
+import { ThreadCommand } from "./thread/command.ts";
 import { DirectGroups } from "./group/direct.ts";
-import { ThreadAccess } from "./thread/access.ts";
+import { ThreadQuery } from "./thread/query.ts";
 import { ThreadMessageApplication } from "./thread/message/application.ts";
-import { ThreadMessagePublication } from "./thread/message/publication.ts";
 import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
-import { ThreadParticipationAdmission } from "./thread/participation/admission.ts";
 import { ThreadParticipationApplication } from "./thread/participation/application.ts";
 import { ThreadParticipationPermissions } from "./thread/participation/permissions.ts";
-import { ThreadParticipationDeparture } from "./thread/participation/departure.ts";
-import { ThreadActivityRecording } from "./thread/activity/recording.ts";
-import { ThreadActivityReading } from "./thread/activity/reading.ts";
-import { ThreadActivityPublisher } from "./thread/activity/publisher.ts";
 import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
@@ -183,22 +177,17 @@ const journal = Journal.layer({
 /** Authorization for the acting member, with its grant resolution. */
 const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
 
-const admissions = ThreadParticipationAdmission.layer;
-const recording = ThreadActivityRecording.layer;
-const publisher = ThreadActivityPublisher.layer.pipe(
-  Layer.provide(Layer.mergeAll(admissions, recording)),
+/** A thread's internal reads and writes, which other domains share. */
+const threadQuery = ThreadQuery.layer.pipe(
+  Layer.provide(
+    Layer.mergeAll(GroupAudience.layer, ThreadActivityResolvers.layer(activityResolvers)),
+  ),
 );
-const departures = ThreadParticipationDeparture.layer.pipe(Layer.provide(publisher));
+const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
 const groupDeparture = GroupMembershipDeparture.layer;
-const messagePublication = ThreadMessagePublication.layer.pipe(Layer.provide(publisher));
-const turnActivity = TurnActivityRecorder.layer.pipe(Layer.provide(publisher));
+const turnActivity = TurnActivityRecorder.layer.pipe(Layer.provide(threadCommand));
 const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivity));
-const threadStart = ThreadStart.layer.pipe(Layer.provide(messagePublication));
-const threadAccess = ThreadAccess.layer.pipe(Layer.provide(GroupAudience.layer));
-const activityReading = ThreadActivityReading.layer.pipe(
-  Layer.provide(Layer.mergeAll(threadAccess, ThreadActivityResolvers.layer(activityResolvers))),
-);
-const notificationSource = NotificationSource.layer.pipe(Layer.provide(activityReading));
+const notificationSource = NotificationSource.layer.pipe(Layer.provide(threadQuery));
 const threadReading = ThreadReading.layer;
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
@@ -241,16 +230,11 @@ const operations = Layer.mergeAll(
       Delegation.layer,
       GroupAudience.layer,
       DirectGroups.layer,
-      threadStart,
-      threadAccess,
-      activityReading,
+      threadQuery,
+      threadCommand,
       notificationSource,
       threadReading,
-      admissions,
-      publisher,
-      departures,
       groupDeparture,
-      messagePublication,
       turnActivity,
       turnEnding,
       TurnDrafts.layer,
@@ -265,8 +249,8 @@ const operations = Layer.mergeAll(
  */
 const background = Layer.mergeAll(
   BackgroundRuns.layer(processes).pipe(Layer.provide(TurnAcceptance.layer)),
-  TurnExecution.layer.pipe(Layer.provide(messagePublication)),
-).pipe(Layer.provide(Layer.mergeAll(threadAccess, admissions, turnActivity, turnEnding)));
+  TurnExecution.layer,
+).pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnActivity, turnEnding)));
 
 /**
  * Complete core for one workspace: application operations, background runs, and turn execution over the

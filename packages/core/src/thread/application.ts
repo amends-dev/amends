@@ -16,17 +16,15 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Thread } from "./thread.ts";
 import { ThreadStore } from "./store.ts";
-import { ThreadStart } from "./start.ts";
+import { ThreadCommand } from "./command.ts";
 import { GroupStore } from "../group/store.ts";
 import { DirectGroups } from "../group/direct.ts";
 import { GroupFollowStore } from "../group/follow/store.ts";
-import { ThreadAccess } from "./access.ts";
-import { ThreadParticipationAdmission } from "./participation/admission.ts";
+import { ThreadQuery } from "./query.ts";
 import { ThreadPermissions } from "./permissions.ts";
 import { ThreadMessageStore } from "./message/store.ts";
 import { ThreadParticipation } from "./participation/participation.ts";
 import { ThreadParticipationStore } from "./participation/store.ts";
-import { ThreadActivityReading } from "./activity/reading.ts";
 import { ThreadActivityResolvers } from "./activity/resolvers.ts";
 import { ThreadActivityStore } from "./activity/store.ts";
 import { ThreadActivity } from "./activity/activity.ts";
@@ -53,7 +51,7 @@ export {
 } from "./errors.ts";
 export type Error =
   | Authorization.Error
-  | Exclude<ThreadStart.Error, ThreadParticipationAdmission.Unavailable>
+  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | Exclude<DirectGroups.Error, DirectGroups.Unavailable>
   | GroupStore.Failure
   | GroupMembershipStore.Failure
@@ -147,14 +145,12 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ThreadApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const audience = yield* GroupAudience.Service;
-  const starts = yield* ThreadStart.Service;
+  const threadCommand = yield* ThreadCommand.Service;
   const groups = yield* GroupStore.Service;
   const directGroups = yield* DirectGroups.Service;
   const follows = yield* GroupFollowStore.Service;
-  const access = yield* ThreadAccess.Service;
-  const admissions = yield* ThreadParticipationAdmission.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const threads = yield* ThreadStore.Service;
-  const reading = yield* ThreadActivityReading.Service;
   const readStates = yield* ReadStateStore.Service;
   const readings = yield* ThreadReading.Service;
   const messages = yield* ThreadMessageStore.Service;
@@ -194,7 +190,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     groupId: Group.Id,
     selected: ReadonlyArray<Member.Id>,
     named: ReadonlyArray<Member.Id>,
-    eligible: ReadonlyMap<Member.Id, ThreadParticipationAdmission.Eligible>,
+    eligible: ReadonlyMap<Member.Id, ThreadQuery.Eligible>,
     message: {
       readonly text: Thread.StartInGroupInput["text"];
       readonly mentions: ReadonlyArray<Member.Id>;
@@ -214,8 +210,8 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     }
     if (actor.identity._tag !== "Human")
       return yield* new HumanAuthorRequired({ memberId: actor.memberId });
-    const started = yield* starts
-      .start({
+    const started = yield* threadCommand
+      .create({
         threadId: ids.threadId,
         groupId,
         participants: selected.map((memberId) => ({ _tag: "Member" as const, memberId })),
@@ -229,7 +225,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         occurredAt: yield* DateTime.now,
       })
       .pipe(
-        Effect.catchTag("ThreadParticipationAdmission.Unavailable", (error) =>
+        Effect.catchTag("ThreadCommand.Unavailable", (error) =>
           Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
         ),
       );
@@ -268,7 +264,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       ]);
       const { previous, ...ids } = yield* startIds("thread.start-direct", options.requestKey);
       if (Option.isSome(previous)) return previous.value;
-      const eligible = yield* admissions.eligible(group.id, memberIds);
+      const eligible = yield* threadQuery.eligibleMembers(group.id, memberIds);
       // Creating the group gives its agents a place in all of its threads, as making an agent
       // follow a team group does, so it needs agent use on each; later starts name only mentions.
       const named = created ? memberIds : request.mentions;
@@ -313,7 +309,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         group.kind === "Direct"
           ? group.memberIds
           : [...request.mentions, ...followed.map((follow) => follow.memberId)];
-      const eligible = yield* admissions.eligible(request.groupId, [actor.memberId, ...involved]);
+      const eligible = yield* threadQuery.eligibleMembers(request.groupId, [
+        actor.memberId,
+        ...involved,
+      ]);
       // A follow counts only through the member's current admission.
       const followers = followed
         .filter(
@@ -336,10 +335,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   // All read entry points use this check before exposing conversation data. It is deliberately
   // outside journal.commit; an enclosing caller transaction remains authoritative when present.
   const get = Effect.fn("ThreadApplication.get")(function* (threadId: Thread.Id) {
-    const thread = yield* access
-      .require(threadId)
+    const thread = yield* threadQuery
+      .requireAccess(threadId)
       .pipe(
-        Effect.catchTag("ThreadAccess.NotFound", (error) =>
+        Effect.catchTag("ThreadQuery.NotFound", (error) =>
           Effect.fail(new NotFound({ threadId: error.threadId })),
         ),
       );
@@ -494,10 +493,10 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   });
   const readTimeline = Effect.fn("ThreadApplication.readTimeline")(
     (threadId: Thread.Id, options: ThreadActivityStore.ReadOptions) =>
-      reading
-        .page(threadId, options)
+      threadQuery
+        .readTimeline(threadId, options)
         .pipe(
-          Effect.catchTag("ThreadAccess.NotFound", (error) =>
+          Effect.catchTag("ThreadQuery.NotFound", (error) =>
             Effect.fail(new NotFound({ threadId: error.threadId })),
           ),
         ),
@@ -507,7 +506,9 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     options: ThreadParticipation.ListOptions,
   ) {
     const thread = yield* get(threadId);
-    return (yield* admissions.page(thread, options)).map(ThreadParticipation.toSummary);
+    return (yield* threadQuery.pageParticipants(thread, options)).map(
+      ThreadParticipation.toSummary,
+    );
   });
   return Service.of({
     startInGroup,
