@@ -16,8 +16,22 @@ contracts. It knows no harness or model provider: the host passes in the ones it
 here takes Effect AI's `LanguageModel`, which the connection's implementation builds from the
 connection's settings and key.
 
-`run(workspaceId, turnId)` takes the turn from where its last commit left it. Each step goes
-through `gateway.executeTurns` as its own commit, attributed to the turn's agent:
+`run(workspaceId, turnId)` takes the turn from where its last commit left it. It loops: prepare
+the turn, decide the next step from what preparing read alone, perform it, and prepare again,
+until the turn ends. The pieces, each in its own module:
+
+| Module                             | What it does                                                                                                                                  |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runner.ts`                        | The loop, and `abandon`.                                                                                                                      |
+| `next-step.ts`                     | `NextStep.decide`, a pure function from a preparation to the next step: done, confirm a stop, fail, give up, start, rest, summarize, or work. |
+| `turn-steps.ts`                    | The commits a run makes for its turn through the gateway, as `turn.prepare`, `turn.close`, and the rest.                                      |
+| `attempt.ts`                       | One attempt: recorded, raced against the turn being asked to stop, its failure recorded as an interruption that says what comes next.         |
+| `session.ts`                       | A harness session: spawn, continue the conversation, give the harness its input, record until idle, then close or take more input.            |
+| `checkpoint.ts`                    | A summary of older history, recorded as the turn's checkpoint.                                                                                |
+| `drafts.ts`                        | Text still being written, shown to readers as drafts.                                                                                         |
+| `settings.ts`, `context-budget.ts` | The runner's options and defaults; how much of its model's context a turn may use.                                                            |
+
+Each step goes through `gateway.executeTurns` as its own commit, attributed to the turn's agent:
 
 1. `prepare` the turn. A finished turn is left as it is, one asked to stop is confirmed
    stopped (`confirmStopped`), and one whose agent, connection, key, or environment is gone is failed with the
