@@ -133,7 +133,7 @@ interface Access {
  * Reasons that only readiness can clear: the environment or the connection still needs setup.
  * Saving waits for neither; each shows on the agent until resolved.
  */
-const pending = (reason: EnvironmentCompatibility.Reason) =>
+const isAwaitingSetup = (reason: EnvironmentCompatibility.Reason) =>
   reason._tag === "EnvironmentNotReady" || reason._tag === "ConnectionNotReady";
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
@@ -163,7 +163,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     ({ _tag: "Environment", workspaceId, environmentId }) as const;
 
   /** The agent's active membership, which names it; an ended one makes the agent missing. */
-  const membershipOf = Effect.fnUntraced(function* (record: Agent.Record) {
+  const readMembership = Effect.fnUntraced(function* (record: Agent.Record) {
     const found = yield* memberStore.get(record.memberId);
     // An agent is created with its named membership.
     if (Option.isNone(found) || found.value.name === undefined)
@@ -171,20 +171,20 @@ export const make = Effect.fn("AgentService.make")(function* () {
     return { member: found.value, name: found.value.name };
   });
   /** The agent by ID with its membership, or NotFound once its membership ended. */
-  const load = Effect.fnUntraced(function* (agentId: Agent.Id) {
+  const requireActiveAgent = Effect.fnUntraced(function* (agentId: Agent.Id) {
     const found = yield* agentStore.get(agentId);
     if (Option.isNone(found)) return yield* new NotFound({ agentId });
     const record = found.value;
-    const { member, name } = yield* membershipOf(record);
+    const { member, name } = yield* readMembership(record);
     if (member.status !== "active") return yield* new NotFound({ agentId });
     return { record, name };
   });
   /** An agent the actor may act on with `permission`; to anyone else it is missing. */
-  const authorized = Effect.fnUntraced(function* (
+  const requirePermittedAgent = Effect.fnUntraced(function* (
     agentId: Agent.Id,
     permission: Permission.Definition<"Member">,
   ) {
-    const loaded = yield* load(agentId);
+    const loaded = yield* requireActiveAgent(agentId);
     const target = memberTarget(loaded.record.memberId);
     const [readable = false, permitted = false] = yield* authorization.permitted([
       Requirement.make(AgentPermissions.Read, target),
@@ -195,16 +195,16 @@ export const make = Effect.fn("AgentService.make")(function* () {
     return loaded;
   });
 
-  const activeEnvironment = Effect.fnUntraced(function* (environmentId: Environment.Id) {
+  const findActiveEnvironment = Effect.fnUntraced(function* (environmentId: Environment.Id) {
     const found = yield* environmentStore.get(environmentId);
     return Option.filter(found, (record) => record.status === "active");
   });
-  const activeConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
+  const findActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connectionStore.get(connectionId);
     return Option.filter(found, (record) => record.status === "active");
   });
   /** An environment as readiness sees it now, with its account connection looked up. */
-  const environmentView = Effect.fnUntraced(function* (record: Environment.Record) {
+  const toEnvironmentView = Effect.fnUntraced(function* (record: Environment.Record) {
     const accountId = record.sandbox?.connectionId ?? null;
     const account = accountId === null ? Option.none() : yield* connectionStore.get(accountId);
     const readiness = EnvironmentCompatibility.readiness(
@@ -225,24 +225,24 @@ export const make = Effect.fn("AgentService.make")(function* () {
     );
     return Environment.view(record, false, readiness);
   });
-  const connectionView = (record: Connection.Record) =>
+  const toConnectionView = (record: Connection.Record) =>
     Connection.view(
       record,
       Option.getOrUndefined(connectionCatalog.get(record.implementationId)),
       false,
     );
-  const harnessOf = (record: Environment.Record): HarnessImplementation.Declaration | undefined =>
+  const findHarness = (record: Environment.Record): HarnessImplementation.Declaration | undefined =>
     Option.getOrUndefined(environmentCatalog.harness(record.harnessId));
-  const compatibility = Effect.fnUntraced(function* (
+  const checkCompatibility = Effect.fnUntraced(function* (
     environment: Environment.Record,
     connection: Connection.Record,
     model: Agent.ModelSelection,
   ) {
     return EnvironmentCompatibility.check(
-      yield* environmentView(environment),
-      harnessOf(environment),
+      yield* toEnvironmentView(environment),
+      findHarness(environment),
       {
-        connection: connectionView(connection),
+        connection: toConnectionView(connection),
         model: model.model,
         ...(model.reasoning === null ? {} : { reasoning: model.reasoning }),
       },
@@ -250,14 +250,14 @@ export const make = Effect.fn("AgentService.make")(function* () {
   });
 
   /** Whether the agent can run as configured now, whoever reads it. */
-  const readinessOf = Effect.fnUntraced(function* (record: Agent.Record) {
-    const environment = yield* activeEnvironment(record.environmentId);
-    const connection = yield* activeConnection(record.model.connectionId);
+  const assessReadiness = Effect.fnUntraced(function* (record: Agent.Record) {
+    const environment = yield* findActiveEnvironment(record.environmentId);
+    const connection = yield* findActiveConnection(record.model.connectionId);
     const issues: Array<Agent.Issue> = [];
     if (Option.isNone(environment)) issues.push({ _tag: "EnvironmentUnavailable" });
     if (Option.isNone(connection)) issues.push({ _tag: "ConnectionUnavailable" });
     if (Option.isSome(environment) && Option.isSome(connection)) {
-      const checked = yield* compatibility(environment.value, connection.value, record.model);
+      const checked = yield* checkCompatibility(environment.value, connection.value, record.model);
       if (checked._tag === "Incompatible") issues.push(...checked.reasons);
     }
     const [first, ...rest] = issues;
@@ -265,7 +265,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
       ? ({ _tag: "Ready" } as const)
       : ({ _tag: "Incomplete", issues: [first, ...rest] } as const);
   });
-  const viewOf = Effect.fnUntraced(function* (
+  const toView = Effect.fnUntraced(function* (
     record: Agent.Record,
     name: Member.Name,
     access: Access,
@@ -283,16 +283,18 @@ export const make = Effect.fn("AgentService.make")(function* () {
       configurable: access.configurable,
       removable: access.removable,
       usable: access.usable,
-      readiness: yield* readinessOf(record),
+      readiness: yield* assessReadiness(record),
     } satisfies Agent.View;
   });
-  const ownerOf = Effect.gen(function* () {
+  const readOwnerId = Effect.gen(function* () {
     const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
     return found.value.ownerMemberId;
   });
   /** The role a membership holds across the workspace, if any, by its current name. */
-  const roleOf = Effect.fnUntraced(function* (assigned: ReadonlyArray<Assignment.Record>) {
+  const findWorkspaceRole = Effect.fnUntraced(function* (
+    assigned: ReadonlyArray<Assignment.Record>,
+  ) {
     const source = assigned.find(
       (assignment) =>
         assignment.source._tag === "Role" && assignment.source.scope._tag === "Workspace",
@@ -305,7 +307,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
    * What the actor may do with each agent, by one grant resolution: whether they may read it, and
    * its access for the view. Removal follows member removal and its delegation rules.
    */
-  const accessOf = Effect.fnUntraced(function* (records: ReadonlyArray<Agent.Record>) {
+  const resolveAccess = Effect.fnUntraced(function* (records: ReadonlyArray<Agent.Record>) {
     const permissions = [
       AgentPermissions.Read,
       AgentPermissions.Configure,
@@ -320,7 +322,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         ),
       ),
     );
-    const ownerId = yield* ownerOf;
+    const ownerId = yield* readOwnerId;
     const actorId = (yield* Actor.Service).memberId;
     return yield* Effect.forEach(records, (record, index) =>
       Effect.gen(function* () {
@@ -340,7 +342,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
             ? yield* assignmentStore.listActiveByMember(record.memberId)
             : [];
         const access: Access = {
-          role: accessReadable ? yield* roleOf(assigned) : null,
+          role: accessReadable ? yield* findWorkspaceRole(assigned) : null,
           configurable: configurable === true,
           removable:
             mayRemove &&
@@ -353,9 +355,9 @@ export const make = Effect.fn("AgentService.make")(function* () {
     );
   });
   /** The agent as the actor sees it, including what they may do with it. */
-  const presented = Effect.fnUntraced(function* (record: Agent.Record, name: Member.Name) {
-    const [found] = yield* accessOf([record]);
-    return yield* viewOf(
+  const viewForActor = Effect.fnUntraced(function* (record: Agent.Record, name: Member.Name) {
+    const [found] = yield* resolveAccess([record]);
+    return yield* toView(
       record,
       name,
       found?.access ?? { role: null, configurable: false, removable: false, usable: false },
@@ -366,7 +368,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
    * The connection and environment a configuration names, which the actor must be able to read
    * and use; to anyone else they are unavailable.
    */
-  const usable = Effect.fnUntraced(function* (configuration: {
+  const requireUsableResources = Effect.fnUntraced(function* (configuration: {
     readonly model: Agent.ModelSelection;
     readonly environmentId: Environment.Id;
   }) {
@@ -379,24 +381,24 @@ export const make = Effect.fn("AgentService.make")(function* () {
         Requirement.make(EnvironmentPermissions.Read, environmentTarget(environmentId)),
         Requirement.make(EnvironmentPermissions.Use, environmentTarget(environmentId)),
       ]);
-    const connection = yield* activeConnection(connectionId);
+    const connection = yield* findActiveConnection(connectionId);
     if (Option.isNone(connection) || !connectionReadable || !connectionUsable)
       return yield* new ConnectionUnavailable({ connectionId });
-    const environment = yield* activeEnvironment(environmentId);
+    const environment = yield* findActiveEnvironment(environmentId);
     if (Option.isNone(environment) || !environmentReadable || !environmentUsable)
       return yield* new EnvironmentUnavailable({ environmentId });
     return { connection: connection.value, environment: environment.value };
   });
   /** Refuse a configuration its environment cannot run; setup still pending does not refuse. */
   const checkConfiguration = Effect.fnUntraced(function* (configuration: Agent.Configuration) {
-    const { connection, environment } = yield* usable(configuration);
-    const checked = yield* compatibility(environment, connection, configuration.model);
+    const { connection, environment } = yield* requireUsableResources(configuration);
+    const checked = yield* checkCompatibility(environment, connection, configuration.model);
     if (checked._tag === "Compatible") return;
-    const [first, ...rest] = checked.reasons.filter((reason) => !pending(reason));
+    const [first, ...rest] = checked.reasons.filter((reason) => !isAwaitingSetup(reason));
     if (first !== undefined) return yield* new Incompatible({ reasons: [first, ...rest] });
   });
 
-  const committed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  const commitAsActor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Publication.withActor,
       Effect.provideService(Crypto.Crypto, crypto),
@@ -407,16 +409,16 @@ export const make = Effect.fn("AgentService.make")(function* () {
     yield* authorization.require([]);
     const loaded: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
     for (const record of yield* agentStore.list) {
-      const { member, name } = yield* membershipOf(record);
+      const { member, name } = yield* readMembership(record);
       if (member.status === "active") loaded.push({ record, name });
     }
-    const access = yield* accessOf(loaded.map(({ record }) => record));
+    const access = yield* resolveAccess(loaded.map(({ record }) => record));
     const views = yield* Effect.forEach(
       loaded.flatMap((entry, index) => {
         const found = access[index];
         return found?.readable ? [{ ...entry, access: found.access }] : [];
       }),
-      ({ record, name, access }) => viewOf(record, name, access),
+      ({ record, name, access }) => toView(record, name, access),
     );
     return views.toSorted((left, right) =>
       left.name === right.name
@@ -429,14 +431,14 @@ export const make = Effect.fn("AgentService.make")(function* () {
 
   const get = Effect.fn("AgentService.get")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);
-    const { record, name } = yield* authorized(id, AgentPermissions.Read);
-    return yield* presented(record, name);
+    const { record, name } = yield* requirePermittedAgent(id, AgentPermissions.Read);
+    return yield* viewForActor(record, name);
   });
 
-  const restore = Effect.fnUntraced(function* (agentId: Agent.Id) {
+  const readRetriedAgent = Effect.fnUntraced(function* (agentId: Agent.Id) {
     const found = yield* agentStore.get(agentId);
     if (Option.isNone(found)) return yield* new NotFound({ agentId });
-    const { name } = yield* membershipOf(found.value);
+    const { name } = yield* readMembership(found.value);
     return { record: found.value, name };
   });
 
@@ -453,8 +455,8 @@ export const make = Effect.fn("AgentService.make")(function* () {
       );
       // A retry returns the agent its first attempt created.
       if (options.requestKey !== undefined && Option.isSome(yield* agentStore.get(agentId))) {
-        const { record, name } = yield* restore(agentId);
-        return yield* presented(record, name);
+        const { record, name } = yield* readRetriedAgent(agentId);
+        return yield* viewForActor(record, name);
       }
       yield* checkConfiguration(request);
       const createdAt = yield* DateTime.now;
@@ -494,7 +496,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
           status: "active",
         });
       yield* journal.publish(AgentFacts.Created, created);
-      return yield* presented(created, request.name);
+      return yield* viewForActor(created, request.name);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -504,7 +506,10 @@ export const make = Effect.fn("AgentService.make")(function* () {
   const configure = Effect.fn("AgentService.configure")(function* (input: Agent.ConfigureInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Agent.ConfigureInput))(input);
     return yield* Effect.gen(function* () {
-      const { record, name } = yield* authorized(request.agentId, AgentPermissions.Configure);
+      const { record, name } = yield* requirePermittedAgent(
+        request.agentId,
+        AgentPermissions.Configure,
+      );
       const configuration = {
         instructions: request.instructions,
         model: request.model,
@@ -518,7 +523,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
           environmentId: record.environmentId,
         })
       )
-        return yield* presented(next, name);
+        return yield* viewForActor(next, name);
       yield* checkConfiguration(configuration);
       yield* journal.publish(AgentFacts.Configured, {
         workspaceId,
@@ -526,28 +531,31 @@ export const make = Effect.fn("AgentService.make")(function* () {
         memberId: record.memberId,
         ...configuration,
       });
-      return yield* presented(next, name);
-    }).pipe(committed);
+      return yield* viewForActor(next, name);
+    }).pipe(commitAsActor);
   });
 
   const rename = Effect.fn("AgentService.rename")(function* (input: Agent.RenameInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Agent.RenameInput))(input);
     return yield* Effect.gen(function* () {
-      const { record, name } = yield* authorized(request.agentId, AgentPermissions.Configure);
-      if (name === request.name) return yield* presented(record, name);
+      const { record, name } = yield* requirePermittedAgent(
+        request.agentId,
+        AgentPermissions.Configure,
+      );
+      if (name === request.name) return yield* viewForActor(record, name);
       if (name !== request.expectedName) return yield* new Changed({ agentId: record.id });
       yield* journal.publish(MemberFacts.Renamed, {
         memberId: record.memberId,
         workspaceId,
         name: request.name,
       });
-      return yield* presented(record, request.name);
-    }).pipe(committed);
+      return yield* viewForActor(record, request.name);
+    }).pipe(commitAsActor);
   });
 
   const remove = Effect.fn("AgentService.remove")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);
-    const { record } = yield* authorized(id, AgentPermissions.Configure);
+    const { record } = yield* requirePermittedAgent(id, AgentPermissions.Configure);
     yield* memberService.remove(record.memberId);
   });
 
@@ -561,7 +569,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
       Requirement.make(ConnectionPermissions.Read, connectionTarget(connectionId)),
       Requirement.make(ConnectionPermissions.Use, connectionTarget(connectionId)),
     ]);
-    const connection = yield* activeConnection(connectionId);
+    const connection = yield* findActiveConnection(connectionId);
     if (Option.isNone(connection) || !readable || !permitted)
       return yield* new ConnectionUnavailable({ connectionId });
     const active: Array<Environment.Record> = [];
@@ -578,7 +586,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     );
     return yield* Effect.forEach(choices, (environment) =>
       Effect.map(
-        compatibility(environment, connection.value, model),
+        checkCompatibility(environment, connection.value, model),
         (checked): Agent.EnvironmentChoice => ({
           environmentId: environment.id,
           compatibility: checked,

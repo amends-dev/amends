@@ -88,7 +88,7 @@ type Standalone = Fact.Definition & {
   readonly payload: { readonly DecodingServices: never; readonly EncodingServices: never };
 };
 
-const register = <F extends Standalone, View extends Schema.Constraint = F["payload"]>(
+const registerFact = <F extends Standalone, View extends Schema.Constraint = F["payload"]>(
   fact: F,
   options: {
     readonly requirement?: (
@@ -143,25 +143,25 @@ const register = <F extends Standalone, View extends Schema.Constraint = F["payl
   };
 };
 
-const readThread = (threadId: ThreadId.Id, workspaceId: WorkspaceId.Id) =>
+const readThreadRequirement = (threadId: ThreadId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
-const readGroup = (groupId: Group.Id, workspaceId: WorkspaceId.Id) =>
+const readGroupRequirement = (groupId: Group.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId });
-const readMember = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+const readMemberRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(MemberPermissions.Read, { _tag: "Member", workspaceId, memberId });
-const readAccess = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+const readAccessRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId });
-const readConnection = (connectionId: ConnectionId.Id, workspaceId: WorkspaceId.Id) =>
+const readConnectionRequirement = (connectionId: ConnectionId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(ConnectionPermissions.Read, { _tag: "Connection", workspaceId, connectionId });
-const readEnvironment = (environmentId: EnvironmentId.Id, workspaceId: WorkspaceId.Id) =>
+const readEnvironmentRequirement = (environmentId: EnvironmentId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(EnvironmentPermissions.Read, {
     _tag: "Environment",
     workspaceId,
     environmentId,
   });
-const readAgent = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+const readAgentRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AgentPermissions.Read, { _tag: "Member", workspaceId, memberId });
-const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
+const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
 /**
@@ -170,136 +170,145 @@ const manageInvitations = (_: unknown, workspaceId: WorkspaceId.Id) =>
  * the matching read requires. Facts absent from this list are internal.
  */
 const registry: ReadonlyArray<Registered> = [
-  register(WorkspaceFacts.Initialized),
-  register(WorkspaceFacts.Renamed),
-  register(WorkspaceFacts.OwnershipTransferred),
+  registerFact(WorkspaceFacts.Initialized),
+  registerFact(WorkspaceFacts.Renamed),
+  registerFact(WorkspaceFacts.OwnershipTransferred),
   // Membership and access changes reach those who may read them, and always the member concerned.
-  register(MemberFacts.Added, {
-    requirement: ({ memberId }, workspaceId) => readMember(memberId, workspaceId),
+  registerFact(MemberFacts.Added, {
+    requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
   }),
-  register(MemberFacts.Removed, {
-    requirement: ({ memberId }, workspaceId) => readMember(memberId, workspaceId),
+  registerFact(MemberFacts.Removed, {
+    requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => ({ _tag: "Removed", memberId }),
   }),
-  register(MemberFacts.Renamed, {
-    requirement: ({ memberId }, workspaceId) => readMember(memberId, workspaceId),
+  registerFact(MemberFacts.Renamed, {
+    requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
   }),
   // Invitations name their recipient and role, which only invitation managers may list.
-  register(InvitationFacts.Issued, { requirement: manageInvitations }),
-  register(InvitationFacts.Accepted, {
-    requirement: manageInvitations,
+  registerFact(InvitationFacts.Issued, { requirement: manageInvitationsRequirement }),
+  registerFact(InvitationFacts.Accepted, {
+    requirement: manageInvitationsRequirement,
     concerns: ({ memberId }) => memberId,
   }),
-  register(InvitationFacts.Revoked, { requirement: manageInvitations }),
-  register(RoleFacts.Created),
-  register(RoleFacts.Renamed),
+  registerFact(InvitationFacts.Revoked, { requirement: manageInvitationsRequirement }),
+  registerFact(RoleFacts.Created),
+  registerFact(RoleFacts.Renamed),
   // Marks a built-in role revision; the renames and permission changes it made come with it.
-  register(RoleFacts.BuiltinsRevised),
-  register(RoleFacts.PermissionsChanged, {
+  registerFact(RoleFacts.BuiltinsRevised),
+  registerFact(RoleFacts.PermissionsChanged, {
     access: () => ({ _tag: "Grants", memberId: undefined }),
   }),
-  register(AssignmentFacts.Created, {
-    requirement: ({ memberId }, workspaceId) => readAccess(memberId, workspaceId),
+  registerFact(AssignmentFacts.Created, {
+    requirement: ({ memberId }, workspaceId) => readAccessRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => ({ _tag: "Grants", memberId }),
   }),
-  register(AssignmentFacts.Revoked, {
-    requirement: ({ memberId }, workspaceId) => readAccess(memberId, workspaceId),
+  registerFact(AssignmentFacts.Revoked, {
+    requirement: ({ memberId }, workspaceId) => readAccessRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
     access: ({ memberId }) => ({ _tag: "Grants", memberId }),
   }),
-  register(GroupFacts.Created, {
-    requirement: ({ id }, workspaceId) => readGroup(id, workspaceId),
+  registerFact(GroupFacts.Created, {
+    requirement: ({ id }, workspaceId) => readGroupRequirement(id, workspaceId),
   }),
-  register(GroupFacts.Renamed, {
-    requirement: ({ groupId }, workspaceId) => readGroup(groupId, workspaceId),
+  registerFact(GroupFacts.Renamed, {
+    requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
   }),
-  register(GroupMembershipFacts.Added, {
-    requirement: ({ groupId }, workspaceId) => readGroup(groupId, workspaceId),
+  registerFact(GroupMembershipFacts.Added, {
+    requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
     access: ({ memberId }) => ({ _tag: "Groups", memberId }),
   }),
-  register(GroupMembershipFacts.Removed, {
-    requirement: ({ groupId }, workspaceId) => readGroup(groupId, workspaceId),
+  registerFact(GroupMembershipFacts.Removed, {
+    requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
     access: ({ memberId }) => ({ _tag: "Groups", memberId }),
   }),
   // Connections reach those who may read them; no fact carries a secret.
-  register(ConnectionFacts.Created, {
-    requirement: ({ id }, workspaceId) => readConnection(id, workspaceId),
+  registerFact(ConnectionFacts.Created, {
+    requirement: ({ id }, workspaceId) => readConnectionRequirement(id, workspaceId),
   }),
-  register(ConnectionFacts.Renamed, {
-    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  registerFact(ConnectionFacts.Renamed, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  register(ConnectionFacts.Configured, {
-    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  registerFact(ConnectionFacts.Configured, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  register(ConnectionFacts.CredentialSet, {
-    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  registerFact(ConnectionFacts.CredentialSet, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  register(ConnectionFacts.CredentialCleared, {
-    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  registerFact(ConnectionFacts.CredentialCleared, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  register(ConnectionFacts.Removed, {
-    requirement: ({ connectionId }, workspaceId) => readConnection(connectionId, workspaceId),
+  registerFact(ConnectionFacts.Removed, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  register(EnvironmentFacts.Created, {
-    requirement: ({ id }, workspaceId) => readEnvironment(id, workspaceId),
+  registerFact(EnvironmentFacts.Created, {
+    requirement: ({ id }, workspaceId) => readEnvironmentRequirement(id, workspaceId),
   }),
-  register(EnvironmentFacts.Renamed, {
-    requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
+  registerFact(EnvironmentFacts.Renamed, {
+    requirement: ({ environmentId }, workspaceId) =>
+      readEnvironmentRequirement(environmentId, workspaceId),
   }),
-  register(EnvironmentFacts.Configured, {
-    requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
+  registerFact(EnvironmentFacts.Configured, {
+    requirement: ({ environmentId }, workspaceId) =>
+      readEnvironmentRequirement(environmentId, workspaceId),
   }),
-  register(EnvironmentFacts.Removed, {
-    requirement: ({ environmentId }, workspaceId) => readEnvironment(environmentId, workspaceId),
+  registerFact(EnvironmentFacts.Removed, {
+    requirement: ({ environmentId }, workspaceId) =>
+      readEnvironmentRequirement(environmentId, workspaceId),
   }),
   // Agents' configuration reaches those who may read it; their names come with membership facts.
-  register(AgentFacts.Created, {
-    requirement: ({ memberId }, workspaceId) => readAgent(memberId, workspaceId),
+  registerFact(AgentFacts.Created, {
+    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
   }),
-  register(AgentFacts.Configured, {
-    requirement: ({ memberId }, workspaceId) => readAgent(memberId, workspaceId),
+  registerFact(AgentFacts.Configured, {
+    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
   }),
   // Turns reach those who may read their thread: what the agent is doing there, and how it ended.
-  register(TurnFacts.Created, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.Created, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.Retried, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.Retried, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.InputAccepted, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.InputAccepted, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.Started, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.Started, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.CancelRequested, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.CancelRequested, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.Completed, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.Completed, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.Failed, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.Failed, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(TurnFacts.Cancelled, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(TurnFacts.Cancelled, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
-  register(GroupFollowFacts.Started),
-  register(GroupFollowFacts.Ended),
-  register(ThreadFacts.Created, {
-    requirement: ({ id }, workspaceId) => readThread(id, workspaceId),
+  registerFact(GroupFollowFacts.Started),
+  registerFact(GroupFollowFacts.Ended),
+  registerFact(ThreadFacts.Created, {
+    requirement: ({ id }, workspaceId) => readThreadRequirement(id, workspaceId),
   }),
-  register(ThreadMessageFacts.Published, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(ThreadMessageFacts.Published, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
   // Readers see the timeline item without whom it notified; each human or agent recipient
   // receives the notification it created for them, which needs no thread read permission.
-  register(ThreadActivityFacts.Recorded, {
-    requirement: ({ activity }, workspaceId) => readThread(activity.threadId, workspaceId),
+  registerFact(ThreadActivityFacts.Recorded, {
+    requirement: ({ activity }, workspaceId) =>
+      readThreadRequirement(activity.threadId, workspaceId),
     notifications: (event) =>
       event.payload.recipients.flatMap((selected) =>
         selected.recipient._tag === "Human" || selected.recipient._tag === "Agent"
@@ -324,8 +333,8 @@ const registry: ReadonlyArray<Registered> = [
     },
   }),
   // Readers see the public participant summary, without routing identities or admissions.
-  register(ThreadParticipationFacts.Added, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(ThreadParticipationFacts.Added, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
     view: {
       schema: Schema.Struct({
         ...ThreadParticipation.Summary.fields,
@@ -335,8 +344,8 @@ const registry: ReadonlyArray<Registered> = [
         Object.assign(ThreadParticipation.toSummary(payload), { groupId: payload.groupId }),
     },
   }),
-  register(ThreadParticipationFacts.Ended, {
-    requirement: ({ threadId }, workspaceId) => readThread(threadId, workspaceId),
+  registerFact(ThreadParticipationFacts.Ended, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
 ];
 

@@ -96,14 +96,14 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
-  const authorizeAccess = Effect.fn("InvitationService.authorizeAccess")(function* (
+  const authorizeInvitation = Effect.fn("InvitationService.authorizeInvitation")(function* (
     input: Invitation.IssueInput,
   ) {
     yield* authorization.require([manage]);
     yield* delegation.requireGrant(input.roleId);
     return yield* Actor.Service;
   });
-  const load = Effect.fnUntraced(function* (id: Invitation.Id) {
+  const requireInvitation = Effect.fnUntraced(function* (id: Invitation.Id) {
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
     const found = yield* invitationStore.get(validId);
     if (Option.isNone(found)) return yield* new NotFound({ invitationId: id });
@@ -121,7 +121,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   const issue = Effect.fn("InvitationService.issue")(
     function* (input: Invitation.IssueInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Invitation.IssueInput))(input);
-      const actor = yield* authorizeAccess(request);
+      const actor = yield* authorizeInvitation(request);
       const invitationId = Invitation.Id.make(
         yield* Request.idFor(options.requestKey, ["invitation.issue", workspaceId, actor.memberId]),
       );
@@ -130,7 +130,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         options.requestKey !== undefined &&
         Option.isSome(yield* invitationStore.get(invitationId))
       )
-        return yield* load(invitationId);
+        return yield* requireInvitation(invitationId);
       const issuedAt = yield* DateTime.now;
       if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
       yield* requireUnjoined(request.recipientId);
@@ -163,7 +163,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       options.name === undefined
         ? undefined
         : yield* Schema.decodeEffect(Member.NewName)(options.name);
-    const invitation = yield* load(id);
+    const invitation = yield* requireInvitation(id);
     const { details, state } = invitation;
     if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });
     // Repeated acceptance returns the original receipt, without restoring grants
@@ -187,7 +187,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         reason: "membership-missing",
       });
     // Only this authority check uses the recorded inviter, never recipient input.
-    yield* authorizeAccess(details).pipe(
+    yield* authorizeInvitation(details).pipe(
       Effect.provideService(Actor.Service, {
         workspaceId,
         memberId: details.inviterMemberId,
@@ -250,8 +250,8 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   const revoke = Effect.fn("InvitationService.revoke")(
     function* (id: Invitation.Id) {
       yield* authorization.require([manage]);
-      const invitation = yield* load(id);
-      const actor = yield* authorizeAccess(invitation.details);
+      const invitation = yield* requireInvitation(id);
+      const actor = yield* authorizeInvitation(invitation.details);
       if (invitation.state._tag === "Revoked") return invitation;
       if (invitation.state._tag === "Accepted")
         return yield* new Unavailable({ invitationId: id, reason: "accepted" });

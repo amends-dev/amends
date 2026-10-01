@@ -109,38 +109,38 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
-  const target = (connectionId: Connection.Id) =>
+  const connectionTarget = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
-  const declarationOf = (id: ConnectionImplementation.Id) =>
+  const findDeclaration = (id: ConnectionImplementation.Id) =>
     Option.getOrUndefined(connectionCatalog.get(id));
-  const viewOf = (record: Connection.Record, manageable: boolean) =>
-    Connection.view(record, declarationOf(record.implementationId), manageable);
+  const toView = (record: Connection.Record, manageable: boolean) =>
+    Connection.view(record, findDeclaration(record.implementationId), manageable);
   /** The connection as the actor sees it, including whether they may manage it. */
-  const presented = (record: Connection.Record) =>
+  const viewForActor = (record: Connection.Record) =>
     authorization
-      .permitted([Requirement.make(ConnectionPermissions.Manage, target(record.id))])
-      .pipe(Effect.map(([manageable = false]) => viewOf(record, manageable)));
+      .permitted([Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id))])
+      .pipe(Effect.map(([manageable = false]) => toView(record, manageable)));
 
   /** The active connection by ID, or NotFound. */
-  const load = Effect.fnUntraced(function* (connectionId: Connection.Id) {
+  const requireActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new NotFound({ connectionId });
     return found.value;
   });
   /** A connection the actor may act on with `permission`; to anyone else it is missing. */
-  const authorized = Effect.fnUntraced(function* (
+  const requirePermittedConnection = Effect.fnUntraced(function* (
     connectionId: Connection.Id,
     permission: Permission.Definition<"Connection">,
   ) {
-    const record = yield* load(connectionId);
+    const record = yield* requireActiveConnection(connectionId);
     const [readable = false, permitted = false] = yield* authorization.permitted([
-      Requirement.make(ConnectionPermissions.Read, target(connectionId)),
-      Requirement.make(permission, target(connectionId)),
+      Requirement.make(ConnectionPermissions.Read, connectionTarget(connectionId)),
+      Requirement.make(permission, connectionTarget(connectionId)),
     ]);
     if (!readable) return yield* new NotFound({ connectionId });
     if (!permitted)
-      yield* authorization.require([Requirement.make(permission, target(connectionId))]);
+      yield* authorization.require([Requirement.make(permission, connectionTarget(connectionId))]);
     return record;
   });
   const checkSettings = (
@@ -150,12 +150,12 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     const issues = Connection.settingIssues(declaration, settings);
     return issues.length === 0 ? Effect.void : Effect.fail(new InvalidSettings({ issues }));
   };
-  const installed = (id: ConnectionImplementation.Id) =>
+  const requireImplementation = (id: ConnectionImplementation.Id) =>
     Option.match(connectionCatalog.get(id), {
       onNone: () => Effect.fail(new UnknownImplementation({ implementationId: id })),
       onSome: Effect.succeed,
     });
-  const committed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  const commitAsActor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Publication.withActor,
       Effect.provideService(Crypto.Crypto, crypto),
@@ -168,13 +168,13 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     // One grant resolution answers both permissions for every connection.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
-        Requirement.make(ConnectionPermissions.Read, target(record.id)),
-        Requirement.make(ConnectionPermissions.Manage, target(record.id)),
+        Requirement.make(ConnectionPermissions.Read, connectionTarget(record.id)),
+        Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id)),
       ]),
     );
     return active
       .flatMap((record, index) =>
-        permitted[index * 2] === true ? [viewOf(record, permitted[index * 2 + 1] === true)] : [],
+        permitted[index * 2] === true ? [toView(record, permitted[index * 2 + 1] === true)] : [],
       )
       .toSorted((left, right) =>
         left.name === right.name
@@ -187,10 +187,10 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
 
   const get = Effect.fn("ConnectionService.get")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
-    return yield* presented(yield* authorized(id, ConnectionPermissions.Read));
+    return yield* viewForActor(yield* requirePermittedConnection(id, ConnectionPermissions.Read));
   });
 
-  const restore = Effect.fnUntraced(function* (connectionId: Connection.Id) {
+  const readRetriedConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found)) return yield* new NotFound({ connectionId });
     return found.value;
@@ -215,8 +215,8 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         options.requestKey !== undefined &&
         Option.isSome(yield* connectionStore.get(connectionId))
       )
-        return yield* presented(yield* restore(connectionId));
-      const declaration = yield* installed(request.implementationId);
+        return yield* viewForActor(yield* readRetriedConnection(connectionId));
+      const declaration = yield* requireImplementation(request.implementationId);
       if (!declaration.authentication.some((method) => method._tag === request.authentication))
         return yield* new UnsupportedAuthentication({
           implementationId: declaration.id,
@@ -238,7 +238,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         createdAt: yield* DateTime.now,
       };
       yield* journal.publish(ConnectionFacts.Created, created);
-      return yield* presented(created);
+      return yield* viewForActor(created);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -248,8 +248,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const rename = Effect.fn("ConnectionService.rename")(function* (input: Connection.RenameInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.RenameInput))(input);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(request.connectionId, ConnectionPermissions.Manage);
-      if (record.name === request.name) return viewOf(record, true);
+      const record = yield* requirePermittedConnection(
+        request.connectionId,
+        ConnectionPermissions.Manage,
+      );
+      if (record.name === request.name) return toView(record, true);
       if (record.name !== request.expectedName)
         return yield* new Changed({ connectionId: record.id });
       yield* journal.publish(ConnectionFacts.Renamed, {
@@ -257,8 +260,8 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         connectionId: record.id,
         name: request.name,
       });
-      return viewOf(Connection.change(record, { name: request.name }), true);
-    }).pipe(committed);
+      return toView(Connection.change(record, { name: request.name }), true);
+    }).pipe(commitAsActor);
   });
 
   const configure = Effect.fn("ConnectionService.configure")(function* (
@@ -266,15 +269,18 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.ConfigureInput))(input);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(request.connectionId, ConnectionPermissions.Manage);
-      yield* checkSettings(yield* installed(record.implementationId), request.settings);
+      const record = yield* requirePermittedConnection(
+        request.connectionId,
+        ConnectionPermissions.Manage,
+      );
+      yield* checkSettings(yield* requireImplementation(record.implementationId), request.settings);
       yield* journal.publish(ConnectionFacts.Configured, {
         workspaceId,
         connectionId: record.id,
         settings: request.settings,
       });
-      return viewOf(Connection.change(record, { settings: request.settings }), true);
-    }).pipe(committed);
+      return toView(Connection.change(record, { settings: request.settings }), true);
+    }).pipe(commitAsActor);
   });
 
   const setCredential = Effect.fn("ConnectionService.setCredential")(function* (
@@ -282,8 +288,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(Schema.toType(Connection.SetCredentialInput))(input);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(request.connectionId, ConnectionPermissions.Manage);
-      const declaration = yield* installed(record.implementationId);
+      const record = yield* requirePermittedConnection(
+        request.connectionId,
+        ConnectionPermissions.Manage,
+      );
+      const declaration = yield* requireImplementation(record.implementationId);
       if (record.authentication._tag !== "ApiKey")
         return yield* new UnsupportedAuthentication({
           implementationId: declaration.id,
@@ -306,11 +315,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         connectionId: record.id,
         credentialId,
       });
-      return viewOf(
+      return toView(
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId } }),
         true,
       );
-    }).pipe(committed);
+    }).pipe(commitAsActor);
   });
 
   const clearCredential = Effect.fn("ConnectionService.clearCredential")(function* (
@@ -318,31 +327,31 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   ) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(id, ConnectionPermissions.Manage);
+      const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
       if (record.authentication._tag !== "ApiKey")
         return yield* new UnsupportedAuthentication({
           implementationId: record.implementationId,
           method: record.authentication._tag,
         });
       const cleared = record.authentication.credentialId;
-      if (cleared === null) return viewOf(record, true);
+      if (cleared === null) return toView(record, true);
       yield* connectionCredentialStore.remove(cleared);
       yield* journal.publish(ConnectionFacts.CredentialCleared, { workspaceId, connectionId: id });
-      return viewOf(
+      return toView(
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId: null } }),
         true,
       );
-    }).pipe(committed);
+    }).pipe(commitAsActor);
   });
 
   const remove = Effect.fn("ConnectionService.remove")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(id, ConnectionPermissions.Manage);
+      const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
       if (record.authentication._tag === "ApiKey" && record.authentication.credentialId !== null)
         yield* connectionCredentialStore.remove(record.authentication.credentialId);
       yield* journal.publish(ConnectionFacts.Removed, { workspaceId, connectionId: id });
-    }).pipe(committed);
+    }).pipe(commitAsActor);
   });
 
   return Service.of({

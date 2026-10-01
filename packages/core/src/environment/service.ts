@@ -107,13 +107,13 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
-  const target = (environmentId: Environment.Id) =>
+  const environmentTarget = (environmentId: Environment.Id) =>
     ({ _tag: "Environment", workspaceId, environmentId }) as const;
   const connectionTarget = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
 
   /** Readiness from the host's catalogs and the account connection, as the environment is now. */
-  const readinessOf = Effect.fnUntraced(function* (record: Environment.Record) {
+  const assessReadiness = Effect.fnUntraced(function* (record: Environment.Record) {
     const connectionId = record.sandbox?.connectionId ?? null;
     const found = connectionId === null ? Option.none() : yield* connectionStore.get(connectionId);
     return EnvironmentCompatibility.readiness(
@@ -133,43 +133,47 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
       },
     );
   });
-  const viewOf = (record: Environment.Record, manageable: boolean) =>
-    Effect.map(readinessOf(record), (readiness) => Environment.view(record, manageable, readiness));
+  const toView = (record: Environment.Record, manageable: boolean) =>
+    Effect.map(assessReadiness(record), (readiness) =>
+      Environment.view(record, manageable, readiness),
+    );
   /** The environment as the actor sees it, including whether they may manage it. */
-  const presented = (record: Environment.Record) =>
+  const viewForActor = (record: Environment.Record) =>
     authorization
-      .permitted([Requirement.make(EnvironmentPermissions.Manage, target(record.id))])
-      .pipe(Effect.flatMap(([manageable = false]) => viewOf(record, manageable)));
+      .permitted([Requirement.make(EnvironmentPermissions.Manage, environmentTarget(record.id))])
+      .pipe(Effect.flatMap(([manageable = false]) => toView(record, manageable)));
 
   /** The active environment by ID, or NotFound. */
-  const load = Effect.fnUntraced(function* (environmentId: Environment.Id) {
+  const requireActiveEnvironment = Effect.fnUntraced(function* (environmentId: Environment.Id) {
     const found = yield* environmentStore.get(environmentId);
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new NotFound({ environmentId });
     return found.value;
   });
   /** An environment the actor may act on with `permission`; to anyone else it is missing. */
-  const authorized = Effect.fnUntraced(function* (
+  const requirePermittedEnvironment = Effect.fnUntraced(function* (
     environmentId: Environment.Id,
     permission: Permission.Definition<"Environment">,
   ) {
-    const record = yield* load(environmentId);
+    const record = yield* requireActiveEnvironment(environmentId);
     const [readable = false, permitted = false] = yield* authorization.permitted([
-      Requirement.make(EnvironmentPermissions.Read, target(environmentId)),
-      Requirement.make(permission, target(environmentId)),
+      Requirement.make(EnvironmentPermissions.Read, environmentTarget(environmentId)),
+      Requirement.make(permission, environmentTarget(environmentId)),
     ]);
     if (!readable) return yield* new NotFound({ environmentId });
     if (!permitted)
-      yield* authorization.require([Requirement.make(permission, target(environmentId))]);
+      yield* authorization.require([
+        Requirement.make(permission, environmentTarget(environmentId)),
+      ]);
     return record;
   });
 
-  const harnessOf = (id: Environment.Record["harnessId"]) =>
+  const requireHarness = (id: Environment.Record["harnessId"]) =>
     Option.match(environmentCatalog.harness(id), {
       onNone: () => Effect.fail(new UnknownHarness({ harnessId: id })),
       onSome: Effect.succeed,
     });
-  const providerOf = (id: SandboxImplementation.Id) =>
+  const requireSandboxProvider = (id: SandboxImplementation.Id) =>
     Option.match(environmentCatalog.sandbox(id), {
       onNone: () => Effect.fail(new UnknownSandboxProvider({ providerId: id })),
       onSome: Effect.succeed,
@@ -212,7 +216,7 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
     const [first, ...rest] = issues;
     if (first !== undefined) return yield* new InvalidSandbox({ issues: [first, ...rest] });
   });
-  const sandboxOf = (
+  const toSandbox = (
     placement: Pick<Environment.Sandbox, "providerId" | "harness">,
     settings: Environment.SandboxSettings,
   ): Environment.Sandbox => ({
@@ -224,7 +228,7 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
     setup: settings.setup,
     retention: settings.retention,
   });
-  const committed = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+  const commitAsActor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Publication.withActor,
       Effect.provideService(Crypto.Crypto, crypto),
@@ -237,8 +241,8 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
     // One grant resolution answers both permissions for every environment.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
-        Requirement.make(EnvironmentPermissions.Read, target(record.id)),
-        Requirement.make(EnvironmentPermissions.Manage, target(record.id)),
+        Requirement.make(EnvironmentPermissions.Read, environmentTarget(record.id)),
+        Requirement.make(EnvironmentPermissions.Manage, environmentTarget(record.id)),
       ]),
     );
     const views = yield* Effect.forEach(
@@ -247,7 +251,7 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
           ? [{ record, manageable: permitted[index * 2 + 1] === true }]
           : [],
       ),
-      ({ record, manageable }) => viewOf(record, manageable),
+      ({ record, manageable }) => toView(record, manageable),
     );
     return views.toSorted((left, right) =>
       left.name === right.name
@@ -260,10 +264,10 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
 
   const get = Effect.fn("EnvironmentService.get")(function* (environmentId: Environment.Id) {
     const id = yield* Schema.decodeEffect(Environment.Id)(environmentId);
-    return yield* presented(yield* authorized(id, EnvironmentPermissions.Read));
+    return yield* viewForActor(yield* requirePermittedEnvironment(id, EnvironmentPermissions.Read));
   });
 
-  const restore = Effect.fnUntraced(function* (environmentId: Environment.Id) {
+  const readRetriedEnvironment = Effect.fnUntraced(function* (environmentId: Environment.Id) {
     const found = yield* environmentStore.get(environmentId);
     if (Option.isNone(found)) return yield* new NotFound({ environmentId });
     return found.value;
@@ -288,25 +292,28 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
         options.requestKey !== undefined &&
         Option.isSome(yield* environmentStore.get(environmentId))
       )
-        return yield* presented(yield* restore(environmentId));
-      const harness = yield* harnessOf(request.harnessId);
+        return yield* viewForActor(yield* readRetriedEnvironment(environmentId));
+      const harness = yield* requireHarness(request.harnessId);
       const placement = request.sandbox?.harness ?? "in-process";
       if (!harness.placement.includes(placement))
         return yield* new UnsupportedPlacement({ harnessId: harness.id, placement });
       if (request.sandbox !== null)
-        yield* checkSandbox(yield* providerOf(request.sandbox.providerId), request.sandbox);
+        yield* checkSandbox(
+          yield* requireSandboxProvider(request.sandbox.providerId),
+          request.sandbox,
+        );
       const created: Environment.Record = {
         id: environmentId,
         workspaceId,
         name: request.name,
         harnessId: harness.id,
-        sandbox: request.sandbox === null ? null : sandboxOf(request.sandbox, request.sandbox),
+        sandbox: request.sandbox === null ? null : toSandbox(request.sandbox, request.sandbox),
         status: "active",
         createdBy: actor.memberId,
         createdAt: yield* DateTime.now,
       };
       yield* journal.publish(EnvironmentFacts.Created, created);
-      return yield* presented(created);
+      return yield* viewForActor(created);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -316,8 +323,11 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
   const rename = Effect.fn("EnvironmentService.rename")(function* (input: Environment.RenameInput) {
     const request = yield* Schema.decodeEffect(Schema.toType(Environment.RenameInput))(input);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(request.environmentId, EnvironmentPermissions.Manage);
-      if (record.name === request.name) return yield* viewOf(record, true);
+      const record = yield* requirePermittedEnvironment(
+        request.environmentId,
+        EnvironmentPermissions.Manage,
+      );
+      if (record.name === request.name) return yield* toView(record, true);
       if (record.name !== request.expectedName)
         return yield* new Changed({ environmentId: record.id });
       yield* journal.publish(EnvironmentFacts.Renamed, {
@@ -325,8 +335,8 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
         environmentId: record.id,
         name: request.name,
       });
-      return yield* viewOf(Environment.change(record, { name: request.name }), true);
-    }).pipe(committed);
+      return yield* toView(Environment.change(record, { name: request.name }), true);
+    }).pipe(commitAsActor);
   });
 
   const configure = Effect.fn("EnvironmentService.configure")(function* (
@@ -334,25 +344,31 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(Schema.toType(Environment.ConfigureInput))(input);
     return yield* Effect.gen(function* () {
-      const record = yield* authorized(request.environmentId, EnvironmentPermissions.Manage);
+      const record = yield* requirePermittedEnvironment(
+        request.environmentId,
+        EnvironmentPermissions.Manage,
+      );
       if (record.sandbox === null) return yield* new InvalidSandbox({ issues: ["no-sandbox"] });
-      yield* checkSandbox(yield* providerOf(record.sandbox.providerId), request.sandbox);
-      const sandbox = sandboxOf(record.sandbox, request.sandbox);
+      yield* checkSandbox(
+        yield* requireSandboxProvider(record.sandbox.providerId),
+        request.sandbox,
+      );
+      const sandbox = toSandbox(record.sandbox, request.sandbox);
       yield* journal.publish(EnvironmentFacts.Configured, {
         workspaceId,
         environmentId: record.id,
         sandbox,
       });
-      return yield* viewOf(Environment.change(record, { sandbox }), true);
-    }).pipe(committed);
+      return yield* toView(Environment.change(record, { sandbox }), true);
+    }).pipe(commitAsActor);
   });
 
   const remove = Effect.fn("EnvironmentService.remove")(function* (environmentId: Environment.Id) {
     const id = yield* Schema.decodeEffect(Environment.Id)(environmentId);
     return yield* Effect.gen(function* () {
-      yield* authorized(id, EnvironmentPermissions.Manage);
+      yield* requirePermittedEnvironment(id, EnvironmentPermissions.Manage);
       yield* journal.publish(EnvironmentFacts.Removed, { workspaceId, environmentId: id });
-    }).pipe(committed);
+    }).pipe(commitAsActor);
   });
 
   return Service.of({

@@ -55,7 +55,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     journal = yield* Journal.Service,
     crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
-  const allowed = <A, R>(effect: Effect.Effect<A, Error, R>) =>
+  const isAllowedBy = <A, R>(effect: Effect.Effect<A, Error, R>) =>
     effect.pipe(
       Effect.as(true),
       Effect.catchTag(
@@ -63,7 +63,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
         () => Effect.succeed(false),
       ),
     );
-  const load = Effect.gen(function* () {
+  const readWorkspace = Effect.gen(function* () {
     const value = yield* workspaceStore.get;
     if (Option.isNone(value)) return yield* Effect.die("A workspace's record is missing");
     return value.value;
@@ -75,14 +75,14 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   const get = Effect.gen(function* () {
     yield* authorization.require([]);
     const roles = yield* assignmentService.roles;
-    const canReadInvitations = yield* allowed(
+    const canReadInvitations = yield* isAllowedBy(
       authorization.require([
         Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId }),
       ]),
     );
     return {
-      workspace: yield* load,
-      canRename: yield* allowed(authorization.require([renamePermission])),
+      workspace: yield* readWorkspace,
+      canRename: yield* isAllowedBy(authorization.require([renamePermission])),
       canReadInvitations,
       canInvite: canReadInvitations && roles.some((role) => role.assignable),
       roles,
@@ -90,7 +90,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   });
   const listing = Effect.gen(function* () {
     const visible = yield* memberService.list;
-    const workspace = yield* load;
+    const workspace = yield* readWorkspace;
     const actorId = (yield* Actor.Service).memberId;
     // One grant resolution answers every permission, and role choices load once, so the reads
     // grow with the member count only by each member's assignments.
@@ -143,7 +143,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     function* (input: WorkspaceSettings.RenameInput) {
       const request = yield* Schema.decodeEffect(WorkspaceSettings.RenameInput)(input);
       yield* authorization.require([renamePermission]);
-      const workspace = yield* load;
+      const workspace = yield* readWorkspace;
       if (workspace.name === request.name) return workspace;
       if (workspace.name !== request.expectedName) return yield* new Changed({ workspaceId });
       yield* journal.publish(WorkspaceFacts.Renamed, {

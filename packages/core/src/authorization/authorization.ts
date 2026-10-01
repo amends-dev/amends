@@ -77,7 +77,9 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   const { workspaceId } = yield* Store.Service;
 
   /** Validate the actor, and that each requirement names a declared permission in this workspace. */
-  const check = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Value>) {
+  const validateRequirements = Effect.fnUntraced(function* (
+    requirements: ReadonlyArray<Requirement.Value>,
+  ) {
     const actor = yield* Actor.Service;
     yield* requireWorkspace(workspaceId, actor.workspaceId);
     const found = yield* memberStore.get(actor.memberId);
@@ -103,7 +105,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     }
     return { actor, checked: requirements };
   });
-  const covered = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
+  const isCovered = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
     grants.some(
       (grant) =>
         grant.permission === requirement.permission.name &&
@@ -113,20 +115,20 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   const requirePermissions = Effect.fn("Authorization.require")(function* (
     requirements: ReadonlyArray<Requirement.Value>,
   ) {
-    const { actor, checked } = yield* check(requirements);
+    const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return;
     const grants = yield* grantResolver.resolve(actor.memberId);
     for (const requirement of checked)
-      if (!covered(grants, requirement))
+      if (!isCovered(grants, requirement))
         return yield* new Denied({ memberId: actor.memberId, requirement });
   });
   const permitted = Effect.fn("Authorization.permitted")(function* (
     requirements: ReadonlyArray<Requirement.Value>,
   ) {
-    const { actor, checked } = yield* check(requirements);
+    const { actor, checked } = yield* validateRequirements(requirements);
     if (checked.length === 0) return [];
     const grants = yield* grantResolver.resolve(actor.memberId);
-    return checked.map((requirement) => covered(grants, requirement));
+    return checked.map((requirement) => isCovered(grants, requirement));
   });
 
   return Service.of({ require: requirePermissions, permitted });

@@ -159,7 +159,7 @@ export interface Runner {
   ) => Effect.Effect<void, Error, Store.Transaction>;
 }
 
-const cursorOf = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
+const toCursor = (entry: Log.Entry<Event.Envelope>): Checkpoint.Cursor => ({
   position: entry.position,
   commitId: entry.commitId,
   index: entry.index,
@@ -192,7 +192,7 @@ export const replaceLive = Effect.fnUntraced(function* (
       const key = { logId: log.id, name: version.name, version: version.version };
       if (batch?.position !== head.value || last === undefined)
         return yield* new InvalidCheckpoint({ key, message: "The log's head batch is missing" });
-      yield* checkpoint.set(key, cursorOf(last));
+      yield* checkpoint.set(key, toCursor(last));
     }
   }
   yield* checkpoint.setLive(log.id, next);
@@ -236,7 +236,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   const progress = checkpoint
     .get(key)
     .pipe(Effect.flatMap(Schema.decodeEffect(Schema.Option(Checkpoint.Cursor))));
-  const next = Effect.fnUntraced(function* (previous: Option.Option<Checkpoint.Cursor>) {
+  const readNextEntries = Effect.fnUntraced(function* (previous: Option.Option<Checkpoint.Cursor>) {
     const storeTransaction = yield* Store.Transaction;
     if (Option.isSome(previous)) {
       const cursor = previous.value;
@@ -283,7 +283,7 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
 
   // Supply static requirements only after entering the operation's transaction.
   // The invocation's context must win over any context present during binding.
-  const withServices = Effect.fnUntraced(function* <A, E2>(
+  const provideServices = Effect.fnUntraced(function* <A, E2>(
     program: Effect.Effect<A, E2, R | Store.Transaction>,
   ) {
     const storeTransaction = yield* Store.Transaction;
@@ -293,8 +293,9 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
       Effect.updateContext((current: Context.Context<never>) => Context.merge(services, current)),
     );
   });
-  const failed = (entry: Log.Entry<Event.Envelope>, phase: Failure["phase"]) => (cause: unknown) =>
-    new Failure({ key, cursor: cursorOf(entry), phase, cause });
+  const toFailure =
+    (entry: Log.Entry<Event.Envelope>, phase: Failure["phase"]) => (cause: unknown) =>
+      new Failure({ key, cursor: toCursor(entry), phase, cause });
 
   const apply = Effect.fn("Projection.apply")(function* (
     entry: Log.Entry<Event.Envelope>,
@@ -302,23 +303,23 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
   ) {
     const storeTransaction = yield* Store.Transaction;
     yield* transaction.operation(
-      withServices(
+      provideServices(
         Effect.gen(function* () {
           if (entry.logId !== log.id || entry.commitId !== storeTransaction.id)
             return yield* new Transaction.Foreign({});
           for (const handler of yield* handlersFor(entry))
-            yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
+            yield* handler.apply(event).pipe(Effect.mapError(toFailure(entry, "apply")));
         }),
       ),
     );
   });
   const step = transaction
     .operation(
-      withServices(
+      provideServices(
         Effect.gen(function* () {
           const live = yield* checkpoint.listLive(log.id);
           if (live.some(isVersion(key))) return Option.none<Checkpoint.Cursor>();
-          const pending = yield* next(yield* progress);
+          const pending = yield* readNextEntries(yield* progress);
           if (Option.isNone(pending)) {
             // Caught up with every commit: from this one on, commits apply the projection.
             yield* replaceLive(checkpoint, log, live, [
@@ -333,16 +334,16 @@ export const makeRunner = Effect.fn("Projection.makeRunner")(function* <E, R>(op
             if (Option.isSome(first)) {
               const event = yield* first.value
                 .decode(entry)
-                .pipe(Effect.mapError(failed(entry, "decode")));
+                .pipe(Effect.mapError(toFailure(entry, "decode")));
               for (const handler of handlers)
-                yield* handler.apply(event).pipe(Effect.mapError(failed(entry, "apply")));
+                yield* handler.apply(event).pipe(Effect.mapError(toFailure(entry, "apply")));
             }
           }
           const last = Array.last(pending.value);
           if (Option.isNone(last)) {
             return yield* new InvalidCheckpoint({ key, message: "Source returned an empty batch" });
           }
-          const cursor = cursorOf(last.value);
+          const cursor = toCursor(last.value);
           yield* checkpoint.set(key, cursor);
           return Option.some(cursor);
         }),

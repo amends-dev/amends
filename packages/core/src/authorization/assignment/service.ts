@@ -82,7 +82,10 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   const crypto = yield* Crypto.Crypto;
   const permissionCatalog = yield* PermissionCatalog.Service;
   const { workspaceId } = yield* Store.Service;
-  const manage = Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId });
+  const manageRequirement = Requirement.make(AssignmentPermissions.Manage, {
+    _tag: "Workspace",
+    workspaceId,
+  });
   const workspaceWide = permissionCatalog.definitions.filter(
     (permission) => permission.targetKind === "Workspace",
   );
@@ -99,19 +102,23 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       .filter((_, index) => covered[index] === true)
       .map((permission) => permission.name);
   }).pipe(Effect.withSpan("AssignmentService.permissions"));
-  const member = Effect.fn("AssignmentService.member")(function* (memberId: Member.Id) {
+  const requireMember = Effect.fn("AssignmentService.requireMember")(function* (
+    memberId: Member.Id,
+  ) {
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
     const found = yield* memberStore.get(id);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId: id });
     return found.value;
   });
-  const recipient = Effect.fn("AssignmentService.recipient")(function* (memberId: Member.Id) {
-    yield* authorization.require([manage]);
-    const record = yield* member(memberId);
+  const authorizeRecipient = Effect.fn("AssignmentService.authorizeRecipient")(function* (
+    memberId: Member.Id,
+  ) {
+    yield* authorization.require([manageRequirement]);
+    const record = yield* requireMember(memberId);
     if (record.status !== "active") return yield* new InactiveMember({ memberId });
     yield* delegation.requireRecipient(memberId);
   });
-  const allowed = <A, R>(effect: Effect.Effect<A, Error, R>) =>
+  const isAllowedBy = <A, R>(effect: Effect.Effect<A, Error, R>) =>
     effect.pipe(
       Effect.as(true),
       Effect.catchTag(
@@ -119,14 +126,14 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
         () => Effect.succeed(false),
       ),
     );
-  const choices = Effect.gen(function* () {
+  const listRoleChoices = Effect.gen(function* () {
     yield* authorization.require([]);
     return yield* Effect.forEach(
       [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId],
       (id) =>
         Effect.gen(function* () {
           const role = yield* delegation.loadRole(id);
-          return { role, assignable: yield* allowed(delegation.requireGrant(id)) };
+          return { role, assignable: yield* isAllowedBy(delegation.requireGrant(id)) };
         }),
     );
   });
@@ -134,14 +141,16 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     yield* authorization.require([
       Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId }),
     ]);
-    const record = yield* member(memberId);
+    const record = yield* requireMember(memberId);
     return Assignment.Access.make({
       assignments: yield* delegation.assignmentsFor(memberId),
-      roles: yield* choices,
-      canManage: record.status === "active" && (yield* allowed(recipient(memberId))),
+      roles: yield* listRoleChoices,
+      canManage: record.status === "active" && (yield* isAllowedBy(authorizeRecipient(memberId))),
     });
   });
-  const create = Effect.fn("AssignmentService.create")(function* (input: Assignment.AssignInput) {
+  const createRoleAssignment = Effect.fn("AssignmentService.createRoleAssignment")(function* (
+    input: Assignment.AssignInput,
+  ) {
     const record = Assignment.Record.make({
       id: Assignment.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
@@ -160,21 +169,21 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     });
     return record;
   });
-  const workspaceRole = (record: Assignment.Record) =>
+  const isWorkspaceRole = (record: Assignment.Record) =>
     record.source._tag === "Role" && record.source.scope._tag === "Workspace";
   const assign = Effect.fn("AssignmentService.assign")(
     function* (input: Assignment.AssignInput) {
       const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input);
-      yield* recipient(request.memberId);
+      yield* authorizeRecipient(request.memberId);
       yield* delegation.requireGrant(request.roleId);
       const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
         (record) =>
-          workspaceRole(record) &&
+          isWorkspaceRole(record) &&
           record.source._tag === "Role" &&
           record.source.roleId === request.roleId,
       );
       if (existing !== undefined) return existing;
-      return yield* create(request);
+      return yield* createRoleAssignment(request);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -182,7 +191,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   );
   const revoke = Effect.fn("AssignmentService.revoke")(
     function* (memberId: Member.Id, assignmentId: Assignment.Id) {
-      yield* recipient(memberId);
+      yield* authorizeRecipient(memberId);
       const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
       const found = yield* assignmentStore.get(id);
       if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
@@ -204,9 +213,9 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   const change = Effect.fn("AssignmentService.change")(
     function* (input: Assignment.ChangeInput) {
       const request = yield* Schema.decodeEffect(Assignment.ChangeInput)(input);
-      yield* recipient(request.memberId);
+      yield* authorizeRecipient(request.memberId);
       yield* delegation.requireGrant(request.roleId);
-      const current = (yield* delegation.assignmentsFor(request.memberId)).filter(workspaceRole);
+      const current = (yield* delegation.assignmentsFor(request.memberId)).filter(isWorkspaceRole);
       if (
         current.length !== request.expectedAssignmentIds.length ||
         current.some(({ id }) => !request.expectedAssignmentIds.includes(id))
@@ -225,13 +234,13 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
           assignmentId: record.id,
           memberId: record.memberId,
         });
-      return yield* create(request);
+      return yield* createRoleAssignment(request);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ permissions, roles: choices, list, assign, revoke, change });
+  return Service.of({ permissions, roles: listRoleChoices, list, assign, revoke, change });
 });
 
 /** @category layers */

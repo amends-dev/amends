@@ -47,7 +47,7 @@ interface Access {
   readonly grants: ReadonlyArray<Grant.Value>;
 }
 
-const permits = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
+const isPermitted = (grants: ReadonlyArray<Grant.Value>, requirement: Requirement.Value) =>
   grants.some(
     (grant) =>
       grant.permission === requirement.permission.name &&
@@ -68,14 +68,14 @@ const reaches = (
 ) =>
   reach.audience.some((scope) => access.scopes.has(scope)) &&
   (reach.requirement === undefined ||
-    permits(access.grants, reach.requirement) ||
+    isPermitted(access.grants, reach.requirement) ||
     (reach.exempt !== undefined && access.scopes.has(reach.exempt)));
 
-const visible = (access: Access) => (prepared: ChangeFeedEvents.Prepared) =>
+const isVisibleTo = (access: Access) => (prepared: ChangeFeedEvents.Prepared) =>
   reaches(access, prepared);
 
 /** Whether a fact changes this reader's access, so it must be reloaded before filtering. */
-const changes = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
+const changesAccessOf = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
   prepared.access !== undefined &&
   (prepared.access.memberId === undefined || prepared.access.memberId === actor.memberId);
 
@@ -88,7 +88,7 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
   const groupMembershipStore = yield* GroupMembershipStore.Service;
   const { workspaceId } = yield* Store.Service;
 
-  const load = Effect.fnUntraced(function* (actor: Actor.Value) {
+  const resolveAccess = Effect.fnUntraced(function* (actor: Actor.Value) {
     const admissions = yield* groupMembershipStore.listActiveByMember(actor.memberId);
     const grants = yield* grantResolver.resolve(actor.memberId);
     const scopes = new Set<Audience.Scope>([
@@ -116,7 +116,9 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
     // committed before it is in what they read, and one committed after it is delivered and
     // reloads them. Read first, a change committed in between would be neither.
     yield* authorization.require([]);
-    let access = yield* load(actor).pipe(Effect.mapError(() => new ChangeFeed.Unavailable({})));
+    let access = yield* resolveAccess(actor).pipe(
+      Effect.mapError(() => new ChangeFeed.Unavailable({})),
+    );
     const ready = ChangeFeed.Message.cases.Ready.make({
       workspaceId,
       cursor: Option.getOrNull(Option.map(subscription.from, ChangeFeed.cursorOf)),
@@ -127,8 +129,8 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
         Stream.unwrap(
           Effect.gen(function* () {
             // Reload first, so a commit that admits the reader also delivers what it admits.
-            if (delivery.events.some(changes(actor))) access = yield* load(actor);
-            const events = delivery.events.filter(visible(access)).map((p) => p.event);
+            if (delivery.events.some(changesAccessOf(actor))) access = yield* resolveAccess(actor);
+            const events = delivery.events.filter(isVisibleTo(access)).map((p) => p.event);
             const notifications = delivery.events.flatMap((p) =>
               p.notifications.flatMap((n) => (access.scopes.has(n.scope) ? [n.record] : [])),
             );

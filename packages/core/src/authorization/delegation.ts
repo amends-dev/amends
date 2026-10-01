@@ -95,7 +95,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   const authorization = yield* Authorization.Service;
   const permissionCatalog = yield* PermissionCatalog.Service;
   const { workspaceId } = yield* Store.Service;
-  const owner = Effect.fn("Delegation.owner")(function* () {
+  const readOwnerId = Effect.fn("Delegation.readOwnerId")(function* () {
     const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
     return found.value.ownerMemberId;
@@ -137,7 +137,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     const role = yield* loadRole(roleId);
     if (
       roleId === BuiltinRoles.AdministratorId &&
-      (yield* Actor.Service).memberId !== (yield* owner())
+      (yield* Actor.Service).memberId !== (yield* readOwnerId())
     )
       return yield* new Denied({ reason: "administrator-role" });
     return role;
@@ -150,7 +150,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     const recipient: Recipient = {
       workspaceId,
       memberId,
-      ownerId: yield* owner(),
+      ownerId: yield* readOwnerId(),
       actorId: (yield* Actor.Service).memberId,
       selfRemoval,
     };

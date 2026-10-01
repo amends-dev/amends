@@ -70,12 +70,14 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     _tag: "Workspace",
     workspaceId,
   });
-  const loadMember = Effect.fn("OwnershipService.loadMember")(function* (memberId: Member.Id) {
+  const requireMember = Effect.fn("OwnershipService.requireMember")(function* (
+    memberId: Member.Id,
+  ) {
     const found = yield* memberStore.get(memberId);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
     return found.value;
   });
-  const current = Effect.gen(function* () {
+  const readCurrentOwnership = Effect.gen(function* () {
     const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
     const owner = yield* memberStore.get(found.value.ownerMemberId);
@@ -86,7 +88,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   });
   const get = Effect.gen(function* () {
     yield* authorization.require([]);
-    const state = yield* current;
+    const state = yield* readCurrentOwnership;
     const actor = yield* Actor.Service;
     const canTransfer =
       actor.memberId === state.owner.id &&
@@ -130,7 +132,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     function* (input: Ownership.TransferInput) {
       yield* authorization.require([requirement]);
       const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
-      const state = yield* current;
+      const state = yield* readCurrentOwnership;
       const actor = yield* Actor.Service;
       if (actor.memberId !== state.owner.id || actor.identity._tag !== "Human")
         return yield* new NotOwner({ workspaceId });
@@ -138,7 +140,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
         return yield* new Changed({ workspaceId });
       if (request.memberId === state.owner.id)
         return yield* new InvalidRecipient({ memberId: request.memberId, reason: "same-owner" });
-      const recipient = yield* loadMember(request.memberId);
+      const recipient = yield* requireMember(request.memberId);
       if (recipient.status !== "active")
         return yield* new InvalidRecipient({ memberId: recipient.id, reason: "removed" });
       if (recipient.identity._tag !== "Human")
@@ -172,7 +174,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
         previousOwnerMemberId: state.owner.id,
         ownerMemberId: recipient.id,
       });
-      return (yield* current).workspace;
+      return (yield* readCurrentOwnership).workspace;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

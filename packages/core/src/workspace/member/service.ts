@@ -107,7 +107,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
-  const load = Effect.fnUntraced(function* (id: Member.Id) {
+  const requireMember = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* memberStore.get(id);
     if (Option.isNone(found)) return yield* new NotFound({ workspaceId, memberId: id });
     return found.value;
@@ -121,7 +121,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
         Target.Reference.cases.Member.make({ workspaceId, memberId: id }),
       ),
     ]);
-    return yield* load(id);
+    return yield* requireMember(id);
   });
 
   const list = Effect.gen(function* () {
@@ -148,7 +148,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
           Target.Reference.cases.Member.make({ workspaceId, memberId: id }),
         ),
       ]);
-      const member = yield* load(id);
+      const member = yield* requireMember(id);
       const found = yield* workspaceStore.get;
       if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
       if (found.value.ownerMemberId === id)
@@ -196,7 +196,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
     function* (input: Member.Name) {
       const name = yield* Schema.decodeEffect(Member.NewName)(input);
       yield* authorization.require([]);
-      const member = yield* load((yield* Actor.Service).memberId);
+      const member = yield* requireMember((yield* Actor.Service).memberId);
       if (member.name === name) return member;
       yield* journal.publish(MemberFacts.Renamed, { workspaceId, memberId: member.id, name });
       return Object.assign({}, member, { name }) satisfies Member.Record;

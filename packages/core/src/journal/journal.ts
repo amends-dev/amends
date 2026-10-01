@@ -142,9 +142,9 @@ export const make = Effect.fn("Journal.make")(function* <
         runners.filter((runner) => runner.subscribes(fact.name)),
       );
   const registeredVersions = runners.map(({ key }) => ({ name: key.name, version: key.version }));
-  const registered = (live: Checkpoint.LiveVersion) =>
+  const isRegistered = (live: Checkpoint.LiveVersion) =>
     runners.some((runner) => Projection.isVersion(runner.key)(live));
-  const keyOf = (live: Checkpoint.LiveVersion): Checkpoint.Key => ({
+  const toCheckpointKey = (live: Checkpoint.LiveVersion): Checkpoint.Key => ({
     logId: journalLog.id,
     name: live.name,
     version: live.version,
@@ -161,12 +161,12 @@ export const make = Effect.fn("Journal.make")(function* <
     if (checked.has(storeTransaction)) return;
     const live = yield* checkpoint.listLive(journalLog.id);
     const behind = runners.find((runner) => !live.some(Projection.isVersion(runner.key)));
-    const unknown = live.find((version) => !registered(version));
+    const unknown = live.find((version) => !isRegistered(version));
     if (behind !== undefined || unknown !== undefined) {
       if ((yield* journalLog.read({ limit: 1 })).length > 0) {
         if (behind !== undefined) return yield* new Projection.Behind({ key: behind.key });
         if (unknown !== undefined)
-          return yield* new Projection.Unregistered({ key: keyOf(unknown) });
+          return yield* new Projection.Unregistered({ key: toCheckpointKey(unknown) });
       }
       yield* checkpoint.setLive(journalLog.id, registeredVersions);
     }
@@ -284,22 +284,22 @@ export const make = Effect.fn("Journal.make")(function* <
   const replay = Effect.gen(function* () {
     const live = yield* checkpoint.listLive(journalLog.id);
     const pending = runners.filter((runner) => !live.some(Projection.isVersion(runner.key)));
-    if (pending.length === 0 && live.every(registered)) return;
+    if (pending.length === 0 && live.every(isRegistered)) return;
     // An empty log waits for its first commit, which makes the registered projections live;
     // booting a workspace that was never created must leave nothing behind.
     if ((yield* journalLog.read({ limit: 1 })).length === 0) return;
     // Live versions this journal does not run would stop its commits, so they are retired first.
     // Whoever runs a retired version again rebuilds it from the last commit it applied.
-    if (!live.every(registered))
+    if (!live.every(isRegistered))
       yield* transaction.run(
         Effect.gen(function* () {
           const current = yield* checkpoint.listLive(journalLog.id);
-          if (!current.every(registered))
+          if (!current.every(isRegistered))
             yield* Projection.replaceLive(
               checkpoint,
               journalLog,
               current,
-              current.filter(registered),
+              current.filter(isRegistered),
             );
         }),
       );

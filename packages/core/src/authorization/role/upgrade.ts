@@ -21,7 +21,7 @@ export interface Target {
   readonly definitions: ReadonlyArray<Permission.Definition>;
 }
 
-const samePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) =>
+const haveSamePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<string>) =>
   left.length === right.length && left.every((name) => right.includes(name));
 
 /**
@@ -43,16 +43,16 @@ export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target
   );
   const definitions = target?.definitions ?? permissionCatalog.definitions;
   // A workspace recorded before revisions existed holds the bundles of revision zero.
-  const due = Effect.gen(function* () {
+  const checkUpgradeDue = Effect.gen(function* () {
     if (Option.isNone(yield* workspaceStore.get)) return false;
     return Option.getOrElse(yield* roleStore.builtinRevision, () => 0) < revision;
   });
-  if (!(yield* due)) return false;
+  if (!(yield* checkUpgradeDue)) return false;
   const provenance = yield* Publication.make(workspaceId, performer);
   return yield* journal.commit(
     Effect.gen(function* () {
       // Another host may have upgraded it meanwhile; writers take turns, so this check holds.
-      if (!(yield* due)) return false;
+      if (!(yield* checkUpgradeDue)) return false;
       for (const role of BuiltinRoles.make(workspaceId, definitions)) {
         const found = yield* roleStore.get(role.id);
         if (Option.isNone(found)) {
@@ -70,7 +70,7 @@ export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target
             workspaceId,
             name: role.name,
           });
-        if (!samePermissions(found.value.permissions, role.permissions))
+        if (!haveSamePermissions(found.value.permissions, role.permissions))
           yield* journal.publish(RoleFacts.PermissionsChanged, {
             roleId: role.id,
             workspaceId,

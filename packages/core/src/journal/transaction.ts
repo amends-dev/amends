@@ -72,7 +72,7 @@ class Forbidden extends Context.Service<Forbidden, string>()(
 export const withoutAppends = <A, E, R>(program: Effect.Effect<A, E, R>, reason: string) =>
   Effect.provideService(program, Forbidden, reason);
 
-const observe = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =>
+const recordFailure = <A, E, R>(program: Effect.Effect<A, E, R>, state: State) =>
   program.pipe(
     Effect.onExit((exit) =>
       Effect.sync(() => {
@@ -100,8 +100,8 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     if (Option.isSome(current)) {
       const state = current.value;
       if (!state.active) return yield* new Closed({});
-      if (state.owner !== owner) return yield* observe(Effect.fail(new Foreign({})), state);
-      return yield* observe(
+      if (state.owner !== owner) return yield* recordFailure(Effect.fail(new Foreign({})), state);
+      return yield* recordFailure(
         program.pipe(Effect.scoped, Effect.provideService(Store.Transaction, state.native)),
         state,
       );
@@ -152,7 +152,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
    * other step while one runs is a concurrency defect rather than a wait, which could deadlock a
    * child fiber on its parent's step or interleave a read with a write the store has staged.
    */
-  const exclusive = Effect.fnUntraced(function* <A, E, R>(
+  const runExclusively = Effect.fnUntraced(function* <A, E, R>(
     state: State,
     program: Effect.Effect<A, E, R>,
   ) {
@@ -162,7 +162,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     const result = yield* state.gate.withPermitsIfAvailable(1)(
       Effect.provideService(program, OperationOwner, fiberId),
     );
-    if (Option.isNone(result)) return yield* observe(Effect.die(new Concurrent({})), state);
+    if (Option.isNone(result)) return yield* recordFailure(Effect.die(new Concurrent({})), state);
     return result.value;
   });
 
@@ -176,9 +176,9 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
         const state = current.value;
         const forbidden = yield* Effect.serviceOption(Forbidden);
         if (Option.isSome(forbidden)) return yield* new WriteForbidden({ reason: forbidden.value });
-        return yield* exclusive(
+        return yield* runExclusively(
           state,
-          observe(
+          recordFailure(
             Effect.gen(function* () {
               if (!state.active) return yield* new Closed({});
               if (Option.isSome(state.failure))
@@ -197,7 +197,7 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     if (Option.isNone(current) || current.value.owner !== owner || !current.value.active)
       return yield* program;
     // A read's own failure leaves the commit as it was; only running concurrently aborts it.
-    return yield* exclusive(current.value, program);
+    return yield* runExclusively(current.value, program);
   });
 
   return Service.of({ workspaceId: store.workspaceId, run, operation, step });
