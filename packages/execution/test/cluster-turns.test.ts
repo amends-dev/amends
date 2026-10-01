@@ -86,8 +86,8 @@ it.effect("a turn that can't be marked failed keeps trying until it is, without 
       yield* dispatch;
       yield* TestClock.adjust("2 hours");
     }).pipe(Effect.provide(layer));
-    expect(runs).toHaveLength(ClusterTurns.attempts);
-    // After 256 seconds, then five minutes, as a run's backoff reaches.
-    expect(abandons).toEqual([254, 510, 810]);
+    expect(runs).toHaveLength(ClusterTurns.maxFailedRuns);
+    // At once when the runs give out, then after two and four seconds, as any retry waits.
+    expect(abandons).toEqual([254, 256, 260]);
   }),
 );

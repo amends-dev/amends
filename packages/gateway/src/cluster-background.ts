@@ -23,6 +23,7 @@ import {
 } from "effect";
 import { ClusterCron, ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
+import { ClusterRetry } from "./cluster-retry.ts";
 import { Gateway } from "./gateway.ts";
 import { WorkspaceWakes } from "./wakes.ts";
 
@@ -66,10 +67,6 @@ export const WorkspaceProcess = Entity.make("amends/WorkspaceProcess", [
 export const entityId = (workspaceId: Workspace.Id, process: BackgroundProcess.Name) =>
   JSON.stringify([workspaceId, process]);
 
-/** How long a process waits after failed runs before it runs again: doubling, up to five minutes. */
-export const backoff = (attempt: number) =>
-  Duration.seconds(Math.min(300, 2 ** Math.min(attempt, 9)));
-
 /** An unknown process is dropped after this many failed runs, as when its host no longer runs it. */
 export const unknownAttempts = 10;
 
@@ -86,7 +83,7 @@ export const layerWakes = Layer.effect(
   WorkspaceWakes.Service,
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
-    const clientFor = yield* WorkspaceProcess.client;
+    const processClient = yield* WorkspaceProcess.client;
     return WorkspaceWakes.Service.of({
       forWorkspace: (workspaceId) =>
         BackgroundWakes.Service.of({
@@ -97,7 +94,7 @@ export const layerWakes = Layer.effect(
               options.at === undefined
                 ? `commit:${storeTransaction.id}`
                 : `commit:${storeTransaction.id}@${DateTime.toEpochMillis(at)}`;
-            yield* clientFor(entityId(workspaceId, process))
+            yield* processClient(entityId(workspaceId, process))
               .Wake(new Wake({ workspaceId, process, key, at, attempt: 0 }), { discard: true })
               .pipe(Effect.mapError((cause) => new Store.Failure({ operation: "wake", cause })));
             yield* storeTransaction.afterCommit(sharding.pollStorage);
@@ -117,22 +114,21 @@ export const layerWakes = Layer.effect(
 export const layerWorker = WorkspaceProcess.toLayer(
   Effect.gen(function* () {
     const gateway = yield* Gateway.Service;
-    const clientFor = yield* WorkspaceProcess.client;
+    const processClient = yield* WorkspaceProcess.client;
     const crypto = yield* Crypto.Crypto;
-    const schedule = Effect.fnUntraced(function* (
+    /** Ask for the woken process to run again at `at`, under `key`, after `attempt` failed runs. */
+    const requestWake = Effect.fnUntraced(function* (
       wake: Wake,
-      at: DateTime.Utc,
-      key: string,
-      attempt: number,
+      next: { readonly at: DateTime.Utc; readonly key: string; readonly attempt: number },
     ) {
-      yield* clientFor(entityId(wake.workspaceId, wake.process))
-        .Wake(
-          new Wake({ workspaceId: wake.workspaceId, process: wake.process, key, at, attempt }),
-          { discard: true },
-        )
+      yield* processClient(entityId(wake.workspaceId, wake.process))
+        .Wake(new Wake({ workspaceId: wake.workspaceId, process: wake.process, ...next }), {
+          discard: true,
+        })
         .pipe(Effect.orDie);
     });
-    const unique = (prefix: string) =>
+    /** A key no other wake has: `prefix` and a random ID. */
+    const freshKey = (prefix: string) =>
       Effect.map(Effect.orDie(crypto.randomUUIDv4), (id) => `${prefix}:${id}`);
     return WorkspaceProcess.of({
       Wake: ({ payload: wake }) =>
@@ -141,7 +137,8 @@ export const layerWorker = WorkspaceProcess.toLayer(
           const now = yield* DateTime.now;
           if (Exit.isSuccess(exit)) {
             const outcome = exit.value;
-            if (outcome._tag === "Continue") yield* schedule(wake, now, yield* unique("more"), 0);
+            if (outcome._tag === "Continue")
+              yield* requestWake(wake, { at: now, key: yield* freshKey("more"), attempt: 0 });
             if (outcome._tag === "At") {
               // Runs that ask for the same later time share one wake. A time this wake or the clock
               // has reached may already have had its wake, which the key would repeat, so it
@@ -149,8 +146,8 @@ export const layerWorker = WorkspaceProcess.toLayer(
               const reached = DateTime.max(wake.at, now);
               const key = DateTime.isGreaterThan(outcome.at, reached)
                 ? `due:${DateTime.toEpochMillis(outcome.at)}`
-                : yield* unique("due");
-              yield* schedule(wake, outcome.at, key, 0);
+                : yield* freshKey("due");
+              yield* requestWake(wake, { at: outcome.at, key, attempt: 0 });
             }
             return;
           }
@@ -175,12 +172,11 @@ export const layerWorker = WorkspaceProcess.toLayer(
             attempt,
             cause: exit.cause,
           });
-          yield* schedule(
-            wake,
-            DateTime.addDuration(now, backoff(attempt)),
-            yield* unique("retry"),
+          yield* requestWake(wake, {
+            at: DateTime.addDuration(now, ClusterRetry.delay(attempt)),
+            key: yield* freshKey("retry"),
             attempt,
-          );
+          });
         }),
     });
   }),
@@ -190,8 +186,8 @@ export const layerWorker = WorkspaceProcess.toLayer(
 /** Stored wakes and the worker that runs them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerWakes);
 
-/** The job that prunes handled wakes. */
-export const pruning = "amends/prune-wakes";
+/** The name of the job that prunes handled wakes. */
+export const pruningJobName = "amends/prune-wakes";
 
 /**
  * Remove the handled messages of these entity types stored before `before`, with anything
@@ -218,11 +214,14 @@ export const layerPruning = <E, R>(options: {
   const keep = Duration.fromInputUnsafe(options.keep ?? "7 days");
   const entityTypes = [WorkspaceProcess.type, ...(options.entityTypes ?? [])];
   return ClusterCron.make({
-    name: pruning,
+    name: pruningJobName,
     cron: Cron.parseUnsafe("0 * * * *"),
     execute: Effect.gen(function* () {
       const before = DateTime.subtractDuration(yield* DateTime.now, keep);
-      const removed = yield* options.prune([...entityTypes, `ClusterCron/${pruning}`], before);
+      const removed = yield* options.prune(
+        [...entityTypes, `ClusterCron/${pruningJobName}`],
+        before,
+      );
       if (removed > 0) yield* Effect.logInfo("Pruned handled background wakes", { removed });
     }),
   });

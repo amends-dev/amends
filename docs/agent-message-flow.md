@@ -196,7 +196,7 @@ followed over its own stream.
 | Wake stored, nothing running | It stays unhandled in Cluster's storage until a runner owns the shard and reads it.                                                                                  |
 | `turn.accept` run fails      | The worker asks for another run after a backoff that doubles from two seconds to five minutes. An unknown process is dropped after ten failed runs.                  |
 | Commit B fails               | No turn, notifications still pending, no `Run`; the next run accepts them.                                                                                           |
-| A turn's run fails           | The worker stores another `Run` after the same backoff; after eight failed runs it fails the turn (`abandon`), asking again with backoff until that is recorded.     |
+| A turn's run fails           | The worker stores another `Run` after the same delay; after eight failed runs it stores an `Abandon`, which fails the turn, asking again until that is recorded.     |
 | A turn's run is cut short    | Cluster redelivers it; the runner continues from the log. Interruptions worth retrying count against `retries` (three) in the log, so a restart does not reset them. |
 | Model silent, context full   | The runner records the interruption, and retries or checkpoints; see [execution](../packages/execution/README.md#running-a-turn).                                    |
 
@@ -235,10 +235,10 @@ model adds its own time to step 4.
 |                  | `amends/WorkspaceProcess` (`ClusterBackground`, in gateway)      | `amends/Turn` (`ClusterTurns`, in execution)                                 |
 | ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | One entity per   | Workspace and process                                            | Workspace and turn                                                           |
-| Message          | `Wake`, keyed `commit:<id>` (and the time, for a later wake)     | `Run`, keyed `created`, or `retry:<n>`                                       |
+| Messages         | `Wake`, keyed `commit:<id>` (and the time, for a later wake)     | `Run`, keyed `created` or `retry:<n>`; `Abandon`, keyed `abandon:<n>`        |
 | Runs             | A sweep: never two at once per workspace and process             | A turn: turns in parallel, each once at a time                               |
 | After a run      | Schedules the next from `Idle`, `Continue`, or `At`              | Nothing, unless the run failed                                               |
-| A run that fails | Retries without limit, with backoff                              | Retries eight times, then fails the turn, retrying that until it is recorded |
+| A run that fails | Retries without limit, after `ClusterRetry.delay`                | Retries eight times, then asks to `Abandon` the turn, until that is recorded |
 | Lives in         | Gateway, beside the `WorkspaceWakes` host contract it implements | Execution, since it needs `TurnRunner`, which gateway cannot depend on       |
 
 ## Where to change things
@@ -251,7 +251,7 @@ model adds its own time to step 4.
 | Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                            |
 | How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                   |
 | How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                                 |
-| Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                          |
+| Retry, delay, pruning of wakes and requests   | `ClusterBackground`, `ClusterTurns`, `ClusterRetry`                                                          |
 | What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                        |
 
 To find what reacts to a fact, find references to its constant, such as `ThreadActivityFacts.Recorded`:

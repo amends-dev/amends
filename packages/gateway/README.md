@@ -179,8 +179,9 @@ resumes after a restart.
   (`Sharding.pollStorage`) once the commit is done. A wake for a workspace another process runs
   still waits for that process's next read, unless sockets carry it.
 - `layerWorker` registers the entity. When a wake arrives it calls `runBackground`, then asks
-  for the next run: at once after `Continue`, at the due time after `At`, and after a backoff
-  that doubles from two seconds up to five minutes after a failure. Runs that ask for the same
+  for the next run: at once after `Continue`, at the due time after `At`, and after a failure
+  once `ClusterRetry.delay` has passed, which doubles from two seconds up to five minutes and
+  which turns' retries share. Runs that ask for the same
   later time share one wake, keyed by that time; a time the waking wake or the clock has
   already reached takes a fresh key, since its wake may have run and a repeated key would be
   dropped. Wakes are not coalesced: each commit's wake runs the process once, and a run that

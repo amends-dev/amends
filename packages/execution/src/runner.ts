@@ -195,8 +195,11 @@ const words = (problem: HarnessErrors.Problem, named: Named, idle: string): stri
  */
 const summaryPass = 200_000;
 
-/** How long a turn waits before running again after its `attempt`th failure: 2, 4, then 8 seconds. */
-const backoff = (attempt: number) => Duration.seconds(2 ** Math.min(attempt, 6));
+/**
+ * How long a turn waits before running again after its `attempt`th interruption: 2, 4, then 8
+ * seconds. Apart from Cluster's retry of a run that failed, which `ClusterTurns` asks for.
+ */
+const interruptionDelay = (attempt: number) => Duration.seconds(2 ** Math.min(attempt, 6));
 
 /** @category constructors */
 export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
@@ -568,7 +571,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const waits = rest ?? plan.diedLast;
       rest = false;
       if (waits) {
-        yield* Effect.sleep(backoff(plan.attempts));
+        yield* Effect.sleep(interruptionDelay(plan.attempts));
         continue;
       }
       // A checkpoint the history needs comes first; either stops the same way when interrupted.

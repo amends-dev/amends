@@ -92,8 +92,8 @@ turn that runs could not finish.
 
 ## Turns on Effect Cluster
 
-Each turn is an entity, `amends/Turn`, keyed by workspace and turn, whose persisted `Run` asks it
-to run. Cluster keeps an entity on one runner at a time, so a turn runs once at a time while
+Each turn is an entity, `amends/Turn`, keyed by workspace and turn, whose persisted requests ask
+it to run (`Run`) or to give up (`Abandon`). Cluster keeps an entity on one runner at a time, so a turn runs once at a time while
 different turns run side by side, and redelivers a run cut short, so a turn continues after a
 restart.
 
@@ -103,12 +103,15 @@ restart.
   transaction when Cluster's message storage uses the workspace storage's SQL client, and the
   runner reads storage again once the commit is done, as with
   [background wakes](../gateway/README.md#background-work-on-effect-cluster).
-- `layerWorker` registers the entity over a `TurnRunner.Service`. A run that fails before its
-  turn finishes, such as when storage fails, asks to run again after a backoff that doubles from
-  two seconds up to five minutes. After eight failed runs the worker abandons the turn; while
-  recording that fails too, as when storage stays down, it asks again after the same backoff
-  without running the turn, so a turn is never left active with nothing to run it. A turn whose
-  workspace was never created is dropped. Failures are logged.
+- `layerWorker` registers the entity over a `TurnRunner.Service`. A `Run` that fails before its
+  turn finishes, such as when storage fails, asks for another `Run` (keyed `retry:<n>`) after
+  `ClusterRetry.delay`, which doubles from two seconds up to five minutes. After
+  `maxFailedRuns` (eight) failed runs it asks for an `Abandon` instead, at once, which records the
+  turn as failed through `TurnRunner.abandon`. An `Abandon` that fails too, as when storage stays
+  down, asks for another (keyed `abandon:<n>`) after the same delay, without running the turn, so
+  a turn is never left active with nothing to run it. A turn whose workspace was never created
+  is dropped. Failures are logged. These retries are apart from the runner's own, which runs a
+  turn again in the same `Run` after an interruption worth retrying.
 - `layer` provides both. Every runner over the same storage runs the worker.
 
 Handled runs are pruned with background wakes when the host passes `TurnEntity.type` to
