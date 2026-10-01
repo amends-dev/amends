@@ -114,9 +114,9 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
   );
   const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
   return NotificationApplication.layer.pipe(
-    Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provide(host))),
+    Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provideMerge(host))),
     Layer.provide(notifications),
-    Layer.provide(Layer.succeed(NotificationSource.Service, { workspaceId, resolve: unexpected })),
+    Layer.provide(Layer.succeed(NotificationSource.Service, { resolve: unexpected })),
     Layer.provide(TestSignals.layer(workspaceId)),
     Layer.provide(
       Layer.succeed(
@@ -149,6 +149,7 @@ it.effect(
         | Authorization.Service
         | NotificationSource.Service
         | Signals.Service
+        | Store.Service
       >();
       expectTypeOf<
         Effect.Services<ReturnType<NotificationApplication.Interface["get"]>>
@@ -160,7 +161,6 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const notifications = yield* NotificationApplication.Service;
-          expect(notifications.workspaceId).toBe(workspaceId);
           expect(yield* notifications.get(mine.id)).toEqual(mine);
           expect(yield* notifications.list(page)).toEqual([mine]);
           expect(yield* notifications.listPending(page)).toEqual([mine]);

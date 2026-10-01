@@ -9,10 +9,12 @@ import { Identity } from "../../src/identity/identity.ts";
 import { SignalApplication } from "../../src/signal/application.ts";
 import { Signal } from "../../src/signal/signal.ts";
 import { Signals } from "../../src/signal/signals.ts";
+import { Store } from "../../src/journal/store.ts";
 import { ThreadAccess } from "../../src/thread/access.ts";
 import { Thread } from "../../src/thread/thread.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
+import { make } from "../memory-store.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const groupId = Group.Id.make("group");
@@ -41,14 +43,12 @@ const run = <A, E>(
     const published: Array<Signal.Value> = [];
     const requirements: Array<Requirement.Value> = [];
     const access = ThreadAccess.Service.of({
-      workspaceId,
       require: (threadId) =>
         readable.has(threadId)
           ? Effect.succeed(thread(threadId))
           : Effect.fail(new ThreadAccess.NotFound({ threadId })),
     });
     const authorization = Authorization.Service.of({
-      workspaceId,
       require: (needed) =>
         Effect.suspend(() => {
           requirements.push(...needed);
@@ -76,6 +76,7 @@ const run = <A, E>(
               Layer.succeed(ThreadAccess.Service, access),
               Layer.succeed(Authorization.Service, authorization),
               Layer.succeed(Signals.Service, signals),
+              Layer.succeed(Store.Service, (yield* make(workspaceId)).store),
             ),
           ),
         ),

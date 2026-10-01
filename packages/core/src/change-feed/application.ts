@@ -10,7 +10,8 @@ import { GroupMembershipStore } from "../group/membership/store.ts";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { Audience } from "../journal/audience.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+import { Store } from "../journal/store.ts";
+
 import { Member } from "../workspace/member/member.ts";
 import { ChangeFeed } from "./change-feed.ts";
 import type { ChangeFeedEvents } from "./events.ts";
@@ -19,7 +20,6 @@ import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
 
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Register, then check active membership and load the reader's access, before returning
    * Ready. The caller owns the subscription scope. A reader sees an event when they hold a
@@ -86,7 +86,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const resolver = yield* GrantResolver.Service;
   const memberships = yield* GroupMembershipStore.Service;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const load = Effect.fnUntraced(function* (actor: Actor.Value) {
     const admissions = yield* memberships.listActiveByMember(actor.memberId);
@@ -165,7 +165,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
       Stream.concat(Stream.merge(updates, happening, { haltStrategy: "left" })),
     );
   });
-  return Service.of({ workspaceId, watch });
+  return Service.of({ watch });
 });
 
 /** Provide the workspace change-feed application. @category layers */

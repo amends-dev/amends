@@ -3,6 +3,7 @@ import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
 import type { Thread } from "../thread/thread.ts";
 import { ReadStateStore } from "./store.ts";
+import { Store } from "../journal/store.ts";
 
 export type Error =
   | NotificationStore.Failure
@@ -12,7 +13,6 @@ export type Error =
 /** The human whose reading this is, as their notifications address them. */
 export type Reader = Extract<Notification.Recipient, { readonly _tag: "Human" }>;
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /** The reader's pending notifications from a thread's activity up to a position. */
   readonly pending: (
     reader: Reader,
@@ -39,7 +39,7 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ThreadReading.make")(function* () {
   const notifications = yield* NotificationStore.Service;
   const readStates = yield* ReadStateStore.Service;
-  const workspaceId = notifications.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const pending = Effect.fn("ThreadReading.pending")(
     (reader: Reader, thread: Thread.Record, throughSequence: number) =>
       notifications.listPendingByThread(reader, thread.id, throughSequence),
@@ -62,7 +62,7 @@ export const make = Effect.fn("ThreadReading.make")(function* () {
       readThrough: throughSequence,
     });
   });
-  return Service.of({ workspaceId, pending, markRead });
+  return Service.of({ pending, markRead });
 });
 /** Internal service: callers own authorization and the commit. @category layers */
 export const layer = Layer.effect(Service, make());

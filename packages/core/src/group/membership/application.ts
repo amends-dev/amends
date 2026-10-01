@@ -8,7 +8,8 @@ import { Journal } from "../../journal/journal.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Publication } from "../../journal/publication.ts";
-import { WorkspaceId } from "../../workspace/id.ts";
+import { Store } from "../../journal/store.ts";
+
 import { Member } from "../../workspace/member/member.ts";
 import { MemberStore } from "../../workspace/member/store.ts";
 import { Group } from "../group.ts";
@@ -69,7 +70,6 @@ export type ReadError =
   | GroupNotFound;
 
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Require group.membership.manage on this group and membership of it, validate its active
    * workspace member, and publish a fresh admission in one commit. An active admission is
@@ -130,6 +130,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   | GroupAudience.Service
   | Journal.Service
   | Crypto.Crypto
+  | Store.Service
 > {
   const authorization = yield* Authorization.Service;
   const groups = yield* GroupStore.Service;
@@ -139,7 +140,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   const audience = yield* GroupAudience.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   /** Management needs the grant and membership of the group; to anyone outside it, it is missing. */
   const requireManagement = Effect.fnUntraced(function* (groupId: Group.Id) {
@@ -345,7 +346,6 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     return yield* current(id, options);
   });
   return Service.of({
-    workspaceId,
     add,
     join,
     remove,

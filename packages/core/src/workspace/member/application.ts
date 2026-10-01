@@ -12,6 +12,7 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 
 import { InvitationFacts } from "../invitation/facts.ts";
 import { InvitationStore } from "../invitation/store.ts";
@@ -20,7 +21,7 @@ import { MemberPermissions } from "./permissions.ts";
 import { MemberStore } from "./store.ts";
 import { Member } from "./member.ts";
 import { WorkspaceStore } from "../store.ts";
-import { Workspace } from "../workspace.ts";
+
 import { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
 export { AlreadyRemoved, NotFound, OwnerProtected } from "./errors.ts";
 
@@ -41,7 +42,6 @@ export type RemoveError =
   | AlreadyRemoved;
 
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
   /**
    * Read an active or removed membership after requiring member.read on it.
    * Authorization and lookup read current state without opening a transaction.
@@ -94,6 +94,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | Delegation.Service
   | Journal.Service
   | Crypto.Crypto
+  | Store.Service
 > {
   const members = yield* MemberStore.Service;
   const workspace = yield* WorkspaceStore.Service;
@@ -104,7 +105,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const load = Effect.fnUntraced(function* (id: Member.Id) {
     const found = yield* members.get(id);
@@ -205,7 +206,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
     journal.commit,
   );
 
-  return Service.of({ workspaceId, get, list, remove, rename });
+  return Service.of({ get, list, remove, rename });
 });
 
 /**

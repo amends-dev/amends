@@ -1,7 +1,7 @@
 import { Clock, Context, Duration, Effect, Layer, Schedule, Stream } from "effect";
 import type { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { TurnId } from "./id.ts";
 
 /** A part of a response a turn is writing, as its drafts told it from the start. */
@@ -12,7 +12,6 @@ export interface Draft {
 }
 
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * What each part of the turn's responses held so far, as this process heard it from the start.
    * A part this process missed some of is left out.
@@ -87,7 +86,7 @@ export const make = Effect.gen(function* () {
           : [{ responseId: held.responseId, part: held.part, text: held.text }],
       ),
     );
-  return Service.of({ workspaceId: signals.workspaceId, current });
+  return Service.of({ current });
 });
 
 /** Internal service for following turns' logs. @category layers */

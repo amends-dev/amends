@@ -157,7 +157,6 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     };
   };
   const execution: TurnExecution.Interface = {
-    workspaceId,
     get: () => Effect.sync(() => state.turn),
     prepare: () =>
       Effect.sync((): TurnExecution.Preparation => {

@@ -2,10 +2,10 @@ import { Context, Effect, Layer } from "effect";
 import type { DateTime } from "effect";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
-import { Store } from "../../journal/store.ts";
 import type { Thread } from "../thread.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { ThreadActivityPublisher } from "../activity/publisher.ts";
 import { ThreadParticipationActivity } from "./activity.ts";
 import { ThreadParticipation } from "./participation.ts";
@@ -13,7 +13,6 @@ import { ThreadParticipationFacts } from "./facts.ts";
 
 export type Error = ThreadActivityPublisher.Error | Log.WriteError | Projection.Error;
 export interface Interface {
-  readonly workspaceId: ThreadParticipation.Record["workspaceId"];
   /**
    * End one active participation because its member unfollowed the thread, with a quiet ending
    * in its timeline. Leaving or being removed from the group ends participations with the
@@ -32,7 +31,7 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () {
   const publisher = yield* ThreadActivityPublisher.Service;
   const journal = yield* Journal.Service;
-  const workspaceId = publisher.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const end = Effect.fn("ThreadParticipationDeparture.end")(function* (
     participant: ThreadParticipation.Record,
     thread: Thread.Record,
@@ -64,7 +63,7 @@ export const make = Effect.fn("ThreadParticipationDeparture.make")(function* () 
         ),
     });
   });
-  return Service.of({ workspaceId, end });
+  return Service.of({ end });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadParticipationDeparture from "./departure.ts";

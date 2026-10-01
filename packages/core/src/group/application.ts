@@ -9,6 +9,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { Group } from "./group.ts";
 import { GroupAudience } from "./audience.ts";
@@ -56,7 +57,6 @@ export type ReadError =
   | NotFound;
 
 export interface Interface {
-  readonly workspaceId: Group.Record["workspaceId"];
   /**
    * Require group.create in this workspace, then create a private team and its explicit
    * initial admissions in one commit. No extra membership-management grant is required
@@ -113,7 +113,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   const notifications = yield* NotificationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const create = Requirement.make(
     GroupPermissions.Create,
     Target.Reference.cases.Workspace.make({ workspaceId }),
@@ -366,7 +366,6 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
   });
 
   return Service.of({
-    workspaceId,
     createTeam,
     rename,
     get,

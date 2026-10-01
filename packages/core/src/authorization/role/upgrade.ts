@@ -2,6 +2,7 @@ import { Effect, Option } from "effect";
 import { Performer } from "../../identity/performer.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
+import { Store } from "../../journal/store.ts";
 import { WorkspaceStore } from "../../workspace/store.ts";
 import { PermissionCatalog } from "../permission-catalog.ts";
 import type { Permission } from "../permission.ts";
@@ -36,7 +37,7 @@ export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target
   const workspaces = yield* WorkspaceStore.Service;
   const journal = yield* Journal.Service;
   const catalog = yield* PermissionCatalog.Service;
-  const workspaceId = roles.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const revision = yield* BuiltinRoles.Revision.makeEffect(
     target?.revision ?? BuiltinRoles.revision,
   );

@@ -8,7 +8,7 @@ import { ThreadAccess } from "../thread/access.ts";
 
 import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
-import { WorkspaceId } from "../workspace/id.ts";
+
 import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
 import { Signal } from "../signal/signal.ts";
@@ -16,6 +16,7 @@ import { Signals } from "../signal/signals.ts";
 import { ThreadReading } from "./reading.ts";
 import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 import { Notification } from "../notification/notification.ts";
+import { Store } from "../journal/store.ts";
 export { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 
 export type Error =
@@ -32,7 +33,6 @@ export type Error =
   | GroupNotFound
   | BeyondTimeline;
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Record that the acting person has read a thread through a timeline position, under the
    * thread's current access and `thread.read`. The position only moves forward. Their pending
@@ -60,7 +60,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const reading = yield* ThreadReading.Service;
   const readStates = yield* ReadStateStore.Service;
   const signals = yield* Signals.Service;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const human = Effect.fnUntraced(function* () {
     const actor = yield* Actor.Service;
@@ -150,7 +150,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     );
   });
 
-  return Service.of({ workspaceId, markThreadRead, markGroupRead });
+  return Service.of({ markThreadRead, markGroupRead });
 });
 /** @category layers */
 export const layer = Layer.effect(Service, make());

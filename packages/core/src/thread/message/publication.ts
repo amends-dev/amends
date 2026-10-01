@@ -2,10 +2,10 @@ import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Member } from "../../workspace/member/member.ts";
 import { Journal } from "../../journal/journal.ts";
-import { Store } from "../../journal/store.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { ThreadId } from "../id.ts";
 import { ThreadStore } from "../store.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
@@ -43,7 +43,6 @@ export type Error =
   | Log.WriteError
   | Projection.Error;
 export interface Interface {
-  readonly workspaceId: ThreadMessage.Record["workspaceId"];
   /**
    * Internal publication. The caller authorizes the workflow, its author, and the selected
    * participants; rules such as requiring a human author belong to that caller.
@@ -64,7 +63,7 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
   const threads = yield* ThreadStore.Service;
   const publisher = yield* ThreadActivityPublisher.Service;
   const journal = yield* Journal.Service;
-  const workspaceId = threads.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const publish = Effect.fn("ThreadMessagePublication.publish")(function* (input: Input) {
     yield* Store.Transaction;
     // Recipients come from the selected participants, so an unselected mention would go unheard.
@@ -140,7 +139,7 @@ export const make = Effect.fn("ThreadMessagePublication.make")(function* () {
     );
     return { message: published.value, activity };
   });
-  return Service.of({ workspaceId, publish });
+  return Service.of({ publish });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadMessagePublication from "./publication.ts";

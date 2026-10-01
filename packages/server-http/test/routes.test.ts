@@ -87,7 +87,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     GroupApplication.Service,
     GroupApplication.Service.of({
-      workspaceId,
       createTeam: record("group.create", () => Effect.succeed(team)),
       rename: record("group.rename", () => Effect.succeed(team)),
       get: record("group.get", (id) => Effect.fail(new GroupApplication.NotFound({ groupId: id }))),
@@ -98,7 +97,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     GroupMembershipApplication.Service,
     GroupMembershipApplication.Service.of({
-      workspaceId,
       add: record("group.add", (input) =>
         Effect.fail(new GroupMembershipApplication.AlreadyMember(input)),
       ),
@@ -117,7 +115,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     GroupFollowApplication.Service,
     GroupFollowApplication.Service.of({
-      workspaceId,
       follow: record("group.follow", () => Effect.void),
       unfollow: record("group.unfollow", (input) =>
         Effect.fail(new GroupFollowApplication.NotFollowable({ groupId: input.groupId })),
@@ -127,7 +124,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     ThreadApplication.Service,
     ThreadApplication.Service.of({
-      workspaceId,
       startInGroup: record("thread.start", () =>
         Effect.fail(new ThreadApplication.ParticipantUnavailable({ memberId })),
       ),
@@ -146,7 +142,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     ThreadMessageApplication.Service,
     ThreadMessageApplication.Service.of({
-      workspaceId,
       publish: record("thread.publish", () =>
         Effect.fail(new ThreadMessageApplication.HumanAuthorRequired({ memberId })),
       ),
@@ -155,7 +150,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     ThreadParticipationApplication.Service,
     ThreadParticipationApplication.Service.of({
-      workspaceId,
       follow: record("thread.follow", (id) =>
         Effect.fail(new ThreadParticipationApplication.ThreadNotFound({ threadId: id })),
       ),
@@ -167,7 +161,6 @@ const conversations = Layer.mergeAll(
   Layer.succeed(
     ReadStateApplication.Service,
     ReadStateApplication.Service.of({
-      workspaceId,
       markThreadRead: record("thread.markRead", ({ threadId, throughSequence }) =>
         Effect.fail(
           new ReadStateApplication.BeyondTimeline({ threadId, throughSequence, latestSequence: 3 }),
@@ -182,7 +175,6 @@ const operations = Layer.mergeAll(
   Layer.succeed(
     NotificationApplication.Service,
     NotificationApplication.Service.of({
-      workspaceId,
       resolveSource: record("notification.resolveSource", (notificationId) =>
         Effect.fail(new NotificationApplication.SourceUnavailable({ notificationId })),
       ),
@@ -204,7 +196,6 @@ const operations = Layer.mergeAll(
   Layer.succeed(
     MemberApplication.Service,
     MemberApplication.Service.of({
-      workspaceId,
       get: record("get", (target) =>
         target === memberId
           ? Effect.succeed(member)

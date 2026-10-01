@@ -107,6 +107,7 @@ const dependencies = (fixture: Fixture, overrides: Overrides = {}) =>
       RoleStore.Service.of({ ...fixture.roles(workspaceId), ...overrides.roles }),
     ),
     Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
+    Layer.succeed(Store.Service, fixture.store),
     PermissionCatalog.layer([MemberPermissions.Read, MemberPermissions.Remove, Create]),
   );
 const configured = (fixture: Fixture, overrides: Overrides = {}) =>
@@ -146,7 +147,7 @@ const seed = (
 it.effect("authorization reads each caller's actor and uses an agent's own grants", () =>
   Effect.gen(function* () {
     expectTypeOf<Layer.Services<typeof Authorization.layer>>().toEqualTypeOf<
-      MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service
+      MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service | Store.Service
     >();
     expectTypeOf<Layer.Error<typeof Authorization.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
@@ -171,7 +172,6 @@ it.effect("authorization reads each caller's actor and uses an agent's own grant
       Effect.provide(configured(fixture)),
       Effect.provideService(Actor.Service, alice),
     );
-    expect(authorization.workspaceId).toBe(workspaceId);
     yield* fixture.store
       .transaction(authorization.require([removeBob]))
       .pipe(Effect.provideService(Actor.Service, alice));

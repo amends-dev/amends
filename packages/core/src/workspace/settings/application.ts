@@ -11,6 +11,7 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { MemberApplication } from "../member/application.ts";
 import { MemberPermissions } from "../member/permissions.ts";
 import { InvitationPermissions } from "../invitation/permissions.ts";
@@ -53,7 +54,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     members = yield* MemberApplication.Service,
     journal = yield* Journal.Service,
     crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const allowed = <A, R>(effect: Effect.Effect<A, Error, R>) =>
     effect.pipe(
       Effect.as(true),

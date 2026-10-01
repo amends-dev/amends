@@ -5,6 +5,7 @@ import { AgentPermissions } from "../../agent/permissions.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
+import { Store } from "../../journal/store.ts";
 import { ThreadAccess } from "../access.ts";
 import { ThreadParticipationAdmission } from "../participation/admission.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
@@ -28,7 +29,6 @@ export type Error =
   | HumanAuthorRequired
   | ThreadMessageStore.Failure;
 export interface Interface {
-  readonly workspaceId: ThreadMessage.Record["workspaceId"];
   /**
    * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
    * Mentioned agents need the author's agent-use authority; agents already taking part do not.
@@ -50,7 +50,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const messages = yield* ThreadMessageStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   /**
    * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
    * from its author and key, so a retry names the message its first attempt published and returns
@@ -156,7 +156,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ workspaceId, publish });
+  return Service.of({ publish });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadMessageApplication from "./application.ts";

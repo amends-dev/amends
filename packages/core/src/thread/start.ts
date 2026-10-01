@@ -5,7 +5,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
-import type { Store } from "../journal/store.ts";
+import { Store } from "../journal/store.ts";
 import { Thread } from "./thread.ts";
 import { ThreadFacts } from "./facts.ts";
 import { ThreadMessage } from "./message/message.ts";
@@ -40,7 +40,6 @@ export interface Started extends Thread.Started {
 }
 export type Error = Projection.Error | Log.WriteError | ThreadMessagePublication.Error;
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /**
    * Internal start shared by every workflow that opens a thread. It creates the thread, admits
    * its starting participants at the first sequence, and records the first activity with its
@@ -57,7 +56,7 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ThreadStart.make")(function* () {
   const journal = yield* Journal.Service;
   const publication = yield* ThreadMessagePublication.Service;
-  const workspaceId = publication.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const start = Effect.fn("ThreadStart.start")(function* (input: Input) {
     const { first, occurredAt } = input;
     const thread: Thread.Record = {
@@ -83,7 +82,7 @@ export const make = Effect.fn("ThreadStart.make")(function* () {
       .pipe(Publication.withCause(created, occurredAt));
     return { thread, message: published.message, activity: published.activity };
   });
-  return Service.of({ workspaceId, start });
+  return Service.of({ start });
 });
 /** Internal service: callers own workflow authorization. @category layers */
 export const layer = Layer.effect(Service, make());

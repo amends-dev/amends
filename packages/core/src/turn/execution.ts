@@ -26,6 +26,7 @@ import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
 import { ThreadAccess } from "../thread/access.ts";
@@ -172,7 +173,6 @@ export type Closing =
  * access before publishing for it.
  */
 export interface Interface {
-  readonly workspaceId: Turn.Record["workspaceId"];
   /** The turn as stored, for execution to watch while it runs. */
   readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.Record, Error>;
   /**
@@ -288,7 +288,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const activity = yield* TurnActivityRecorder.Service;
   const ending = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = turns.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const load = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turns.get(turnId);
@@ -858,7 +858,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   return Service.of({
-    workspaceId,
     get,
     prepare,
     start,

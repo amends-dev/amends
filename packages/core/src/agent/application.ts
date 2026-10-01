@@ -30,6 +30,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import { MemberApplication } from "../workspace/member/application.ts";
 import { MemberFacts } from "../workspace/member/facts.ts";
@@ -84,7 +85,6 @@ export interface ChoicesInput {
 }
 
 export interface Interface {
-  readonly workspaceId: Agent.Record["workspaceId"];
   /** The workspace's agents the actor may read, by name; those whose membership ended are gone. */
   readonly list: Effect.Effect<ReadonlyArray<Agent.View>, ReadError, Actor.Service>;
   readonly get: (agentId: Agent.Id) => Effect.Effect<Agent.View, ReadError, Actor.Service>;
@@ -153,7 +153,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const memberTarget = (memberId: Member.Id) =>
     Target.Reference.cases.Member.make({ workspaceId, memberId });
@@ -590,7 +590,6 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   });
 
   return Service.of({
-    workspaceId,
     list,
     get,
     create,

@@ -16,7 +16,6 @@ export type Error =
   | Schema.SchemaError
   | NotFound;
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /** Audience only. Applications check their action permission separately, inside the commit for writes. */
   readonly require: (threadId: Thread.Id) => Effect.Effect<Thread.Record, Error, Actor.Service>;
 }
@@ -27,7 +26,6 @@ export const make = Effect.fn("ThreadAccess.make")(function* () {
   const authorization = yield* Authorization.Service;
   const audience = yield* GroupAudience.Service;
   const threads = yield* ThreadStore.Service;
-  const workspaceId = authorization.workspaceId;
   const requireAccess = Effect.fn("ThreadAccess.require")(function* (threadId: Thread.Id) {
     const id = yield* Schema.decodeEffect(Thread.Id)(threadId);
     yield* authorization.require([]);
@@ -43,7 +41,7 @@ export const make = Effect.fn("ThreadAccess.make")(function* () {
       );
     return thread;
   });
-  return Service.of({ workspaceId, require: requireAccess });
+  return Service.of({ require: requireAccess });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadAccess from "./access.ts";

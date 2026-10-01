@@ -9,6 +9,7 @@ import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import type { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
@@ -50,7 +51,6 @@ export type CancelError = ChangeError | NotActive;
 export type RetryError = ChangeError | NotRetryable | MemberStore.Failure | Log.ReadError;
 
 export interface Interface {
-  readonly workspaceId: Turn.Record["workspaceId"];
   /**
    * A turn in a thread the reader may read: in its group's audience, with `thread.read` on it, as
    * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
@@ -123,7 +123,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const drafts = yield* TurnDrafts.Service;
   const commits = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = turns.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const readThread = (threadId: ThreadId.Id) =>
     Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
@@ -507,7 +507,6 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   );
 
   return Service.of({
-    workspaceId,
     get,
     listByThread,
     listActive,

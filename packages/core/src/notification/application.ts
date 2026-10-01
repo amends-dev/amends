@@ -1,7 +1,7 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Actor } from "../identity/actor.ts";
-import { WorkspaceId } from "../workspace/id.ts";
+
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationSource } from "./source.ts";
@@ -10,6 +10,7 @@ import type { Thread } from "../thread/thread.ts";
 import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
 import { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
+import { Store } from "../journal/store.ts";
 export { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
 
 export type Error = Authorization.Error | NotificationStore.Failure | Schema.SchemaError | NotFound;
@@ -35,7 +36,6 @@ export type AcknowledgeError =
  * access to its source.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (
     notificationId: Notification.Id,
   ) => Effect.Effect<Notification.Record, Error, Actor.Service>;
@@ -104,13 +104,17 @@ const seenBatch = 100;
 export const make = Effect.fn("NotificationApplication.make")(function* (): Effect.fn.Return<
   Interface,
   never,
-  NotificationStore.Service | Authorization.Service | NotificationSource.Service | Signals.Service
+  | NotificationStore.Service
+  | Authorization.Service
+  | NotificationSource.Service
+  | Signals.Service
+  | Store.Service
 > {
   const notifications = yield* NotificationStore.Service;
   const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
   const source = yield* NotificationSource.Service;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const recipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
@@ -259,7 +263,6 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     return yield* notifications.countPendingByRecipient(target);
   }).pipe(Effect.withSpan("NotificationApplication.countPending"));
   return Service.of({
-    workspaceId,
     get,
     list,
     listPending,

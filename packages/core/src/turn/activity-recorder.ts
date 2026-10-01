@@ -15,7 +15,6 @@ export type Error = ThreadActivityPublisher.Error | ThreadStore.Failure;
  * kinds, so protocols that read timelines carry none of it.
  */
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /**
    * Record a turn's change in its thread's timeline, in the caller's commit, caused by the turn
    * fact that reports it. It informs no one.
@@ -42,7 +41,6 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("TurnActivityRecorder.make")(function* () {
   const publisher = yield* ThreadActivityPublisher.Service;
   const threads = yield* ThreadStore.Service;
-  const workspaceId = publisher.workspaceId;
   const record: Interface["record"] = Effect.fnUntraced(function* (thread, kind, details, cause) {
     const found =
       typeof thread === "string" ? Option.getOrUndefined(yield* threads.get(thread)) : thread;
@@ -54,7 +52,7 @@ export const make = Effect.fn("TurnActivityRecorder.make")(function* () {
       step: () => Effect.succeed({ value: undefined, kind, details, recipients: [], cause }),
     });
   });
-  return Service.of({ workspaceId, record });
+  return Service.of({ record });
 });
 
 /** Internal service: callers own authorization and the commit. @category layers */

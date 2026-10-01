@@ -23,7 +23,6 @@ export type Error =
   | Log.ReadError
   | Unavailable;
 export interface Interface {
-  readonly workspaceId: Notification.Record["workspaceId"];
   /** Internal: the application establishes notification ownership before calling this reader. */
   readonly resolve: (
     notification: Notification.Record,
@@ -36,7 +35,6 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("NotificationSource.make")(function* () {
   const journal = yield* Journal.Service;
   const reading = yield* ThreadActivityReading.Service;
-  const workspaceId = reading.workspaceId;
   const resolve = Effect.fn("NotificationSource.resolve")(function* (
     notification: Notification.Record,
   ) {
@@ -66,7 +64,7 @@ export const make = Effect.fn("NotificationSource.make")(function* () {
       }),
     );
   });
-  return Service.of({ workspaceId, resolve });
+  return Service.of({ resolve });
 });
 /** @category layers */
 export const layer = Layer.effect(Service, make());

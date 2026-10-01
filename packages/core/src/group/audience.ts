@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Actor } from "../identity/actor.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import { GroupId } from "./id.ts";
 import { GroupMembership } from "./membership/membership.ts";
 import { GroupMembershipStore } from "./membership/store.ts";
@@ -17,7 +17,6 @@ export type Error =
   | NotMember;
 
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Require current workspace and group membership, returning the actor's active admission.
    * This grants no action permission and has no management or ownership bypass. It opens
@@ -35,7 +34,6 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("GroupAudience.make")(function* () {
   const authorization = yield* Authorization.Service;
   const memberships = yield* GroupMembershipStore.Service;
-  const workspaceId = authorization.workspaceId;
 
   const requireAudience = Effect.fn("GroupAudience.require")(function* (groupId: GroupId.Id) {
     const id = yield* Schema.decodeEffect(GroupId.Id)(groupId);
@@ -45,7 +43,7 @@ export const make = Effect.fn("GroupAudience.make")(function* () {
     if (Option.isNone(found)) return yield* new NotMember({ groupId: id });
     return found.value;
   });
-  return Service.of({ workspaceId, require: requireAudience });
+  return Service.of({ require: requireAudience });
 });
 
 /** Provide the membership policy to domain operations, without exposing it as a gateway operation. @category layers */

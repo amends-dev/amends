@@ -116,7 +116,6 @@ it.effect("the resolver reads current state without requiring a transaction", ()
     const resolver = yield* fixture.store
       .transaction(GrantResolver.make())
       .pipe(Effect.provide(dependencies(fixture)));
-    expect(resolver.workspaceId).toBe(workspaceId);
     expect(yield* resolver.resolve(memberId)).toEqual([
       Grant.make(MemberPermissions.Read, memberScope),
     ]);

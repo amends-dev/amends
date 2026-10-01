@@ -1,6 +1,6 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { Member } from "../workspace/member/member.ts";
-import { Workspace } from "../workspace/workspace.ts";
+
 import { AssignmentStore } from "./assignment/store.ts";
 
 import { Grant } from "./grant.ts";
@@ -13,7 +13,6 @@ import type { Scope } from "./scope.ts";
 export type Error = AssignmentStore.Failure | RoleStore.Failure | Schema.SchemaError;
 
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
   /**
    * Resolve active assignments from current state, using an existing transaction
    * when the caller supplies one. This does not open a transaction. Any invalid
@@ -41,7 +40,6 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   const assignments = yield* AssignmentStore.Service;
   const roles = yield* RoleStore.Service;
   const catalog = yield* PermissionCatalog.Service;
-  const workspaceId = assignments.workspaceId;
 
   /** A retired permission grants nothing, rather than failing every grant its holder has. */
   const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
@@ -75,7 +73,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
     return grants;
   });
 
-  return Service.of({ workspaceId, resolve });
+  return Service.of({ resolve });
 });
 
 /**

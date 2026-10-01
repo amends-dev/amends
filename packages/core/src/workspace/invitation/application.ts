@@ -17,6 +17,7 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { Invitation } from "./invitation.ts";
 import { InvitationFacts } from "./facts.ts";
 import { InvitationPermissions } from "./permissions.ts";
@@ -80,6 +81,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   | Delegation.Service
   | Journal.Service
   | Crypto.Crypto
+  | Store.Service
 > {
   const invitations = yield* InvitationStore.Service;
   const members = yield* MemberStore.Service;
@@ -88,7 +90,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = invitations.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const manage = Requirement.make(
     InvitationPermissions.Manage,
     Target.Reference.cases.Workspace.make({ workspaceId }),

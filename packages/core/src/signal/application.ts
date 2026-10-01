@@ -5,10 +5,11 @@ import { Actor } from "../identity/actor.ts";
 import { ThreadAccess } from "../thread/access.ts";
 import { ThreadMessagePermissions } from "../thread/message/permissions.ts";
 import { Thread } from "../thread/thread.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import { Signal } from "./signal.ts";
 import { Signals } from "./signals.ts";
 import { ThreadNotFound } from "./errors.ts";
+import { Store } from "../journal/store.ts";
 export { ThreadNotFound } from "./errors.ts";
 
 export type Error =
@@ -17,7 +18,6 @@ export type Error =
   | ThreadNotFound;
 
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Tell the thread's readers that the acting member is composing a message there, for the next
    * few seconds. Requires current group access and `thread.publish`, as posting does. Repeats
@@ -41,7 +41,7 @@ export const make = Effect.fn("SignalApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const access = yield* ThreadAccess.Service;
   const signals = yield* Signals.Service;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   /** When each member last signalled typing in each thread, in this process. */
   const lastTyping = new Map<string, number>();
 
@@ -81,7 +81,7 @@ export const make = Effect.fn("SignalApplication.make")(function* () {
       }),
     );
   });
-  return Service.of({ workspaceId, typing });
+  return Service.of({ typing });
 });
 
 /** Provide signal operations over the workspace's services. @category layers */

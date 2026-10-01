@@ -2,10 +2,10 @@ import { Context, Crypto, Effect, Layer, Option } from "effect";
 import type { PlatformError, Schema } from "effect";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
-import { Store } from "../../journal/store.ts";
 import type { Event } from "../../journal/event.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import type { ThreadId } from "../id.ts";
 import type { Thread } from "../thread.ts";
 import { ThreadActivity } from "./activity.ts";
@@ -29,7 +29,6 @@ export type Error =
   | Log.WriteError
   | Projection.Error;
 export interface Interface {
-  readonly workspaceId: ThreadActivity.Record["workspaceId"];
   /** The position the thread's next activity takes, read in the caller's transaction. */
   readonly nextSequence: (threadId: ThreadId.Id) => Effect.Effect<number, Error, Store.Transaction>;
   readonly record: <K extends ThreadActivityKind.Definition>(
@@ -48,7 +47,7 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
   const activities = yield* ThreadActivityStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = activities.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const nextSequence = Effect.fn("ThreadActivityRecording.nextSequence")(function* (
     threadId: ThreadId.Id,
   ) {
@@ -76,7 +75,7 @@ export const make = Effect.fn("ThreadActivityRecording.make")(function* () {
       })
       .pipe(Publication.withOccurredAt(input.occurredAt));
   });
-  return Service.of({ workspaceId, nextSequence, record });
+  return Service.of({ nextSequence, record });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadActivityRecording from "./recording.ts";

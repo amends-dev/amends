@@ -24,7 +24,6 @@ const secret = "connect ECONNREFUSED 10.0.0.5:5432 password=hunter2";
 const failing = Layer.succeed(
   ChangeFeedApplication.Service,
   ChangeFeedApplication.Service.of({
-    workspaceId,
     watch: () =>
       Effect.succeed(
         Stream.make(

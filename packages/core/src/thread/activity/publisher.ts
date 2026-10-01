@@ -51,7 +51,6 @@ export interface Published<A> {
   readonly event: Event.Type<typeof ThreadActivityFacts.Recorded>;
 }
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /**
    * Publish one activity in the caller's commit: take the thread's next position, admit the
    * participants asked for, run the owning domain's step, and record the activity it returns
@@ -69,7 +68,6 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ThreadActivityPublisher.make")(function* () {
   const recording = yield* ThreadActivityRecording.Service;
   const admissions = yield* ThreadParticipationAdmission.Service;
-  const workspaceId = recording.workspaceId;
   const publish = Effect.fn("ThreadActivityPublisher.publish")(function* <
     A,
     K extends ThreadActivityKind.Definition,
@@ -99,7 +97,7 @@ export const make = Effect.fn("ThreadActivityPublisher.make")(function* () {
       .pipe(Publication.withCause(step.cause, occurredAt));
     return { value: step.value, event } satisfies Published<A>;
   });
-  return Service.of({ workspaceId, publish });
+  return Service.of({ publish });
 });
 /** Internal service: callers own authorization and the commit. @category layers */
 export const layer = Layer.effect(Service, make());

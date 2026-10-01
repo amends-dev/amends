@@ -7,11 +7,9 @@ import { Publication } from "../../journal/publication.ts";
 import { Store } from "../../journal/store.ts";
 import type { GroupMembership } from "./membership.ts";
 import { GroupMembershipFacts } from "./facts.ts";
-import { GroupMembershipStore } from "./store.ts";
 
 export type Error = Projection.Error | Log.WriteError;
 export interface Interface {
-  readonly workspaceId: GroupMembership.Record["workspaceId"];
   /**
    * End an active admission, recording why. The departure is one fact however much the member
    * took part: projections end their follow of the group and every thread participation held
@@ -26,9 +24,7 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/membership/departure/Service",
 ) {}
 export const make = Effect.fn("GroupMembershipDeparture.make")(function* () {
-  const memberships = yield* GroupMembershipStore.Service;
   const journal = yield* Journal.Service;
-  const workspaceId = memberships.workspaceId;
   const remove = Effect.fn("GroupMembershipDeparture.remove")(function* (
     input: GroupMembership.Removal,
     occurredAt: DateTime.Utc,
@@ -38,7 +34,7 @@ export const make = Effect.fn("GroupMembershipDeparture.make")(function* () {
       .publish(GroupMembershipFacts.Removed, input)
       .pipe(Publication.withOccurredAt(occurredAt));
   });
-  return Service.of({ workspaceId, remove });
+  return Service.of({ remove });
 });
 export const layer = Layer.effect(Service, make());
 export * as GroupMembershipDeparture from "./departure.ts";

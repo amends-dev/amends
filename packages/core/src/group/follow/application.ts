@@ -8,7 +8,8 @@ import { Journal } from "../../journal/journal.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Publication } from "../../journal/publication.ts";
-import { WorkspaceId } from "../../workspace/id.ts";
+import { Store } from "../../journal/store.ts";
+
 import { MemberStore } from "../../workspace/member/store.ts";
 import { GroupAudience } from "../audience.ts";
 import { GroupPermissions } from "../permissions.ts";
@@ -35,7 +36,6 @@ export type Error =
   | MemberUnavailable
   | AgentRequired;
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Follow a team group, so that threads started there afterwards admit the member. Members follow
    * for themselves under `group.follow`; making an agent member follow needs `agent.use` for it.
@@ -63,7 +63,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const follows = yield* GroupFollowStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   /** The admission whose follow changes, after the checks that apply to the actor and target. */
   const resolve = Effect.fnUntraced(function* (input: GroupFollow.Input, following: boolean) {
@@ -146,7 +146,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ workspaceId, follow, unfollow });
+  return Service.of({ follow, unfollow });
 });
 /** @category layers */
 export const layer = Layer.effect(Service, make());

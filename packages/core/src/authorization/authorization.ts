@@ -10,6 +10,7 @@ import { PermissionCatalog } from "./permission-catalog.ts";
 import { Requirement } from "./requirement.ts";
 import { Scope } from "./scope.ts";
 import { Denied, InvalidActor } from "./errors.ts";
+import { Store } from "../journal/store.ts";
 export { Denied, InvalidActor } from "./errors.ts";
 
 export class WorkspaceMismatch extends Schema.TaggedError<WorkspaceMismatch>()(
@@ -26,7 +27,6 @@ export type Error =
   | Denied;
 
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
   /**
    * Check the current actor and require every declared permission on its target.
    * Reads check current state without opening a transaction. Write operations
@@ -69,12 +69,12 @@ const requireWorkspace = Effect.fnUntraced(function* (
 export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Return<
   Interface,
   never,
-  MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service
+  MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service | Store.Service
 > {
   const members = yield* MemberStore.Service;
   const resolver = yield* GrantResolver.Service;
   const catalog = yield* PermissionCatalog.Service;
-  const workspaceId = resolver.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   /** Validate the actor, and that each requirement names a declared permission in this workspace. */
   const check = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Value>) {
@@ -129,7 +129,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
     return checked.map((requirement) => covered(grants, requirement));
   });
 
-  return Service.of({ workspaceId, require: requirePermissions, permitted });
+  return Service.of({ require: requirePermissions, permitted });
 });
 
 /**

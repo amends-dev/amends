@@ -13,6 +13,7 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { WorkspaceFacts } from "../facts.ts";
 import { Member } from "../member/member.ts";
 import { MemberStore } from "../member/store.ts";
@@ -55,6 +56,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   | Delegation.Service
   | Journal.Service
   | Crypto.Crypto
+  | Store.Service
 > {
   const workspace = yield* WorkspaceStore.Service;
   const members = yield* MemberStore.Service;
@@ -63,7 +65,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = workspace.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const requirement = Requirement.make(OwnershipPermissions.Transfer, {
     _tag: "Workspace",
     workspaceId,

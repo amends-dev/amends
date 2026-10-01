@@ -8,6 +8,7 @@ import { ThreadPermissions } from "../permissions.ts";
 import { ThreadActivity } from "./activity.ts";
 import { ThreadActivityResolvers } from "./resolvers.ts";
 import { ThreadActivityStore } from "./store.ts";
+import { Store } from "../../journal/store.ts";
 
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadActivityReading.NotFound", {
   activityId: ThreadActivity.Id,
@@ -19,7 +20,6 @@ export type Error =
   | ThreadActivityResolvers.Failure
   | NotFound;
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   readonly get: (
     activityId: ThreadActivity.Id,
   ) => Effect.Effect<Thread.TimelineItem, Error, Actor.Service>;
@@ -37,7 +37,7 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
   const access = yield* ThreadAccess.Service;
   const resolvers = yield* ThreadActivityResolvers.Service;
   const activities = yield* ThreadActivityStore.Service;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const authorize = Effect.fn("ThreadActivityReading.authorize")(function* (threadId: Thread.Id) {
     const thread = yield* access.require(threadId);
     yield* authorization.require([
@@ -67,7 +67,7 @@ export const make = Effect.fn("ThreadActivityReading.make")(function* () {
     if (item === undefined) return yield* Effect.die("An activity resolved to no timeline item");
     return item;
   });
-  return Service.of({ workspaceId, get, page });
+  return Service.of({ get, page });
 });
 /**
  * Internal authorized reader shared by timeline and notification-source operations.

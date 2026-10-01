@@ -6,11 +6,11 @@ import { GroupMembershipStore } from "../../group/membership/store.ts";
 import { Member } from "../../workspace/member/member.ts";
 import { MemberStore } from "../../workspace/member/store.ts";
 import { Journal } from "../../journal/journal.ts";
-import { Store } from "../../journal/store.ts";
 import type { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Event } from "../../journal/event.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { Thread } from "../thread.ts";
 import { ThreadParticipation } from "./participation.ts";
 import { ThreadParticipationStore } from "./store.ts";
@@ -42,7 +42,6 @@ export interface Ensured {
   readonly added: ReadonlyArray<Event.Type<typeof ThreadParticipationFacts.Added>>;
 }
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /**
    * Those of the given members with a current admission to the group and active workspace
    * membership, with both records. Reads only the members asked about.
@@ -92,7 +91,7 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
   const participations = yield* ThreadParticipationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = memberships.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const membersById = (ids: ReadonlyArray<Member.Id>) =>
     Effect.map(
       members.getMany(ids),
@@ -248,7 +247,7 @@ export const make = Effect.fn("ThreadParticipationAdmission.make")(function* () 
     }
     return { participants: result, added };
   });
-  return Service.of({ workspaceId, eligible, current, page, find, ensure });
+  return Service.of({ eligible, current, page, find, ensure });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadParticipationAdmission from "./admission.ts";

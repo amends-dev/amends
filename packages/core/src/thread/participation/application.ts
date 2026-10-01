@@ -4,6 +4,7 @@ import { Requirement } from "../../authorization/requirement.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
+import { Store } from "../../journal/store.ts";
 import { Thread } from "../thread.ts";
 import { ThreadAccess } from "../access.ts";
 import { ThreadActivityPublisher } from "../activity/publisher.ts";
@@ -29,7 +30,6 @@ export type Error =
   | AlreadyEnded
   | FixedParticipation;
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /** Follow as the acting member. An existing participation is returned without new facts. */
   readonly follow: (
     threadId: Thread.Id,
@@ -55,7 +55,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
   const groups = yield* GroupStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const requireAccess = (threadId: Thread.Id) =>
     access
       .require(threadId)
@@ -129,7 +129,7 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ workspaceId, follow, unfollow });
+  return Service.of({ follow, unfollow });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadParticipationApplication from "./application.ts";

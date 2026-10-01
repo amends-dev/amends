@@ -139,8 +139,8 @@ const configured = (
         invitations,
         groupMemberships,
         delegation,
+        Layer.succeed(Store.Service, fixture.store),
         Layer.succeed(GroupMembershipDeparture.Service, {
-          workspaceId,
           remove: () => Effect.die("These member tests have no group admissions"),
         }),
       ),
@@ -207,6 +207,7 @@ it.effect("member reads require only the current actor and leave the journal unc
       | Delegation.Service
       | Journal.Service
       | Crypto.Crypto
+      | Store.Service
     >();
     expectTypeOf<Layer.Error<typeof MemberApplication.layer>>().toEqualTypeOf<never>();
     expectTypeOf<
@@ -268,7 +269,6 @@ it.effect("a shared member application uses each call's actor and current member
     const fixture = yield* make();
     yield* seed(fixture, [assignment("read-bob")]);
     const application = yield* run(fixture, MemberApplication.Service);
-    expect(application.workspaceId).toBe(workspaceId);
     const read = application.get(bob.id);
     expect(yield* read.pipe(Effect.provideService(Actor.Service, alice))).toEqual(bob);
     expect(

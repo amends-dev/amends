@@ -12,6 +12,7 @@ import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
 import { ThreadAccess } from "../thread/access.ts";
@@ -47,7 +48,6 @@ export type Error =
   | Projection.Error;
 
 export interface Interface {
-  readonly workspaceId: Turn.Record["workspaceId"];
   /**
    * Handle every agent's pending work, as that agent: accept each thread's notifications into its
    * active turn there, or into a new one, settling them in the same commit, and leave them waiting
@@ -79,7 +79,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   const activity = yield* TurnActivityRecorder.Service;
   const ending = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = turns.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   /** The agent as the actor and performer of what it does with its own work. */
   const asAgent = (agent: { readonly id: Agent.Id; readonly memberId: Member.Id }) => {
@@ -320,7 +320,6 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   }).pipe(Effect.provideService(Crypto.Crypto, crypto));
 
   return Service.of({
-    workspaceId,
     run,
     stopDeparted: stopDeparted.pipe(Effect.provideService(Crypto.Crypto, crypto)),
   });

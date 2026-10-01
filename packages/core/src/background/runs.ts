@@ -2,7 +2,7 @@ import { Context, Crypto, Effect, Layer, Schema } from "effect";
 import { Performer } from "../identity/performer.ts";
 import { Publication } from "../journal/publication.ts";
 import { Transaction } from "../journal/transaction.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import { BackgroundProcess } from "./process.ts";
 
 /** No process of this name is registered, as when a newer host asked for it. */
@@ -20,7 +20,6 @@ export class Duplicate extends Schema.TaggedError<Duplicate>()("BackgroundRuns.D
 }) {}
 
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly names: ReadonlyArray<BackgroundProcess.Name>;
   /**
    * Run a registered process once in this workspace, attributed to it as a system performer,
@@ -59,7 +58,7 @@ export const make = Effect.fn("BackgroundRuns.make")(function* <E, R>(
       Effect.mapError((cause) => new Failure({ process: process.name, cause })),
     );
   });
-  return Service.of({ workspaceId, names: processes.map((process) => process.name), run });
+  return Service.of({ names: processes.map((process) => process.name), run });
 });
 
 /** Register the domains' processes, built over the services they use. @category layers */

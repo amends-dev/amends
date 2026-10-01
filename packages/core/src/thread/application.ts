@@ -13,6 +13,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Thread } from "./thread.ts";
 import { ThreadStore } from "./store.ts";
 import { ThreadStart } from "./start.ts";
@@ -84,7 +85,6 @@ export type ReadError =
   | GroupNotFound
   | NotFound;
 export interface Interface {
-  readonly workspaceId: Thread.Record["workspaceId"];
   /**
    * Start a thread in a group the author belongs to. A team thread starts with its author,
    * mentioned members, and the group's followers; the rest of the group can read it without
@@ -161,7 +161,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const activities = yield* ThreadActivityStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   /** A start's thread and opening message, by the IDs its request named; None before it ran. */
   const opening = Effect.fnUntraced(function* (threadId: Thread.Id, messageId: ThreadMessage.Id) {
     const thread = yield* threads.get(threadId);
@@ -510,7 +510,6 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     return (yield* admissions.page(thread, options)).map(ThreadParticipation.toSummary);
   });
   return Service.of({
-    workspaceId,
     startInGroup,
     startDirect,
     get,

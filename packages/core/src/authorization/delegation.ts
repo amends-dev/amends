@@ -14,6 +14,7 @@ import { BuiltinRoles } from "./role/builtin.ts";
 import { Role } from "./role/role.ts";
 import { RoleStore } from "./role/store.ts";
 import { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
+import { Store } from "../journal/store.ts";
 export { Denied, OwnerProtected, RoleNotFound, UnsupportedRole } from "./delegation-errors.ts";
 
 export type Error =
@@ -28,7 +29,6 @@ export type Error =
   | UnsupportedRole
   | RoleNotFound;
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
   readonly loadRole: (roleId: Role.Id) => Effect.Effect<Role.Record, Error>;
   readonly assignmentsFor: (
     memberId: Member.Id,
@@ -87,13 +87,14 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   | RoleStore.Service
   | Authorization.Service
   | PermissionCatalog.Service
+  | Store.Service
 > {
   const workspace = yield* WorkspaceStore.Service;
   const assignments = yield* AssignmentStore.Service;
   const roles = yield* RoleStore.Service;
   const authorization = yield* Authorization.Service;
   const catalog = yield* PermissionCatalog.Service;
-  const workspaceId = workspace.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const owner = Effect.fn("Delegation.owner")(function* () {
     const found = yield* workspace.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
@@ -163,7 +164,6 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     yield* requireRecipient(memberId, true);
   });
   return Service.of({
-    workspaceId,
     loadRole,
     assignmentsFor,
     requireGrant,

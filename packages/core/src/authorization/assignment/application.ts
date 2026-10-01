@@ -5,6 +5,7 @@ import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
 import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
+import { Store } from "../../journal/store.ts";
 import { Member } from "../../workspace/member/member.ts";
 import { MemberStore } from "../../workspace/member/store.ts";
 import { Authorization } from "../authorization.ts";
@@ -71,6 +72,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   | Journal.Service
   | Crypto.Crypto
   | PermissionCatalog.Service
+  | Store.Service
 > {
   const assignments = yield* AssignmentStore.Service;
   const members = yield* MemberStore.Service;
@@ -79,7 +81,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const catalog = yield* PermissionCatalog.Service;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const manage = Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId });
   const workspaceWide = catalog.definitions.filter(
     (permission) => permission.targetKind === "Workspace",

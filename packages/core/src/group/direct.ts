@@ -26,7 +26,6 @@ export type Error =
   | Log.WriteError
   | Projection.Error;
 export interface Interface {
-  readonly workspaceId: Group.Record["workspaceId"];
   /**
    * Reuse the direct group for exactly these members, or create it with an admission for each,
    * saying which. The creator must be one of them. Members need active workspace membership only
@@ -52,7 +51,7 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
   const members = yield* MemberStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = groups.workspaceId;
+  const { workspaceId } = yield* Store.Service;
   const establish = Effect.fn("DirectGroups.establish")(function* (
     memberIds: ReadonlyArray<Member.Id>,
     createdBy: Member.Id,
@@ -94,7 +93,7 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
         .pipe(Publication.withCause(created, occurredAt));
     return { group, created: true } satisfies Established;
   });
-  return Service.of({ workspaceId, establish });
+  return Service.of({ establish });
 });
 /** Internal service: callers own workflow authorization. @category layers */
 export const layer = Layer.effect(Service, make());

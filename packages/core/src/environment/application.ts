@@ -14,6 +14,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import { EnvironmentCatalog } from "./catalog.ts";
 import { EnvironmentCompatibility } from "./compatibility.ts";
@@ -62,7 +63,6 @@ export interface Implementations {
 }
 
 export interface Interface {
-  readonly workspaceId: Environment.Record["workspaceId"];
   /**
    * The harnesses and sandbox providers this host installed, as they declare themselves. They
    * describe the host rather than the workspace, so every member may see them.
@@ -105,7 +105,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const target = (environmentId: Environment.Id) =>
     ({ _tag: "Environment", workspaceId, environmentId }) as const;
@@ -355,7 +355,6 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   });
 
   return Service.of({
-    workspaceId,
     implementations: { harnesses: catalog.harnesses, sandboxes: catalog.sandboxes },
     list,
     get,

@@ -9,6 +9,7 @@ import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import { ConnectionCatalog } from "./catalog.ts";
 import { Connection } from "./connection.ts";
@@ -58,7 +59,6 @@ export type CredentialError =
   | CredentialsUnavailable;
 
 export interface Interface {
-  readonly workspaceId: Connection.Record["workspaceId"];
   /**
    * The implementations this host installed, as they declare themselves. They describe the host
    * rather than the workspace, so every member may see them.
@@ -107,7 +107,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const catalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const workspaceId = authorization.workspaceId;
+  const { workspaceId } = yield* Store.Service;
 
   const target = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
@@ -344,7 +344,6 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   });
 
   return Service.of({
-    workspaceId,
     implementations: catalog.list,
     list,
     get,
