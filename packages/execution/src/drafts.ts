@@ -9,7 +9,7 @@ import { Clock, Effect } from "effect";
 import type { TurnSteps } from "./turn-steps.ts";
 
 /** How often readers are shown more of a response being written, in milliseconds. */
-const interval = 150;
+const showInterval = 150;
 /** The most text one draft carries, so a signal stays small wherever it is relayed. */
 const pieceSize = 1500;
 
@@ -22,17 +22,17 @@ interface Draft {
 }
 
 /** @category constructors */
-export const make = (turn: TurnSteps.Interface) => {
+export const make = (turnSteps: TurnSteps.Interface) => {
   const drafts = new Map<string, Draft>();
-  let shownAt = Number.NEGATIVE_INFINITY;
-  const keyOf = (responseId: string, part: number) => `${responseId}\u0000${part}`;
+  let lastShownAt = Number.NEGATIVE_INFINITY;
+  const draftKey = (responseId: string, part: number) => `${responseId}\u0000${part}`;
   const showPending = Effect.gen(function* () {
     if (![...drafts.values()].some((draft) => draft.pending !== "")) return;
-    shownAt = yield* Clock.currentTimeMillis;
+    lastShownAt = yield* Clock.currentTimeMillis;
     for (const draft of drafts.values()) {
       while (draft.pending !== "") {
         const text = draft.pending.slice(0, pieceSize);
-        yield* turn
+        yield* turnSteps
           .showDraft({ responseId: draft.responseId, part: draft.part, offset: draft.offset, text })
           .pipe(Effect.catchCause((cause) => Effect.logDebug("Draft not shown", cause)));
         draft.offset += text.length;
@@ -42,9 +42,9 @@ export const make = (turn: TurnSteps.Interface) => {
   });
   return {
     /** Keep the text a harness event adds to a block, or drop a block's draft once it completes. */
-    note: (event: HarnessEvent.Event) => {
+    applyEvent: (event: HarnessEvent.Event) => {
       if (event._tag === "TextDelta") {
-        const key = keyOf(event.responseId, event.part);
+        const key = draftKey(event.responseId, event.part);
         const draft = drafts.get(key) ?? {
           responseId: event.responseId,
           part: event.part,
@@ -54,11 +54,11 @@ export const make = (turn: TurnSteps.Interface) => {
         draft.pending += event.delta;
         drafts.set(key, draft);
       } else if (event._tag === "BlockCompleted")
-        drafts.delete(keyOf(event.responseId, event.part));
+        drafts.delete(draftKey(event.responseId, event.part));
     },
     /** Show readers what was written since the last draft, once the interval has passed. */
     showWhenDue: Effect.gen(function* () {
-      if ((yield* Clock.currentTimeMillis) - shownAt >= interval) yield* showPending;
+      if ((yield* Clock.currentTimeMillis) - lastShownAt >= showInterval) yield* showPending;
     }),
   };
 };

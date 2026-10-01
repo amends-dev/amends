@@ -24,13 +24,13 @@ export const contextBudget = (limits: ModelInference.Limits, policy: ContextPoli
  * reads it, if any. `force` asks for one however the estimate stands, as when the context proved
  * full, and `shrink` halves what it keeps that many times.
  */
-export const compactionFor = (
+export const measureAgainstBudget = (
   plan: TurnExecution.Plan,
   model: ModelInference.Implementation,
   policy: ContextPolicy,
   options: { readonly force?: boolean; readonly shrink?: number } = {},
 ) => {
-  const limits = contextBudget(
+  const { budget, keep } = contextBudget(
     model.limits(
       { settings: plan.connection.settings, credential: plan.connection.credential },
       { model: plan.selection.model },
@@ -38,10 +38,11 @@ export const compactionFor = (
     policy,
   );
   return {
-    ...limits,
+    budget,
+    keep,
     compaction: TurnLog.proposeCompaction(plan.transcript, plan.waiting, {
-      ...limits,
-      keep: Math.floor(limits.keep / 2 ** (options.shrink ?? 0)),
+      budget,
+      keep: Math.floor(keep / 2 ** (options.shrink ?? 0)),
       fixed: plan.fixed,
       measured: plan.measured,
       instructions: plan.instructions,

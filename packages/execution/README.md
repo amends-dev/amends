@@ -24,7 +24,7 @@ until the turn ends. The pieces, each in its own module:
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `runner.ts`                        | The loop, and `abandon`.                                                                                                                      |
 | `next-step.ts`                     | `NextStep.decide`, a pure function from a preparation to the next step: done, confirm a stop, fail, give up, start, rest, summarize, or work. |
-| `turn-steps.ts`                    | The commits a run makes for its turn through the gateway, as `turn.prepare`, `turn.close`, and the rest.                                      |
+| `turn-steps.ts`                    | The commits a run makes for its turn through the gateway, as `turnSteps.prepare`, `turnSteps.close`, and the rest.                            |
 | `attempt.ts`                       | One attempt: recorded, raced against the turn being asked to stop, its failure recorded as an interruption that says what comes next.         |
 | `session.ts`                       | A harness session: spawn, continue the conversation, give the harness its input, record until idle, then close or take more input.            |
 | `checkpoint.ts`                    | A summary of older history, recorded as the turn's checkpoint.                                                                                |

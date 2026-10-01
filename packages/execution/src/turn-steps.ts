@@ -18,36 +18,37 @@ type Argument<K extends keyof TurnExecution.Interface> = TurnExecution.Interface
 
 /** @category constructors */
 export const make = (gateway: Gateway.Interface, workspaceId: Workspace.Id, turnId: Turn.Id) => {
-  const step = <A, E>(use: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>) =>
-    gateway.executeTurns(workspaceId, Effect.flatMap(TurnExecution.Service, use));
+  const executeTurnStep = <A, E>(
+    call: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>,
+  ) => gateway.executeTurns(workspaceId, Effect.flatMap(TurnExecution.Service, call));
   return {
     /** The turn, as log fields. */
     ids: { workspaceId, turnId },
-    get: step((turnExecution) => turnExecution.get(turnId)),
-    prepare: step((turnExecution) => turnExecution.prepare(turnId)),
+    get: executeTurnStep((turnExecution) => turnExecution.get(turnId)),
+    prepare: executeTurnStep((turnExecution) => turnExecution.prepare(turnId)),
     start: (selection: Argument<"start">) =>
-      step((turnExecution) => turnExecution.start(turnId, selection)).pipe(
+      executeTurnStep((turnExecution) => turnExecution.start(turnId, selection)).pipe(
         Effect.asVoid,
         Effect.catchTag("TurnService.NotActive", () => Effect.void),
       ),
     recordAttempt: (kind: Argument<"recordAttempt">) =>
-      step((turnExecution) => turnExecution.recordAttempt(turnId, kind)),
+      executeTurnStep((turnExecution) => turnExecution.recordAttempt(turnId, kind)),
     recordSubmission: (batch: Argument<"recordSubmission">) =>
-      step((turnExecution) => turnExecution.recordSubmission(turnId, batch)),
+      executeTurnStep((turnExecution) => turnExecution.recordSubmission(turnId, batch)),
     recordEvents: (events: Argument<"recordEvents">) =>
-      step((turnExecution) => turnExecution.recordEvents(turnId, events)),
+      executeTurnStep((turnExecution) => turnExecution.recordEvents(turnId, events)),
     showDraft: (piece: Argument<"showDraft">) =>
-      step((turnExecution) => turnExecution.showDraft(turnId, piece)),
+      executeTurnStep((turnExecution) => turnExecution.showDraft(turnId, piece)),
     recordInterruption: (stop: Argument<"recordInterruption">) =>
-      step((turnExecution) => turnExecution.recordInterruption(turnId, stop)),
+      executeTurnStep((turnExecution) => turnExecution.recordInterruption(turnId, stop)),
     recordCheckpoint: (checkpoint: Argument<"recordCheckpoint">) =>
-      step((turnExecution) => turnExecution.recordCheckpoint(turnId, checkpoint)),
-    close: step((turnExecution) => turnExecution.close(turnId)),
+      executeTurnStep((turnExecution) => turnExecution.recordCheckpoint(turnId, checkpoint)),
+    close: executeTurnStep((turnExecution) => turnExecution.close(turnId)),
     fail: (reason: string) =>
-      step((turnExecution) => turnExecution.fail(turnId, reason)).pipe(
+      executeTurnStep((turnExecution) => turnExecution.fail(turnId, reason)).pipe(
         Effect.catchTag("TurnService.NotActive", () => Effect.void),
       ),
-    confirmStopped: step((turnExecution) => turnExecution.confirmStopped(turnId)),
+    confirmStopped: executeTurnStep((turnExecution) => turnExecution.confirmStopped(turnId)),
   };
 };
 

@@ -16,16 +16,16 @@ import type { TurnSteps } from "./turn-steps.ts";
  * How many characters of conversation one summary request reads at most: less when the model's
  * budget is smaller, so each request fits its model.
  */
-const summaryPass = 200_000;
+const maxPassCharacters = 200_000;
 
 /** Summarize the history the step's compaction covers, and record it as the turn's checkpoint. */
 export const record = Effect.fnUntraced(function* (
-  turn: TurnSteps.Interface,
+  turnSteps: TurnSteps.Interface,
   settings: Settings,
   { plan, model, budget, compaction }: NextStep.Work & { readonly compaction: NextStep.Compaction },
 ) {
   const summary = yield* Compaction.summarize(compaction.summarize, {
-    passSize: Math.min(summaryPass, budget * Transcript.charactersPerToken),
+    passSize: Math.min(maxPassCharacters, budget * Transcript.charactersPerToken),
     timeout: settings.idleTimeout,
   }).pipe(
     Effect.provide(
@@ -35,7 +35,7 @@ export const record = Effect.fnUntraced(function* (
       ),
     ),
   );
-  yield* turn.recordCheckpoint({
+  yield* turnSteps.recordCheckpoint({
     summary,
     kept: compaction.kept,
     through: compaction.through,

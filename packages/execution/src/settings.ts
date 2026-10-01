@@ -68,8 +68,8 @@ export interface Settings {
   readonly policy: ContextPolicy;
 }
 
-/** Apply the defaults to a runner's options. */
-export const resolve = (options: Options): Settings => ({
+/** A runner's settings from its options, with the defaults applied. */
+export const fromOptions = (options: Options): Settings => ({
   harnesses: new Map(options.harnesses.map((harness) => [harness.name as string, harness])),
   models: new Map(options.models.map((model) => [model.declaration.id as string, model])),
   checkInterval: Duration.fromInputUnsafe(options.checkInterval ?? "1 second"),
@@ -80,7 +80,7 @@ export const resolve = (options: Options): Settings => ({
 });
 
 /** A duration in words, as the turn's readers see it in an interruption. */
-export const inWords = (duration: Duration.Duration) => {
+export const durationInWords = (duration: Duration.Duration) => {
   const seconds = Math.round(Duration.toSeconds(duration));
   return seconds % 60 === 0
     ? `${seconds / 60} minute${seconds === 60 ? "" : "s"}`

@@ -88,7 +88,7 @@ const model = (limits: ModelInference.Limits): ModelInference.Implementation => 
 });
 const roomy = model({ contextTokens: 1_000_000, outputTokens: 128_000 });
 const settings = (limits = roomy) =>
-  RunnerSettings.resolve({ harnesses: [AmendsHarness.make()], models: [limits] });
+  RunnerSettings.fromOptions({ harnesses: [AmendsHarness.make()], models: [limits] });
 
 /** A running turn's plan, with nothing yet done in it. */
 const plan = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Plan => ({

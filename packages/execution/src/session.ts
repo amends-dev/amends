@@ -12,7 +12,7 @@ import { ContextBudget } from "./context-budget.ts";
 import { Drafts } from "./drafts.ts";
 import { Ending } from "./ending.ts";
 import type { NextStep } from "./next-step.ts";
-import { inWords, type Settings } from "./settings.ts";
+import { durationInWords, type Settings } from "./settings.ts";
 import type { TurnSteps } from "./turn-steps.ts";
 
 /** The session cannot go on, for this reason, which fails the turn. */
@@ -21,38 +21,41 @@ class CannotRun extends Schema.TaggedError<CannotRun>()("Session.CannotRun", {
 }) {}
 
 /** The session was prepared and is not released while the run works in it. */
-const unexpected = {
+const dieOnUnexpected = {
   "Harness.NotPrepared": Effect.die,
   "Environment.Released": Effect.die,
 } as const;
 
 /** Input the harness has not taken in, as `prepare` gives it. */
-type Pending = NonNullable<TurnExecution.Plan["pending"]>;
+type PendingInput = NonNullable<TurnExecution.Plan["pending"]>;
 
 /**
  * Run a harness session for the turn's work until the turn closes, its context is full, which
  * ends the session for a checkpoint, or it cannot go on.
  */
 export const run = Effect.fnUntraced(
-  function* (turn: TurnSteps.Interface, settings: Settings, work: NextStep.Work) {
-    const running = yield* spawnEnvironment(turn, work);
-    const awaitsResponse = yield* continueConversation(turn, running, work.plan.transcript);
-    const { recordUntilIdle } = yield* recorder(turn, settings, running);
-    const submit = (pending: Pending) => submitInput(turn, running, pending);
+  function* (turnSteps: TurnSteps.Interface, settings: Settings, work: NextStep.Work) {
+    const runningEnvironment = yield* spawnEnvironment(turnSteps, work);
+    const awaitsResponse = yield* continueConversation(
+      turnSteps,
+      runningEnvironment,
+      work.plan.transcript,
+    );
+    const { recordUntilIdle } = yield* makeEventRecorder(turnSteps, settings, runningEnvironment);
 
     // Work on the input the turn has not taken in, or answer what the conversation awaits.
     const { pending } = work.plan;
     if (pending !== undefined || awaitsResponse) {
-      if (pending !== undefined) yield* submit(pending);
-      else yield* running.resume.pipe(Effect.catchTags(unexpected));
+      if (pending !== undefined) yield* submitInput(turnSteps, runningEnvironment, pending);
+      else yield* runningEnvironment.resume.pipe(Effect.catchTags(dieOnUnexpected));
       if ((yield* recordUntilIdle) === "full") return Ending.again;
     }
     // Then close the turn, unless more input came for its agent: take that in and work again.
     for (;;) {
-      const closing = yield* turn.close;
+      const closing = yield* turnSteps.close;
       if (closing._tag !== "InputPending") return Ending.finished;
-      const more = yield* takeMoreInput(turn, settings, work, submit);
-      if (more !== "submitted") return more;
+      const moreInput = yield* takeMoreInput(turnSteps, settings, work, runningEnvironment);
+      if (moreInput !== "submitted") return moreInput;
       if ((yield* recordUntilIdle) === "full") return Ending.again;
     }
   },
@@ -63,10 +66,10 @@ export const run = Effect.fnUntraced(
 
 /** Spawn the agent's environment with the turn's model access, instructions, and budget. */
 const spawnEnvironment = Effect.fnUntraced(function* (
-  turn: TurnSteps.Interface,
+  turnSteps: TurnSteps.Interface,
   { plan, harness, model, budget }: NextStep.Work,
 ) {
-  const access = yield* Layer.build(
+  const modelAccess = yield* Layer.build(
     model.languageModel(
       { settings: plan.connection.settings, credential: plan.connection.credential },
       { model: plan.selection.model },
@@ -77,17 +80,17 @@ const spawnEnvironment = Effect.fnUntraced(function* (
   const spawned = yield* Environment.spawn(
     { id: Environment.DefinitionId.make(plan.environment.id), harness },
     { sessionId, instructions: plan.instructions, contextLimit: budget, measured: plan.measured },
-  ).pipe(Effect.provideContext(access), Effect.result);
+  ).pipe(Effect.provideContext(modelAccess), Effect.result);
   if (Result.isFailure(spawned)) {
     yield* Effect.logWarning("Turn environment did not start", {
-      ...turn.ids,
+      ...turnSteps.ids,
       failure: spawned.failure,
     });
     return yield* new CannotRun({ reason: "The agent's environment couldn't start." });
   }
-  const running = spawned.success;
-  yield* Effect.addFinalizer(() => Effect.ignore(running.release));
-  return running;
+  const runningEnvironment = spawned.success;
+  yield* Effect.addFinalizer(() => Effect.ignore(runningEnvironment.release));
+  return runningEnvironment;
 });
 
 /**
@@ -95,32 +98,32 @@ const spawnEnvironment = Effect.fnUntraced(function* (
  * awaits a response, as when the run that asked for one was cut short.
  */
 const continueConversation = Effect.fnUntraced(function* (
-  turn: TurnSteps.Interface,
-  running: Environment.Running,
+  turnSteps: TurnSteps.Interface,
+  runningEnvironment: Environment.Running,
   transcript: TurnExecution.Plan["transcript"],
 ) {
   const cannotContinue = "The agent's conversation so far couldn't be continued.";
-  const summary = Transcript.summarize(transcript);
-  if (Result.isFailure(summary)) {
+  const transcriptState = Transcript.summarize(transcript);
+  if (Result.isFailure(transcriptState)) {
     yield* Effect.logWarning("Turn transcript is invalid", {
-      ...turn.ids,
-      reason: summary.failure,
+      ...turnSteps.ids,
+      reason: transcriptState.failure,
     });
     return yield* new CannotRun({ reason: cannotContinue });
   }
-  if (summary.success.pending.length > 0)
+  if (transcriptState.success.pending.length > 0)
     return yield* new CannotRun({
       reason: "The turn is waiting on tool calls, which can't run yet.",
     });
-  const prepared = yield* Effect.result(running.prepare(transcript));
+  const prepared = yield* Effect.result(runningEnvironment.prepare(transcript));
   if (Result.isFailure(prepared)) {
     yield* Effect.logWarning("Turn transcript was refused", {
-      ...turn.ids,
+      ...turnSteps.ids,
       failure: prepared.failure,
     });
     return yield* new CannotRun({ reason: cannotContinue });
   }
-  return summary.success.awaitsResponse;
+  return transcriptState.success.awaitsResponse;
 });
 
 /**
@@ -128,53 +131,53 @@ const continueConversation = Effect.fnUntraced(function* (
  * the log recorded it, which a restart submits again unchanged.
  */
 const submitInput = Effect.fnUntraced(function* (
-  turn: TurnSteps.Interface,
-  running: Environment.Running,
-  pending: Pending,
+  turnSteps: TurnSteps.Interface,
+  runningEnvironment: Environment.Running,
+  pending: PendingInput,
 ) {
   // The same range of input always gets the same batch, so submitting it again after a restart
   // records it once.
   const batchId = HarnessEvent.BatchId.make(
-    `${turn.ids.turnId}/after:${pending.afterSequence}/through:${pending.throughSequence}`,
+    `${turnSteps.ids.turnId}/after:${pending.afterSequence}/through:${pending.throughSequence}`,
   );
-  const items = yield* turn.recordSubmission({
+  const items = yield* turnSteps.recordSubmission({
     batchId,
     throughSequence: pending.throughSequence,
     items: pending.items,
   });
-  yield* running.submit({ id: batchId, items }).pipe(Effect.catchTags(unexpected));
+  yield* runningEnvironment.submit({ id: batchId, items }).pipe(Effect.catchTags(dieOnUnexpected));
 });
 
 /**
- * What the log records: everything the environment and its harness report except streaming
+ * What the log keeps of what the environment and its harness report: everything except streaming
  * deltas, which only show readers a block while it streams.
  */
-const recorded = (event: Environment.Event): ReadonlyArray<Environment.Event> =>
+const withoutDeltas = (event: Environment.Event): ReadonlyArray<Environment.Event> =>
   event._tag === "Harness" &&
   (event.event._tag === "TextDelta" || event.event._tag === "ReasoningDelta")
     ? []
     : [event];
 
 /**
- * Record what the harness reports until it is idle or its context is full, showing readers the
- * text it writes as drafts. While it waits on the model, a silence longer than the idle timeout
- * fails the session as an interruption worth retrying, so a model that stops answering does not
- * hold the turn; time a tool call the harness started spends running does not count. The
- * environment ending first fails it the same way.
+ * Follow what the harness reports, to record it until it is idle or its context is full, showing
+ * readers the text it writes as drafts. While it waits on the model, a silence longer than the
+ * idle timeout fails the session as an interruption worth retrying, so a model that stops
+ * answering does not hold the turn; time a tool call the harness started spends running does not
+ * count. The environment ending first fails it the same way.
  */
-const recorder = Effect.fnUntraced(function* (
-  turn: TurnSteps.Interface,
+const makeEventRecorder = Effect.fnUntraced(function* (
+  turnSteps: TurnSteps.Interface,
   settings: Settings,
-  running: Environment.Running,
+  runningEnvironment: Environment.Running,
 ) {
-  const pull = yield* Stream.toPull(running.events);
-  const drafts = Drafts.make(turn);
-  const silent = new HarnessErrors.ExecutionFailed({
-    reason: `The model sent nothing for ${inWords(settings.idleTimeout)}.`,
+  const pullEvents = yield* Stream.toPull(runningEnvironment.events);
+  const drafts = Drafts.make(turnSteps);
+  const modelSilent = new HarnessErrors.ExecutionFailed({
+    reason: `The model sent nothing for ${durationInWords(settings.idleTimeout)}.`,
     retryable: true,
     problem: "model-silent",
   });
-  const next = pull.pipe(
+  const nextEvents = pullEvents.pipe(
     Pull.catchDone(() =>
       Effect.fail(
         new HarnessErrors.ExecutionFailed({
@@ -186,31 +189,31 @@ const recorder = Effect.fnUntraced(function* (
     ),
   );
   /** Calls the harness started that have no result yet: while one runs, silence is its. */
-  const started = new Set<string>();
+  const runningToolCalls = new Set<string>();
   const recordUntilIdle = Effect.gen(function* () {
     for (;;) {
-      const chunk = yield* started.size > 0
-        ? next
-        : next.pipe(
+      const chunk = yield* runningToolCalls.size > 0
+        ? nextEvents
+        : nextEvents.pipe(
             Effect.timeoutOrElse({
               duration: settings.idleTimeout,
-              orElse: () => Effect.fail(silent),
+              orElse: () => Effect.fail(modelSilent),
             }),
           );
       for (const item of chunk) {
         if (item._tag !== "Harness") continue;
         const event = item.event;
-        if (event._tag === "ToolCallStarted") started.add(event.callId);
-        else if (event._tag === "ToolCallCompleted") started.delete(event.result.callId);
-        drafts.note(event);
+        if (event._tag === "ToolCallStarted") runningToolCalls.add(event.callId);
+        else if (event._tag === "ToolCallCompleted") runningToolCalls.delete(event.result.callId);
+        drafts.applyEvent(event);
       }
       yield* drafts.showWhenDue;
-      const events = chunk.flatMap(recorded);
-      if (events.length > 0) yield* turn.recordEvents(events);
+      const events = chunk.flatMap(withoutDeltas);
+      if (events.length > 0) yield* turnSteps.recordEvents(events);
       if (events.some((item) => item._tag === "Harness" && item.event._tag === "ContextFull"))
         return "full" as const;
-      const last = events.at(-1);
-      if (last?._tag === "Harness" && last.event._tag === "Idle") return "idle" as const;
+      const lastEvent = events.at(-1);
+      if (lastEvent?._tag === "Harness" && lastEvent.event._tag === "Idle") return "idle" as const;
     }
   });
   return { recordUntilIdle };
@@ -223,26 +226,26 @@ const recorder = Effect.fnUntraced(function* (
  * budget ends the session instead, for a checkpoint first.
  */
 const takeMoreInput = Effect.fnUntraced(function* (
-  turn: TurnSteps.Interface,
+  turnSteps: TurnSteps.Interface,
   settings: Settings,
   work: NextStep.Work,
-  submit: (pending: Pending) => ReturnType<typeof submitInput>,
+  runningEnvironment: Environment.Running,
 ) {
-  const since = yield* Clock.currentTimeMillis;
+  const waitingSince = yield* Clock.currentTimeMillis;
   for (;;) {
-    const preparation = yield* turn.prepare;
+    const preparation = yield* turnSteps.prepare;
     if (preparation._tag !== "Ready") return Ending.again;
     const { plan } = preparation;
     if (plan.pending !== undefined) {
-      if (ContextBudget.compactionFor(plan, work.model, settings.policy).compaction !== undefined)
-        return Ending.again;
-      yield* submit(plan.pending);
+      const { compaction } = ContextBudget.measureAgainstBudget(plan, work.model, settings.policy);
+      if (compaction !== undefined) return Ending.again;
+      yield* submitInput(turnSteps, runningEnvironment, plan.pending);
       return "submitted" as const;
     }
-    if ((yield* Clock.currentTimeMillis) - since >= Duration.toMillis(settings.inputWait))
+    if ((yield* Clock.currentTimeMillis) - waitingSince >= Duration.toMillis(settings.inputWait))
       return Ending.unrunnable("Input the agent accepted never arrived.");
     yield* Effect.sleep(settings.checkInterval);
-    const closing = yield* turn.close;
+    const closing = yield* turnSteps.close;
     if (closing._tag !== "InputPending") return Ending.finished;
   }
 });

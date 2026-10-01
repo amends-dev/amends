@@ -50,43 +50,43 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
   const gateway = yield* Gateway.Service;
   const crypto = yield* Crypto.Crypto;
-  const settings = RunnerSettings.resolve(options);
+  const settings = RunnerSettings.fromOptions(options);
 
   const run = Effect.fn("TurnRunner.run")(
     function* (workspaceId: Workspace.Id, turnId: Turn.Id) {
-      const turn = TurnSteps.make(gateway, workspaceId, turnId);
+      const turnSteps = TurnSteps.make(gateway, workspaceId, turnId);
       // Whether to rest before the next attempt, as after one that was interrupted; until the
       // run's first attempt, the turn's log says, by an attempt that died.
-      let rest: boolean | undefined;
+      let restBeforeAttempt: boolean | undefined;
       for (;;) {
-        const step = NextStep.decide(yield* turn.prepare, settings, rest);
+        const step = NextStep.decide(yield* turnSteps.prepare, settings, restBeforeAttempt);
         switch (step._tag) {
           case "Done":
             return;
           case "ConfirmStop":
-            return yield* turn.confirmStopped;
+            return yield* turnSteps.confirmStopped;
           case "Fail":
-            return yield* turn.fail(step.reason);
+            return yield* turnSteps.fail(step.reason);
           case "GiveUp":
             yield* Effect.logWarning("Turn given up", {
-              ...turn.ids,
+              ...turnSteps.ids,
               attempts: step.attempts,
               problem: step.problem,
             });
-            return yield* turn.fail(step.reason);
+            return yield* turnSteps.fail(step.reason);
           case "Start":
-            yield* turn.start(step.selection);
+            yield* turnSteps.start(step.selection);
             break;
           case "Rest":
             yield* Effect.sleep(step.delay);
-            rest = false;
+            restBeforeAttempt = false;
             break;
           case "Summarize":
           case "Work": {
-            const ending = yield* Attempt.run(turn, settings, step);
+            const ending = yield* Attempt.run(turnSteps, settings, step);
             if (ending._tag === "Finished") return;
-            if (ending._tag === "Unrunnable") return yield* turn.fail(ending.reason);
-            rest = ending._tag === "Interrupted";
+            if (ending._tag === "Unrunnable") return yield* turnSteps.fail(ending.reason);
+            restBeforeAttempt = ending._tag === "Interrupted";
           }
         }
       }

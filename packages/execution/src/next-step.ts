@@ -44,7 +44,7 @@ export type Step =
   | (Work & { readonly _tag: "Work" });
 
 const done: Step = { _tag: "Done" };
-const fail = (reason: string): Step => ({ _tag: "Fail", reason });
+const failTurn = (reason: string): Step => ({ _tag: "Fail", reason });
 
 /**
  * How long a turn rests before its next attempt after `attempts` that got nowhere: 2, 4, then 8
@@ -53,27 +53,27 @@ const fail = (reason: string): Step => ({ _tag: "Fail", reason });
 export const interruptionDelay = (attempts: number) => Duration.seconds(2 ** Math.min(attempts, 6));
 
 /**
- * Decide the next step. `rest` says whether to wait first, as after an interruption worth
- * retrying; before the run's first attempt it is undefined, and the turn rests when its log shows
- * an attempt that died, as when its process did.
+ * Decide the next step. `restBeforeAttempt` says whether to wait first, as after an interruption
+ * worth retrying; before the run's first attempt it is undefined, and the turn rests when its log
+ * shows an attempt that died, as when its process did.
  */
 export const decide = (
   preparation: TurnExecution.Preparation,
   settings: Settings,
-  rest: boolean | undefined,
+  restBeforeAttempt: boolean | undefined,
 ): Step => {
   if (preparation._tag === "Finished") return done;
   if (preparation._tag === "Stopping") return { _tag: "ConfirmStop" };
-  if (preparation._tag === "Unrunnable") return fail(preparation.reason);
+  if (preparation._tag === "Unrunnable") return failTurn(preparation.reason);
   const plan = preparation.plan;
   if (plan.environment.sandbox !== null)
-    return fail("Environments with a sandbox can't run turns yet.");
+    return failTurn("Environments with a sandbox can't run turns yet.");
   const harness = settings.harnesses.get(plan.environment.harnessId);
   if (harness === undefined)
-    return fail(`The ${plan.environment.harnessId} harness doesn't run on this server.`);
+    return failTurn(`The ${plan.environment.harnessId} harness doesn't run on this server.`);
   const model = settings.models.get(plan.connection.implementationId);
   if (model === undefined)
-    return fail(`${plan.connection.name}'s models can't run on this server.`);
+    return failTurn(`${plan.connection.name}'s models can't run on this server.`);
   // Starting may record the thread's history in the agent's log, so the run prepares again after;
   // a turn stopped before it started is then found finished.
   if (plan.turn.status === "queued") return { _tag: "Start", selection: plan.selection };
@@ -84,18 +84,19 @@ export const decide = (
       attempts: plan.attempts,
       problem: plan.interruption?.problem,
     };
-  if (rest ?? plan.diedLast) return { _tag: "Rest", delay: interruptionDelay(plan.attempts) };
+  if (restBeforeAttempt ?? plan.diedLast)
+    return { _tag: "Rest", delay: interruptionDelay(plan.attempts) };
   // A context that proved full owes a checkpoint however the estimate stands, which keeps less
   // each time it proves full again before the model answers; past that, or when a checkpoint
   // would free nothing, even a summary does not make it fit.
-  const tooLong = `The conversation no longer fits in ${plan.selection.model}'s context window, even summarized.`;
+  const tooLongReason = `The conversation no longer fits in ${plan.selection.model}'s context window, even summarized.`;
   const { overflow } = plan;
-  if (overflow.pending && overflow.count > settings.policy.shrinks) return fail(tooLong);
-  const { compaction, budget } = ContextBudget.compactionFor(plan, model, settings.policy, {
+  if (overflow.pending && overflow.count > settings.policy.shrinks) return failTurn(tooLongReason);
+  const { compaction, budget } = ContextBudget.measureAgainstBudget(plan, model, settings.policy, {
     force: overflow.pending,
     shrink: overflow.pending ? overflow.count - 1 : 0,
   });
-  if (overflow.pending && compaction === undefined) return fail(tooLong);
+  if (overflow.pending && compaction === undefined) return failTurn(tooLongReason);
   const work = { plan, harness, model, budget };
   return compaction === undefined
     ? { _tag: "Work", ...work }
