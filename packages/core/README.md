@@ -122,8 +122,9 @@ turn's runner or harness reports.
 
 A host binds the journal store to one workspace, and that binding is the only place a service
 learns which workspace it serves: services that need the workspace ID read it from `Store.Service`.
-Projection stores, signals, and background and turn jobs are bound the same way and carry no ID of
-their own.
+Projection stores and signals are bound the same way and carry no ID of their own. Background and turn
+job requests name their workspace, taken from the fact that asks for them, since the host runs
+every workspace's jobs.
 
 ## Groups
 
@@ -367,8 +368,8 @@ are. A client folds a turn's items into one row at its `turn.created` position.
 
 The commit that creates or retries a turn asks `TurnJobs` to run it, through a journal
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
-the turn. The gateway binds
-`TurnJobs` to its host's `WorkspaceTurnJobs`; [cluster](../cluster/README.md) runs harnesses
+the turn. The host supplies
+`TurnJobs`, and `TurnJobs.layerNoRunner` accepts requests and runs nothing; [cluster](../cluster/README.md) runs harnesses
 and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
 from a person's message through its background job, acceptance, and turn job to the reply.
 
@@ -710,9 +711,10 @@ A commit that publishes such a fact requests the process's background job throug
 once per process per commit, in that same commit: the request is stored with the commit and
 discarded if it rolls back, and a request that cannot be stored fails the commit. This is a
 journal [reaction](../../docs/journal.md#reactions), so neither replay nor a retried publication
-that returns its original event asks again. `BackgroundJobs.Service` is a required host binding,
-bound to the workspace, which delivers each request to whatever runs the workspace's background
-jobs.
+that returns its original event asks again. Each request names the workspace of the fact that
+asked for it. `BackgroundJobs.Service` is a required host service, shared by every workspace, which
+delivers each request to whatever runs background jobs; `BackgroundJobs.layerUnavailable` refuses
+them, for a host that runs none.
 
 `BackgroundRuns.Service` is how that process runs one: `run(name)` runs a registered process once,
 attributed to it as a `System` performer named after it, and returns its outcome. An unregistered

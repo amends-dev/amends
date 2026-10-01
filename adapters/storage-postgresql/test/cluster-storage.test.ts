@@ -1,8 +1,8 @@
-import { BackgroundProcess, BackgroundRuns } from "@amends/core/background";
+import { BackgroundJobs, BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import { BackgroundJob } from "@amends/cluster";
-import { Gateway, GatewayErrors, WorkspaceBackgroundJobs } from "@amends/gateway";
+import { Gateway, GatewayErrors } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";
@@ -41,8 +41,8 @@ const cluster = (url: string) => {
 };
 
 const requestIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
-  Effect.flatMap(WorkspaceBackgroundJobs.Service, (workspaceBackgroundJobs) =>
-    workspaceBackgroundJobs.forWorkspace(id).request(process, { at }),
+  Effect.flatMap(BackgroundJobs.Service, (backgroundJobs) =>
+    backgroundJobs.request({ workspaceId: id, process, at }),
   ).pipe(
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),

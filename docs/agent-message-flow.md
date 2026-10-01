@@ -59,7 +59,7 @@ Publishing that fact does two things in the same transaction, in this order
 - **Reactions** run after the projections ([journal](journal.md#reactions)). `turn.accept` is
   registered to wake on `thread.activity.recorded` when any recipient has `requestsWork`
   (`BackgroundProcess.on` in `TurnCommand.acceptWorkProcess`), so the reaction requests its
-  **background job** from the host's `WorkspaceBackgroundJobs`, once per process per commit. The
+  **background job** from the host's `BackgroundJobs`, naming the workspace the fact belongs to, once per process per commit. The
   host stores that request as a **persisted Cluster message**, a `Run` for the entity
   `amends/BackgroundJob`, keyed by workspace and process name, with the primary key
   `commit:<commit id>`. The local host gives Cluster and the workspace storage one SQL client, so
@@ -113,7 +113,7 @@ exists and its notification is still pending, or the reverse. Several pending no
 thread join one turn.
 
 A second reaction, `TurnJobs.reactions` on `turn.created` and `turn.retried`, requests the turn's
-**turn job** from the host's `WorkspaceTurnJobs`, which stores a persisted `Run` message for the
+**turn job** from the host's `TurnJobs`, which stores a persisted `Run` message for the
 entity `amends/TurnJob`, keyed by workspace and turn, in this same transaction.
 
 ## 4. The turn runs
@@ -233,14 +233,14 @@ model adds its own time to step 4.
 
 ## The two kinds of job
 
-|                  | Background job: `BackgroundJob`, entity `amends/BackgroundJob`                                     | Turn job: `TurnJob`, entity `amends/TurnJob`                                           |
-| ---------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| One job per      | Workspace and process                                                                              | Workspace and turn                                                                     |
-| Requests         | `Run`, keyed `commit:<id>` (and the time, for a later run)                                         | `Run`, keyed `created` or `retry:<n>`; `Abandon`, keyed `abandon:<n>`                  |
-| Runs             | A sweep: never two at once per workspace and process                                               | A turn: turns in parallel, each once at a time                                         |
-| After a run      | Schedules the next from `Idle`, `Continue`, or `At`                                                | Nothing, unless the run failed                                                         |
-| A run that fails | Retries without limit, after `JobRetry.delay`                                                      | Retries eight times, then asks to `Abandon` the turn, until that is recorded           |
-| Lives in         | `@amends/cluster` (`jobs/background-job.ts`), implementing the gateway's `WorkspaceBackgroundJobs` | `@amends/cluster` (`jobs/turn-job.ts`), implementing the gateway's `WorkspaceTurnJobs` |
+|                  | Background job: `BackgroundJob`, entity `amends/BackgroundJob`                     | Turn job: `TurnJob`, entity `amends/TurnJob`                                 |
+| ---------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| One job per      | Workspace and process                                                              | Workspace and turn                                                           |
+| Requests         | `Run`, keyed `commit:<id>` (and the time, for a later run)                         | `Run`, keyed `created` or `retry:<n>`; `Abandon`, keyed `abandon:<n>`        |
+| Runs             | A sweep: never two at once per workspace and process                               | A turn: turns in parallel, each once at a time                               |
+| After a run      | Schedules the next from `Idle`, `Continue`, or `At`                                | Nothing, unless the run failed                                               |
+| A run that fails | Retries without limit, after `JobRetry.delay`                                      | Retries eight times, then asks to `Abandon` the turn, until that is recorded |
+| Lives in         | `@amends/cluster` (`jobs/background-job.ts`), implementing core's `BackgroundJobs` | `@amends/cluster` (`jobs/turn-job.ts`), implementing core's `TurnJobs`       |
 
 ## Where to change things
 

@@ -1,6 +1,7 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnStore } from "@amends/core/turn";
+import { BackgroundJobs } from "@amends/core/background";
+import { TurnJobs, TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
@@ -42,8 +43,6 @@ import { TestClock } from "effect/testing";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
 import { WorkspaceSignals } from "../src/signals.ts";
-import { WorkspaceTurnJobs } from "../src/turn-jobs.ts";
-import { WorkspaceBackgroundJobs } from "../src/background-jobs.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
 import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
@@ -321,8 +320,8 @@ const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
     Layer.succeed(WorkspaceSignals.Service, quiet),
-    WorkspaceBackgroundJobs.layerUnavailable,
-    WorkspaceTurnJobs.layerNoRunner,
+    BackgroundJobs.layerUnavailable,
+    TurnJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,
       Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),

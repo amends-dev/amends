@@ -1,7 +1,6 @@
 import { Commit, Store } from "@amends/core/journal";
-import { Turn, TurnStore } from "@amends/core/turn";
+import { Turn, TurnJobs, TurnStore } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
-import { WorkspaceTurnJobs } from "@amends/gateway";
 import { expect, it } from "@effect/vitest";
 import { Clock, Duration, Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";
@@ -55,8 +54,8 @@ const turns = (abandon: (call: number) => Effect.Effect<void, TurnRunner.Failure
 };
 
 /** Ask for the turn to run, as the commit that created it does. */
-const requestTurnJob = Effect.flatMap(WorkspaceTurnJobs.Service, (workspaceTurnJobs) =>
-  workspaceTurnJobs.forWorkspace(workspaceId).request(turnId),
+const requestTurnJob = Effect.flatMap(TurnJobs.Service, (turnJobs) =>
+  turnJobs.request({ workspaceId, turnId }),
 ).pipe(
   Effect.provideService(Store.Transaction, {
     id: Commit.Id.make("commit-1"),

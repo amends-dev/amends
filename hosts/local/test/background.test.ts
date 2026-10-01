@@ -1,8 +1,8 @@
-import { BackgroundProcess } from "@amends/core/background";
+import { BackgroundJobs, BackgroundProcess } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import { BackgroundJob } from "@amends/cluster";
-import { Gateway, WorkspaceBackgroundJobs } from "@amends/gateway";
+import { Gateway } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { PostgresStorage } from "@amends/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
@@ -47,9 +47,7 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
-          const backgroundJobs = Context.get(context, WorkspaceBackgroundJobs.Service).forWorkspace(
-            workspaceId,
-          );
+          const backgroundJobs = Context.get(context, BackgroundJobs.Service);
           const stored = Effect.flatMap(
             SqlClient.SqlClient,
             (sql) => sql<{ readonly count: number }>`
@@ -62,12 +60,14 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const rolledBack = yield* Effect.exit(
             store.transaction(
-              backgroundJobs.request(process).pipe(Effect.andThen(Effect.fail("abandon"))),
+              backgroundJobs
+                .request({ workspaceId, process })
+                .pipe(Effect.andThen(Effect.fail("abandon"))),
             ),
           );
           expect(Exit.isFailure(rolledBack)).toBe(true);
           expect(yield* stored).toBe(0);
-          yield* store.transaction(backgroundJobs.request(process));
+          yield* store.transaction(backgroundJobs.request({ workspaceId, process }));
           expect(yield* stored).toBe(1);
           // The committed request reaches the worker; the rolled-back one never existed.
           yield* Effect.sleep("3 seconds");
@@ -110,14 +110,14 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
-          const backgroundJobs = Context.get(context, WorkspaceBackgroundJobs.Service).forWorkspace(
-            workspaceId,
-          );
+          const backgroundJobs = Context.get(context, BackgroundJobs.Service);
           // A commit goes on after it makes a request, as a real one does with its later facts
           // and staged writes, so Cluster's own look comes before the request is there to find.
           for (let commit = 1; commit <= 5; commit++) {
             yield* store.transaction(
-              backgroundJobs.request(process).pipe(Effect.andThen(Effect.sleep("100 millis"))),
+              backgroundJobs
+                .request({ workspaceId, process })
+                .pipe(Effect.andThen(Effect.sleep("100 millis"))),
             );
             const committedAt = yield* Clock.currentTimeMillis;
             while (runs < commit) {
@@ -191,7 +191,7 @@ describe.skipIf(!available)("background work on the local host", () => {
             );
           const first = yield* Layer.build(runner("first", 34471));
           yield* Layer.build(runner("second", 34472));
-          const backgroundJobs = Context.get(first, WorkspaceBackgroundJobs.Service);
+          const backgroundJobs = Context.get(first, BackgroundJobs.Service);
           const workspaces = Array.from({ length: 20 }, (_, index) =>
             Workspace.Id.make(`workspace-${index}`),
           );
@@ -199,16 +199,13 @@ describe.skipIf(!available)("background work on the local host", () => {
             Effect.forEach(
               workspaces,
               (id) =>
-                backgroundJobs
-                  .forWorkspace(id)
-                  .request(process)
-                  .pipe(
-                    Effect.provideService(Store.Transaction, {
-                      id: Commit.Id.make(`${name}:${id}`),
-                      append: () => Effect.die("Unexpected append"),
-                      afterCommit: (effect) => effect,
-                    }),
-                  ),
+                backgroundJobs.request({ workspaceId: id, process }).pipe(
+                  Effect.provideService(Store.Transaction, {
+                    id: Commit.Id.make(`${name}:${id}`),
+                    append: () => Effect.die("Unexpected append"),
+                    afterCommit: (effect) => effect,
+                  }),
+                ),
               { discard: true },
             );
           const ran = (count: number, within: Duration.Input) =>

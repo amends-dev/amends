@@ -1,6 +1,10 @@
 import * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
-import { type BackgroundProcess, BackgroundRuns } from "@amends/core/background";
+import {
+  type BackgroundJobs,
+  type BackgroundProcess,
+  BackgroundRuns,
+} from "@amends/core/background";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Projection, Store } from "@amends/core/journal";
 import {
@@ -11,15 +15,13 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
-import type { TurnExecution } from "@amends/core/turn";
+import type { TurnExecution, TurnJobs } from "@amends/core/turn";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Cause } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import type { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
-import type { WorkspaceTurnJobs } from "./turn-jobs.ts";
-import type { WorkspaceBackgroundJobs } from "./background-jobs.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
 export interface Interface {
@@ -167,8 +169,8 @@ export const make = Effect.fn("Gateway.make")(function* (
   never,
   | WorkspaceStorage.Service
   | WorkspaceSignals.Service
-  | WorkspaceBackgroundJobs.Service
-  | WorkspaceTurnJobs.Service
+  | BackgroundJobs.Service
+  | TurnJobs.Service
   | Crypto.Crypto
   | Scope.Scope
 > {

@@ -38,16 +38,20 @@ const tally = BackgroundProcess.make("test.tally", {
 
 /** Background job requests recorded with the commit that made them, or refused while `refusing` is set. */
 const recordedRequests = () => {
-  const requested: Array<{ readonly process: string; readonly commit: string }> = [];
+  const requested: Array<{
+    readonly workspaceId: string;
+    readonly process: string;
+    readonly commit: string;
+  }> = [];
   const state = { refusing: false };
   const service = BackgroundJobs.Service.of({
-    request: Effect.fnUntraced(function* (process) {
+    request: Effect.fnUntraced(function* ({ workspaceId, process }) {
       if (state.refusing)
         return yield* new Store.Failure({
           operation: "request background job",
           cause: "Requests are refused",
         });
-      requested.push({ process, commit: (yield* Store.Transaction).id });
+      requested.push({ workspaceId, process, commit: (yield* Store.Transaction).id });
     }),
   });
   return { requested, state, service };
@@ -109,10 +113,11 @@ it.effect("a commit asks, in that commit, for each process its facts wake, once 
       );
       return [first, second] as const;
     }).pipe(publishing, Effect.provide(plain));
+    // Each request names the workspace of the fact that asked for it.
     expect(requests.requested).toEqual([
-      { process: "test.settle", commit: commits[0] },
-      { process: "test.tally", commit: commits[0] },
-      { process: "test.tally", commit: commits[1] },
+      { workspaceId, process: "test.settle", commit: commits[0] },
+      { workspaceId, process: "test.tally", commit: commits[0] },
+      { workspaceId, process: "test.tally", commit: commits[1] },
     ]);
   }),
 );

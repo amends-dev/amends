@@ -1,4 +1,4 @@
-import { BackgroundProcess, BackgroundRuns } from "@amends/core/background";
+import { BackgroundJobs, BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import { expect, it } from "@effect/vitest";
@@ -12,7 +12,7 @@ import {
   Sharding,
   ShardingConfig,
 } from "effect/unstable/cluster";
-import { Gateway, GatewayErrors, WorkspaceBackgroundJobs } from "@amends/gateway";
+import { Gateway, GatewayErrors } from "@amends/gateway";
 import { BackgroundJob } from "../../src/jobs/background-job.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
@@ -67,8 +67,8 @@ const background = (
 
 /** Ask for the process to run from inside a commit with this ID. */
 const requestIn = (commit: string, at?: DateTime.Utc) =>
-  Effect.flatMap(WorkspaceBackgroundJobs.Service, (workspaceBackgroundJobs) =>
-    workspaceBackgroundJobs.forWorkspace(workspaceId).request(process, { at }),
+  Effect.flatMap(BackgroundJobs.Service, (backgroundJobs) =>
+    backgroundJobs.request({ workspaceId, process, at }),
   ).pipe(
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),

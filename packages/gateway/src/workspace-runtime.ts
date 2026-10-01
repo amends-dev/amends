@@ -25,8 +25,6 @@ import {
 } from "effect";
 import { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
-import { WorkspaceBackgroundJobs } from "./background-jobs.ts";
-import { WorkspaceTurnJobs } from "./turn-jobs.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Services = Layer.Success<typeof Core.layer> | Core.HostServices;
@@ -78,8 +76,8 @@ export interface Interface {
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
   const workspaceSignals = yield* WorkspaceSignals.Service;
-  const workspaceBackgroundJobs = yield* WorkspaceBackgroundJobs.Service;
-  const workspaceTurnJobs = yield* WorkspaceTurnJobs.Service;
+  const backgroundJobs = yield* BackgroundJobs.Service;
+  const turnJobs = yield* TurnJobs.Service;
   const crypto = yield* Crypto.Crypto;
   const hostContext = yield* Effect.context<never>();
   const connectionCatalog = ConnectionCatalog.make(options.connections ?? []);
@@ -98,8 +96,8 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
           Layer.succeed(Signals.Service, workspaceSignals.forWorkspace(workspaceId)),
-          Layer.succeed(BackgroundJobs.Service, workspaceBackgroundJobs.forWorkspace(workspaceId)),
-          Layer.succeed(TurnJobs.Service, workspaceTurnJobs.forWorkspace(workspaceId)),
+          Layer.succeed(BackgroundJobs.Service, backgroundJobs),
+          Layer.succeed(TurnJobs.Service, turnJobs),
           Layer.succeed(ConnectionCatalog.Service, connectionCatalog),
           Layer.succeed(EnvironmentCatalog.Service, environmentCatalog),
         ),

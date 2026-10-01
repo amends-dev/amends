@@ -49,13 +49,7 @@ import { TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
-import {
-  Gateway,
-  WorkspaceSignals,
-  WorkspaceStorage,
-  WorkspaceTurnJobs,
-  WorkspaceBackgroundJobs,
-} from "@amends/gateway";
+import { Gateway, WorkspaceSignals, WorkspaceStorage } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
@@ -149,11 +143,9 @@ export const installed = {
  * Background jobs the suites run themselves: each request is accepted and nothing runs, so a suite
  * runs the background process it expects, as a host's runner would.
  */
-export const manualBackgroundJobs: WorkspaceBackgroundJobs.Interface = {
-  forWorkspace: () => BackgroundJobs.Service.of({ request: () => Effect.void }),
-};
+export const manualBackgroundJobs = BackgroundJobs.Service.of({ request: () => Effect.void });
 export const layerManualBackgroundJobs = Layer.succeed(
-  WorkspaceBackgroundJobs.Service,
+  BackgroundJobs.Service,
   manualBackgroundJobs,
 );
 
@@ -206,8 +198,8 @@ const withHostServices = (
   bind(
     context.pipe(
       Context.add(Signals.Service, workspaceSignals.forWorkspace(id)),
-      Context.add(BackgroundJobs.Service, manualBackgroundJobs.forWorkspace(id)),
-      Context.add(TurnJobs.Service, WorkspaceTurnJobs.noRunner.forWorkspace(id)),
+      Context.add(BackgroundJobs.Service, manualBackgroundJobs),
+      Context.add(TurnJobs.Service, TurnJobs.noRunner),
       Context.add(ConnectionCatalog.Service, catalog),
       Context.add(EnvironmentCatalog.Service, environmentCatalog),
     ),
@@ -263,7 +255,7 @@ export const make = (harness: Harness) => {
           Layer.succeedContext(host),
           harness.crypto,
           layerManualBackgroundJobs,
-          WorkspaceTurnJobs.layerNoRunner,
+          TurnJobs.layerNoRunner,
         ),
       ),
     );

@@ -8,7 +8,6 @@
 import { Store } from "@amends/core/journal";
 import { Turn, TurnJobs } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
-import { WorkspaceTurnJobs } from "@amends/gateway";
 import { Cause, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
@@ -78,28 +77,23 @@ export const maxFailedRuns = 8;
  * @category layers
  */
 export const layerRequests = Layer.effect(
-  WorkspaceTurnJobs.Service,
+  TurnJobs.Service,
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
     const turnJobClient = yield* entity.client;
-    return WorkspaceTurnJobs.Service.of({
-      forWorkspace: (workspaceId) =>
-        TurnJobs.Service.of({
-          request: Effect.fnUntraced(function* (turnId) {
-            const storeTransaction = yield* Store.Transaction;
-            const at = yield* DateTime.now;
-            yield* turnJobClient(entityId(workspaceId, turnId))
-              .Run(new Run({ workspaceId, turnId, key: "created", at, attempt: 0 }), {
-                discard: true,
-              })
-              .pipe(
-                Effect.mapError(
-                  (cause) => new Store.Failure({ operation: "request turn job", cause }),
-                ),
-              );
-            yield* storeTransaction.afterCommit(sharding.pollStorage);
-          }),
-        }),
+    return TurnJobs.Service.of({
+      request: Effect.fnUntraced(function* ({ workspaceId, turnId }) {
+        const storeTransaction = yield* Store.Transaction;
+        const at = yield* DateTime.now;
+        yield* turnJobClient(entityId(workspaceId, turnId))
+          .Run(new Run({ workspaceId, turnId, key: "created", at, attempt: 0 }), {
+            discard: true,
+          })
+          .pipe(
+            Effect.mapError((cause) => new Store.Failure({ operation: "request turn job", cause })),
+          );
+        yield* storeTransaction.afterCommit(sharding.pollStorage);
+      }),
     });
   }),
 );

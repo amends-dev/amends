@@ -1,25 +1,29 @@
-import { Context, Effect } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { DateTime } from "effect";
 import type { Reaction } from "../journal/reaction.ts";
 import { Store } from "../journal/store.ts";
+import type { WorkspaceId } from "../workspace/id.ts";
 
 import type { BackgroundProcess } from "./process.ts";
 
+/** A request for a workspace's background process to run, now or at `at`. */
+export interface Request {
+  readonly workspaceId: WorkspaceId.Id;
+  readonly process: BackgroundProcess.Name;
+  readonly at?: DateTime.Utc | undefined;
+}
+
 /**
- * Background jobs: requests for one workspace's background processes to run. Hosts supply it,
- * bound to the workspace, and deliver each request to whatever runs the workspace's background
- * jobs.
+ * Background jobs: requests for workspaces' background processes to run. Hosts supply it and
+ * deliver each request to whatever runs background jobs.
  */
 export interface Interface {
   /**
-   * Ask for a process to run, now or at `at`, as part of the caller's commit: the request is
-   * stored with the commit and discarded if it rolls back. Asking again in the same commit for
-   * the same process and time asks once.
+   * Request a process's background job as part of the caller's commit: the request is stored with
+   * the commit and discarded if it rolls back. Asking again in the same commit for the same
+   * process and time asks once.
    */
-  readonly request: (
-    process: BackgroundProcess.Name,
-    options?: { readonly at?: DateTime.Utc | undefined },
-  ) => Effect.Effect<void, Store.Failure, Store.Transaction>;
+  readonly request: (request: Request) => Effect.Effect<void, Store.Failure, Store.Transaction>;
 }
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
@@ -27,8 +31,26 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 
 /**
- * The journal reactions that request each process's background job when a commit publishes a fact
- * it wakes on, once per process however many such facts the commit publishes.
+ * For a host that runs no background jobs: a commit that requests one fails, so no work is
+ * accepted that nothing would do.
+ */
+export const unavailable: Interface = Service.of({
+  request: ({ process }) =>
+    Effect.fail(
+      new Store.Failure({
+        operation: "request background job",
+        cause: `This host runs no background jobs, so ${process} cannot run`,
+      }),
+    ),
+});
+
+/** @category layers */
+export const layerUnavailable = Layer.succeed(Service, unavailable);
+
+/**
+ * The journal reactions that request each process's background job, in the workspace of the fact
+ * that wakes it, when a commit publishes such a fact; once per process however many such facts the
+ * commit publishes.
  */
 export const reactions = (
   processes: ReadonlyArray<
@@ -44,7 +66,10 @@ export const reactions = (
         const storeTransaction = yield* Store.Transaction;
         const woken = requested.get(storeTransaction) ?? new Set();
         if (woken.has(process.name)) return;
-        yield* (yield* Service).request(process.name);
+        yield* (yield* Service).request({
+          workspaceId: event.provenance.workspaceId,
+          process: process.name,
+        });
         woken.add(process.name);
         requested.set(storeTransaction, woken);
       }),

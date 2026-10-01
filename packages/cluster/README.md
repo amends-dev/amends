@@ -27,8 +27,8 @@ owns the entity handles it when it arrives. Cluster keeps an entity on one runne
 job handles one request at a time, and redelivers a request whose handling was cut short, so work
 resumes after a restart. Each kind has the same three layers:
 
-- `layerRequests` provides the gateway's contract for the kind, through which core requests jobs
-  in a commit. Sent inside the commit, a request is stored in the commit's transaction when
+- `layerRequests` provides core's service for the kind (`BackgroundJobs` or `TurnJobs`), through
+  which core requests jobs in a commit, each request naming its workspace. Sent inside the commit, a request is stored in the commit's transaction when
   Cluster's message storage uses the same SQL client as the workspace's storage; the host
   composing them owns that. Cluster saves such a persisted request and only notifies its runner
   best-effort, so a shard not yet assigned does not hold up the commit: the runner that takes the
@@ -48,7 +48,7 @@ minutes.
 
 A background job is one workspace's background process: an entity, `amends/BackgroundJob`, keyed
 by workspace and process, whose `Run` requests say when the process should run.
-`BackgroundJob.layerRequests` provides `WorkspaceBackgroundJobs.Service`; a commit's request is
+`BackgroundJob.layerRequests` provides core's `BackgroundJobs.Service`; a commit's request is
 keyed by its commit ID, so a commit that asks twice asks once.
 
 When a `Run` arrives, the worker calls `runBackgroundProcess`, then asks for the next run: at once
@@ -68,7 +68,7 @@ A turn job is one turn: an entity, `amends/TurnJob`, keyed by workspace and turn
 it to run (`Run`) or to give up (`Abandon`), so a turn runs once at a time while different turns run
 side by side, and a run cut short continues after a restart.
 
-`TurnJob.layerRequests` provides `WorkspaceTurnJobs.Service`. Core requests a run in the commit
+`TurnJob.layerRequests` provides core's `TurnJobs.Service`. Core requests a run in the commit
 that creates or retries a turn, through a journal reaction to `TurnFacts.Created` and
 `TurnFacts.Retried`, keyed `created`, so a commit asks once.
 

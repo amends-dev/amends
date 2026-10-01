@@ -9,7 +9,7 @@
 import { BackgroundJobs, BackgroundProcess } from "@amends/core/background";
 import { Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { Gateway, WorkspaceBackgroundJobs } from "@amends/gateway";
+import { Gateway } from "@amends/gateway";
 import { Cause, Crypto, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
@@ -69,30 +69,27 @@ export const maxUnknownRuns = 10;
  * @category layers
  */
 export const layerRequests = Layer.effect(
-  WorkspaceBackgroundJobs.Service,
+  BackgroundJobs.Service,
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
     const backgroundJobClient = yield* entity.client;
-    return WorkspaceBackgroundJobs.Service.of({
-      forWorkspace: (workspaceId) =>
-        BackgroundJobs.Service.of({
-          request: Effect.fnUntraced(function* (process, options = {}) {
-            const storeTransaction = yield* Store.Transaction;
-            const at = options.at ?? (yield* DateTime.now);
-            const key =
-              options.at === undefined
-                ? `commit:${storeTransaction.id}`
-                : `commit:${storeTransaction.id}@${DateTime.toEpochMillis(at)}`;
-            yield* backgroundJobClient(entityId(workspaceId, process))
-              .Run(new Run({ workspaceId, process, key, at, attempt: 0 }), { discard: true })
-              .pipe(
-                Effect.mapError(
-                  (cause) => new Store.Failure({ operation: "request background job", cause }),
-                ),
-              );
-            yield* storeTransaction.afterCommit(sharding.pollStorage);
-          }),
-        }),
+    return BackgroundJobs.Service.of({
+      request: Effect.fnUntraced(function* ({ workspaceId, process, at: requestedAt }) {
+        const storeTransaction = yield* Store.Transaction;
+        const at = requestedAt ?? (yield* DateTime.now);
+        const key =
+          requestedAt === undefined
+            ? `commit:${storeTransaction.id}`
+            : `commit:${storeTransaction.id}@${DateTime.toEpochMillis(at)}`;
+        yield* backgroundJobClient(entityId(workspaceId, process))
+          .Run(new Run({ workspaceId, process, key, at, attempt: 0 }), { discard: true })
+          .pipe(
+            Effect.mapError(
+              (cause) => new Store.Failure({ operation: "request background job", cause }),
+            ),
+          );
+        yield* storeTransaction.afterCommit(sharding.pollStorage);
+      }),
     });
   }),
 );
