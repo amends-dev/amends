@@ -180,10 +180,10 @@ it.effect("an unknown process is dropped after ten runs, a missing workspace aft
       yield* wakeIn("commit-1");
       // Its nine backoffs add up to under fifteen minutes; after them, nothing runs again.
       yield* TestClock.adjust("15 minutes");
-      expect(unknown.runs).toHaveLength(ClusterBackground.unknownAttempts);
+      expect(unknown.runs).toHaveLength(ClusterBackground.maxUnknownRuns);
       yield* TestClock.adjust("15 minutes");
     }).pipe(Effect.provide(unknown.layer));
-    expect(unknown.runs).toHaveLength(ClusterBackground.unknownAttempts);
+    expect(unknown.runs).toHaveLength(ClusterBackground.maxUnknownRuns);
     const missing = background(() =>
       Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId })),
     );
@@ -205,27 +205,5 @@ it.effect("a wake asked for a later time waits for it", () =>
       yield* TestClock.adjust("2 minutes");
     }).pipe(Effect.provide(layer));
     expect(seconds(runs)).toEqual([300]);
-  }),
-);
-
-it.effect("handled wakes are pruned every hour, once they are a week old", () =>
-  Effect.gen(function* () {
-    const calls: Array<{ readonly types: ReadonlyArray<string>; readonly before: number }> = [];
-    const pruning = ClusterBackground.layerPruning({
-      prune: (types, before) =>
-        Effect.sync(() => {
-          calls.push({ types, before: DateTime.toEpochMillis(before) });
-          return 0;
-        }),
-    }).pipe(Layer.provideMerge(cluster));
-    yield* TestClock.adjust("3 hours").pipe(Effect.provide(pruning), Effect.scoped);
-    const week = Duration.toMillis(Duration.days(7));
-    const hour = Duration.toMillis(Duration.hours(1));
-    expect(calls).toEqual(
-      [1, 2, 3].map((hours) => ({
-        types: ["amends/WorkspaceProcess", "ClusterCron/amends/prune-wakes"],
-        before: hours * hour - week,
-      })),
-    );
   }),
 );

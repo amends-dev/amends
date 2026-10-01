@@ -114,8 +114,8 @@ restart.
   turn again in the same `Run` after an interruption worth retrying.
 - `layer` provides both. Every runner over the same storage runs the worker.
 
-Handled runs are pruned with background wakes when the host passes `TurnEntity.type` to
-`ClusterBackground.layerPruning`.
+Handled requests are pruned with background wakes when the host lists `TurnEntity.type` in the
+gateway's [`ClusterPruning.layer`](../gateway/README.md#background-work-on-effect-cluster).
 
 ## Limits
 

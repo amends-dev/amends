@@ -1,6 +1,11 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
-import { ClusterBackground, Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import {
+  ClusterBackground,
+  ClusterPruning,
+  Gateway,
+  type WorkspaceDirectory,
+} from "@amends/gateway";
 import { ClusterTurns, TurnRunner } from "@amends/execution";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
@@ -115,9 +120,9 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer =>
   Layer.mergeAll(
     ClusterBackground.layerWorker,
-    ClusterBackground.layerPruning({
+    ClusterPruning.layer({
       prune: PostgresClusterStorage.prune,
-      entityTypes: [ClusterTurns.TurnEntity.type],
+      entityTypes: [ClusterBackground.WorkspaceProcess.type, ClusterTurns.TurnEntity.type],
     }),
     ClusterTurns.layerWorker.pipe(Layer.provide(TurnRunner.layer(execution))),
   ).pipe(

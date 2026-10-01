@@ -251,7 +251,7 @@ model adds its own time to step 4.
 | Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                            |
 | How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                   |
 | How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                                 |
-| Retry, delay, pruning of wakes and requests   | `ClusterBackground`, `ClusterTurns`, `ClusterRetry`                                                          |
+| Retry, delay, pruning of wakes and requests   | `ClusterBackground`, `ClusterTurns`, `ClusterRetry`, `ClusterPruning`                                        |
 | What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                        |
 
 To find what reacts to a fact, find references to its constant, such as `ThreadActivityFacts.Recorded`:
@@ -263,6 +263,6 @@ projections, reactions, the change feed, and `wakesOn` triggers all name it.
   reply, and the timeline's `turn.created`, `turn.started`, reply, `turn.ended`.
 - `hosts/local/test/background.test.ts` checks a wake is stored with its commit and not if the
   commit rolls back.
-- `packages/gateway/test/cluster-background.test.ts` covers wake dedupe, rescheduling, backoff,
-  dropping, and pruning.
+- `packages/gateway/test/cluster-background.test.ts` covers wake dedupe, rescheduling, retry
+  delays, and dropping; `cluster-pruning.test.ts` covers pruning.
 - `packages/execution/test/runner.test.ts` runs the runner over turn execution in memory.

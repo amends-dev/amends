@@ -186,19 +186,22 @@ resumes after a restart.
   already reached takes a fresh key, since its wake may have run and a repeated key would be
   dropped. Wakes are not coalesced: each commit's wake runs the process once, and a run that
   finds nothing outstanding returns at once. A process this host does
-  not register is dropped after `unknownAttempts` (ten) failed runs, and a workspace that was
+  not register is dropped after `maxUnknownRuns` (ten) failed runs, and a workspace that was
   never created at once. It fails a wake it drops with `ClusterBackground.Dropped`, naming the
   reason and the retries before it, so Cluster keeps the drop as the wake's reply, where
   operators find it until handled wakes are pruned. A wake it could not act on stays
   undelivered, so Cluster runs it again.
 - `layer` provides both. Every runner over the same storage runs the worker, as Cluster
   requires of every entity type.
-- `layerPruning({ prune, keep?, entityTypes? })` removes handled wakes once they are older than
-  `keep` (seven days by default), with the job's own past runs and the handled messages of any
-  other `entityTypes`, such as [turns'](../execution/README.md#turns-on-effect-cluster), every
-  hour on one runner, through `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
-  supplies `prune`. By then a wake's key no longer needs to stop a repeat: commits are not
-  retried days later, and wakes not yet handled are kept however old.
+
+`ClusterPruning.layer({ prune, entityTypes, keep? })` removes the handled requests of the entity
+types it is given, such as `ClusterBackground.WorkspaceProcess.type` and
+[turns'](../execution/README.md#turns-on-effect-cluster), with the job's own past runs, once they
+are older than `keep` (seven days by default), every hour on one runner, through `ClusterCron`.
+Cluster removes neither, and only the host's storage knows how, so the host supplies `prune`. By
+then a request's key no longer needs to stop a repeat, since nothing asks again days later, and
+requests not yet handled are kept however old. `ClusterRetry.delay` is the delay before both
+entities' retries.
 
 `WorkspaceSignals.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because

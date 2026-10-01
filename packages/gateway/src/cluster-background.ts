@@ -8,20 +8,8 @@
 import { BackgroundProcess, BackgroundWakes } from "@amends/core/background";
 import { Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import {
-  Cause,
-  Cron,
-  Crypto,
-  DateTime,
-  Duration,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  PrimaryKey,
-  Schema,
-} from "effect";
-import { ClusterCron, ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
+import { Cause, Crypto, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
+import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
 import { ClusterRetry } from "./cluster-retry.ts";
 import { Gateway } from "./gateway.ts";
@@ -29,7 +17,8 @@ import { WorkspaceWakes } from "./wakes.ts";
 
 /**
  * A request for a workspace's process to run at `at`. Its key identifies it among the process's
- * wakes: Cluster keeps one wake per key, so a commit's retry or a repeated schedule asks once.
+ * wakes: Cluster keeps one wake per key, so a commit that asks twice, or runs that ask for the
+ * same later time, store one wake.
  */
 export class Wake extends Schema.Class<Wake>("amends/background/Wake")({
   workspaceId: Workspace.Id,
@@ -68,7 +57,7 @@ export const entityId = (workspaceId: Workspace.Id, process: BackgroundProcess.N
   JSON.stringify([workspaceId, process]);
 
 /** An unknown process is dropped after this many failed runs, as when its host no longer runs it. */
-export const unknownAttempts = 10;
+export const maxUnknownRuns = 10;
 
 /**
  * Wakes stored by Cluster. Sent inside a commit, a wake shares its transaction when Cluster's
@@ -154,7 +143,7 @@ export const layerWorker = WorkspaceProcess.toLayer(
           const failure = Option.map(Cause.findErrorOption(exit.cause), (error) => error._tag);
           const notFound = Option.contains(failure, "Gateway.WorkspaceNotFound");
           const unknown = Option.contains(failure, "BackgroundRuns.Unknown");
-          if (notFound || (unknown && wake.attempt + 1 >= unknownAttempts)) {
+          if (notFound || (unknown && wake.attempt + 1 >= maxUnknownRuns)) {
             yield* Effect.logError("Background process dropped", {
               workspaceId: wake.workspaceId,
               process: wake.process,
@@ -185,46 +174,5 @@ export const layerWorker = WorkspaceProcess.toLayer(
 
 /** Stored wakes and the worker that runs them, over the host's Cluster. @category layers */
 export const layer = Layer.merge(layerWorker, layerWakes);
-
-/** The name of the job that prunes handled wakes. */
-export const pruningJobName = "amends/prune-wakes";
-
-/**
- * Remove the handled messages of these entity types stored before `before`, with anything
- * Cluster kept for them, and return how many went; the host's storage knows how.
- */
-export type Prune<E, R> = (
-  entityTypes: ReadonlyArray<string>,
-  before: DateTime.Utc,
-) => Effect.Effect<number, E, R>;
-
-/**
- * Prune handled wakes, and the job's own past runs, once they are older than `keep` (seven days
- * by default), every hour on one runner of the cluster. Cluster removes neither. A wake's key
- * then no longer stops a repeat, which no longer arises: commits are not retried days later.
- * `entityTypes` names other entities whose handled messages go the same way, such as turns'.
- *
- * @category layers
- */
-export const layerPruning = <E, R>(options: {
-  readonly prune: Prune<E, R>;
-  readonly keep?: Duration.Input | undefined;
-  readonly entityTypes?: ReadonlyArray<string> | undefined;
-}) => {
-  const keep = Duration.fromInputUnsafe(options.keep ?? "7 days");
-  const entityTypes = [WorkspaceProcess.type, ...(options.entityTypes ?? [])];
-  return ClusterCron.make({
-    name: pruningJobName,
-    cron: Cron.parseUnsafe("0 * * * *"),
-    execute: Effect.gen(function* () {
-      const before = DateTime.subtractDuration(yield* DateTime.now, keep);
-      const removed = yield* options.prune(
-        [...entityTypes, `ClusterCron/${pruningJobName}`],
-        before,
-      );
-      if (removed > 0) yield* Effect.logInfo("Pruned handled background wakes", { removed });
-    }),
-  });
-};
 
 export * as ClusterBackground from "./cluster-background.ts";
