@@ -97,7 +97,7 @@ to run. Cluster keeps an entity on one runner at a time, so a turn runs once at 
 different turns run side by side, and redelivers a run cut short, so a turn continues after a
 restart.
 
-- `layerDispatch` provides the gateway's `WorkspaceTurns.Service`. Core asks for a run in the
+- `layerDispatch` provides the gateway's `WorkspaceTurnDispatch.Service`. Core asks for a run in the
   commit that creates or retries a turn, through a journal reaction to `TurnFacts.Created` and
   `TurnFacts.Retried`, and the request is keyed `created`, so a commit asks once. Sent inside the commit, it is stored in the commit's
   transaction when Cluster's message storage uses the workspace storage's SQL client, as with

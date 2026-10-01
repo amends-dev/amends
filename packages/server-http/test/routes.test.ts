@@ -30,7 +30,7 @@ import {
   MemberPermissions,
   Workspace,
 } from "@amends/core/workspace";
-import { Credentials, Gateway, GatewayErrors, SignIn, WorkspaceDirectory } from "@amends/gateway";
+import { SessionTokens, Gateway, GatewayErrors, SignIn, WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/unstable/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
@@ -245,7 +245,10 @@ const gateway = Layer.succeed(
     createWorkspace: record("createWorkspace", () => Effect.succeed(workspace)),
     inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, Core.Operations>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] });
-      return Effect.provide(program, operations) as Effect.Effect<A, GatewayErrors.ExposedError<E>>;
+      return Effect.provide(program, operations) as Effect.Effect<
+        A,
+        GatewayErrors.PublicErrorOf<E>
+      >;
     },
     asMember: <A, E>(
       id: Workspace.Id,
@@ -258,15 +261,15 @@ const gateway = Layer.succeed(
       return Effect.provide(
         Effect.provideService(program, Actor.Service, actor),
         operations,
-      ) as Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember>;
+      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember>;
     },
   }),
 );
 
 /** Trusts the token as a human ID, like the local host's development credentials. */
 const credentials = Layer.succeed(
-  Credentials.Service,
-  Credentials.Service.of({
+  SessionTokens.Service,
+  SessionTokens.Service.of({
     resolve: (credential) => {
       const token = Redacted.value(credential);
       if (token === "agent")
@@ -274,7 +277,7 @@ const credentials = Layer.succeed(
           Identity.Reference.cases.Agent.make({ id: Identity.AgentId.make(token) }),
         );
       if (token.length === 0 || token === "invalid")
-        return Effect.fail(new Credentials.Rejected({ reason: "unknown" }));
+        return Effect.fail(new SessionTokens.Rejected({ reason: "unknown" }));
       return Effect.succeed(
         Identity.Reference.cases.Human.make({ id: Identity.HumanId.make(token) }),
       );

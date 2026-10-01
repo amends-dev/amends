@@ -23,13 +23,13 @@ import {
   Schedule,
   Scope,
 } from "effect";
-import { SignalHub } from "./signals.ts";
+import { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceWakes } from "./wakes.ts";
-import { WorkspaceTurns } from "./turns.ts";
+import { WorkspaceTurnDispatch } from "./turn-dispatch.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
-export type Provided = Layer.Success<typeof Core.layer> | Core.HostServices;
+export type Services = Layer.Success<typeof Core.layer> | Core.HostServices;
 
 export interface Options {
   /**
@@ -44,19 +44,22 @@ export interface Options {
   readonly harnesses?: ReadonlyArray<HarnessImplementation.Declaration> | undefined;
   readonly sandboxes?: ReadonlyArray<SandboxImplementation.Declaration> | undefined;
   /**
-   * How long a workspace stays prepared after its last lease closes. A later request boots it
+   * How long a workspace stays prepared after its last lease closes. A later request prepares it
    * again from storage. Defaults to five minutes.
    */
   readonly idleTimeToLive?: Duration.Input | undefined;
 }
 
 export interface Interface {
-  /** Share a prepared workspace for the caller's scope; it stays prepared while any lease is open. */
-  readonly forWorkspace: (
+  /**
+   * Lease the workspace's prepared runtime for the caller's scope, preparing it first if need be;
+   * it stays prepared while any lease is open.
+   */
+  readonly lease: (
     workspaceId: Workspace.Id,
-  ) => Effect.Effect<Context.Context<Provided>, never, Scope.Scope>;
-  /** Whether the workspace is prepared or being prepared, so a lease on it would not boot it. */
-  readonly prepared: (workspaceId: Workspace.Id) => Effect.Effect<boolean>;
+  ) => Effect.Effect<Context.Context<Services>, never, Scope.Scope>;
+  /** Whether the workspace is prepared or being prepared, so a lease on it would not prepare it. */
+  readonly isPrepared: (workspaceId: Workspace.Id) => Effect.Effect<boolean>;
   /**
    * Stop sharing the workspace's prepared runtime: leases already open keep it until they close,
    * and the next lease prepares the workspace again from storage, replaying what it needs.
@@ -65,38 +68,40 @@ export interface Interface {
 }
 
 /**
- * Lazily boot each workspace in the host scope. Concurrent callers await the same boot, and
- * a successful runtime keeps its services, including its change-feed follower, while leases are
- * open and for the idle time-to-live after the last one closes; then it is released, and the
- * next request boots it again. Request identity and transaction context must never enter service construction.
+ * Lazily prepare each workspace in the host scope. Concurrent callers await the same preparation,
+ * and a successful runtime keeps its services, including its change-feed follower, while leases
+ * are open and for the idle time-to-live after the last one closes; then it is released, and the
+ * next request prepares it again. Request identity and transaction context must never enter service construction.
  *
  * @category constructors
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
-  const signalHub = yield* SignalHub.Service;
+  const workspaceSignals = yield* WorkspaceSignals.Service;
   const workspaceWakes = yield* WorkspaceWakes.Service;
-  const workspaceTurns = yield* WorkspaceTurns.Service;
+  const workspaceTurnDispatch = yield* WorkspaceTurnDispatch.Service;
   const crypto = yield* Crypto.Crypto;
-  const environment = yield* Effect.context<never>();
-  const catalog = ConnectionCatalog.make(options.connections ?? []);
-  const environments = EnvironmentCatalog.make({
+  const hostContext = yield* Effect.context<never>();
+  const connectionCatalog = ConnectionCatalog.make(options.connections ?? []);
+  const environmentCatalog = EnvironmentCatalog.make({
     harnesses: options.harnesses,
     sandboxes: options.sandboxes,
   });
 
-  const boot = Effect.fn("WorkspaceRuntime.boot")(function* (workspaceId: Workspace.Id) {
+  const prepareWorkspace = Effect.fn("WorkspaceRuntime.prepareWorkspace")(function* (
+    workspaceId: Workspace.Id,
+  ) {
     const bindings = yield* workspaceStorage.forWorkspace(workspaceId);
     const services = Core.layer.pipe(
       Layer.provideMerge(
         Layer.mergeAll(
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
-          Layer.succeed(Signals.Service, signalHub.forWorkspace(workspaceId)),
+          Layer.succeed(Signals.Service, workspaceSignals.forWorkspace(workspaceId)),
           Layer.succeed(BackgroundWakes.Service, workspaceWakes.forWorkspace(workspaceId)),
-          Layer.succeed(TurnDispatch.Service, workspaceTurns.forWorkspace(workspaceId)),
-          Layer.succeed(ConnectionCatalog.Service, catalog),
-          Layer.succeed(EnvironmentCatalog.Service, environments),
+          Layer.succeed(TurnDispatch.Service, workspaceTurnDispatch.forWorkspace(workspaceId)),
+          Layer.succeed(ConnectionCatalog.Service, connectionCatalog),
+          Layer.succeed(EnvironmentCatalog.Service, environmentCatalog),
         ),
       ),
       Layer.orDie,
@@ -106,12 +111,12 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     // Bring built-in roles recorded by older code to this host's bundles. Recorded roles still
     // serve if it cannot run now, such as while another host writes; it then tries again in the
     // background, backing off to once a minute, for as long as the workspace stays prepared.
-    const upgrade = BuiltinRoleUpgrade.upgrade().pipe(Effect.provide(context));
-    yield* upgrade.pipe(
+    const upgradeBuiltinRoles = BuiltinRoleUpgrade.upgrade().pipe(Effect.provide(context));
+    yield* upgradeBuiltinRoles.pipe(
       Effect.catch((error) =>
         Effect.logWarning("Built-in role upgrade did not run; trying again later", error).pipe(
           Effect.andThen(
-            upgrade.pipe(
+            upgradeBuiltinRoles.pipe(
               Effect.retry(
                 Schedule.min([Schedule.exponential("1 second"), Schedule.spaced("1 minute")]),
               ),
@@ -125,15 +130,15 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     return context;
   });
 
-  const runtimes: LayerMap.LayerMap<Workspace.Id, Provided> = yield* LayerMap.make(
+  const runtimes: LayerMap.LayerMap<Workspace.Id, Services> = yield* LayerMap.make(
     (workspaceId: Workspace.Id) =>
       Layer.effectContext(
         Effect.gen(function* () {
           const scope = yield* Scope.fork(yield* Scope.Scope);
-          return yield* boot(workspaceId).pipe(
-            Effect.setContext(Context.add(environment, Scope.Scope, scope)),
+          return yield* prepareWorkspace(workspaceId).pipe(
+            Effect.setContext(Context.add(hostContext, Scope.Scope, scope)),
             // Evict from the acquisition itself: a cancelled waiter must never
-            // discard shared boot, and failed waiters must not evict a later retry.
+            // discard a shared preparation, and failed waiters must not evict a later retry.
             Effect.onExit((exit) =>
               Exit.isFailure(exit)
                 ? Scope.close(scope, exit).pipe(Effect.ensuring(runtimes.invalidate(workspaceId)))
@@ -145,18 +150,16 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     { idleTimeToLive: options.idleTimeToLive ?? Duration.minutes(5) },
   );
 
-  const forWorkspace = Effect.fn("WorkspaceRuntime.forWorkspace")(function* (
-    workspaceId: Workspace.Id,
-  ) {
+  const lease = Effect.fn("WorkspaceRuntime.lease")(function* (workspaceId: Workspace.Id) {
     const id = yield* Effect.orDie(Schema.decodeEffect(Workspace.Id)(workspaceId));
     return yield* runtimes.contextEffect(id);
   });
 
-  const prepared = (workspaceId: Workspace.Id) => RcMap.has(runtimes.rcMap, workspaceId);
+  const isPrepared = (workspaceId: Workspace.Id) => RcMap.has(runtimes.rcMap, workspaceId);
 
   const invalidate = (workspaceId: Workspace.Id) => runtimes.invalidate(workspaceId);
 
-  return { forWorkspace, prepared, invalidate } satisfies Interface;
+  return { lease, isPrepared, invalidate } satisfies Interface;
 });
 
 export * as WorkspaceRuntime from "./workspace-runtime.ts";

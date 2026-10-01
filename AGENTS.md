@@ -40,7 +40,7 @@ currently run through TypeScript. Check compatibility before changing this setup
   reads in one `query.ts` service; a command may read through the query, a query never
   writes, and a step with one caller stays a private function of that caller. `gateway` is how a host enters core: it bootstraps
   a workspace and resolves an authenticated identity into the actor, and it holds
-  the host contracts for storage, sign-in, credential resolution, and the workspace
+  the host contracts for storage, sign-in, session token resolution, and the workspace
   directory. `api-http` is the HTTP contract shared by servers and clients, and
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
   over the same gateway rather than new gateway methods. `storage-conformance` holds

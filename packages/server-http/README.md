@@ -67,9 +67,9 @@ preserve the existing `identity` and `people` JSON keys.
 ## Construction and registration
 
 `BearerAuthentication.make()` constructs the contract's `Authentication`
-implementation from `Credentials.Service`. `BearerAuthentication.layer`
+implementation from `SessionTokens.Service`. `BearerAuthentication.layer`
 delegates to it. Construction captures the resolver; each request resolves its
-own credential and supplies its own `Principal`. Hosts provide the credential
+own bearer token and supplies its own `Principal`. Hosts provide the token
 resolver through the gateway contract.
 
 Each handler module exports `layer`, using Effect's `HttpApiBuilder.group` to
@@ -81,7 +81,7 @@ collection. `HttpApiBuilder` checks that every declared endpoint is implemented.
 `Routes.layer` registers every group and serves the OpenAPI document at
 `/openapi.json`; `Routes.layerDocs` serves interactive documentation at `/docs`.
 `Routes.layerHandlers` exposes the group layers and authentication for tests.
-A host supplies `Gateway.Service`, `SignIn.Service`, `Credentials.Service`,
+A host supplies `Gateway.Service`, `SignIn.Service`, `SessionTokens.Service`,
 `WorkspaceDirectory.Service`, and its platform HTTP services, then mounts the
 route layers with `HttpRouter.serve` or `HttpRouter.toWebHandler`.
 

@@ -8,7 +8,7 @@ import { Store } from "@amends/core/journal";
 import { Turn } from "@amends/core/turn";
 import { TurnDispatch } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
-import { WorkspaceTurns } from "@amends/gateway";
+import { WorkspaceTurnDispatch } from "@amends/gateway";
 import { Cause, DateTime, Duration, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, DeliverAt, Entity } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
@@ -58,10 +58,10 @@ export const attempts = 8;
  * @category layers
  */
 export const layerDispatch = Layer.effect(
-  WorkspaceTurns.Service,
+  WorkspaceTurnDispatch.Service,
   Effect.gen(function* () {
     const clientFor = yield* TurnEntity.client;
-    return WorkspaceTurns.Service.of({
+    return WorkspaceTurnDispatch.Service.of({
       forWorkspace: (workspaceId) =>
         TurnDispatch.Service.of({
           request: Effect.fnUntraced(function* (turnId) {

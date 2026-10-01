@@ -3,7 +3,7 @@ import type { Workspace } from "@amends/core/workspace";
 import { Context, Effect, Layer } from "effect";
 
 /**
- * Host contract for running turns: each commit's requests for a workspace's turns to run,
+ * Host contract for turn dispatch: each commit's requests for a workspace's turns to run,
  * delivered to whatever runs them.
  */
 export interface Interface {
@@ -12,18 +12,18 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/gateway/turns/Service",
+  "@amends/gateway/turn-dispatch/Service",
 ) {}
 
 /**
  * For a host that runs no turns, or runs them itself: requests are accepted and nothing runs, so
  * agents still accept their work, which waits queued until something executes it.
  */
-export const idle: Interface = {
+export const noRunner: Interface = {
   forWorkspace: () => TurnDispatch.Service.of({ request: () => Effect.void }),
 };
 
 /** @category layers */
-export const layerIdle = Layer.succeed(Service, idle);
+export const layerNoRunner = Layer.succeed(Service, noRunner);
 
-export * as WorkspaceTurns from "./turns.ts";
+export * as WorkspaceTurnDispatch from "./turn-dispatch.ts";

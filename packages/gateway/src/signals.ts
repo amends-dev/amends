@@ -3,7 +3,7 @@ import type { Workspace } from "@amends/core/workspace";
 import { Context } from "effect";
 
 /**
- * Host contract for ephemeral signals, such as typing: one hub shared by every process serving
+ * Host contract for ephemeral signals, such as typing: a hub shared by every process serving
  * the same workspaces, so a signal published in one reaches subscribers in all of them. It stores
  * nothing, and missed signals are gone. The storage adapters provide one over their system.
  */
@@ -16,4 +16,4 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/gateway/signals/Service",
 ) {}
 
-export * as SignalHub from "./signals.ts";
+export * as WorkspaceSignals from "./signals.ts";

@@ -41,7 +41,7 @@ export const layerHandlers = Layer.mergeAll(
 
 /**
  * The API routes and its OpenAPI document. Hosts provide Gateway.Service,
- * SignIn.Service, Credentials.Service, WorkspaceDirectory.Service, and their
+ * SignIn.Service, SessionTokens.Service, WorkspaceDirectory.Service, and their
  * platform's HTTP services, then serve this through HttpRouter.serve or
  * HttpRouter.toWebHandler.
  *

@@ -6,7 +6,7 @@ import { NotificationService } from "@amends/core/notification";
 import { Signal, SignalService } from "@amends/core/signal";
 import { Thread, ThreadService } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
-import { SignalHub } from "@amends/gateway";
+import { WorkspaceSignals } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Queue, Schema, Stream } from "effect";
 import type { Harness, Host } from "./harness.ts";
@@ -68,7 +68,7 @@ const markerFor = (memberId: Member.Id) =>
     caughtUpAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
   });
 const hubOf = (host: Context.Context<Host>, id = workspaceId) =>
-  Context.get(host, SignalHub.Service).forWorkspace(id);
+  Context.get(host, WorkspaceSignals.Service).forWorkspace(id);
 
 /** Ephemeral signals through the host's hub: delivery across hosts, by workspace and by reach. */
 export const signals = (harness: Harness) => {

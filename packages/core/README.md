@@ -368,7 +368,7 @@ are. A client folds a turn's items into one row at its `turn.created` position.
 The commit that creates or retries a turn asks `TurnDispatch` to run it, through a journal
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
 the turn. The gateway binds
-`TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
+`TurnDispatch` to its host's `WorkspaceTurnDispatch`; [execution](../execution/README.md) runs harnesses
 and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
 from a person's message through the wake, acceptance, and dispatch to the reply.
 
@@ -412,7 +412,7 @@ sequence, so reading a thread settles exactly its notifications. See
 ## Identity and target boundaries
 
 `Identity.Reference` identifies a Human, Agent, or Contact. `Identity.MemberReference`
-is the Human/Agent subset used by members, actors, credential resolution, and the
+is the Human/Agent subset used by members, actors, session token resolution, and the
 gateway. External authors use `Performer.Reference.Identity` with a Contact;
 `Performer.Reference.Member` always carries a member identity. Attribution does
 not grant authority, and a contact identity does not select an external reply destination.

@@ -23,7 +23,7 @@ import { BackgroundWakes } from "@amends/core/background";
 import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
 import { TurnDispatch } from "@amends/core/turn";
-import { WorkspaceTurns } from "@amends/gateway";
+import { WorkspaceTurnDispatch } from "@amends/gateway";
 import type { WorkspaceStorage, WorkspaceWakes } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
@@ -93,7 +93,10 @@ export const views = (options: PostgresStorage.Options = {}) =>
             context.pipe(
               Context.add(Signals.Service, hub.forWorkspace(workspaceId)),
               Context.add(BackgroundWakes.Service, manualWakes.forWorkspace(workspaceId)),
-              Context.add(TurnDispatch.Service, WorkspaceTurns.idle.forWorkspace(workspaceId)),
+              Context.add(
+                TurnDispatch.Service,
+                WorkspaceTurnDispatch.noRunner.forWorkspace(workspaceId),
+              ),
             ),
           ),
         ),

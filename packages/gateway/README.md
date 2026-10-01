@@ -13,7 +13,7 @@ The gateway implementation and its host contracts remain focused leaf modules.
 `gateway.ts` owns workspace entry, `storage.ts` binds workspace stores,
 `workspace-runtime.ts` owns prepared workspace services while they are in use,
 `directory.ts` describes cross-workspace discovery, and `sign-in.ts` and
-`credentials.ts` describe token issuance and resolution. Add a feature directory
+`session-tokens.ts` describe token issuance and resolution. Add a feature directory
 when one of these concepts needs related modules.
 
 `SignIn.Session` contains `token` and `humanId`. Its schema encodes `humanId` as
@@ -30,7 +30,8 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`SignalHub.Service`, `WorkspaceWakes.Service`, and `Crypto.Crypto`, in the host's scope. It captures
+`WorkspaceSignals.Service`, `WorkspaceWakes.Service`, `WorkspaceTurnDispatch.Service`, and
+`Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `options.connections` lists
@@ -42,10 +43,11 @@ storage bindings. Each defaults to none. `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
-`WorkspaceStorage`, `SignalHub`, `WorkspaceWakes`, `Credentials`, `SignIn`, and
-`WorkspaceDirectory` declare host-owned contracts. Their implementations and construction APIs
+`WorkspaceStorage`, `WorkspaceSignals`, `WorkspaceWakes`, `WorkspaceTurnDispatch`, `SessionTokens`,
+`SignIn`, and `WorkspaceDirectory` declare host-owned contracts. Their implementations and construction APIs
 belong to adapters or hosts; they have no default `make` or `layer` here, except
-`WorkspaceWakes.layerUnavailable` for hosts that run no background work. `Service.of(...)`
+`WorkspaceWakes.layerUnavailable` for hosts that run no background work and
+`WorkspaceTurnDispatch.layerNoRunner` for hosts that run no turns. `Service.of(...)`
 is sufficient to type-check a supplied implementation.
 
 ## Surface
@@ -84,11 +86,11 @@ is sufficient to type-check a supplied implementation.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
-`SignalHub.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
+`WorkspaceSignals.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
 `WorkspaceWakes.Service`, whose `forWorkspace` returns its `BackgroundWakes.Service`,
-`WorkspaceTurns.Service`, whose `forWorkspace` returns its `TurnDispatch.Service`, delivering
+`WorkspaceTurnDispatch.Service`, whose `forWorkspace` returns its `TurnDispatch.Service`, delivering
 requests to run new turns to whatever runs them, and `Crypto.Crypto`. A host that runs no turns
-provides `WorkspaceTurns.layerIdle`: agents still accept their work, which waits queued.
+provides `WorkspaceTurnDispatch.layerNoRunner`: agents still accept their work, which waits queued.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
@@ -119,7 +121,7 @@ follower, and the next request boots it again, finding its projections live. Mem
 therefore follows the workspaces in recent use rather than every workspace acquired since
 startup. Change-feed subscribers share their runtime's follower, and each process follows
 the journal itself, so subscribers on different hosts see the same commits. Signals reach
-them through the host's `SignalHub`, which relays between the processes over the same
+them through the host's `WorkspaceSignals`, which relays between the processes over the same
 storage. Host shutdown
 closes runtime resources and subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
@@ -193,7 +195,7 @@ resumes after a restart.
   supplies `prune`. By then a wake's key no longer needs to stop a repeat: commits are not
   retried days later, and wakes not yet handled are kept however old.
 
-`SignalHub.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
+`WorkspaceSignals.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because
 it stores nothing: an adapter may relay through its database, as PostgreSQL does with
 `NOTIFY`, or through any broker the host composes. Its `Signals.Service` is best effort; a
@@ -210,7 +212,7 @@ when a commit's outcome is unknown, and `InvalidInput` when core rejects
 caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its
 cause for host logging. `GatewayErrors.PublicError` is the schema of these
-outcomes, and `GatewayErrors.ExposedError<E>` computes a program's public error
+outcomes, and `GatewayErrors.PublicErrorOf<E>` computes a program's public error
 type from core's. A domain error core adds reaches callers only once it is listed there;
 otherwise it becomes a defect, which HTTP answers with 500. A server-http test checks that every
 error an HTTP route declares is public here or raised by the HTTP layer itself, and a gateway

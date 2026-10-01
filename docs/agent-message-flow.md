@@ -110,7 +110,7 @@ exists and its notification is still pending, or the reverse. Several pending no
 thread join one turn.
 
 A second reaction, `TurnDispatch.reactions` on `turn.created` and `turn.retried`, asks the host's
-`WorkspaceTurns` to run the turn, which stores a persisted `Run` message for the entity
+`WorkspaceTurnDispatch` to run the turn, which stores a persisted `Run` message for the entity
 `amends/Turn`, keyed by workspace and turn, in this same transaction.
 
 ## 4. The turn runs

@@ -51,9 +51,9 @@ import { Harness as HarnessContract, HarnessImplementation } from "@amends/harne
 import { SandboxImplementation } from "@amends/sandbox";
 import {
   Gateway,
-  SignalHub,
+  WorkspaceSignals,
   WorkspaceStorage,
-  WorkspaceTurns,
+  WorkspaceTurnDispatch,
   WorkspaceWakes,
 } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
@@ -197,14 +197,14 @@ export type Bound = ReturnType<typeof bind>;
  */
 const withHostServices = (
   context: Context.Context<WorkspaceStorage.Bindings>,
-  hub: SignalHub.Interface,
+  workspaceSignals: WorkspaceSignals.Interface,
   id: Workspace.Id,
 ) =>
   bind(
     context.pipe(
-      Context.add(Signals.Service, hub.forWorkspace(id)),
+      Context.add(Signals.Service, workspaceSignals.forWorkspace(id)),
       Context.add(BackgroundWakes.Service, manualWakes.forWorkspace(id)),
-      Context.add(TurnDispatch.Service, WorkspaceTurns.idle.forWorkspace(id)),
+      Context.add(TurnDispatch.Service, WorkspaceTurnDispatch.noRunner.forWorkspace(id)),
       Context.add(ConnectionCatalog.Service, catalog),
       Context.add(EnvironmentCatalog.Service, environmentCatalog),
     ),
@@ -213,14 +213,14 @@ const withHostServices = (
 /** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
   Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
-    withHostServices(context, Context.get(host, SignalHub.Service), id),
+    withHostServices(context, Context.get(host, WorkspaceSignals.Service), id),
   );
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = (id: Workspace.Id) =>
-  Effect.flatMap(Effect.context<WorkspaceStorage.Service | SignalHub.Service>(), (host) =>
+  Effect.flatMap(Effect.context<WorkspaceStorage.Service | WorkspaceSignals.Service>(), (host) =>
     Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
-      withHostServices(context, Context.get(host, SignalHub.Service), id),
+      withHostServices(context, Context.get(host, WorkspaceSignals.Service), id),
     ),
   );
 
@@ -260,7 +260,7 @@ export const make = (harness: Harness) => {
           Layer.succeedContext(host),
           harness.crypto,
           layerManualWakes,
-          WorkspaceTurns.layerIdle,
+          WorkspaceTurnDispatch.layerNoRunner,
         ),
       ),
     );
