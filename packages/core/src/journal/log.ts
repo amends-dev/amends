@@ -268,8 +268,8 @@ export const make = Effect.fn("Log.make")(function* (): Effect.fn.Return<
       if (Option.isNone(yield* Effect.serviceOption(Store.Transaction)))
         return yield* write(values, options, undefined, store.append);
       return yield* transaction.operation(
-        Effect.flatMap(Store.Transaction, (native) =>
-          write(values, options, native.id, native.append),
+        Effect.flatMap(Store.Transaction, (storeTransaction) =>
+          write(values, options, storeTransaction.id, storeTransaction.append),
         ),
       );
     });

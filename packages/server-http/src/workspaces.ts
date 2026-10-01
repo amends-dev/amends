@@ -20,7 +20,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(WorkspaceSettingsApplication.Service, (settings) => settings.get),
+            Effect.flatMap(
+              WorkspaceSettingsApplication.Service,
+              (workspaceSettingsApplication) => workspaceSettingsApplication.get,
+            ),
           ),
         ),
       members: ({ params }) =>
@@ -28,7 +31,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(WorkspaceSettingsApplication.Service, (settings) => settings.members),
+            Effect.flatMap(
+              WorkspaceSettingsApplication.Service,
+              (workspaceSettingsApplication) => workspaceSettingsApplication.members,
+            ),
           ),
         ),
       rename: ({ params, payload }) =>
@@ -36,8 +42,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(WorkspaceSettingsApplication.Service, (settings) =>
-              settings.rename(payload),
+            Effect.flatMap(WorkspaceSettingsApplication.Service, (workspaceSettingsApplication) =>
+              workspaceSettingsApplication.rename(payload),
             ),
           ),
         ),
@@ -46,7 +52,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(OwnershipApplication.Service, (ownership) => ownership.get),
+            Effect.flatMap(
+              OwnershipApplication.Service,
+              (ownershipApplication) => ownershipApplication.get,
+            ),
           ),
         ),
       transferOwnership: ({ params, payload }) =>
@@ -56,8 +65,8 @@ export const layer = HttpApiBuilder.group(
           return yield* gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(OwnershipApplication.Service, (ownership) =>
-              ownership.transfer(payload),
+            Effect.flatMap(OwnershipApplication.Service, (ownershipApplication) =>
+              ownershipApplication.transfer(payload),
             ),
           );
         }),

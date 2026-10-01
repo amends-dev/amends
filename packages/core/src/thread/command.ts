@@ -161,9 +161,9 @@ const authorReference = (author: ThreadMessage.Author): ThreadParticipation.Refe
     : { _tag: "Contact", contactId: author.contactId };
 /** @category constructors */
 export const make = Effect.fn("ThreadCommand.make")(function* () {
-  const query = yield* ThreadQuery.Service;
-  const threads = yield* ThreadStore.Service;
-  const activities = yield* ThreadActivityStore.Service;
+  const threadQuery = yield* ThreadQuery.Service;
+  const threadStore = yield* ThreadStore.Service;
+  const threadActivityStore = yield* ThreadActivityStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -171,7 +171,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   /** The position the thread's next activity takes, read in the caller's transaction. */
   const nextSequence = Effect.fn("ThreadCommand.nextSequence")(function* (threadId: Thread.Id) {
     yield* Store.Transaction;
-    const latest = yield* activities.latest(threadId);
+    const latest = yield* threadActivityStore.latest(threadId);
     return Option.isNone(latest) ? 1 : latest.value.sequence + 1;
   });
   /**
@@ -189,7 +189,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       return yield* Effect.die("Participants to admit must be distinct");
     // Current participants are reused; they already hold the member's current admission.
     const existing = new Map(
-      (yield* query.findParticipants(thread, requested)).map(
+      (yield* threadQuery.findParticipants(thread, requested)).map(
         (p) => [ThreadParticipation.keyOf(p.participant), p] as const,
       ),
     );
@@ -198,7 +198,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
         ? [reference.memberId]
         : [],
     );
-    const candidates = yield* query.eligibleMembers(thread.groupId, joining);
+    const candidates = yield* threadQuery.eligibleMembers(thread.groupId, joining);
     const result: Array<ThreadParticipation.Record> = [];
     const added: Array<Event.Type<typeof ThreadParticipationFacts.Added>> = [];
     for (const reference of requested) {
@@ -307,7 +307,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       )
     )
       return yield* Effect.die("A message's author and mentions must be selected participants");
-    const found = yield* threads.get(input.threadId);
+    const found = yield* threadStore.get(input.threadId);
     if (Option.isNone(found)) return yield* Effect.die("A published message's thread is missing");
     const thread = found.value;
     const published = yield* publishActivity({

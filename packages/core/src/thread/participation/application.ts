@@ -46,8 +46,8 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
-  const participations = yield* ThreadParticipationStore.Service;
-  const groups = yield* GroupStore.Service;
+  const threadParticipationStore = yield* ThreadParticipationStore.Service;
+  const groupStore = yield* GroupStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -102,12 +102,12 @@ export const make = Effect.fn("ThreadParticipationApplication.make")(function* (
     function* (input: ThreadParticipation.UnfollowInput) {
       const request = yield* Schema.decodeEffect(ThreadParticipation.UnfollowInput)(input);
       const thread = yield* requireAccess(request.threadId);
-      const group = yield* groups.get(thread.groupId);
+      const group = yield* groupStore.get(thread.groupId);
       if (Option.isNone(group)) return yield* Effect.die("A thread's group is missing");
       if (group.value.kind === "Direct")
         return yield* new FixedParticipation({ threadId: thread.id });
       const actor = yield* Actor.Service;
-      const found = yield* participations.get(request.participationId);
+      const found = yield* threadParticipationStore.get(request.participationId);
       if (Option.isNone(found)) return yield* new NotFound(request);
       const participant = found.value;
       const own = participant.participant;

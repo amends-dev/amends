@@ -110,10 +110,10 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   | Signals.Service
   | Store.Service
 > {
-  const notifications = yield* NotificationStore.Service;
+  const notificationStore = yield* NotificationStore.Service;
   const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
-  const source = yield* NotificationSource.Service;
+  const notificationSource = yield* NotificationSource.Service;
   const { workspaceId } = yield* Store.Service;
 
   const recipient = Effect.fnUntraced(function* () {
@@ -125,7 +125,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   const get = Effect.fn("NotificationApplication.get")(function* (notificationId: Notification.Id) {
     const target = yield* recipient();
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId);
-    const found = yield* notifications.get(id);
+    const found = yield* notificationStore.get(id);
     // Another recipient's notification reads as missing.
     if (Option.isNone(found) || !sameRecipient(found.value.recipient, target))
       return yield* new NotFound({ workspaceId, notificationId: id });
@@ -139,8 +139,8 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     const target = yield* recipient();
     const request = yield* decodeOptions(options);
     return yield* pendingOnly
-      ? notifications.listPendingByRecipient(target, request)
-      : notifications.listByRecipient(target, request);
+      ? notificationStore.listPendingByRecipient(target, request)
+      : notificationStore.listByRecipient(target, request);
   });
 
   const list = Effect.fn("NotificationApplication.list")((options: NotificationStore.ReadOptions) =>
@@ -152,7 +152,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
 
   /** The source of a notification the actor owns, or None where it is unavailable. */
   const sourceOf = (notification: Notification.Record) =>
-    source.resolve(notification).pipe(
+    notificationSource.resolve(notification).pipe(
       Effect.asSome,
       Effect.catchTag("NotificationSource.Unavailable", () =>
         Effect.succeed(Option.none<Thread.TimelineItem>()),
@@ -173,8 +173,8 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     const target = yield* recipient();
     const { pendingOnly = false, ...request } = yield* decodeInboxOptions(options);
     const records = yield* pendingOnly
-      ? notifications.listLatestPendingByRecipient(target, request)
-      : notifications.listLatestByRecipient(target, request);
+      ? notificationStore.listLatestPendingByRecipient(target, request)
+      : notificationStore.listLatestByRecipient(target, request);
     return yield* Effect.forEach(
       records,
       (notification) =>
@@ -198,7 +198,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       return yield* new AlreadyHandled({ notificationId: notification.id });
     // Leaving its group may settle it first, and the store then refuses it or records nothing:
     // what it reads as afterwards decides.
-    yield* notifications
+    yield* notificationStore
       .markSeen([notification.id], yield* DateTime.now)
       .pipe(Effect.catchTag("NotificationStore.Conflict", () => Effect.void));
     // Another device may have seen it first; the stored time is the one that holds.
@@ -226,7 +226,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     const memberId = (yield* Actor.Service).memberId;
     /** One page marked: what it listed and how many of them were due. */
     const markPage = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
-      const page = yield* notifications.listPendingByRecipient(
+      const page = yield* notificationStore.listPendingByRecipient(
         target,
         after === undefined ? { limit: seenBatch } : { limit: seenBatch, after },
       );
@@ -234,7 +234,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       const [first, ...rest] = due.map((record) => record.id);
       if (first !== undefined) {
         const notificationIds = [first, ...rest] as const;
-        yield* notifications.markSeen(notificationIds, yield* DateTime.now);
+        yield* notificationStore.markSeen(notificationIds, yield* DateTime.now);
         yield* signals.publish(
           Signal.Value.cases.NotificationsSeen.make({ workspaceId, memberId, notificationIds }),
         );
@@ -260,7 +260,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   });
   const countPending = Effect.gen(function* () {
     const target = yield* recipient();
-    return yield* notifications.countPendingByRecipient(target);
+    return yield* notificationStore.countPendingByRecipient(target);
   }).pipe(Effect.withSpan("NotificationApplication.countPending"));
   return Service.of({
     get,

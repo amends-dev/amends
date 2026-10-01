@@ -12,18 +12,18 @@ const change = Effect.fnUntraced(function* (
   },
   apply: (record: Connection.Record) => Connection.Record,
 ) {
-  const store = yield* ConnectionStore.Service;
-  const found = yield* store.get(payload.connectionId);
+  const connectionStore = yield* ConnectionStore.Service;
+  const found = yield* connectionStore.get(payload.connectionId);
   if (Option.isNone(found)) return yield* Effect.die("A changed connection is missing");
-  yield* store.update(apply(found.value));
+  yield* connectionStore.update(apply(found.value));
 });
 
 export const definition = Projection.make("connections", { version: 1 })
   .on(
     ConnectionFacts.Created,
     Effect.fn("ConnectionProjection.created")(function* ({ payload }) {
-      const store = yield* ConnectionStore.Service;
-      yield* store.insert(payload);
+      const connectionStore = yield* ConnectionStore.Service;
+      yield* connectionStore.insert(payload);
     }),
   )
   .on(ConnectionFacts.Renamed, ({ payload }) =>

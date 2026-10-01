@@ -44,8 +44,8 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
-  const readings = yield* ThreadReading.Service;
-  const messages = yield* ThreadMessageStore.Service;
+  const threadReading = yield* ThreadReading.Service;
+  const threadMessageStore = yield* ThreadMessageStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -60,7 +60,9 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
       yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]),
     );
     const previous =
-      key === undefined ? Option.none<ThreadMessage.Record>() : yield* messages.get(messageId);
+      key === undefined
+        ? Option.none<ThreadMessage.Record>()
+        : yield* threadMessageStore.get(messageId);
     return { messageId, previous };
   });
   const publish = Effect.fn("ThreadMessageApplication.publish")(
@@ -144,7 +146,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
           ),
         );
       // Replying reads the thread through the author's own message.
-      yield* readings.markRead(
+      yield* threadReading.markRead(
         Notification.ofMember(actor.memberId, actor.identity),
         thread,
         published.activity.sequence,

@@ -140,15 +140,15 @@ const pending = (reason: EnvironmentCompatibility.Reason) =>
 export const make = Effect.fn("AgentApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
-  const agents = yield* AgentStore.Service;
-  const members = yield* MemberStore.Service;
-  const memberships = yield* MemberApplication.Service;
-  const assignments = yield* AssignmentStore.Service;
-  const roles = yield* RoleStore.Service;
-  const workspace = yield* WorkspaceStore.Service;
-  const groups = yield* GroupStore.Service;
-  const environments = yield* EnvironmentStore.Service;
-  const connections = yield* ConnectionStore.Service;
+  const agentStore = yield* AgentStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const memberApplication = yield* MemberApplication.Service;
+  const assignmentStore = yield* AssignmentStore.Service;
+  const roleStore = yield* RoleStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
+  const groupStore = yield* GroupStore.Service;
+  const environmentStore = yield* EnvironmentStore.Service;
+  const connectionStore = yield* ConnectionStore.Service;
   const environmentCatalog = yield* EnvironmentCatalog.Service;
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
@@ -164,7 +164,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
 
   /** The agent's active membership, which names it; an ended one makes the agent missing. */
   const membershipOf = Effect.fnUntraced(function* (record: Agent.Record) {
-    const found = yield* members.get(record.memberId);
+    const found = yield* memberStore.get(record.memberId);
     // An agent is created with its named membership.
     if (Option.isNone(found) || found.value.name === undefined)
       return yield* Effect.die("An agent's named membership is missing");
@@ -172,7 +172,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   });
   /** The agent by ID with its membership, or NotFound once its membership ended. */
   const load = Effect.fnUntraced(function* (agentId: Agent.Id) {
-    const found = yield* agents.get(agentId);
+    const found = yield* agentStore.get(agentId);
     if (Option.isNone(found)) return yield* new NotFound({ agentId });
     const record = found.value;
     const { member, name } = yield* membershipOf(record);
@@ -196,17 +196,17 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   });
 
   const activeEnvironment = Effect.fnUntraced(function* (environmentId: Environment.Id) {
-    const found = yield* environments.get(environmentId);
+    const found = yield* environmentStore.get(environmentId);
     return Option.filter(found, (record) => record.status === "active");
   });
   const activeConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
-    const found = yield* connections.get(connectionId);
+    const found = yield* connectionStore.get(connectionId);
     return Option.filter(found, (record) => record.status === "active");
   });
   /** An environment as readiness sees it now, with its account connection looked up. */
   const environmentView = Effect.fnUntraced(function* (record: Environment.Record) {
     const accountId = record.sandbox?.connectionId ?? null;
-    const account = accountId === null ? Option.none() : yield* connections.get(accountId);
+    const account = accountId === null ? Option.none() : yield* connectionStore.get(accountId);
     const readiness = EnvironmentCompatibility.readiness(
       record,
       {
@@ -287,7 +287,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     } satisfies Agent.View;
   });
   const ownerOf = Effect.gen(function* () {
-    const found = yield* workspace.get;
+    const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
     return found.value.ownerMemberId;
   });
@@ -298,7 +298,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
         assignment.source._tag === "Role" && assignment.source.scope._tag === "Workspace",
     )?.source;
     if (source?._tag !== "Role") return null;
-    const found = yield* roles.get(source.roleId);
+    const found = yield* roleStore.get(source.roleId);
     return Option.isSome(found) ? { id: found.value.id, name: found.value.name } : null;
   });
   /**
@@ -337,7 +337,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
         const mayRemove = configurable === true && memberRemovable === true;
         const assigned =
           accessReadable || (mayRemove && Delegation.recipientNeedsAssignments(removal))
-            ? yield* assignments.listActiveByMember(record.memberId)
+            ? yield* assignmentStore.listActiveByMember(record.memberId)
             : [];
         const access: Access = {
           role: accessReadable ? yield* roleOf(assigned) : null,
@@ -406,7 +406,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
     const loaded: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
-    for (const record of yield* agents.list) {
+    for (const record of yield* agentStore.list) {
       const { member, name } = yield* membershipOf(record);
       if (member.status === "active") loaded.push({ record, name });
     }
@@ -434,7 +434,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   });
 
   const restore = Effect.fnUntraced(function* (agentId: Agent.Id) {
-    const found = yield* agents.get(agentId);
+    const found = yield* agentStore.get(agentId);
     if (Option.isNone(found)) return yield* new NotFound({ agentId });
     const { name } = yield* membershipOf(found.value);
     return { record: found.value, name };
@@ -452,7 +452,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
         yield* Request.idFor(options.requestKey, ["agent.create", workspaceId, actor.memberId]),
       );
       // A retry returns the agent its first attempt created.
-      if (options.requestKey !== undefined && Option.isSome(yield* agents.get(agentId))) {
+      if (options.requestKey !== undefined && Option.isSome(yield* agentStore.get(agentId))) {
         const { record, name } = yield* restore(agentId);
         return yield* presented(record, name);
       }
@@ -484,7 +484,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
         }),
       });
       // An agent joins the general group as every member does.
-      if (Option.isSome(yield* groups.get(Group.GeneralId)))
+      if (Option.isSome(yield* groupStore.get(Group.GeneralId)))
         yield* journal.publish(GroupMembershipFacts.Added, {
           id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
           workspaceId,
@@ -550,7 +550,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const remove = Effect.fn("AgentApplication.remove")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);
     const { record } = yield* authorized(id, AgentPermissions.Configure);
-    yield* memberships.remove(record.memberId);
+    yield* memberApplication.remove(record.memberId);
   });
 
   const environmentChoices = Effect.fn("AgentApplication.environmentChoices")(function* (
@@ -567,7 +567,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     if (Option.isNone(connection) || !readable || !permitted)
       return yield* new ConnectionUnavailable({ connectionId });
     const active: Array<Environment.Record> = [];
-    for (const record of yield* environments.list)
+    for (const record of yield* environmentStore.list)
       if (record.status === "active") active.push(record);
     const allowed = yield* authorization.permitted(
       active.flatMap((record) => [

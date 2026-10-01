@@ -110,18 +110,18 @@ const logPage = 100;
 
 /** @category constructors */
 export const make = Effect.fn("TurnApplication.make")(function* () {
-  const turns = yield* TurnStore.Service;
-  const participations = yield* ThreadParticipationStore.Service;
+  const turnStore = yield* TurnStore.Service;
+  const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const authorization = yield* Authorization.Service;
-  const members = yield* MemberStore.Service;
-  const activity = yield* TurnActivityRecorder.Service;
-  const ending = yield* TurnEnding.Service;
+  const memberStore = yield* MemberStore.Service;
+  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
+  const turnEnding = yield* TurnEnding.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const signals = yield* Signals.Service;
-  const drafts = yield* TurnDrafts.Service;
-  const commits = yield* ChangeFeedSource.Service;
+  const turnDrafts = yield* TurnDrafts.Service;
+  const changeFeedSource = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
@@ -138,7 +138,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   });
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
   const readable = Effect.fnUntraced(function* (turnId: Turn.Id) {
-    const found = yield* turns.get(turnId);
+    const found = yield* turnStore.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
     const turn = found.value;
     yield* readableThread(turn.threadId).pipe(
@@ -157,11 +157,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const retryBlock = Effect.fnUntraced(function* (turn: Turn.Record) {
     if (Turn.active(turn.status)) return "active" as const;
     if (turn.status === "completed") return "completed" as const;
-    if (Option.isSome(yield* turns.findActive(turn.memberId, turn.threadId)))
+    if (Option.isSome(yield* turnStore.findActive(turn.memberId, turn.threadId)))
       return "superseded" as const;
-    const latest = yield* turns.findLatest(turn.memberId, turn.threadId);
+    const latest = yield* turnStore.findLatest(turn.memberId, turn.threadId);
     if (Option.isSome(latest) && latest.value.id !== turn.id) return "superseded" as const;
-    const participation = yield* participations.get(turn.participationId);
+    const participation = yield* threadParticipationStore.get(turn.participationId);
     if (Option.isNone(participation) || participation.value.status !== "active")
       return "departed" as const;
     return undefined;
@@ -209,7 +209,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         Effect.fail(new ThreadNotFound({ threadId: id })),
       ),
     );
-    return yield* present(yield* turns.listByThread(thread.id, count), { newestFirst: true });
+    return yield* present(yield* turnStore.listByThread(thread.id, count), { newestFirst: true });
   });
 
   const bounded = Schema.decodeEffect(
@@ -217,7 +217,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   );
 
   const listActive = Effect.fn("TurnApplication.listActive")(function* (limit: number) {
-    const active = yield* turns.listActive(yield* bounded(limit));
+    const active = yield* turnStore.listActive(yield* bounded(limit));
     // Each thread's audience is checked once, whatever number of its turns are active, then the
     // permission to read the threads in it, together.
     const opened = new Map<ThreadId.Id, boolean>();
@@ -254,7 +254,9 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     // Register for drafts and commits before reading, so none that follows is missed: a change to
     // the reader's access committed after the read below is delivered, and rechecked.
     const live = yield* signals.subscribe;
-    const committed = yield* commits.subscribe(Option.none()).pipe(Effect.mapError(unavailable));
+    const committed = yield* changeFeedSource
+      .subscribe(Option.none())
+      .pipe(Effect.mapError(unavailable));
     const turn = yield* readable(id);
     const handle = TurnLog.open(log, turn.participationId);
     // Following outlasts the request that opened it, so its access checks name the reader.
@@ -317,7 +319,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const opened = Turn.LogMessage.cases.Opened.make({ items: sent });
     if (over || !Turn.active(turn.status)) return Stream.make(opened, ended);
     // What the response being written holds so far, since drafts carry only what follows it.
-    const written = (yield* drafts.current(turn.id)).map((draft) =>
+    const written = (yield* turnDrafts.current(turn.id)).map((draft) =>
       Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
     );
 
@@ -410,12 +412,12 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         Object.assign({}, where, { reason: "requested" as const, requestedAt: at }),
       );
       if (turn.status === "queued") {
-        yield* ending.end(turn, { outcome: "cancelled", cancelReason: "requested" });
+        yield* turnEnding.end(turn, { outcome: "cancelled", cancelReason: "requested" });
         return yield* presentOne(
           Turn.change(turn, { status: "cancelled", cancelReason: "requested", finishedAt: at }),
         );
       }
-      yield* activity.record(
+      yield* turnActivityRecorder.record(
         turn.threadId,
         TurnActivity.Stopping,
         { turnId: turn.id, cancelReason: "requested" },
@@ -438,7 +440,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       // A turn is retried at most once, since its retry supersedes it, so the retry's ID comes from
       // the turn it retries and asking again returns that retry.
       const retryId = Turn.Id.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]));
-      if (Option.isSome(yield* turns.get(retryId)))
+      if (Option.isSome(yield* turnStore.get(retryId)))
         return yield* presentOne(yield* readable(retryId));
       const reason = yield* retryBlock(turn);
       if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
@@ -475,7 +477,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         finishedAt: null,
       };
       const event = yield* journal.publish(TurnFacts.Retried, created);
-      yield* activity.record(
+      yield* turnActivityRecorder.record(
         created.threadId,
         TurnActivity.Created,
         { turnId: created.id, memberId: created.memberId, retryOf: turn.id },
@@ -483,7 +485,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       );
       // Who asked is the retry's new input, after what the turn it retries left.
       const actor = yield* Actor.Service;
-      const asker = yield* members.get(actor.memberId);
+      const asker = yield* memberStore.get(actor.memberId);
       yield* handle.append({
         _tag: "Requested",
         turnId: created.id,

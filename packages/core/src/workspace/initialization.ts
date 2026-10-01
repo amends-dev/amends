@@ -44,18 +44,18 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
 ) {
   const createdBy = yield* Schema.decodeEffect(Identity.HumanId)(creator);
   const { name, memberName } = yield* Schema.decodeEffect(Workspace.CreateInput)(input);
-  const workspace = yield* WorkspaceStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
   const { workspaceId } = yield* Store.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const catalog = yield* PermissionCatalog.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
   const provenance = yield* Publication.make(workspaceId, {
     _tag: "Identity",
     identity: Identity.Reference.cases.Human.make({ id: createdBy }),
   });
   return yield* journal.commit(
     Effect.gen(function* () {
-      if (Option.isSome(yield* workspace.get))
+      if (Option.isSome(yield* workspaceStore.get))
         return yield* new AlreadyInitialized({ workspaceId });
       const ownerMemberId = Member.Id.make(yield* crypto.randomUUIDv4);
       const record = Workspace.Record.make({
@@ -71,7 +71,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         identity: Identity.Reference.cases.Human.make({ id: createdBy }),
         ...(memberName === undefined ? {} : { name: memberName }),
       });
-      for (const role of BuiltinRoles.make(record.id, catalog.definitions)) {
+      for (const role of BuiltinRoles.make(record.id, permissionCatalog.definitions)) {
         yield* journal.publish(RoleFacts.Created, {
           roleId: role.id,
           workspaceId: role.workspaceId,

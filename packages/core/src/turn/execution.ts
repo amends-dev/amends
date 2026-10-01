@@ -267,29 +267,29 @@ export class Service extends Context.Service<Service, Interface>()(
 
 /** @category constructors */
 export const make = Effect.fn("TurnExecution.make")(function* () {
-  const turns = yield* TurnStore.Service;
-  const notifications = yield* NotificationStore.Service;
+  const turnStore = yield* TurnStore.Service;
+  const notificationStore = yield* NotificationStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
   const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
-  const agents = yield* AgentStore.Service;
-  const connections = yield* ConnectionStore.Service;
-  const credentials = yield* ConnectionCredentialStore.Service;
-  const environments = yield* EnvironmentStore.Service;
-  const catalog = yield* EnvironmentCatalog.Service;
-  const activities = yield* ThreadActivityStore.Service;
-  const messages = yield* ThreadMessageStore.Service;
-  const members = yield* MemberStore.Service;
+  const agentStore = yield* AgentStore.Service;
+  const connectionStore = yield* ConnectionStore.Service;
+  const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
+  const environmentStore = yield* EnvironmentStore.Service;
+  const environmentCatalog = yield* EnvironmentCatalog.Service;
+  const threadActivityStore = yield* ThreadActivityStore.Service;
+  const threadMessageStore = yield* ThreadMessageStore.Service;
+  const memberStore = yield* MemberStore.Service;
   const signals = yield* Signals.Service;
-  const activity = yield* TurnActivityRecorder.Service;
-  const ending = yield* TurnEnding.Service;
+  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
+  const turnEnding = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
   const load = Effect.fnUntraced(function* (turnId: Turn.Id) {
-    const found = yield* turns.get(turnId);
+    const found = yield* turnStore.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
     return found.value;
   });
@@ -336,7 +336,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const all: Array<ThreadActivity.Record> = [];
     let after = range.after ?? 0;
     for (;;) {
-      const page = yield* activities.readPage(turn.threadId, {
+      const page = yield* threadActivityStore.readPage(turn.threadId, {
         afterSequence: after,
         beforeSequence: range.through + 1,
         from: "oldest",
@@ -360,7 +360,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       ),
     ).pipe(Effect.orDie);
     const found = new Map(
-      (yield* messages.getMany(ids.map((entry) => entry.messageId))).map((message) => [
+      (yield* threadMessageStore.getMany(ids.map((entry) => entry.messageId))).map((message) => [
         message.id as string,
         message,
       ]),
@@ -382,7 +382,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       ),
     ];
     const named = new Map(
-      (yield* members.getMany(memberIds)).map((member) => [member.id as string, member.name]),
+      (yield* memberStore.getMany(memberIds)).map((member) => [member.id as string, member.name]),
     );
     return (author: ThreadMessage.Author): Transcript.Author =>
       author._tag === "Member"
@@ -446,7 +446,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     if (!Turn.active(turn.status)) return { _tag: "Finished" } as const;
     if (turn.status === "cancelling") return { _tag: "Stopping" } as const;
     const unrunnable = (reason: string) => ({ _tag: "Unrunnable", reason }) as const;
-    const agent = yield* agents.get(turn.agentId);
+    const agent = yield* agentStore.get(turn.agentId);
     if (Option.isNone(agent)) return unrunnable("The agent no longer exists.");
     const selection: Turn.Selection = turn.selection ?? {
       connectionId: agent.value.model.connectionId,
@@ -454,7 +454,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       reasoning: agent.value.model.reasoning,
       environmentId: agent.value.environmentId,
     };
-    const connection = yield* connections.get(selection.connectionId);
+    const connection = yield* connectionStore.get(selection.connectionId);
     if (Option.isNone(connection) || connection.value.status !== "active")
       return unrunnable("The agent's model connection is no longer available.");
     const authentication = connection.value.authentication;
@@ -462,17 +462,17 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     if (authentication._tag === "ApiKey") {
       if (authentication.credentialId === null)
         return unrunnable(`${connection.value.name} needs its API key.`);
-      const stored = yield* credentials
+      const stored = yield* connectionCredentialStore
         .get(authentication.credentialId)
         .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
       if (Option.isNone(stored))
         return unrunnable(`${connection.value.name}'s API key can't be read on this server.`);
       credential = stored.value.secret;
     }
-    const environment = yield* environments.get(selection.environmentId);
+    const environment = yield* environmentStore.get(selection.environmentId);
     if (Option.isNone(environment) || environment.value.status !== "active")
       return unrunnable("The agent's environment is no longer available.");
-    if (Option.isNone(catalog.harness(environment.value.harnessId)))
+    if (Option.isNone(environmentCatalog.harness(environment.value.harnessId)))
       return unrunnable(
         `The ${environment.value.harnessId} harness is not installed on this server.`,
       );
@@ -537,7 +537,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["queued"]);
-        const agent = yield* agents.get(turn.agentId);
+        const agent = yield* agentStore.get(turn.agentId);
         if (Option.isNone(agent)) return yield* Effect.die("A turn's agent is missing");
         // The first turn of a participation records the thread's history before its input, so
         // later turns read it from the agent's log rather than from the thread, in entries of a
@@ -567,7 +567,12 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           TurnFacts.Started,
           Object.assign(where(turn), { selection: chosen, startedAt }),
         );
-        yield* activity.record(turn.threadId, TurnActivity.Started, { turnId: turn.id }, event);
+        yield* turnActivityRecorder.record(
+          turn.threadId,
+          TurnActivity.Started,
+          { turnId: turn.id },
+          event,
+        );
         return Turn.change(turn, { status: "running", selection: chosen, startedAt });
       }),
     );
@@ -754,7 +759,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         if (turn.status === "cancelling") {
-          yield* ending.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
+          yield* turnEnding.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
           return { _tag: "Stopped" } as const;
         }
         yield* require(turn, ["running"]);
@@ -763,7 +768,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           return { _tag: "InputPending" } as const;
         // Work its agent has not accepted yet is still this turn's to consider before closing;
         // accepting it extends the turn, and execution takes it in.
-        const waiting = yield* notifications.listPendingByThread(
+        const waiting = yield* notificationStore.listPendingByThread(
           Notification.ofMember(turn.memberId, identityOf(turn)),
           turn.threadId,
           Number.MAX_SAFE_INTEGER,
@@ -773,7 +778,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         if (reading.replies.length > 0) {
           const unable = (reason: string) =>
             Effect.gen(function* () {
-              yield* ending.end(turn, { outcome: "failed", reason });
+              yield* turnEnding.end(turn, { outcome: "failed", reason });
               return { _tag: "Failed", reason } as const;
             });
           const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
@@ -826,7 +831,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             messageIds.push(published.message.id);
           }
         }
-        yield* ending.end(turn, { outcome: "completed", messageIds });
+        yield* turnEnding.end(turn, { outcome: "completed", messageIds });
         return { _tag: "Closed", messageIds } as const;
       }),
     );
@@ -837,7 +842,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       Effect.gen(function* () {
         yield* require(turn, ["queued", "running", "cancelling"]);
         const failure = yield* Schema.decodeEffect(Schema.NonEmptyString)(reason);
-        yield* ending.end(turn, { outcome: "failed", reason: failure });
+        yield* turnEnding.end(turn, { outcome: "failed", reason: failure });
       }),
     );
   });
@@ -846,7 +851,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["cancelling"]);
-        yield* ending.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
+        yield* turnEnding.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
       }),
     );
   });

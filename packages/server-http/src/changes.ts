@@ -28,8 +28,10 @@ export const layer = HttpApiBuilder.group(
               gateway.asMemberScoped(
                 params.workspaceId,
                 principal,
-                Effect.flatMap(ChangeFeedApplication.Service, (changes) =>
-                  Effect.map(changes.watch(query), (stream) => streams.serve(stream, unavailable)),
+                Effect.flatMap(ChangeFeedApplication.Service, (changeFeedApplication) =>
+                  Effect.map(changeFeedApplication.watch(query), (stream) =>
+                    streams.serve(stream, unavailable),
+                  ),
                 ),
               ),
             ),
@@ -40,7 +42,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(params.threadId)),
+            Effect.flatMap(SignalApplication.Service, (signalApplication) =>
+              signalApplication.typing(params.threadId),
+            ),
           ),
         ),
     });

@@ -8,17 +8,17 @@ export const definition = Projection.make("agents", { version: 1 })
   .on(
     AgentFacts.Created,
     Effect.fn("AgentProjection.created")(function* ({ payload }) {
-      const store = yield* AgentStore.Service;
-      yield* store.insert(payload);
+      const agentStore = yield* AgentStore.Service;
+      yield* agentStore.insert(payload);
     }),
   )
   .on(
     AgentFacts.Configured,
     Effect.fn("AgentProjection.configured")(function* ({ payload }) {
-      const store = yield* AgentStore.Service;
-      const found = yield* store.get(payload.agentId);
+      const agentStore = yield* AgentStore.Service;
+      const found = yield* agentStore.get(payload.agentId);
       if (Option.isNone(found)) return yield* Effect.die("A configured agent is missing");
-      yield* store.update(
+      yield* agentStore.update(
         Agent.change(found.value, {
           instructions: payload.instructions,
           model: payload.model,

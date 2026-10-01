@@ -96,22 +96,22 @@ export class Service extends Context.Service<Service, Interface>()(
 /** @category constructors */
 export const make = Effect.fn("ThreadQuery.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const audience = yield* GroupAudience.Service;
-  const threads = yield* ThreadStore.Service;
-  const memberships = yield* GroupMembershipStore.Service;
-  const members = yield* MemberStore.Service;
-  const participations = yield* ThreadParticipationStore.Service;
-  const activities = yield* ThreadActivityStore.Service;
-  const resolvers = yield* ThreadActivityResolvers.Service;
+  const groupAudience = yield* GroupAudience.Service;
+  const threadStore = yield* ThreadStore.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const threadParticipationStore = yield* ThreadParticipationStore.Service;
+  const threadActivityStore = yield* ThreadActivityStore.Service;
+  const threadActivityResolvers = yield* ThreadActivityResolvers.Service;
   const { workspaceId } = yield* Store.Service;
 
   const requireAccess = Effect.fn("ThreadQuery.requireAccess")(function* (threadId: Thread.Id) {
     const id = yield* Schema.decodeEffect(Thread.Id)(threadId);
     yield* authorization.require([]);
-    const found = yield* threads.get(id);
+    const found = yield* threadStore.get(id);
     if (Option.isNone(found)) return yield* new NotFound({ threadId: id });
     const thread = found.value;
-    yield* audience
+    yield* groupAudience
       .require(thread.groupId)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
@@ -123,7 +123,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
 
   const membersById = (ids: ReadonlyArray<Member.Id>) =>
     Effect.map(
-      members.getMany(ids),
+      memberStore.getMany(ids),
       (found) => new Map(found.map((member) => [member.id, member] as const)),
     );
   const eligibleMembers = Effect.fn("ThreadQuery.eligibleMembers")(function* (
@@ -132,7 +132,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   ) {
     const result = new Map<Member.Id, Eligible>();
     if (memberIds.length === 0) return result;
-    const admissions = yield* memberships.findActiveMany(groupId, memberIds);
+    const admissions = yield* groupMembershipStore.findActiveMany(groupId, memberIds);
     const found = yield* membersById(admissions.map((admission) => admission.memberId));
     for (const admission of admissions) {
       const member = found.get(admission.memberId);
@@ -147,7 +147,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   const backed = Effect.fnUntraced(function* (rows: ReadonlyArray<ThreadParticipation.Record>) {
     const joined = rows.flatMap((p) => (p.participant._tag === "Member" ? [p.participant] : []));
     const admissions = new Map(
-      (yield* memberships.getMany(joined.map((p) => p.groupMembershipId))).map(
+      (yield* groupMembershipStore.getMany(joined.map((p) => p.groupMembershipId))).map(
         (admission) => [admission.id, admission] as const,
       ),
     );
@@ -164,7 +164,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     thread: Thread.Record,
     options: ThreadParticipation.ListOptions,
   ) {
-    const rows = yield* participations.pageActiveByThread(thread.id, options);
+    const rows = yield* threadParticipationStore.pageActiveByThread(thread.id, options);
     const last = rows.at(-1);
     return {
       participants: yield* backed(rows),
@@ -213,7 +213,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     references: ReadonlyArray<ThreadParticipation.Reference>,
   ) {
     if (references.length === 0) return [];
-    return yield* backed(yield* participations.findActive(thread.id, references));
+    return yield* backed(yield* threadParticipationStore.findActive(thread.id, references));
   });
 
   /** The thread, under its audience and `thread.read`. */
@@ -234,18 +234,21 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ThreadActivityStore.ReadOptions)(options);
     const thread = yield* requireReadable(threadId);
-    return yield* resolvers.resolve(thread, yield* activities.readPage(thread.id, request));
+    return yield* threadActivityResolvers.resolve(
+      thread,
+      yield* threadActivityStore.readPage(thread.id, request),
+    );
   });
   const readTimelineItem = Effect.fn("ThreadQuery.readTimelineItem")(function* (
     activityId: ThreadActivity.Id,
   ) {
     const id = yield* Schema.decodeEffect(ThreadActivity.Id)(activityId);
     yield* authorization.require([]);
-    const found = yield* activities.get(id);
+    const found = yield* threadActivityStore.get(id);
     if (Option.isNone(found))
       return yield* Effect.die("A recorded activity is missing from the timeline");
     const thread = yield* requireReadable(found.value.threadId);
-    const [item] = yield* resolvers.resolve(thread, [found.value]);
+    const [item] = yield* threadActivityResolvers.resolve(thread, [found.value]);
     if (item === undefined) return yield* Effect.die("An activity resolved to no timeline item");
     return item;
   });

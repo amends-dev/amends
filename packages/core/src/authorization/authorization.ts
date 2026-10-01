@@ -71,16 +71,16 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   never,
   MemberStore.Service | GrantResolver.Service | PermissionCatalog.Service | Store.Service
 > {
-  const members = yield* MemberStore.Service;
-  const resolver = yield* GrantResolver.Service;
-  const catalog = yield* PermissionCatalog.Service;
+  const memberStore = yield* MemberStore.Service;
+  const grantResolver = yield* GrantResolver.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
   const { workspaceId } = yield* Store.Service;
 
   /** Validate the actor, and that each requirement names a declared permission in this workspace. */
   const check = Effect.fnUntraced(function* (requirements: ReadonlyArray<Requirement.Value>) {
     const actor = yield* Actor.Service;
     yield* requireWorkspace(workspaceId, actor.workspaceId);
-    const found = yield* members.get(actor.memberId);
+    const found = yield* memberStore.get(actor.memberId);
     if (Option.isNone(found)) {
       return yield* new InvalidActor({ memberId: actor.memberId, reason: "membership-missing" });
     }
@@ -94,7 +94,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
 
     for (const requirement of requirements) {
       yield* requireWorkspace(workspaceId, requirement.target.workspaceId);
-      const permission = yield* catalog.get(requirement.permission.name);
+      const permission = yield* permissionCatalog.get(requirement.permission.name);
       // Requirements name permissions as the catalog declares them; another target kind is a bug.
       if (permission.targetKind !== requirement.target._tag)
         return yield* Effect.die(
@@ -115,7 +115,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   ) {
     const { actor, checked } = yield* check(requirements);
     if (checked.length === 0) return;
-    const grants = yield* resolver.resolve(actor.memberId);
+    const grants = yield* grantResolver.resolve(actor.memberId);
     for (const requirement of checked)
       if (!covered(grants, requirement))
         return yield* new Denied({ memberId: actor.memberId, requirement });
@@ -125,7 +125,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
   ) {
     const { actor, checked } = yield* check(requirements);
     if (checked.length === 0) return [];
-    const grants = yield* resolver.resolve(actor.memberId);
+    const grants = yield* grantResolver.resolve(actor.memberId);
     return checked.map((requirement) => covered(grants, requirement));
   });
 

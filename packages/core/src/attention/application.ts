@@ -55,10 +55,10 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
-  const audience = yield* GroupAudience.Service;
-  const activities = yield* ThreadActivityStore.Service;
-  const reading = yield* ThreadReading.Service;
-  const readStates = yield* ReadStateStore.Service;
+  const groupAudience = yield* GroupAudience.Service;
+  const threadActivityStore = yield* ThreadActivityStore.Service;
+  const threadReading = yield* ThreadReading.Service;
+  const readStateStore = yield* ReadStateStore.Service;
   const signals = yield* Signals.Service;
   const { workspaceId } = yield* Store.Service;
 
@@ -87,7 +87,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
         threadId: thread.id,
       }),
     ]);
-    const found = yield* activities.latest(thread.id);
+    const found = yield* threadActivityStore.latest(thread.id);
     const latest = Option.isNone(found) ? 0 : found.value.sequence;
     if (request.throughSequence > latest)
       return yield* new BeyondTimeline({
@@ -103,7 +103,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     };
     // Reading settles the inbox up to the position. Both are private state, written outside the
     // workspace's write order; the reader's other sessions hear of it as a signal.
-    yield* reading.markRead(reader, thread, position.readThrough);
+    yield* threadReading.markRead(reader, thread, position.readThrough);
     yield* signals.publish(
       Signal.Value.cases.ThreadRead.make({
         workspaceId,
@@ -119,7 +119,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input);
     const reader = yield* human();
-    yield* audience
+    yield* groupAudience
       .require(request.groupId)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
@@ -134,7 +134,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
       }),
     ]);
     const caughtUpAt = yield* DateTime.now;
-    yield* readStates.advanceGroup({
+    yield* readStateStore.advanceGroup({
       workspaceId,
       memberId: reader.memberId,
       groupId: request.groupId,

@@ -90,7 +90,7 @@ export const layerDispatch = Layer.effect(
  */
 export const layerWorker = TurnEntity.toLayer(
   Effect.gen(function* () {
-    const runner = yield* TurnRunner.Service;
+    const turnRunner = yield* TurnRunner.Service;
     const clientFor = yield* TurnEntity.client;
     return TurnEntity.of({
       Run: ({ payload: request }) =>
@@ -114,8 +114,8 @@ export const layerWorker = TurnEntity.toLayer(
           });
           const exit = yield* Effect.exit(
             request.attempt >= attempts
-              ? runner.abandon(request.workspaceId, request.turnId)
-              : runner.run(request.workspaceId, request.turnId),
+              ? turnRunner.abandon(request.workspaceId, request.turnId)
+              : turnRunner.run(request.workspaceId, request.turnId),
           );
           if (Exit.isSuccess(exit)) return;
           const failure = Option.map(Cause.findErrorOption(exit.cause), (error) => error._tag);
@@ -135,7 +135,7 @@ export const layerWorker = TurnEntity.toLayer(
           if (attempt >= attempts) {
             yield* Effect.logError("Turn given up after failed runs", { ...where, attempt });
             const abandoned = yield* Effect.exit(
-              runner.abandon(request.workspaceId, request.turnId),
+              turnRunner.abandon(request.workspaceId, request.turnId),
             );
             if (Exit.isSuccess(abandoned)) return;
             yield* Effect.logError("Turn could not be marked failed; trying again later", {

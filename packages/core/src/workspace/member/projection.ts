@@ -8,8 +8,8 @@ export const definition = Projection.make("workspace.members", { version: 1 })
   .on(
     MemberFacts.Added,
     Effect.fn("MemberProjection.added")(function* ({ payload }) {
-      const store = yield* MemberStore.Service;
-      yield* store.insert({
+      const memberStore = yield* MemberStore.Service;
+      yield* memberStore.insert({
         id: payload.memberId,
         workspaceId: payload.workspaceId,
         identity: payload.identity,
@@ -21,15 +21,15 @@ export const definition = Projection.make("workspace.members", { version: 1 })
   .on(
     MemberFacts.Renamed,
     Effect.fn("MemberProjection.renamed")(function* ({ payload }) {
-      const store = yield* MemberStore.Service;
-      yield* store.rename(payload.memberId, payload.name);
+      const memberStore = yield* MemberStore.Service;
+      yield* memberStore.rename(payload.memberId, payload.name);
     }),
   )
   .on(
     MemberFacts.Removed,
     Effect.fn("MemberProjection.removed")(function* ({ payload }) {
-      const store = yield* MemberStore.Service;
-      yield* store.markRemoved(payload.memberId);
+      const memberStore = yield* MemberStore.Service;
+      yield* memberStore.markRemoved(payload.memberId);
     }),
   );
 

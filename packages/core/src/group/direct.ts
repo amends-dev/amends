@@ -47,8 +47,8 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 /** Capture domain dependencies without capturing actor or transaction authority. @category constructors */
 export const make = Effect.fn("DirectGroups.make")(function* () {
-  const groups = yield* GroupStore.Service;
-  const members = yield* MemberStore.Service;
+  const groupStore = yield* GroupStore.Service;
+  const memberStore = yield* MemberStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -61,11 +61,11 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
     const requested = Group.directMembers(memberIds);
     if (requested.length < 2 || !requested.includes(createdBy))
       return yield* Effect.die("A direct group needs two or more members, its creator among them");
-    const existing = yield* groups.findDirect(requested);
+    const existing = yield* groupStore.findDirect(requested);
     if (Option.isSome(existing))
       return { group: existing.value, created: false } satisfies Established;
     const found = new Map(
-      (yield* members.getMany(requested)).map((member) => [member.id, member] as const),
+      (yield* memberStore.getMany(requested)).map((member) => [member.id, member] as const),
     );
     for (const memberId of requested)
       if (found.get(memberId)?.status !== "active") return yield* new Unavailable({ memberId });

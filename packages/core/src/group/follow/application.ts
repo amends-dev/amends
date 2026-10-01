@@ -56,11 +56,11 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
 export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const audience = yield* GroupAudience.Service;
-  const groups = yield* GroupStore.Service;
-  const memberships = yield* GroupMembershipStore.Service;
-  const members = yield* MemberStore.Service;
-  const follows = yield* GroupFollowStore.Service;
+  const groupAudience = yield* GroupAudience.Service;
+  const groupStore = yield* GroupStore.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const groupFollowStore = yield* GroupFollowStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -68,14 +68,14 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   /** The admission whose follow changes, after the checks that apply to the actor and target. */
   const resolve = Effect.fnUntraced(function* (input: GroupFollow.Input, following: boolean) {
     const request = yield* Schema.decodeEffect(GroupFollow.Input)(input);
-    const own = yield* audience
+    const own = yield* groupAudience
       .require(request.groupId)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
           Effect.fail(new GroupNotFound({ groupId: request.groupId })),
         ),
       );
-    const foundGroup = yield* groups.get(request.groupId);
+    const foundGroup = yield* groupStore.get(request.groupId);
     if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
     const group = foundGroup.value;
     if (group.kind === "Direct") return yield* new NotFollowable({ groupId: group.id });
@@ -92,8 +92,8 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
         ]);
       return own;
     }
-    const admission = yield* memberships.findActive(group.id, request.memberId);
-    const found = yield* members.get(request.memberId);
+    const admission = yield* groupMembershipStore.findActive(group.id, request.memberId);
+    const found = yield* memberStore.get(request.memberId);
     if (Option.isNone(admission) || Option.isNone(found))
       return yield* new MemberUnavailable({ memberId: request.memberId });
     const member = found.value;
@@ -111,7 +111,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const follow = Effect.fn("GroupFollowApplication.follow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* resolve(input, true);
-      if (Option.isSome(yield* follows.findActive(admission.id))) return;
+      if (Option.isSome(yield* groupFollowStore.findActive(admission.id))) return;
       const followedAt = yield* DateTime.now;
       yield* journal
         .publish(GroupFollowFacts.Started, {
@@ -133,7 +133,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const unfollow = Effect.fn("GroupFollowApplication.unfollow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* resolve(input, false);
-      const existing = yield* follows.findActive(admission.id);
+      const existing = yield* groupFollowStore.findActive(admission.id);
       if (Option.isNone(existing)) return;
       yield* journal.publish(GroupFollowFacts.Ended, {
         workspaceId,

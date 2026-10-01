@@ -9,8 +9,8 @@ export const definition = Projection.make("workspace.assignments", { version: 1 
   .on(
     AssignmentFacts.Created,
     Effect.fn("AssignmentProjection.created")(function* ({ payload }) {
-      const store = yield* AssignmentStore.Service;
-      yield* store.insert({
+      const assignmentStore = yield* AssignmentStore.Service;
+      yield* assignmentStore.insert({
         id: payload.assignmentId,
         workspaceId: payload.workspaceId,
         memberId: payload.memberId,
@@ -22,14 +22,14 @@ export const definition = Projection.make("workspace.assignments", { version: 1 
   .on(
     AssignmentFacts.Revoked,
     Effect.fn("AssignmentProjection.revoked")(function* ({ payload }) {
-      const store = yield* AssignmentStore.Service;
-      const recorded = yield* store.get(payload.assignmentId);
+      const assignmentStore = yield* AssignmentStore.Service;
+      const recorded = yield* assignmentStore.get(payload.assignmentId);
       if (Option.isSome(recorded) && recorded.value.memberId !== payload.memberId)
         return yield* new AssignmentStore.Conflict({
           operation: "project",
           message: "Revocation names another member than its assignment",
         });
-      yield* store.markRevoked(payload.assignmentId);
+      yield* assignmentStore.markRevoked(payload.assignmentId);
     }),
   );
 

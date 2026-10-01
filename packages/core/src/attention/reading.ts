@@ -37,12 +37,12 @@ export class Service extends Context.Service<Service, Interface>()(
 
 /** @category constructors */
 export const make = Effect.fn("ThreadReading.make")(function* () {
-  const notifications = yield* NotificationStore.Service;
-  const readStates = yield* ReadStateStore.Service;
+  const notificationStore = yield* NotificationStore.Service;
+  const readStateStore = yield* ReadStateStore.Service;
   const { workspaceId } = yield* Store.Service;
   const pending = Effect.fn("ThreadReading.pending")(
     (reader: Reader, thread: Thread.Record, throughSequence: number) =>
-      notifications.listPendingByThread(reader, thread.id, throughSequence),
+      notificationStore.listPendingByThread(reader, thread.id, throughSequence),
   );
   const markRead = Effect.fn("ThreadReading.markRead")(function* (
     reader: Reader,
@@ -51,11 +51,11 @@ export const make = Effect.fn("ThreadReading.make")(function* () {
   ) {
     const settled = yield* pending(reader, thread, throughSequence);
     if (settled.length > 0)
-      yield* notifications.markSeen(
+      yield* notificationStore.markSeen(
         settled.map((note) => note.id),
         yield* DateTime.now,
       );
-    yield* readStates.advanceThread({
+    yield* readStateStore.advanceThread({
       workspaceId,
       memberId: reader.memberId,
       threadId: thread.id,

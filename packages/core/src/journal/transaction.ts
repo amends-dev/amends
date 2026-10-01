@@ -113,11 +113,11 @@ export const make = Effect.fn("Transaction.make")(function* (): Effect.fn.Return
     return yield* store.transaction(
       Effect.uninterruptibleMask((restore) =>
         Effect.gen(function* () {
-          const native = yield* Store.Transaction;
+          const storeTransaction = yield* Store.Transaction;
           const gate = yield* Semaphore.make(1);
           const state: State = {
             owner,
-            native,
+            native: storeTransaction,
             gate,
             active: true,
             failure: Option.none(),

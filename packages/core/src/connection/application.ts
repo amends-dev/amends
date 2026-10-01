@@ -102,16 +102,17 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const connections = yield* ConnectionStore.Service;
-  const credentials = yield* ConnectionCredentialStore.Service;
-  const catalog = yield* ConnectionCatalog.Service;
+  const connectionStore = yield* ConnectionStore.Service;
+  const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
+  const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
   const target = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
-  const declarationOf = (id: ConnectionImplementation.Id) => Option.getOrUndefined(catalog.get(id));
+  const declarationOf = (id: ConnectionImplementation.Id) =>
+    Option.getOrUndefined(connectionCatalog.get(id));
   const viewOf = (record: Connection.Record, manageable: boolean) =>
     Connection.view(record, declarationOf(record.implementationId), manageable);
   /** The connection as the actor sees it, including whether they may manage it. */
@@ -122,7 +123,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
 
   /** The active connection by ID, or NotFound. */
   const load = Effect.fnUntraced(function* (connectionId: Connection.Id) {
-    const found = yield* connections.get(connectionId);
+    const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new NotFound({ connectionId });
     return found.value;
@@ -150,7 +151,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     return issues.length === 0 ? Effect.void : Effect.fail(new InvalidSettings({ issues }));
   };
   const installed = (id: ConnectionImplementation.Id) =>
-    Option.match(catalog.get(id), {
+    Option.match(connectionCatalog.get(id), {
       onNone: () => Effect.fail(new UnknownImplementation({ implementationId: id })),
       onSome: Effect.succeed,
     });
@@ -163,7 +164,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const active = (yield* connections.list).filter((record) => record.status === "active");
+    const active = (yield* connectionStore.list).filter((record) => record.status === "active");
     // One grant resolution answers both permissions for every connection.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
@@ -190,7 +191,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   });
 
   const restore = Effect.fnUntraced(function* (connectionId: Connection.Id) {
-    const found = yield* connections.get(connectionId);
+    const found = yield* connectionStore.get(connectionId);
     if (Option.isNone(found)) return yield* new NotFound({ connectionId });
     return found.value;
   });
@@ -210,7 +211,10 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
         ]),
       );
       // A retry returns the connection its first attempt created.
-      if (options.requestKey !== undefined && Option.isSome(yield* connections.get(connectionId)))
+      if (
+        options.requestKey !== undefined &&
+        Option.isSome(yield* connectionStore.get(connectionId))
+      )
         return yield* presented(yield* restore(connectionId));
       const declaration = yield* installed(request.implementationId);
       if (!declaration.authentication.some((method) => method._tag === request.authentication))
@@ -288,7 +292,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
           method: record.authentication._tag,
         });
       const credentialId = Connection.CredentialId.make(yield* crypto.randomUUIDv4);
-      yield* credentials
+      yield* connectionCredentialStore
         .put({ id: credentialId, connectionId: record.id, secret: request.secret })
         .pipe(
           Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
@@ -298,7 +302,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
           Effect.catchTag("ConnectionCredentialStore.Conflict", Effect.die),
         );
       const replaced = record.authentication.credentialId;
-      if (replaced !== null) yield* credentials.remove(replaced);
+      if (replaced !== null) yield* connectionCredentialStore.remove(replaced);
       yield* journal.publish(ConnectionFacts.CredentialSet, {
         workspaceId,
         connectionId: record.id,
@@ -324,7 +328,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
         });
       const cleared = record.authentication.credentialId;
       if (cleared === null) return viewOf(record, true);
-      yield* credentials.remove(cleared);
+      yield* connectionCredentialStore.remove(cleared);
       yield* journal.publish(ConnectionFacts.CredentialCleared, { workspaceId, connectionId: id });
       return viewOf(
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId: null } }),
@@ -338,13 +342,13 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
     return yield* Effect.gen(function* () {
       const record = yield* authorized(id, ConnectionPermissions.Manage);
       if (record.authentication._tag === "ApiKey" && record.authentication.credentialId !== null)
-        yield* credentials.remove(record.authentication.credentialId);
+        yield* connectionCredentialStore.remove(record.authentication.credentialId);
       yield* journal.publish(ConnectionFacts.Removed, { workspaceId, connectionId: id });
     }).pipe(committed);
   });
 
   return Service.of({
-    implementations: catalog.list,
+    implementations: connectionCatalog.list,
     list,
     get,
     create,

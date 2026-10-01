@@ -23,7 +23,7 @@ declare module "../activity/kind.ts" {
 
 /** Resolve message publications with one read of their messages. @category constructors */
 export const resolver = Effect.gen(function* () {
-  const messages = yield* ThreadMessageStore.Service;
+  const threadMessageStore = yield* ThreadMessageStore.Service;
   const resolve = Effect.fn("ThreadMessageTimeline.resolve")(function* (
     _thread: Thread.Record,
     listed: ReadonlyArray<ThreadActivity.Record>,
@@ -33,7 +33,7 @@ export const resolver = Effect.gen(function* () {
         ThreadActivityKind.decode(ThreadMessageActivity.Published, activity),
       ),
     );
-    const rows = yield* messages
+    const rows = yield* threadMessageStore
       .getMany([...new Set(activities.map((activity) => activity.details.messageId))])
       .pipe(Effect.mapError((cause) => new ThreadActivityResolvers.Failure({ cause })));
     const found = new Map(rows.map((message) => [message.id, message] as const));

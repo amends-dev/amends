@@ -89,14 +89,14 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
   | PermissionCatalog.Service
   | Store.Service
 > {
-  const workspace = yield* WorkspaceStore.Service;
-  const assignments = yield* AssignmentStore.Service;
-  const roles = yield* RoleStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
+  const assignmentStore = yield* AssignmentStore.Service;
+  const roleStore = yield* RoleStore.Service;
   const authorization = yield* Authorization.Service;
-  const catalog = yield* PermissionCatalog.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
   const { workspaceId } = yield* Store.Service;
   const owner = Effect.fn("Delegation.owner")(function* () {
-    const found = yield* workspace.get;
+    const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
     return found.value.ownerMemberId;
   });
@@ -104,13 +104,13 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     const id = yield* Schema.decodeEffect(Role.Id)(roleId);
     if (![BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId].includes(id))
       return yield* new UnsupportedRole({ roleId: id });
-    const found = yield* roles.get(id);
+    const found = yield* roleStore.get(id);
     if (Option.isNone(found)) return yield* new RoleNotFound({ roleId: id });
     const role = found.value;
     // A permission this host does not declare, retired or added by a newer host's bundles, grants
     // nothing here, as in GrantResolver; the role still loads, with every permission it records.
     for (const name of role.permissions) {
-      const definition = yield* catalog.get(name).pipe(
+      const definition = yield* permissionCatalog.get(name).pipe(
         Effect.asSome,
         Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
       );
@@ -127,7 +127,7 @@ export const make = Effect.fn("Delegation.make")(function* (): Effect.fn.Return<
     return role;
   });
   const assignmentsFor = Effect.fn("Delegation.assignmentsFor")((memberId: Member.Id) =>
-    assignments.listActiveByMember(memberId),
+    assignmentStore.listActiveByMember(memberId),
   );
   const requireGrant = Effect.fn("Delegation.requireGrant")(function* (roleId: Role.Id) {
     yield* authorization.require([

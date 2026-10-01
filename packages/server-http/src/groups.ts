@@ -25,7 +25,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupApplication.Service, (groups) => groups.listMine(query)),
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.listMine(query),
+            ),
           ),
         ),
       listPublic: ({ params, query }) =>
@@ -33,7 +35,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupApplication.Service, (groups) => groups.listPublic(query)),
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.listPublic(query),
+            ),
           ),
         ),
       create: ({ params, headers, payload }) =>
@@ -41,8 +45,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.createTeam(payload, { requestKey: headers["idempotency-key"] }),
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.createTeam(payload, { requestKey: headers["idempotency-key"] }),
             ),
           ),
         ),
@@ -51,8 +55,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.rename({
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.rename({
                 groupId: params.groupId,
                 name: payload.name,
                 expectedName: payload.expectedName,
@@ -65,7 +69,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupApplication.Service, (groups) => groups.get(params.groupId)),
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.get(params.groupId),
+            ),
           ),
         ),
       members: ({ params, query }) =>
@@ -73,8 +79,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-              memberships.listCurrent(params.groupId, query),
+            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+              groupMembershipApplication.listCurrent(params.groupId, query),
             ),
           ),
         ),
@@ -83,8 +89,11 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-              memberships.add({ groupId: params.groupId, memberId: payload.memberId }),
+            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+              groupMembershipApplication.add({
+                groupId: params.groupId,
+                memberId: payload.memberId,
+              }),
             ),
           ),
         ),
@@ -93,8 +102,11 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-              memberships.remove({ groupId: params.groupId, membershipId: params.membershipId }),
+            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+              groupMembershipApplication.remove({
+                groupId: params.groupId,
+                membershipId: params.membershipId,
+              }),
             ),
           ),
         ),
@@ -103,8 +115,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-              memberships.join(params.groupId),
+            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+              groupMembershipApplication.join(params.groupId),
             ),
           ),
         ),
@@ -113,8 +125,11 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-              memberships.leave({ groupId: params.groupId, membershipId: params.membershipId }),
+            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+              groupMembershipApplication.leave({
+                groupId: params.groupId,
+                membershipId: params.membershipId,
+              }),
             ),
           ),
         ),
@@ -123,8 +138,11 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupFollowApplication.Service, (follows) =>
-              follows.follow({ groupId: params.groupId, memberId: payload.memberId }),
+            Effect.flatMap(GroupFollowApplication.Service, (groupFollowApplication) =>
+              groupFollowApplication.follow({
+                groupId: params.groupId,
+                memberId: payload.memberId,
+              }),
             ),
           ),
         ),
@@ -133,8 +151,11 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(GroupFollowApplication.Service, (follows) =>
-              follows.unfollow({ groupId: params.groupId, memberId: payload.memberId }),
+            Effect.flatMap(GroupFollowApplication.Service, (groupFollowApplication) =>
+              groupFollowApplication.unfollow({
+                groupId: params.groupId,
+                memberId: payload.memberId,
+              }),
             ),
           ),
         ),
@@ -143,8 +164,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(ReadStateApplication.Service, (readState) =>
-              readState.markGroupRead({ groupId: params.groupId }),
+            Effect.flatMap(ReadStateApplication.Service, (readStateApplication) =>
+              readStateApplication.markGroupRead({ groupId: params.groupId }),
             ),
           ),
         ),

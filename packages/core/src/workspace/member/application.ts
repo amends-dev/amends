@@ -96,11 +96,11 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   | Crypto.Crypto
   | Store.Service
 > {
-  const members = yield* MemberStore.Service;
-  const workspace = yield* WorkspaceStore.Service;
-  const invitations = yield* InvitationStore.Service;
-  const groupMemberships = yield* GroupMembershipStore.Service;
-  const groupDeparture = yield* GroupMembershipDeparture.Service;
+  const memberStore = yield* MemberStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
+  const invitationStore = yield* InvitationStore.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
+  const groupMembershipDeparture = yield* GroupMembershipDeparture.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -108,7 +108,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
   const { workspaceId } = yield* Store.Service;
 
   const load = Effect.fnUntraced(function* (id: Member.Id) {
-    const found = yield* members.get(id);
+    const found = yield* memberStore.get(id);
     if (Option.isNone(found)) return yield* new NotFound({ workspaceId, memberId: id });
     return found.value;
   });
@@ -126,7 +126,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const all = yield* members.list;
+    const all = yield* memberStore.list;
     // One grant resolution decides every member, rather than one per member.
     const allowed = yield* authorization.permitted(
       all.map((member) =>
@@ -149,7 +149,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
         ),
       ]);
       const member = yield* load(id);
-      const found = yield* workspace.get;
+      const found = yield* workspaceStore.get;
       if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
       if (found.value.ownerMemberId === id)
         return yield* new OwnerProtected({ workspaceId, memberId: id });
@@ -158,8 +158,8 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
       yield* delegation.requireRemoval(id);
       const removed = yield* journal.publish(MemberFacts.Removed, { workspaceId, memberId: id });
       yield* Effect.gen(function* () {
-        for (const membership of yield* groupMemberships.listActiveByMember(id))
-          yield* groupDeparture.remove(
+        for (const membership of yield* groupMembershipStore.listActiveByMember(id))
+          yield* groupMembershipDeparture.remove(
             {
               workspaceId,
               groupId: membership.groupId,
@@ -175,7 +175,7 @@ export const make = Effect.fn("MemberApplication.make")(function* (): Effect.fn.
         const actor = yield* Actor.Service;
         const revokedAt = yield* DateTime.now;
         yield* Effect.gen(function* () {
-          for (const invitation of yield* invitations.listPendingByRecipient(recipientId))
+          for (const invitation of yield* invitationStore.listPendingByRecipient(recipientId))
             yield* journal.publish(InvitationFacts.Revoked, {
               workspaceId,
               invitationId: invitation.details.id,

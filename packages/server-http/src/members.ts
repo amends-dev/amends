@@ -20,7 +20,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.list),
+            Effect.flatMap(
+              MemberApplication.Service,
+              (memberApplication) => memberApplication.list,
+            ),
           ),
         ),
       get: ({ params }) =>
@@ -28,7 +31,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.get(params.memberId)),
+            Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+              memberApplication.get(params.memberId),
+            ),
           ),
         ),
       rename: ({ params, payload }) =>
@@ -36,7 +41,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.rename(payload.name)),
+            Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+              memberApplication.rename(payload.name),
+            ),
           ),
         ),
       remove: ({ params }) =>
@@ -44,7 +51,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(MemberApplication.Service, (members) => members.remove(params.memberId)),
+            Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+              memberApplication.remove(params.memberId),
+            ),
           ),
         ),
     });

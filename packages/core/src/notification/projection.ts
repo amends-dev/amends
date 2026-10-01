@@ -13,8 +13,8 @@ const accepted = Effect.fnUntraced(function* (payload: {
   readonly notificationIds: ReadonlyArray<Notification.Id>;
   readonly acceptedAt: Parameters<NotificationStore.Interface["accept"]>[2];
 }) {
-  const notifications = yield* NotificationStore.Service;
-  yield* notifications.accept(payload.notificationIds, payload.turnId, payload.acceptedAt);
+  const notificationStore = yield* NotificationStore.Service;
+  yield* notificationStore.accept(payload.notificationIds, payload.turnId, payload.acceptedAt);
 });
 
 /**
@@ -29,15 +29,15 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("NotificationProjection.activity")(function* (event) {
-      const notifications = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.Service;
       const { activity, recipients } = event.payload;
       // Settlement is driven by the activity itself, even when no new recipients are selected. The
       // store settles only an agent's notifications, which it recognizes by their recipient.
       if (ThreadActivityKind.is(ThreadParticipationActivity.Ended)(activity)) {
         const ended = yield* ThreadActivityKind.decode(ThreadParticipationActivity.Ended, activity);
-        yield* notifications.discardPendingForParticipation(ended.details.participationId);
+        yield* notificationStore.discardPendingForParticipation(ended.details.participationId);
       }
-      yield* notifications.insertMany(
+      yield* notificationStore.insertMany(
         recipients.map((recipient) =>
           Notification.generated(
             event,
@@ -55,9 +55,9 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     GroupMembershipFacts.Removed,
     Effect.fn("NotificationProjection.departure")(function* (event) {
-      const notifications = yield* NotificationStore.Service;
+      const notificationStore = yield* NotificationStore.Service;
       const { memberId, groupId } = event.payload;
-      yield* notifications.discardPendingForGroup(memberId, groupId);
+      yield* notificationStore.discardPendingForGroup(memberId, groupId);
     }),
   )
   .on(

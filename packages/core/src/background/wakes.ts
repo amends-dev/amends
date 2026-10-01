@@ -40,12 +40,12 @@ export const reactions = (
       fact: trigger.fact,
       react: Effect.fnUntraced(function* (event) {
         if (!trigger.when(event.payload)) return;
-        const commit = yield* Store.Transaction;
-        const woken = requested.get(commit) ?? new Set();
+        const storeTransaction = yield* Store.Transaction;
+        const woken = requested.get(storeTransaction) ?? new Set();
         if (woken.has(process.name)) return;
         yield* (yield* Service).request(process.name);
         woken.add(process.name);
-        requested.set(commit, woken);
+        requested.set(storeTransaction, woken);
       }),
     })),
   );

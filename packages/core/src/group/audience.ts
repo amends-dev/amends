@@ -33,13 +33,13 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture bound services; check the acting member and current admission on every call. @category constructors */
 export const make = Effect.fn("GroupAudience.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const memberships = yield* GroupMembershipStore.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
 
   const requireAudience = Effect.fn("GroupAudience.require")(function* (groupId: GroupId.Id) {
     const id = yield* Schema.decodeEffect(GroupId.Id)(groupId);
     yield* authorization.require([]);
     const actor = yield* Actor.Service;
-    const found = yield* memberships.findActive(id, actor.memberId);
+    const found = yield* groupMembershipStore.findActive(id, actor.memberId);
     if (Option.isNone(found)) return yield* new NotMember({ groupId: id });
     return found.value;
   });

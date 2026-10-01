@@ -151,6 +151,11 @@ to verify APIs rather than guessing from prior versions or web snippets.
 - Bun integration: `repos/effect/packages/platform/bun`.
 - Domain design: `docs/core-model.md`.
 
+Name a variable that holds a service after the service, so a call says who it calls:
+`const threadStore = yield* ThreadStore.Service`, `const threadQuery = yield* ThreadQuery.Service`,
+and `(threadApplication) => threadApplication.get(id)` for a callback given one. Effect's platform
+services keep the names Effect gives them, such as `sql` and `fs`.
+
 ## Vendored repositories
 
 `repos/` contains upstream Git subtrees for reference. Treat their contents as

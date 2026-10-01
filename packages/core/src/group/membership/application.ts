@@ -133,11 +133,11 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   | Store.Service
 > {
   const authorization = yield* Authorization.Service;
-  const groups = yield* GroupStore.Service;
-  const members = yield* MemberStore.Service;
-  const memberships = yield* GroupMembershipStore.Service;
-  const departure = yield* GroupMembershipDeparture.Service;
-  const audience = yield* GroupAudience.Service;
+  const groupStore = yield* GroupStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
+  const groupMembershipDeparture = yield* GroupMembershipDeparture.Service;
+  const groupAudience = yield* GroupAudience.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -150,7 +150,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
         Target.Reference.cases.Group.make({ workspaceId, groupId }),
       ),
     ]);
-    yield* audience
+    yield* groupAudience
       .require(groupId)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
@@ -159,7 +159,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       );
   });
   const loadGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
-    const foundGroup = yield* groups.get(groupId);
+    const foundGroup = yield* groupStore.get(groupId);
     if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
     return foundGroup.value;
   });
@@ -191,10 +191,10 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       yield* requireManagement(groupId);
       yield* loadManagedGroup(groupId);
 
-      const member = yield* members.get(memberId);
+      const member = yield* memberStore.get(memberId);
       if (Option.isNone(member)) return yield* new MemberNotFound({ memberId });
       if (member.value.status !== "active") return yield* new InactiveMember({ memberId });
-      if (Option.isSome(yield* memberships.findActive(groupId, memberId)))
+      if (Option.isSome(yield* groupMembershipStore.findActive(groupId, memberId)))
         return yield* new AlreadyMember({ groupId, memberId });
       return yield* admit(groupId, memberId);
     },
@@ -215,7 +215,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       const group = yield* loadGroup(groupId);
       if (group.kind !== "Team" || group.visibility !== "Public")
         return yield* new GroupNotFound({ groupId });
-      const current = yield* memberships.findActive(groupId, actor.memberId);
+      const current = yield* groupMembershipStore.findActive(groupId, actor.memberId);
       if (Option.isSome(current)) return current.value;
       return yield* admit(groupId, actor.memberId);
     },
@@ -225,7 +225,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   );
 
   const loadMembership = Effect.fnUntraced(function* (input: GroupMembership.RemoveInput) {
-    const found = yield* memberships.get(input.membershipId);
+    const found = yield* groupMembershipStore.get(input.membershipId);
     if (Option.isNone(found) || found.value.groupId !== input.groupId)
       return yield* new NotFound(input);
     return found.value;
@@ -240,7 +240,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
         membershipId: membership.id,
       });
     const occurredAt = yield* DateTime.now;
-    yield* departure.remove(
+    yield* groupMembershipDeparture.remove(
       {
         workspaceId,
         groupId: membership.groupId,
@@ -308,16 +308,16 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     const active: Array<GroupMembership.Record> = [];
     let after = options.after;
     while (active.length < options.limit) {
-      const page = yield* memberships.pageActiveByGroup(
+      const page = yield* groupMembershipStore.pageActiveByGroup(
         groupId,
         after === undefined ? { limit: options.limit } : { after, limit: options.limit },
       );
       if (page.length === 0) break;
       // One read for the page's members; only admissions of active members are current.
       const found = new Map(
-        (yield* members.getMany([...new Set(page.map((membership) => membership.memberId))])).map(
-          (member) => [member.id, member] as const,
-        ),
+        (yield* memberStore.getMany([
+          ...new Set(page.map((membership) => membership.memberId)),
+        ])).map((member) => [member.id, member] as const),
       );
       for (const membership of page) {
         after = membership.id;
@@ -333,7 +333,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     options: GroupMembership.ListOptions,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* audience
+    yield* groupAudience
       .require(id)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>

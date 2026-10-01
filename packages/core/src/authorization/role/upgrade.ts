@@ -33,19 +33,19 @@ const samePermissions = (left: ReadonlyArray<string>, right: ReadonlyArray<strin
  * Returns whether it upgraded.
  */
 export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target?: Target) {
-  const roles = yield* RoleStore.Service;
-  const workspaces = yield* WorkspaceStore.Service;
+  const roleStore = yield* RoleStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
   const journal = yield* Journal.Service;
-  const catalog = yield* PermissionCatalog.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
   const { workspaceId } = yield* Store.Service;
   const revision = yield* BuiltinRoles.Revision.makeEffect(
     target?.revision ?? BuiltinRoles.revision,
   );
-  const definitions = target?.definitions ?? catalog.definitions;
+  const definitions = target?.definitions ?? permissionCatalog.definitions;
   // A workspace recorded before revisions existed holds the bundles of revision zero.
   const due = Effect.gen(function* () {
-    if (Option.isNone(yield* workspaces.get)) return false;
-    return Option.getOrElse(yield* roles.builtinRevision, () => 0) < revision;
+    if (Option.isNone(yield* workspaceStore.get)) return false;
+    return Option.getOrElse(yield* roleStore.builtinRevision, () => 0) < revision;
   });
   if (!(yield* due)) return false;
   const provenance = yield* Publication.make(workspaceId, performer);
@@ -54,7 +54,7 @@ export const upgrade = Effect.fn("BuiltinRoleUpgrade.upgrade")(function* (target
       // Another host may have upgraded it meanwhile; writers take turns, so this check holds.
       if (!(yield* due)) return false;
       for (const role of BuiltinRoles.make(workspaceId, definitions)) {
-        const found = yield* roles.get(role.id);
+        const found = yield* roleStore.get(role.id);
         if (Option.isNone(found)) {
           yield* journal.publish(RoleFacts.Created, {
             roleId: role.id,

@@ -183,10 +183,10 @@ export const make = Effect.fn("Gateway.make")(function* (
     );
   const exposed = <A, E, R>(workspaceId: Workspace.Id, effect: Effect.Effect<A, E, R>) =>
     expose(workspaceId, heal(workspaceId, effect));
-  const storage = yield* WorkspaceStorage.Service;
+  const workspaceStorage = yield* WorkspaceStorage.Service;
   // Admission reads storage as the host, never inside a request's actor or transaction.
   const environment = yield* Effect.context<never>();
-  const cryptography = yield* Crypto.Crypto;
+  const crypto = yield* Crypto.Crypto;
 
   const bind = Effect.fn("Gateway.bind")(function* <A, E>(
     workspaceId: Workspace.Id,
@@ -201,7 +201,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
   ) {
-    const bindings = yield* storage.forWorkspace(workspaceId);
+    const bindings = yield* workspaceStorage.forWorkspace(workspaceId);
     const membership = yield* Effect.orDie(
       Context.get(bindings, MemberStore.Service).findActive(identity),
     );
@@ -230,7 +230,7 @@ export const make = Effect.fn("Gateway.make")(function* (
   });
   /** Whether the workspace has history, read as the host. */
   const created = (workspaceId: Workspace.Id) =>
-    storage.forWorkspace(workspaceId).pipe(
+    workspaceStorage.forWorkspace(workspaceId).pipe(
       Effect.flatMap((bindings) => Context.get(bindings, Store.Service).head(Core.journalLog)),
       Effect.map(Option.isSome),
       Effect.orDie,
@@ -259,7 +259,7 @@ export const make = Effect.fn("Gateway.make")(function* (
   const keyedId = (creator: Identity.HumanId, key: Request.Key) =>
     Request.derivedId(["workspace.create", creator, key]).pipe(
       Effect.map((id) => Workspace.Id.make(id)),
-      Effect.provideService(Crypto.Crypto, cryptography),
+      Effect.provideService(Crypto.Crypto, crypto),
       Effect.orDie,
     );
   const createWorkspace: Interface["createWorkspace"] = Effect.fn("Gateway.createWorkspace")(
@@ -270,14 +270,14 @@ export const make = Effect.fn("Gateway.make")(function* (
     ) {
       const key = options.requestKey;
       if (key === undefined) {
-        const id = Workspace.Id.make(yield* Effect.orDie(cryptography.randomUUIDv4));
+        const id = Workspace.Id.make(yield* Effect.orDie(crypto.randomUUIDv4));
         return yield* Effect.scoped(
           bind(id, exposed(id, WorkspaceInitialization.initialize(creator, input))),
         );
       }
       const id = yield* keyedId(creator, key);
       // A completed first attempt answers its retry without preparing the workspace.
-      const recorded = yield* storage.forWorkspace(id).pipe(
+      const recorded = yield* workspaceStorage.forWorkspace(id).pipe(
         Effect.flatMap((bindings) => Context.get(bindings, WorkspaceStore.Service).get),
         Effect.orDie,
         Effect.setContext(environment),
@@ -291,7 +291,7 @@ export const make = Effect.fn("Gateway.make")(function* (
             WorkspaceInitialization.initialize(creator, input).pipe(
               // A concurrent attempt with the same key initialized it first.
               Effect.catchTag("WorkspaceInitialization.AlreadyInitialized", () =>
-                Effect.flatMap(WorkspaceStore.Service, (store) => store.get).pipe(
+                Effect.flatMap(WorkspaceStore.Service, (workspaceStore) => workspaceStore.get).pipe(
                   Effect.orDie,
                   Effect.flatMap(
                     Option.match({
@@ -349,7 +349,7 @@ export const make = Effect.fn("Gateway.make")(function* (
         workspaceId,
         heal(
           workspaceId,
-          Effect.flatMap(BackgroundRuns.Service, (runs) => runs.run(process)),
+          Effect.flatMap(BackgroundRuns.Service, (backgroundRuns) => backgroundRuns.run(process)),
         ),
       ),
     );

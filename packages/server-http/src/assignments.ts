@@ -16,7 +16,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             identity,
-            Effect.flatMap(AssignmentApplication.Service, (service) => service.permissions),
+            Effect.flatMap(
+              AssignmentApplication.Service,
+              (assignmentApplication) => assignmentApplication.permissions,
+            ),
           ),
         ),
       roles: ({ params }) =>
@@ -24,7 +27,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             identity,
-            Effect.flatMap(AssignmentApplication.Service, (service) => service.roles),
+            Effect.flatMap(
+              AssignmentApplication.Service,
+              (assignmentApplication) => assignmentApplication.roles,
+            ),
           ),
         ),
       list: ({ params }) =>
@@ -32,8 +38,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             identity,
-            Effect.flatMap(AssignmentApplication.Service, (service) =>
-              service.list(params.memberId),
+            Effect.flatMap(AssignmentApplication.Service, (assignmentApplication) =>
+              assignmentApplication.list(params.memberId),
             ),
           ),
         ),
@@ -42,7 +48,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             identity,
-            Effect.flatMap(AssignmentApplication.Service, (service) => service.assign(payload)),
+            Effect.flatMap(AssignmentApplication.Service, (assignmentApplication) =>
+              assignmentApplication.assign(payload),
+            ),
           ),
         ),
       change: ({ params, payload }) =>
@@ -50,7 +58,9 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             identity,
-            Effect.flatMap(AssignmentApplication.Service, (service) => service.change(payload)),
+            Effect.flatMap(AssignmentApplication.Service, (assignmentApplication) =>
+              assignmentApplication.change(payload),
+            ),
           ),
         ),
       revoke: ({ params }) =>
@@ -58,8 +68,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             identity,
-            Effect.flatMap(AssignmentApplication.Service, (service) =>
-              service.revoke(params.memberId, params.assignmentId),
+            Effect.flatMap(AssignmentApplication.Service, (assignmentApplication) =>
+              assignmentApplication.revoke(params.memberId, params.assignmentId),
             ),
           ),
         ),

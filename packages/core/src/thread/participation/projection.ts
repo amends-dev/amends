@@ -14,12 +14,12 @@ export const definition = Projection.make("thread.participation", { version: 1 }
   .on(
     ThreadParticipationFacts.Ended,
     Effect.fn("ThreadParticipationProjection.ended")(function* ({ payload, provenance }) {
-      const store = yield* ThreadParticipationStore.Service;
+      const threadParticipationStore = yield* ThreadParticipationStore.Service;
       if (payload.reason !== "unfollowed") {
-        const found = yield* store.get(payload.participationId);
+        const found = yield* threadParticipationStore.get(payload.participationId);
         if (Option.isSome(found) && found.value.status === "ended") return;
       }
-      yield* store.end(payload, provenance.occurredAt);
+      yield* threadParticipationStore.end(payload, provenance.occurredAt);
     }),
   )
   .on(
@@ -27,15 +27,15 @@ export const definition = Projection.make("thread.participation", { version: 1 }
     Effect.fn("ThreadParticipationProjection.added")(function* ({
       payload: { groupId: _group, ...payload },
     }) {
-      const store = yield* ThreadParticipationStore.Service;
-      yield* store.insert(payload);
+      const threadParticipationStore = yield* ThreadParticipationStore.Service;
+      yield* threadParticipationStore.insert(payload);
     }),
   )
   .on(
     GroupMembershipFacts.Removed,
     Effect.fn("ThreadParticipationProjection.departed")(function* ({ payload, provenance }) {
-      const store = yield* ThreadParticipationStore.Service;
-      yield* store.endByAdmission(payload.membershipId, provenance.occurredAt);
+      const threadParticipationStore = yield* ThreadParticipationStore.Service;
+      yield* threadParticipationStore.endByAdmission(payload.membershipId, provenance.occurredAt);
     }),
   );
 export * as ThreadParticipationProjection from "./projection.ts";

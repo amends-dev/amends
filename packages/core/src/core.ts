@@ -184,18 +184,18 @@ const threadQuery = ThreadQuery.layer.pipe(
   ),
 );
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
-const groupDeparture = GroupMembershipDeparture.layer;
-const turnActivity = TurnActivityRecorder.layer.pipe(Layer.provide(threadCommand));
-const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivity));
+const groupMembershipDeparture = GroupMembershipDeparture.layer;
+const turnActivityRecorder = TurnActivityRecorder.layer.pipe(Layer.provide(threadCommand));
+const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivityRecorder));
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(threadQuery));
 const threadReading = ThreadReading.layer;
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
  */
-const changeSource = ChangeFeedSource.layer();
-const changeFeed = ChangeFeedApplication.layer.pipe(
-  Layer.provide(Layer.mergeAll(changeSource, GrantResolver.layer)),
+const changeFeedSource = ChangeFeedSource.layer();
+const changeFeedApplication = ChangeFeedApplication.layer.pipe(
+  Layer.provide(Layer.mergeAll(changeFeedSource, GrantResolver.layer)),
 );
 
 /**
@@ -211,7 +211,7 @@ const operations = Layer.mergeAll(
   AssignmentApplication.layer,
   OwnershipApplication.layer,
   NotificationApplication.layer,
-  changeFeed,
+  changeFeedApplication,
   GroupApplication.layer,
   GroupMembershipApplication.layer,
   GroupFollowApplication.layer,
@@ -234,11 +234,11 @@ const operations = Layer.mergeAll(
       threadCommand,
       notificationSource,
       threadReading,
-      groupDeparture,
-      turnActivity,
+      groupMembershipDeparture,
+      turnActivityRecorder,
       turnEnding,
       TurnDrafts.layer,
-      changeSource,
+      changeFeedSource,
     ),
   ),
 );
@@ -250,7 +250,7 @@ const operations = Layer.mergeAll(
 const background = Layer.mergeAll(
   BackgroundRuns.layer(processes).pipe(Layer.provide(TurnAcceptance.layer)),
   TurnExecution.layer,
-).pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnActivity, turnEnding)));
+).pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnActivityRecorder, turnEnding)));
 
 /**
  * Complete core for one workspace: application operations, background runs, and turn execution over the

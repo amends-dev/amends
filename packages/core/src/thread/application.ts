@@ -144,25 +144,25 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture bound services; authorize the complete requested conversation inside its commit. @category constructors */
 export const make = Effect.fn("ThreadApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const audience = yield* GroupAudience.Service;
+  const groupAudience = yield* GroupAudience.Service;
   const threadCommand = yield* ThreadCommand.Service;
-  const groups = yield* GroupStore.Service;
+  const groupStore = yield* GroupStore.Service;
   const directGroups = yield* DirectGroups.Service;
-  const follows = yield* GroupFollowStore.Service;
+  const groupFollowStore = yield* GroupFollowStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
-  const threads = yield* ThreadStore.Service;
-  const readStates = yield* ReadStateStore.Service;
-  const readings = yield* ThreadReading.Service;
-  const messages = yield* ThreadMessageStore.Service;
-  const activities = yield* ThreadActivityStore.Service;
+  const threadStore = yield* ThreadStore.Service;
+  const readStateStore = yield* ReadStateStore.Service;
+  const threadReading = yield* ThreadReading.Service;
+  const threadMessageStore = yield* ThreadMessageStore.Service;
+  const threadActivityStore = yield* ThreadActivityStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
   /** A start's thread and opening message, by the IDs its request named; None before it ran. */
   const opening = Effect.fnUntraced(function* (threadId: Thread.Id, messageId: ThreadMessage.Id) {
-    const thread = yield* threads.get(threadId);
+    const thread = yield* threadStore.get(threadId);
     if (Option.isNone(thread)) return Option.none<Thread.Started>();
-    const message = yield* messages.get(messageId);
+    const message = yield* threadMessageStore.get(messageId);
     if (Option.isNone(message))
       return yield* Effect.die("A started thread's opening message is missing");
     return Option.some<Thread.Started>({ thread: thread.value, message: message.value });
@@ -230,7 +230,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         ),
       );
     // Posting reads the thread through the author's own message.
-    yield* readings.markRead(
+    yield* threadReading.markRead(
       Notification.ofMember(actor.memberId, actor.identity),
       started.thread,
       started.activity.sequence,
@@ -277,7 +277,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const startInGroup = Effect.fn("ThreadApplication.startInGroup")(
     function* (input: Thread.StartInGroupInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Thread.StartInGroupInput)(input);
-      yield* audience
+      yield* groupAudience
         .require(request.groupId)
         .pipe(
           Effect.catchTag("GroupAudience.NotMember", () =>
@@ -296,7 +296,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const { previous, ...ids } = yield* startIds("thread.start", options.requestKey);
       if (Option.isSome(previous)) return previous.value;
-      const foundGroup = yield* groups.get(request.groupId);
+      const foundGroup = yield* groupStore.get(request.groupId);
       if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
       const group = foundGroup.value;
       // A direct group's members all take part; a team thread starts with its author, the
@@ -304,7 +304,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       // sees it as unread, so only these members' admissions are read.
       // Whether a follow counts depends on its member's current admission.
       const followed =
-        group.kind === "Direct" ? [] : yield* follows.listActiveByGroup(request.groupId);
+        group.kind === "Direct" ? [] : yield* groupFollowStore.listActiveByGroup(request.groupId);
       const involved =
         group.kind === "Direct"
           ? group.memberIds
@@ -366,7 +366,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     cursorOf: (thread: Thread.Record, latest: Thread.Latest) => Cursor,
   ) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    const admission = yield* audience
+    const admission = yield* groupAudience
       .require(id)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
@@ -381,7 +381,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       if (page.length === 0) break;
       const ids = page.map((thread) => thread.id);
       const latest = new Map(
-        (yield* threads.getLatest(ids)).map((value) => [value.threadId, value] as const),
+        (yield* threadStore.getLatest(ids)).map((value) => [value.threadId, value] as const),
       );
       const allowed = yield* authorization.permitted(
         ids.map((threadId) =>
@@ -390,7 +390,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       );
       const readableIds = ids.filter((_, index) => allowed[index] === true);
       const positions = new Map(
-        (yield* readStates.getThreadPositions(actor.memberId, readableIds)).map(
+        (yield* readStateStore.getThreadPositions(actor.memberId, readableIds)).map(
           (position) => [position.threadId, position.readThrough] as const,
         ),
       );
@@ -426,7 +426,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       options.limit,
       options.before,
       (id, before) =>
-        threads.listByLatest(
+        threadStore.listByLatest(
           id,
           before === undefined ? { limit: options.limit } : { before, limit: options.limit },
         ),
@@ -447,7 +447,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
       options.limit,
       options.before,
       (id, before) =>
-        threads.listByStart(
+        threadStore.listByStart(
           id,
           before === undefined ? { limit: options.limit } : { before, limit: options.limit },
         ),
@@ -457,19 +457,19 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
     // A start publishes its opening message as the thread's first activity.
     const ids = items.map((item) => item.thread.id);
     const openings = new Map<Thread.Id, ThreadMessage.Id>();
-    for (const activity of yield* activities.getFirst(ids)) {
+    for (const activity of yield* threadActivityStore.getFirst(ids)) {
       const opening = yield* Effect.orDie(
         ThreadActivityKind.decode(ThreadMessageActivity.Published, activity),
       );
       openings.set(activity.threadId, opening.details.messageId);
     }
     const found = new Map(
-      (yield* messages.getMany([...openings.values()])).map(
+      (yield* threadMessageStore.getMany([...openings.values()])).map(
         (message) => [message.id, message] as const,
       ),
     );
     const counts = new Map(
-      (yield* activities.countByKind(ids, published)).map(
+      (yield* threadActivityStore.countByKind(ids, published)).map(
         (value) => [value.threadId, value.count] as const,
       ),
     );

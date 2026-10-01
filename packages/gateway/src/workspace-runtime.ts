@@ -73,11 +73,11 @@ export interface Interface {
  * @category constructors
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
-  const storage = yield* WorkspaceStorage.Service;
-  const hub = yield* SignalHub.Service;
-  const wakes = yield* WorkspaceWakes.Service;
-  const turns = yield* WorkspaceTurns.Service;
-  const cryptography = yield* Crypto.Crypto;
+  const workspaceStorage = yield* WorkspaceStorage.Service;
+  const signalHub = yield* SignalHub.Service;
+  const workspaceWakes = yield* WorkspaceWakes.Service;
+  const workspaceTurns = yield* WorkspaceTurns.Service;
+  const crypto = yield* Crypto.Crypto;
   const environment = yield* Effect.context<never>();
   const catalog = ConnectionCatalog.make(options.connections ?? []);
   const environments = EnvironmentCatalog.make({
@@ -86,15 +86,15 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
   });
 
   const boot = Effect.fn("WorkspaceRuntime.boot")(function* (workspaceId: Workspace.Id) {
-    const bindings = yield* storage.forWorkspace(workspaceId);
+    const bindings = yield* workspaceStorage.forWorkspace(workspaceId);
     const services = Core.layer.pipe(
       Layer.provideMerge(
         Layer.mergeAll(
           Layer.succeedContext(bindings),
-          Layer.succeed(Crypto.Crypto, cryptography),
-          Layer.succeed(Signals.Service, hub.forWorkspace(workspaceId)),
-          Layer.succeed(BackgroundWakes.Service, wakes.forWorkspace(workspaceId)),
-          Layer.succeed(TurnDispatch.Service, turns.forWorkspace(workspaceId)),
+          Layer.succeed(Crypto.Crypto, crypto),
+          Layer.succeed(Signals.Service, signalHub.forWorkspace(workspaceId)),
+          Layer.succeed(BackgroundWakes.Service, workspaceWakes.forWorkspace(workspaceId)),
+          Layer.succeed(TurnDispatch.Service, workspaceTurns.forWorkspace(workspaceId)),
           Layer.succeed(ConnectionCatalog.Service, catalog),
           Layer.succeed(EnvironmentCatalog.Service, environments),
         ),

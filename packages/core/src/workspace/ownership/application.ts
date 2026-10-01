@@ -58,9 +58,9 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
   | Crypto.Crypto
   | Store.Service
 > {
-  const workspace = yield* WorkspaceStore.Service;
-  const members = yield* MemberStore.Service;
-  const assignments = yield* AssignmentStore.Service;
+  const workspaceStore = yield* WorkspaceStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const assignmentStore = yield* AssignmentStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -71,15 +71,15 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
     workspaceId,
   });
   const loadMember = Effect.fn("OwnershipApplication.loadMember")(function* (memberId: Member.Id) {
-    const found = yield* members.get(memberId);
+    const found = yield* memberStore.get(memberId);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId });
     return found.value;
   });
   const current = Effect.gen(function* () {
-    const found = yield* workspace.get;
+    const found = yield* workspaceStore.get;
     if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
-    const owner = yield* members.get(found.value.ownerMemberId);
-    const [assignment] = yield* assignments.listActiveByRole(BuiltinRoles.OwnerId);
+    const owner = yield* memberStore.get(found.value.ownerMemberId);
+    const [assignment] = yield* assignmentStore.listActiveByRole(BuiltinRoles.OwnerId);
     if (Option.isNone(owner) || assignment === undefined)
       return yield* Effect.die("A workspace's owner or its Owner assignment is missing");
     return { workspace: found.value, owner: owner.value, assignment };
@@ -96,7 +96,7 @@ export const make = Effect.fn("OwnershipApplication.make")(function* (): Effect.
         Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
       ));
     const candidates = canTransfer
-      ? (yield* members.list).filter(
+      ? (yield* memberStore.list).filter(
           (member) =>
             member.status === "active" &&
             member.identity._tag === "Human" &&

@@ -8,17 +8,17 @@ export const definition = Projection.make("threads", { version: 1 })
   .on(
     ThreadFacts.Created,
     Effect.fn("ThreadProjection.created")(function* ({ payload }) {
-      const store = yield* ThreadStore.Service;
-      yield* store.insert(payload);
+      const threadStore = yield* ThreadStore.Service;
+      yield* threadStore.insert(payload);
     }),
   )
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("ThreadProjection.activity")(function* ({ payload: { activity } }) {
-      const store = yield* ThreadStore.Service;
+      const threadStore = yield* ThreadStore.Service;
       // A thread's latest activity is its latest of a kind that counts as new, such as a message.
       if (!activity.newActivity) return;
-      yield* store.recordLatest({
+      yield* threadStore.recordLatest({
         threadId: activity.threadId,
         sequence: activity.sequence,
         occurredAt: activity.occurredAt,

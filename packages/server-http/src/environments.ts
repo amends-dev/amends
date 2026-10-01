@@ -20,7 +20,7 @@ export const layer = HttpApiBuilder.group(
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
       operation: (
-        environments: EnvironmentApplication.Interface,
+        environmentApplication: EnvironmentApplication.Interface,
       ) => Effect.Effect<A, E, Actor.Service>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
@@ -32,30 +32,38 @@ export const layer = HttpApiBuilder.group(
       );
     return handlers.handleAll({
       implementations: ({ params }) =>
-        asMember(params.workspaceId, (environments) =>
-          Effect.succeed(environments.implementations),
+        asMember(params.workspaceId, (environmentApplication) =>
+          Effect.succeed(environmentApplication.implementations),
         ),
-      list: ({ params }) => asMember(params.workspaceId, (environments) => environments.list),
+      list: ({ params }) =>
+        asMember(params.workspaceId, (environmentApplication) => environmentApplication.list),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (environments) =>
-          environments.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(params.workspaceId, (environmentApplication) =>
+          environmentApplication.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (environments) => environments.get(params.environmentId)),
+        asMember(params.workspaceId, (environmentApplication) =>
+          environmentApplication.get(params.environmentId),
+        ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (environments) =>
-          environments.rename({
+        asMember(params.workspaceId, (environmentApplication) =>
+          environmentApplication.rename({
             environmentId: params.environmentId,
             name: payload.name,
             expectedName: payload.expectedName,
           }),
         ),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (environments) =>
-          environments.configure({ environmentId: params.environmentId, sandbox: payload.sandbox }),
+        asMember(params.workspaceId, (environmentApplication) =>
+          environmentApplication.configure({
+            environmentId: params.environmentId,
+            sandbox: payload.sandbox,
+          }),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (environments) => environments.remove(params.environmentId)),
+        asMember(params.workspaceId, (environmentApplication) =>
+          environmentApplication.remove(params.environmentId),
+        ),
     });
   }),
 );

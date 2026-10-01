@@ -99,9 +99,9 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const environments = yield* EnvironmentStore.Service;
-  const connections = yield* ConnectionStore.Service;
-  const catalog = yield* EnvironmentCatalog.Service;
+  const environmentStore = yield* EnvironmentStore.Service;
+  const connectionStore = yield* ConnectionStore.Service;
+  const environmentCatalog = yield* EnvironmentCatalog.Service;
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -115,13 +115,15 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   /** Readiness from the host's catalogs and the account connection, as the environment is now. */
   const readinessOf = Effect.fnUntraced(function* (record: Environment.Record) {
     const connectionId = record.sandbox?.connectionId ?? null;
-    const found = connectionId === null ? Option.none() : yield* connections.get(connectionId);
+    const found = connectionId === null ? Option.none() : yield* connectionStore.get(connectionId);
     return EnvironmentCompatibility.readiness(
       record,
       {
-        harness: catalog.harness(record.harnessId),
+        harness: environmentCatalog.harness(record.harnessId),
         sandbox:
-          record.sandbox === null ? Option.none() : catalog.sandbox(record.sandbox.providerId),
+          record.sandbox === null
+            ? Option.none()
+            : environmentCatalog.sandbox(record.sandbox.providerId),
       },
       {
         record: found,
@@ -141,7 +143,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
 
   /** The active environment by ID, or NotFound. */
   const load = Effect.fnUntraced(function* (environmentId: Environment.Id) {
-    const found = yield* environments.get(environmentId);
+    const found = yield* environmentStore.get(environmentId);
     if (Option.isNone(found) || found.value.status !== "active")
       return yield* new NotFound({ environmentId });
     return found.value;
@@ -163,12 +165,12 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   });
 
   const harnessOf = (id: Environment.Record["harnessId"]) =>
-    Option.match(catalog.harness(id), {
+    Option.match(environmentCatalog.harness(id), {
       onNone: () => Effect.fail(new UnknownHarness({ harnessId: id })),
       onSome: Effect.succeed,
     });
   const providerOf = (id: SandboxImplementation.Id) =>
-    Option.match(catalog.sandbox(id), {
+    Option.match(environmentCatalog.sandbox(id), {
       onNone: () => Effect.fail(new UnknownSandboxProvider({ providerId: id })),
       onSome: Effect.succeed,
     });
@@ -188,7 +190,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
     else {
       const connectionId = settings.connectionId;
       const found = Option.filter(
-        yield* connections.get(connectionId),
+        yield* connectionStore.get(connectionId),
         (connection) => connection.status === "active",
       );
       const [readable = false, usable = false] = yield* authorization.permitted([
@@ -231,7 +233,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const active = (yield* environments.list).filter((record) => record.status === "active");
+    const active = (yield* environmentStore.list).filter((record) => record.status === "active");
     // One grant resolution answers both permissions for every environment.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
@@ -262,7 +264,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   });
 
   const restore = Effect.fnUntraced(function* (environmentId: Environment.Id) {
-    const found = yield* environments.get(environmentId);
+    const found = yield* environmentStore.get(environmentId);
     if (Option.isNone(found)) return yield* new NotFound({ environmentId });
     return found.value;
   });
@@ -282,7 +284,10 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
         ]),
       );
       // A retry returns the environment its first attempt created.
-      if (options.requestKey !== undefined && Option.isSome(yield* environments.get(environmentId)))
+      if (
+        options.requestKey !== undefined &&
+        Option.isSome(yield* environmentStore.get(environmentId))
+      )
         return yield* presented(yield* restore(environmentId));
       const harness = yield* harnessOf(request.harnessId);
       const placement = request.sandbox?.harness ?? "in-process";
@@ -355,7 +360,10 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   });
 
   return Service.of({
-    implementations: { harnesses: catalog.harnesses, sandboxes: catalog.sandboxes },
+    implementations: {
+      harnesses: environmentCatalog.harnesses,
+      sandboxes: environmentCatalog.sandboxes,
+    },
     list,
     get,
     create,

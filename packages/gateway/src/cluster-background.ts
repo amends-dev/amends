@@ -88,12 +88,12 @@ export const layerWakes = Layer.effect(
       forWorkspace: (workspaceId) =>
         BackgroundWakes.Service.of({
           request: Effect.fnUntraced(function* (process, options = {}) {
-            const commit = yield* Store.Transaction;
+            const storeTransaction = yield* Store.Transaction;
             const at = options.at ?? (yield* DateTime.now);
             const key =
               options.at === undefined
-                ? `commit:${commit.id}`
-                : `commit:${commit.id}@${DateTime.toEpochMillis(at)}`;
+                ? `commit:${storeTransaction.id}`
+                : `commit:${storeTransaction.id}@${DateTime.toEpochMillis(at)}`;
             yield* clientFor(entityId(workspaceId, process))
               .Wake(new Wake({ workspaceId, process, key, at, attempt: 0 }), { discard: true })
               .pipe(Effect.mapError((cause) => new Store.Failure({ operation: "wake", cause })));

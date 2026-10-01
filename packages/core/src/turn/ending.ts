@@ -42,7 +42,7 @@ export class Service extends Context.Service<Service, Interface>()(
 export const make = Effect.fn("TurnEnding.make")(function* () {
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
-  const activity = yield* TurnActivityRecorder.Service;
+  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
 
   const end: Interface["end"] = Effect.fnUntraced(function* (turn, ending) {
     const finishedAt = yield* DateTime.now;
@@ -67,7 +67,7 @@ export const make = Effect.fn("TurnEnding.make")(function* () {
               Object.assign(where, { reason: ending.reason, finishedAt }),
             )
           : yield* journal.publish(TurnFacts.Cancelled, Object.assign(where, { finishedAt }));
-    yield* activity.record(
+    yield* turnActivityRecorder.record(
       turn.threadId,
       TurnActivity.Ended,
       { turnId: turn.id, outcome: ending.outcome, messageIds, reason, cancelReason },

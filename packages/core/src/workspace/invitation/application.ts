@@ -83,9 +83,9 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   | Crypto.Crypto
   | Store.Service
 > {
-  const invitations = yield* InvitationStore.Service;
-  const members = yield* MemberStore.Service;
-  const groups = yield* GroupStore.Service;
+  const invitationStore = yield* InvitationStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const groupStore = yield* GroupStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
@@ -105,14 +105,14 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
   });
   const load = Effect.fnUntraced(function* (id: Invitation.Id) {
     const validId = yield* Schema.decodeEffect(Invitation.Id)(id);
-    const found = yield* invitations.get(validId);
+    const found = yield* invitationStore.get(validId);
     if (Option.isNone(found)) return yield* new NotFound({ invitationId: id });
     return found.value;
   });
   const requireUnjoined = Effect.fnUntraced(function* (recipientId: Identity.HumanId) {
     if (
       Option.isSome(
-        yield* members.findActive(Identity.Reference.cases.Human.make({ id: recipientId })),
+        yield* memberStore.findActive(Identity.Reference.cases.Human.make({ id: recipientId })),
       )
     )
       return yield* new AlreadyMember({ recipientId });
@@ -126,7 +126,10 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
         yield* Request.idFor(options.requestKey, ["invitation.issue", workspaceId, actor.memberId]),
       );
       // A retry returns the invitation its first attempt issued, as it stands now.
-      if (options.requestKey !== undefined && Option.isSome(yield* invitations.get(invitationId)))
+      if (
+        options.requestKey !== undefined &&
+        Option.isSome(yield* invitationStore.get(invitationId))
+      )
         return yield* load(invitationId);
       const issuedAt = yield* DateTime.now;
       if (!DateTime.isGreaterThan(request.expiresAt, issuedAt)) return yield* new InvalidExpiry({});
@@ -166,7 +169,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     // Repeated acceptance returns the original receipt, without restoring grants
     // or reactivating a membership that has since been removed.
     if (state._tag === "Accepted") {
-      const member = yield* members.get(state.memberId);
+      const member = yield* memberStore.get(state.memberId);
       if (Option.isNone(member))
         return yield* Effect.die("An accepted invitation's member is missing");
       return member.value;
@@ -177,7 +180,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
     if (!DateTime.isGreaterThan(details.expiresAt, acceptedAt))
       return yield* new Unavailable({ invitationId: id, reason: "expired" });
     yield* requireUnjoined(recipient);
-    const inviter = yield* members.get(details.inviterMemberId);
+    const inviter = yield* memberStore.get(details.inviterMemberId);
     if (Option.isNone(inviter))
       return yield* new Authorization.InvalidActor({
         memberId: details.inviterMemberId,
@@ -231,7 +234,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
       });
       // Every member joins the workspace's general group as they join it; a workspace created
       // before general groups existed has none.
-      if (Option.isSome(yield* groups.get(Group.GeneralId)))
+      if (Option.isSome(yield* groupStore.get(Group.GeneralId)))
         yield* journal.publish(GroupMembershipFacts.Added, {
           id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
           workspaceId,
@@ -268,7 +271,7 @@ export const make = Effect.fn("InvitationApplication.make")(function* (): Effect
 
   const list = Effect.gen(function* () {
     yield* authorization.require([manage]);
-    return yield* invitations.list;
+    return yield* invitationStore.list;
   }).pipe(Effect.withSpan("InvitationApplication.list"));
 
   return Service.of({ issue, accept, revoke, list });

@@ -104,13 +104,13 @@ export class Service extends Context.Service<Service, Interface>()(
 /** Capture workspace dependencies; resolve authority and member eligibility inside each commit. @category constructors */
 export const make = Effect.fn("GroupApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
-  const members = yield* MemberStore.Service;
-  const groups = yield* GroupStore.Service;
-  const memberships = yield* GroupMembershipStore.Service;
-  const audience = yield* GroupAudience.Service;
-  const follows = yield* GroupFollowStore.Service;
-  const readStates = yield* ReadStateStore.Service;
-  const notifications = yield* NotificationStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const groupStore = yield* GroupStore.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
+  const groupAudience = yield* GroupAudience.Service;
+  const groupFollowStore = yield* GroupFollowStore.Service;
+  const readStateStore = yield* ReadStateStore.Service;
+  const notificationStore = yield* NotificationStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -128,10 +128,12 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         yield* Request.idFor(options.requestKey, ["group.create", workspaceId, actor.memberId]),
       );
       // A retry returns the group its first attempt created.
-      if (options.requestKey !== undefined && Option.isSome(yield* groups.get(groupId)))
+      if (options.requestKey !== undefined && Option.isSome(yield* groupStore.get(groupId)))
         return yield* load(groupId);
       const found = new Map(
-        (yield* members.getMany(request.memberIds)).map((member) => [member.id, member] as const),
+        (yield* memberStore.getMany(request.memberIds)).map(
+          (member) => [member.id, member] as const,
+        ),
       );
       for (const memberId of request.memberIds) {
         const member = found.get(memberId);
@@ -170,13 +172,13 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     journal.commit,
   );
   const load = Effect.fnUntraced(function* (groupId: Group.Id) {
-    const found = yield* groups.get(groupId);
+    const found = yield* groupStore.get(groupId);
     if (Option.isNone(found)) return yield* new NotFound({ groupId });
     return found.value;
   });
   const get = Effect.fn("GroupApplication.get")(function* (groupId: Group.Id) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    yield* audience
+    yield* groupAudience
       .require(id)
       .pipe(
         Effect.catchTag("GroupAudience.NotMember", () =>
@@ -199,7 +201,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
         }),
       ]);
       // Only its members may rename a group; to anyone else it is missing.
-      yield* audience
+      yield* groupAudience
         .require(request.groupId)
         .pipe(
           Effect.catchTag("GroupAudience.NotMember", () =>
@@ -248,23 +250,23 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       renamers = granted(2),
       moderators = granted(3);
     const records = new Map(
-      (yield* groups.getMany(ids)).map((group) => [group.id, group] as const),
+      (yield* groupStore.getMany(ids)).map((group) => [group.id, group] as const),
     );
     const latest = new Map(
-      (yield* groups.getLatest(ids)).map((value) => [value.groupId, value.occurredAt] as const),
+      (yield* groupStore.getLatest(ids)).map((value) => [value.groupId, value.occurredAt] as const),
     );
     const caughtUp = new Map(
-      (yield* readStates.getGroupsCaughtUp(memberId, ids)).map(
+      (yield* readStateStore.getGroupsCaughtUp(memberId, ids)).map(
         (value) => [value.groupId, value.caughtUpAt] as const,
       ),
     );
     const following = new Set(
-      (yield* follows.findActiveMany(
+      (yield* groupFollowStore.findActiveMany(
         ids.flatMap((groupId) => admissions.get(groupId)?.id ?? []),
       )).map((follow) => follow.groupMembershipId),
     );
     const pending = new Map(
-      (yield* notifications.countPendingByGroup(
+      (yield* notificationStore.countPendingByGroup(
         Notification.ofMember(actor.memberId, actor.identity),
         ids,
       )).map((value) => [value.groupId, value.count] as const),
@@ -309,7 +311,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     // Fill the page with readable groups, reading further when grants skip some.
     while (items.length < options.limit) {
       const admissions = new Map(
-        (yield* memberships.pageActiveByMember(
+        (yield* groupMembershipStore.pageActiveByMember(
           actor.memberId,
           after === undefined
             ? { limit: options.limit }
@@ -332,7 +334,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
     let after = options.after;
     // Fill the page with groups the actor may join, reading further when grants skip some.
     while (items.length < options.limit) {
-      const page = yield* groups.pagePublic(
+      const page = yield* groupStore.pagePublic(
         after === undefined ? { limit: options.limit } : { after, limit: options.limit },
       );
       if (page.length === 0) break;
@@ -348,7 +350,7 @@ export const make = Effect.fn("GroupApplication.make")(function* () {
       const joinable = page.filter((_, index) => allowed[index] === true);
       const ids = new Set(joinable.map((group) => group.id));
       const summaries = new Map(
-        (yield* memberships.summarize([...ids], actor.memberId)).map(
+        (yield* groupMembershipStore.summarize([...ids], actor.memberId)).map(
           (summary) => [summary.groupId, summary] as const,
         ),
       );

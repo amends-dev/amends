@@ -19,7 +19,9 @@ export const layer = HttpApiBuilder.group(
     /** Run an agent operation as the principal, a member of the workspace. */
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
-      operation: (agents: AgentApplication.Interface) => Effect.Effect<A, E, Actor.Service>,
+      operation: (
+        agentApplication: AgentApplication.Interface,
+      ) => Effect.Effect<A, E, Actor.Service>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
         gateway.asMember(
@@ -29,14 +31,15 @@ export const layer = HttpApiBuilder.group(
         ),
       );
     return handlers.handleAll({
-      list: ({ params }) => asMember(params.workspaceId, (agents) => agents.list),
+      list: ({ params }) =>
+        asMember(params.workspaceId, (agentApplication) => agentApplication.list),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(params.workspaceId, (agentApplication) =>
+          agentApplication.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
       environmentChoices: ({ params, query }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.environmentChoices({
+        asMember(params.workspaceId, (agentApplication) =>
+          agentApplication.environmentChoices({
             model: {
               connectionId: query.connectionId,
               model: query.model,
@@ -44,21 +47,22 @@ export const layer = HttpApiBuilder.group(
             },
           }),
         ),
-      get: ({ params }) => asMember(params.workspaceId, (agents) => agents.get(params.agentId)),
+      get: ({ params }) =>
+        asMember(params.workspaceId, (agentApplication) => agentApplication.get(params.agentId)),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.configure(Object.assign({ agentId: params.agentId }, payload)),
+        asMember(params.workspaceId, (agentApplication) =>
+          agentApplication.configure(Object.assign({ agentId: params.agentId }, payload)),
         ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (agents) =>
-          agents.rename({
+        asMember(params.workspaceId, (agentApplication) =>
+          agentApplication.rename({
             agentId: params.agentId,
             name: payload.name,
             expectedName: payload.expectedName,
           }),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (agents) => agents.remove(params.agentId)),
+        asMember(params.workspaceId, (agentApplication) => agentApplication.remove(params.agentId)),
     });
   }),
 );

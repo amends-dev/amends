@@ -12,18 +12,18 @@ const change = Effect.fnUntraced(function* (
   },
   apply: (record: Environment.Record) => Environment.Record,
 ) {
-  const store = yield* EnvironmentStore.Service;
-  const found = yield* store.get(payload.environmentId);
+  const environmentStore = yield* EnvironmentStore.Service;
+  const found = yield* environmentStore.get(payload.environmentId);
   if (Option.isNone(found)) return yield* Effect.die("A changed environment is missing");
-  yield* store.update(apply(found.value));
+  yield* environmentStore.update(apply(found.value));
 });
 
 export const definition = Projection.make("environments", { version: 1 })
   .on(
     EnvironmentFacts.Created,
     Effect.fn("EnvironmentProjection.created")(function* ({ payload }) {
-      const store = yield* EnvironmentStore.Service;
-      yield* store.insert(payload);
+      const environmentStore = yield* EnvironmentStore.Service;
+      yield* environmentStore.insert(payload);
     }),
   )
   .on(EnvironmentFacts.Renamed, ({ payload }) =>

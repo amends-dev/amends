@@ -20,7 +20,10 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationApplication.Service, (invitations) => invitations.list),
+            Effect.flatMap(
+              InvitationApplication.Service,
+              (invitationApplication) => invitationApplication.list,
+            ),
           ),
         ),
       issue: ({ params, headers, payload }) =>
@@ -28,8 +31,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.issue(payload, { requestKey: headers["idempotency-key"] }),
+            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
+              invitationApplication.issue(payload, { requestKey: headers["idempotency-key"] }),
             ),
           ),
         ),
@@ -39,8 +42,8 @@ export const layer = HttpApiBuilder.group(
           if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
           return yield* gateway.inWorkspace(
             params.workspaceId,
-            Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.accept(params.invitationId, principal.id, payload ?? {}),
+            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
+              invitationApplication.accept(params.invitationId, principal.id, payload ?? {}),
             ),
           );
         }),
@@ -49,8 +52,8 @@ export const layer = HttpApiBuilder.group(
           gateway.asMember(
             params.workspaceId,
             principal,
-            Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.revoke(params.invitationId),
+            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
+              invitationApplication.revoke(params.invitationId),
             ),
           ),
         ),

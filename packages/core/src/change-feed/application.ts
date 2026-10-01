@@ -81,16 +81,16 @@ const changes = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prepared) =>
 
 /** Capture the shared source and the reader's policy; authenticate the actor per subscription. @category constructors */
 export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
-  const source = yield* ChangeFeedSource.Service;
+  const changeFeedSource = yield* ChangeFeedSource.Service;
   const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
-  const resolver = yield* GrantResolver.Service;
-  const memberships = yield* GroupMembershipStore.Service;
+  const grantResolver = yield* GrantResolver.Service;
+  const groupMembershipStore = yield* GroupMembershipStore.Service;
   const { workspaceId } = yield* Store.Service;
 
   const load = Effect.fnUntraced(function* (actor: Actor.Value) {
-    const admissions = yield* memberships.listActiveByMember(actor.memberId);
-    const grants = yield* resolver.resolve(actor.memberId);
+    const admissions = yield* groupMembershipStore.listActiveByMember(actor.memberId);
+    const grants = yield* grantResolver.resolve(actor.memberId);
     const scopes = new Set<Audience.Scope>([
       Audience.workspace,
       Member.audienceOf(actor.memberId),
@@ -109,7 +109,7 @@ export const make = Effect.fn("ChangeFeedApplication.make")(function* () {
     const actor = yield* Actor.Service;
     // Register for signals and commits before Ready, so neither misses what follows it.
     const live = yield* signals.subscribe;
-    const subscription = yield* source.subscribe(
+    const subscription = yield* changeFeedSource.subscribe(
       Option.map(Option.fromUndefinedOr(options.after), ChangeFeed.positionOf),
     );
     // Membership and access are read after the subscription has read the head: a change

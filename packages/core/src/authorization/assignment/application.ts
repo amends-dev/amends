@@ -74,16 +74,16 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   | PermissionCatalog.Service
   | Store.Service
 > {
-  const assignments = yield* AssignmentStore.Service;
-  const members = yield* MemberStore.Service;
+  const assignmentStore = yield* AssignmentStore.Service;
+  const memberStore = yield* MemberStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
-  const catalog = yield* PermissionCatalog.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
   const { workspaceId } = yield* Store.Service;
   const manage = Requirement.make(AssignmentPermissions.Manage, { _tag: "Workspace", workspaceId });
-  const workspaceWide = catalog.definitions.filter(
+  const workspaceWide = permissionCatalog.definitions.filter(
     (permission) => permission.targetKind === "Workspace",
   );
   const permissions = Effect.gen(function* () {
@@ -101,7 +101,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
   }).pipe(Effect.withSpan("AssignmentApplication.permissions"));
   const member = Effect.fn("AssignmentApplication.member")(function* (memberId: Member.Id) {
     const id = yield* Schema.decodeEffect(Member.Id)(memberId);
-    const found = yield* members.get(id);
+    const found = yield* memberStore.get(id);
     if (Option.isNone(found)) return yield* new MemberNotFound({ memberId: id });
     return found.value;
   });
@@ -186,7 +186,7 @@ export const make = Effect.fn("AssignmentApplication.make")(function* (): Effect
     function* (memberId: Member.Id, assignmentId: Assignment.Id) {
       yield* recipient(memberId);
       const id = yield* Schema.decodeEffect(Assignment.Id)(assignmentId);
-      const found = yield* assignments.get(id);
+      const found = yield* assignmentStore.get(id);
       if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
       const record = found.value;
       if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });

@@ -40,10 +40,10 @@ export class Service extends Context.Service<Service, Interface>()(
 /** @category constructors */
 export const make = Effect.fn("TurnActivityRecorder.make")(function* () {
   const threadCommand = yield* ThreadCommand.Service;
-  const threads = yield* ThreadStore.Service;
+  const threadStore = yield* ThreadStore.Service;
   const record: Interface["record"] = Effect.fnUntraced(function* (thread, kind, details, cause) {
     const found =
-      typeof thread === "string" ? Option.getOrUndefined(yield* threads.get(thread)) : thread;
+      typeof thread === "string" ? Option.getOrUndefined(yield* threadStore.get(thread)) : thread;
     if (found === undefined) return yield* Effect.die("A turn's thread is missing");
     const occurredAt = yield* DateTime.now;
     yield* threadCommand.publishActivity({

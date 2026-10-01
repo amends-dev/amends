@@ -68,16 +68,16 @@ const page = 100;
 
 /** @category constructors */
 export const make = Effect.fn("TurnAcceptance.make")(function* () {
-  const agents = yield* AgentStore.Service;
-  const members = yield* MemberStore.Service;
-  const notifications = yield* NotificationStore.Service;
-  const participations = yield* ThreadParticipationStore.Service;
-  const turns = yield* TurnStore.Service;
+  const agentStore = yield* AgentStore.Service;
+  const memberStore = yield* MemberStore.Service;
+  const notificationStore = yield* NotificationStore.Service;
+  const threadParticipationStore = yield* ThreadParticipationStore.Service;
+  const turnStore = yield* TurnStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
-  const activity = yield* TurnActivityRecorder.Service;
-  const ending = yield* TurnEnding.Service;
+  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
+  const turnEnding = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
@@ -96,8 +96,8 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   /** Agents whose membership is active, with their inbox recipient. */
   const activeAgents = Effect.gen(function* () {
     const found: Array<{ readonly id: Agent.Id; readonly memberId: Member.Id }> = [];
-    for (const stored of yield* agents.list) {
-      const membership = yield* members.get(stored.memberId);
+    for (const stored of yield* agentStore.list) {
+      const membership = yield* memberStore.get(stored.memberId);
       if (Option.isSome(membership) && membership.value.status === "active")
         found.push({ id: stored.id, memberId: stored.memberId });
     }
@@ -120,7 +120,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     const pending: Array<Notification.Record & { readonly thread: Notification.ThreadReference }> =
       [];
     for (const id of ids) {
-      const found = yield* notifications.get(id);
+      const found = yield* notificationStore.get(id);
       if (Option.isNone(found)) continue;
       const record = found.value;
       if (
@@ -149,7 +149,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     const [head, ...rest] = notificationIds;
     if (head === undefined) return false;
     const acceptedAt = yield* DateTime.now;
-    const active = yield* turns.findActive(agent.memberId, threadId);
+    const active = yield* turnStore.findActive(agent.memberId, threadId);
     if (Option.isSome(active)) {
       // A turn still stopping takes no more, nor does one whose participation ended, which is
       // stopped as departed: work asked of the agent since it took part anew belongs to that
@@ -157,7 +157,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       if (active.value.status === "cancelling") return false;
       const participationId = active.value.participationId;
       if (pending.some((record) => record.participationId !== participationId)) return false;
-      const current = yield* participations.get(participationId);
+      const current = yield* threadParticipationStore.get(participationId);
       if (Option.isNone(current) || current.value.status !== "active") return false;
       yield* journal.publish(TurnFacts.InputAccepted, {
         workspaceId,
@@ -176,11 +176,11 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
     // the agent's log for the thread holds now, and its history starts from that log's latest
     // checkpoint: the previous turn's own, or the one it started from.
     const participationId = pending.at(-1)!.participationId!;
-    const participation = yield* participations.get(participationId);
+    const participation = yield* threadParticipationStore.get(participationId);
     if (Option.isNone(participation))
       return yield* Effect.die("A pending notification's participation is missing");
     const joined = participation.value;
-    const latest = yield* turns.findLatest(agent.memberId, threadId);
+    const latest = yield* turnStore.findLatest(agent.memberId, threadId);
     const previous = Option.filter(latest, (turn) => turn.participationId === participationId);
     const prior = Option.isSome(previous)
       ? TurnLog.read(yield* TurnLog.entriesOf(log, previous.value))
@@ -220,7 +220,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       TurnFacts.Created,
       Object.assign({}, created, { notificationIds: [head, ...rest] as const }),
     );
-    yield* activity.record(
+    yield* turnActivityRecorder.record(
       thread.value,
       TurnActivity.Created,
       { turnId: created.id, memberId: agent.memberId, retryOf: null },
@@ -236,20 +236,20 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
    * workspace ends their participation too. Every run handles all of them.
    */
   const stopDeparted = Effect.gen(function* () {
-    for (const agent of yield* agents.list) {
-      const active = (yield* turns.listActiveByMember(agent.memberId)).filter(
+    for (const agent of yield* agentStore.list) {
+      const active = (yield* turnStore.listActiveByMember(agent.memberId)).filter(
         (turn) => turn.status !== "cancelling",
       );
       if (active.length === 0) continue;
       const current = new Map(
-        (yield* participations.getMany(active.map((turn) => turn.participationId))).map(
+        (yield* threadParticipationStore.getMany(active.map((turn) => turn.participationId))).map(
           (participation) => [participation.id as string, participation.status],
         ),
       );
       for (const turn of active) {
         if (current.get(turn.participationId) === "active") continue;
         yield* Effect.gen(function* () {
-          const found = yield* turns.get(turn.id);
+          const found = yield* turnStore.get(turn.id);
           if (Option.isNone(found) || !Turn.active(found.value.status)) return;
           if (found.value.status === "cancelling") return;
           const at = yield* DateTime.now;
@@ -264,14 +264,14 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
             Object.assign({}, where, { reason: "participation-ended" as const, requestedAt: at }),
           );
           if (found.value.status !== "queued")
-            yield* activity.record(
+            yield* turnActivityRecorder.record(
               turn.threadId,
               TurnActivity.Stopping,
               { turnId: turn.id, cancelReason: "participation-ended" },
               requested,
             );
           else
-            yield* ending.end(found.value, {
+            yield* turnEnding.end(found.value, {
               outcome: "cancelled",
               cancelReason: "participation-ended",
             });
@@ -296,7 +296,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       );
       let after: NotificationStore.Cursor | undefined;
       for (;;) {
-        const listed = yield* notifications.listPendingByRecipient(
+        const listed = yield* notificationStore.listPendingByRecipient(
           recipient,
           after === undefined ? { limit: page } : { after, limit: page },
         );

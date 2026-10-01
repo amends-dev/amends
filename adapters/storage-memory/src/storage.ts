@@ -70,14 +70,14 @@ export const layerWorkspace = (workspaceId: Workspace.Id) =>
  * @category constructors
  */
 export const make = Effect.fn("MemoryStorage.make")(function* () {
-  const connection = yield* MemoryConnection.Service;
+  const memoryConnection = yield* MemoryConnection.Service;
   const forWorkspace: WorkspaceStorage.Interface["forWorkspace"] = Effect.fn(
     "MemoryStorage.forWorkspace",
   )(
     function* (workspaceId: Workspace.Id) {
       return yield* Effect.scoped(Layer.build(layerWorkspace(workspaceId)));
     },
-    Effect.provideService(MemoryConnection.Service, connection),
+    Effect.provideService(MemoryConnection.Service, memoryConnection),
   );
   return WorkspaceStorage.Service.of({ forWorkspace });
 });

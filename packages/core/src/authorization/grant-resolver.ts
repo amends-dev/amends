@@ -37,13 +37,13 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
   never,
   AssignmentStore.Service | RoleStore.Service | PermissionCatalog.Service
 > {
-  const assignments = yield* AssignmentStore.Service;
-  const roles = yield* RoleStore.Service;
-  const catalog = yield* PermissionCatalog.Service;
+  const assignmentStore = yield* AssignmentStore.Service;
+  const roleStore = yield* RoleStore.Service;
+  const permissionCatalog = yield* PermissionCatalog.Service;
 
   /** A retired permission grants nothing, rather than failing every grant its holder has. */
   const resolveGrant = Effect.fnUntraced(function* (name: Permission.Name, scope: Scope.Value) {
-    const permission = yield* catalog.get(name).pipe(
+    const permission = yield* permissionCatalog.get(name).pipe(
       Effect.asSome,
       Effect.catchTag("PermissionCatalog.Unknown", () => Effect.succeedNone),
     );
@@ -58,12 +58,12 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
 
   const resolve = Effect.fn("GrantResolver.resolve")(function* (memberId: Member.Id) {
     const grants: Array<Grant.Value> = [];
-    for (const assignment of yield* assignments.listActiveByMember(memberId)) {
+    for (const assignment of yield* assignmentStore.listActiveByMember(memberId)) {
       const source = assignment.source;
       if (source._tag === "Direct") {
         grants.push(...(yield* resolveGrant(source.grant.permission, source.grant.scope)));
       } else {
-        const role = yield* roles.get(source.roleId);
+        const role = yield* roleStore.get(source.roleId);
         if (Option.isNone(role)) return yield* Effect.die("An assignment's role is missing");
         for (const name of role.value.permissions) {
           grants.push(...(yield* resolveGrant(name, source.scope)));

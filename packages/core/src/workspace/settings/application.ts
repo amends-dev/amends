@@ -47,11 +47,11 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 /** @category constructors */
 export const make = Effect.fn("WorkspaceSettings.make")(function* () {
-  const store = yield* WorkspaceStore.Service,
+  const workspaceStore = yield* WorkspaceStore.Service,
     authorization = yield* Authorization.Service,
     delegation = yield* Delegation.Service,
-    assignments = yield* AssignmentApplication.Service,
-    members = yield* MemberApplication.Service,
+    assignmentApplication = yield* AssignmentApplication.Service,
+    memberApplication = yield* MemberApplication.Service,
     journal = yield* Journal.Service,
     crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -64,7 +64,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
       ),
     );
   const load = Effect.gen(function* () {
-    const value = yield* store.get;
+    const value = yield* workspaceStore.get;
     if (Option.isNone(value)) return yield* Effect.die("A workspace's record is missing");
     return value.value;
   });
@@ -74,7 +74,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
   });
   const get = Effect.gen(function* () {
     yield* authorization.require([]);
-    const roles = yield* assignments.roles;
+    const roles = yield* assignmentApplication.roles;
     const canReadInvitations = yield* allowed(
       authorization.require([
         Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId }),
@@ -89,7 +89,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
     };
   });
   const listing = Effect.gen(function* () {
-    const visible = yield* members.list;
+    const visible = yield* memberApplication.list;
     const workspace = yield* load;
     const actorId = (yield* Actor.Service).memberId;
     // One grant resolution answers every permission, and role choices load once, so the reads
@@ -101,7 +101,7 @@ export const make = Effect.fn("WorkspaceSettings.make")(function* () {
         Requirement.make(MemberPermissions.Remove, { _tag: "Member", workspaceId, memberId }),
       ]),
     ]);
-    const roles = yield* assignments.roles;
+    const roles = yield* assignmentApplication.roles;
     return yield* Effect.forEach(visible, (member, index) =>
       Effect.gen(function* () {
         const readable = permissions[index * 2] ?? false,

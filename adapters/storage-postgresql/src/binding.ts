@@ -172,8 +172,8 @@ export const make = Effect.fn("Binding.make")(function* (
   workspaceId: Workspace.Id,
   options: Options = {},
 ) {
-  const database = yield* PostgresDatabase.Service;
-  const { sql, turns, reads } = database;
+  const postgresDatabase = yield* PostgresDatabase.Service;
+  const { sql, turns, reads } = postgresDatabase;
   const { lockTimeout, statementTimeout, transactionTimeout, pollInterval, readConnections } =
     yield* settings(options);
   const lockMillis = Duration.toMillis(lockTimeout);
@@ -194,7 +194,7 @@ export const make = Effect.fn("Binding.make")(function* (
       Option.isNone(native) ||
       Option.isNone(connection) ||
       !current.value.active ||
-      current.value.owner !== database ||
+      current.value.owner !== postgresDatabase ||
       current.value.workspaceId !== workspaceId ||
       current.value.commit.id !== native.value.id
     ) {
@@ -279,7 +279,7 @@ export const make = Effect.fn("Binding.make")(function* (
           }
           // Recorded once the writer holds the workspace, so commit times follow their order.
           const session: TransactionState = {
-            owner: database,
+            owner: postgresDatabase,
             workspaceId,
             active: true,
             commit: {
@@ -368,7 +368,7 @@ export const make = Effect.fn("Binding.make")(function* (
     );
   });
 
-  return Service.of({ workspaceId, database, pollInterval, guard, transaction });
+  return Service.of({ workspaceId, database: postgresDatabase, pollInterval, guard, transaction });
 });
 
 /**

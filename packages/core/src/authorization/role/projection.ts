@@ -9,8 +9,8 @@ export const definition = Projection.make("workspace.roles", { version: 1 })
   .on(
     RoleFacts.Created,
     Effect.fn("RoleProjection.created")(function* ({ payload }) {
-      const store = yield* RoleStore.Service;
-      yield* store.insert({
+      const roleStore = yield* RoleStore.Service;
+      yield* roleStore.insert({
         id: payload.roleId,
         workspaceId: payload.workspaceId,
         name: payload.name,
@@ -21,22 +21,22 @@ export const definition = Projection.make("workspace.roles", { version: 1 })
   .on(
     RoleFacts.Renamed,
     Effect.fn("RoleProjection.renamed")(function* ({ payload }) {
-      const store = yield* RoleStore.Service;
-      yield* store.rename(payload.roleId, payload.name);
+      const roleStore = yield* RoleStore.Service;
+      yield* roleStore.rename(payload.roleId, payload.name);
     }),
   )
   .on(
     RoleFacts.PermissionsChanged,
     Effect.fn("RoleProjection.permissionsChanged")(function* ({ payload }) {
-      const store = yield* RoleStore.Service;
-      yield* store.setPermissions(payload.roleId, payload.permissions);
+      const roleStore = yield* RoleStore.Service;
+      yield* roleStore.setPermissions(payload.roleId, payload.permissions);
     }),
   )
   .on(
     RoleFacts.BuiltinsRevised,
     Effect.fn("RoleProjection.builtinsRevised")(function* ({ payload }) {
-      const store = yield* RoleStore.Service;
-      yield* store.recordBuiltinRevision(payload.revision);
+      const roleStore = yield* RoleStore.Service;
+      yield* roleStore.recordBuiltinRevision(payload.revision);
     }),
   );
 

@@ -41,13 +41,13 @@ const decode = (
 
 /** Resolve follows and departures with one read of their participations. @category constructors */
 export const resolver = Effect.gen(function* () {
-  const participations = yield* ThreadParticipationStore.Service;
+  const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const resolve = Effect.fn("ThreadParticipationTimeline.resolve")(function* (
     _thread: Thread.Record,
     listed: ReadonlyArray<ThreadActivity.Record>,
   ) {
     const activities = yield* Effect.orDie(Effect.forEach(listed, (activity) => decode(activity)));
-    const rows = yield* participations
+    const rows = yield* threadParticipationStore
       .getMany([...new Set(activities.map((activity) => activity.details.participationId))])
       .pipe(Effect.mapError((cause) => new ThreadActivityResolvers.Failure({ cause })));
     const found = new Map(rows.map((participant) => [participant.id, participant] as const));

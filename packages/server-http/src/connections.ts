@@ -20,7 +20,7 @@ export const layer = HttpApiBuilder.group(
     const asMember = <A, E>(
       workspaceId: Workspace.Id,
       operation: (
-        connections: ConnectionApplication.Interface,
+        connectionApplication: ConnectionApplication.Interface,
       ) => Effect.Effect<A, E, Actor.Service>,
     ) =>
       Effect.flatMap(Principal, (principal) =>
@@ -32,36 +32,49 @@ export const layer = HttpApiBuilder.group(
       );
     return handlers.handleAll({
       implementations: ({ params }) =>
-        asMember(params.workspaceId, (connections) => Effect.succeed(connections.implementations)),
-      list: ({ params }) => asMember(params.workspaceId, (connections) => connections.list),
+        asMember(params.workspaceId, (connectionApplication) =>
+          Effect.succeed(connectionApplication.implementations),
+        ),
+      list: ({ params }) =>
+        asMember(params.workspaceId, (connectionApplication) => connectionApplication.list),
       create: ({ params, headers, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.create(payload, { requestKey: headers["idempotency-key"] }),
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
       get: ({ params }) =>
-        asMember(params.workspaceId, (connections) => connections.get(params.connectionId)),
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.get(params.connectionId),
+        ),
       rename: ({ params, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.rename({
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.rename({
             connectionId: params.connectionId,
             name: payload.name,
             expectedName: payload.expectedName,
           }),
         ),
       configure: ({ params, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.configure({ connectionId: params.connectionId, settings: payload.settings }),
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.configure({
+            connectionId: params.connectionId,
+            settings: payload.settings,
+          }),
         ),
       setCredential: ({ params, payload }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.setCredential({ connectionId: params.connectionId, secret: payload.secret }),
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.setCredential({
+            connectionId: params.connectionId,
+            secret: payload.secret,
+          }),
         ),
       clearCredential: ({ params }) =>
-        asMember(params.workspaceId, (connections) =>
-          connections.clearCredential(params.connectionId),
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.clearCredential(params.connectionId),
         ),
       remove: ({ params }) =>
-        asMember(params.workspaceId, (connections) => connections.remove(params.connectionId)),
+        asMember(params.workspaceId, (connectionApplication) =>
+          connectionApplication.remove(params.connectionId),
+        ),
     });
   }),
 );
