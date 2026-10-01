@@ -306,9 +306,9 @@ request, then the turn's own work. The log has begun once a turn recorded the th
 started, or recorded a checkpoint; a turn that ended before it started does not begin it. `TurnExecution` is what a
 host's runner drives, each step its own commit attributed to the turn's agent: `start` a queued
 turn with its selection and the agent's instructions now, which for a participation's first turn
-records the thread's history in the log first, record each `attempt`, a `checkpoint`, `submitted`
-batches, whose first record stands and is what execution hands the harness, and what the
-environment and harness `report`, where input the harness says it took in must be a batch as
+records the thread's history in the log first, record each attempt (`recordAttempt`), a checkpoint (`recordCheckpoint`), submitted
+batches (`recordSubmission`), whose first record stands and is what execution hands the harness, and what the
+environment and harness report (`recordEvents`), where input the harness says it took in must be a batch as
 recorded, and `close` it. Closing requires
 all accepted input taken in and no work still waiting for the agent on the thread, both checked in
 the closing commit; otherwise it reports `InputPending`. It then publishes every answer the turn
@@ -316,7 +316,7 @@ owes, in order, each as the agent's own message to the thread's current particip
 naming the turn that posted it (`turnId` on the message):
 each finished response with text and no tool calls that more input followed, and the last. It
 checks the agent may still open and post in the thread, and records completion with the messages.
-A turn can complete without a reply. `fail` and `stopped` end a turn and publish nothing. Every way
+A turn can complete without a reply. `fail` and `confirmStopped` end a turn and publish nothing. Every way
 a turn ends, including a queued turn stopped by a reader or because its agent left, goes through
 `TurnCommand.endTurn`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
 thread's timeline, and appends `Ended` to its agent's log. `prepare` assembles what a run needs from
@@ -333,10 +333,10 @@ model, can tell with `TurnLog.proposeCompaction` whether a checkpoint must come 
 budget, the newest exchanges within what it keeps, cut at an input or a response and never between
 two pieces of one waiting message, with the turn's own input kept verbatim when the cut falls
 inside its work, and everything kept without reasoning. The runner records it with a summary of
-the rest before working; `checkpoint` records it in the log, from which the turn's and the next
+the rest before working; `recordCheckpoint` records it in the log, from which the turn's and the next
 turn's history start, and when the summary covered waiting input, the position it reaches, which
 counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
-when its connection has no key. `get` reads the turn, for a run to watch. `draft` shows the turn's
+when its connection has no key. `get` reads the turn, for a run to watch. `showDraft` shows the turn's
 readers more of a response before it completes, as a `TurnDraft` signal.
 
 `TurnApplication.watchLog` follows a turn's log for a reader who may read its thread, as a stream

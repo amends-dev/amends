@@ -187,13 +187,16 @@ export interface Interface {
     selection: Turn.Selection,
   ) => Effect.Effect<Turn.Record, PrepareError>;
   /** Record that execution begins a harness session for a running turn, or a summary for it. */
-  readonly attempt: (turnId: Turn.Id, kind: "session" | "summary") => Effect.Effect<void, Error>;
+  readonly recordAttempt: (
+    turnId: Turn.Id,
+    kind: "session" | "summary",
+  ) => Effect.Effect<void, Error>;
   /**
    * Record a checkpoint for a running turn: the summary of the older history, the newest exchanges
    * verbatim, and how far through the thread the summary took in input the turn had not taken in.
    * The turn's history, and the next turn's, starts from it, at the position returned.
    */
-  readonly checkpoint: (
+  readonly recordCheckpoint: (
     turnId: Turn.Id,
     checkpoint: {
       readonly summary: string;
@@ -207,7 +210,7 @@ export interface Interface {
    * asked of the turn itself. The first record of a batch stands: the items returned are what the
    * batch holds, which execution hands the harness.
    */
-  readonly submitted: (
+  readonly recordSubmission: (
     turnId: Turn.Id,
     batch: {
       readonly batchId: HarnessEvent.BatchId;
@@ -219,7 +222,7 @@ export interface Interface {
    * Record what the environment and its harness reported, in order. A batch the harness says it
    * took in must be one submitted, as it was recorded; it counts as taken in from then on.
    */
-  readonly report: (
+  readonly recordEvents: (
     turnId: Turn.Id,
     events: ReadonlyArray<EnvironmentRuntime.Event>,
   ) => Effect.Effect<void, Error>;
@@ -227,7 +230,7 @@ export interface Interface {
    * Show the turn's readers more of a response before it completes, as a signal: nothing is
    * recorded, and a turn no longer running shows nothing.
    */
-  readonly draft: (
+  readonly showDraft: (
     turnId: Turn.Id,
     piece: {
       readonly responseId: string;
@@ -237,7 +240,7 @@ export interface Interface {
     },
   ) => Effect.Effect<void, Error>;
   /** Record that execution stopped before the turn finished, why in words, and what went wrong. */
-  readonly interrupted: (
+  readonly recordInterruption: (
     turnId: Turn.Id,
     stop: {
       readonly reason: string;
@@ -246,7 +249,7 @@ export interface Interface {
     },
   ) => Effect.Effect<void, Error>;
   /** The turn's own entries in its agent's log for the thread. */
-  readonly entries: (turnId: Turn.Id) => Effect.Effect<ReadonlyArray<TurnLog.Recorded>, Error>;
+  readonly readEntries: (turnId: Turn.Id) => Effect.Effect<ReadonlyArray<TurnLog.Recorded>, Error>;
   /**
    * Close a running turn once all its accepted input is taken in and no more work waits for its
    * agent on the thread: publish the replies its log owes, in order, each as its own message to
@@ -256,7 +259,7 @@ export interface Interface {
   /** The turn could not continue. */
   readonly fail: (turnId: Turn.Id, reason: string) => Effect.Effect<void, Error>;
   /** Execution stopped a turn asked to stop. */
-  readonly stopped: (turnId: Turn.Id) => Effect.Effect<void, Error>;
+  readonly confirmStopped: (turnId: Turn.Id) => Effect.Effect<void, Error>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -580,7 +583,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const checkpoint = Effect.fn("TurnExecution.checkpoint")(function* (
+  const recordCheckpoint = Effect.fn("TurnExecution.recordCheckpoint")(function* (
     turnId: Turn.Id,
     recorded: {
       readonly summary: string;
@@ -624,7 +627,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return entry?._tag === "Submitted" ? entry : undefined;
   });
 
-  const submitted = Effect.fn("TurnExecution.submitted")(function* (
+  const recordSubmission = Effect.fn("TurnExecution.recordSubmission")(function* (
     turnId: Turn.Id,
     batch: {
       readonly batchId: HarnessEvent.BatchId;
@@ -662,7 +665,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const sameInput = Schema.toEquivalence(Schema.Array(Transcript.Input));
 
-  const report = Effect.fn("TurnExecution.report")(function* (
+  const recordEvents = Effect.fn("TurnExecution.recordEvents")(function* (
     turnId: Turn.Id,
     events: ReadonlyArray<EnvironmentRuntime.Event>,
   ) {
@@ -694,7 +697,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const attempt = Effect.fn("TurnExecution.attempt")(function* (
+  const recordAttempt = Effect.fn("TurnExecution.recordAttempt")(function* (
     turnId: Turn.Id,
     kind: "session" | "summary",
   ) {
@@ -706,7 +709,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const interrupted = Effect.fn("TurnExecution.interrupted")(function* (
+  const recordInterruption = Effect.fn("TurnExecution.recordInterruption")(function* (
     turnId: Turn.Id,
     stop: {
       readonly reason: string;
@@ -730,7 +733,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const draft = Effect.fn("TurnExecution.draft")(function* (
+  const showDraft = Effect.fn("TurnExecution.showDraft")(function* (
     turnId: Turn.Id,
     piece: {
       readonly responseId: string;
@@ -754,7 +757,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     });
   });
 
-  const entries = Effect.fn("TurnExecution.entries")(function* (turnId: Turn.Id) {
+  const readEntries = Effect.fn("TurnExecution.readEntries")(function* (turnId: Turn.Id) {
     return yield* readOwnEntries(yield* requireTurn(turnId));
   });
 
@@ -854,7 +857,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
-  const stopped = Effect.fn("TurnExecution.stopped")(function* (turnId: Turn.Id) {
+  const confirmStopped = Effect.fn("TurnExecution.confirmStopped")(function* (turnId: Turn.Id) {
     yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* requireStatus(turn, ["cancelling"]);
@@ -871,16 +874,16 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     get,
     prepare,
     start,
-    attempt,
-    checkpoint,
-    submitted,
-    report,
-    draft,
-    interrupted,
-    entries,
+    recordAttempt,
+    recordCheckpoint,
+    recordSubmission,
+    recordEvents,
+    showDraft,
+    recordInterruption,
+    readEntries,
     close,
     fail,
-    stopped,
+    confirmStopped,
   });
 });
 

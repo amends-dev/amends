@@ -261,7 +261,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         `${turnId}/after:${pending.afterSequence}/through:${pending.throughSequence}`,
       );
       const items = yield* step((turnExecution) =>
-        turnExecution.submitted(turnId, {
+        turnExecution.recordSubmission(turnId, {
           batchId,
           throughSequence: pending.throughSequence,
           items: pending.items,
@@ -344,7 +344,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
           while (draft.pending !== "") {
             const text = draft.pending.slice(0, draftPiece);
             yield* step((turnExecution) =>
-              turnExecution.draft(turnId, {
+              turnExecution.showDraft(turnId, {
                 responseId: draft.responseId,
                 part: draft.part,
                 offset: draft.offset,
@@ -403,7 +403,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
           if ((yield* Clock.currentTimeMillis) - shownAt >= draftInterval) yield* showDrafts;
           const events = chunk.flatMap(recorded);
           if (events.length > 0)
-            yield* step((turnExecution) => turnExecution.report(turnId, events));
+            yield* step((turnExecution) => turnExecution.recordEvents(turnId, events));
           if (events.some((item) => item._tag === "Harness" && item.event._tag === "ContextFull"))
             return "full" as const;
           const last = events.at(-1);
@@ -476,7 +476,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         ),
       );
       yield* step((turnExecution) =>
-        turnExecution.checkpoint(turnId, {
+        turnExecution.recordCheckpoint(turnId, {
           summary,
           kept: compaction.kept,
           through: compaction.through,
@@ -494,7 +494,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       const preparation = yield* prepare;
       if (preparation._tag === "Finished") return;
       if (preparation._tag === "Stopping")
-        return yield* step((turnExecution) => turnExecution.stopped(turnId));
+        return yield* step((turnExecution) => turnExecution.confirmStopped(turnId));
       if (preparation._tag === "Unrunnable")
         return yield* step((turnExecution) => turnExecution.fail(turnId, preparation.reason));
       const plan = preparation.plan;
@@ -510,7 +510,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       ) =>
         Effect.gen(function* () {
           yield* step((turnExecution) =>
-            turnExecution.interrupted(turnId, {
+            turnExecution.recordInterruption(turnId, {
               reason: text,
               // A full context goes on after a checkpoint, however its provider classed it.
               retryable: failure.retryable || failure.problem === "model-context",
@@ -584,7 +584,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       });
       if (plan.overflow.pending && compaction === undefined) return yield* fail(tooLong);
       yield* step((turnExecution) =>
-        turnExecution.attempt(turnId, compaction === undefined ? "session" : "summary"),
+        turnExecution.recordAttempt(turnId, compaction === undefined ? "session" : "summary"),
       );
       type Work = ReturnType<typeof session> | ReturnType<typeof checkpoint>;
       const ending = yield* Effect.suspend(

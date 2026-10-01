@@ -124,17 +124,17 @@ The runner never touches storage. Every step goes through `gateway.executeTurns`
 turn's agent. The runner decides the next step only from what `prepare` reads out of the turn and
 its log:
 
-| Step                             | What it records                                                                                                                  |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `prepare`                        | Nothing. Assembles the plan: instructions, model access, environment, transcript, pending input, attempts.                       |
-| `start`                          | Commit C: the thread's history (the agent's first turn there) and `Started` in the turn's log, `turn.started`, and its activity. |
-| `checkpoint`                     | A summary of older history, when the conversation would not fit the model's context.                                             |
-| `attempt`                        | That a harness session, or a summary, is beginning. Attempts since the turn last got further are counted.                        |
-| `submitted`                      | The batch of input handed to the harness, under a key of its range so a restart records it once.                                 |
-| `report`                         | What the environment and harness produced: completed blocks, responses, tool results, the environment ready.                     |
-| `draft`                          | Nothing durable: streaming text, as a `TurnDraft` signal for readers.                                                            |
-| `interrupted`, `fail`, `stopped` | Why a run stopped short, or how the turn ended without a reply.                                                                  |
-| `close`                          | Commit D, below.                                                                                                                 |
+| Step                                           | What it records                                                                                                                  |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `prepare`                                      | Nothing. Assembles the plan: instructions, model access, environment, transcript, pending input, attempts.                       |
+| `start`                                        | Commit C: the thread's history (the agent's first turn there) and `Started` in the turn's log, `turn.started`, and its activity. |
+| `recordCheckpoint`                             | A summary of older history, when the conversation would not fit the model's context.                                             |
+| `recordAttempt`                                | That a harness session, or a summary, is beginning. Attempts since the turn last got further are counted.                        |
+| `recordSubmission`                             | The batch of input handed to the harness, under a key of its range so a restart records it once.                                 |
+| `recordEvents`                                 | What the environment and harness produced: completed blocks, responses, tool results, the environment ready.                     |
+| `showDraft`                                    | Nothing durable: streaming text, as a `TurnDraft` signal for readers.                                                            |
+| `recordInterruption`, `fail`, `confirmStopped` | Why a run stopped short, or how the turn ended without a reply.                                                                  |
+| `close`                                        | Commit D, below.                                                                                                                 |
 
 Between steps the runner spawns the agent's environment, prepares the harness with the transcript,
 and waits on the model. None of that is inside a commit. The in-process amends harness runs over
@@ -178,13 +178,13 @@ followed over its own stream.
 
 ## Other ways through
 
-| Situation                                | What happens                                                                                                                                                                                                  |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Another message while the turn works     | Steps 1 to 3 run again; `turn.input-accepted` extends the running turn, and `close` returns `InputPending` for what it has not taken in.                                                                      |
-| Stop                                     | `TurnApplication.cancel` publishes `turn.cancel-requested`. A queued turn ends at once; a running one is noticed by the runner, which checks every `checkInterval` (one second), and confirms with `stopped`. |
-| Retry                                    | `TurnApplication.retry` publishes `turn.retried` for a new queued turn, and the dispatch reaction stores its `Run`.                                                                                           |
-| The agent leaves the thread or the group | `turn.stop-departed` wakes on the departure facts and stops the agent's active turns there.                                                                                                                   |
-| An agent posts a message                 | Its recipients are informational for agents, so nothing wakes another agent.                                                                                                                                  |
+| Situation                                | What happens                                                                                                                                                                                                         |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Another message while the turn works     | Steps 1 to 3 run again; `turn.input-accepted` extends the running turn, and `close` returns `InputPending` for what it has not taken in.                                                                             |
+| Stop                                     | `TurnApplication.cancel` publishes `turn.cancel-requested`. A queued turn ends at once; a running one is noticed by the runner, which checks every `checkInterval` (one second), and confirms with `confirmStopped`. |
+| Retry                                    | `TurnApplication.retry` publishes `turn.retried` for a new queued turn, and the dispatch reaction stores its `Run`.                                                                                                  |
+| The agent leaves the thread or the group | `turn.stop-departed` wakes on the departure facts and stops the agent's active turns there.                                                                                                                          |
+| An agent posts a message                 | Its recipients are informational for agents, so nothing wakes another agent.                                                                                                                                         |
 
 ## Failure and recovery
 

@@ -156,7 +156,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       overflow: context.own.overflow,
     };
   };
-  const execution: TurnExecution.Interface = {
+  const turnExecution: TurnExecution.Interface = {
     get: () => Effect.sync(() => state.turn),
     prepare: () =>
       Effect.sync((): TurnExecution.Preparation => {
@@ -172,13 +172,13 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         change({ status: "running", selection: chosen });
         return state.turn;
       }),
-    attempt: (_, kind) =>
+    recordAttempt: (_, kind) =>
       Effect.gen(function* () {
         yield* require(["running", "cancelling"]);
         state.steps.push(`attempt ${kind}`);
         record({ _tag: "Attempt", turnId, kind });
       }),
-    submitted: (_, batch) =>
+    recordSubmission: (_, batch) =>
       Effect.sync(() => {
         state.steps.push(`submitted ${batch.batchId}`);
         const found = state.log.find(
@@ -188,7 +188,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         record({ _tag: "Submitted", turnId, ...batch });
         return batch.items;
       }),
-    report: (_, events) =>
+    recordEvents: (_, events) =>
       Effect.sync(() => {
         for (const event of events) {
           state.steps.push(`report ${event.event._tag}`);
@@ -199,23 +199,23 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
           );
         }
       }),
-    draft: (_, piece) =>
+    showDraft: (_, piece) =>
       Effect.sync(() => {
         state.drafts.push({ ...piece });
       }),
-    interrupted: (_, stop) =>
+    recordInterruption: (_, stop) =>
       Effect.sync(() => {
         state.steps.push(`interrupted ${stop.retryable ? "retryable" : "final"}`);
         record({ _tag: "Interrupted", turnId, ...stop });
       }),
-    checkpoint: (_, recorded) =>
+    recordCheckpoint: (_, recorded) =>
       Effect.sync(() => {
         state.steps.push("checkpoint");
         state.checkpoints.push({ ...recorded });
         record({ _tag: "Checkpoint", turnId, ...recorded });
         return Log.Position.make(state.log.length - 1);
       }),
-    entries: () => Effect.sync(() => [...state.log]),
+    readEntries: () => Effect.sync(() => [...state.log]),
     close: () =>
       Effect.gen(function* () {
         state.steps.push("close");
@@ -236,7 +236,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         state.steps.push(`fail: ${reason}`);
         change({ status: "failed", failure: reason });
       }),
-    stopped: () =>
+    confirmStopped: () =>
       Effect.gen(function* () {
         yield* require(["cancelling"]);
         state.steps.push("stopped");
@@ -248,7 +248,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     state.messages.push({ sequence, text });
     change({ acceptedThroughSequence: sequence });
   };
-  return { state, execution, accept, record };
+  return { state, turnExecution, accept, record };
 };
 
 /** A model that answers each request with the next script and keeps every prompt it was sent. */
@@ -327,7 +327,7 @@ const settle = <A, E>(fiber: Fiber.Fiber<A, E>) =>
 
 const unexpected = () => Effect.die(new Error("Only turn execution is expected"));
 const runnerOver = (
-  execution: TurnExecution.Interface,
+  turnExecution: TurnExecution.Interface,
   model: ModelInference.Implementation,
   options: Partial<TurnRunner.Options> = {},
 ) =>
@@ -341,7 +341,7 @@ const runnerOver = (
         asMemberScoped: unexpected,
         runBackground: unexpected,
         executeTurns: (_, program) =>
-          Effect.provideService(program, TurnExecution.Service, execution),
+          Effect.provideService(program, TurnExecution.Service, turnExecution),
       }),
     ),
     Effect.provideService(
@@ -366,9 +366,9 @@ const harnessEvents = (
 describe("TurnRunner", () => {
   it.effect("starts a queued turn, hands the harness its input, and closes it with the reply", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const { implementation, prompts } = yield* scripted([reply("Noon is high tide.")]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -402,7 +402,7 @@ describe("TurnRunner", () => {
 
   it.effect("shows readers a response's text as it streams, then records it once complete", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const first = yield* Deferred.make<void>();
       const rest = yield* Deferred.make<void>();
       const part = (value: Response.StreamPartEncoded) => Stream.make(value);
@@ -431,7 +431,7 @@ describe("TurnRunner", () => {
           ),
         ),
       ]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
       while (state.drafts.length === 0) yield* Effect.yieldNow;
@@ -453,7 +453,7 @@ describe("TurnRunner", () => {
 
   it.effect("takes in input accepted while it worked, and owes both answers when closing", () =>
     Effect.gen(function* () {
-      const { state, execution, accept } = fakeExecution();
+      const { state, turnExecution, accept } = fakeExecution();
       const { implementation, prompts } = yield* scripted([
         Stream.fromEffect(Effect.sync(() => accept(3, "And at midnight?"))).pipe(
           Stream.drain,
@@ -461,7 +461,7 @@ describe("TurnRunner", () => {
         ),
         reply("Noon, and again just after midnight."),
       ]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -495,10 +495,10 @@ describe("TurnRunner", () => {
 
   it.effect("waits while its agent accepts more work, then takes it in", () =>
     Effect.gen(function* () {
-      const { state, execution, accept } = fakeExecution();
+      const { state, turnExecution, accept } = fakeExecution();
       state.unaccepted = true;
       const { implementation } = yield* scripted([reply("Noon."), reply("Midnight too.")]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
       while (!state.steps.includes("close")) yield* Effect.yieldNow;
@@ -522,10 +522,10 @@ describe("TurnRunner", () => {
 
   it.effect("stops a running turn once asked to", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const requested = yield* Deferred.make<void>();
       const { implementation } = yield* scripted([hanging(requested)]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
       yield* Deferred.await(requested);
@@ -546,12 +546,12 @@ describe("TurnRunner", () => {
 
   it.effect("runs again after a failure worth retrying, continuing from its log", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const { implementation, prompts } = yield* scripted([
         failure(new AiError.RateLimitError({})),
         reply("Noon."),
       ]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       const fiber = yield* Effect.forkChild(runner.run(workspaceId, turnId));
       yield* settle(fiber);
@@ -578,11 +578,11 @@ describe("TurnRunner", () => {
 
   it.effect("interrupts a run whose model goes silent, and fails once retries run out", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const first = yield* Deferred.make<void>();
       const second = yield* Deferred.make<void>();
       const { implementation, prompts } = yield* scripted([hanging(first), hanging(second)]);
-      const runner = yield* runnerOver(execution, implementation, {
+      const runner = yield* runnerOver(turnExecution, implementation, {
         idleTimeout: "1 minute",
         retries: 1,
       });
@@ -608,9 +608,9 @@ describe("TurnRunner", () => {
 
   it.effect("gives up a turn whose attempts, as its log counts them, keep getting nowhere", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       const { implementation, prompts } = yield* scripted([]);
-      const runner = yield* runnerOver(execution, implementation, { retries: 2 });
+      const runner = yield* runnerOver(turnExecution, implementation, { retries: 2 });
       // Earlier runs died, as when their process did: the log still counts them.
       state.turn = Turn.change(state.turn, { status: "running", selection });
       record({ _tag: "Started", turnId, selection, instructions: "Be brief." });
@@ -626,9 +626,9 @@ describe("TurnRunner", () => {
 
   it.effect("waits before running again after an attempt that died, then carries on", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       const { implementation } = yield* scripted([reply("Noon.")]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
       state.turn = Turn.change(state.turn, { status: "running", selection });
       record({ _tag: "Started", turnId, selection, instructions: "Be brief." });
       record({ _tag: "Attempt", turnId, kind: "session" });
@@ -645,9 +645,9 @@ describe("TurnRunner", () => {
 
   it.effect("keeps the instructions its agent had when the turn started", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       const { implementation, prompts } = yield* scripted([reply("Midi.")]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
       state.turn = Turn.change(state.turn, { status: "running", selection });
       record({ _tag: "Started", turnId, selection, instructions: "Answer in French." });
       state.instructions = "Be brief.";
@@ -660,7 +660,7 @@ describe("TurnRunner", () => {
 
   it.effect("records a checkpoint with a summary before working when the history is too long", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       // The history outgrows what the model's window allows before the turn's input.
       const older = [input(`How was the launch? ${"We shipped it. ".repeat(300)}`)];
       const kept = [input("Anything else?")];
@@ -677,7 +677,7 @@ describe("TurnRunner", () => {
         ]),
         { contextTokens: 1_000, outputTokens: undefined },
       );
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -705,7 +705,7 @@ describe("TurnRunner", () => {
 
   it.effect("summarizes a large history in passes, each reading the summary so far", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       const long = (label: string) => input(`${label} ${"detail ".repeat(20_000)}`);
       record({ _tag: "History", turnId, items: [long("First"), long("Second")] });
       const { implementation, summarized } = yield* scripted(
@@ -720,7 +720,7 @@ describe("TurnRunner", () => {
         ]),
         { contextTokens: 80_000, outputTokens: undefined },
       );
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -733,7 +733,7 @@ describe("TurnRunner", () => {
 
   it.effect("interrupts a run whose summary cannot be written, and fails the turn in the end", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       record({
         _tag: "History",
         turnId,
@@ -750,7 +750,7 @@ describe("TurnRunner", () => {
         ),
         { contextTokens: 1_000, outputTokens: undefined },
       );
-      const runner = yield* runnerOver(execution, implementation, { retries: 1 });
+      const runner = yield* runnerOver(turnExecution, implementation, { retries: 1 });
 
       yield* settle(yield* Effect.forkChild(runner.run(workspaceId, turnId)));
 
@@ -814,13 +814,13 @@ describe("TurnRunner", () => {
 
   it.effect("records a checkpoint mid-turn once its context is full, then carries on", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       record({ _tag: "History", turnId, items: [input("How was the launch?")] });
       const { implementation, prompts } = yield* scripted(
         [reply("Noon.")],
         summarized("They asked about the launch."),
       );
-      const runner = yield* runnerOver(execution, implementation, { harnesses: [fillsUp()] });
+      const runner = yield* runnerOver(turnExecution, implementation, { harnesses: [fillsUp()] });
 
       yield* runner.run(workspaceId, turnId);
 
@@ -841,13 +841,13 @@ describe("TurnRunner", () => {
     "records a checkpoint when its provider refuses a request too long, then carries on",
     () =>
       Effect.gen(function* () {
-        const { state, execution, record } = fakeExecution();
+        const { state, turnExecution, record } = fakeExecution();
         record({ _tag: "History", turnId, items: [input("How was the launch?")] });
         const { implementation, prompts } = yield* scripted(
           [tooLong, reply("Noon.")],
           summarized("They asked about the launch."),
         );
-        const runner = yield* runnerOver(execution, implementation);
+        const runner = yield* runnerOver(turnExecution, implementation);
 
         yield* runner.run(workspaceId, turnId);
 
@@ -862,7 +862,7 @@ describe("TurnRunner", () => {
 
   it.effect("summarizes in smaller passes when its model refuses a pass as too long", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       record({
         _tag: "History",
         turnId,
@@ -889,7 +889,7 @@ describe("TurnRunner", () => {
             : summarized("They asked about the launch."),
         { contextTokens: 1_000, outputTokens: undefined },
       );
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -904,7 +904,7 @@ describe("TurnRunner", () => {
 
   it.effect("keeps less at each checkpoint while its provider still refuses, then carries on", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       const notes = Array.from({ length: 6 }, (_, index) =>
         input(`Note ${index + 1}: ${"the launch is on track ".repeat(9)}`),
       );
@@ -914,7 +914,7 @@ describe("TurnRunner", () => {
         summarized("They sent notes about the launch."),
         { contextTokens: 1_000, outputTokens: undefined },
       );
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -926,13 +926,13 @@ describe("TurnRunner", () => {
 
   it.effect("fails a turn whose context is full again before its model answers", () =>
     Effect.gen(function* () {
-      const { state, execution, record } = fakeExecution();
+      const { state, turnExecution, record } = fakeExecution();
       record({ _tag: "History", turnId, items: [input("How was the launch?")] });
       const { implementation } = yield* scripted(
         [tooLong, tooLong],
         summarized("They asked about the launch."),
       );
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -944,9 +944,9 @@ describe("TurnRunner", () => {
 
   it.effect("fails a turn after a failure not worth retrying", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const { implementation } = yield* scripted([failure(new AiError.QuotaExhaustedError({}))]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -960,7 +960,7 @@ describe("TurnRunner", () => {
 
   it.effect("tells readers what went wrong without the provider's own message", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const { implementation } = yield* scripted([
         failure(
           new AiError.AuthenticationError({
@@ -969,7 +969,7 @@ describe("TurnRunner", () => {
           }),
         ),
       ]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -980,9 +980,9 @@ describe("TurnRunner", () => {
 
   it.effect("fails a turn whose environment has a sandbox, without starting it", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution({ sandbox: true });
+      const { state, turnExecution } = fakeExecution({ sandbox: true });
       const { implementation, prompts } = yield* scripted([]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
 
       yield* runner.run(workspaceId, turnId);
 
@@ -993,9 +993,9 @@ describe("TurnRunner", () => {
 
   it.effect("leaves a finished turn as it is, and confirms a stop asked for before it ran", () =>
     Effect.gen(function* () {
-      const { state, execution } = fakeExecution();
+      const { state, turnExecution } = fakeExecution();
       const { implementation } = yield* scripted([]);
-      const runner = yield* runnerOver(execution, implementation);
+      const runner = yield* runnerOver(turnExecution, implementation);
       state.turn = Turn.change(state.turn, { status: "running" });
       state.turn = Turn.change(state.turn, { status: "cancelling", cancelReason: "requested" });
 
