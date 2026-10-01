@@ -16,13 +16,12 @@ import {
   GroupMembership,
   GroupMembershipApplication,
   GroupMembershipPermissions,
-  GroupMembershipStore,
   GroupPermissions,
   GroupStore,
 } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberApplication, MemberFacts, MemberStore } from "@amends/core/workspace";
+import { Member, MemberApplication, MemberFacts } from "@amends/core/workspace";
 import { ThreadApplication } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Context, Effect, Option } from "effect";
@@ -30,7 +29,6 @@ import {
   type Bound,
   boundTo,
   otherWorkspaceId,
-  replacing,
   runHost,
   Support,
   testProvenance,
@@ -806,119 +804,35 @@ export const groupReads = (harness: Harness) => {
       ),
     );
 
-    it.effect(
-      "malformed audience, group, and roster responses fail closed instead of widening reads",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const { bound, reader, first, second } = yield* prepare();
-              yield* grant(bound, readerId, GroupPermissions.Read);
-              const admission = Option.getOrThrow(
-                yield* bound.groupMemberships.findActive(first.id, readerId),
-              );
-              const before = yield* history(bound);
-              for (const wrong of [
-                Object.assign({}, admission, { groupId: second.id }),
-                Object.assign({}, admission, { workspaceId: otherWorkspaceId }),
-                Object.assign({}, admission, { memberId: otherId }),
-                Object.assign({}, admission, { status: "removed" as const }),
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    findActive: () => Effect.succeedSome(wrong),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, reader, get(first.id)))).toMatchObject({
-                  _tag: "GroupAudience.InvalidResponse",
-                });
-                expect(yield* Effect.flip(run(broken, reader, roster(first.id)))).toMatchObject({
-                  _tag: "GroupAudience.InvalidResponse",
-                });
-              }
-              for (const records of [
-                [Object.assign({}, admission, { memberId: otherId })],
-                [Object.assign({}, admission, { status: "removed" as const })],
-                [Object.assign({}, admission, { workspaceId: otherWorkspaceId })],
-                [admission, admission],
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    listActiveByMember: () => Effect.succeed(records),
-                    pageActiveByMember: () => Effect.succeed(records),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, reader, mine))).toMatchObject({
-                  _tag: "GroupApplication.InvalidResponse",
-                });
-              }
-              const wrongGroup = {
-                ...bound,
-                context: Context.add(bound.context, GroupStore.Service, {
-                  ...bound.groups,
-                  get: () => Effect.succeedSome(second),
-                }),
-              };
-              expect(yield* Effect.flip(run(wrongGroup, reader, get(first.id)))).toMatchObject({
-                _tag: "GroupApplication.InvalidResponse",
-              });
-              for (const records of [
-                [Object.assign({}, admission, { groupId: second.id })],
-                [Object.assign({}, admission, { workspaceId: otherWorkspaceId })],
-                [admission, admission],
-                [
-                  admission,
-                  Object.assign({}, admission, { id: GroupMembership.Id.make("duplicate-active") }),
-                ],
-              ]) {
-                const broken = {
-                  ...bound,
-                  context: Context.add(bound.context, GroupMembershipStore.Service, {
-                    ...bound.groupMemberships,
-                    listByGroup: () => Effect.succeed(records),
-                    pageActiveByGroup: () => Effect.succeed(records),
-                  }),
-                };
-                expect(yield* Effect.flip(run(broken, reader, roster(first.id)))).toMatchObject({
-                  _tag: "GroupMembershipApplication.InvalidResponse",
-                });
-              }
-              const wrongMember = {
-                ...bound,
-                context: Context.add(bound.context, MemberStore.Service, {
-                  ...bound.members,
-                  ...replacing(bound.members, agentId, yield* bound.members.get(otherId)),
-                }),
-              };
-              expect(yield* Effect.flip(run(wrongMember, reader, roster(first.id)))).toMatchObject({
-                _tag: "GroupMembershipApplication.InvalidResponse",
-              });
-              const failed = {
-                ...bound,
-                context: Context.add(bound.context, GroupStore.Service, {
-                  ...bound.groups,
-                  get: () =>
-                    Effect.fail(
-                      new GroupStore.Failure({ operation: "get", cause: "failed storage" }),
-                    ),
-                  getMany: () =>
-                    Effect.fail(
-                      new GroupStore.Failure({ operation: "getMany", cause: "failed storage" }),
-                    ),
-                }),
-              };
-              expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({
-                _tag: "GroupStore.Failure",
-              });
-              expect(yield* history(bound)).toEqual(before);
-            }),
-          ),
+    it.effect("a storage failure reaches a group reader as it is, and records nothing", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, reader } = yield* prepare();
+            yield* grant(bound, readerId, GroupPermissions.Read);
+            const before = yield* history(bound);
+            const failed = {
+              ...bound,
+              context: Context.add(bound.context, GroupStore.Service, {
+                ...bound.groups,
+                get: () =>
+                  Effect.fail(
+                    new GroupStore.Failure({ operation: "get", cause: "failed storage" }),
+                  ),
+                getMany: () =>
+                  Effect.fail(
+                    new GroupStore.Failure({ operation: "getMany", cause: "failed storage" }),
+                  ),
+              }),
+            };
+            expect(yield* Effect.flip(run(failed, reader, mine))).toMatchObject({
+              _tag: "GroupStore.Failure",
+            });
+            expect(yield* history(bound)).toEqual(before);
+          }),
         ),
+      ),
     );
 
     it.effect("group lists and rosters page in ID order and skip what the reader cannot see", () =>

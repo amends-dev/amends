@@ -17,13 +17,8 @@ import { GroupMembershipFacts } from "./membership/facts.ts";
 export class Unavailable extends Schema.TaggedError<Unavailable>()("DirectGroups.Unavailable", {
   memberId: Member.Id,
 }) {}
-export class InvalidReference extends Schema.TaggedError<InvalidReference>()(
-  "DirectGroups.InvalidReference",
-  { message: Schema.String },
-) {}
 export type Error =
   | Unavailable
-  | InvalidReference
   | GroupStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
@@ -58,52 +53,21 @@ export const make = Effect.fn("DirectGroups.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = groups.workspaceId;
-  if (members.workspaceId !== workspaceId)
-    return yield* new InvalidReference({
-      message: "Direct-group services belong to different workspaces",
-    });
   const establish = Effect.fn("DirectGroups.establish")(function* (
     memberIds: ReadonlyArray<Member.Id>,
     createdBy: Member.Id,
     occurredAt: DateTime.Utc,
   ) {
     yield* Store.Transaction;
-    const requested = yield* Schema.decodeEffect(Group.DirectMembers)(
-      Group.directMembers(memberIds),
-    ).pipe(
-      Effect.mapError(
-        () => new InvalidReference({ message: "A direct group needs two or more members" }),
-      ),
-    );
-    if (!requested.includes(createdBy))
-      return yield* new InvalidReference({
-        message: "A direct group's creator must be one of its members",
-      });
+    const requested = Group.directMembers(memberIds);
+    if (requested.length < 2 || !requested.includes(createdBy))
+      return yield* Effect.die("A direct group needs two or more members, its creator among them");
     const existing = yield* groups.findDirect(requested);
-    if (Option.isSome(existing)) {
-      const group = existing.value;
-      if (
-        group.workspaceId !== workspaceId ||
-        Group.directKey(group.memberIds) !== Group.directKey(requested)
-      )
-        return yield* new InvalidReference({
-          message: "Group store returned another direct group or workspace",
-        });
-      return { group, created: false } satisfies Established;
-    }
-    const found = new Map<Member.Id, Member.Record>();
-    for (const row of yield* members.getMany(requested)) {
-      const member = yield* Schema.decodeEffect(Member.Record)(row);
-      if (
-        member.workspaceId !== workspaceId ||
-        !requested.includes(member.id) ||
-        found.has(member.id)
-      )
-        return yield* new InvalidReference({
-          message: "Member store returned another member or workspace",
-        });
-      found.set(member.id, member);
-    }
+    if (Option.isSome(existing))
+      return { group: existing.value, created: false } satisfies Established;
+    const found = new Map(
+      (yield* members.getMany(requested)).map((member) => [member.id, member] as const),
+    );
     for (const memberId of requested)
       if (found.get(memberId)?.status !== "active") return yield* new Unavailable({ memberId });
     const group: Group.DirectRecord = {

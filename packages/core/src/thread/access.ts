@@ -11,7 +11,6 @@ export class NotFound extends Schema.TaggedError<NotFound>()("ThreadAccess.NotFo
 }) {}
 export type Error =
   | Authorization.Error
-  | GroupAudience.InvalidResponse
   | GroupMembershipStore.Failure
   | ThreadStore.Failure
   | Schema.SchemaError

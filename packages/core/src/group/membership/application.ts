@@ -41,11 +41,6 @@ export {
   NotFound,
 } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "GroupMembershipApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type Error =
   | GroupMembershipDeparture.Error
   | Authorization.Error
@@ -63,9 +58,7 @@ export type Error =
   | NotFound
   | AlreadyRemoved
   | FixedMembership
-  | GeneralMembership
-  | GroupAudience.InvalidResponse
-  | InvalidResponse;
+  | GeneralMembership;
 
 export type ReadError =
   | Authorization.Error
@@ -73,9 +66,7 @@ export type ReadError =
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
-  | GroupAudience.InvalidResponse
-  | GroupNotFound
-  | InvalidResponse;
+  | GroupNotFound;
 
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -124,18 +115,13 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/membership/application/Service",
 ) {}
 
-const invalidRecord = (cause: Schema.SchemaError) =>
-  new InvalidResponse({ message: `Membership storage returned invalid data: ${cause.message}` });
 const decodeInput = Schema.decodeEffect(GroupMembership.AddInput);
 const decodeRemovalInput = Schema.decodeEffect(GroupMembership.RemoveInput);
-const decodeGroup = Schema.decodeEffect(Schema.toType(Group.Record));
-const decodeMember = Schema.decodeEffect(Member.Record);
-const decodeMembership = Schema.decodeEffect(Schema.toType(GroupMembership.Record));
 
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
 export const make = Effect.fn("GroupMembershipApplication.make")(function* (): Effect.fn.Return<
   Interface,
-  InvalidResponse,
+  never,
   | Authorization.Service
   | GroupStore.Service
   | MemberStore.Service
@@ -154,18 +140,6 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [
-      groups.workspaceId,
-      members.workspaceId,
-      memberships.workspaceId,
-      audience.workspaceId,
-      departure.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({
-      message: "Group membership services belong to different workspaces",
-    });
 
   /** Management needs the grant and membership of the group; to anyone outside it, it is missing. */
   const requireManagement = Effect.fnUntraced(function* (groupId: Group.Id) {
@@ -186,12 +160,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   const loadGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const foundGroup = yield* groups.get(groupId);
     if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
-    const group = yield* decodeGroup(foundGroup.value).pipe(Effect.mapError(invalidRecord));
-    if (group.workspaceId !== workspaceId || group.id !== groupId)
-      return yield* new InvalidResponse({
-        message: "Group store returned another group or workspace",
-      });
-    return group;
+    return foundGroup.value;
   });
   const loadManagedGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const group = yield* loadGroup(groupId);
@@ -199,22 +168,6 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
     return group;
   });
 
-  /** The member's current admission to the group, checked against what was asked for. */
-  const activeAdmission = Effect.fnUntraced(function* (groupId: Group.Id, memberId: Member.Id) {
-    const found = yield* memberships.findActive(groupId, memberId);
-    if (Option.isNone(found)) return Option.none<GroupMembership.Record>();
-    const membership = yield* decodeMembership(found.value).pipe(Effect.mapError(invalidRecord));
-    if (
-      membership.workspaceId !== workspaceId ||
-      membership.groupId !== groupId ||
-      membership.memberId !== memberId ||
-      membership.status !== "active"
-    )
-      return yield* new InvalidResponse({
-        message: "Membership store returned another group, member, workspace, or state",
-      });
-    return Option.some(membership);
-  });
   /** Publish a fresh admission of the member to the group. */
   const admit = Effect.fnUntraced(function* (groupId: Group.Id, memberId: Member.Id) {
     const admittedAt = yield* DateTime.now;
@@ -237,15 +190,10 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       yield* requireManagement(groupId);
       yield* loadManagedGroup(groupId);
 
-      const foundMember = yield* members.get(memberId);
-      if (Option.isNone(foundMember)) return yield* new MemberNotFound({ memberId });
-      const member = yield* decodeMember(foundMember.value).pipe(Effect.mapError(invalidRecord));
-      if (member.workspaceId !== workspaceId || member.id !== memberId)
-        return yield* new InvalidResponse({
-          message: "Member store returned another member or workspace",
-        });
-      if (member.status !== "active") return yield* new InactiveMember({ memberId });
-      if (Option.isSome(yield* activeAdmission(groupId, memberId)))
+      const member = yield* members.get(memberId);
+      if (Option.isNone(member)) return yield* new MemberNotFound({ memberId });
+      if (member.value.status !== "active") return yield* new InactiveMember({ memberId });
+      if (Option.isSome(yield* memberships.findActive(groupId, memberId)))
         return yield* new AlreadyMember({ groupId, memberId });
       return yield* admit(groupId, memberId);
     },
@@ -266,7 +214,7 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
       const group = yield* loadGroup(groupId);
       if (group.kind !== "Team" || group.visibility !== "Public")
         return yield* new GroupNotFound({ groupId });
-      const current = yield* activeAdmission(groupId, actor.memberId);
+      const current = yield* memberships.findActive(groupId, actor.memberId);
       if (Option.isSome(current)) return current.value;
       return yield* admit(groupId, actor.memberId);
     },
@@ -277,14 +225,9 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
 
   const loadMembership = Effect.fnUntraced(function* (input: GroupMembership.RemoveInput) {
     const found = yield* memberships.get(input.membershipId);
-    if (Option.isNone(found)) return yield* new NotFound(input);
-    const membership = yield* decodeMembership(found.value).pipe(Effect.mapError(invalidRecord));
-    if (membership.workspaceId !== workspaceId || membership.id !== input.membershipId)
-      return yield* new InvalidResponse({
-        message: "Membership store returned another admission or workspace",
-      });
-    if (membership.groupId !== input.groupId) return yield* new NotFound(input);
-    return membership;
+    if (Option.isNone(found) || found.value.groupId !== input.groupId)
+      return yield* new NotFound(input);
+    return found.value;
   });
   const depart = Effect.fnUntraced(function* (
     membership: GroupMembership.Record,
@@ -361,55 +304,24 @@ export const make = Effect.fn("GroupMembershipApplication.make")(function* (): E
   ) {
     const options = yield* Schema.decodeEffect(GroupMembership.ListOptions)(input);
     yield* loadGroup(groupId);
-    const seenIds = new Set<GroupMembership.Id>();
-    const seenMembers = new Set<Member.Id>();
     const active: Array<GroupMembership.Record> = [];
     let after = options.after;
     while (active.length < options.limit) {
-      const page: Array<GroupMembership.Record> = [];
-      for (const found of yield* memberships.pageActiveByGroup(
+      const page = yield* memberships.pageActiveByGroup(
         groupId,
         after === undefined ? { limit: options.limit } : { after, limit: options.limit },
-      )) {
-        const membership = yield* decodeMembership(found).pipe(Effect.mapError(invalidRecord));
-        if (
-          membership.workspaceId !== workspaceId ||
-          membership.groupId !== groupId ||
-          membership.status !== "active" ||
-          seenIds.has(membership.id) ||
-          (after !== undefined && membership.id <= after)
-        )
-          return yield* new InvalidResponse({
-            message: "Membership store returned an inconsistent group listing",
-          });
-        if (seenMembers.has(membership.memberId))
-          return yield* new InvalidResponse({
-            message: "Membership store returned duplicate active admissions",
-          });
-        seenIds.add(membership.id);
-        seenMembers.add(membership.memberId);
-        page.push(membership);
-      }
+      );
       if (page.length === 0) break;
       // One read for the page's members; only admissions of active members are current.
-      const requested = new Set(page.map((membership) => membership.memberId));
-      const found = new Map<Member.Id, Member.Record>();
-      for (const row of yield* members.getMany([...requested])) {
-        const member = yield* decodeMember(row).pipe(Effect.mapError(invalidRecord));
-        if (member.workspaceId !== workspaceId || !requested.has(member.id) || found.has(member.id))
-          return yield* new InvalidResponse({
-            message: "Member store returned another member or workspace",
-          });
-        found.set(member.id, member);
-      }
+      const found = new Map(
+        (yield* members.getMany([...new Set(page.map((membership) => membership.memberId))])).map(
+          (member) => [member.id, member] as const,
+        ),
+      );
       for (const membership of page) {
-        const member = found.get(membership.memberId);
-        if (member === undefined)
-          return yield* new InvalidResponse({
-            message: "Group admission references a missing workspace member",
-          });
         after = membership.id;
-        if (member.status === "active" && active.length < options.limit) active.push(membership);
+        if (found.get(membership.memberId)?.status === "active" && active.length < options.limit)
+          active.push(membership);
       }
       if (page.length < options.limit) break;
     }

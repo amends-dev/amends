@@ -9,13 +9,10 @@ import type { Log } from "../../journal/log.ts";
 import type { Projection } from "../../journal/projection.ts";
 import { Publication } from "../../journal/publication.ts";
 import { WorkspaceId } from "../../workspace/id.ts";
-import { Member } from "../../workspace/member/member.ts";
 import { MemberStore } from "../../workspace/member/store.ts";
-import { Group } from "../group.ts";
 import { GroupAudience } from "../audience.ts";
 import { GroupPermissions } from "../permissions.ts";
 import { GroupStore } from "../store.ts";
-import { GroupMembership } from "../membership/membership.ts";
 import { GroupMembershipStore } from "../membership/store.ts";
 import { GroupFollow } from "./follow.ts";
 import { GroupFollowFacts } from "./facts.ts";
@@ -23,13 +20,8 @@ import { GroupFollowStore } from "./store.ts";
 import { AgentRequired, GroupNotFound, MemberUnavailable, NotFollowable } from "./errors.ts";
 export { AgentRequired, GroupNotFound, MemberUnavailable, NotFollowable } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "GroupFollowApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
 export type Error =
   | Authorization.Error
-  | GroupAudience.InvalidResponse
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | MemberStore.Failure
@@ -41,8 +33,7 @@ export type Error =
   | GroupNotFound
   | NotFollowable
   | MemberUnavailable
-  | AgentRequired
-  | InvalidResponse;
+  | AgentRequired;
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
   /**
@@ -62,9 +53,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/follow/application/Service",
 ) {}
 
-const invalidRecord = (cause: Schema.SchemaError) =>
-  new InvalidResponse({ message: `Group storage returned invalid data: ${cause.message}` });
-
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
 export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -76,18 +64,6 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [
-      audience.workspaceId,
-      groups.workspaceId,
-      memberships.workspaceId,
-      members.workspaceId,
-      follows.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({
-      message: "Group follow services belong to different workspaces",
-    });
 
   /** The admission whose follow changes, after the checks that apply to the actor and target. */
   const resolve = Effect.fnUntraced(function* (input: GroupFollow.Input, following: boolean) {
@@ -100,15 +76,8 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
         ),
       );
     const foundGroup = yield* groups.get(request.groupId);
-    if (Option.isNone(foundGroup))
-      return yield* new InvalidResponse({ message: "Audience group is missing" });
-    const group = yield* Schema.decodeEffect(Schema.toType(Group.Record))(foundGroup.value).pipe(
-      Effect.mapError(invalidRecord),
-    );
-    if (group.workspaceId !== workspaceId || group.id !== request.groupId)
-      return yield* new InvalidResponse({
-        message: "Group store returned another group or workspace",
-      });
+    if (Option.isNone(foundGroup)) return yield* Effect.die("An audience's group is missing");
+    const group = foundGroup.value;
     if (group.kind === "Direct") return yield* new NotFollowable({ groupId: group.id });
     const actor = yield* Actor.Service;
     if (request.memberId === actor.memberId) {
@@ -123,29 +92,11 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
         ]);
       return own;
     }
-    const foundAdmission = yield* memberships.findActive(group.id, request.memberId);
-    if (Option.isNone(foundAdmission))
+    const admission = yield* memberships.findActive(group.id, request.memberId);
+    const found = yield* members.get(request.memberId);
+    if (Option.isNone(admission) || Option.isNone(found))
       return yield* new MemberUnavailable({ memberId: request.memberId });
-    const admission = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
-      foundAdmission.value,
-    ).pipe(Effect.mapError(invalidRecord));
-    const foundMember = yield* members.get(request.memberId);
-    if (Option.isNone(foundMember))
-      return yield* new MemberUnavailable({ memberId: request.memberId });
-    const member = yield* Schema.decodeEffect(Member.Record)(foundMember.value).pipe(
-      Effect.mapError(invalidRecord),
-    );
-    if (
-      admission.workspaceId !== workspaceId ||
-      admission.groupId !== group.id ||
-      admission.memberId !== request.memberId ||
-      admission.status !== "active" ||
-      member.workspaceId !== workspaceId ||
-      member.id !== request.memberId
-    )
-      return yield* new InvalidResponse({
-        message: "Group storage returned another admission, member, or workspace",
-      });
+    const member = found.value;
     if (member.status !== "active")
       return yield* new MemberUnavailable({ memberId: request.memberId });
     if (member.identity._tag !== "Agent")
@@ -154,31 +105,13 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
     yield* authorization.require([
       Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId: member.id }),
     ]);
-    return admission;
-  });
-  const current = Effect.fnUntraced(function* (admission: GroupMembership.Record) {
-    const found = yield* follows.findActive(admission.id);
-    if (Option.isNone(found)) return Option.none<GroupFollow.Record>();
-    const follow = yield* Schema.decodeEffect(Schema.toType(GroupFollow.Record))(found.value).pipe(
-      Effect.mapError(invalidRecord),
-    );
-    if (
-      follow.workspaceId !== workspaceId ||
-      follow.groupId !== admission.groupId ||
-      follow.memberId !== admission.memberId ||
-      follow.groupMembershipId !== admission.id ||
-      follow.status !== "active"
-    )
-      return yield* new InvalidResponse({
-        message: "Follow store returned another admission's follow",
-      });
-    return Option.some(follow);
+    return admission.value;
   });
 
   const follow = Effect.fn("GroupFollowApplication.follow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* resolve(input, true);
-      if (Option.isSome(yield* current(admission))) return;
+      if (Option.isSome(yield* follows.findActive(admission.id))) return;
       const followedAt = yield* DateTime.now;
       yield* journal
         .publish(GroupFollowFacts.Started, {
@@ -200,7 +133,7 @@ export const make = Effect.fn("GroupFollowApplication.make")(function* () {
   const unfollow = Effect.fn("GroupFollowApplication.unfollow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* resolve(input, false);
-      const existing = yield* current(admission);
+      const existing = yield* follows.findActive(admission.id);
       if (Option.isNone(existing)) return;
       yield* journal.publish(GroupFollowFacts.Ended, {
         workspaceId,

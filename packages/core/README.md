@@ -466,10 +466,11 @@ type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` register
 kind adds its resolver to the first and its item schema to the second. Reading a kind without a
 resolver is a defect, `ThreadActivityResolvers.Unknown`.
 
-Thread services trust what storage returns: the adapters decode each record and scope it to its
-workspace, and the storage conformance suites check that. So thread services use stored records as
-they come, without decoding or cross-checking them again, and a record core itself wrote that is
-missing is a defect rather than a typed error. Storage failures still reach callers as they are.
+Thread and group services trust what storage returns: the adapters decode each record and scope it
+to its workspace, and the storage conformance suites check that. So these services use stored
+records as they come, without decoding or cross-checking them again, and a record core itself wrote
+that is missing is a defect rather than a typed error. Storage failures still reach callers as they
+are.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without

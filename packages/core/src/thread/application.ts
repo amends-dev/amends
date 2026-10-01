@@ -52,7 +52,6 @@ export {
 } from "./errors.ts";
 export type Error =
   | Authorization.Error
-  | GroupAudience.InvalidResponse
   | Exclude<ThreadStart.Error, ThreadParticipationAdmission.Unavailable>
   | Exclude<DirectGroups.Error, DirectGroups.Unavailable>
   | GroupStore.Failure
@@ -74,7 +73,6 @@ export type Error =
 export type ReadError =
   | ReadStateStore.Failure
   | Authorization.Error
-  | GroupAudience.InvalidResponse
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | ThreadStore.Failure

@@ -18,7 +18,6 @@ import {
   GroupMembershipPermissions,
   GroupMembershipStore,
   GroupPermissions,
-  GroupStore,
 } from "@amends/core/group";
 
 import { Actor, Identity } from "@amends/core/identity";
@@ -31,7 +30,6 @@ import {
   MemberApplication,
   MemberFacts,
   MemberPermissions,
-  MemberStore,
 } from "@amends/core/workspace";
 
 import { Gateway } from "@amends/gateway";
@@ -931,75 +929,6 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
 
-    it.effect("inconsistent stores are rejected before a membership can be published", () =>
-      harness.withStorage((storage) =>
-        runHost(
-          storage,
-          Effect.gen(function* () {
-            const { bound, group, otherGroup, owner } = yield* prepare();
-            const before = yield* history(bound);
-            const badGroup = {
-              ...bound,
-              context: Context.add(bound.context, GroupStore.Service, {
-                ...bound.groups,
-                get: () => Effect.succeedSome(otherGroup),
-              }),
-            };
-            expect(yield* Effect.flip(run(badGroup, owner, add(group.id, humanId)))).toMatchObject({
-              _tag: "GroupMembershipApplication.InvalidResponse",
-            });
-            const badMember = {
-              ...bound,
-              context: Context.add(bound.context, MemberStore.Service, {
-                ...bound.members,
-                get: (id) => (id === humanId ? bound.members.get(agentId) : bound.members.get(id)),
-              }),
-            };
-            expect(yield* Effect.flip(run(badMember, owner, add(group.id, humanId)))).toMatchObject(
-              {
-                _tag: "GroupMembershipApplication.InvalidResponse",
-              },
-            );
-            const badMembership = {
-              ...bound,
-              context: Context.add(bound.context, GroupMembershipStore.Service, {
-                ...bound.groupMemberships,
-                // The owner's own admission reads correctly; the human's comes back wrong.
-                findActive: (groupId: Group.Id, memberId: Member.Id) =>
-                  memberId === humanId
-                    ? Effect.succeedSome({
-                        id: GroupMembership.Id.make("wrong-membership"),
-                        workspaceId,
-                        groupId: otherGroup.id,
-                        memberId: humanId,
-                        admittedAt: group.createdAt,
-                        status: "active" as const,
-                      })
-                    : bound.groupMemberships.findActive(groupId, memberId),
-              }),
-            };
-            expect(
-              yield* Effect.flip(run(badMembership, owner, add(group.id, humanId))),
-            ).toMatchObject({ _tag: "GroupMembershipApplication.InvalidResponse" });
-            const foreignStore = {
-              ...bound,
-              context: Context.add(bound.context, GroupMembershipStore.Service, {
-                ...bound.groupMemberships,
-                workspaceId: otherWorkspaceId,
-              }),
-            };
-            expect(
-              yield* Effect.flip(run(foreignStore, owner, add(group.id, humanId))),
-            ).toMatchObject({
-              _tag: "GroupAudience.InvalidResponse",
-            });
-            expect(yield* history(bound)).toEqual(before);
-            expect(admitted(yield* bound.groupMemberships.listByGroup(group.id))).toEqual([]);
-          }),
-        ),
-      ),
-    );
-
     it.effect(
       "managed departure uses group-scoped permission, preserves history, and records actor and time",
       () =>
@@ -1838,7 +1767,7 @@ export const groupMemberships = (harness: Harness) => {
         ),
     );
 
-    it.effect("inconsistent admission responses abort departures and workspace cleanup", () =>
+    it.effect("inconsistent admission responses abort workspace cleanup", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
@@ -1846,21 +1775,6 @@ export const groupMemberships = (harness: Harness) => {
             const { bound, group, owner } = yield* prepare();
             const admission = yield* run(bound, owner, add(group.id, humanId));
             const before = yield* history(bound);
-            for (const wrong of [
-              Object.assign({}, admission, { id: GroupMembership.Id.make("wrong") }),
-              Object.assign({}, admission, { workspaceId: otherWorkspaceId }),
-            ]) {
-              const broken = {
-                ...bound,
-                context: Context.add(bound.context, GroupMembershipStore.Service, {
-                  ...bound.groupMemberships,
-                  get: () => Effect.succeedSome(wrong),
-                }),
-              };
-              expect(yield* Effect.flip(run(broken, owner, remove(admission)))).toMatchObject({
-                _tag: "GroupMembershipApplication.InvalidResponse",
-              });
-            }
             for (const wrong of [
               Object.assign({}, admission, { memberId: agentId }),
               Object.assign({}, admission, { workspaceId: otherWorkspaceId }),

@@ -10,16 +10,11 @@ import { GroupMembershipStore } from "./membership/store.ts";
 export class NotMember extends Schema.TaggedError<NotMember>()("GroupAudience.NotMember", {
   groupId: GroupId.Id,
 }) {}
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "GroupAudience.InvalidResponse",
-  { message: Schema.String },
-) {}
 export type Error =
   | Authorization.Error
   | GroupMembershipStore.Failure
   | Schema.SchemaError
-  | NotMember
-  | InvalidResponse;
+  | NotMember;
 
 export interface Interface {
   readonly workspaceId: WorkspaceId.Id;
@@ -41,10 +36,6 @@ export const make = Effect.fn("GroupAudience.make")(function* () {
   const authorization = yield* Authorization.Service;
   const memberships = yield* GroupMembershipStore.Service;
   const workspaceId = authorization.workspaceId;
-  if (memberships.workspaceId !== workspaceId)
-    return yield* new InvalidResponse({
-      message: "Group audience services belong to different workspaces",
-    });
 
   const requireAudience = Effect.fn("GroupAudience.require")(function* (groupId: GroupId.Id) {
     const id = yield* Schema.decodeEffect(GroupId.Id)(groupId);
@@ -52,26 +43,7 @@ export const make = Effect.fn("GroupAudience.make")(function* () {
     const actor = yield* Actor.Service;
     const found = yield* memberships.findActive(id, actor.memberId);
     if (Option.isNone(found)) return yield* new NotMember({ groupId: id });
-    const membership = yield* Schema.decodeEffect(Schema.toType(GroupMembership.Record))(
-      found.value,
-    ).pipe(
-      Effect.mapError(
-        (cause) =>
-          new InvalidResponse({
-            message: `Membership store returned invalid data: ${cause.message}`,
-          }),
-      ),
-    );
-    if (
-      membership.workspaceId !== workspaceId ||
-      membership.groupId !== id ||
-      membership.memberId !== actor.memberId ||
-      membership.status !== "active"
-    )
-      return yield* new InvalidResponse({
-        message: "Membership store returned another group, member, workspace, or state",
-      });
-    return membership;
+    return found.value;
   });
   return Service.of({ workspaceId, require: requireAudience });
 });
