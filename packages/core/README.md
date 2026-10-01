@@ -113,6 +113,13 @@ build a read screen do not authorize a later write. Stores still require a valid
 workspace transaction for every mutation. A read invoked inside an existing commit
 uses that transaction and sees its staged changes without opening another one.
 
+Core trusts what storage returns: the adapters decode each record and scope it to its workspace,
+and the storage conformance suites check that. Operations use stored records as they come, without
+decoding or cross-checking them again, and a record core itself wrote that is missing is a defect
+rather than a typed error. Storage failures still reach callers as they are. Core validates what
+crosses into it instead: callers' input, an actor or target from another workspace, and what a
+turn's runner or harness reports.
+
 ## Groups
 
 `@amends/core/group` holds team and direct groups, their admissions, and follows.
@@ -465,12 +472,6 @@ type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` register
 `ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new
 kind adds its resolver to the first and its item schema to the second. Reading a kind without a
 resolver is a defect, `ThreadActivityResolvers.Unknown`.
-
-Thread, group, notification, turn, workspace, authorization, attention, and signal services trust what storage returns: the adapters decode each record and scope it
-to its workspace, and the storage conformance suites check that. So these services use stored
-records as they come, without decoding or cross-checking them again, and a record core itself wrote
-that is missing is a defect rather than a typed error. Storage failures still reach callers as they
-are.
 
 Starts and replies read only the admissions and participations of those they name, through
 `GroupMembershipStore.findActiveMany` and `ThreadParticipationStore.findActive`; a reply without

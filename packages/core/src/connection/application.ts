@@ -33,17 +33,11 @@ export {
   UnsupportedAuthentication,
 } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "ConnectionApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type ReadError =
   | Authorization.Error
   | ConnectionStore.Failure
   | Schema.SchemaError
-  | NotFound
-  | InvalidResponse;
+  | NotFound;
 export type Error =
   | ReadError
   | PlatformError.PlatformError
@@ -114,10 +108,6 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if ([connections.workspaceId, credentials.workspaceId].some((id) => id !== workspaceId))
-    return yield* new InvalidResponse({
-      message: "Connection services belong to different workspaces",
-    });
 
   const target = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
@@ -130,25 +120,12 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
       .permitted([Requirement.make(ConnectionPermissions.Manage, target(record.id))])
       .pipe(Effect.map(([manageable = false]) => viewOf(record, manageable)));
 
-  const decode = Schema.decodeEffect(Schema.toType(Connection.Record));
   /** The active connection by ID, or NotFound. */
   const load = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connections.get(connectionId);
-    if (Option.isNone(found)) return yield* new NotFound({ connectionId });
-    const record = yield* decode(found.value).pipe(
-      Effect.mapError(
-        (cause) =>
-          new InvalidResponse({
-            message: `Connection store returned invalid data: ${cause.message}`,
-          }),
-      ),
-    );
-    if (record.workspaceId !== workspaceId || record.id !== connectionId)
-      return yield* new InvalidResponse({
-        message: "Connection store returned another connection or workspace",
-      });
-    if (record.status !== "active") return yield* new NotFound({ connectionId });
-    return record;
+    if (Option.isNone(found) || found.value.status !== "active")
+      return yield* new NotFound({ connectionId });
+    return found.value;
   });
   /** A connection the actor may act on with `permission`; to anyone else it is missing. */
   const authorized = Effect.fnUntraced(function* (
@@ -186,19 +163,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const records = yield* Effect.forEach(yield* connections.list, (record) =>
-      decode(record).pipe(
-        Effect.mapError(
-          (cause) =>
-            new InvalidResponse({
-              message: `Connection store returned invalid data: ${cause.message}`,
-            }),
-        ),
-      ),
-    );
-    const active = records.filter(
-      (record) => record.status === "active" && record.workspaceId === workspaceId,
-    );
+    const active = (yield* connections.list).filter((record) => record.status === "active");
     // One grant resolution answers both permissions for every connection.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
@@ -227,7 +192,7 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
   const restore = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connections.get(connectionId);
     if (Option.isNone(found)) return yield* new NotFound({ connectionId });
-    return yield* decode(found.value);
+    return found.value;
   });
 
   const create = Effect.fn("ConnectionApplication.create")(
@@ -329,9 +294,8 @@ export const make = Effect.fn("ConnectionApplication.make")(function* () {
           Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
             Effect.fail(new CredentialsUnavailable({ reason })),
           ),
-          Effect.catchTag("ConnectionCredentialStore.Conflict", ({ message }) =>
-            Effect.fail(new InvalidResponse({ message })),
-          ),
+          // A credential takes a new random ID, which nothing else holds.
+          Effect.catchTag("ConnectionCredentialStore.Conflict", Effect.die),
         );
       const replaced = record.authentication.credentialId;
       if (replaced !== null) yield* credentials.remove(replaced);

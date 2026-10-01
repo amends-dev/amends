@@ -37,7 +37,7 @@ import { Member } from "../workspace/member/member.ts";
 import { MemberPermissions } from "../workspace/member/permissions.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { WorkspaceStore } from "../workspace/store.ts";
-import { Workspace } from "../workspace/workspace.ts";
+
 import { Agent } from "./agent.ts";
 import {
   Changed,
@@ -57,11 +57,6 @@ export {
   NotFound,
 } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "AgentApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type ReadError =
   | Authorization.Error
   | AgentStore.Failure
@@ -72,8 +67,7 @@ export type ReadError =
   | EnvironmentStore.Failure
   | ConnectionStore.Failure
   | Schema.SchemaError
-  | NotFound
-  | InvalidResponse;
+  | NotFound;
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** Model access or an environment the actor cannot use, or that cannot run together. */
 export type SelectionError = ConnectionUnavailable | EnvironmentUnavailable | Incompatible;
@@ -160,21 +154,6 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if (
-    [
-      delegation.workspaceId,
-      agents.workspaceId,
-      members.workspaceId,
-      memberships.workspaceId,
-      assignments.workspaceId,
-      roles.workspaceId,
-      workspace.workspaceId,
-      groups.workspaceId,
-      environments.workspaceId,
-      connections.workspaceId,
-    ].some((id) => id !== workspaceId)
-  )
-    return yield* new InvalidResponse({ message: "Agent services belong to different workspaces" });
 
   const memberTarget = (memberId: Member.Id) =>
     Target.Reference.cases.Member.make({ workspaceId, memberId });
@@ -183,37 +162,19 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const environmentTarget = (environmentId: Environment.Id) =>
     ({ _tag: "Environment", workspaceId, environmentId }) as const;
 
-  const invalid = (message: string) => new InvalidResponse({ message });
-  const decodeAgent = Schema.decodeEffect(Schema.toType(Agent.Record));
-  const decodeMember = Schema.decodeEffect(Schema.toType(Member.Record));
-  const decodeEnvironment = Schema.decodeEffect(Schema.toType(Environment.Record));
-  const decodeConnection = Schema.decodeEffect(Schema.toType(Connection.Record));
-  const decoded = (record: Agent.Record) =>
-    decodeAgent(record).pipe(
-      Effect.mapError((cause) => invalid(`Agent store returned invalid data: ${cause.message}`)),
-    );
-
   /** The agent's active membership, which names it; an ended one makes the agent missing. */
   const membershipOf = Effect.fnUntraced(function* (record: Agent.Record) {
     const found = yield* members.get(record.memberId);
-    if (Option.isNone(found)) return yield* invalid("Agent membership is missing");
-    const member = yield* decodeMember(found.value);
-    if (
-      member.workspaceId !== workspaceId ||
-      member.identity._tag !== "Agent" ||
-      member.identity.id !== record.id
-    )
-      return yield* invalid("Member store returned another member for this agent");
-    if (member.name === undefined) return yield* invalid("Agent membership has no name");
-    return { member, name: member.name };
+    // An agent is created with its named membership.
+    if (Option.isNone(found) || found.value.name === undefined)
+      return yield* Effect.die("An agent's named membership is missing");
+    return { member: found.value, name: found.value.name };
   });
   /** The agent by ID with its membership, or NotFound once its membership ended. */
   const load = Effect.fnUntraced(function* (agentId: Agent.Id) {
     const found = yield* agents.get(agentId);
     if (Option.isNone(found)) return yield* new NotFound({ agentId });
-    const record = yield* decoded(found.value);
-    if (record.workspaceId !== workspaceId || record.id !== agentId)
-      return yield* invalid("Agent store returned another agent or workspace");
+    const record = found.value;
     const { member, name } = yield* membershipOf(record);
     if (member.status !== "active") return yield* new NotFound({ agentId });
     return { record, name };
@@ -236,19 +197,11 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
 
   const activeEnvironment = Effect.fnUntraced(function* (environmentId: Environment.Id) {
     const found = yield* environments.get(environmentId);
-    if (Option.isNone(found)) return Option.none<Environment.Record>();
-    const record = yield* decodeEnvironment(found.value);
-    return record.workspaceId === workspaceId && record.status === "active"
-      ? Option.some(record)
-      : Option.none();
+    return Option.filter(found, (record) => record.status === "active");
   });
   const activeConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
     const found = yield* connections.get(connectionId);
-    if (Option.isNone(found)) return Option.none<Connection.Record>();
-    const record = yield* decodeConnection(found.value);
-    return record.workspaceId === workspaceId && record.status === "active"
-      ? Option.some(record)
-      : Option.none();
+    return Option.filter(found, (record) => record.status === "active");
   });
   /** An environment as readiness sees it now, with its account connection looked up. */
   const environmentView = Effect.fnUntraced(function* (record: Environment.Record) {
@@ -335,8 +288,8 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   });
   const ownerOf = Effect.gen(function* () {
     const found = yield* workspace.get;
-    if (Option.isNone(found)) return yield* invalid("Workspace metadata is missing");
-    return (yield* Schema.decodeEffect(Workspace.Record)(found.value)).ownerMemberId;
+    if (Option.isNone(found)) return yield* Effect.die("A workspace's record is missing");
+    return found.value.ownerMemberId;
   });
   /** The role a membership holds across the workspace, if any, by its current name. */
   const roleOf = Effect.fnUntraced(function* (assigned: ReadonlyArray<Assignment.Record>) {
@@ -455,10 +408,7 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
     const loaded: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
-    for (const found of yield* agents.list) {
-      const record = yield* decoded(found);
-      if (record.workspaceId !== workspaceId)
-        return yield* invalid("Agent store returned another workspace");
+    for (const record of yield* agents.list) {
       const { member, name } = yield* membershipOf(record);
       if (member.status === "active") loaded.push({ record, name });
     }
@@ -488,9 +438,8 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
   const restore = Effect.fnUntraced(function* (agentId: Agent.Id) {
     const found = yield* agents.get(agentId);
     if (Option.isNone(found)) return yield* new NotFound({ agentId });
-    const record = yield* decoded(found.value);
-    const { name } = yield* membershipOf(record);
-    return { record, name };
+    const { name } = yield* membershipOf(found.value);
+    return { record: found.value, name };
   });
 
   const create = Effect.fn("AgentApplication.create")(
@@ -620,10 +569,8 @@ export const make = Effect.fn("AgentApplication.make")(function* () {
     if (Option.isNone(connection) || !readable || !permitted)
       return yield* new ConnectionUnavailable({ connectionId });
     const active: Array<Environment.Record> = [];
-    for (const found of yield* environments.list) {
-      const record = yield* decodeEnvironment(found);
-      if (record.workspaceId === workspaceId && record.status === "active") active.push(record);
-    }
+    for (const record of yield* environments.list)
+      if (record.status === "active") active.push(record);
     const allowed = yield* authorization.permitted(
       active.flatMap((record) => [
         Requirement.make(EnvironmentPermissions.Read, environmentTarget(record.id)),

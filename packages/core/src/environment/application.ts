@@ -39,18 +39,12 @@ export {
   UnsupportedPlacement,
 } from "./errors.ts";
 
-export class InvalidResponse extends Schema.TaggedError<InvalidResponse>()(
-  "EnvironmentApplication.InvalidResponse",
-  { message: Schema.String },
-) {}
-
 export type ReadError =
   | Authorization.Error
   | EnvironmentStore.Failure
   | ConnectionStore.Failure
   | Schema.SchemaError
-  | NotFound
-  | InvalidResponse;
+  | NotFound;
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** Creating can also meet a harness or provider this host lacks, or a request key used before. */
 export type CreateError =
@@ -112,10 +106,6 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const workspaceId = authorization.workspaceId;
-  if ([environments.workspaceId, connections.workspaceId].some((id) => id !== workspaceId))
-    return yield* new InvalidResponse({
-      message: "Environment services belong to different workspaces",
-    });
 
   const target = (environmentId: Environment.Id) =>
     ({ _tag: "Environment", workspaceId, environmentId }) as const;
@@ -149,27 +139,12 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
       .permitted([Requirement.make(EnvironmentPermissions.Manage, target(record.id))])
       .pipe(Effect.flatMap(([manageable = false]) => viewOf(record, manageable)));
 
-  const decode = Schema.decodeEffect(Schema.toType(Environment.Record));
-  const decoded = (record: Environment.Record) =>
-    decode(record).pipe(
-      Effect.mapError(
-        (cause) =>
-          new InvalidResponse({
-            message: `Environment store returned invalid data: ${cause.message}`,
-          }),
-      ),
-    );
   /** The active environment by ID, or NotFound. */
   const load = Effect.fnUntraced(function* (environmentId: Environment.Id) {
     const found = yield* environments.get(environmentId);
-    if (Option.isNone(found)) return yield* new NotFound({ environmentId });
-    const record = yield* decoded(found.value);
-    if (record.workspaceId !== workspaceId || record.id !== environmentId)
-      return yield* new InvalidResponse({
-        message: "Environment store returned another environment or workspace",
-      });
-    if (record.status !== "active") return yield* new NotFound({ environmentId });
-    return record;
+    if (Option.isNone(found) || found.value.status !== "active")
+      return yield* new NotFound({ environmentId });
+    return found.value;
   });
   /** An environment the actor may act on with `permission`; to anyone else it is missing. */
   const authorized = Effect.fnUntraced(function* (
@@ -214,7 +189,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
       const connectionId = settings.connectionId;
       const found = Option.filter(
         yield* connections.get(connectionId),
-        (connection) => connection.workspaceId === workspaceId && connection.status === "active",
+        (connection) => connection.status === "active",
       );
       const [readable = false, usable = false] = yield* authorization.permitted([
         Requirement.make(ConnectionPermissions.Read, connectionTarget(connectionId)),
@@ -256,10 +231,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const records = yield* Effect.forEach(yield* environments.list, decoded);
-    const active = records.filter(
-      (record) => record.status === "active" && record.workspaceId === workspaceId,
-    );
+    const active = (yield* environments.list).filter((record) => record.status === "active");
     // One grant resolution answers both permissions for every environment.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
@@ -292,7 +264,7 @@ export const make = Effect.fn("EnvironmentApplication.make")(function* () {
   const restore = Effect.fnUntraced(function* (environmentId: Environment.Id) {
     const found = yield* environments.get(environmentId);
     if (Option.isNone(found)) return yield* new NotFound({ environmentId });
-    return yield* decoded(found.value);
+    return found.value;
   });
 
   const create = Effect.fn("EnvironmentApplication.create")(
