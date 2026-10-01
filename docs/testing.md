@@ -67,6 +67,7 @@ iterating; watch mode also reuses Vite's in-memory transforms between edits.
 bun run test packages/core/test --watch
 bun run test --project @amends/ui
 bun run test --project '!@amends/ui'
+bun run test --project '!postgresql'
 bun run test --maxWorkers=2
 ```
 
@@ -75,6 +76,10 @@ the client and app tests, browser bundle check, and all backend integrations ena
 It does not remove the cost of creating and migrating PostgreSQL databases for individual
 tests. The two-worker command limits concurrent test processes for lower CPU pressure;
 the default is four, and fewer workers can take longer.
+
+For changes that do not involve database storage or the host, excluding `postgresql`
+keeps the memory adapter's conformance suites and every frontend project. Run the full
+suite before relying on integration coverage; CI always includes the PostgreSQL project.
 
 The `backend` and `postgresql` projects reuse Bun worker processes and imported modules
 across files (`isolate: false`). Tests must keep mutable stores, service layers, and
