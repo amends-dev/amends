@@ -34,7 +34,6 @@ export const make = Effect.fn("ConnectionCredentials.make")(function* () {
   const inWorkspace = (id: Connection.CredentialId) =>
     and(eq(connectionCredentials.workspaceId, workspaceId), eq(connectionCredentials.id, id));
   return ConnectionCredentialStore.Service.of({
-    workspaceId,
     put: Effect.fn("ConnectionCredentials.put")(function* (credential) {
       yield* Store.Transaction;
       if (Option.isNone(key)) return yield* unavailable;

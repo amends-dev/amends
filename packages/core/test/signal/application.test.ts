@@ -61,7 +61,6 @@ const run = <A, E>(
       permitted: () => Effect.die("Unexpected permitted check"),
     });
     const signals = Signals.Service.of({
-      workspaceId,
       publish: (signal) =>
         Effect.sync(() => {
           published.push(signal);

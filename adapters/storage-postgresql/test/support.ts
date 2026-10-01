@@ -37,8 +37,7 @@ import { temporary } from "./postgres.ts";
  * the background process it expects, as a host's runner would.
  */
 const manualWakes: WorkspaceWakes.Interface = {
-  forWorkspace: (workspaceId) =>
-    BackgroundWakes.Service.of({ workspaceId, request: () => Effect.void }),
+  forWorkspace: () => BackgroundWakes.Service.of({ request: () => Effect.void }),
 };
 
 export const setup = () => {

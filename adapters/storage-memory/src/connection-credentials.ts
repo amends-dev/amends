@@ -15,9 +15,8 @@ const rows = Rows.make(Schema.fromJsonString(Row));
 
 /** Credentials in the workspace's memory, written in its transactions. @category constructors */
 export const make = Effect.fn("ConnectionCredentials.make")(function* () {
-  const { workspaceId, read, write } = yield* Binding.Service;
+  const { read, write } = yield* Binding.Service;
   return ConnectionCredentialStore.Service.of({
-    workspaceId,
     put: Effect.fn("ConnectionCredentials.put")(function* (credential) {
       yield* Store.Transaction;
       const space = yield* write.pipe(

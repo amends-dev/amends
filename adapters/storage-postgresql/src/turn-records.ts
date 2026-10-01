@@ -83,7 +83,6 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
   const ofAgent = (memberId: Member.Id, threadId: Thread.Id) =>
     and(inWorkspace, eq(turns.memberId, memberId), eq(turns.threadId, threadId));
   return TurnStore.Service.of({
-    workspaceId,
     get: Effect.fn("TurnRecords.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Turn.Id)(input);

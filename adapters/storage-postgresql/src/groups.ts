@@ -56,7 +56,6 @@ export const make = Effect.fn("Groups.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
   const { db } = database;
   return GroupStore.Service.of({
-    workspaceId,
     get: Effect.fn("Groups.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Group.Id)(input);

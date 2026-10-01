@@ -41,7 +41,6 @@ export const make = Effect.fn("Assignments.make")(function* () {
       Effect.mapError(storeFailure(AssignmentStore, operation)),
     );
   return AssignmentStore.Service.of({
-    workspaceId,
     get: (id) => Effect.map(select("get", and(inWorkspace, eq(assignments.id, id))), Array.head),
     listActiveByMember: (memberId) =>
       select(

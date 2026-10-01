@@ -1,7 +1,7 @@
 import { Context, Effect, Schema } from "effect";
 import type { Reaction } from "../journal/reaction.ts";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import { TurnFacts } from "./facts.ts";
 import type { Turn } from "./turn.ts";
 
@@ -11,7 +11,6 @@ import type { Turn } from "./turn.ts";
  * so accepted work waits queued.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Ask for a turn to run, as part of the caller's commit: the request is stored with the commit
    * and discarded if it rolls back. Asking again for the same turn asks once.

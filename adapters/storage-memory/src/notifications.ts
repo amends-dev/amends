@@ -159,7 +159,6 @@ export const make = Effect.fn("Notifications.make")(function* () {
   });
 
   return NotificationStore.Service.of({
-    workspaceId,
     get: Effect.fn("Notifications.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(Notification.Id)(input);

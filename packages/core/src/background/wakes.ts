@@ -2,7 +2,7 @@ import { Context, Effect } from "effect";
 import type { DateTime } from "effect";
 import type { Reaction } from "../journal/reaction.ts";
 import { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { BackgroundProcess } from "./process.ts";
 
 /**
@@ -10,7 +10,6 @@ import type { BackgroundProcess } from "./process.ts";
  * workspace, and deliver each request to whichever process runs that workspace's background work.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Ask for a process to run, now or at `at`, as part of the caller's commit: the request is
    * stored with the commit and discarded if it rolls back. Asking again in the same commit for

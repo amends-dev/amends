@@ -87,7 +87,6 @@ export const layerWakes = Layer.effect(
     return WorkspaceWakes.Service.of({
       forWorkspace: (workspaceId) =>
         BackgroundWakes.Service.of({
-          workspaceId,
           request: Effect.fnUntraced(function* (process, options = {}) {
             const commit = yield* Store.Transaction;
             const at = options.at ?? (yield* DateTime.now);

@@ -73,7 +73,7 @@ export const notificationSources = (harness: Harness) => {
       asActor(effect, actor).pipe(Effect.provide(core(bound)));
     const facts = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
@@ -108,7 +108,7 @@ export const notificationSources = (harness: Harness) => {
         bound,
         Effect.flatMap(Journal.Service, (j) =>
           j.publish(AssignmentFacts.Created, {
-            workspaceId: bound.workspace.workspaceId,
+            workspaceId: bound.store.workspaceId,
             assignmentId: Assignment.Id.make(
               `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`,
             ),
@@ -118,7 +118,7 @@ export const notificationSources = (harness: Harness) => {
               grant: Grant.make(
                 permission,
                 target === undefined
-                  ? { _tag: "Workspace", workspaceId: bound.workspace.workspaceId }
+                  ? { _tag: "Workspace", workspaceId: bound.store.workspaceId }
                   : { _tag: "Target", target },
               ),
             },
@@ -133,7 +133,7 @@ export const notificationSources = (harness: Harness) => {
             Effect.gen(function* () {
               for (const memberId of [humanId, otherId, agentId])
                 yield* j.publish(MemberFacts.Added, {
-                  workspaceId: bound.workspace.workspaceId,
+                  workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: identityFor(memberId),
                 });

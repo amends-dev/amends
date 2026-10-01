@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../../journal/store.ts";
-import type { Workspace } from "../../workspace/workspace.ts";
+
 import type { Role } from "./role.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("RoleStore.Failure", {
@@ -26,8 +26,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("RoleStore.Conflict
  * by application services before publication.
  */
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
-
   /** Find a role in this workspace; None if absent. */
   readonly get: (roleId: Role.Id) => Effect.Effect<Option.Option<Role.Record>, Failure>;
 

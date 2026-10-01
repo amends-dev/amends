@@ -1,6 +1,6 @@
 import { Context } from "effect";
 import type { Effect, Scope, Stream } from "effect";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { Signal } from "./signal.ts";
 
 /**
@@ -8,7 +8,6 @@ import type { Signal } from "./signal.ts";
  * the workspace; it holds nothing durable and takes no part in the journal or its write order.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /**
    * Offer a signal to the workspace's current subscribers, best effort: it never fails the caller,
    * and a subscriber too slow to keep up, or disconnected, misses it.

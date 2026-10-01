@@ -20,7 +20,6 @@ const advance = (values: Map<string, number>, key: string, value: number) =>
 export const make = Effect.fn("ReadStates.make")(function* () {
   const { workspaceId, read, join } = yield* Binding.Service;
   return ReadStateStore.Service.of({
-    workspaceId,
     getThreadPositions: Effect.fn("ReadStates.getThreadPositions")(
       function* (memberInput, threadInput) {
         const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);

@@ -45,7 +45,6 @@ const key = {
 };
 /** A notification store that refuses every call; tests replace the calls they expect. */
 const refusing: NotificationStore.Interface = {
-  workspaceId,
   get: () => Effect.die("Unexpected notification read"),
   listByRecipient: () => Effect.die("Unexpected notification read"),
   listPendingByRecipient: () => Effect.die("Unexpected notification read"),

@@ -2,7 +2,7 @@ import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { ThreadId } from "../thread/id.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { MemberId } from "../workspace/member/id.ts";
 import type { Turn } from "./turn.ts";
 
@@ -17,7 +17,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("TurnStore.Conflict
 
 /** Internal projection storage. Reads honor an existing transaction; writes require one. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Turn.Id) => Effect.Effect<Option.Option<Turn.Record>, Failure>;
   /** The agent's active turn on the thread: queued, running, or cancelling. */
   readonly findActive: (

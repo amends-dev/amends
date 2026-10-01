@@ -28,7 +28,6 @@ export const make = Effect.fn("Invitations.make")(function* () {
       Effect.mapError(storeFailure(InvitationStore, operation)),
     );
   return InvitationStore.Service.of({
-    workspaceId,
     get: (id) =>
       Effect.flatMap(read, (space) => rows.get(space.records.invitations, id)).pipe(
         Effect.mapError(storeFailure(InvitationStore, "get")),

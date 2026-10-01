@@ -120,6 +120,11 @@ rather than a typed error. Storage failures still reach callers as they are. Cor
 crosses into it instead: callers' input, an actor or target from another workspace, and what a
 turn's runner or harness reports.
 
+A host binds the journal store to one workspace, and that binding is the only place a service
+learns which workspace it serves: services that need the workspace ID read it from `Store.Service`.
+Projection stores, signals, wakes, and turn dispatch are bound the same way and carry no ID of
+their own.
+
 ## Groups
 
 `@amends/core/group` holds team and direct groups, their admissions, and follows.

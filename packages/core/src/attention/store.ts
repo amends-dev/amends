@@ -2,7 +2,7 @@ import { Context, Schema } from "effect";
 import type { Effect } from "effect";
 import type { GroupId } from "../group/id.ts";
 import type { ThreadId } from "../thread/id.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { MemberId } from "../workspace/member/id.ts";
 import type { ReadState } from "./read-state.ts";
 
@@ -24,7 +24,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ReadStateStore.Con
  * threads, and groups they have checked.
  */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   /** One member's read positions for several threads; unread threads are omitted. */
   readonly getThreadPositions: (
     memberId: MemberId.Id,

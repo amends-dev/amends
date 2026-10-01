@@ -21,9 +21,8 @@ export class Service extends Context.Service<Service, Interface>()(
  * accepted that nothing would do.
  */
 export const unavailable: Interface = {
-  forWorkspace: (workspaceId) =>
+  forWorkspace: () =>
     BackgroundWakes.Service.of({
-      workspaceId,
       request: (process) =>
         Effect.fail(
           new Store.Failure({

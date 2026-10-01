@@ -93,7 +93,6 @@ const configured = (
   const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
   const services = Layer.mergeAll(journal, authorization).pipe(Layer.provide(host));
   const workspace = Layer.succeed(WorkspaceStore.Service, {
-    workspaceId,
     get: Effect.succeedSome({
       id: workspaceId,
       createdBy: Identity.HumanId.make("alice"),
@@ -106,7 +105,6 @@ const configured = (
     ...workspaceOverrides,
   });
   const invitations = Layer.succeed(InvitationStore.Service, {
-    workspaceId,
     listPendingByRecipient: () => Effect.succeed([]),
     list: Effect.succeed([]),
     get: () => Effect.die("Invitation lookup is not used in these member tests"),
@@ -114,7 +112,6 @@ const configured = (
     settle: () => Effect.die("These member tests have no pending invitations"),
   });
   const groupMemberships = Layer.succeed(GroupMembershipStore.Service, {
-    workspaceId,
     listActiveByMember: () => Effect.succeed([]),
     get: () => Effect.die("These member tests have no group admissions"),
     getMany: () => Effect.die("These member tests have no group admissions"),

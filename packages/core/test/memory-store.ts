@@ -488,7 +488,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
   const members = (workspaceId: Workspace.Id): MemberStore.Interface => {
     const keyOf = (id: Member.Id) => JSON.stringify([workspaceId, id]);
     return MemberStore.Service.of({
-      workspaceId,
       get: Effect.fn("JournalTest.members.get")(function* (id) {
         return Option.map(
           Option.fromUndefinedOr((yield* view).members.get(keyOf(id))),
@@ -612,7 +611,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       );
     });
     return RoleStore.Service.of({
-      workspaceId,
       get: Effect.fn("JournalTest.roles.get")(function* (id) {
         return Option.map(
           Option.fromUndefinedOr((yield* read("get")).roles.get(keyOf(id))),
@@ -696,7 +694,6 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
       );
     });
     return AssignmentStore.Service.of({
-      workspaceId,
       get: Effect.fn("JournalTest.assignments.get")(function* (id) {
         return Option.map(
           Option.fromUndefinedOr((yield* read("get")).assignments.get(keyOf(id))),

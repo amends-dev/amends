@@ -39,7 +39,6 @@ export const make = Effect.fn("Roles.make")(function* () {
       return yield* new RoleStore.Conflict({ operation, message: "Role does not exist" });
   });
   return RoleStore.Service.of({
-    workspaceId,
     get: (id) =>
       guard(
         db

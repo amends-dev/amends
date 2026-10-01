@@ -16,7 +16,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("WorkspaceStore.Con
 
 /** Workspace metadata shares the native transaction used by journal projections. */
 export interface Interface {
-  readonly workspaceId: Workspace.Id;
   /** Change only the name, requiring matching workspace and previous name inside a transaction. */
   readonly rename: (
     change: WorkspaceSettings.NameChange,

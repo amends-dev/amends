@@ -52,7 +52,7 @@ export const readState = (harness: Harness) => {
       program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
     const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });

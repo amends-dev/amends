@@ -84,7 +84,6 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
       records.filter((value) => sameRecipient(value.recipient, recipient)).slice(0, options.limit),
     );
   const notifications = Layer.succeed(NotificationStore.Service, {
-    workspaceId,
     get: (id) => Effect.succeed(Option.fromUndefinedOr(records.find((value) => value.id === id))),
     listByRecipient: list,
     listPendingByRecipient: list,
@@ -117,7 +116,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provideMerge(host))),
     Layer.provide(notifications),
     Layer.provide(Layer.succeed(NotificationSource.Service, { resolve: unexpected })),
-    Layer.provide(TestSignals.layer(workspaceId)),
+    Layer.provide(TestSignals.layer),
     Layer.provide(
       Layer.succeed(
         Crypto.Crypto,

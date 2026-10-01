@@ -23,7 +23,6 @@ export const make = Effect.fn("GroupMemberships.make")(function* () {
   const { db } = database;
   const inWorkspace = eq(groupMemberships.workspaceId, workspaceId);
   return GroupMembershipStore.Service.of({
-    workspaceId,
     get: Effect.fn("GroupMemberships.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(GroupMembership.Id)(input);

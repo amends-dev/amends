@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { MemberId } from "../workspace/member/id.ts";
 import type { Group } from "./group.ts";
 
@@ -16,7 +16,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflic
 
 /** Internal projection storage. Reads honor an existing transaction; writes require one. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Group.Id) => Effect.Effect<Option.Option<Group.Record>, Failure>;
   /**
    * Find several groups in one read. Absent IDs are omitted and each found record appears once;

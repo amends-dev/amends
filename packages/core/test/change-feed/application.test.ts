@@ -218,7 +218,6 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
     const members = fixture.members(workspaceId);
     const unexpected = () => Effect.die(new Error("Unexpected membership store use"));
     const memberships = GroupMembershipStore.Service.of({
-      workspaceId,
       get: unexpected,
       getMany: unexpected,
       findActive: unexpected,
@@ -246,7 +245,7 @@ const run = <A, E>(use: (world: World) => Effect.Effect<A, E, Services>, options
       Layer.succeed(RoleStore.Service, fixture.roles(workspaceId)),
       Layer.succeed(AssignmentStore.Service, fixture.assignments(workspaceId)),
       Layer.succeed(GroupMembershipStore.Service, memberships),
-      TestSignals.layer(workspaceId),
+      TestSignals.layer,
       PermissionCatalog.layer([
         ThreadPermissions.Read,
         GroupPermissions.Read,

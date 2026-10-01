@@ -52,7 +52,7 @@ export const threadStarts = (harness: Harness) => {
     );
     const trusted = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(internal.pipe(Layer.provideMerge(core(bound)))),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 200 });

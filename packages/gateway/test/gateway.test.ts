@@ -103,7 +103,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       WorkspaceStore.Service,
       WorkspaceStore.Service.of({
-        workspaceId: boundWorkspaceId,
         // Booting checks the built-in roles of an initialized workspace; these boot none.
         get: Effect.succeedNone,
         insert: unexpected,
@@ -114,7 +113,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       MemberStore.Service,
       MemberStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findActive:
@@ -135,7 +133,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       InvitationStore.Service,
       InvitationStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         listPendingByRecipient: unexpected,
@@ -150,7 +147,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         discardPendingForGroup: unexpected,
         markSeen: unexpected,
         accept: unexpected,
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         listByRecipient: unexpected,
         listPendingByRecipient: unexpected,
@@ -164,7 +160,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       }),
     ),
     Context.add(ThreadStore.Service, {
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       listByGroup: unexpected,
       listByLatest: unexpected,
@@ -174,7 +169,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       recordLatest: unexpected,
     }),
     Context.add(ThreadParticipationStore.Service, {
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       getMany: unexpected,
       listByThread: unexpected,
@@ -185,14 +179,12 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       end: unexpected,
     }),
     Context.add(ThreadMessageStore.Service, {
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       getMany: unexpected,
       insert: unexpected,
     }),
     Context.add(ThreadActivityStore.Service, {
       latest: unexpected,
-      workspaceId: boundWorkspaceId,
       get: unexpected,
       listByThread: unexpected,
       getFirst: unexpected,
@@ -203,7 +195,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       GroupStore.Service,
       GroupStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findDirect: unexpected,
@@ -217,7 +208,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       GroupMembershipStore.Service,
       GroupMembershipStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         getMany: unexpected,
         findActive: unexpected,
@@ -234,7 +224,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ReadStateStore.Service,
       ReadStateStore.Service.of({
-        workspaceId: boundWorkspaceId,
         getThreadPositions: unexpected,
         advanceThread: unexpected,
         getGroupsCaughtUp: unexpected,
@@ -244,7 +233,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       GroupFollowStore.Service,
       GroupFollowStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         findActive: unexpected,
         findActiveMany: unexpected,
@@ -256,7 +244,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ConnectionStore.Service,
       ConnectionStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         insert: unexpected,
@@ -266,7 +253,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       EnvironmentStore.Service,
       EnvironmentStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         insert: unexpected,
@@ -276,7 +262,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       AgentStore.Service,
       AgentStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         list: unexpected(),
         insert: unexpected,
@@ -286,7 +271,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       TurnStore.Service,
       TurnStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         findActive: unexpected,
         findLatest: unexpected,
@@ -300,7 +284,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       ConnectionCredentialStore.Service,
       ConnectionCredentialStore.Service.of({
-        workspaceId: boundWorkspaceId,
         put: unexpected,
         get: unexpected,
         remove: unexpected,
@@ -309,7 +292,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       RoleStore.Service,
       RoleStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         insert: unexpected,
         rename: unexpected,
@@ -321,7 +303,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     Context.add(
       AssignmentStore.Service,
       AssignmentStore.Service.of({
-        workspaceId: boundWorkspaceId,
         get: unexpected,
         listActiveByMember: unexpected,
         listActiveByRole: unexpected,

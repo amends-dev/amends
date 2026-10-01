@@ -41,7 +41,6 @@ const recordedWakes = () => {
   const requested: Array<{ readonly process: string; readonly commit: string }> = [];
   const state = { refusing: false };
   const service = BackgroundWakes.Service.of({
-    workspaceId,
     request: Effect.fnUntraced(function* (process) {
       if (state.refusing)
         return yield* new Store.Failure({ operation: "wake", cause: "Wakes are refused" });

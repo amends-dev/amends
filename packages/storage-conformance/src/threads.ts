@@ -86,7 +86,7 @@ export const threads = (harness: Harness) => {
       asActor(program, actor).pipe(Effect.provide(core(bound)));
     const publish = <A, E, R>(bound: Bound, program: Effect.Effect<A, E, R>) =>
       program.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const startOnly = (
@@ -129,7 +129,7 @@ export const threads = (harness: Harness) => {
                 [otherId, { _tag: "Human", id: Identity.HumanId.make("other") }],
               ] as const)
                 yield* journal.publish(MemberFacts.Added, {
-                  workspaceId: bound.workspace.workspaceId,
+                  workspaceId: bound.store.workspaceId,
                   memberId,
                   identity,
                 });

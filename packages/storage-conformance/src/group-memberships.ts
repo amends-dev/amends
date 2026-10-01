@@ -76,7 +76,7 @@ export const groupMemberships = (harness: Harness) => {
       effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
     const publish = <A, E, R>(bound: Bound, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       );
     const history = (bound: Bound) => bound.store.read(journalId, { limit: 100 });
@@ -98,7 +98,7 @@ export const groupMemberships = (harness: Harness) => {
                 [agentId, { _tag: "Agent", id: Identity.AgentId.make("new-agent") }],
               ] as const)
                 yield* journal.publish(MemberFacts.Added, {
-                  workspaceId: bound.workspace.workspaceId,
+                  workspaceId: bound.store.workspaceId,
                   memberId,
                   identity,
                 });
@@ -132,14 +132,14 @@ export const groupMemberships = (harness: Harness) => {
         bound,
         Effect.flatMap(Journal.Service, (journal) =>
           journal.publish(AssignmentFacts.Created, {
-            workspaceId: bound.workspace.workspaceId,
+            workspaceId: bound.store.workspaceId,
             assignmentId: Assignment.Id.make("group-management"),
             memberId: managerId,
             source: {
               _tag: "Direct",
               grant: Grant.make(GroupMembershipPermissions.Manage, {
                 _tag: "Target",
-                target: { _tag: "Group", workspaceId: bound.workspace.workspaceId, groupId },
+                target: { _tag: "Group", workspaceId: bound.store.workspaceId, groupId },
               }),
             },
           }),

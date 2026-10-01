@@ -18,7 +18,6 @@ export const make = Effect.fn("MemorySignals.make")(function* () {
   const database = yield* MemoryDatabase.Service;
   const forWorkspace = (workspaceId: Workspace.Id) =>
     Signals.Service.of({
-      workspaceId,
       publish: (signal) =>
         Effect.forEach(database.listeners.get(workspaceId) ?? [], (queue) =>
           Queue.offer(queue, signal),

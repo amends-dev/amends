@@ -145,8 +145,7 @@ export const installed = {
  * the background process it expects, as a host's runner would.
  */
 export const manualWakes: WorkspaceWakes.Interface = {
-  forWorkspace: (workspaceId) =>
-    BackgroundWakes.Service.of({ workspaceId, request: () => Effect.void }),
+  forWorkspace: () => BackgroundWakes.Service.of({ request: () => Effect.void }),
 };
 export const layerManualWakes = Layer.succeed(WorkspaceWakes.Service, manualWakes);
 
@@ -279,25 +278,25 @@ export const make = (harness: Harness) => {
           Effect.gen(function* () {
             for (const member of members)
               yield* journal.publish(MemberFacts.Added, {
-                workspaceId: bound.workspace.workspaceId,
+                workspaceId: bound.store.workspaceId,
                 memberId: member.memberId,
                 identity: member.identity,
               });
             for (const viewer of viewers)
               yield* journal.publish(AssignmentFacts.Created, {
-                workspaceId: bound.workspace.workspaceId,
+                workspaceId: bound.store.workspaceId,
                 assignmentId: Assignment.Id.make(`viewer:${viewer.memberId}`),
                 memberId: viewer.memberId,
                 source: {
                   _tag: "Role",
                   roleId: BuiltinRoles.MemberId,
-                  scope: { _tag: "Workspace", workspaceId: bound.workspace.workspaceId },
+                  scope: { _tag: "Workspace", workspaceId: bound.store.workspaceId },
                 },
               });
           }),
         ),
       ).pipe(
-        Effect.provideService(Publication.Service, testProvenance(bound.workspace.workspaceId)),
+        Effect.provideService(Publication.Service, testProvenance(bound.store.workspaceId)),
         Effect.provide(core(bound)),
       ),
     /** Run a program on a gateway over a new host, which stays open for the enclosing scope. */

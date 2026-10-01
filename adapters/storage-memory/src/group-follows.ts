@@ -15,7 +15,6 @@ export const make = Effect.fn("GroupFollows.make")(function* () {
     Effect.map((records) => records.filter((record) => record.status === "active")),
   );
   return GroupFollowStore.Service.of({
-    workspaceId,
     get: Effect.fn("GroupFollows.get")(
       function* (input) {
         const id = yield* Schema.decodeEffect(GroupFollow.Id)(input);

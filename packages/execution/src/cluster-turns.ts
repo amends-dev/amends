@@ -64,7 +64,6 @@ export const layerDispatch = Layer.effect(
     return WorkspaceTurns.Service.of({
       forWorkspace: (workspaceId) =>
         TurnDispatch.Service.of({
-          workspaceId,
           request: Effect.fnUntraced(function* (turnId) {
             yield* Store.Transaction;
             const at = yield* DateTime.now;

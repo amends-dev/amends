@@ -52,7 +52,6 @@ it.effect(
       const threadLatest: Array<Thread.Latest> = [];
       const groupLatest: Array<Group.Latest> = [];
       const threads: ThreadStore.Interface = {
-        workspaceId,
         get: () => Effect.die("Unexpected thread read"),
         listByGroup: () => Effect.die("Unexpected thread read"),
         listByLatest: () => Effect.die("Unexpected thread read"),
@@ -62,7 +61,6 @@ it.effect(
         recordLatest: (latest) => Effect.sync(() => void threadLatest.push(latest)),
       };
       const groups: GroupStore.Interface = {
-        workspaceId,
         get: () => Effect.die("Unexpected group read"),
         getMany: () => Effect.die("Unexpected group read"),
         findDirect: () => Effect.die("Unexpected group read"),

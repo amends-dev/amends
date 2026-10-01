@@ -27,7 +27,6 @@ export const make = Effect.fn("Workspaces.make")(function* () {
   const { db } = database;
   const own = eq(workspaces.workspaceId, workspaceId);
   return WorkspaceStore.Service.of({
-    workspaceId,
     get: guard(db.select(recordColumns).from(workspaces).where(own)).pipe(
       Effect.flatMap(decode),
       Effect.map(Array.head),

@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
+
 import type { Thread } from "./thread.ts";
 import type { GroupId } from "../group/id.ts";
 
@@ -15,7 +15,6 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Confli
 }) {}
 /** Internal projection storage. Reads honor the caller transaction; writes require it. */
 export interface Interface {
-  readonly workspaceId: WorkspaceId.Id;
   readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
   readonly listByGroup: (id: GroupId.Id) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
   /**
