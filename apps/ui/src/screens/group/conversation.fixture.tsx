@@ -16,7 +16,8 @@ import { GroupPane } from "./group-pane.tsx";
 import { GroupThreads, type ConversationStatus } from "./group-threads.tsx";
 import { ThreadPane } from "./thread-pane.tsx";
 
-const now = new Date();
+/** Recent messages fall today whatever the clock says: just after midnight, they count from 1am. */
+const now = new Date(Math.max(Date.now(), new Date().setHours(1, 0, 0, 0)));
 const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
 const daysAgo = (days: number, hour: number) => {
   const date = new Date(now);
