@@ -247,8 +247,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const started = yield* gateway.asMember(
           workspace.id,
           { _tag: "Human", id: Identity.HumanId.make("alice") },
-          Effect.flatMap(ThreadApplication.Service, (threads) =>
-            threads.startDirect({ memberIds: [member.id], mentions: [], text: "Hello" }),
+          Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+            threadApplication.startDirect({ memberIds: [member.id], mentions: [], text: "Hello" }),
           ),
         );
         const threadId = started.thread.id;

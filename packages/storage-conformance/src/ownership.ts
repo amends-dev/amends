@@ -307,8 +307,8 @@ export const ownership = (harness: Harness) => {
             });
             const broken = failingLate(bound, failure);
             expect(
-              yield* Effect.flatMap(OwnershipApplication.Service, (service) =>
-                service.transfer({
+              yield* Effect.flatMap(OwnershipApplication.Service, (ownershipApplication) =>
+                ownershipApplication.transfer({
                   memberId: recipient.id,
                   expectedOwnerAssignmentId: view.ownerAssignmentId,
                 }),

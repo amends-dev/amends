@@ -92,7 +92,9 @@ const run = <A, E>(
     return { result, requirements };
   });
 const typing = (threadId: string) =>
-  Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(Thread.Id.make(threadId)));
+  Effect.flatMap(SignalApplication.Service, (signalApplication) =>
+    signalApplication.typing(Thread.Id.make(threadId)),
+  );
 
 it.effect(
   "typing tells the thread's readers for the next few seconds, and needs permission to post",

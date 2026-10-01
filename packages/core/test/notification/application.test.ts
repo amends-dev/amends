@@ -159,10 +159,10 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notifications = yield* NotificationApplication.Service;
-          expect(yield* notifications.get(mine.id)).toEqual(mine);
-          expect(yield* notifications.list(page)).toEqual([mine]);
-          expect(yield* notifications.listPending(page)).toEqual([mine]);
+          const notificationApplication = yield* NotificationApplication.Service;
+          expect(yield* notificationApplication.get(mine.id)).toEqual(mine);
+          expect(yield* notificationApplication.list(page)).toEqual([mine]);
+          expect(yield* notificationApplication.listPending(page)).toEqual([mine]);
           expect(yield* (yield* Journal.Service).log.read({ limit: 10 })).toEqual([]);
         }),
       );
@@ -179,22 +179,24 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notifications = yield* NotificationApplication.Service;
+          const notificationApplication = yield* NotificationApplication.Service;
           for (const [actor, expected] of [
             [alice, mine],
             [agent, agents],
             [bob, theirs],
           ] as const) {
             expect(
-              yield* notifications
+              yield* notificationApplication
                 .get(expected.id)
                 .pipe(Effect.provideService(Actor.Service, actor)),
             ).toEqual(expected);
             expect(
-              yield* notifications.list(page).pipe(Effect.provideService(Actor.Service, actor)),
+              yield* notificationApplication
+                .list(page)
+                .pipe(Effect.provideService(Actor.Service, actor)),
             ).toEqual([expected]);
             expect(
-              yield* notifications
+              yield* notificationApplication
                 .listPending(page)
                 .pipe(Effect.provideService(Actor.Service, actor)),
             ).toEqual([expected]);
@@ -213,9 +215,9 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notifications = yield* NotificationApplication.Service;
+          const notificationApplication = yield* NotificationApplication.Service;
           for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
-            expect(yield* Effect.flip(notifications.get(id))).toEqual(
+            expect(yield* Effect.flip(notificationApplication.get(id))).toEqual(
               new NotificationApplication.NotFound({
                 workspaceId,
                 notificationId: id,
@@ -243,11 +245,11 @@ it.effect(
         yield* run(
           fixture,
           Effect.gen(function* () {
-            const notifications = yield* NotificationApplication.Service;
+            const notificationApplication = yield* NotificationApplication.Service;
             for (const operation of [
-              notifications.get(mine.id).pipe(Effect.asVoid),
-              notifications.list(page).pipe(Effect.asVoid),
-              notifications.listPending(page).pipe(Effect.asVoid),
+              notificationApplication.get(mine.id).pipe(Effect.asVoid),
+              notificationApplication.list(page).pipe(Effect.asVoid),
+              notificationApplication.listPending(page).pipe(Effect.asVoid),
             ]) {
               const error = yield* Effect.flip(operation);
               expect(error._tag).toBe(
@@ -271,18 +273,18 @@ it.effect("notification reads join an outer commit and observe staged membership
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notifications = yield* NotificationApplication.Service;
+        const notificationApplication = yield* NotificationApplication.Service;
         const journal = yield* Journal.Service;
         const error = yield* Effect.flip(
           journal.commit(
             Effect.gen(function* () {
-              const native = yield* Store.Transaction;
-              expect(yield* notifications.get(mine.id)).toEqual(mine);
-              expect((yield* Store.Transaction).id).toBe(native.id);
+              const storeTransaction = yield* Store.Transaction;
+              expect(yield* notificationApplication.get(mine.id)).toEqual(mine);
+              expect((yield* Store.Transaction).id).toBe(storeTransaction.id);
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
                 .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-              return yield* notifications.listPending(page);
+              return yield* notificationApplication.listPending(page);
             }),
           ),
         );
@@ -290,7 +292,7 @@ it.effect("notification reads join an outer commit and observe staged membership
           _tag: "Authorization.InvalidActor",
           reason: "membership-removed",
         });
-        expect(yield* notifications.listPending(page)).toEqual([mine]);
+        expect(yield* notificationApplication.listPending(page)).toEqual([mine]);
         expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
       }),
       alice,
@@ -330,10 +332,10 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const notifications = yield* NotificationApplication.Service;
+          const notificationApplication = yield* NotificationApplication.Service;
           const input = { ...options, recipient: bob.identity };
-          expect(yield* notifications.list(input)).toEqual([mine]);
-          expect(yield* notifications.listPending(input)).toEqual([mine]);
+          expect(yield* notificationApplication.list(input)).toEqual([mine]);
+          expect(yield* notificationApplication.listPending(input)).toEqual([mine]);
         }),
         alice,
         { listByRecipient: list(false), listPendingByRecipient: list(true) },
@@ -358,11 +360,17 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notifications = yield* NotificationApplication.Service;
-        expect((yield* Effect.flip(notifications.get(invalid.id)))._tag).toBe("SchemaError");
+        const notificationApplication = yield* NotificationApplication.Service;
+        expect((yield* Effect.flip(notificationApplication.get(invalid.id)))._tag).toBe(
+          "SchemaError",
+        );
         for (const options of [{ limit: 0 }, { limit: -1 }, { limit: 1.5 }, { limit: 1, after }]) {
-          expect((yield* Effect.flip(notifications.list(options)))._tag).toBe("SchemaError");
-          expect((yield* Effect.flip(notifications.listPending(options)))._tag).toBe("SchemaError");
+          expect((yield* Effect.flip(notificationApplication.list(options)))._tag).toBe(
+            "SchemaError",
+          );
+          expect((yield* Effect.flip(notificationApplication.listPending(options)))._tag).toBe(
+            "SchemaError",
+          );
         }
       }),
       alice,
@@ -380,10 +388,10 @@ it.effect("notification storage failures retain their cause", () =>
     yield* run(
       fixture,
       Effect.gen(function* () {
-        const notifications = yield* NotificationApplication.Service;
-        expect(yield* Effect.flip(notifications.get(mine.id))).toBe(failure);
-        expect(yield* Effect.flip(notifications.list(page))).toBe(failure);
-        expect(yield* Effect.flip(notifications.listPending(page))).toBe(failure);
+        const notificationApplication = yield* NotificationApplication.Service;
+        expect(yield* Effect.flip(notificationApplication.get(mine.id))).toBe(failure);
+        expect(yield* Effect.flip(notificationApplication.list(page))).toBe(failure);
+        expect(yield* Effect.flip(notificationApplication.listPending(page))).toBe(failure);
       }),
       alice,
       { get: fail, listByRecipient: fail, listPendingByRecipient: fail },

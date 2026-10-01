@@ -49,8 +49,8 @@ export const groups = (harness: Harness) => {
     const asActor = <A, E, R>(program: Effect.Effect<A, E, R>, actor: Actor.Value) =>
       program.pipe(Effect.provideService(Actor.Service, actor));
     const create = (memberIds: ReadonlyArray<Member.Id>, name = "Engineering") =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+        groupApplication.createTeam({ name, memberIds }),
       );
     const prepare = Effect.fnUntraced(function* () {
       const bound = yield* boundTo(workspaceId);
@@ -657,8 +657,8 @@ export const groups = (harness: Harness) => {
               expectedName: string = "Engineering",
             ) =>
               asActor(
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.rename({ groupId, name, expectedName }),
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.rename({ groupId, name, expectedName }),
                 ),
                 by,
               ).pipe(Effect.provide(core(bound)));

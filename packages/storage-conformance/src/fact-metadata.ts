@@ -143,8 +143,12 @@ export const factMetadata = (harness: Harness) => {
             const key = Log.IdempotencyKey.make("native-fact");
             const append = (entry: Store.Content) =>
               bound.store.transaction(
-                Effect.flatMap(Store.Transaction, (native) =>
-                  native.append({ logId: journalLog, entries: [entry], idempotencyKey: key }),
+                Effect.flatMap(Store.Transaction, (storeTransaction) =>
+                  storeTransaction.append({
+                    logId: journalLog,
+                    entries: [entry],
+                    idempotencyKey: key,
+                  }),
                 ),
               );
             const original = yield* append(content);

@@ -53,8 +53,10 @@ export const invitationReplay = (harness: Harness) => {
                 cause: "injected late failure",
               });
               const broken = failingLate(bound, error);
-              const failure = yield* Effect.flatMap(InvitationApplication.Service, (service) =>
-                service.accept(invitation.details.id, bob.id),
+              const failure = yield* Effect.flatMap(
+                InvitationApplication.Service,
+                (invitationApplication) =>
+                  invitationApplication.accept(invitation.details.id, bob.id),
               ).pipe(Effect.provide(core(broken)), Effect.flip);
               expect(failure).toBe(error);
               expect(yield* bound.members.findActive(bob)).toEqual(Option.none());
@@ -114,8 +116,9 @@ export const invitationReplay = (harness: Harness) => {
                 cause: "injected late failure",
               });
               const broken = failingLate(bound, error);
-              const failure = yield* Effect.flatMap(MemberApplication.Service, (application) =>
-                application.remove(member.id),
+              const failure = yield* Effect.flatMap(
+                MemberApplication.Service,
+                (memberApplication) => memberApplication.remove(member.id),
               ).pipe(
                 Effect.provide(core(broken)),
                 Effect.provideService(Actor.Service, {

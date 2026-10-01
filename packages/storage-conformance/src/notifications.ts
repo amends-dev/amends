@@ -421,8 +421,8 @@ export const notifications = (harness: Harness) => {
               const sourceLog = Entry.LogId.make("notification-source");
               const key = { logId: sourceLog, name: "notification-contract", version: 1 };
               const write = Effect.gen(function* () {
-                const native = yield* Store.Transaction;
-                const [entry] = yield* native.append({
+                const storeTransaction = yield* Store.Transaction;
+                const [entry] = yield* storeTransaction.append({
                   logId: sourceLog,
                   entries: [{ payload: new Uint8Array([1]) }],
                 });
@@ -672,21 +672,22 @@ export const notifications = (harness: Harness) => {
                 workspaceId,
                 humanIdentity,
                 Effect.gen(function* () {
-                  const notifications = yield* NotificationApplication.Service;
-                  expect(yield* notifications.get(first.id)).toEqual(first);
-                  expect(yield* notifications.list({ limit: 1 })).toEqual([first]);
-                  expect(yield* notifications.list(page)).toEqual([first, second]);
-                  expect(yield* notifications.listPending(page)).toEqual([first, second]);
+                  const notificationApplication = yield* NotificationApplication.Service;
+                  expect(yield* notificationApplication.get(first.id)).toEqual(first);
+                  expect(yield* notificationApplication.list({ limit: 1 })).toEqual([first]);
+                  expect(yield* notificationApplication.list(page)).toEqual([first, second]);
+                  expect(yield* notificationApplication.listPending(page)).toEqual([first, second]);
                   const options = {
                     limit: 1,
                     after: { recordedAt: first.recordedAt, id: first.id },
                   };
-                  expect(yield* notifications.list(options)).toEqual([second]);
-                  expect(yield* notifications.listPending(options)).toEqual([second]);
+                  expect(yield* notificationApplication.list(options)).toEqual([second]);
+                  expect(yield* notificationApplication.listPending(options)).toEqual([second]);
                 }),
               );
-              const list = Effect.flatMap(NotificationApplication.Service, (notifications) =>
-                notifications.list(page),
+              const list = Effect.flatMap(
+                NotificationApplication.Service,
+                (notificationApplication) => notificationApplication.list(page),
               );
               expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual([forAgent]);
               expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual([
@@ -698,8 +699,9 @@ export const notifications = (harness: Harness) => {
                 earlier.id,
                 Notification.Id.make("missing"),
               ]) {
-                const get = Effect.flatMap(NotificationApplication.Service, (notifications) =>
-                  notifications.get(id),
+                const get = Effect.flatMap(
+                  NotificationApplication.Service,
+                  (notificationApplication) => notificationApplication.get(id),
                 );
                 expect(
                   yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, get)),
@@ -749,27 +751,27 @@ export const notifications = (harness: Harness) => {
                 recipient: Notification.ofMember(actor.memberId, humanIdentity),
               });
               yield* Effect.gen(function* () {
-                const notifications = yield* NotificationApplication.Service;
+                const notificationApplication = yield* NotificationApplication.Service;
                 const journal = yield* Journal.Service;
                 expect(
                   yield* Effect.flip(
                     journal.commit(
                       Effect.gen(function* () {
                         yield* bound.notifications.insert(value);
-                        expect(yield* notifications.get(value.id)).toEqual(value);
-                        expect(yield* notifications.list(page)).toEqual([value]);
-                        expect(yield* notifications.listPending(page)).toEqual([value]);
+                        expect(yield* notificationApplication.get(value.id)).toEqual(value);
+                        expect(yield* notificationApplication.list(page)).toEqual([value]);
+                        expect(yield* notificationApplication.listPending(page)).toEqual([value]);
                         return yield* Effect.fail("rollback");
                       }),
                     ),
                   ),
                 ).toBe("rollback");
-                expect(yield* notifications.list(page)).toEqual([]);
-                expect(yield* Effect.flip(notifications.get(value.id))).toMatchObject({
+                expect(yield* notificationApplication.list(page)).toEqual([]);
+                expect(yield* Effect.flip(notificationApplication.get(value.id))).toMatchObject({
                   _tag: "NotificationApplication.NotFound",
                 });
                 yield* journal.commit(bound.notifications.insert(value));
-                expect(yield* notifications.get(value.id)).toEqual(value);
+                expect(yield* notificationApplication.get(value.id)).toEqual(value);
               }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
             }),
           ),

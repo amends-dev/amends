@@ -66,39 +66,46 @@ export const groupReads = (harness: Harness) => {
         Effect.provide(core(bound)),
       );
     const get = (id: Group.Id) =>
-      Effect.flatMap(GroupApplication.Service, (service) => service.get(id));
+      Effect.flatMap(GroupApplication.Service, (groupApplication) => groupApplication.get(id));
     const rename = (id: Group.Id, name: string, expectedName: string) =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.rename({ groupId: id, name, expectedName }),
+      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+        groupApplication.rename({ groupId: id, name, expectedName }),
       );
-    const publicGroups = Effect.flatMap(GroupApplication.Service, (service) =>
-      service.listPublic({ limit: 100 }),
+    const publicGroups = Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+      groupApplication.listPublic({ limit: 100 }),
     );
     /** The actor's readable groups as records; activity and following have their own tests. */
-    const mine = Effect.flatMap(GroupApplication.Service, (service) =>
-      Effect.map(service.listMine({ limit: 100 }), (items) => items.map((item) => item.group)),
+    const mine = Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+      Effect.map(groupApplication.listMine({ limit: 100 }), (items) =>
+        items.map((item) => item.group),
+      ),
     );
     const roster = (id: Group.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.listCurrent(id, { limit: 100 }),
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.listCurrent(id, { limit: 100 }),
       );
     const join = (id: Group.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) => service.join(id));
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.join(id),
+      );
     const removeMember = (groupId: Group.Id, membershipId: GroupMembership.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.remove({ groupId, membershipId }),
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.remove({ groupId, membershipId }),
       );
     const create = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+        groupApplication.createTeam({ name, memberIds }),
       );
     const add = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.add({ groupId, memberId }),
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.add({ groupId, memberId }),
       );
     const leave = (membership: GroupMembership.Record) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.leave({ groupId: membership.groupId, membershipId: membership.id }),
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.leave({
+          groupId: membership.groupId,
+          membershipId: membership.id,
+        }),
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const seed = (bound: Bound) =>
@@ -442,30 +449,35 @@ export const groupReads = (harness: Harness) => {
                 bound,
                 reader,
                 Effect.gen(function* () {
-                  const groups = yield* GroupApplication.Service;
-                  const memberships = yield* GroupMembershipApplication.Service;
-                  const members = yield* MemberApplication.Service;
+                  const groupApplication = yield* GroupApplication.Service;
+                  const groupMembershipApplication = yield* GroupMembershipApplication.Service;
+                  const memberApplication = yield* MemberApplication.Service;
                   const audience = yield* GroupAudience.make();
                   const journal = yield* Journal.Service;
                   const original = yield* audience.require(first.id);
-                  expect(yield* groups.get(first.id)).toEqual(first);
-                  yield* memberships.leave({ groupId: first.id, membershipId: original.id });
+                  expect(yield* groupApplication.get(first.id)).toEqual(first);
+                  yield* groupMembershipApplication.leave({
+                    groupId: first.id,
+                    membershipId: original.id,
+                  });
                   expect(
-                    (yield* groups.listMine({ limit: 100 })).map((item) => item.group),
+                    (yield* groupApplication.listMine({ limit: 100 })).map((item) => item.group),
                   ).toEqual([second]);
-                  expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
+                  expect(yield* Effect.flip(groupApplication.get(first.id))).toMatchObject({
                     _tag: "GroupApplication.NotFound",
                   });
                   expect(yield* Effect.flip(audience.require(first.id))).toMatchObject({
                     _tag: "GroupAudience.NotMember",
                   });
                   const fresh = yield* asActor(
-                    memberships.add({ groupId: first.id, memberId: readerId }),
+                    groupMembershipApplication.add({ groupId: first.id, memberId: readerId }),
                     actorFor(agentId),
                   );
                   expect(fresh.id).not.toBe(original.id);
                   expect(yield* audience.require(first.id)).toEqual(fresh);
-                  const current = yield* memberships.listCurrent(first.id, { limit: 100 });
+                  const current = yield* groupMembershipApplication.listCurrent(first.id, {
+                    limit: 100,
+                  });
                   expect(current.some((value) => value.id === original.id)).toBe(false);
                   expect(current.some((value) => value.id === fresh.id)).toBe(true);
                   const permissions = (names: ReadonlyArray<Permission.Name>) =>
@@ -478,19 +490,21 @@ export const groupReads = (harness: Harness) => {
                       .pipe(Publication.withActor);
                   yield* asActor(permissions([]), owner);
                   expect(
-                    (yield* groups.listMine({ limit: 100 })).map((item) => item.group),
+                    (yield* groupApplication.listMine({ limit: 100 })).map((item) => item.group),
                   ).toEqual([]);
-                  expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
+                  expect(yield* Effect.flip(groupApplication.get(first.id))).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
                   expect(
-                    yield* Effect.flip(memberships.listCurrent(first.id, { limit: 100 })),
+                    yield* Effect.flip(
+                      groupMembershipApplication.listCurrent(first.id, { limit: 100 }),
+                    ),
                   ).toMatchObject({
                     _tag: "Authorization.Denied",
                   });
                   expect(yield* audience.require(first.id)).toEqual(fresh);
                   yield* asActor(permissions([GroupPermissions.Read.name]), owner);
-                  yield* asActor(members.remove(readerId), owner);
+                  yield* asActor(memberApplication.remove(readerId), owner);
                   const checks: ReadonlyArray<
                     Effect.Effect<
                       unknown,
@@ -500,9 +514,9 @@ export const groupReads = (harness: Harness) => {
                       Actor.Service
                     >
                   > = [
-                    groups.listMine({ limit: 100 }),
-                    groups.get(first.id),
-                    memberships.listCurrent(first.id, { limit: 100 }),
+                    groupApplication.listMine({ limit: 100 }),
+                    groupApplication.get(first.id),
+                    groupMembershipApplication.listCurrent(first.id, { limit: 100 }),
                     audience.require(first.id),
                   ];
                   for (const effect of checks) {
@@ -680,8 +694,8 @@ export const groupReads = (harness: Harness) => {
               run(
                 bound,
                 actor,
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  Effect.map(service.listMine({ limit: 100 }), (items) =>
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  Effect.map(groupApplication.listMine({ limit: 100 }), (items) =>
                     Object.fromEntries(
                       items.map((item) => [
                         item.group.kind === "Team" ? item.group.name : item.group.id,
@@ -702,8 +716,8 @@ export const groupReads = (harness: Harness) => {
             const renamable = run(
               bound,
               reader,
-              Effect.flatMap(GroupApplication.Service, (service) =>
-                Effect.map(service.listMine({ limit: 100 }), (items) =>
+              Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                Effect.map(groupApplication.listMine({ limit: 100 }), (items) =>
                   items.map((item) => item.renamable),
                 ),
               ),
@@ -715,15 +729,19 @@ export const groupReads = (harness: Harness) => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.startDirect({ memberIds: [readerId], text: "Hello", mentions: [] }),
+              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                threadApplication.startDirect({
+                  memberIds: [readerId],
+                  text: "Hello",
+                  mentions: [],
+                }),
               ),
             );
             const listed = yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupApplication.Service, (service) =>
-                service.listMine({ limit: 100 }),
+              Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                groupApplication.listMine({ limit: 100 }),
               ),
             );
             // The direct group, then the general group, whose members the owner manages.
@@ -747,9 +765,9 @@ export const groupReads = (harness: Harness) => {
               bound,
               reader,
               Effect.gen(function* () {
-                const groups = yield* GroupApplication.Service;
-                const memberships = yield* GroupMembershipApplication.Service;
-                expect(yield* groups.get(first.id)).toEqual(first);
+                const groupApplication = yield* GroupApplication.Service;
+                const groupMembershipApplication = yield* GroupMembershipApplication.Service;
+                expect(yield* groupApplication.get(first.id)).toEqual(first);
                 yield* publish(
                   bound,
                   Effect.flatMap(Journal.Service, (journal) =>
@@ -762,11 +780,13 @@ export const groupReads = (harness: Harness) => {
                     }),
                   ),
                 );
-                expect(yield* Effect.flip(groups.get(first.id))).toMatchObject({
+                expect(yield* Effect.flip(groupApplication.get(first.id))).toMatchObject({
                   _tag: "Authorization.Denied",
                 });
                 expect(
-                  yield* Effect.flip(memberships.listCurrent(first.id, { limit: 100 })),
+                  yield* Effect.flip(
+                    groupMembershipApplication.listCurrent(first.id, { limit: 100 }),
+                  ),
                 ).toMatchObject({ _tag: "Authorization.Denied" });
                 const impostor = Actor.Value.make({
                   workspaceId,
@@ -782,9 +802,9 @@ export const groupReads = (harness: Harness) => {
                     Actor.Service
                   >
                 > = [
-                  groups.listMine({ limit: 100 }),
-                  groups.get(first.id),
-                  memberships.listCurrent(first.id, { limit: 100 }),
+                  groupApplication.listMine({ limit: 100 }),
+                  groupApplication.get(first.id),
+                  groupMembershipApplication.listCurrent(first.id, { limit: 100 }),
                 ];
                 for (const effect of checks) {
                   expect(yield* Effect.flip(asActor(effect, impostor))).toMatchObject({
@@ -794,7 +814,7 @@ export const groupReads = (harness: Harness) => {
                 }
                 expect(
                   yield* Effect.flip(
-                    asActor(groups.get(first.id), actorFor(readerId, otherWorkspaceId)),
+                    asActor(groupApplication.get(first.id), actorFor(readerId, otherWorkspaceId)),
                   ),
                 ).toMatchObject({ _tag: "Authorization.WorkspaceMismatch" });
               }),
@@ -851,8 +871,10 @@ export const groupReads = (harness: Harness) => {
               run(
                 bound,
                 reader,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  Effect.map(s.listMine(options), (items) => items.map((item) => item.group.id)),
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  Effect.map(groupApplication.listMine(options), (items) =>
+                    items.map((item) => item.group.id),
+                  ),
                 ),
               );
             // Only the last group is readable at first; the page reads past the others to fill.
@@ -870,8 +892,8 @@ export const groupReads = (harness: Harness) => {
               run(
                 bound,
                 reader,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  Effect.map(s.listCurrent(third.id, options), (items) =>
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  Effect.map(groupMembershipApplication.listCurrent(third.id, options), (items) =>
                     items.map((item) => item.id),
                   ),
                 ),
@@ -885,7 +907,9 @@ export const groupReads = (harness: Harness) => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(MemberApplication.Service, (s) => s.remove(otherId)),
+              Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                memberApplication.remove(otherId),
+              ),
             );
             expect(yield* rosterPage({ limit: 3 })).toEqual(
               admissions

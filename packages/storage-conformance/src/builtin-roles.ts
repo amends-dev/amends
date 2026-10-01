@@ -135,8 +135,8 @@ export const builtinRoles = (harness: Harness) => {
             yield* Deferred.await(held);
             const host = yield* Layer.build(gateway(yield* storage.connect({ failFast: true })));
             // The workspace still loads and admits its members, with the roles it recorded.
-            yield* Effect.flatMap(Gateway.Service, (g) =>
-              g.asMember(workspaceId, alice, Effect.void),
+            yield* Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.asMember(workspaceId, alice, Effect.void),
             ).pipe(Effect.provide(host));
             expect(yield* bound.roles.builtinRevision).toEqual(Option.none());
             yield* Deferred.succeed(release, undefined);
@@ -186,11 +186,14 @@ export const builtinRoles = (harness: Harness) => {
             yield* recordedBeforeRevisions(bound);
             expect(yield* bound.roles.builtinRevision).toEqual(Option.none());
             // Any operation loads the workspace; the owner's grants already hold the new bundle.
-            const choices = yield* Effect.flatMap(Gateway.Service, (g) =>
-              g.asMember(
+            const choices = yield* Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.asMember(
                 workspaceId,
                 alice,
-                Effect.flatMap(AssignmentApplication.Service, (assignments) => assignments.roles),
+                Effect.flatMap(
+                  AssignmentApplication.Service,
+                  (assignmentApplication) => assignmentApplication.roles,
+                ),
               ),
             ).pipe(Effect.provide(gateway(yield* storage.connect())));
             expect(choices.map(({ role }) => role)).toEqual(current);
@@ -245,8 +248,8 @@ export const builtinRoles = (harness: Harness) => {
           yield* initialized(bound);
           // A newer host upgrades the bundles; this host, still on the current revision, loads them.
           expect(yield* upgrade(bound, later)).toBe(true);
-          const [choices, invitation] = yield* Effect.flatMap(Gateway.Service, (g) =>
-            g.asMember(
+          const [choices, invitation] = yield* Effect.flatMap(Gateway.Service, (gateway) =>
+            gateway.asMember(
               workspaceId,
               alice,
               Effect.gen(function* () {

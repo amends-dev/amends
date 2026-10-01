@@ -107,8 +107,8 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const roles = yield* RoleStore.Service;
-          const assignments = yield* AssignmentStore.Service;
+          const roleStore = yield* RoleStore.Service;
+          const assignmentStore = yield* AssignmentStore.Service;
           const otherMemberId = Member.Id.make("other-recipient");
           const otherAssignmentId = Assignment.Id.make("other-recipient-assignment");
           yield* journal.commit(
@@ -123,12 +123,12 @@ it.effect(
                 AssignmentFacts.Created,
                 assigned(otherAssignmentId, roleSource, otherMemberId),
               );
-              expect(yield* roles.get(roleId)).toEqual(Option.some(initialRole));
+              expect(yield* roleStore.get(roleId)).toEqual(Option.some(initialRole));
               expect(
-                new Set((yield* assignments.listActiveByMember(memberId)).map((a) => a.id)),
+                new Set((yield* assignmentStore.listActiveByMember(memberId)).map((a) => a.id)),
               ).toEqual(new Set([roleAssignmentId, directAssignmentId]));
               expect(
-                new Set((yield* assignments.listActiveByRole(roleId)).map((a) => a.id)),
+                new Set((yield* assignmentStore.listActiveByRole(roleId)).map((a) => a.id)),
               ).toEqual(new Set([roleAssignmentId, otherAssignmentId]));
               expect((yield* fixture.snapshot).roles.size).toBe(0);
               expect((yield* fixture.snapshot).assignments.size).toBe(0);
@@ -146,7 +146,7 @@ it.effect(
                 workspaceId,
                 permissions: [MemberPermissions.Read.name],
               });
-              expect(yield* roles.get(roleId)).toEqual(
+              expect(yield* roleStore.get(roleId)).toEqual(
                 Option.some({
                   ...initialRole,
                   name: "Renamed role",
@@ -163,18 +163,18 @@ it.effect(
                 workspaceId,
                 memberId: memberId,
               });
-              expect((yield* assignments.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
-                directAssignmentId,
-              ]);
-              expect((yield* assignments.listActiveByRole(roleId)).map((a) => a.id)).toEqual([
+              expect(
+                (yield* assignmentStore.listActiveByMember(memberId)).map((a) => a.id),
+              ).toEqual([directAssignmentId]);
+              expect((yield* assignmentStore.listActiveByRole(roleId)).map((a) => a.id)).toEqual([
                 otherAssignmentId,
               ]);
             }),
           );
-          expect(yield* roles.get(roleId)).toEqual(
+          expect(yield* roleStore.get(roleId)).toEqual(
             Option.some({ ...initialRole, name: "Renamed role", permissions: [] }),
           );
-          expect(yield* assignments.get(roleAssignmentId)).toEqual(
+          expect(yield* assignmentStore.get(roleAssignmentId)).toEqual(
             Option.some({
               id: roleAssignmentId,
               workspaceId,
@@ -183,7 +183,7 @@ it.effect(
               status: "revoked",
             }),
           );
-          expect(yield* assignments.get(directAssignmentId)).toEqual(
+          expect(yield* assignmentStore.get(directAssignmentId)).toEqual(
             Option.some({
               id: directAssignmentId,
               workspaceId,
@@ -204,7 +204,7 @@ it.effect(
             AssignmentFacts.Created,
             assigned(Assignment.Id.make("reassigned")),
           );
-          expect(yield* assignments.listActiveByMember(memberId)).toHaveLength(2);
+          expect(yield* assignmentStore.listActiveByMember(memberId)).toHaveLength(2);
           yield* journal.replay;
           expect((yield* fixture.snapshot).assignments.size).toBe(4);
         }),
@@ -256,11 +256,11 @@ it.effect(
           expect(yield* (yield* RoleStore.Service).get(roleId)).toEqual(
             Option.some({ ...initialRole, name: "Replayed role", permissions: [] }),
           );
-          const assignments = yield* AssignmentStore.Service;
-          expect(Option.map(yield* assignments.get(roleAssignmentId), (a) => a.status)).toEqual(
+          const assignmentStore = yield* AssignmentStore.Service;
+          expect(Option.map(yield* assignmentStore.get(roleAssignmentId), (a) => a.status)).toEqual(
             Option.some("revoked"),
           );
-          expect((yield* assignments.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
+          expect((yield* assignmentStore.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
             directAssignmentId,
           ]);
           for (const definition of [RoleProjection.definition, AssignmentProjection.definition]) {
@@ -463,11 +463,11 @@ it.effect(
             _tag: "Projection.Failure",
             cause: { _tag: "AssignmentStore.Conflict", operation: "markRevoked" },
           });
-          const assignments = yield* AssignmentStore.Service;
-          expect((yield* assignments.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
+          const assignmentStore = yield* AssignmentStore.Service;
+          expect((yield* assignmentStore.listActiveByMember(memberId)).map((a) => a.id)).toEqual([
             roleAssignmentId,
           ]);
-          expect(yield* assignments.get(directAssignmentId)).toEqual(Option.none());
+          expect(yield* assignmentStore.get(directAssignmentId)).toEqual(Option.none());
           const cursor = yield* fixture.checkpoints.get({
             logId,
             name: AssignmentProjection.definition.name,
@@ -488,8 +488,8 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const roles = yield* RoleStore.Service;
-          const assignments = yield* AssignmentStore.Service;
+          const roleStore = yield* RoleStore.Service;
+          const assignmentStore = yield* AssignmentStore.Service;
           const permissions = [MemberPermissions.Read.name];
           const target = Target.Reference.cases.Member.make({
             workspaceId,
@@ -500,15 +500,15 @@ it.effect(
           });
           yield* fixture.store.transaction(
             Effect.gen(function* () {
-              yield* roles.insert({ ...initialRole, permissions });
-              yield* assignments.insert({
+              yield* roleStore.insert({ ...initialRole, permissions });
+              yield* assignmentStore.insert({
                 id: roleAssignmentId,
                 workspaceId,
                 memberId,
                 source: roleSource,
                 status: "active",
               });
-              yield* assignments.insert({
+              yield* assignmentStore.insert({
                 id: directAssignmentId,
                 workspaceId,
                 memberId,
@@ -532,14 +532,14 @@ it.effect(
           );
           permissions.push(MemberPermissions.Remove.name);
           Reflect.set(target, "memberId", Member.Id.make("mutated-input"));
-          const role = yield* roles.get(roleId);
+          const role = yield* roleStore.get(roleId);
           if (Option.isNone(role)) throw new Error("Missing role");
           expect(role.value.permissions).toEqual([MemberPermissions.Read.name]);
           expect(Option.map(yield* fixture.roles(foreign).get(roleId), (r) => r.name)).toEqual(
             Option.some("Foreign role"),
           );
           Reflect.set(role.value.permissions, 0, MemberPermissions.Remove.name);
-          const direct = yield* assignments.get(directAssignmentId);
+          const direct = yield* assignmentStore.get(directAssignmentId);
           expect(Option.map(direct, (a) => a.source)).toEqual(Option.some(directSource));
           if (
             Option.isNone(direct) ||
@@ -548,26 +548,26 @@ it.effect(
           )
             throw new Error("Missing direct target");
           Reflect.set(direct.value.source.grant.scope.target, "workspaceId", foreign);
-          const list = yield* assignments.listActiveByMember(memberId);
+          const list = yield* assignmentStore.listActiveByMember(memberId);
           expect(list).toHaveLength(2);
-          expect(yield* assignments.listActiveByRole(roleId)).toHaveLength(1);
+          expect(yield* assignmentStore.listActiveByRole(roleId)).toHaveLength(1);
           expect(yield* fixture.assignments(foreign).listActiveByMember(memberId)).toHaveLength(1);
           for (const assignment of list) Reflect.set(assignment, "status", "revoked");
-          const byRole = yield* assignments.listActiveByRole(roleId);
+          const byRole = yield* assignmentStore.listActiveByRole(roleId);
           for (const assignment of byRole) {
             if (assignment.source._tag === "Role")
               Reflect.set(assignment.source.scope, "workspaceId", foreign);
           }
-          expect(Option.map(yield* roles.get(roleId), (r) => r.permissions)).toEqual(
+          expect(Option.map(yield* roleStore.get(roleId), (r) => r.permissions)).toEqual(
             Option.some([MemberPermissions.Read.name]),
           );
-          expect(Option.map(yield* assignments.get(directAssignmentId), (a) => a.source)).toEqual(
-            Option.some(directSource),
-          );
-          expect(Option.map(yield* assignments.get(roleAssignmentId), (a) => a.source)).toEqual(
+          expect(
+            Option.map(yield* assignmentStore.get(directAssignmentId), (a) => a.source),
+          ).toEqual(Option.some(directSource));
+          expect(Option.map(yield* assignmentStore.get(roleAssignmentId), (a) => a.source)).toEqual(
             Option.some(roleSource),
           );
-          expect(yield* assignments.listActiveByMember(memberId)).toHaveLength(2);
+          expect(yield* assignmentStore.listActiveByMember(memberId)).toHaveLength(2);
         }),
       );
     }),
@@ -582,8 +582,8 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const roles = yield* RoleStore.Service;
-          const assignments = yield* AssignmentStore.Service;
+          const roleStore = yield* RoleStore.Service;
+          const assignmentStore = yield* AssignmentStore.Service;
           const expired = yield* fixture.store.transaction(Effect.context<Store.Transaction>());
           const operations: ReadonlyArray<
             Effect.Effect<
@@ -595,12 +595,12 @@ it.effect(
               Store.Transaction
             >
           > = [
-            roles.get(roleId).pipe(Effect.asVoid),
-            roles.insert(initialRole),
-            assignments.get(roleAssignmentId).pipe(Effect.asVoid),
-            assignments.listActiveByMember(memberId).pipe(Effect.asVoid),
-            assignments.listActiveByRole(roleId).pipe(Effect.asVoid),
-            assignments.insert({
+            roleStore.get(roleId).pipe(Effect.asVoid),
+            roleStore.insert(initialRole),
+            assignmentStore.get(roleAssignmentId).pipe(Effect.asVoid),
+            assignmentStore.listActiveByMember(memberId).pipe(Effect.asVoid),
+            assignmentStore.listActiveByRole(roleId).pipe(Effect.asVoid),
+            assignmentStore.insert({
               id: roleAssignmentId,
               workspaceId,
               memberId,

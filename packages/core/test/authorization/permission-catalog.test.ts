@@ -27,11 +27,15 @@ it.effect(
         Effect.Success<ReturnType<typeof PermissionCatalog.make>>
       >().toEqualTypeOf<PermissionCatalog.Interface>();
       const consume = Effect.gen(function* () {
-        const catalog = yield* PermissionCatalog.Service;
-        expect(yield* catalog.get(MemberPermissions.Read.name)).toEqual(MemberPermissions.Read);
-        expect(yield* catalog.get(MemberPermissions.Remove.name)).toEqual(MemberPermissions.Remove);
-        expect(yield* catalog.get(Create.name)).toEqual(Create);
-        expect(catalog.definitions).toEqual([
+        const permissionCatalog = yield* PermissionCatalog.Service;
+        expect(yield* permissionCatalog.get(MemberPermissions.Read.name)).toEqual(
+          MemberPermissions.Read,
+        );
+        expect(yield* permissionCatalog.get(MemberPermissions.Remove.name)).toEqual(
+          MemberPermissions.Remove,
+        );
+        expect(yield* permissionCatalog.get(Create.name)).toEqual(Create);
+        expect(permissionCatalog.definitions).toEqual([
           MemberPermissions.Read,
           MemberPermissions.Remove,
           Create,

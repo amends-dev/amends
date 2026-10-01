@@ -193,15 +193,15 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const logs = yield* Log.Service;
-          const log = logs.open({ id: Log.Id.make("execution"), schema: Schema.String });
-          const first = yield* logs.commit(
+          const log = yield* Log.Service;
+          const executionLog = log.open({ id: Log.Id.make("execution"), schema: Schema.String });
+          const first = yield* log.commit(
             Effect.gen(function* () {
-              yield* log.append("before");
-              const batch = yield* log.appendAll(["one", "two"], { idempotencyKey: key });
-              yield* log.append("after");
+              yield* executionLog.append("before");
+              const batch = yield* executionLog.appendAll(["one", "two"], { idempotencyKey: key });
+              yield* executionLog.append("after");
               expect(
-                yield* log.appendAll(["one", "two"], {
+                yield* executionLog.appendAll(["one", "two"], {
                   idempotencyKey: key,
                   expectedAfter: Option.none(),
                 }),
@@ -210,34 +210,38 @@ it.effect(
             }),
           );
           expect(first.map((entry) => entry.index)).toEqual([1, 2]);
-          expect(yield* log.getAppend(key)).toEqual(Option.some(first));
-          expect(yield* log.appendAll(["one", "two"], { idempotencyKey: key })).toEqual(first);
+          expect(yield* executionLog.getAppend(key)).toEqual(Option.some(first));
+          expect(yield* executionLog.appendAll(["one", "two"], { idempotencyKey: key })).toEqual(
+            first,
+          );
           for (const input of [["one"], ["two", "one"], ["one", "changed"]])
-            expect((yield* Effect.flip(log.appendAll(input, { idempotencyKey: key })))._tag).toBe(
-              "JournalStore.Conflict",
-            );
+            expect(
+              (yield* Effect.flip(executionLog.appendAll(input, { idempotencyKey: key })))._tag,
+            ).toBe("JournalStore.Conflict");
           expect(
             (yield* Effect.flip(
-              log.appendAll([], { idempotencyKey: Log.IdempotencyKey.make("empty") }),
+              executionLog.appendAll([], { idempotencyKey: Log.IdempotencyKey.make("empty") }),
             ))._tag,
           ).toBe("SchemaError");
           expect(
             (yield* Effect.flip(
-              log.append("new", {
+              executionLog.append("new", {
                 idempotencyKey: Log.IdempotencyKey.make("new"),
                 expectedAfter: Option.none(),
               }),
             ))._tag,
           ).toBe("JournalStore.Conflict");
-          expect(yield* log.getAppend(Log.IdempotencyKey.make("new"))).toEqual(Option.none());
-          const other = logs.open({ id: Log.Id.make("other"), schema: Schema.String });
-          yield* other.append("different", { idempotencyKey: key });
-          const a = yield* log.append("unkeyed");
-          const b = yield* log.append("unkeyed");
-          expect(a.id).not.toBe(b.id);
-          expect((yield* log.read({ limit: 10 })).flatMap((batch) => batch.entries)).toHaveLength(
-            6,
+          expect(yield* executionLog.getAppend(Log.IdempotencyKey.make("new"))).toEqual(
+            Option.none(),
           );
+          const other = log.open({ id: Log.Id.make("other"), schema: Schema.String });
+          yield* other.append("different", { idempotencyKey: key });
+          const a = yield* executionLog.append("unkeyed");
+          const b = yield* executionLog.append("unkeyed");
+          expect(a.id).not.toBe(b.id);
+          expect(
+            (yield* executionLog.read({ limit: 10 })).flatMap((batch) => batch.entries),
+          ).toHaveLength(6);
         }),
       );
     }),

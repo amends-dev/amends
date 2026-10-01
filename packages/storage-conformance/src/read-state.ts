@@ -57,19 +57,21 @@ export const readState = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startInGroup({ groupId, text: "Opening", mentions }),
+      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+        threadApplication.startInGroup({ groupId, text: "Opening", mentions }),
       ).pipe(Effect.flatMap(placed));
     const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-        s.publish({ threadId, text: "Reply", mentions }),
+      Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+        threadMessageApplication.publish({ threadId, text: "Reply", mentions }),
       ).pipe(Effect.flatMap((message) => placed({ message })));
     const markRead = (threadId: Thread.Id, throughSequence: number) =>
-      Effect.flatMap(ReadStateApplication.Service, (s) =>
-        s.markThreadRead({ threadId, throughSequence }),
+      Effect.flatMap(ReadStateApplication.Service, (readStateApplication) =>
+        readStateApplication.markThreadRead({ threadId, throughSequence }),
       );
     const markGroupRead = (groupId: Group.Id) =>
-      Effect.flatMap(ReadStateApplication.Service, (s) => s.markGroupRead({ groupId }));
+      Effect.flatMap(ReadStateApplication.Service, (readStateApplication) =>
+        readStateApplication.markGroupRead({ groupId }),
+      );
     const pending = (bound: Bound, memberId: Member.Id) =>
       Effect.map(
         bound.notifications.listPendingByRecipient(
@@ -126,8 +128,8 @@ export const readState = (harness: Harness) => {
       const team = yield* run(
         bound,
         owner,
-        Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createTeam({
+        Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+          groupApplication.createTeam({
             name: "Team",
             memberIds: [owner.memberId, humanId, otherId, plainId, agentId],
           }),
@@ -156,8 +158,10 @@ export const readState = (harness: Harness) => {
             yield* run(
               bound,
               actorFor(otherId),
-              Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-                s.follow(started.thread.id),
+              Effect.flatMap(
+                ThreadParticipationApplication.Service,
+                (threadParticipationApplication) =>
+                  threadParticipationApplication.follow(started.thread.id),
               ),
             );
             expect(yield* bound.threads.getLatest([started.thread.id])).toMatchObject([
@@ -395,7 +399,9 @@ export const readState = (harness: Harness) => {
               run(
                 bound,
                 actor,
-                Effect.flatMap(ThreadApplication.Service, (s) => s.listInGroup(team.id, options)),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.listInGroup(team.id, options),
+                ),
               );
             yield* TestClock.adjust("1 minute");
             const first = yield* run(bound, owner, start(team.id, []));
@@ -432,8 +438,8 @@ export const readState = (harness: Harness) => {
             yield* run(
               bound,
               owner,
-              Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                s.add({ groupId: team.id, memberId: outsiderId }),
+              Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                groupMembershipApplication.add({ groupId: team.id, memberId: outsiderId }),
               ),
             );
             const outsider = actorFor(outsiderId);
@@ -473,8 +479,8 @@ export const readState = (harness: Harness) => {
                 run(
                   bound,
                   actorFor(outsiderId),
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.listInGroup(Group.Id.make("missing"), { limit: 1 }),
+                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                    threadApplication.listInGroup(Group.Id.make("missing"), { limit: 1 }),
                   ),
                 ),
               ),
@@ -497,8 +503,8 @@ export const readState = (harness: Harness) => {
                 run(
                   bound,
                   actor,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.listOpenings(team.id, options),
+                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                    threadApplication.listOpenings(team.id, options),
                   ),
                 );
               yield* TestClock.adjust("1 minute");
@@ -542,8 +548,8 @@ export const readState = (harness: Harness) => {
               const recent = yield* run(
                 bound,
                 human,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.listInGroup(team.id, { limit: 1 }),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.listInGroup(team.id, { limit: 1 }),
                 ),
               );
               expect(recent.map((item) => item.thread.id)).toEqual([first.thread.id]);
@@ -562,8 +568,8 @@ export const readState = (harness: Harness) => {
                   run(
                     bound,
                     actorFor(outsiderId),
-                    Effect.flatMap(ThreadApplication.Service, (s) =>
-                      s.listOpenings(team.id, { limit: 1 }),
+                    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                      threadApplication.listOpenings(team.id, { limit: 1 }),
                     ),
                   ),
                 ),
@@ -585,8 +591,8 @@ export const readState = (harness: Harness) => {
               const items = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.listOpenings(team.id, { limit: 50 }),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.listOpenings(team.id, { limit: 50 }),
                 ),
               ).pipe(
                 Effect.withTracer(
@@ -637,13 +643,18 @@ export const readState = (harness: Harness) => {
                 run(
                   bound,
                   actor,
-                  Effect.flatMap(GroupApplication.Service, (s) => s.listMine({ limit: 100 })),
+                  Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                    groupApplication.listMine({ limit: 100 }),
+                  ),
                 );
               const quiet = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createTeam({ name: "Quiet", memberIds: [owner.memberId, humanId] }),
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.createTeam({
+                    name: "Quiet",
+                    memberIds: [owner.memberId, humanId],
+                  }),
                 ),
               );
               const itemOf = (items: ReadonlyArray<Group.ListItem>, groupId: Group.Id) =>
@@ -672,8 +683,8 @@ export const readState = (harness: Harness) => {
               yield* run(
                 bound,
                 human,
-                Effect.flatMap(GroupFollowApplication.Service, (s) =>
-                  s.follow({ groupId: team.id, memberId: humanId }),
+                Effect.flatMap(GroupFollowApplication.Service, (groupFollowApplication) =>
+                  groupFollowApplication.follow({ groupId: team.id, memberId: humanId }),
                 ),
               );
               expect(itemOf(yield* mine(human), team.id)).toMatchObject({

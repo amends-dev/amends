@@ -17,7 +17,7 @@ import { Counter, make, type Fixture } from "../memory-store.ts";
 const testSubject = () => Subject.make("test", "entity");
 const workspaceId = WorkspaceId.Id.make("workspace-one");
 const logId = Log.Id.make("turn/one");
-const open = Effect.map(Log.Service, (logs) => logs.open({ id: logId, schema: Schema.String }));
+const open = Effect.map(Log.Service, (log) => log.open({ id: logId, schema: Schema.String }));
 const run = <A, E>(
   fixture: Fixture,
   program: Effect.Effect<
@@ -384,13 +384,13 @@ it.effect("tail consumption inside a transaction is rejected before reading or w
     yield* run(
       watched,
       Effect.gen(function* () {
-        const logs = yield* Log.Service;
-        const log = yield* open;
-        const tail = log.tail({ limit: 1 });
+        const log = yield* Log.Service;
+        const watchedLog = yield* open;
+        const tail = watchedLog.tail({ limit: 1 });
         const failure = yield* Effect.flip(
-          logs.commit(
+          log.commit(
             Effect.gen(function* () {
-              yield* log.append("staged");
+              yield* watchedLog.append("staged");
               yield* Stream.runDrain(tail);
             }),
           ),
@@ -399,8 +399,8 @@ it.effect("tail consumption inside a transaction is rejected before reading or w
         expect(reads).toBe(0);
         expect((yield* fixture.snapshot).logs.size).toBe(0);
         // Creating a tail is lazy; only the context in which it is consumed matters.
-        const created = yield* logs.commit(Effect.succeed(log.tail({ limit: 1 })));
-        yield* log.append("committed");
+        const created = yield* log.commit(Effect.succeed(watchedLog.tail({ limit: 1 })));
+        yield* watchedLog.append("committed");
         const batches = yield* created.pipe(Stream.take(1), Stream.runCollect);
         expect(batches[0]?.entries[0]?.payload).toBe("committed");
         expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(true);

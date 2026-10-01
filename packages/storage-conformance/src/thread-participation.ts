@@ -105,18 +105,18 @@ export const threadParticipation = (harness: Harness) => {
         limit: 100,
       });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
-      Effect.flatMap(GroupApplication.Service, (s) =>
-        s.createTeam({ name: "Engineering", memberIds }),
+      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+        groupApplication.createTeam({ name: "Engineering", memberIds }),
       );
     const opening = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startInGroup({ groupId, mentions, text: "Opening" }),
+      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+        threadApplication.startInGroup({ groupId, mentions, text: "Opening" }),
       );
     const start = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
       Effect.flatMap(opening(groupId, mentions), placed);
     const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id> = [], text = "Reply") =>
-      Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-        s.publish({ threadId, mentions, text }),
+      Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+        threadMessageApplication.publish({ threadId, mentions, text }),
       ).pipe(Effect.flatMap((message) => placed({ message })));
     const threadTarget = (threadId: Thread.Id): Target.Reference => ({
       _tag: "Thread",
@@ -131,8 +131,8 @@ export const threadParticipation = (harness: Harness) => {
     ) =>
       facts(
         bound,
-        Effect.flatMap(Journal.Service, (j) =>
-          j.publish(AssignmentFacts.Created, {
+        Effect.flatMap(Journal.Service, (journal) =>
+          journal.publish(AssignmentFacts.Created, {
             workspaceId: bound.store.workspaceId,
             assignmentId: Assignment.Id.make(
               `${memberId}:${permission.name}:${JSON.stringify(target ?? "workspace")}`,
@@ -153,11 +153,11 @@ export const threadParticipation = (harness: Harness) => {
     const seed = (bound: Bound) =>
       facts(
         bound,
-        Effect.flatMap(Journal.Service, (j) =>
-          j.commit(
+        Effect.flatMap(Journal.Service, (journal) =>
+          journal.commit(
             Effect.gen(function* () {
               for (const memberId of [humanId, otherId, agentId])
-                yield* j.publish(MemberFacts.Added, {
+                yield* journal.publish(MemberFacts.Added, {
                   workspaceId: bound.store.workspaceId,
                   memberId,
                   identity: identityFor(memberId),
@@ -181,14 +181,16 @@ export const threadParticipation = (harness: Harness) => {
     });
 
     const follow = (threadId: Thread.Id) =>
-      Effect.flatMap(ThreadParticipationApplication.Service, (s) => s.follow(threadId));
+      Effect.flatMap(ThreadParticipationApplication.Service, (threadParticipationApplication) =>
+        threadParticipationApplication.follow(threadId),
+      );
     const unfollow = (threadId: Thread.Id, participationId: ThreadParticipation.Id) =>
-      Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-        s.unfollow({ threadId, participationId }),
+      Effect.flatMap(ThreadParticipationApplication.Service, (threadParticipationApplication) =>
+        threadParticipationApplication.unfollow({ threadId, participationId }),
       );
     const timeline = (threadId: Thread.Id, afterSequence = 0) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.readTimeline(threadId, { limit: 100, afterSequence }),
+      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+        threadApplication.readTimeline(threadId, { limit: 100, afterSequence }),
       );
     const snapshot = Effect.fnUntraced(function* (bound: Bound, threadId: Thread.Id) {
       return {
@@ -524,8 +526,8 @@ export const threadParticipation = (harness: Harness) => {
               ).toMatchObject({ _tag: "Authorization.Denied" });
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) =>
-                  j.publish(AssignmentFacts.Revoked, {
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.publish(AssignmentFacts.Revoked, {
                     workspaceId,
                     assignmentId: assignment.payload.assignmentId,
                     memberId: assignment.payload.memberId,
@@ -541,8 +543,8 @@ export const threadParticipation = (harness: Harness) => {
               );
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) =>
-                  j.publish(AssignmentFacts.Created, {
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.publish(AssignmentFacts.Created, {
                     workspaceId,
                     assignmentId: Assignment.Id.make("viewer"),
                     memberId: humanId,
@@ -557,8 +559,8 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(bound, human, follow(second.thread.id));
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) =>
-                  j.publish(RoleFacts.PermissionsChanged, {
+                Effect.flatMap(Journal.Service, (journal) =>
+                  journal.publish(RoleFacts.PermissionsChanged, {
                     workspaceId,
                     roleId: BuiltinRoles.MemberId,
                     permissions: [],
@@ -637,8 +639,8 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(
                 bound,
                 human,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.leave({
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.leave({
                     groupId: group.id,
                     membershipId: memberParticipant(record).groupMembershipId,
                   }),
@@ -653,7 +655,9 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(MemberApplication.Service, (s) => s.remove(humanId)),
+                Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                  memberApplication.remove(humanId),
+                ),
               );
               expect(yield* Effect.flip(run(bound, human, follow(first.thread.id)))).toMatchObject({
                 _tag: "Authorization.InvalidActor",
@@ -734,8 +738,8 @@ export const threadParticipation = (harness: Harness) => {
                 ThreadParticipationPermissions.Follow,
               );
               const before = yield* snapshot(bound, first.thread.id);
-              const operation = Effect.flatMap(Journal.Service, (j) =>
-                j.commit(
+              const operation = Effect.flatMap(Journal.Service, (journal) =>
+                journal.commit(
                   Effect.gen(function* () {
                     const p = yield* asActor(follow(first.thread.id), human);
                     expect(p.joinedAtSequence).toBe(2);
@@ -751,10 +755,10 @@ export const threadParticipation = (harness: Harness) => {
               );
               expect(yield* Effect.flip(run(bound, owner, operation))).toBe("rollback");
               expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
-              const revoked = Effect.flatMap(Journal.Service, (j) =>
-                j.commit(
+              const revoked = Effect.flatMap(Journal.Service, (journal) =>
+                journal.commit(
                   Effect.gen(function* () {
-                    yield* j.publish(AssignmentFacts.Revoked, {
+                    yield* journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: assignment.payload.assignmentId,
                       memberId: assignment.payload.memberId,
@@ -939,12 +943,14 @@ export const threadParticipation = (harness: Harness) => {
                   yield* run(
                     bound,
                     owner,
-                    Effect.flatMap(MemberApplication.Service, (s) => s.remove(agentId)),
+                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                      memberApplication.remove(agentId),
+                    ),
                   );
                   yield* facts(
                     bound,
-                    Effect.flatMap(Journal.Service, (j) =>
-                      j.publish(RoleFacts.PermissionsChanged, {
+                    Effect.flatMap(Journal.Service, (journal) =>
+                      journal.publish(RoleFacts.PermissionsChanged, {
                         workspaceId,
                         roleId: BuiltinRoles.OwnerId,
                         permissions: [],
@@ -967,7 +973,7 @@ export const threadParticipation = (harness: Harness) => {
                   yield* storage.discardProjections;
                   yield* facts(
                     bound,
-                    Effect.flatMap(Journal.Service, (j) => j.replay),
+                    Effect.flatMap(Journal.Service, (journal) => journal.replay),
                   );
                   expect(yield* snapshot(bound, saved.threadId)).toEqual(saved.snapshot);
                 }),
@@ -1182,12 +1188,14 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(MemberApplication.Service, (s) => s.remove(humanId)),
+                Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                  memberApplication.remove(humanId),
+                ),
               );
               yield* storage.discardProjections;
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) => j.replay),
+                Effect.flatMap(Journal.Service, (journal) => journal.replay),
               );
               expect(
                 yield* bound.notifications.listByRecipient(
@@ -1247,7 +1255,9 @@ export const threadParticipation = (harness: Harness) => {
                     run(
                       { ...bound, context },
                       owner,
-                      Effect.flatMap(MemberApplication.Service, (s) => s.remove(agentId)),
+                      Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                        memberApplication.remove(agentId),
+                      ),
                     ),
                   ),
                 ),
@@ -1265,8 +1275,11 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.remove({ groupId: group.id, membershipId: admission.id }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.remove({
+                    groupId: group.id,
+                    membershipId: admission.id,
+                  }),
                 ),
               );
               const removedAt = yield* DateTime.now;
@@ -1277,8 +1290,11 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(
                 bound,
                 agent,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.leave({ groupId: otherGroup.id, membershipId: otherAdmission.id }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.leave({
+                    groupId: otherGroup.id,
+                    membershipId: otherAdmission.id,
+                  }),
                 ),
               );
               const leftAt = yield* DateTime.now;
@@ -1301,15 +1317,17 @@ export const threadParticipation = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.add({ groupId: group.id, memberId: agentId }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.add({ groupId: group.id, memberId: agentId }),
                 ),
               );
               yield* run(bound, owner, reply(first.thread.id, [agentId]));
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(MemberApplication.Service, (s) => s.remove(agentId)),
+                Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                  memberApplication.remove(agentId),
+                ),
               );
               const all = yield* agentParticipations;
               expect(all).toHaveLength(4);
@@ -1331,8 +1349,8 @@ export const threadParticipation = (harness: Harness) => {
               expect(
                 yield* facts(
                   bound,
-                  Effect.flatMap(Journal.Service, (j) =>
-                    j.read({ name: ThreadParticipationFacts.Ended.name, limit: 100 }),
+                  Effect.flatMap(Journal.Service, (journal) =>
+                    journal.read({ name: ThreadParticipationFacts.Ended.name, limit: 100 }),
                   ),
                 ),
               ).toEqual([]);
@@ -1340,7 +1358,7 @@ export const threadParticipation = (harness: Harness) => {
               yield* storage.discardProjections;
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) => j.replay),
+                Effect.flatMap(Journal.Service, (journal) => journal.replay),
               );
               expect(yield* Effect.forEach(threads, (id) => snapshot(bound, id))).toEqual(live);
             }),
@@ -1421,7 +1439,7 @@ export const threadParticipation = (harness: Harness) => {
               yield* storage.discardProjections;
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) => j.replay),
+                Effect.flatMap(Journal.Service, (journal) => journal.replay),
               );
               expect(yield* snapshot(bound, first.thread.id)).toEqual(live);
             }),
@@ -1438,8 +1456,8 @@ export const threadParticipation = (harness: Harness) => {
             const started = yield* run(
               bound,
               owner,
-              Effect.flatMap(ThreadApplication.Service, (s) =>
-                s.startDirect({ memberIds: [humanId], text: "Hi", mentions: [] }),
+              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                threadApplication.startDirect({ memberIds: [humanId], text: "Hi", mentions: [] }),
               ),
             );
             const own = (yield* bound.participations.listByThread(started.thread.id)).find(
@@ -1546,7 +1564,7 @@ export const threadParticipation = (harness: Harness) => {
               yield* storage.discardProjections;
               yield* facts(
                 bound,
-                Effect.flatMap(Journal.Service, (j) => j.replay),
+                Effect.flatMap(Journal.Service, (journal) => journal.replay),
               );
               expect(yield* notifications(bound, agentId)).toEqual(settled);
             }),
@@ -1644,8 +1662,8 @@ export const threadParticipation = (harness: Harness) => {
               const participants = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.listParticipants(threadId, { limit: 100 }),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.listParticipants(threadId, { limit: 100 }),
                 ),
               );
               expect(

@@ -232,9 +232,9 @@ it.effect(
       yield* run(
         fixture,
         Effect.gen(function* () {
-          const logs = yield* Log.Service;
-          const plain = logs.open({ id: Log.Id.make("plain"), schema: Schema.String });
-          const other = logs.open({ id: Log.Id.make("other"), schema: Schema.String });
+          const log = yield* Log.Service;
+          const plain = log.open({ id: Log.Id.make("plain"), schema: Schema.String });
+          const other = log.open({ id: Log.Id.make("other"), schema: Schema.String });
           const written = yield* plain.append("value");
           const before = yield* fixture.snapshot;
           const attempts = yield* fixture.attempts;
@@ -243,7 +243,7 @@ it.effect(
           expect(yield* fixture.snapshot).toEqual(before);
           expect(yield* fixture.attempts).toBe(attempts);
           const outcome = yield* Effect.flip(
-            logs.commit(
+            log.commit(
               Effect.gen(function* () {
                 const staged = yield* plain.append("staged");
                 expect(yield* plain.getEntry(staged.id)).toEqual(Option.some(staged));

@@ -307,8 +307,8 @@ export const connections = (harness: Harness) => {
             });
             expect(
               yield* Effect.flip(
-                Effect.flatMap(ConnectionApplication.Service, (service) =>
-                  service.setCredential({
+                Effect.flatMap(ConnectionApplication.Service, (connectionApplication) =>
+                  connectionApplication.setCredential({
                     connectionId: created.id,
                     secret: Redacted.make("sk-rolled-back"),
                   }),

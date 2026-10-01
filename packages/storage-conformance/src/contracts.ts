@@ -261,8 +261,8 @@ export const contracts = (harness: Harness) => {
               yield* initialized(bound);
               const saved = yield* bound.store.transaction(
                 Effect.gen(function* () {
-                  const native = yield* Store.Transaction;
-                  const [entry] = yield* native.append({
+                  const storeTransaction = yield* Store.Transaction;
+                  const [entry] = yield* storeTransaction.append({
                     logId: Entry.LogId.make("checkpoint-contract"),
                     entries: [{ payload: new Uint8Array([1]) }],
                   });

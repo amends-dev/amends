@@ -55,12 +55,16 @@ export const groupFollows = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 500 });
     const follow = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupFollowApplication.Service, (s) => s.follow({ groupId, memberId }));
+      Effect.flatMap(GroupFollowApplication.Service, (groupFollowApplication) =>
+        groupFollowApplication.follow({ groupId, memberId }),
+      );
     const unfollow = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupFollowApplication.Service, (s) => s.unfollow({ groupId, memberId }));
+      Effect.flatMap(GroupFollowApplication.Service, (groupFollowApplication) =>
+        groupFollowApplication.unfollow({ groupId, memberId }),
+      );
     const post = (groupId: Group.Id, mentions: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startInGroup({ groupId, text: "Update", mentions }),
+      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+        threadApplication.startInGroup({ groupId, text: "Update", mentions }),
       );
     const participantsOf = (bound: Bound, started: Thread.Started) =>
       Effect.map(bound.participations.listByThread(started.thread.id), (records) =>
@@ -116,8 +120,8 @@ export const groupFollows = (harness: Harness) => {
       const team = yield* run(
         bound,
         owner,
-        Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createTeam({
+        Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+          groupApplication.createTeam({
             name: "Team",
             memberIds: [owner.memberId, humanId, plainId, agentId],
           }),
@@ -252,8 +256,12 @@ export const groupFollows = (harness: Harness) => {
               const direct = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.startDirect({ memberIds: [humanId], text: "Hello", mentions: [] }),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.startDirect({
+                    memberIds: [humanId],
+                    text: "Hello",
+                    mentions: [],
+                  }),
                 ),
               );
               expect(
@@ -274,8 +282,11 @@ export const groupFollows = (harness: Harness) => {
               yield* run(
                 bound,
                 human,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.leave({ groupId: team.id, membershipId: admission.id }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.leave({
+                    groupId: team.id,
+                    membershipId: admission.id,
+                  }),
                 ),
               );
               expect(yield* bound.groupFollows.get(followed.id)).toMatchObject({
@@ -284,8 +295,8 @@ export const groupFollows = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.add({ groupId: team.id, memberId: humanId }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.add({ groupId: team.id, memberId: humanId }),
                 ),
               );
               expect(yield* participantsOf(bound, yield* run(bound, owner, post(team.id)))).toEqual(

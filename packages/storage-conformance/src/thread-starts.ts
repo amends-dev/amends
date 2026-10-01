@@ -50,8 +50,8 @@ export const threadStarts = (harness: Harness) => {
       memberIds: ReadonlyArray<Member.Id>,
       mentions: ReadonlyArray<Member.Id> = [],
     ) =>
-      Effect.flatMap(ThreadApplication.Service, (s) =>
-        s.startDirect({ memberIds, text: "Hello", mentions }),
+      Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+        threadApplication.startDirect({ memberIds, text: "Hello", mentions }),
       );
     const participantsOf = (bound: Bound, threadId: Thread.Id) =>
       Effect.map(bound.participations.listByThread(threadId), (records) =>
@@ -224,8 +224,8 @@ export const threadStarts = (harness: Harness) => {
               const mentioned = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.startInGroup({
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.startInGroup({
                     groupId: trio.thread.groupId,
                     text: "Just Bob",
                     mentions: [humanId],
@@ -275,8 +275,11 @@ export const threadStarts = (harness: Harness) => {
               const team = yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createTeam({ name: "Support", memberIds: [owner.memberId, humanId] }),
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.createTeam({
+                    name: "Support",
+                    memberIds: [owner.memberId, humanId],
+                  }),
                 ),
               );
               const contact: Notification.Recipient = { _tag: "Contact", id: contactId };
@@ -320,8 +323,12 @@ export const threadStarts = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: started.thread.id, text: "Looking into it", mentions: [] }),
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
+                    threadId: started.thread.id,
+                    text: "Looking into it",
+                    mentions: [],
+                  }),
                 ),
               );
               expect(yield* inbox(bound, contact)).toHaveLength(1);
@@ -333,8 +340,12 @@ export const threadStarts = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: started.thread.id, text: "Bob?", mentions: [humanId] }),
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
+                    threadId: started.thread.id,
+                    text: "Bob?",
+                    mentions: [humanId],
+                  }),
                 ),
               );
               expect(yield* inbox(bound, contact)).toHaveLength(1);
@@ -383,8 +394,8 @@ export const threadStarts = (harness: Harness) => {
                 const team = yield* run(
                   counted.bound,
                   owner,
-                  Effect.flatMap(GroupApplication.Service, (s) =>
-                    s.createTeam({
+                  Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                    groupApplication.createTeam({
                       name: `Team ${size}`,
                       memberIds: [owner.memberId, ...extra.slice(0, size)],
                     }),
@@ -394,9 +405,9 @@ export const threadStarts = (harness: Harness) => {
                 const started = yield* run(
                   counted.bound,
                   owner,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
+                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
                     // Mentioning the members enrolls them, so the participants grow with the group.
-                    s.startInGroup({
+                    threadApplication.startInGroup({
                       groupId: team.id,
                       text: "Hello",
                       mentions: extra.slice(0, size),
@@ -404,8 +415,14 @@ export const threadStarts = (harness: Harness) => {
                   ),
                 );
                 const start = counted.take();
-                const reply = Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: started.thread.id, text: "Reply", mentions: [] }),
+                const reply = Effect.flatMap(
+                  ThreadMessageApplication.Service,
+                  (threadMessageApplication) =>
+                    threadMessageApplication.publish({
+                      threadId: started.thread.id,
+                      text: "Reply",
+                      mentions: [],
+                    }),
                 );
                 yield* run(counted.bound, owner, reply);
                 const replied = counted.take();
@@ -415,8 +432,8 @@ export const threadStarts = (harness: Harness) => {
                 const page = yield* run(
                   counted.bound,
                   owner,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.readTimeline(started.thread.id, { limit: 50 }),
+                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                    threadApplication.readTimeline(started.thread.id, { limit: 50 }),
                   ),
                 );
                 expect(page).toHaveLength(size + 2);
@@ -463,16 +480,16 @@ export const threadStarts = (harness: Harness) => {
                   identity: { _tag: "Human", id: Identity.HumanId.make(memberId) },
                 });
               const reply = (threadId: Thread.Id, mentions: ReadonlyArray<Member.Id>) =>
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId, text: "Reply", mentions }),
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({ threadId, text: "Reply", mentions }),
                 );
               const counted = countingReads(bound);
               const measure = Effect.fnUntraced(function* (size: number) {
                 const team = yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(GroupApplication.Service, (s) =>
-                    s.createTeam({
+                  Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                    groupApplication.createTeam({
                       name: `Team ${size}`,
                       memberIds: [owner.memberId, ...extra.slice(0, size)],
                     }),
@@ -481,8 +498,8 @@ export const threadStarts = (harness: Harness) => {
                 const started = yield* run(
                   bound,
                   owner,
-                  Effect.flatMap(ThreadApplication.Service, (s) =>
-                    s.startInGroup({
+                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                    threadApplication.startInGroup({
                       groupId: team.id,
                       text: "Hello",
                       mentions: extra.slice(0, size),
@@ -499,8 +516,13 @@ export const threadStarts = (harness: Harness) => {
                   yield* run(
                     bound,
                     as(memberId),
-                    Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-                      s.unfollow({ threadId: started.thread.id, participationId: own.id }),
+                    Effect.flatMap(
+                      ThreadParticipationApplication.Service,
+                      (threadParticipationApplication) =>
+                        threadParticipationApplication.unfollow({
+                          threadId: started.thread.id,
+                          participationId: own.id,
+                        }),
                     ),
                   );
                 }

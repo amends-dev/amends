@@ -488,10 +488,10 @@ it.effect("invalid or partial durable checkpoints fail before applying more even
           }),
         );
         const bound = yield* runner;
-        const checkpoints = yield* Checkpoint.Service;
+        const checkpoint = yield* Checkpoint.Service;
         for (const entryId of [first.id, Entry.Id.make("missing-entry")]) {
           yield* journal.commit(
-            checkpoints.set(bound.key, {
+            checkpoint.set(bound.key, {
               position: first.position,
               commitId: first.commitId,
               index: first.index,

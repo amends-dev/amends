@@ -219,8 +219,8 @@ export const journal = (harness: Harness) => {
             // History that every projection records something from.
             const group = yield* as(
               owner,
-              Effect.flatMap(GroupApplication.Service, (groups) =>
-                groups.createTeam({
+              Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                groupApplication.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, human.memberId, agent.memberId],
                 }),
@@ -228,14 +228,14 @@ export const journal = (harness: Harness) => {
             );
             yield* as(
               owner,
-              Effect.flatMap(GroupFollowApplication.Service, (follows) =>
-                follows.follow({ groupId: group.id, memberId: owner.memberId }),
+              Effect.flatMap(GroupFollowApplication.Service, (groupFollowApplication) =>
+                groupFollowApplication.follow({ groupId: group.id, memberId: owner.memberId }),
               ),
             );
             const started = yield* as(
               owner,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.startInGroup({
+              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                threadApplication.startInGroup({
                   groupId: group.id,
                   text: "Hello",
                   mentions: [owner.memberId, human.memberId, agent.memberId],
@@ -245,8 +245,12 @@ export const journal = (harness: Harness) => {
             const reply = (mentions: ReadonlyArray<Member.Id>) =>
               as(
                 owner,
-                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-                  messages.publish({ threadId: started.thread.id, text: "Reply", mentions }),
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
+                    threadId: started.thread.id,
+                    text: "Reply",
+                    mentions,
+                  }),
                 ),
               );
             yield* reply([agent.memberId]);
@@ -255,15 +259,15 @@ export const journal = (harness: Harness) => {
             );
             yield* as(
               agent,
-              Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-                memberships.leave({ groupId: group.id, membershipId: admission.id }),
+              Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                groupMembershipApplication.leave({ groupId: group.id, membershipId: admission.id }),
               ),
             );
             const expiresAt = yield* future;
             yield* as(
               owner,
-              Effect.flatMap(InvitationApplication.Service, (invitations) =>
-                invitations.issue(request(expiresAt, charlie.id)),
+              Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
+                invitationApplication.issue(request(expiresAt, charlie.id)),
               ),
             );
             const byId = <A extends { readonly id: string }>(values: ReadonlyArray<A>) =>

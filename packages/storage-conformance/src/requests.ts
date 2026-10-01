@@ -50,13 +50,16 @@ export const requests = (harness: Harness) => {
         program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(on));
       const group = yield* as(
         owner,
-        Effect.flatMap(GroupApplication.Service, (groups) =>
-          groups.createTeam({ name: "Team", memberIds: [owner.memberId, other.memberId] }),
+        Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+          groupApplication.createTeam({
+            name: "Team",
+            memberIds: [owner.memberId, other.memberId],
+          }),
         ),
       );
       const start = (text: string, options: Request.Options = { requestKey: key }) =>
-        Effect.flatMap(ThreadApplication.Service, (threads) =>
-          threads.startInGroup({ groupId: group.id, text, mentions: [] }, options),
+        Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+          threadApplication.startInGroup({ groupId: group.id, text, mentions: [] }, options),
         );
       return { storage, bound, owner, group, services, as, start };
     });
@@ -88,8 +91,8 @@ export const requests = (harness: Harness) => {
           expect(yield* as(owner, start("Goodbye"))).toEqual(first);
           expect(yield* history(bound)).toEqual(before);
           const direct = (text: string) =>
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.startDirect(
+            Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+              threadApplication.startDirect(
                 { memberIds: [other.memberId], text, mentions: [] },
                 { requestKey: key },
               ),
@@ -112,8 +115,8 @@ export const requests = (harness: Harness) => {
           // The same key names a different request for another operation.
           const reply = yield* as(
             owner,
-            Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-              messages.publish(
+            Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+              threadMessageApplication.publish(
                 { threadId: mine.thread.id, text: "Hello", mentions: [] },
                 { requestKey: key },
               ),
@@ -132,8 +135,8 @@ export const requests = (harness: Harness) => {
           const admission = yield* bound.groupMemberships.findActive(group.id, other.memberId);
           yield* as(
             other,
-            Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-              memberships.leave({
+            Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+              groupMembershipApplication.leave({
                 groupId: group.id,
                 membershipId: Option.getOrThrow(admission).id,
               }),
@@ -191,30 +194,30 @@ export const requests = (harness: Harness) => {
             });
           const requestKey = Request.Key.make("request-2");
           yield* twice(
-            Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-              messages.publish(
+            Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+              threadMessageApplication.publish(
                 { threadId: started.thread.id, text: "Reply", mentions: [] },
                 { requestKey },
               ),
             ),
           );
           yield* twice(
-            Effect.flatMap(ThreadApplication.Service, (threads) =>
-              threads.startDirect(
+            Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+              threadApplication.startDirect(
                 { memberIds: [other.memberId], text: "Hi", mentions: [] },
                 { requestKey },
               ),
             ),
           );
           yield* twice(
-            Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.createTeam({ name: "Second", memberIds: [] }, { requestKey }),
             ),
           );
           const expiresAt = yield* future;
           yield* twice(
-            Effect.flatMap(InvitationApplication.Service, (invitations) =>
-              invitations.issue(request(expiresAt, Identity.HumanId.make("carol")), {
+            Effect.flatMap(InvitationApplication.Service, (invitationApplication) =>
+              invitationApplication.issue(request(expiresAt, Identity.HumanId.make("carol")), {
                 requestKey,
               }),
             ),
@@ -228,8 +231,8 @@ export const requests = (harness: Harness) => {
         Effect.gen(function* () {
           const { bound, owner, as } = yield* world(storage);
           const create = (name: string) =>
-            Effect.flatMap(GroupApplication.Service, (groups) =>
-              groups.createTeam({ name, memberIds: [] }, { requestKey: key }),
+            Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+              groupApplication.createTeam({ name, memberIds: [] }, { requestKey: key }),
             );
           const first = yield* as(owner, create("Second"));
           const before = yield* history(bound);
@@ -244,8 +247,8 @@ export const requests = (harness: Harness) => {
         Effect.gen(function* () {
           const host = yield* storage.connect();
           const create = (name: string, creator = alice.id) =>
-            Effect.flatMap(Gateway.Service, (g) =>
-              g.createWorkspace(creator, { name }, { requestKey: key }),
+            Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.createWorkspace(creator, { name }, { requestKey: key }),
             ).pipe(Effect.provide(gateway(host)));
           const first = yield* create("Studio");
           expect(yield* create("Studio")).toEqual(first);
@@ -256,8 +259,8 @@ export const requests = (harness: Harness) => {
           // A retry on another host finds it too.
           const elsewhere = yield* storage.connect();
           expect(
-            yield* Effect.flatMap(Gateway.Service, (g) =>
-              g.createWorkspace(alice.id, { name: "Studio" }, { requestKey: key }),
+            yield* Effect.flatMap(Gateway.Service, (gateway) =>
+              gateway.createWorkspace(alice.id, { name: "Studio" }, { requestKey: key }),
             ).pipe(Effect.provide(gateway(elsewhere))),
           ).toEqual(first);
         }),

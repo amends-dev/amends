@@ -58,11 +58,11 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* setup;
-          const members = yield* MemberStore.Service;
+          const memberStore = yield* MemberStore.Service;
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(MemberFacts.Added, added(firstId, human));
-              expect(yield* members.findActive(human)).toEqual(
+              expect(yield* memberStore.findActive(human)).toEqual(
                 Option.some({
                   id: firstId,
                   workspaceId,
@@ -73,7 +73,7 @@ it.effect(
               yield* journal.publish(MemberFacts.Added, added(agentId, agent));
             }),
           );
-          expect(yield* members.findActive(agent)).toEqual(
+          expect(yield* memberStore.findActive(agent)).toEqual(
             Option.some({
               id: agentId,
               workspaceId,
@@ -84,11 +84,11 @@ it.effect(
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(MemberFacts.Removed, removed(firstId));
-              expect(Option.isNone(yield* members.findActive(human))).toBe(true);
+              expect(Option.isNone(yield* memberStore.findActive(human))).toBe(true);
               yield* journal.publish(MemberFacts.Added, added(secondId, human));
             }),
           );
-          expect(yield* members.get(firstId)).toEqual(
+          expect(yield* memberStore.get(firstId)).toEqual(
             Option.some({
               id: firstId,
               workspaceId,
@@ -96,7 +96,7 @@ it.effect(
               status: "removed",
             }),
           );
-          expect(yield* members.findActive(human)).toEqual(
+          expect(yield* memberStore.findActive(human)).toEqual(
             Option.some({
               id: secondId,
               workspaceId,
@@ -136,8 +136,8 @@ it.effect("replay reconstructs membership history and resumes without reapplying
         );
         expect((yield* fixture.snapshot).members.size).toBe(0);
         yield* (yield* setup).replay;
-        const members = yield* MemberStore.Service;
-        expect(yield* members.get(firstId)).toEqual(
+        const memberStore = yield* MemberStore.Service;
+        expect(yield* memberStore.get(firstId)).toEqual(
           Option.some({
             id: firstId,
             workspaceId,
@@ -145,10 +145,10 @@ it.effect("replay reconstructs membership history and resumes without reapplying
             status: "removed",
           }),
         );
-        expect(Option.map(yield* members.findActive(human), (member) => member.id)).toEqual(
+        expect(Option.map(yield* memberStore.findActive(human), (member) => member.id)).toEqual(
           Option.some(secondId),
         );
-        expect(Option.map(yield* members.findActive(agent), (member) => member.id)).toEqual(
+        expect(Option.map(yield* memberStore.findActive(agent), (member) => member.id)).toEqual(
           Option.some(agentId),
         );
       }),

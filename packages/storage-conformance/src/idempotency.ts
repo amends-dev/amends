@@ -132,8 +132,8 @@ export const idempotency = (harness: Harness) => {
           Effect.gen(function* () {
             const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
             const append = (payloads: ReadonlyArray<Uint8Array>, idempotencyKey = key) =>
-              Effect.flatMap(Store.Transaction, (native) =>
-                native.append({
+              Effect.flatMap(Store.Transaction, (storeTransaction) =>
+                storeTransaction.append({
                   logId: executionId,
                   entries: payloads.map((payload) => ({ payload })),
                   idempotencyKey,
@@ -179,7 +179,9 @@ export const idempotency = (harness: Harness) => {
             expect(
               (yield* Effect.flip(
                 bound.store.transaction(
-                  Effect.flatMap(Store.Transaction, (native) => native.append(invalid)),
+                  Effect.flatMap(Store.Transaction, (storeTransaction) =>
+                    storeTransaction.append(invalid),
+                  ),
                 ),
               ))._tag,
             ).toBe("JournalStore.Conflict");
@@ -192,8 +194,8 @@ export const idempotency = (harness: Harness) => {
         Effect.gen(function* () {
           const a = yield* forWorkspace(yield* storage.connect(), workspaceId);
           const b = yield* forWorkspace(yield* storage.connect(), workspaceId);
-          const append = Effect.flatMap(Store.Transaction, (native) =>
-            native.append({
+          const append = Effect.flatMap(Store.Transaction, (storeTransaction) =>
+            storeTransaction.append({
               logId: executionId,
               entries: [{ payload: new Uint8Array([7]) }],
               idempotencyKey: key,

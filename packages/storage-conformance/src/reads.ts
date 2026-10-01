@@ -56,23 +56,27 @@ export const reads = (harness: Harness) => {
                     expect(Option.isNone(yield* Effect.serviceOption(Store.Transaction))).toBe(
                       true,
                     );
-                    const members = yield* MemberApplication.Service;
-                    expect((yield* members.get(workspace.ownerMemberId)).identity).toEqual(alice);
-                    expect(yield* members.list).toHaveLength(1);
-                    expect(yield* (yield* InvitationApplication.Service).list).toEqual([]);
-                    const assignments = yield* AssignmentApplication.Service;
-                    expect(yield* assignments.roles).toHaveLength(3);
+                    const memberApplication = yield* MemberApplication.Service;
                     expect(
-                      (yield* assignments.list(workspace.ownerMemberId)).assignments,
+                      (yield* memberApplication.get(workspace.ownerMemberId)).identity,
+                    ).toEqual(alice);
+                    expect(yield* memberApplication.list).toHaveLength(1);
+                    expect(yield* (yield* InvitationApplication.Service).list).toEqual([]);
+                    const assignmentApplication = yield* AssignmentApplication.Service;
+                    expect(yield* assignmentApplication.roles).toHaveLength(3);
+                    expect(
+                      (yield* assignmentApplication.list(workspace.ownerMemberId)).assignments,
                     ).toHaveLength(1);
                     expect((yield* (yield* OwnershipApplication.Service).get).workspace).toEqual(
                       workspace,
                     );
-                    const notifications = yield* NotificationApplication.Service;
-                    expect(yield* notifications.list({ limit: 10 })).toEqual([]);
-                    expect(yield* notifications.listPending({ limit: 10 })).toEqual([]);
+                    const notificationApplication = yield* NotificationApplication.Service;
+                    expect(yield* notificationApplication.list({ limit: 10 })).toEqual([]);
+                    expect(yield* notificationApplication.listPending({ limit: 10 })).toEqual([]);
                     expect(
-                      yield* Effect.flip(notifications.get(Notification.Id.make("missing"))),
+                      yield* Effect.flip(
+                        notificationApplication.get(Notification.Id.make("missing")),
+                      ),
                     ).toMatchObject({ _tag: "NotificationApplication.NotFound" });
                     const stream = yield* (yield* ChangeFeedApplication.Service).watch();
                     expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([
@@ -86,8 +90,8 @@ export const reads = (harness: Harness) => {
                     gateway.asMember(
                       workspace.id,
                       alice,
-                      Effect.flatMap(MemberApplication.Service, (members) =>
-                        members.remove(Member.Id.make("missing")),
+                      Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                        memberApplication.remove(Member.Id.make("missing")),
                       ),
                     ),
                   ),

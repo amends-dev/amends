@@ -101,8 +101,8 @@ export const signals = (harness: Harness) => {
           program.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(cores[host]));
       const group = yield* as("first")(
         owner,
-        Effect.flatMap(GroupApplication.Service, (groups) =>
-          groups.createTeam({
+        Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+          groupApplication.createTeam({
             name: "Private",
             memberIds: [owner.memberId, reader.memberId, unpermitted.memberId],
           }),
@@ -110,15 +110,21 @@ export const signals = (harness: Harness) => {
       );
       const started = yield* as("first")(
         owner,
-        Effect.flatMap(ThreadApplication.Service, (threads) =>
-          threads.startInGroup({ groupId: group.id, mentions: [reader.memberId], text: "Look" }),
+        Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+          threadApplication.startInGroup({
+            groupId: group.id,
+            mentions: [reader.memberId],
+            text: "Look",
+          }),
         ),
       );
       /** Subscribe to the change feed as a member on a host, after its opening Ready. */
       const feed = Effect.fnUntraced(function* (host: keyof typeof cores, actor: Actor.Value) {
         const next = yield* as(host)(
           actor,
-          Effect.flatMap(ChangeFeedApplication.Service, (changes) => changes.watch()),
+          Effect.flatMap(ChangeFeedApplication.Service, (changeFeedApplication) =>
+            changeFeedApplication.watch(),
+          ),
         ).pipe(Effect.flatMap(buffer));
         expect(yield* next).toMatchObject({ _tag: "Ready", reset: true });
         return signalsOf(next);
@@ -187,7 +193,9 @@ export const signals = (harness: Harness) => {
           const before = yield* DateTime.now;
           yield* as("first")(
             owner,
-            Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(threadId)),
+            Effect.flatMap(SignalApplication.Service, (signalApplication) =>
+              signalApplication.typing(threadId),
+            ),
           );
           const typing = yield* readerFeed;
           expect(typing).toMatchObject({
@@ -219,7 +227,9 @@ export const signals = (harness: Harness) => {
             as("first")(
               actor,
               Effect.flip(
-                Effect.flatMap(SignalApplication.Service, (signals) => signals.typing(thread)),
+                Effect.flatMap(SignalApplication.Service, (signalApplication) =>
+                  signalApplication.typing(thread),
+                ),
               ),
             );
           const notFound = (thread: Thread.Id) =>
@@ -241,16 +251,18 @@ export const signals = (harness: Harness) => {
           const ownerFeed = yield* feed("second", owner);
           const [notification] = yield* as("first")(
             reader,
-            Effect.flatMap(NotificationApplication.Service, (n) => n.list({ limit: 10 })),
+            Effect.flatMap(NotificationApplication.Service, (notificationApplication) =>
+              notificationApplication.list({ limit: 10 }),
+            ),
           );
           if (notification === undefined) return yield* Effect.die("Expected a notification");
           yield* as("first")(
             reader,
             Effect.gen(function* () {
               yield* (yield* NotificationApplication.Service).acknowledge(notification.id);
-              const reading = yield* ReadStateApplication.Service;
-              yield* reading.markThreadRead({ threadId, throughSequence: 1 });
-              yield* reading.markGroupRead({ groupId });
+              const readStateApplication = yield* ReadStateApplication.Service;
+              yield* readStateApplication.markThreadRead({ threadId, throughSequence: 1 });
+              yield* readStateApplication.markGroupRead({ groupId });
             }),
           );
           for (const next of [elsewhere, sameHost])

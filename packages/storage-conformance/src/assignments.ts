@@ -324,12 +324,14 @@ export const assignments = (harness: Harness) => {
               cause: "injected late failure",
             });
             const broken = failingLate(bound, failure);
-            const rejected = yield* Effect.flatMap(AssignmentApplication.Service, (service) =>
-              service.change({
-                memberId: viewer.id,
-                roleId: BuiltinRoles.AdministratorId,
-                expectedAssignmentIds: active.map(({ id }) => id),
-              }),
+            const rejected = yield* Effect.flatMap(
+              AssignmentApplication.Service,
+              (assignmentApplication) =>
+                assignmentApplication.change({
+                  memberId: viewer.id,
+                  roleId: BuiltinRoles.AdministratorId,
+                  expectedAssignmentIds: active.map(({ id }) => id),
+                }),
             ).pipe(
               Effect.provide(core(broken)),
               Effect.provideService(Actor.Service, {

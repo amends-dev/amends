@@ -55,8 +55,8 @@ const turns = (abandon: (call: number) => Effect.Effect<void, TurnRunner.Failure
 };
 
 /** Ask for the turn to run, as the commit that created it does. */
-const dispatch = Effect.flatMap(WorkspaceTurns.Service, (dispatch) =>
-  dispatch.forWorkspace(workspaceId).request(turnId),
+const dispatch = Effect.flatMap(WorkspaceTurns.Service, (workspaceTurns) =>
+  workspaceTurns.forWorkspace(workspaceId).request(turnId),
 ).pipe(
   Effect.provideService(Store.Transaction, {
     id: Commit.Id.make("commit-1"),

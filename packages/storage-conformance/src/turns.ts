@@ -41,7 +41,9 @@ const turnsOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,
     alice,
-    Effect.flatMap(TurnApplication.Service, (turns) => turns.listByThread(threadId, 10)),
+    Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+      turnApplication.listByThread(threadId, 10),
+    ),
   );
 const execute = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, TurnExecution.Service>) =>
   Effect.flatMap(Gateway.Service, (gateway) => gateway.executeTurns(id, program));
@@ -53,8 +55,8 @@ const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,
     alice,
-    Effect.flatMap(ThreadApplication.Service, (threads) =>
-      threads.readTimeline(threadId, { limit: 50 }),
+    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+      threadApplication.readTimeline(threadId, { limit: 50 }),
     ),
   );
 /**
@@ -67,7 +69,9 @@ const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberRef
     const stream = yield* gateway.asMemberScoped(
       id,
       reader,
-      Effect.flatMap(TurnApplication.Service, (turns) => turns.watchLog(turnId)),
+      Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+        turnApplication.watchLog(turnId),
+      ),
     );
     const queue = yield* Queue.unbounded<Turn.LogMessage | "done" | "unavailable">();
     yield* stream.pipe(
@@ -126,8 +130,8 @@ const workspaceWithAgent = Effect.gen(function* () {
   const models = yield* as(
     workspace.id,
     alice,
-    Effect.flatMap(ConnectionApplication.Service, (connections) =>
-      connections.create({
+    Effect.flatMap(ConnectionApplication.Service, (connectionApplication) =>
+      connectionApplication.create({
         name: "Models",
         implementationId: testImplementation.id,
         settings: { endpoint: "https://models.example" },
@@ -138,8 +142,8 @@ const workspaceWithAgent = Effect.gen(function* () {
   const agent = yield* as(
     workspace.id,
     alice,
-    Effect.flatMap(AgentApplication.Service, (agents) =>
-      agents.create({
+    Effect.flatMap(AgentApplication.Service, (agentApplication) =>
+      agentApplication.create({
         name: "Scout",
         instructions: "Help the team.",
         model: { connectionId: models.id, model: "model-x", reasoning: null },
@@ -179,16 +183,16 @@ const start = (id: Workspace.Id, text: string, mentions: ReadonlyArray<Turn.Reco
   as(
     id,
     alice,
-    Effect.flatMap(ThreadApplication.Service, (threads) =>
-      threads.startInGroup({ groupId: Group.GeneralId, text, mentions: [...mentions] }),
+    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+      threadApplication.startInGroup({ groupId: Group.GeneralId, text, mentions: [...mentions] }),
     ),
   ).pipe(Effect.flatMap((started) => withPlace(id, started)));
 const reply = (id: Workspace.Id, threadId: Turn.Record["threadId"], text: string) =>
   as(
     id,
     alice,
-    Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-      messages.publish({ threadId, text, mentions: [] }),
+    Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+      threadMessageApplication.publish({ threadId, text, mentions: [] }),
     ),
   ).pipe(Effect.flatMap((message) => withPlace(id, { message })));
 
@@ -318,8 +322,8 @@ export const turns = (harness: ConformanceHarness) => {
               ).toEqual([turnId]);
               const running = yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
-                  execution.start(turnId, selection),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.start(turnId, selection),
                 ),
               );
               expect(running).toMatchObject({ status: "running", selection });
@@ -327,20 +331,22 @@ export const turns = (harness: ConformanceHarness) => {
               expect(
                 yield* execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) => execution.close(turnId)),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.close(turnId),
+                  ),
                 ),
               ).toEqual({ _tag: "InputPending" });
               const first = batch("b1", "Scout, summarize the plan.");
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.submitted(turnId, {
+                    yield* turnExecution.submitted(turnId, {
                       batchId: first.id,
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       turnId,
                       reported(took(first), ...answered("r1", "An early answer.")),
                     );
@@ -350,7 +356,9 @@ export const turns = (harness: ConformanceHarness) => {
               // How far the turn's input is taken in is its log's to say.
               const taken = yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) => execution.entries(turnId)),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.entries(turnId),
+                ),
               );
               expect(TurnLog.read(taken).incorporatedThrough(0)).toBe(started.activity.sequence);
               // New work that has not been accepted yet keeps the turn open.
@@ -358,25 +366,27 @@ export const turns = (harness: ConformanceHarness) => {
               expect(
                 yield* execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) => execution.close(turnId)),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.close(turnId),
+                  ),
                 ),
               ).toEqual({ _tag: "InputPending" });
               yield* accept(workspace.id);
               const second = batch("b2", "Include the risks too.");
               const closing = yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.submitted(turnId, {
+                    yield* turnExecution.submitted(turnId, {
                       batchId: second.id,
                       throughSequence: more.activity.sequence,
                       items: second.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       turnId,
                       reported(took(second), ...answered("r2", "The plan, with its risks.")),
                     );
-                    return yield* execution.close(turnId);
+                    return yield* turnExecution.close(turnId);
                   }),
                 ),
               );
@@ -438,7 +448,9 @@ export const turns = (harness: ConformanceHarness) => {
               expect(yield* readTurns((turns) => turns.listActive(10))).toEqual([]);
               const entries = yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) => execution.entries(turnId)),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.entries(turnId),
+                ),
               );
               expect(entries.filter(({ entry }) => entry._tag === "Submitted")).toHaveLength(2);
               // The log says how the turn began and ended, as its facts do.
@@ -554,7 +566,9 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnApplication.Service, (turns) => turns.cancel(queued!.id)),
+                Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+                  turnApplication.cancel(queued!.id),
+                ),
               );
               // Its end is in its agent's log, which is all a reader follows.
               expect(brief(yield* next)).toBe("ended");
@@ -581,7 +595,9 @@ export const turns = (harness: ConformanceHarness) => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turns) => turns.cancel(turnId)),
+                  Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+                    turnApplication.cancel(turnId),
+                  ),
                 );
               yield* accept(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
@@ -601,7 +617,9 @@ export const turns = (harness: ConformanceHarness) => {
               const entriesOf = (turnId: Turn.Id) =>
                 execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) => execution.entries(turnId)),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.entries(turnId),
+                  ),
                 );
               // The turn stopped before it started leaves only its end in the agent's log, so the
               // next turn still records the thread's history before it starts.
@@ -617,8 +635,8 @@ export const turns = (harness: ConformanceHarness) => {
               ]);
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
-                  execution.start(second!.id, selection),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.start(second!.id, selection),
                 ),
               );
               expect((yield* entriesOf(second!.id)).map(({ entry }) => entry._tag)).toEqual([
@@ -635,7 +653,9 @@ export const turns = (harness: ConformanceHarness) => {
               ]);
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) => execution.stopped(second!.id)),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.stopped(second!.id),
+                ),
               );
               yield* accept(workspace.id);
               const [third] = yield* turnsOf(workspace.id, threadId);
@@ -644,10 +664,10 @@ export const turns = (harness: ConformanceHarness) => {
               // A failure ends the turn with its reason.
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(third!.id, selection);
-                    yield* execution.fail(third!.id, "The model provider is unavailable.");
+                    yield* turnExecution.start(third!.id, selection);
+                    yield* turnExecution.fail(third!.id, "The model provider is unavailable.");
                   }),
                 ),
               );
@@ -696,7 +716,9 @@ export const turns = (harness: ConformanceHarness) => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turns) => turns.retry(turnId)),
+                  Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+                    turnApplication.retry(turnId),
+                  ),
                 );
               const flags = (views: ReadonlyArray<Turn.View>) =>
                 views.map(({ status, stoppable, retryable }) => ({ status, stoppable, retryable }));
@@ -713,16 +735,16 @@ export const turns = (harness: ConformanceHarness) => {
               const first = batch("b1", "Scout, draft the notes.");
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(queued!.id, selection);
-                    yield* execution.submitted(queued!.id, {
+                    yield* turnExecution.start(queued!.id, selection);
+                    yield* turnExecution.submitted(queued!.id, {
                       batchId: first.id,
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* execution.report(queued!.id, reported(took(first)));
-                    yield* execution.fail(queued!.id, "The model provider is unavailable.");
+                    yield* turnExecution.report(queued!.id, reported(took(first)));
+                    yield* turnExecution.fail(queued!.id, "The model provider is unavailable.");
                   }),
                 ),
               );
@@ -767,8 +789,8 @@ export const turns = (harness: ConformanceHarness) => {
               expect(
                 yield* execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) =>
-                    execution.prepare(retried.id),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.prepare(retried.id),
                   ),
                 ),
               ).toMatchObject({
@@ -795,19 +817,19 @@ export const turns = (harness: ConformanceHarness) => {
               const request = batch(`${retried.id}/retry`, "Please try that again.");
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(retried.id, selection);
-                    yield* execution.submitted(retried.id, {
+                    yield* turnExecution.start(retried.id, selection);
+                    yield* turnExecution.submitted(retried.id, {
                       batchId: request.id,
                       throughSequence: started.activity.sequence,
                       items: request.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       retried.id,
                       reported(took(request), ...answered("r1", "The notes.")),
                     );
-                    yield* execution.close(retried.id);
+                    yield* turnExecution.close(retried.id);
                   }),
                 ),
               );
@@ -836,7 +858,9 @@ export const turns = (harness: ConformanceHarness) => {
               const prepare = (turnId: Turn.Id) =>
                 execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) => execution.prepare(turnId)),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.prepare(turnId),
+                  ),
                 );
               const reasoning: Transcript.ResponsePart = {
                 _tag: "Reasoning",
@@ -851,15 +875,15 @@ export const turns = (harness: ConformanceHarness) => {
               const asked = batch("b1", "Scout, when is the deploy?");
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(first!.id, selection);
-                    yield* execution.submitted(first!.id, {
+                    yield* turnExecution.start(first!.id, selection);
+                    yield* turnExecution.submitted(first!.id, {
                       batchId: asked.id,
                       throughSequence: started.activity.sequence,
                       items: asked.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       first!.id,
                       reported(
                         took(asked),
@@ -872,7 +896,7 @@ export const turns = (harness: ConformanceHarness) => {
                         ...answered("s1/1", "Thursday.", 1),
                       ),
                     );
-                    yield* execution.close(first!.id);
+                    yield* turnExecution.close(first!.id);
                   }),
                 ),
               );
@@ -910,15 +934,15 @@ export const turns = (harness: ConformanceHarness) => {
               const followUp = batch("b2", "And the rollback plan?");
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(second!.id, selection);
-                    yield* execution.submitted(second!.id, {
+                    yield* turnExecution.start(second!.id, selection);
+                    yield* turnExecution.submitted(second!.id, {
                       batchId: followUp.id,
                       throughSequence: more.activity.sequence,
                       items: followUp.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       second!.id,
                       reported(took(followUp), {
                         _tag: "BlockCompleted",
@@ -933,11 +957,15 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnApplication.Service, (turns) => turns.cancel(second!.id)),
+                Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+                  turnApplication.cancel(second!.id),
+                ),
               );
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) => execution.stopped(second!.id)),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.stopped(second!.id),
+                ),
               );
               const last = yield* reply(workspace.id, threadId, "Never mind, just the date.");
               yield* accept(workspace.id);
@@ -967,10 +995,10 @@ export const turns = (harness: ConformanceHarness) => {
               const dateOnly = batch("b3", "Never mind, just the date.");
               const recorded = yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(third!.id, selection);
-                    return yield* execution.checkpoint(third!.id, {
+                    yield* turnExecution.start(third!.id, selection);
+                    return yield* turnExecution.checkpoint(third!.id, {
                       summary,
                       kept: [],
                       through: null,
@@ -991,18 +1019,18 @@ export const turns = (harness: ConformanceHarness) => {
               });
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.submitted(third!.id, {
+                    yield* turnExecution.submitted(third!.id, {
                       batchId: dateOnly.id,
                       throughSequence: last.activity.sequence,
                       items: dateOnly.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       third!.id,
                       reported(took(dateOnly), ...answered("s3/1", "Thursday.")),
                     );
-                    yield* execution.close(third!.id);
+                    yield* turnExecution.close(third!.id);
                   }),
                 ),
               );
@@ -1042,14 +1070,16 @@ export const turns = (harness: ConformanceHarness) => {
               const [first] = yield* turnsOf(workspace.id, threadId);
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
-                  execution.start(first!.id, selection),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.start(first!.id, selection),
                 ),
               );
               yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(TurnApplication.Service, (turns) => turns.cancel(first!.id)),
+                Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+                  turnApplication.cancel(first!.id),
+                ),
               );
               // A hundred messages ask for the agent's work while its turn is still stopping.
               yield* Effect.forEach(
@@ -1064,7 +1094,9 @@ export const turns = (harness: ConformanceHarness) => {
               ]);
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) => execution.stopped(first!.id)),
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                  turnExecution.stopped(first!.id),
+                ),
               );
               expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
               const [next] = yield* turnsOf(workspace.id, threadId);
@@ -1096,8 +1128,8 @@ export const turns = (harness: ConformanceHarness) => {
               const asked = yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-                  messages.publish({
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
                     threadId,
                     text: "Scout, catch up and summarize.",
                     mentions: [agent.memberId],
@@ -1109,7 +1141,9 @@ export const turns = (harness: ConformanceHarness) => {
               const prepare = (turnId: Turn.Id) =>
                 execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) => execution.prepare(turnId)),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.prepare(turnId),
+                  ),
                 );
               const joined = yield* prepare(first!.id);
               expect(joined._tag).toBe("Ready");
@@ -1124,22 +1158,22 @@ export const turns = (harness: ConformanceHarness) => {
               const took = batch("b1", "Scout, catch up and summarize.");
               yield* execute(
                 workspace.id,
-                Effect.flatMap(TurnExecution.Service, (execution) =>
+                Effect.flatMap(TurnExecution.Service, (turnExecution) =>
                   Effect.gen(function* () {
-                    yield* execution.start(first!.id, selection);
-                    yield* execution.submitted(first!.id, {
+                    yield* turnExecution.start(first!.id, selection);
+                    yield* turnExecution.submitted(first!.id, {
                       batchId: took.id,
                       throughSequence: asked.activity.sequence,
                       items: took.items,
                     });
-                    yield* execution.report(
+                    yield* turnExecution.report(
                       first!.id,
                       reported(
                         { _tag: "InputIncorporated", batch: took },
                         ...answered("s1/1", "Here is the summary."),
                       ),
                     );
-                    yield* execution.close(first!.id);
+                    yield* turnExecution.close(first!.id);
                   }),
                 ),
               );
@@ -1176,8 +1210,8 @@ export const turns = (harness: ConformanceHarness) => {
             const participants = yield* as(
               workspace.id,
               identity,
-              Effect.flatMap(ThreadApplication.Service, (threads) =>
-                threads.listParticipants(threadId, { limit: 10 }),
+              Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                threadApplication.listParticipants(threadId, { limit: 10 }),
               ),
             );
             const mine = participants.find(
@@ -1188,8 +1222,10 @@ export const turns = (harness: ConformanceHarness) => {
             yield* as(
               workspace.id,
               identity,
-              Effect.flatMap(ThreadParticipationApplication.Service, (participation) =>
-                participation.unfollow({ threadId, participationId: mine!.id }),
+              Effect.flatMap(
+                ThreadParticipationApplication.Service,
+                (threadParticipationApplication) =>
+                  threadParticipationApplication.unfollow({ threadId, participationId: mine!.id }),
               ),
             );
             // Taking work in does not look for departures; the process that stops them does.
@@ -1214,7 +1250,9 @@ export const turns = (harness: ConformanceHarness) => {
                 as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(TurnApplication.Service, (turns) => turns.retry(stopped!.id)),
+                  Effect.flatMap(TurnApplication.Service, (turnApplication) =>
+                    turnApplication.retry(stopped!.id),
+                  ),
                 ),
               ),
             ).toMatchObject({ _tag: "TurnApplication.NotRetryable", reason: "departed" });
@@ -1240,8 +1278,8 @@ export const turns = (harness: ConformanceHarness) => {
               const participants = yield* as(
                 workspace.id,
                 identity,
-                Effect.flatMap(ThreadApplication.Service, (threads) =>
-                  threads.listParticipants(threadId, { limit: 10 }),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.listParticipants(threadId, { limit: 10 }),
                 ),
               );
               const mine = participants.find(
@@ -1252,16 +1290,21 @@ export const turns = (harness: ConformanceHarness) => {
               yield* as(
                 workspace.id,
                 identity,
-                Effect.flatMap(ThreadParticipationApplication.Service, (participation) =>
-                  participation.unfollow({ threadId, participationId: mine!.id }),
+                Effect.flatMap(
+                  ThreadParticipationApplication.Service,
+                  (threadParticipationApplication) =>
+                    threadParticipationApplication.unfollow({
+                      threadId,
+                      participationId: mine!.id,
+                    }),
                 ),
               );
               // Asked again before its turn there is stopped, the agent takes part anew.
               const asked = yield* as(
                 workspace.id,
                 alice,
-                Effect.flatMap(ThreadMessageApplication.Service, (messages) =>
-                  messages.publish({
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
                     threadId,
                     text: "Scout, come back to this.",
                     mentions: [agent.memberId],
@@ -1346,8 +1389,8 @@ export const turns = (harness: ConformanceHarness) => {
                   as(
                     workspace.id,
                     bob,
-                    Effect.flatMap(ThreadApplication.Service, (threads) =>
-                      threads.readTimeline(threadId, { limit: 50 }),
+                    Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                      threadApplication.readTimeline(threadId, { limit: 50 }),
                     ),
                   ),
                 ),
@@ -1376,8 +1419,8 @@ export const turns = (harness: ConformanceHarness) => {
                 alice,
                 Effect.gen(function* () {
                   const { memberId } = yield* Actor.Service;
-                  const groups = yield* GroupApplication.Service;
-                  return yield* groups.createTeam({
+                  const groupApplication = yield* GroupApplication.Service;
+                  return yield* groupApplication.createTeam({
                     name: "Planning",
                     memberIds: [memberId, reader.id, agent.memberId],
                   });
@@ -1388,8 +1431,8 @@ export const turns = (harness: ConformanceHarness) => {
                 const started = yield* as(
                   workspace.id,
                   alice,
-                  Effect.flatMap(ThreadApplication.Service, (threads) =>
-                    threads.startInGroup({
+                  Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                    threadApplication.startInGroup({
                       groupId,
                       text: "Scout, draft the plan.",
                       mentions: [agent.memberId],
@@ -1402,14 +1445,14 @@ export const turns = (harness: ConformanceHarness) => {
                 const draft = (text: string, offset: number) =>
                   execute(
                     workspace.id,
-                    Effect.flatMap(TurnExecution.Service, (execution) =>
-                      execution.draft(turnId, { responseId: "r1", part: 0, offset, text }),
+                    Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                      turnExecution.draft(turnId, { responseId: "r1", part: 0, offset, text }),
                     ),
                   );
                 yield* execute(
                   workspace.id,
-                  Effect.flatMap(TurnExecution.Service, (execution) =>
-                    execution.start(turnId, selection),
+                  Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                    turnExecution.start(turnId, selection),
                   ),
                 );
                 const next = yield* followLog(workspace.id, turnId, bob);
@@ -1424,15 +1467,18 @@ export const turns = (harness: ConformanceHarness) => {
               const [membership] = (yield* as(
                 workspace.id,
                 bob,
-                Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-                  memberships.listCurrent(team.id, { limit: 10 }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.listCurrent(team.id, { limit: 10 }),
                 ),
               )).filter((admission) => admission.memberId === reader.id);
               yield* as(
                 workspace.id,
                 bob,
-                Effect.flatMap(GroupMembershipApplication.Service, (memberships) =>
-                  memberships.leave({ groupId: team.id, membershipId: membership!.id }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.leave({
+                    groupId: team.id,
+                    membershipId: membership!.id,
+                  }),
                 ),
               );
               expect(yield* left.next).toBe("unavailable");

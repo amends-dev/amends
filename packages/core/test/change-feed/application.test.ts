@@ -300,7 +300,8 @@ const committed = (message: ChangeFeed.Message) => {
   if (message._tag !== "Committed") throw new Error(`Expected a commit, got ${message._tag}`);
   return message;
 };
-const signal = (value: Signal.Value) => Effect.flatMap(Signals.Service, (s) => s.publish(value));
+const signal = (value: Signal.Value) =>
+  Effect.flatMap(Signals.Service, (signals) => signals.publish(value));
 const typing = (thread: Thread.Id, group: Group.Id, memberId = bobMember) =>
   Signal.Value.cases.Typing.make({
     workspaceId,
@@ -419,9 +420,11 @@ it.effect("a cursor past the head, or further behind than the replay limit, rese
 it.effect("invalid cursors are rejected before subscribing", () =>
   run(() =>
     Effect.gen(function* () {
-      const application = yield* ChangeFeedApplication.Service;
+      const changeFeedApplication = yield* ChangeFeedApplication.Service;
       for (const after of ["-1", "01", "1.5", "x", "9007199254740993"]) {
-        const error = yield* Effect.flip(application.watch({ after: after as ChangeFeed.Cursor }));
+        const error = yield* Effect.flip(
+          changeFeedApplication.watch({ after: after as ChangeFeed.Cursor }),
+        );
         expect(Schema.isSchemaError(error)).toBe(true);
       }
     }),
@@ -990,8 +993,8 @@ it.effect("a slow subscriber catches up from the journal instead of losing commi
   run(
     () =>
       Effect.gen(function* () {
-        const application = yield* ChangeFeedApplication.Service;
-        const slow = yield* application.watch();
+        const changeFeedApplication = yield* ChangeFeedApplication.Service;
+        const slow = yield* changeFeedApplication.watch();
         const fast = yield* listen();
         yield* fast.next;
         for (const id of ["a", "b", "c", "d", "e"])

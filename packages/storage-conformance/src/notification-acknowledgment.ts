@@ -74,9 +74,13 @@ export const notificationAcknowledgment = (harness: Harness) => {
         Effect.provide(core(bound)),
       );
     const ack = (id: Notification.Id) =>
-      Effect.flatMap(NotificationApplication.Service, (s) => s.acknowledge(id));
+      Effect.flatMap(NotificationApplication.Service, (notificationApplication) =>
+        notificationApplication.acknowledge(id),
+      );
     const resolve = (id: Notification.Id) =>
-      Effect.flatMap(NotificationApplication.Service, (s) => s.resolveSource(id));
+      Effect.flatMap(NotificationApplication.Service, (notificationApplication) =>
+        notificationApplication.resolveSource(id),
+      );
     /** A member's inbox, as their membership. */
     const notes = (bound: Bound, member: Actor.Value) =>
       bound.notifications.listByRecipient(Notification.ofMember(member.memberId, member.identity), {
@@ -126,8 +130,8 @@ export const notificationAcknowledgment = (harness: Harness) => {
       const group = yield* run(
         bound,
         owner,
-        Effect.flatMap(GroupApplication.Service, (s) =>
-          s.createTeam({
+        Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+          groupApplication.createTeam({
             name: "Team",
             memberIds: [owner.memberId, human.memberId, agent.memberId, writer.memberId],
           }),
@@ -136,9 +140,9 @@ export const notificationAcknowledgment = (harness: Harness) => {
       const first = yield* run(
         bound,
         writer,
-        Effect.flatMap(ThreadApplication.Service, (s) =>
+        Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
           // Mentioning the three others enrolls and notifies them; the writer is not notified.
-          s.startInGroup({
+          threadApplication.startInGroup({
             groupId: group.id,
             mentions: [owner.memberId, human.memberId, agent.memberId],
             text: "Proposal",
@@ -247,8 +251,12 @@ export const notificationAcknowledgment = (harness: Harness) => {
               yield* run(
                 p.bound,
                 writer,
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({ threadId: p.first.thread.id, text: "Any thoughts?", mentions: [] }),
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
+                    threadId: p.first.thread.id,
+                    text: "Any thoughts?",
+                    mentions: [],
+                  }),
                 ),
               );
               const [older, newer] = yield* pending();
@@ -313,17 +321,19 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 p.bound,
                 human,
                 Effect.gen(function* () {
-                  const application = yield* NotificationApplication.Service;
+                  const notificationApplication = yield* NotificationApplication.Service;
                   yield* run(
                     p.bound,
                     p.owner,
-                    Effect.flatMap(MemberApplication.Service, (s) => s.remove(human.memberId)),
+                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                      memberApplication.remove(human.memberId),
+                    ),
                   );
-                  expect(yield* Effect.flip(application.acknowledge(p.humanNote.id))).toMatchObject(
-                    {
-                      _tag: "Authorization.InvalidActor",
-                    },
-                  );
+                  expect(
+                    yield* Effect.flip(notificationApplication.acknowledge(p.humanNote.id)),
+                  ).toMatchObject({
+                    _tag: "Authorization.InvalidActor",
+                  });
                 }),
               );
               // Removal from the workspace ended their access, which settled what was pending.
@@ -377,8 +387,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
               yield* run(
                 p.bound,
                 human,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.leave({ groupId: p.group.id, membershipId: admission.id }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.leave({
+                    groupId: p.group.id,
+                    membershipId: admission.id,
+                  }),
                 ),
               );
               expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
@@ -434,8 +447,8 @@ export const notificationAcknowledgment = (harness: Harness) => {
               const elsewhere = yield* run(
                 p.bound,
                 p.owner,
-                Effect.flatMap(GroupApplication.Service, (s) =>
-                  s.createTeam({
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.createTeam({
                     name: "Elsewhere",
                     memberIds: [p.owner.memberId, human.memberId],
                   }),
@@ -444,8 +457,12 @@ export const notificationAcknowledgment = (harness: Harness) => {
               yield* run(
                 p.bound,
                 p.owner,
-                Effect.flatMap(ThreadApplication.Service, (s) =>
-                  s.startInGroup({ groupId: elsewhere.id, mentions: [human.memberId], text: "Hi" }),
+                Effect.flatMap(ThreadApplication.Service, (threadApplication) =>
+                  threadApplication.startInGroup({
+                    groupId: elsewhere.id,
+                    mentions: [human.memberId],
+                    text: "Hi",
+                  }),
                 ),
               );
               const other = (yield* notes(p.bound, human)).find(
@@ -459,8 +476,8 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 run(
                   p.bound,
                   human,
-                  Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                    s.leave({ groupId: p.group.id, membershipId }),
+                  Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                    groupMembershipApplication.leave({ groupId: p.group.id, membershipId }),
                   ),
                 );
               // The human leaves Team after the notification was read as pending, before Seen.
@@ -475,15 +492,15 @@ export const notificationAcknowledgment = (harness: Harness) => {
               yield* run(
                 p.bound,
                 p.owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                  s.add({ groupId: p.group.id, memberId: human.memberId }),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.add({ groupId: p.group.id, memberId: human.memberId }),
                 ),
               );
               yield* run(
                 p.bound,
                 writer,
-                Effect.flatMap(ThreadMessageApplication.Service, (s) =>
-                  s.publish({
+                Effect.flatMap(ThreadMessageApplication.Service, (threadMessageApplication) =>
+                  threadMessageApplication.publish({
                     threadId: p.first.thread.id,
                     mentions: [human.memberId],
                     text: "Again",
@@ -504,8 +521,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 yield* run(
                   racingSeen(p.bound, leave(rejoined.id)),
                   human,
-                  Effect.flatMap(NotificationApplication.Service, (s) =>
-                    s.acknowledgeThrough({ recordedAt: through.recordedAt, id: through.id }),
+                  Effect.flatMap(NotificationApplication.Service, (notificationApplication) =>
+                    notificationApplication.acknowledgeThrough({
+                      recordedAt: through.recordedAt,
+                      id: through.id,
+                    }),
                   ),
                 ),
               ).toBe(1);
@@ -550,8 +570,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
             const leaving = yield* run(
               pausing,
               human,
-              Effect.flatMap(GroupMembershipApplication.Service, (s) =>
-                s.leave({ groupId: p.group.id, membershipId: admission.id }),
+              Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                groupMembershipApplication.leave({
+                  groupId: p.group.id,
+                  membershipId: admission.id,
+                }),
               ),
             ).pipe(Effect.forkChild);
             yield* Deferred.await(reached);
@@ -568,7 +591,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
             yield* storage.discardProjections;
             yield* facts(
               p.bound,
-              Effect.flatMap(Journal.Service, (j) => j.replay),
+              Effect.flatMap(Journal.Service, (journal) => journal.replay),
             );
             expect(yield* p.bound.notifications.get(p.humanNote.id)).toEqual(live);
           }),
@@ -626,11 +649,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
             const operation = run(
               p.bound,
               p.owner,
-              Effect.flatMap(Journal.Service, (j) =>
-                j.commit(
+              Effect.flatMap(Journal.Service, (journal) =>
+                journal.commit(
                   Effect.gen(function* () {
-                    yield* Effect.flatMap(MemberApplication.Service, (s) =>
-                      s.remove(human.memberId),
+                    yield* Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                      memberApplication.remove(human.memberId),
                     );
                     return yield* ack(p.humanNote.id).pipe(
                       Effect.provideService(Actor.Service, human),
@@ -666,14 +689,21 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   yield* run(
                     p.bound,
                     agent,
-                    Effect.flatMap(ThreadParticipationApplication.Service, (s) =>
-                      s.unfollow({ threadId: p.first.thread.id, participationId: participant.id }),
+                    Effect.flatMap(
+                      ThreadParticipationApplication.Service,
+                      (threadParticipationApplication) =>
+                        threadParticipationApplication.unfollow({
+                          threadId: p.first.thread.id,
+                          participationId: participant.id,
+                        }),
                     ),
                   );
                   yield* run(
                     p.bound,
                     p.owner,
-                    Effect.flatMap(MemberApplication.Service, (s) => s.remove(human.memberId)),
+                    Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+                      memberApplication.remove(human.memberId),
+                    ),
                   );
                   return {
                     result,
@@ -693,7 +723,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   yield* TestClock.adjust("2 hours");
                   yield* facts(
                     bound,
-                    Effect.flatMap(Journal.Service, (j) => j.replay),
+                    Effect.flatMap(Journal.Service, (journal) => journal.replay),
                   );
                   expect(yield* notes(bound, human)).toEqual([saved.result]);
                   expect(yield* notes(bound, agent)).toEqual(saved.agent);
@@ -708,7 +738,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   const live = yield* bound.checkpoints.listLive(journalLog);
                   yield* facts(
                     bound,
-                    Effect.flatMap(Journal.Service, (j) => j.replay),
+                    Effect.flatMap(Journal.Service, (journal) => journal.replay),
                   );
                   expect(yield* bound.checkpoints.listLive(journalLog)).toEqual(live);
                   expect(yield* history(bound)).toEqual(saved.history);

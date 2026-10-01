@@ -171,9 +171,9 @@ it.effect("a run acts as its process and reports what it left outstanding", () =
       }),
     });
     const outcome = yield* Effect.gen(function* () {
-      const runs = yield* BackgroundRuns.Service;
-      expect(runs.names).toEqual(["test.count"]);
-      const outcome = yield* runs.run("test.count");
+      const backgroundRuns = yield* BackgroundRuns.Service;
+      expect(backgroundRuns.names).toEqual(["test.count"]);
+      const outcome = yield* backgroundRuns.run("test.count");
       const [batch] = yield* (yield* Journal.Service).log.read({ limit: 1 });
       return { outcome, performer: batch?.entries[0]?.payload.provenance.performedBy };
     }).pipe(Effect.provide(yield* runsWith([counting])));
@@ -192,10 +192,10 @@ it.effect("a run of an unknown or failing process reports which", () =>
       run: Effect.fail(new Stuck()),
     });
     const failures = yield* Effect.gen(function* () {
-      const runs = yield* BackgroundRuns.Service;
+      const backgroundRuns = yield* BackgroundRuns.Service;
       return [
-        yield* Effect.flip(runs.run("test.missing")),
-        yield* Effect.flip(runs.run("test.fail")),
+        yield* Effect.flip(backgroundRuns.run("test.missing")),
+        yield* Effect.flip(backgroundRuns.run("test.fail")),
       ];
     }).pipe(Effect.provide(yield* runsWith([failing])));
     expect(failures).toEqual([

@@ -40,8 +40,8 @@ const cluster = (url: string) => {
 };
 
 const wakeIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
-  Effect.flatMap(WorkspaceWakes.Service, (wakes) =>
-    wakes.forWorkspace(id).request(process, { at }),
+  Effect.flatMap(WorkspaceWakes.Service, (workspaceWakes) =>
+    workspaceWakes.forWorkspace(id).request(process, { at }),
   ).pipe(
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),

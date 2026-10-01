@@ -47,8 +47,8 @@ it.effect.each(["make", "layer"] as const)(
         Changed,
         Effect.fn("ServiceTest.audit")(function* (event) {
           yield* (yield* Audit).check;
-          const native = yield* Store.Transaction;
-          expect(native.id).toBe(event.commitId);
+          const storeTransaction = yield* Store.Transaction;
+          expect(storeTransaction.id).toBe(event.commitId);
           yield* Effect.addFinalizer(() => Ref.update(finalized, (count) => count + 1));
         }),
       );
@@ -180,8 +180,8 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       }),
     );
     yield* Effect.gen(function* () {
-      const logs = yield* Log.Service;
-      const journal = yield* logs.commit(
+      const log = yield* Log.Service;
+      const journal = yield* log.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
           return yield* Journal.make({ logId: Log.Id.make("domain"), projections: [scoped] });
@@ -205,7 +205,7 @@ it.effect("binding inside an earlier commit never reuses its transaction or scop
       yield* source
         .publish(Changed, 4)
         .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-      const bound = yield* logs.commit(
+      const bound = yield* log.commit(
         Effect.gen(function* () {
           boundIn.add((yield* Store.Transaction).id);
           return yield* Projection.makeRunner({ definition: scoped, log: source.log });

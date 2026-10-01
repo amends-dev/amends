@@ -65,12 +65,12 @@ export const groupMemberships = (harness: Harness) => {
       id: Identity.HumanId.make("manager"),
     });
     const add = (groupId: Group.Id, memberId: Member.Id) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.add({ groupId, memberId }),
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.add({ groupId, memberId }),
       );
     const create = (name: string, memberIds: ReadonlyArray<Member.Id> = []) =>
-      Effect.flatMap(GroupApplication.Service, (service) =>
-        service.createTeam({ name, memberIds }),
+      Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+        groupApplication.createTeam({ name, memberIds }),
       );
     const run = <A, E, R>(bound: Bound, actor: Actor.Value, effect: Effect.Effect<A, E, R>) =>
       effect.pipe(Effect.provideService(Actor.Service, actor), Effect.provide(core(bound)));
@@ -147,21 +147,23 @@ export const groupMemberships = (harness: Harness) => {
       );
 
     const remove = (membership: GroupMembership.Record) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.remove({
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.remove({
           groupId: membership.groupId,
           membershipId: membership.id,
         }),
       );
     const leave = (membership: GroupMembership.Record) =>
-      Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-        service.leave({
+      Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+        groupMembershipApplication.leave({
           groupId: membership.groupId,
           membershipId: membership.id,
         }),
       );
     const removeWorkspaceMember = (id: Member.Id) =>
-      Effect.flatMap(MemberApplication.Service, (service) => service.remove(id));
+      Effect.flatMap(MemberApplication.Service, (memberApplication) =>
+        memberApplication.remove(id),
+      );
     const memberActor = (memberId: Member.Id) =>
       Actor.Value.make({
         workspaceId,
@@ -447,16 +449,16 @@ export const groupMemberships = (harness: Harness) => {
               );
               const human = memberActor(humanId);
               const createTeam = (name: string, visibility: Group.Visibility) =>
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.createTeam({ name, memberIds: [humanId], visibility }),
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.createTeam({ name, memberIds: [humanId], visibility }),
                 );
               const flags = (actor: Actor.Value, groupId: Group.Id) =>
                 run(
                   bound,
                   actor,
                   Effect.map(
-                    Effect.flatMap(GroupApplication.Service, (service) =>
-                      service.listMine({ limit: 100 }),
+                    Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                      groupApplication.listMine({ limit: 100 }),
                     ),
                     (items) => {
                       const item = items.find((listed) => listed.group.id === groupId);
@@ -486,8 +488,8 @@ export const groupMemberships = (harness: Harness) => {
               yield* run(
                 bound,
                 owner,
-                Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-                  service.join(lobby.id),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.join(lobby.id),
                 ),
               );
               expect(yield* flags(owner, lobby.id)).toEqual([true, true, true]);
@@ -529,14 +531,16 @@ export const groupMemberships = (harness: Harness) => {
                 ),
               );
               const createPublic = (name: string, memberIds: ReadonlyArray<Member.Id>) =>
-                Effect.flatMap(GroupApplication.Service, (service) =>
-                  service.createTeam({ name, memberIds, visibility: "Public" }),
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.createTeam({ name, memberIds, visibility: "Public" }),
                 );
               const listPublic = (options: Group.ListOptions) =>
-                Effect.flatMap(GroupApplication.Service, (service) => service.listPublic(options));
+                Effect.flatMap(GroupApplication.Service, (groupApplication) =>
+                  groupApplication.listPublic(options),
+                );
               const join = (groupId: Group.Id) =>
-                Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-                  service.join(groupId),
+                Effect.flatMap(GroupMembershipApplication.Service, (groupMembershipApplication) =>
+                  groupMembershipApplication.join(groupId),
                 );
               const lobby = yield* run(bound, owner, createPublic("Lobby", [managerId]));
               const quiet = yield* run(bound, owner, createPublic("Quiet", []));
@@ -795,10 +799,13 @@ export const groupMemberships = (harness: Harness) => {
                     bound,
                     saved.owner,
                     Effect.gen(function* () {
-                      const service = yield* GroupMembershipApplication.Service;
+                      const groupMembershipApplication = yield* GroupMembershipApplication.Service;
                       yield* Deferred.succeed(ready, undefined);
                       yield* Deferred.await(start);
-                      return yield* service.add({ groupId: saved.group.id, memberId: humanId });
+                      return yield* groupMembershipApplication.add({
+                        groupId: saved.group.id,
+                        memberId: humanId,
+                      });
                     }),
                   );
                 }),
@@ -1200,8 +1207,10 @@ export const groupMemberships = (harness: Harness) => {
                       run(
                         bound,
                         operation === "remove" ? owner : actor,
-                        Effect.flatMap(GroupMembershipApplication.Service, (service) =>
-                          service[operation](input),
+                        Effect.flatMap(
+                          GroupMembershipApplication.Service,
+                          (groupMembershipApplication) =>
+                            groupMembershipApplication[operation](input),
                         ),
                       ),
                     ),

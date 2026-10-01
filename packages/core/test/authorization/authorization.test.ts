@@ -283,7 +283,9 @@ it.effect("permitted reports each requirement in order without failing on denial
       ],
     );
     const permitted = (requirements: ReadonlyArray<Requirement.Value>) =>
-      Effect.flatMap(Authorization.Service, (service) => service.permitted(requirements));
+      Effect.flatMap(Authorization.Service, (authorization) =>
+        authorization.permitted(requirements),
+      );
     expect(
       yield* run(fixture, permitted([readBob, removeBob, removeCharlie, readCharlie])),
     ).toEqual([true, true, false, true]);

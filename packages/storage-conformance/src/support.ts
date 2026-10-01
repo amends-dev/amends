@@ -328,8 +328,8 @@ export const publishedMessage = (activity: ThreadActivity.Record) =>
 export const placed = Effect.fnUntraced(function* <
   A extends { readonly message: ThreadMessage.Record },
 >(result: A) {
-  const activities = yield* ThreadActivityStore.Service;
-  const found = (yield* activities.listByThread(result.message.threadId)).find(
+  const threadActivityStore = yield* ThreadActivityStore.Service;
+  const found = (yield* threadActivityStore.listByThread(result.message.threadId)).find(
     (activity) => publishedMessage(activity) === result.message.id,
   );
   if (found === undefined) return yield* Effect.die(new Error("A posted message has no activity"));

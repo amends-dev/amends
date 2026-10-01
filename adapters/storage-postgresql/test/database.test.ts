@@ -36,8 +36,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         withDatabase((url) =>
           Effect.gen(function* () {
             const program = Effect.gen(function* () {
-              const database = yield* PostgresDatabase.Service;
-              expect(database.sql).toBe(yield* SqlClient.SqlClient);
+              const postgresDatabase = yield* PostgresDatabase.Service;
+              expect(postgresDatabase.sql).toBe(yield* SqlClient.SqlClient);
               const bound = yield* (yield* views()).forWorkspace(workspaceId);
               const record = yield* initialized(bound);
               expect(yield* bound.invitations.list).toEqual([]);
@@ -72,10 +72,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
         const opened = yield* Effect.forEach(
           Array.range(1, 4),
           () =>
-            Effect.flatMap(PostgresDatabase.Service, (database) => database.sql`SELECT 1`).pipe(
-              Effect.provide(database(url)),
-              Effect.exit,
-            ),
+            Effect.flatMap(
+              PostgresDatabase.Service,
+              (postgresDatabase) => postgresDatabase.sql`SELECT 1`,
+            ).pipe(Effect.provide(database(url)), Effect.exit),
           { concurrency: "unbounded" },
         );
         expect(opened.filter((exit) => exit._tag === "Failure")).toEqual([]);
@@ -172,16 +172,20 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 ),
               )
               .pipe(Effect.provideService(Publication.Service, testProvenance()));
-            const groups = yield* GroupApplication.Service;
-            const threads = yield* ThreadApplication.Service;
+            const groupApplication = yield* GroupApplication.Service;
+            const threadApplication = yield* ThreadApplication.Service;
             return yield* Effect.forEach([memberIds.slice(0, 10), memberIds.slice(10)], (members) =>
               Effect.gen(function* () {
-                const group = yield* groups.createTeam({
+                const group = yield* groupApplication.createTeam({
                   name: "Team",
                   memberIds: [owner.memberId, ...members],
                 });
                 return yield* Effect.forEach(Array.range(1, 6), () =>
-                  threads.startInGroup({ groupId: group.id, text: "Hello", mentions: members }),
+                  threadApplication.startInGroup({
+                    groupId: group.id,
+                    text: "Hello",
+                    mentions: members,
+                  }),
                 );
               }),
             ).pipe(Effect.map(Array.flatten), Effect.provideService(Actor.Service, owner));

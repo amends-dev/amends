@@ -293,7 +293,7 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const journal = yield* Journal.Service;
-          const application = yield* MemberApplication.Service;
+          const memberApplication = yield* MemberApplication.Service;
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal
@@ -307,7 +307,7 @@ it.effect(
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: bob.id })
                 .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-              expect(yield* application.get(bob.id)).toMatchObject({
+              expect(yield* memberApplication.get(bob.id)).toMatchObject({
                 id: bob.id,
                 status: "removed",
               });
@@ -334,7 +334,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
       fixture,
       Effect.gen(function* () {
         const journal = yield* Journal.Service;
-        const application = yield* MemberApplication.Service;
+        const memberApplication = yield* MemberApplication.Service;
         return yield* journal.commit(
           Effect.gen(function* () {
             yield* journal
@@ -344,7 +344,7 @@ it.effect("a staged revocation denies the read and rolls back the enclosing comm
                 memberId: alice.memberId,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            return yield* application.get(bob.id);
+            return yield* memberApplication.get(bob.id);
           }),
         );
       }).pipe(Effect.flip),
@@ -507,7 +507,7 @@ it.effect(
       const granted = assignment("remove-bob", bobScope, MemberPermissions.Remove);
       const program = Effect.gen(function* () {
         const journal = yield* Journal.Service;
-        const application = yield* MemberApplication.Service;
+        const memberApplication = yield* MemberApplication.Service;
         return yield* journal.commit(
           Effect.gen(function* () {
             yield* journal
@@ -518,7 +518,7 @@ it.effect(
                 source: granted.source,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            return yield* application.remove(bob.id);
+            return yield* memberApplication.remove(bob.id);
           }),
         );
       });
@@ -551,7 +551,10 @@ it.effect(
   "listing returns the memberships the actor may read, including removed ones, and nothing more",
   () =>
     Effect.gen(function* () {
-      const list = Effect.flatMap(MemberApplication.Service, (service) => service.list);
+      const list = Effect.flatMap(
+        MemberApplication.Service,
+        (memberApplication) => memberApplication.list,
+      );
       const fixture = yield* make();
       yield* seed(fixture, [assignment("read-bob")]);
       // An exact grant sees that member only; the actor's own record needs its own grant.

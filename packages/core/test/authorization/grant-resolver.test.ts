@@ -165,7 +165,7 @@ it.effect(
       const roleAssignmentId = Assignment.Id.make("role-assignment");
       const directAssignmentId = Assignment.Id.make("direct-assignment");
       yield* Effect.gen(function* () {
-        const resolver = yield* GrantResolver.Service;
+        const grantResolver = yield* GrantResolver.Service;
         const journal = yield* Journal.make({
           logId: Log.Id.make("workspace-one/journal"),
           projections: [RoleProjection.definition, AssignmentProjection.definition],
@@ -196,7 +196,7 @@ it.effect(
                 source: directSource(MemberPermissions.Read.name, memberScope),
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            expect(yield* resolver.resolve(memberId)).toHaveLength(3);
+            expect(yield* grantResolver.resolve(memberId)).toHaveLength(3);
           }),
         );
         yield* journal.commit(
@@ -215,12 +215,12 @@ it.effect(
                 memberId: memberId,
               })
               .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-            expect(yield* resolver.resolve(memberId)).toEqual([
+            expect(yield* grantResolver.resolve(memberId)).toEqual([
               Grant.make(MemberPermissions.Read, workspaceScope),
             ]);
           }),
         );
-        expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([
+        expect(yield* journal.commit(grantResolver.resolve(memberId))).toEqual([
           Grant.make(MemberPermissions.Read, workspaceScope),
         ]);
         yield* journal
@@ -230,7 +230,7 @@ it.effect(
             memberId: memberId,
           })
           .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-        expect(yield* journal.commit(resolver.resolve(memberId))).toEqual([]);
+        expect(yield* journal.commit(grantResolver.resolve(memberId))).toEqual([]);
       }).pipe(
         Effect.provide(Layer.mergeAll(configured(fixture), Log.layer)),
         Effect.provideService(Store.Service, fixture.store),
