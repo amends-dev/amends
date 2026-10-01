@@ -306,7 +306,7 @@ const registry: ReadonlyArray<Registered> = [
           ? [
               {
                 scope: Member.audienceOf(selected.recipient.memberId),
-                record: Notification.generated(
+                record: Notification.fromActivity(
                   event,
                   Object.assign({ groupId: event.payload.groupId }, event.payload.activity),
                   selected,

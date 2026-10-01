@@ -1,10 +1,14 @@
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Actor } from "../identity/actor.ts";
+import { Event } from "../journal/event.ts";
+import { Journal } from "../journal/journal.ts";
+import type { Log } from "../journal/log.ts";
+import { ThreadActivityFacts } from "../thread/activity/facts.ts";
+import { ThreadQuery } from "../thread/query.ts";
 
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
-import { NotificationSource } from "./source.ts";
 import { NotificationInbox } from "./inbox.ts";
 import type { Thread } from "../thread/thread.ts";
 import { Signal } from "../signal/signal.ts";
@@ -14,13 +18,12 @@ import { Store } from "../journal/store.ts";
 export { AlreadyHandled, HumanRecipientRequired, NotFound, SourceUnavailable } from "./errors.ts";
 
 export type Error = Authorization.Error | NotificationStore.Failure | Schema.SchemaError | NotFound;
-export type ResolveError =
-  | Error
-  | Exclude<NotificationSource.Error, NotificationSource.Unavailable>
-  | SourceUnavailable;
-export type InboxError =
-  | Exclude<Error, NotFound>
-  | Exclude<NotificationSource.Error, NotificationSource.Unavailable>;
+/** What reading a notification's source can fail with, besides it being unavailable. */
+export type SourceError =
+  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
+  | Log.ReadError;
+export type ResolveError = Error | SourceError | SourceUnavailable;
+export type InboxError = Exclude<Error, NotFound> | SourceError;
 export type AcknowledgeError =
   | Error
   | NotificationStore.Conflict
@@ -77,7 +80,7 @@ export class Service extends Context.Service<Service, Interface>()(
 
 const decodeOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));
-const sameRecipient = Schema.toEquivalence(Notification.Recipient);
+const isSameRecipient = Schema.toEquivalence(Notification.Recipient);
 const decodeCursor = Schema.decodeEffect(Schema.toType(NotificationStore.Cursor));
 /** IDs in binary lexical order, as stores order them: by code point. */
 const compareIds = (left: string, right: string) => {
@@ -88,7 +91,7 @@ const compareIds = (left: string, right: string) => {
   return a.length - b.length;
 };
 /** Whether a notification comes at or before a cursor in inbox order. */
-const atOrBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) => {
+const isAtOrBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) => {
   const byTime =
     DateTime.toEpochMillis(record.recordedAt) - DateTime.toEpochMillis(cursor.recordedAt);
   return byTime < 0 || (byTime === 0 && compareIds(record.id, cursor.id) <= 0);
@@ -106,37 +109,40 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   never,
   | NotificationStore.Service
   | Authorization.Service
-  | NotificationSource.Service
+  | Journal.Service
+  | ThreadQuery.Service
   | Signals.Service
   | Store.Service
 > {
   const notificationStore = yield* NotificationStore.Service;
   const signals = yield* Signals.Service;
   const authorization = yield* Authorization.Service;
-  const notificationSource = yield* NotificationSource.Service;
+  const journal = yield* Journal.Service;
+  const threadQuery = yield* ThreadQuery.Service;
   const { workspaceId } = yield* Store.Service;
 
-  const recipient = Effect.fnUntraced(function* () {
+  /** The acting member as a recipient, once their membership is checked. */
+  const requireRecipient = Effect.fnUntraced(function* () {
     yield* authorization.require([]);
     const actor = yield* Actor.Service;
     return Notification.ofMember(actor.memberId, actor.identity);
   });
 
   const get = Effect.fn("NotificationApplication.get")(function* (notificationId: Notification.Id) {
-    const target = yield* recipient();
+    const target = yield* requireRecipient();
     const id = yield* Schema.decodeEffect(Notification.Id)(notificationId);
     const found = yield* notificationStore.get(id);
     // Another recipient's notification reads as missing.
-    if (Option.isNone(found) || !sameRecipient(found.value.recipient, target))
+    if (Option.isNone(found) || !isSameRecipient(found.value.recipient, target))
       return yield* new NotFound({ workspaceId, notificationId: id });
     return found.value;
   });
 
-  const read = Effect.fnUntraced(function* (
+  const listForRecipient = Effect.fnUntraced(function* (
     options: NotificationStore.ReadOptions,
     pendingOnly: boolean,
   ) {
-    const target = yield* recipient();
+    const target = yield* requireRecipient();
     const request = yield* decodeOptions(options);
     return yield* pendingOnly
       ? notificationStore.listPendingByRecipient(target, request)
@@ -144,25 +150,47 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   });
 
   const list = Effect.fn("NotificationApplication.list")((options: NotificationStore.ReadOptions) =>
-    read(options, false),
+    listForRecipient(options, false),
   );
   const listPending = Effect.fn("NotificationApplication.listPending")(
-    (options: NotificationStore.ReadOptions) => read(options, true),
+    (options: NotificationStore.ReadOptions) => listForRecipient(options, true),
   );
 
-  /** The source of a notification the actor owns, or None where it is unavailable. */
-  const sourceOf = (notification: Notification.Record) =>
-    notificationSource.resolve(notification).pipe(
+  /**
+   * The timeline item a notification the actor owns points to, while they may still read it. None
+   * when they have lost access to it, or its source is not thread activity; access is current,
+   * whatever the notification's state.
+   */
+  const findSource = Effect.fnUntraced(function* (notification: Notification.Record) {
+    if (
+      notification.source.logId !== journal.log.id ||
+      (notification.recipient._tag !== "Human" && notification.recipient._tag !== "Agent")
+    )
+      return Option.none<Thread.TimelineItem>();
+    const found = yield* journal.log
+      .getEntry(notification.source.entryId)
+      .pipe(Effect.catchTag("SchemaError", Effect.die));
+    if (Option.isNone(found)) return Option.none<Thread.TimelineItem>();
+    const entry = found.value;
+    if (
+      entry.payload.name !== ThreadActivityFacts.Recorded.name ||
+      entry.payload.version !== ThreadActivityFacts.Recorded.version
+    )
+      return Option.none<Thread.TimelineItem>();
+    const event = yield* Effect.orDie(Event.decode(ThreadActivityFacts.Recorded, entry));
+    return yield* threadQuery.readTimelineItem(event.payload.activity.id).pipe(
       Effect.asSome,
-      Effect.catchTag("NotificationSource.Unavailable", () =>
-        Effect.succeed(Option.none<Thread.TimelineItem>()),
-      ),
+      Effect.catchTags({
+        "ThreadQuery.NotFound": () => Effect.succeedNone,
+        "Authorization.Denied": () => Effect.succeedNone,
+      }),
     );
+  });
   const resolveSource = Effect.fn("NotificationApplication.resolveSource")(function* (
     notificationId: Notification.Id,
   ) {
     const notification = yield* get(notificationId);
-    const found = yield* sourceOf(notification);
+    const found = yield* findSource(notification);
     if (Option.isNone(found))
       return yield* new SourceUnavailable({ notificationId: notification.id });
     return found.value;
@@ -170,7 +198,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   const inbox = Effect.fn("NotificationApplication.inbox")(function* (
     options: NotificationInbox.Options,
   ) {
-    const target = yield* recipient();
+    const target = yield* requireRecipient();
     const { pendingOnly = false, ...request } = yield* decodeInboxOptions(options);
     const records = yield* pendingOnly
       ? notificationStore.listLatestPendingByRecipient(target, request)
@@ -179,7 +207,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
       records,
       (notification) =>
         Effect.map(
-          sourceOf(notification),
+          findSource(notification),
           Option.match({
             onNone: (): NotificationInbox.Item => ({ notification }),
             onSome: (item): NotificationInbox.Item => ({ notification, source: item }),
@@ -220,17 +248,17 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
   const acknowledgeThrough = Effect.fn("NotificationApplication.acknowledgeThrough")(function* (
     input: NotificationStore.Cursor,
   ) {
-    const target = yield* recipient();
+    const target = yield* requireRecipient();
     if (target._tag !== "Human") return yield* new HumanRecipientRequired({});
     const through = yield* decodeCursor(input);
     const memberId = (yield* Actor.Service).memberId;
     /** One page marked: what it listed and how many of them were due. */
-    const markPage = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
+    const markPageSeen = Effect.fnUntraced(function* (after: NotificationStore.Cursor | undefined) {
       const page = yield* notificationStore.listPendingByRecipient(
         target,
         after === undefined ? { limit: seenBatch } : { limit: seenBatch, after },
       );
-      const due = page.filter((record) => atOrBefore(record, through));
+      const due = page.filter((record) => isAtOrBefore(record, through));
       const [first, ...rest] = due.map((record) => record.id);
       if (first !== undefined) {
         const notificationIds = [first, ...rest] as const;
@@ -246,7 +274,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     while (true) {
       // Leaving a group settles its notifications, which the store then refuses to mark; they are
       // no longer pending, so reading the page again leaves them out.
-      const { page, due } = yield* markPage(after).pipe(
+      const { page, due } = yield* markPageSeen(after).pipe(
         Effect.retry({
           times: 2,
           while: (error) => error._tag === "NotificationStore.Conflict",
@@ -259,7 +287,7 @@ export const make = Effect.fn("NotificationApplication.make")(function* (): Effe
     }
   });
   const countPending = Effect.gen(function* () {
-    const target = yield* recipient();
+    const target = yield* requireRecipient();
     return yield* notificationStore.countPendingByRecipient(target);
   }).pipe(Effect.withSpan("NotificationApplication.countPending"));
   return Service.of({

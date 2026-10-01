@@ -27,7 +27,6 @@ import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
 import { TurnQuery } from "./turn/query.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
-import { NotificationSource } from "./notification/source.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
 import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
@@ -185,7 +184,6 @@ const turnCommand = TurnCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand)),
 );
 const turnQuery = TurnQuery.layer;
-const notificationSource = NotificationSource.layer.pipe(Layer.provide(threadQuery));
 const readStateCommand = ReadStateCommand.layer;
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
@@ -230,7 +228,6 @@ const operations = Layer.mergeAll(
       groupCommand,
       threadQuery,
       threadCommand,
-      notificationSource,
       readStateCommand,
       turnCommand,
       turnQuery,

@@ -8,7 +8,7 @@ import { TurnFacts } from "../turn/facts.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 /** A turn's acceptance settles the notifications it took, in the same commit. */
-const accepted = Effect.fnUntraced(function* (payload: {
+const settleAccepted = Effect.fnUntraced(function* (payload: {
   readonly turnId: Parameters<NotificationStore.Interface["accept"]>[1];
   readonly notificationIds: ReadonlyArray<Notification.Id>;
   readonly acceptedAt: Parameters<NotificationStore.Interface["accept"]>[2];
@@ -39,7 +39,7 @@ export const definition = Projection.make("notifications", { version: 3 })
       }
       yield* notificationStore.insertMany(
         recipients.map((recipient) =>
-          Notification.generated(
+          Notification.fromActivity(
             event,
             Object.assign({ groupId: event.payload.groupId }, activity),
             recipient,
@@ -63,7 +63,7 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     TurnFacts.Created,
     Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
-      yield* accepted({
+      yield* settleAccepted({
         turnId: payload.id,
         notificationIds: payload.notificationIds,
         acceptedAt: payload.createdAt,
@@ -73,7 +73,7 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     TurnFacts.InputAccepted,
     Effect.fn("NotificationProjection.inputAccepted")(function* ({ payload }) {
-      yield* accepted(payload);
+      yield* settleAccepted(payload);
     }),
   );
 export * as NotificationProjection from "./projection.ts";

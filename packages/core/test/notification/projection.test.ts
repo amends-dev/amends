@@ -213,7 +213,7 @@ it.effect("notifications rebuild from recorded activity alone", () =>
         yield* journal.replay;
         expect(inserted).toEqual(
           recipients.map((recipient) =>
-            Notification.generated(message, Object.assign({ groupId }, published), recipient),
+            Notification.fromActivity(message, Object.assign({ groupId }, published), recipient),
           ),
         );
         // The store decides from its own records which of the participation's notifications settle.

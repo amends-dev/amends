@@ -1,4 +1,4 @@
-import { NotificationSource } from "../../src/notification/source.ts";
+import { ThreadQuery } from "../../src/thread/query.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
@@ -115,7 +115,17 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
   return NotificationApplication.layer.pipe(
     Layer.provideMerge(Layer.mergeAll(journal, authorization).pipe(Layer.provideMerge(host))),
     Layer.provide(notifications),
-    Layer.provide(Layer.succeed(NotificationSource.Service, { resolve: unexpected })),
+    Layer.provide(
+      Layer.succeed(ThreadQuery.Service, {
+        requireAccess: unexpected,
+        eligibleMembers: unexpected,
+        currentParticipants: unexpected,
+        pageParticipants: unexpected,
+        findParticipants: unexpected,
+        readTimeline: unexpected,
+        readTimelineItem: unexpected,
+      }),
+    ),
     Layer.provide(TestSignals.layer),
     Layer.provide(
       Layer.succeed(
@@ -146,7 +156,8 @@ it.effect(
       expectTypeOf<Layer.Services<typeof NotificationApplication.layer>>().toEqualTypeOf<
         | NotificationStore.Service
         | Authorization.Service
-        | NotificationSource.Service
+        | Journal.Service
+        | ThreadQuery.Service
         | Signals.Service
         | Store.Service
       >();

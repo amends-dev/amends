@@ -15,7 +15,6 @@ import {
   Notification,
   NotificationApplication,
   NotificationInbox,
-  NotificationSource,
   NotificationStore,
 } from "@amends/core/notification";
 import {
@@ -199,9 +198,7 @@ export const notificationSources = (harness: Harness) => {
           runHost(
             storage,
             Effect.gen(function* () {
-              expectTypeOf<
-                Extract<Core.Operations, NotificationSource.Service | ThreadQuery.Service>
-              >().toEqualTypeOf<never>();
+              expectTypeOf<Extract<Core.Operations, ThreadQuery.Service>>().toEqualTypeOf<never>();
               const { bound, owner, first, human, agent } = yield* prepare();
               for (const actor of [human, agent])
                 yield* grant(

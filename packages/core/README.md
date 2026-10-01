@@ -51,8 +51,8 @@ membership: someone who rejoins under a new member ID starts with an empty one.
 store. `NotificationProjection`
 generates notifications from each recorded thread activity's recipients, and settles pending agent
 input when a participation ends, from the activity and its own notifications alone. A human's `Seen` is private state the store keeps outside the
-journal. Internal `NotificationSource` resolves a notification's recorded activity for
-`resolveSource`. Notifications never create turns, accept their input, or execute work. See
+journal. `resolveSource` and `inbox` read a notification's recorded activity as its timeline
+shows it, under the recipient's current access. Notifications never create turns, accept their input, or execute work. See
 [reading the inbox](../../docs/thread-workflows.md#reading-the-inbox),
 [resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source),
 and [acknowledging a notification](../../docs/thread-workflows.md#acknowledging-a-notification).
@@ -653,7 +653,7 @@ so reconnecting from the last cursor resets. The follower logs it and continues.
 
 Recorded thread activity also carries the notifications its projection creates. Each
 recipient's arrives in the same `Committed` message's `notifications`, derived with
-`Notification.generated` exactly as the projection stores it, so it equals what the inbox
+`Notification.fromActivity` exactly as the projection stores it, so it equals what the inbox
 lists; human and agent recipients receive their own, whether or not they may read the thread,
 and nobody else sees them. A commit with no visible events and no notifications for the reader
 sends nothing, so a reader's cursor only advances with commits it sees.

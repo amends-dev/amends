@@ -240,16 +240,16 @@ calls best effort. A real model adds its own time to step 4.
 
 ## Where to change things
 
-| To change                                     | Look at                                                                                                   |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Which messages ask an agent for work          | `requestsWork` in `ThreadCommand.publishMessage`; how it becomes a notification, `Notification.generated` |
-| When a process wakes                          | `wakesOn` in `TurnCommand.acceptWorkProcess`; processes are registered in `Core.processes`                |
-| How work is accepted into turns               | `acceptThreadNotifications` in `TurnCommand`                                                              |
-| Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                         |
-| How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                |
-| How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                              |
-| Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                       |
-| What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                     |
+| To change                                     | Look at                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Which messages ask an agent for work          | `requestsWork` in `ThreadCommand.publishMessage`; how it becomes a notification, `Notification.fromActivity` |
+| When a process wakes                          | `wakesOn` in `TurnCommand.acceptWorkProcess`; processes are registered in `Core.processes`                   |
+| How work is accepted into turns               | `acceptThreadNotifications` in `TurnCommand`                                                                 |
+| Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                            |
+| How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                   |
+| How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                                 |
+| Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                          |
+| What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                        |
 
 To find what reacts to a fact, find references to its constant, such as `ThreadActivityFacts.Recorded`:
 projections, reactions, the change feed, and `wakesOn` triggers all name it.
