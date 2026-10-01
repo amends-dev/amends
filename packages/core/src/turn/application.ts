@@ -20,11 +20,10 @@ import { ThreadPermissions } from "../thread/permissions.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
-import { TurnActivityRecorder } from "./activity-recorder.ts";
-import { TurnDrafts } from "./drafts.ts";
-import { TurnEnding } from "./ending.ts";
+import { TurnCommand } from "./command.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
+import { TurnQuery } from "./query.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 export { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
@@ -45,8 +44,7 @@ export type ChangeError =
   | PlatformError.PlatformError
   | Log.WriteError
   | Projection.Error
-  | TurnActivityRecorder.Error
-  | TurnEnding.Error;
+  | TurnCommand.EndError;
 export type CancelError = ChangeError | NotActive;
 export type RetryError = ChangeError | NotRetryable | MemberStore.Failure | Log.ReadError;
 
@@ -115,12 +113,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const threadQuery = yield* ThreadQuery.Service;
   const authorization = yield* Authorization.Service;
   const memberStore = yield* MemberStore.Service;
-  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
-  const turnEnding = yield* TurnEnding.Service;
+  const turnCommand = yield* TurnCommand.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
   const signals = yield* Signals.Service;
-  const turnDrafts = yield* TurnDrafts.Service;
+  const turnQuery = yield* TurnQuery.Service;
   const changeFeedSource = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -319,7 +316,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const opened = Turn.LogMessage.cases.Opened.make({ items: sent });
     if (over || !Turn.active(turn.status)) return Stream.make(opened, ended);
     // What the response being written holds so far, since drafts carry only what follows it.
-    const written = (yield* turnDrafts.current(turn.id)).map((draft) =>
+    const written = (yield* turnQuery.currentDrafts(turn.id)).map((draft) =>
       Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
     );
 
@@ -400,32 +397,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       if (!Turn.active(turn.status))
         return yield* new NotActive({ turnId: turn.id, status: turn.status });
       if (turn.status === "cancelling") return yield* presentOne(turn);
-      const at = yield* DateTime.now;
-      const where = {
-        workspaceId,
-        groupId: turn.groupId,
-        threadId: turn.threadId,
-        turnId: turn.id,
-      };
-      const requested = yield* journal.publish(
-        TurnFacts.CancelRequested,
-        Object.assign({}, where, { reason: "requested" as const, requestedAt: at }),
-      );
-      if (turn.status === "queued") {
-        yield* turnEnding.end(turn, { outcome: "cancelled", cancelReason: "requested" });
-        return yield* presentOne(
-          Turn.change(turn, { status: "cancelled", cancelReason: "requested", finishedAt: at }),
-        );
-      }
-      yield* turnActivityRecorder.record(
-        turn.threadId,
-        TurnActivity.Stopping,
-        { turnId: turn.id, cancelReason: "requested" },
-        requested,
-      );
-      return yield* presentOne(
-        Turn.change(turn, { status: "cancelling", cancelReason: "requested" }),
-      );
+      return yield* presentOne(yield* turnCommand.requestStop(turn, "requested"));
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -477,7 +449,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         finishedAt: null,
       };
       const event = yield* journal.publish(TurnFacts.Retried, created);
-      yield* turnActivityRecorder.record(
+      yield* turnCommand.recordActivity(
         created.threadId,
         TurnActivity.Created,
         { turnId: created.id, memberId: created.memberId, retryOf: turn.id },

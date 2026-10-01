@@ -8,6 +8,7 @@ import { GroupMembershipFacts } from "../group/membership/facts.ts";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { Performer } from "../identity/performer.ts";
+import type { Event } from "../journal/event.ts";
 import { Journal } from "../journal/journal.ts";
 import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
@@ -15,22 +16,42 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
+import { ThreadCommand } from "../thread/command.ts";
+import type { ThreadId } from "../thread/id.ts";
 import { ThreadQuery } from "../thread/query.ts";
+import { ThreadStore } from "../thread/store.ts";
+import { Thread } from "../thread/thread.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
+import type { ThreadMessageId } from "../thread/message/id.ts";
 import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
-
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { TurnActivity } from "./activity.ts";
-import { TurnActivityRecorder } from "./activity-recorder.ts";
-import { TurnEnding } from "./ending.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
-export type Error =
+/**
+ * How a turn ended: completed with the replies it posted, failed and why, or stopped and why it
+ * was asked to. Callers name the stop's reason, since the record they hold may predate the request.
+ */
+export type Ending =
+  | { readonly outcome: "completed"; readonly messageIds: ReadonlyArray<ThreadMessageId.Id> }
+  | { readonly outcome: "failed"; readonly reason: string }
+  | { readonly outcome: "cancelled"; readonly cancelReason: Turn.CancelReason | null };
+
+/** A turn's change, as its thread's timeline shows it. */
+export type ActivityKind =
+  | typeof TurnActivity.Created
+  | typeof TurnActivity.Started
+  | typeof TurnActivity.Stopping
+  | typeof TurnActivity.Ended;
+
+export type RecordError = ThreadCommand.Error | ThreadStore.Failure;
+export type EndError = Projection.Error | Log.WriteError | RecordError;
+export type AcceptError =
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound | Authorization.Denied>
   | AgentStore.Failure
   | MemberStore.Failure
@@ -42,44 +63,153 @@ export type Error =
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Log.ReadError
-  | Log.WriteError
-  | TurnActivityRecorder.Error
-  | TurnEnding.Error
-  | Projection.Error;
+  | EndError;
 
 export interface Interface {
+  /**
+   * Record a turn's change in its thread's timeline, in the caller's commit, caused by the turn
+   * fact that reports it. It informs no one.
+   */
+  readonly recordActivity: <K extends ActivityKind>(
+    thread: Thread.Record | ThreadId.Id,
+    kind: K,
+    details: K["details"]["Type"],
+    cause: Event.Record,
+  ) => Effect.Effect<void, RecordError, Store.Transaction | Publication.Service>;
+  /**
+   * End a turn in the caller's commit, everywhere it is told: its fact in the journal, its row in
+   * its thread's timeline, and its agent's log for the thread, which so says how every turn there
+   * ended. Callers check that the turn may end this way.
+   */
+  readonly endTurn: (
+    turn: Turn.Record,
+    ending: Ending,
+  ) => Effect.Effect<void, EndError, Store.Transaction | Publication.Service>;
+  /**
+   * Ask an active turn to stop, in the caller's commit: a queued one ends cancelled at once, since
+   * nothing runs it yet; a running one is marked stopping, which execution confirms once it has
+   * stopped. Returns the turn as it now stands. Callers check it is active and not already stopping.
+   */
+  readonly requestStop: (
+    turn: Turn.Record,
+    reason: Turn.CancelReason,
+  ) => Effect.Effect<Turn.Record, EndError, Store.Transaction | Publication.Service>;
   /**
    * Handle every agent's pending work, as that agent: accept each thread's notifications into its
    * active turn there, or into a new one, settling them in the same commit, and leave them waiting
    * while an earlier turn there is still stopping or belongs to a participation that ended.
    * Reports whether more is outstanding.
    */
-  readonly run: Effect.Effect<BackgroundProcess.Outcome, Error, Publication.Service>;
+  readonly acceptWork: Effect.Effect<BackgroundProcess.Outcome, AcceptError, Publication.Service>;
   /** Stop the turns of agents that no longer take part in their thread. */
-  readonly stopDeparted: Effect.Effect<BackgroundProcess.Outcome, Error, Publication.Service>;
+  readonly stopDepartedTurns: Effect.Effect<
+    BackgroundProcess.Outcome,
+    AcceptError,
+    Publication.Service
+  >;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/acceptance/Service",
+  "@amends/core/turn/command/Service",
 ) {}
 
 /** How many notifications an agent's inbox is read by at a time, and threads accepted per run. */
 const page = 100;
 
 /** @category constructors */
-export const make = Effect.fn("TurnAcceptance.make")(function* () {
+export const make = Effect.fn("TurnCommand.make")(function* () {
   const agentStore = yield* AgentStore.Service;
   const memberStore = yield* MemberStore.Service;
   const notificationStore = yield* NotificationStore.Service;
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
+  const threadStore = yield* ThreadStore.Service;
   const turnStore = yield* TurnStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
+  const threadCommand = yield* ThreadCommand.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
-  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
-  const turnEnding = yield* TurnEnding.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
+
+  const recordActivity: Interface["recordActivity"] = Effect.fnUntraced(
+    function* (thread, kind, details, cause) {
+      const found =
+        typeof thread === "string" ? Option.getOrUndefined(yield* threadStore.get(thread)) : thread;
+      if (found === undefined) return yield* Effect.die("A turn's thread is missing");
+      const occurredAt = yield* DateTime.now;
+      yield* threadCommand.publishActivity({
+        thread: found,
+        occurredAt,
+        step: () => Effect.succeed({ value: undefined, kind, details, recipients: [], cause }),
+      });
+    },
+  );
+
+  const endTurn: Interface["endTurn"] = Effect.fnUntraced(function* (turn, ending) {
+    const finishedAt = yield* DateTime.now;
+    const where = {
+      workspaceId: turn.workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      turnId: turn.id,
+    };
+    const messageIds = ending.outcome === "completed" ? ending.messageIds : [];
+    const reason = ending.outcome === "failed" ? ending.reason : null;
+    const cancelReason = ending.outcome === "cancelled" ? ending.cancelReason : null;
+    const event =
+      ending.outcome === "completed"
+        ? yield* journal.publish(
+            TurnFacts.Completed,
+            Object.assign(where, { messageIds, finishedAt }),
+          )
+        : ending.outcome === "failed"
+          ? yield* journal.publish(
+              TurnFacts.Failed,
+              Object.assign(where, { reason: ending.reason, finishedAt }),
+            )
+          : yield* journal.publish(TurnFacts.Cancelled, Object.assign(where, { finishedAt }));
+    yield* recordActivity(
+      turn.threadId,
+      TurnActivity.Ended,
+      { turnId: turn.id, outcome: ending.outcome, messageIds, reason, cancelReason },
+      event,
+    );
+    yield* TurnLog.open(log, turn.participationId).append({
+      _tag: "Ended",
+      turnId: turn.id,
+      outcome: ending.outcome,
+      reason,
+      cancelReason,
+      messageIds,
+    });
+  });
+
+  const requestStop: Interface["requestStop"] = Effect.fnUntraced(function* (turn, reason) {
+    const requestedAt = yield* DateTime.now;
+    const requested = yield* journal.publish(TurnFacts.CancelRequested, {
+      workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      turnId: turn.id,
+      reason,
+      requestedAt,
+    });
+    if (turn.status === "queued") {
+      yield* endTurn(turn, { outcome: "cancelled", cancelReason: reason });
+      return Turn.change(turn, {
+        status: "cancelled",
+        cancelReason: reason,
+        finishedAt: requestedAt,
+      });
+    }
+    yield* recordActivity(
+      turn.threadId,
+      TurnActivity.Stopping,
+      { turnId: turn.id, cancelReason: reason },
+      requested,
+    );
+    return Turn.change(turn, { status: "cancelling", cancelReason: reason });
+  });
 
   /** The agent as the actor and performer of what it does with its own work. */
   const asAgent = (agent: { readonly id: Agent.Id; readonly memberId: Member.Id }) => {
@@ -220,7 +350,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
       TurnFacts.Created,
       Object.assign({}, created, { notificationIds: [head, ...rest] as const }),
     );
-    yield* turnActivityRecorder.record(
+    yield* recordActivity(
       thread.value,
       TurnActivity.Created,
       { turnId: created.id, memberId: agent.memberId, retryOf: null },
@@ -235,7 +365,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
    * agent's own active turns are checked, including agents no longer members, since leaving the
    * workspace ends their participation too. Every run handles all of them.
    */
-  const stopDeparted = Effect.gen(function* () {
+  const stopDepartedTurns = Effect.gen(function* () {
     for (const agent of yield* agentStore.list) {
       const active = (yield* turnStore.listActiveByMember(agent.memberId)).filter(
         (turn) => turn.status !== "cancelling",
@@ -252,29 +382,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
           const found = yield* turnStore.get(turn.id);
           if (Option.isNone(found) || !Turn.active(found.value.status)) return;
           if (found.value.status === "cancelling") return;
-          const at = yield* DateTime.now;
-          const where = {
-            workspaceId,
-            groupId: turn.groupId,
-            threadId: turn.threadId,
-            turnId: turn.id,
-          };
-          const requested = yield* journal.publish(
-            TurnFacts.CancelRequested,
-            Object.assign({}, where, { reason: "participation-ended" as const, requestedAt: at }),
-          );
-          if (found.value.status !== "queued")
-            yield* turnActivityRecorder.record(
-              turn.threadId,
-              TurnActivity.Stopping,
-              { turnId: turn.id, cancelReason: "participation-ended" },
-              requested,
-            );
-          else
-            yield* turnEnding.end(found.value, {
-              outcome: "cancelled",
-              cancelReason: "participation-ended",
-            });
+          yield* requestStop(found.value, "participation-ended");
         }).pipe(journal.commit);
       }
     }
@@ -287,7 +395,7 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
    * threads the run stops and reports more outstanding, which only accepting can cause, so a run
    * that finds only waiting work ends idle rather than running again at once.
    */
-  const run = Effect.gen(function* () {
+  const acceptWork = Effect.gen(function* () {
     let accepted = 0;
     for (const agent of yield* activeAgents) {
       const recipient = Notification.ofMember(
@@ -320,19 +428,22 @@ export const make = Effect.fn("TurnAcceptance.make")(function* () {
   }).pipe(Effect.provideService(Crypto.Crypto, crypto));
 
   return Service.of({
-    run,
-    stopDeparted: stopDeparted.pipe(Effect.provideService(Crypto.Crypto, crypto)),
+    recordActivity,
+    endTurn,
+    requestStop,
+    acceptWork,
+    stopDepartedTurns: stopDepartedTurns.pipe(Effect.provideService(Crypto.Crypto, crypto)),
   });
 });
 
-/** @category layers */
+/** Internal writes shared by turn operations, execution, and background work. @category layers */
 export const layer = Layer.effect(Service, make());
 
 /**
  * Agents take work as it is asked of them: activity that requests an agent's work, and a turn
  * ending, after which work that waited for it can be accepted.
  */
-export const process = BackgroundProcess.make("turn.accept", {
+export const acceptWorkProcess = BackgroundProcess.make("turn.accept", {
   wakesOn: [
     BackgroundProcess.on(ThreadActivityFacts.Recorded, (payload) =>
       payload.recipients.some((recipient) => recipient.requestsWork),
@@ -341,16 +452,16 @@ export const process = BackgroundProcess.make("turn.accept", {
     BackgroundProcess.on(TurnFacts.Failed),
     BackgroundProcess.on(TurnFacts.Cancelled),
   ],
-  run: Effect.flatMap(Service, (acceptance) => acceptance.run),
+  run: Effect.flatMap(Service, (turnCommand) => turnCommand.acceptWork),
 });
 
 /** Agents stop working where they no longer take part: after they unfollow a thread or leave a group. */
-export const departures = BackgroundProcess.make("turn.stop-departed", {
+export const stopDepartedProcess = BackgroundProcess.make("turn.stop-departed", {
   wakesOn: [
     BackgroundProcess.on(ThreadParticipationFacts.Ended),
     BackgroundProcess.on(GroupMembershipFacts.Removed),
   ],
-  run: Effect.flatMap(Service, (acceptance) => acceptance.stopDeparted),
+  run: Effect.flatMap(Service, (turnCommand) => turnCommand.stopDepartedTurns),
 });
 
-export * as TurnAcceptance from "./acceptance.ts";
+export * as TurnCommand from "./command.ts";

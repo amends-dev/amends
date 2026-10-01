@@ -20,8 +20,8 @@ turn is one conversation with a model.
 | #   | Step                       | Runs in                                         | Commit               | Hands off through                                                                                       |
 | --- | -------------------------- | ----------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
 | 1   | The person's request       | HTTP handler, then core                         | A                    | A pending notification for the agent, and a stored `Wake` for `turn.accept`, both written by commit A   |
-| 2   | `turn.accept` wakes        | Cluster entity `amends/WorkspaceProcess`        | none                 | `TurnAcceptance.run`, which reads the agent's pending notifications                                     |
-| 3   | The agent accepts the work | `TurnAcceptance`, acting as the agent           | B                    | A turn, the notifications settled as accepted, and a stored `Run` for the turn, all written by commit B |
+| 2   | `turn.accept` wakes        | Cluster entity `amends/WorkspaceProcess`        | none                 | `TurnCommand.acceptWork`, which reads the agent's pending notifications                                 |
+| 3   | The agent accepts the work | `TurnCommand.acceptWork`, as the agent          | B                    | A turn, the notifications settled as accepted, and a stored `Run` for the turn, all written by commit B |
 | 4   | The turn runs              | Cluster entity `amends/Turn`, then `TurnRunner` | C, then one per step | The turn's log, which every step reads its next move from                                               |
 | 5   | The turn closes            | `TurnExecution.close`                           | D                    | The reply message, `turn.completed`, and a stored `Wake` for `turn.accept`                              |
 | 6   | `turn.accept` runs again   | As step 2                                       | none                 | Nothing, usually: it finds no work left                                                                 |
@@ -58,7 +58,7 @@ Publishing that fact does two things in the same transaction, in this order
   nothing. The thread, group, and activity read models update.
 - **Reactions** run after the projections ([journal](journal.md#reactions)). `turn.accept` is
   registered to wake on `thread.activity.recorded` when any recipient has `requestsWork`
-  (`BackgroundProcess.on` in `TurnAcceptance.process`), so the reaction asks the host's
+  (`BackgroundProcess.on` in `TurnCommand.acceptWorkProcess`), so the reaction asks the host's
   `WorkspaceWakes` for a wake, once per process per commit. The host stores that wake as a
   **persisted Cluster message** for the entity `amends/WorkspaceProcess`, keyed by workspace and
   process name, with the primary key `commit:<commit id>`. The local host gives Cluster and the
@@ -81,7 +81,7 @@ the local host), and `ClusterBackground.layerWorker` handles it:
 1. `gateway.runBackground(workspaceId, "turn.accept")` leases the workspace's prepared runtime,
    booting it if need be.
 2. `BackgroundRuns.run` runs the registered process once, as the system performer `turn.accept`.
-   The process is `TurnAcceptance.run`.
+   The process is `TurnCommand.acceptWork`.
 3. The worker then asks for the next run from what the process left outstanding: `Continue` runs
    again at once, `At` at that time, `Idle` waits for the next wake.
 
@@ -91,7 +91,7 @@ One entity per workspace and process means the process never runs against itself
 
 ## 3. The agent accepts the work (commit B)
 
-`TurnAcceptance.run` goes through each active agent's pending notifications a page at a time,
+`TurnCommand.acceptWork` goes through each active agent's pending notifications a page at a time,
 groups them by thread, and calls `acceptThread` for each thread in a commit of its own, **acting
 as the agent**: the agent is the actor and the performer of everything in the commit. The commit
 rechecks that the notifications are still pending and that the agent can still open the thread,
@@ -156,7 +156,7 @@ commit:
 1. Each reply the log says the turn owes is published as the agent's own message through the same
    `ThreadCommand.publishMessage` as step 1, with the turn's ID on the message. Its recipients are the
    thread's other participants, and none of the agents among them is asked for work.
-2. `TurnEnding.end` publishes `turn.completed`, records the `turn.ended` activity in the thread,
+2. `TurnCommand.endTurn` publishes `turn.completed`, records the `turn.ended` activity in the thread,
    and appends `Ended` to the agent's log.
 
 The reply and the turn's completion become visible together or not at all. A turn can complete
@@ -218,14 +218,14 @@ calls best effort. A real model adds its own time to step 4.
 
 ## Words that mean several things
 
-| Word      | Meanings                                                                                                                                                                                                                                       |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| run       | `BackgroundRuns.run(name)`, a host running a registered process once; a process's `run` effect; `TurnAcceptance.run`, `turn.accept`'s body; the `Run` message that asks a turn's entity to run; `TurnRunner.run`, running one turn to its end. |
-| execution | `TurnExecution` in core, the interface the runner calls through the gateway; and the `@amends/execution` package, which holds `TurnRunner` and `ClusterTurns`.                                                                                 |
-| process   | A `BackgroundProcess`: a workspace's sweep such as `turn.accept`. Not an operating system process, which other guides also call a process.                                                                                                     |
-| wake      | A stored request for a `BackgroundProcess` to run (`BackgroundWakes`, the Cluster `Wake` message).                                                                                                                                             |
-| dispatch  | A stored request for one turn to run (`TurnDispatch`, the Cluster `Run` message).                                                                                                                                                              |
-| reaction  | What a commit does when it first publishes a fact, such as storing a wake. Not replayed. Projections are the replayed ones.                                                                                                                    |
+| Word      | Meanings                                                                                                                                                                                                                                           |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| run       | `BackgroundRuns.run(name)`, a host running a registered process once; a process's `run` effect; `TurnCommand.acceptWork`, `turn.accept`'s body; the `Run` message that asks a turn's entity to run; `TurnRunner.run`, running one turn to its end. |
+| execution | `TurnExecution` in core, the interface the runner calls through the gateway; and the `@amends/execution` package, which holds `TurnRunner` and `ClusterTurns`.                                                                                     |
+| process   | A `BackgroundProcess`: a workspace's sweep such as `turn.accept`. Not an operating system process, which other guides also call a process.                                                                                                         |
+| wake      | A stored request for a `BackgroundProcess` to run (`BackgroundWakes`, the Cluster `Wake` message).                                                                                                                                                 |
+| dispatch  | A stored request for one turn to run (`TurnDispatch`, the Cluster `Run` message).                                                                                                                                                                  |
+| reaction  | What a commit does when it first publishes a fact, such as storing a wake. Not replayed. Projections are the replayed ones.                                                                                                                        |
 
 ## The two Cluster entities
 
@@ -243,11 +243,11 @@ calls best effort. A real model adds its own time to step 4.
 | To change                                     | Look at                                                                                                   |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Which messages ask an agent for work          | `requestsWork` in `ThreadCommand.publishMessage`; how it becomes a notification, `Notification.generated` |
-| When a process wakes                          | `wakesOn` in `TurnAcceptance.process`; processes are registered in `Core.processes`                       |
-| How work is accepted into turns               | `acceptThread` in `TurnAcceptance`                                                                        |
+| When a process wakes                          | `wakesOn` in `TurnCommand.acceptWorkProcess`; processes are registered in `Core.processes`                |
+| How work is accepted into turns               | `acceptThread` in `TurnCommand`                                                                           |
 | Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                         |
 | How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                |
-| How the reply is published, and the turn ends | `TurnExecution.close`, `TurnEnding`                                                                       |
+| How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                              |
 | Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                       |
 | What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                     |
 

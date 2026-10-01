@@ -36,8 +36,7 @@ import { ThreadCommand } from "../thread/command.ts";
 import { ThreadParticipation } from "../thread/participation/participation.ts";
 import { NotActive, NotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
-import { TurnActivityRecorder } from "./activity-recorder.ts";
-import { TurnEnding } from "./ending.ts";
+import { TurnCommand } from "./command.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnLog } from "./log.ts";
 import { TurnStore } from "./store.ts";
@@ -60,8 +59,7 @@ export type Error =
   | InvalidResponse
   | NotFound
   | NotActive
-  | TurnActivityRecorder.Error
-  | TurnEnding.Error;
+  | TurnCommand.EndError;
 export type PrepareError =
   | Error
   | AgentStore.Failure
@@ -283,8 +281,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const threadMessageStore = yield* ThreadMessageStore.Service;
   const memberStore = yield* MemberStore.Service;
   const signals = yield* Signals.Service;
-  const turnActivityRecorder = yield* TurnActivityRecorder.Service;
-  const turnEnding = yield* TurnEnding.Service;
+  const turnCommand = yield* TurnCommand.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
@@ -567,7 +564,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           TurnFacts.Started,
           Object.assign(where(turn), { selection: chosen, startedAt }),
         );
-        yield* turnActivityRecorder.record(
+        yield* turnCommand.recordActivity(
           turn.threadId,
           TurnActivity.Started,
           { turnId: turn.id },
@@ -759,7 +756,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         if (turn.status === "cancelling") {
-          yield* turnEnding.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
+          yield* turnCommand.endTurn(turn, {
+            outcome: "cancelled",
+            cancelReason: turn.cancelReason,
+          });
           return { _tag: "Stopped" } as const;
         }
         yield* require(turn, ["running"]);
@@ -778,7 +778,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         if (reading.replies.length > 0) {
           const unable = (reason: string) =>
             Effect.gen(function* () {
-              yield* turnEnding.end(turn, { outcome: "failed", reason });
+              yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
               return { _tag: "Failed", reason } as const;
             });
           const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
@@ -831,7 +831,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             messageIds.push(published.message.id);
           }
         }
-        yield* turnEnding.end(turn, { outcome: "completed", messageIds });
+        yield* turnCommand.endTurn(turn, { outcome: "completed", messageIds });
         return { _tag: "Closed", messageIds } as const;
       }),
     );
@@ -842,7 +842,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       Effect.gen(function* () {
         yield* require(turn, ["queued", "running", "cancelling"]);
         const failure = yield* Schema.decodeEffect(Schema.NonEmptyString)(reason);
-        yield* turnEnding.end(turn, { outcome: "failed", reason: failure });
+        yield* turnCommand.endTurn(turn, { outcome: "failed", reason: failure });
       }),
     );
   });
@@ -851,7 +851,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     yield* asAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* require(turn, ["cancelling"]);
-        yield* turnEnding.end(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
+        yield* turnCommand.endTurn(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
       }),
     );
   });

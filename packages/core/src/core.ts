@@ -1,7 +1,7 @@
 import { AgentApplication } from "./agent/application.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentProjection } from "./agent/projection.ts";
-import { TurnAcceptance } from "./turn/acceptance.ts";
+import { TurnCommand } from "./turn/command.ts";
 import { TurnApplication } from "./turn/application.ts";
 import { TurnDispatch } from "./turn/dispatch.ts";
 import { TurnExecution } from "./turn/execution.ts";
@@ -25,9 +25,7 @@ import { ThreadParticipationPermissions } from "./thread/participation/permissio
 import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
-import { TurnActivityRecorder } from "./turn/activity-recorder.ts";
-import { TurnDrafts } from "./turn/drafts.ts";
-import { TurnEnding } from "./turn/ending.ts";
+import { TurnQuery } from "./turn/query.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { NotificationSource } from "./notification/source.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
@@ -162,7 +160,7 @@ export const journalLog = Log.Id.make("journal");
  * a commit that publishes a fact it wakes on asks for it to run in that same commit. A domain that
  * adds background work registers its process here.
  */
-export const processes = [TurnAcceptance.process, TurnAcceptance.departures] as const;
+export const processes = [TurnCommand.acceptWorkProcess, TurnCommand.stopDepartedProcess] as const;
 
 /** The domain journal and its log, over host storage; its commits ask for background work. */
 const journal = Journal.layer({
@@ -183,8 +181,10 @@ const threadQuery = ThreadQuery.layer.pipe(
   Layer.provide(Layer.mergeAll(groupQuery, ThreadActivityResolvers.layer(activityResolvers))),
 );
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
-const turnActivityRecorder = TurnActivityRecorder.layer.pipe(Layer.provide(threadCommand));
-const turnEnding = TurnEnding.layer.pipe(Layer.provide(turnActivityRecorder));
+const turnCommand = TurnCommand.layer.pipe(
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand)),
+);
+const turnQuery = TurnQuery.layer;
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(threadQuery));
 const threadReading = ThreadReading.layer;
 /**
@@ -232,9 +232,8 @@ const operations = Layer.mergeAll(
       threadCommand,
       notificationSource,
       threadReading,
-      turnActivityRecorder,
-      turnEnding,
-      TurnDrafts.layer,
+      turnCommand,
+      turnQuery,
       changeFeedSource,
     ),
   ),
@@ -245,9 +244,9 @@ const operations = Layer.mergeAll(
  * host's runner drives for the turns agents accepted. Neither is an operation an actor calls.
  */
 const background = Layer.mergeAll(
-  BackgroundRuns.layer(processes).pipe(Layer.provide(TurnAcceptance.layer)),
+  BackgroundRuns.layer(processes).pipe(Layer.provide(turnCommand)),
   TurnExecution.layer,
-).pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnActivityRecorder, turnEnding)));
+).pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)));
 
 /**
  * Complete core for one workspace: application operations, background runs, and turn execution over the

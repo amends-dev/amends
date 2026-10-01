@@ -264,8 +264,8 @@ execution starts, the replies it published, and why it failed or was asked to st
 works, its row changes only with its status and the input it accepts; its progress lives in the
 log.
 
-Agents handle their own notifications as people do theirs. `TurnAcceptance`, the `turn.accept`
-background process, acts as each agent: its pending work notifications on a thread join the
+Agents handle their own notifications as people do theirs. `TurnCommand.acceptWork`, the
+`turn.accept` background process, acts as each agent: its pending work notifications on a thread join the
 active turn there, or start a new one, and the same commit settles them as `Acknowledged` with
 outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, while the
 active turn belongs to a participation that ended, so an agent that left and came back is not
@@ -318,7 +318,7 @@ each finished response with text and no tool calls that more input followed, and
 checks the agent may still open and post in the thread, and records completion with the messages.
 A turn can complete without a reply. `fail` and `stopped` end a turn and publish nothing. Every way
 a turn ends, including a queued turn stopped by a reader or because its agent left, goes through
-`TurnEnding`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
+`TurnCommand.endTurn`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
 thread's timeline, and appends `Ended` to its agent's log. `prepare` assembles what a run needs from
 the stores: the agent's instructions and the model access and environment the turn started with
 or, before it starts, the agent's current ones, the connection's settings and key, the history and
@@ -346,7 +346,7 @@ the turn's entries into one `TurnLog.reader` until its `Ended` entry or another 
 changes, by index, and `Ended` follows the turn's end, which its log records in the commit that
 ends it, after everything it wrote. It passes on the turn's `TurnDraft` signals as `Drafted`, first
 what the response being written holds so far: a draft carries only what follows the text before
-it, so `TurnDrafts` holds each turn's drafts in memory as they reach the process, forgetting a
+it, so `TurnQuery` holds each turn's drafts in memory as they reach the process, forgetting a
 turn's ten minutes after its last, and a reader who starts following mid-response begins with
 them. The drafts subscription registers before the turn and its log are read, so nothing published
 in between is missed. Each batch checks that the reader still may read the thread, and so does
@@ -357,7 +357,7 @@ reader's access is delivered, so a reader who lost it sees at most the drafts se
 delivery was on its way. A stream that cannot go on fails with `Turn.LogUnavailable`.
 
 A turn's changes also show in its thread's timeline, recorded as thread activity in the commits
-that make them (the `TurnActivity` kinds, which `TurnActivityRecorder` records): `turn.created` where the agent took on the work, or where a retry
+that make them (the `TurnActivity` kinds, which `TurnCommand.recordActivity` records): `turn.created` where the agent took on the work, or where a retry
 asked again (naming the turn it retries), `turn.started`, `turn.stopping` once a working turn is
 asked to stop or its agent stops taking part, and `turn.ended` with its outcome, the replies it
 posted, and why it failed or was stopped. Each carries what its item shows, so `TurnTimeline`

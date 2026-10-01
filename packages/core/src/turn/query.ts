@@ -1,7 +1,6 @@
 import { Clock, Context, Duration, Effect, Layer, Schedule, Stream } from "effect";
 import type { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
-
 import type { TurnId } from "./id.ts";
 
 /** A part of a response a turn is writing, as its drafts told it from the start. */
@@ -16,11 +15,11 @@ export interface Interface {
    * What each part of the turn's responses held so far, as this process heard it from the start.
    * A part this process missed some of is left out.
    */
-  readonly current: (turnId: TurnId.Id) => Effect.Effect<ReadonlyArray<Draft>>;
+  readonly currentDrafts: (turnId: TurnId.Id) => Effect.Effect<ReadonlyArray<Draft>>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/drafts/Service",
+  "@amends/core/turn/query/Service",
 ) {}
 
 /** How long a turn's drafts are kept after its last one. */
@@ -46,7 +45,10 @@ interface Held {
 export const make = Effect.gen(function* () {
   const signals = yield* Signals.Service;
   const turns = new Map<string, { readonly parts: Map<string, Held>; at: number }>();
-  const add = (signal: Extract<Signal.Value, { readonly _tag: "TurnDraft" }>, now: number) => {
+  const holdDraft = (
+    signal: Extract<Signal.Value, { readonly _tag: "TurnDraft" }>,
+    now: number,
+  ) => {
     const turn = turns.get(signal.turnId) ?? { parts: new Map<string, Held>(), at: now };
     turns.set(signal.turnId, turn);
     turn.at = now;
@@ -68,7 +70,7 @@ export const make = Effect.gen(function* () {
   yield* live.pipe(
     Stream.runForEach((signal) =>
       signal._tag === "TurnDraft"
-        ? Effect.map(Clock.currentTimeMillis, (now) => add(signal, now))
+        ? Effect.map(Clock.currentTimeMillis, (now) => holdDraft(signal, now))
         : Effect.void,
     ),
     Effect.forkScoped,
@@ -78,7 +80,7 @@ export const make = Effect.gen(function* () {
     for (const [turnId, turn] of turns)
       if (now - turn.at > Duration.toMillis(keep)) turns.delete(turnId);
   }).pipe(Effect.repeat(Schedule.spaced("1 minute")), Effect.forkScoped);
-  const current: Interface["current"] = (turnId) =>
+  const currentDrafts: Interface["currentDrafts"] = (turnId) =>
     Effect.sync(() =>
       [...(turns.get(turnId)?.parts.values() ?? [])].flatMap((held) =>
         held.broken || held.text === ""
@@ -86,10 +88,10 @@ export const make = Effect.gen(function* () {
           : [{ responseId: held.responseId, part: held.part, text: held.text }],
       ),
     );
-  return Service.of({ current });
+  return Service.of({ currentDrafts });
 });
 
-/** Internal service for following turns' logs. @category layers */
+/** Internal reads for following turns' logs. @category layers */
 export const layer = Layer.effect(Service, make);
 
-export * as TurnDrafts from "./drafts.ts";
+export * as TurnQuery from "./query.ts";
