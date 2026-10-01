@@ -96,7 +96,7 @@ const readPage = 100;
  * Every entry of an agent's log for a thread after a position, oldest first, or from the start
  * without one, stopping before the first entry `until` accepts.
  */
-export const recordsAfter = Effect.fnUntraced(function* (
+export const readRecordsAfter = Effect.fnUntraced(function* (
   log: Log.Interface,
   participationId: ThreadParticipationId.Id,
   from: Log.Position | undefined,
@@ -124,12 +124,12 @@ export const recordsAfter = Effect.fnUntraced(function* (
  * A turn's own entries, which sit together in its agent's log after `logAfter`: only one turn of
  * an agent writes there at a time, so another turn's entry means this one's are over.
  */
-export const entriesOf = (
+export const readTurnEntries = (
   log: Log.Interface,
   turn: Pick<Turn.Record, "id" | "participationId" | "logAfter">,
 ) => {
   let began = false;
-  return recordsAfter(log, turn.participationId, turn.logAfter ?? undefined, (entry) => {
+  return readRecordsAfter(log, turn.participationId, turn.logAfter ?? undefined, (entry) => {
     if (entry.turnId === turn.id) began = true;
     return began && entry.turnId !== turn.id;
   });
@@ -208,10 +208,10 @@ export interface Reading {
   readonly overflow: Overflow;
 }
 
-/** Reads one turn's entries as they come: `add` each in order, and `reading` says what they hold. */
+/** Reads one turn's entries as they come: `add` each in order, and `currentReading` says what they hold. */
 export interface Reader {
   readonly add: (record: Recorded) => void;
-  readonly reading: () => Reading;
+  readonly currentReading: () => Reading;
 }
 
 const hasText = (text: string) => /\S/u.test(text);
@@ -242,13 +242,13 @@ export const reader = (): Reader => {
   /** Whether the latest attempt recorded why it stopped. */
   let accounted = true;
   let overflow: Overflow = { count: 0, pending: false };
-  const overflowed = () => {
+  const recordOverflow = () => {
     overflow = { count: overflow.count + 1, pending: true };
   };
-  const partsOf = (blocks: Map<number, Transcript.ResponsePart>) =>
+  const sortParts = (blocks: Map<number, Transcript.ResponsePart>) =>
     [...blocks.entries()].toSorted(([left], [right]) => left - right);
   /** The turn got further: its attempts so far no longer count against it. */
-  const progressed = () => {
+  const resetAttempts = () => {
     attempts = 0;
     interruption = undefined;
   };
@@ -271,7 +271,7 @@ export const reader = (): Reader => {
       case "Interrupted":
         interruption = { reason: entry.reason, problem: entry.problem };
         accounted = true;
-        if (entry.problem === "model-context") overflowed();
+        if (entry.problem === "model-context") recordOverflow();
         items.push({ _tag: "Interrupted", at, reason: entry.reason, retryable: entry.retryable });
         break;
       case "Requested":
@@ -279,7 +279,7 @@ export const reader = (): Reader => {
         break;
       case "Checkpoint":
         checkpoint = position;
-        progressed();
+        resetAttempts();
         overflow = { ...overflow, pending: false };
         // Input a summary took in counts as taken in, after any answer given before it.
         if (entry.through === null) break;
@@ -308,7 +308,7 @@ export const reader = (): Reader => {
           responses.set(event.responseId, response);
           response.blocks.set(event.part, event.block);
           if (event.block._tag !== "Text") break;
-          const texts = partsOf(response.blocks).filter(([, part]) => part._tag === "Text");
+          const texts = sortParts(response.blocks).filter(([, part]) => part._tag === "Text");
           const text = HarnessEvent.textOf(texts.map(([, part]) => part));
           if (!hasText(text)) break;
           const updated = {
@@ -323,9 +323,9 @@ export const reader = (): Reader => {
           else items[items.indexOf(response.item)] = updated;
           response.item = updated;
         } else if (event._tag === "ResponseFinished") {
-          progressed();
+          resetAttempts();
           overflow = { count: 0, pending: false };
-          const parts = partsOf(responses.get(event.responseId)?.blocks ?? new Map()).map(
+          const parts = sortParts(responses.get(event.responseId)?.blocks ?? new Map()).map(
             ([, part]) => part,
           );
           const text = HarnessEvent.textOf(parts);
@@ -333,14 +333,14 @@ export const reader = (): Reader => {
             parts.some((part) => part._tag === "ToolCall") || !hasText(text)
               ? undefined
               : { responseId: event.responseId, text };
-        } else if (event._tag === "ToolCallCompleted") progressed();
-        else if (event._tag === "ContextFull") overflowed();
+        } else if (event._tag === "ToolCallCompleted") resetAttempts();
+        else if (event._tag === "ContextFull") recordOverflow();
         break;
       }
     }
   };
 
-  const reading = (): Reading => {
+  const currentReading = (): Reading => {
     const owedReplies = answer === undefined ? [...replies] : [...replies, answer];
     const owed = new Set<string>(owedReplies.map((reply) => reply.responseId));
     const recorded = [...events];
@@ -364,14 +364,14 @@ export const reader = (): Reader => {
       overflow,
     };
   };
-  return { add, reading };
+  return { add, currentReading };
 };
 
 /** Read one turn's entries once: what they hold for execution, for closing, and for its readers. */
 export const read = (records: Iterable<Recorded>): Reading => {
   const turn = reader();
   for (const record of records) turn.add(record);
-  return turn.reading();
+  return turn.currentReading();
 };
 
 /** Who a checkpoint's summary speaks as, so the model reads it apart from what people said. */
@@ -384,7 +384,7 @@ export const checkpointAuthor: Transcript.Author = {
 export const noteAuthor: Transcript.Author = { id: "amends", name: "Amends" };
 
 /** What a checkpoint puts in place of the history before it. */
-export const opening = (checkpoint: {
+export const historyFromCheckpoint = (checkpoint: {
   readonly summary: string;
   readonly kept: ReadonlyArray<Transcript.Item>;
 }): ReadonlyArray<Transcript.Item> => [
@@ -401,7 +401,7 @@ export const opening = (checkpoint: {
  * finish: why it stopped, when it failed or someone stopped it. A turn that completed, or that
  * stopped because the agent no longer took part, needs no note.
  */
-const noteOf = (ended: Ended | undefined): ReadonlyArray<Transcript.Input> => {
+const endingNoteFor = (ended: Ended | undefined): ReadonlyArray<Transcript.Input> => {
   const text =
     ended?.outcome === "failed"
       ? `Your work here stopped: ${ended.reason ?? "something went wrong."}`
@@ -444,20 +444,20 @@ export interface Context {
  * short, then this turn's own work, which continues. `records` must reach back to the latest
  * checkpoint and to the turn's first entry.
  */
-export const context = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Context => {
+export const buildContext = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Context => {
   let items: ReadonlyArray<Transcript.Item> = [];
   /** An earlier turn's entries since the latest checkpoint, read as they come. */
   let segment: { readonly turnId: string; readonly reader: Reader } | undefined;
   const startedTurns = new Set<string>();
-  const flush = () => {
+  const foldSegment = () => {
     if (segment === undefined) return;
-    const reading = segment.reader.reading();
+    const reading = segment.reader.currentReading();
     const before = items.length;
     const folded = reading.view(items);
     items = [
       ...folded.slice(0, before),
       ...folded.slice(before).map(withoutReasoning),
-      ...(startedTurns.has(segment.turnId) ? noteOf(reading.ended) : []),
+      ...(startedTurns.has(segment.turnId) ? endingNoteFor(reading.ended) : []),
     ];
     segment = undefined;
   };
@@ -488,33 +488,33 @@ export const context = (records: ReadonlyArray<Recorded>, turnId: Turn.Id): Cont
     }
     switch (entry._tag) {
       case "Checkpoint":
-        items = opening(entry);
+        items = historyFromCheckpoint(entry);
         segment = undefined;
         current = [];
         begun = true;
         break;
       case "History":
-        flush();
+        foldSegment();
         items = [...items, ...entry.items];
         begun = true;
         break;
       default:
         if (mine) {
           if (entry._tag !== "Harness") break;
-          flush();
+          foldSegment();
           current.push(entry.event);
           break;
         }
-        if (segment !== undefined && segment.turnId !== entry.turnId) flush();
+        if (segment !== undefined && segment.turnId !== entry.turnId) foldSegment();
         segment ??= { turnId: entry.turnId, reader: reader() };
         segment.reader.add(record);
     }
   }
-  flush();
+  foldSegment();
   return {
     history: items,
     transcript: HarnessEvent.transcript(current, items, { unfinished: "omit" }),
-    own: own.reading(),
+    own: own.currentReading(),
     entries,
     begun,
     measured,
@@ -570,7 +570,7 @@ const isSummary = (item: Transcript.Item) =>
  * larger. Nothing is proposed when all that would be summarized is an earlier summary, since
  * summarizing it again frees nothing.
  */
-export const compaction = (
+export const proposeCompaction = (
   transcript: ReadonlyArray<Transcript.Item>,
   waiting: ReadonlyArray<Waiting>,
   limits: Limits,
@@ -587,14 +587,14 @@ export const compaction = (
     characters += Transcript.characters([all[index]!]);
     tails[index] = Math.ceil(characters / Transcript.charactersPerToken);
   }
-  const boundary = (index: number) => {
+  const isCutPoint = (index: number) => {
     if (all[index]!._tag === "ToolResult") return false;
     const piece = index - transcript.length;
     return piece <= 0 || waiting[piece]!.sequence !== waiting[piece - 1]!.sequence;
   };
   let cut: number | undefined;
   for (let index = all.length - 1; index > 0; index--) {
-    if (!boundary(index)) continue;
+    if (!isCutPoint(index)) continue;
     if (cut !== undefined && tails[index]! > limits.keep) break;
     cut = index;
   }
@@ -623,7 +623,10 @@ export const compaction = (
  * A text in pieces of at most `size` characters, so a long message can be summarized in part
  * rather than cut: when everything fits, every piece is given verbatim.
  */
-export const pieces = (text: string, size: number): readonly [string, ...Array<string>] => {
+export const splitIntoPieces = (
+  text: string,
+  size: number,
+): readonly [string, ...Array<string>] => {
   const [first = "", ...rest] = Array.from(
     { length: Math.max(1, Math.ceil(text.length / size)) },
     (_, index) => text.slice(index * size, (index + 1) * size),

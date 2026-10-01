@@ -285,20 +285,20 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
-  const load = Effect.fnUntraced(function* (turnId: Turn.Id) {
+  const requireTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
     return found.value;
   });
-  const identityOf = (turn: Turn.Record) =>
+  const agentIdentityOf = (turn: Turn.Record) =>
     Identity.MemberReference.cases.Agent.make({ id: turn.agentId });
   /** Run a step as the turn's agent, attributed to it, in its own commit. */
-  const asAgent =
+  const runAsAgent =
     (turnId: Turn.Id) =>
     <A, E, R>(step: (turn: Turn.Record) => Effect.Effect<A, E, R>) =>
       Effect.gen(function* () {
-        const turn = yield* load(turnId);
-        const identity = identityOf(turn);
+        const turn = yield* requireTurn(turnId);
+        const identity = agentIdentityOf(turn);
         const provenance = yield* Publication.make(
           workspaceId,
           Performer.Reference.cases.Member.make({ memberId: turn.memberId, identity }),
@@ -312,20 +312,20 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           }),
         );
       }).pipe(Effect.provideService(Crypto.Crypto, crypto), journal.commit);
-  const where = (turn: Turn.Record) => ({
+  const factFieldsOf = (turn: Turn.Record) => ({
     workspaceId,
     groupId: turn.groupId,
     threadId: turn.threadId,
     turnId: turn.id,
   });
-  const require = (turn: Turn.Record, statuses: ReadonlyArray<Turn.Status>) =>
+  const requireStatus = (turn: Turn.Record, statuses: ReadonlyArray<Turn.Status>) =>
     statuses.includes(turn.status)
       ? Effect.void
       : Effect.fail(new NotActive({ turnId: turn.id, status: turn.status }));
-  const submittedKey = (batchId: string) => Log.IdempotencyKey.make(`submitted:${batchId}`);
+  const submissionKeyOf = (batchId: string) => Log.IdempotencyKey.make(`submitted:${batchId}`);
 
   /** Every thread message in a sequence range, oldest first, read a page at a time. */
-  const messagesIn = Effect.fnUntraced(function* (
+  const readMessagesBetween = Effect.fnUntraced(function* (
     turn: Turn.Record,
     range: { readonly after?: number; readonly through: number },
   ) {
@@ -368,7 +368,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     });
   });
   /** Who said something, as the model is told: a member by name, or a contact. */
-  const authorsOf = Effect.fnUntraced(function* (
+  const nameAuthors = Effect.fnUntraced(function* (
     list: ReadonlyArray<{ readonly message: ThreadMessage.Record }>,
   ) {
     const memberIds = [
@@ -388,34 +388,37 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   /** The agent's log for the thread a turn belongs to. */
-  const logOf = (turn: Turn.Record) => TurnLog.open(log, turn.participationId);
+  const openAgentLog = (turn: Turn.Record) => TurnLog.open(log, turn.participationId);
   /** The position just before one, to read from it: none before the first. */
-  const before = (position: Log.Position | null): Log.Position | undefined =>
+  const positionBefore = (position: Log.Position | null): Log.Position | undefined =>
     position === null || position === 0 ? undefined : Log.Position.make(position - 1);
   /** A turn's own entries: from where it began until another turn's. */
-  const ownRecords = (turn: Turn.Record) => TurnLog.entriesOf(log, turn);
+  const readOwnEntries = (turn: Turn.Record) => TurnLog.readTurnEntries(log, turn);
   /** How far a turn's input is taken in, as its own entries say. */
-  const incorporatedOf = Effect.fnUntraced(function* (turn: Turn.Record) {
-    return TurnLog.read(yield* ownRecords(turn)).incorporatedThrough(turn.inputAfterSequence);
+  const readIncorporatedThrough = Effect.fnUntraced(function* (turn: Turn.Record) {
+    return TurnLog.read(yield* readOwnEntries(turn)).incorporatedThrough(turn.inputAfterSequence);
   });
   /**
    * What a turn continues from: its agent's log for the thread read from the latest checkpoint the
    * turn knew when it was created, or from the start while there was none, and far enough back
    * for the turn's own entries. Reading on finds any checkpoint the turn recorded since.
    */
-  const contextOf = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const readContext = Effect.fnUntraced(function* (turn: Turn.Record) {
     const from =
       turn.historyFrom === null || turn.logAfter === null
         ? undefined
-        : before(Log.Position.make(Math.min(turn.historyFrom, turn.logAfter + 1)));
-    return TurnLog.context(yield* TurnLog.recordsAfter(log, turn.participationId, from), turn.id);
+        : positionBefore(Log.Position.make(Math.min(turn.historyFrom, turn.logAfter + 1)));
+    return TurnLog.buildContext(
+      yield* TurnLog.readRecordsAfter(log, turn.participationId, from),
+      turn.id,
+    );
   });
   /** A message as the model is told it: from its author, in pieces when it is long. */
-  const inputsOf = (
+  const toInputs = (
     message: ThreadMessage.Record,
     author: (author: ThreadMessage.Author) => Transcript.Author,
   ) =>
-    TurnLog.pieces(message.text, pieceSize).map((text): Transcript.Input => ({
+    TurnLog.splitIntoPieces(message.text, pieceSize).map((text): Transcript.Input => ({
       _tag: "Input",
       author: author(message.author),
       content: [{ _tag: "Text", text }],
@@ -424,27 +427,27 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
    * The thread's messages before a turn's input, as its agent's first history there: others' as
    * input and the agent's own as its responses, every message, in pieces when long.
    */
-  const threadHistory = Effect.fnUntraced(function* (turn: Turn.Record) {
-    const earlier = yield* messagesIn(turn, { through: turn.inputAfterSequence });
-    const author = yield* authorsOf(earlier);
+  const readThreadHistory = Effect.fnUntraced(function* (turn: Turn.Record) {
+    const earlier = yield* readMessagesBetween(turn, { through: turn.inputAfterSequence });
+    const author = yield* nameAuthors(earlier);
     return earlier.flatMap(({ message }): ReadonlyArray<Transcript.Item> =>
       message.author._tag === "Member" && message.author.memberId === turn.memberId
-        ? TurnLog.pieces(message.text, pieceSize).map((text, index) => ({
+        ? TurnLog.splitIntoPieces(message.text, pieceSize).map((text, index) => ({
             _tag: "Response",
             id: `message:${message.id}${index === 0 ? "" : `/${index}`}` as Transcript.ResponseId,
             parts: [{ _tag: "Text", text }],
           }))
-        : inputsOf(message, author),
+        : toInputs(message, author),
     );
   });
 
   const prepare = Effect.fn("TurnExecution.prepare")(function* (turnId: Turn.Id) {
-    const turn = yield* load(turnId);
+    const turn = yield* requireTurn(turnId);
     if (!Turn.active(turn.status)) return { _tag: "Finished" } as const;
     if (turn.status === "cancelling") return { _tag: "Stopping" } as const;
-    const unrunnable = (reason: string) => ({ _tag: "Unrunnable", reason }) as const;
+    const unrunnableBecause = (reason: string) => ({ _tag: "Unrunnable", reason }) as const;
     const agent = yield* agentStore.get(turn.agentId);
-    if (Option.isNone(agent)) return unrunnable("The agent no longer exists.");
+    if (Option.isNone(agent)) return unrunnableBecause("The agent no longer exists.");
     const selection: Turn.Selection = turn.selection ?? {
       connectionId: agent.value.model.connectionId,
       model: agent.value.model.model,
@@ -453,42 +456,44 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     };
     const connection = yield* connectionStore.get(selection.connectionId);
     if (Option.isNone(connection) || connection.value.status !== "active")
-      return unrunnable("The agent's model connection is no longer available.");
+      return unrunnableBecause("The agent's model connection is no longer available.");
     const authentication = connection.value.authentication;
     let credential: Redacted.Redacted<string> | undefined;
     if (authentication._tag === "ApiKey") {
       if (authentication.credentialId === null)
-        return unrunnable(`${connection.value.name} needs its API key.`);
+        return unrunnableBecause(`${connection.value.name} needs its API key.`);
       const stored = yield* connectionCredentialStore
         .get(authentication.credentialId)
         .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
       if (Option.isNone(stored))
-        return unrunnable(`${connection.value.name}'s API key can't be read on this server.`);
+        return unrunnableBecause(
+          `${connection.value.name}'s API key can't be read on this server.`,
+        );
       credential = stored.value.secret;
     }
     const environment = yield* environmentStore.get(selection.environmentId);
     if (Option.isNone(environment) || environment.value.status !== "active")
-      return unrunnable("The agent's environment is no longer available.");
+      return unrunnableBecause("The agent's environment is no longer available.");
     if (Option.isNone(environmentCatalog.harness(environment.value.harnessId)))
-      return unrunnable(
+      return unrunnableBecause(
         `The ${environment.value.harnessId} harness is not installed on this server.`,
       );
-    const context = yield* contextOf(turn);
+    const context = yield* readContext(turn);
     const incorporated = context.own.incorporatedThrough(turn.inputAfterSequence);
-    const messages = (yield* messagesIn(turn, {
+    const messages = (yield* readMessagesBetween(turn, {
       after: incorporated,
       through: turn.acceptedThroughSequence,
     })).filter(
       ({ message }) =>
         !(message.author._tag === "Member" && message.author.memberId === turn.memberId),
     );
-    const author = yield* authorsOf(messages);
+    const author = yield* nameAuthors(messages);
     const waiting = messages.flatMap(({ sequence, message }) =>
-      inputsOf(message, author).map((item): TurnLog.Waiting => ({ sequence, item })),
+      toInputs(message, author).map((item): TurnLog.Waiting => ({ sequence, item })),
     );
     // Until the first turn of a participation starts, its history is the thread's, which starting
     // records in the agent's log.
-    const seeded = context.begun ? undefined : yield* threadHistory(turn);
+    const seeded = context.begun ? undefined : yield* readThreadHistory(turn);
     const history = seeded ?? context.history;
     const transcript = seeded === undefined ? context.transcript : context.own.transcript(seeded);
     const [first, ...rest] = [...context.own.requested, ...waiting.map(({ item }) => item)];
@@ -531,17 +536,17 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     selection: Turn.Selection,
   ) {
     const chosen = yield* Schema.decodeEffect(Schema.toType(Turn.Selection))(selection);
-    return yield* asAgent(turnId)((turn) =>
+    return yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["queued"]);
+        yield* requireStatus(turn, ["queued"]);
         const agent = yield* agentStore.get(turn.agentId);
         if (Option.isNone(agent)) return yield* Effect.die("A turn's agent is missing");
         // The first turn of a participation records the thread's history before its input, so
         // later turns read it from the agent's log rather than from the thread, in entries of a
         // bounded size however long the thread.
         const entries: Array<TurnLog.Entry> = [];
-        if (!(yield* contextOf(turn)).begun) {
-          const items = yield* threadHistory(turn);
+        if (!(yield* readContext(turn)).begun) {
+          const items = yield* readThreadHistory(turn);
           let held: Array<Transcript.Item> = [];
           for (const item of items) {
             if (held.length > 0 && Transcript.characters([...held, item]) > historyEntrySize) {
@@ -558,11 +563,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           selection: chosen,
           instructions: agent.value.instructions,
         });
-        yield* logOf(turn).appendAll(entries);
+        yield* openAgentLog(turn).appendAll(entries);
         const startedAt = yield* DateTime.now;
         const event = yield* journal.publish(
           TurnFacts.Started,
-          Object.assign(where(turn), { selection: chosen, startedAt }),
+          Object.assign(factFieldsOf(turn), { selection: chosen, startedAt }),
         );
         yield* turnCommand.recordActivity(
           turn.threadId,
@@ -583,20 +588,21 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       readonly through: number | null;
     },
   ) {
-    return yield* asAgent(turnId)((turn) =>
+    return yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["running"]);
+        yield* requireStatus(turn, ["running"]);
         const summary = yield* Schema.decodeEffect(Schema.NonEmptyString)(recorded.summary);
         const through = recorded.through;
         if (
           through !== null &&
-          (through <= (yield* incorporatedOf(turn)) || through > turn.acceptedThroughSequence)
+          (through <= (yield* readIncorporatedThrough(turn)) ||
+            through > turn.acceptedThroughSequence)
         )
           return yield* new InvalidResponse({
             message: "A checkpoint can take in only input the turn accepted and has not taken in",
           });
         // The input the summary takes in counts as taken in from here on.
-        const entry = yield* logOf(turn).append({
+        const entry = yield* openAgentLog(turn).append({
           _tag: "Checkpoint",
           turnId: turn.id,
           summary,
@@ -609,11 +615,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   /** The batch as the turn's log recorded it, if it did. */
-  const submittedBatch = Effect.fnUntraced(function* (
+  const findSubmittedBatch = Effect.fnUntraced(function* (
     turn: Turn.Record,
     batchId: HarnessEvent.BatchId,
   ) {
-    const found = yield* logOf(turn).getAppend(submittedKey(batchId));
+    const found = yield* openAgentLog(turn).getAppend(submissionKeyOf(batchId));
     const entry = Option.getOrUndefined(found)?.[0]?.payload;
     return entry?._tag === "Submitted" ? entry : undefined;
   });
@@ -626,20 +632,20 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
     },
   ) {
-    return yield* asAgent(turnId)((turn) =>
+    return yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["running", "cancelling"]);
+        yield* requireStatus(turn, ["running", "cancelling"]);
         // A batch submitted again, as after a restart, holds what it held the first time.
-        const recorded = yield* submittedBatch(turn, batch.batchId);
+        const recorded = yield* findSubmittedBatch(turn, batch.batchId);
         if (recorded !== undefined) return recorded.items;
         if (
-          batch.throughSequence < (yield* incorporatedOf(turn)) ||
+          batch.throughSequence < (yield* readIncorporatedThrough(turn)) ||
           batch.throughSequence > turn.acceptedThroughSequence
         )
           return yield* new InvalidResponse({
             message: "A batch must cover input the turn accepted",
           });
-        yield* logOf(turn).append(
+        yield* openAgentLog(turn).append(
           {
             _tag: "Submitted",
             turnId: turn.id,
@@ -647,7 +653,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             throughSequence: batch.throughSequence,
             items: batch.items,
           },
-          { idempotencyKey: submittedKey(batch.batchId) },
+          { idempotencyKey: submissionKeyOf(batch.batchId) },
         );
         return batch.items;
       }),
@@ -660,13 +666,13 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     turnId: Turn.Id,
     events: ReadonlyArray<EnvironmentRuntime.Event>,
   ) {
-    yield* asAgent(turnId)((turn) =>
+    yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["running", "cancelling"]);
+        yield* requireStatus(turn, ["running", "cancelling"]);
         // Input the harness took in is a batch execution submitted, exactly as recorded.
         for (const event of events) {
           if (event._tag !== "Harness" || event.event._tag !== "InputIncorporated") continue;
-          const recorded = yield* submittedBatch(turn, event.event.batch.id);
+          const recorded = yield* findSubmittedBatch(turn, event.event.batch.id);
           if (recorded === undefined)
             return yield* new InvalidResponse({
               message: "Incorporated input was never submitted",
@@ -677,7 +683,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             });
         }
         if (events.length > 0)
-          yield* logOf(turn).appendAll(
+          yield* openAgentLog(turn).appendAll(
             events.map((event): TurnLog.Entry =>
               event._tag === "Harness"
                 ? { _tag: "Harness", turnId: turn.id, event: event.event }
@@ -692,10 +698,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     turnId: Turn.Id,
     kind: "session" | "summary",
   ) {
-    yield* asAgent(turnId)((turn) =>
+    yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["running", "cancelling"]);
-        yield* logOf(turn).append({ _tag: "Attempt", turnId: turn.id, kind });
+        yield* requireStatus(turn, ["running", "cancelling"]);
+        yield* openAgentLog(turn).append({ _tag: "Attempt", turnId: turn.id, kind });
       }),
     );
   });
@@ -708,11 +714,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       readonly problem: HarnessErrors.Problem;
     },
   ) {
-    yield* asAgent(turnId)((turn) =>
+    yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["running", "cancelling"]);
+        yield* requireStatus(turn, ["running", "cancelling"]);
         const reason = yield* Schema.decodeEffect(Schema.NonEmptyString)(stop.reason);
-        yield* logOf(turn).append({
+        yield* openAgentLog(turn).append({
           _tag: "Interrupted",
           turnId: turn.id,
           reason,
@@ -733,7 +739,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       readonly text: string;
     },
   ) {
-    const turn = yield* load(turnId);
+    const turn = yield* requireTurn(turnId);
     if (turn.status !== "running" || piece.text === "" || piece.responseId === "") return;
     yield* signals.publish({
       _tag: "TurnDraft",
@@ -749,11 +755,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   const entries = Effect.fn("TurnExecution.entries")(function* (turnId: Turn.Id) {
-    return yield* ownRecords(yield* load(turnId));
+    return yield* readOwnEntries(yield* requireTurn(turnId));
   });
 
   const close = Effect.fn("TurnExecution.close")(function* (turnId: Turn.Id) {
-    return yield* asAgent(turnId)((turn) =>
+    return yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
         if (turn.status === "cancelling") {
           yield* turnCommand.endTurn(turn, {
@@ -762,21 +768,21 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           });
           return { _tag: "Stopped" } as const;
         }
-        yield* require(turn, ["running"]);
-        const reading = TurnLog.read(yield* ownRecords(turn));
+        yield* requireStatus(turn, ["running"]);
+        const reading = TurnLog.read(yield* readOwnEntries(turn));
         if (reading.incorporatedThrough(turn.inputAfterSequence) < turn.acceptedThroughSequence)
           return { _tag: "InputPending" } as const;
         // Work its agent has not accepted yet is still this turn's to consider before closing;
         // accepting it extends the turn, and execution takes it in.
         const waiting = yield* notificationStore.listPendingByThread(
-          Notification.ofMember(turn.memberId, identityOf(turn)),
+          Notification.ofMember(turn.memberId, agentIdentityOf(turn)),
           turn.threadId,
           Number.MAX_SAFE_INTEGER,
         );
         if (waiting.length > 0) return { _tag: "InputPending" } as const;
         const messageIds: Array<ThreadMessage.Id> = [];
         if (reading.replies.length > 0) {
-          const unable = (reason: string) =>
+          const failTurn = (reason: string) =>
             Effect.gen(function* () {
               yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
               return { _tag: "Failed", reason } as const;
@@ -789,7 +795,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             }),
           );
           if (Option.isNone(thread))
-            return yield* unable("The agent can no longer open this thread.");
+            return yield* failTurn("The agent can no longer open this thread.");
           const permitted = yield* authorization.permitted([
             Requirement.make(ThreadMessagePermissions.Publish, {
               _tag: "Thread",
@@ -798,7 +804,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             }),
           ]);
           if (permitted[0] !== true)
-            return yield* unable("The agent may no longer post in this thread.");
+            return yield* failTurn("The agent may no longer post in this thread.");
           const current = yield* threadQuery.currentParticipants(thread.value);
           const agent: ThreadParticipation.Reference = { _tag: "Member", memberId: turn.memberId };
           if (
@@ -806,14 +812,15 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
               (p) => ThreadParticipation.keyOf(p.participant) === ThreadParticipation.keyOf(agent),
             )
           )
-            return yield* unable("The agent no longer takes part in this thread.");
+            return yield* failTurn("The agent no longer takes part in this thread.");
           const texts: Array<typeof ThreadMessage.Text.Type> = [];
           for (const reply of reading.replies) {
             const text = yield* Schema.decodeEffect(ThreadMessage.Text)(reply.text).pipe(
               Effect.asSome,
               Effect.catchTag("SchemaError", () => Effect.succeedNone),
             );
-            if (Option.isNone(text)) return yield* unable("The agent's reply could not be posted.");
+            if (Option.isNone(text))
+              return yield* failTurn("The agent's reply could not be posted.");
             texts.push(text.value);
           }
           // Each answer is its own message, in the order the agent gave them.
@@ -838,9 +845,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   const fail = Effect.fn("TurnExecution.fail")(function* (turnId: Turn.Id, reason: string) {
-    yield* asAgent(turnId)((turn) =>
+    yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["queued", "running", "cancelling"]);
+        yield* requireStatus(turn, ["queued", "running", "cancelling"]);
         const failure = yield* Schema.decodeEffect(Schema.NonEmptyString)(reason);
         yield* turnCommand.endTurn(turn, { outcome: "failed", reason: failure });
       }),
@@ -848,16 +855,16 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   const stopped = Effect.fn("TurnExecution.stopped")(function* (turnId: Turn.Id) {
-    yield* asAgent(turnId)((turn) =>
+    yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
-        yield* require(turn, ["cancelling"]);
+        yield* requireStatus(turn, ["cancelling"]);
         yield* turnCommand.endTurn(turn, { outcome: "cancelled", cancelReason: turn.cancelReason });
       }),
     );
   });
 
   const get = Effect.fn("TurnExecution.get")(function* (turnId: Turn.Id) {
-    return yield* load(turnId);
+    return yield* requireTurn(turnId);
   });
 
   return Service.of({

@@ -212,7 +212,7 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
   });
 
   /** The agent as the actor and performer of what it does with its own work. */
-  const asAgent = (agent: { readonly id: Agent.Id; readonly memberId: Member.Id }) => {
+  const actingAs = (agent: { readonly id: Agent.Id; readonly memberId: Member.Id }) => {
     const identity = Identity.MemberReference.cases.Agent.make({ id: agent.id });
     return <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       effect.pipe(
@@ -224,7 +224,7 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
   };
 
   /** Agents whose membership is active, with their inbox recipient. */
-  const activeAgents = Effect.gen(function* () {
+  const listActiveAgents = Effect.gen(function* () {
     const found: Array<{ readonly id: Agent.Id; readonly memberId: Member.Id }> = [];
     for (const stored of yield* agentStore.list) {
       const membership = yield* memberStore.get(stored.memberId);
@@ -238,7 +238,7 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
    * Accept one thread's pending notifications for an agent, in one commit: recheck they are still
    * pending, then extend the active turn or create one.
    */
-  const acceptThread = Effect.fnUntraced(function* (
+  const acceptThreadNotifications = Effect.fnUntraced(function* (
     agent: { readonly id: Agent.Id; readonly memberId: Member.Id },
     threadId: Turn.Record["threadId"],
     ids: ReadonlyArray<Notification.Id>,
@@ -313,7 +313,7 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
     const latest = yield* turnStore.findLatest(agent.memberId, threadId);
     const previous = Option.filter(latest, (turn) => turn.participationId === participationId);
     const prior = Option.isSome(previous)
-      ? TurnLog.read(yield* TurnLog.entriesOf(log, previous.value))
+      ? TurnLog.read(yield* TurnLog.readTurnEntries(log, previous.value))
       : undefined;
     const boundary = Option.isSome(previous)
       ? prior!.incorporatedThrough(previous.value.inputAfterSequence)
@@ -397,7 +397,7 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
    */
   const acceptWork = Effect.gen(function* () {
     let accepted = 0;
-    for (const agent of yield* activeAgents) {
+    for (const agent of yield* listActiveAgents) {
       const recipient = Notification.ofMember(
         agent.memberId,
         Identity.MemberReference.cases.Agent.make({ id: agent.id }),
@@ -415,7 +415,12 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
           byThread.set(threadId, [...(byThread.get(threadId) ?? []), stored.id]);
         }
         for (const [threadId, ids] of byThread) {
-          if (yield* acceptThread(agent, threadId, ids).pipe(asAgent(agent), journal.commit))
+          if (
+            yield* acceptThreadNotifications(agent, threadId, ids).pipe(
+              actingAs(agent),
+              journal.commit,
+            )
+          )
             accepted += 1;
           if (accepted >= page) return BackgroundProcess.continuing;
         }

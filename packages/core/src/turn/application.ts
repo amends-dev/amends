@@ -122,28 +122,28 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
-  const readThread = (threadId: ThreadId.Id) =>
+  const readThreadRequirement = (threadId: ThreadId.Id) =>
     Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId });
   /**
    * The thread, when the reader may open it and read it, as its timeline requires: every read of
    * its turns checks this. Outside its audience, it is missing to them.
    */
-  const readableThread = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
+  const requireReadableThread = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
     const thread = yield* threadQuery.requireAccess(threadId);
-    yield* authorization.require([readThread(thread.id)]);
+    yield* authorization.require([readThreadRequirement(thread.id)]);
     return thread;
   });
   /** The turn, when the reader may read its thread; outside the thread's audience, it is missing. */
-  const readable = Effect.fnUntraced(function* (turnId: Turn.Id) {
+  const requireReadableTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
     const found = yield* turnStore.get(turnId);
     if (Option.isNone(found)) return yield* new NotFound({ turnId });
     const turn = found.value;
-    yield* readableThread(turn.threadId).pipe(
+    yield* requireReadableThread(turn.threadId).pipe(
       Effect.catchTag("ThreadQuery.NotFound", () => Effect.fail(new NotFound({ turnId }))),
     );
     return turn;
   });
-  const directs = (turn: Turn.Record) =>
+  const directAgentRequirement = (turn: Turn.Record) =>
     Requirement.make(AgentPermissions.Use, {
       _tag: "Member",
       workspaceId,
@@ -151,7 +151,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     });
 
   /** Why the turn can't be retried now, or undefined when it can. */
-  const retryBlock = Effect.fnUntraced(function* (turn: Turn.Record) {
+  const whyNotRetryable = Effect.fnUntraced(function* (turn: Turn.Record) {
     if (Turn.active(turn.status)) return "active" as const;
     if (turn.status === "completed") return "completed" as const;
     if (Option.isSome(yield* turnStore.findActive(turn.memberId, turn.threadId)))
@@ -169,11 +169,11 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
    * thread's turns, newest first, only each agent's first can be its latest, so the others need
    * no reads to tell they were superseded.
    */
-  const present = Effect.fnUntraced(function* (
+  const toViews = Effect.fnUntraced(function* (
     list: ReadonlyArray<Turn.Record>,
     options: { readonly newestFirst?: boolean } = {},
   ) {
-    const directed = yield* authorization.permitted(list.map(directs));
+    const directed = yield* authorization.permitted(list.map(directAgentRequirement));
     const seen = new Set<string>();
     return yield* Effect.forEach(list, (turn, index) =>
       Effect.gen(function* () {
@@ -182,17 +182,17 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         seen.add(turn.memberId);
         const view: Turn.View = Object.assign({}, turn, {
           stoppable: mayDirect && Turn.active(turn.status) && turn.status !== "cancelling",
-          retryable: mayDirect && !later && (yield* retryBlock(turn)) === undefined,
+          retryable: mayDirect && !later && (yield* whyNotRetryable(turn)) === undefined,
         });
         return view;
       }),
     );
   });
-  const presentOne = (turn: Turn.Record) =>
-    Effect.map(present([turn]), (views) => views[0] as Turn.View);
+  const toView = (turn: Turn.Record) =>
+    Effect.map(toViews([turn]), (views) => views[0] as Turn.View);
 
   const get = Effect.fn("TurnApplication.get")(function* (turnId: Turn.Id) {
-    return yield* presentOne(yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId)));
+    return yield* toView(yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId)));
   });
 
   const listByThread = Effect.fn("TurnApplication.listByThread")(function* (
@@ -200,21 +200,21 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     limit: number,
   ) {
     const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
-    const count = yield* bounded(limit);
-    const thread = yield* readableThread(id).pipe(
+    const count = yield* decodeLimit(limit);
+    const thread = yield* requireReadableThread(id).pipe(
       Effect.catchTag("ThreadQuery.NotFound", () =>
         Effect.fail(new ThreadNotFound({ threadId: id })),
       ),
     );
-    return yield* present(yield* turnStore.listByThread(thread.id, count), { newestFirst: true });
+    return yield* toViews(yield* turnStore.listByThread(thread.id, count), { newestFirst: true });
   });
 
-  const bounded = Schema.decodeEffect(
+  const decodeLimit = Schema.decodeEffect(
     Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
   );
 
   const listActive = Effect.fn("TurnApplication.listActive")(function* (limit: number) {
-    const active = yield* turnStore.listActive(yield* bounded(limit));
+    const active = yield* turnStore.listActive(yield* decodeLimit(limit));
     // Each thread's audience is checked once, whatever number of its turns are active, then the
     // permission to read the threads in it, together.
     const opened = new Map<ThreadId.Id, boolean>();
@@ -230,21 +230,21 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       opened.set(turn.threadId, may);
     }
     const threads = [...opened].flatMap(([threadId, may]) => (may ? [threadId] : []));
-    const permitted = yield* authorization.permitted(threads.map(readThread));
+    const permitted = yield* authorization.permitted(threads.map(readThreadRequirement));
     const readable = new Set(threads.filter((_, index) => permitted[index] === true));
-    return yield* present(active.filter((turn) => readable.has(turn.threadId)));
+    return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
   });
 
   const readLog = Effect.fn("TurnApplication.log")(function* (turnId: Turn.Id) {
-    const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
+    const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
     return {
-      turn: yield* presentOne(turn),
-      items: TurnLog.read(yield* TurnLog.entriesOf(log, turn)).items,
+      turn: yield* toView(turn),
+      items: TurnLog.read(yield* TurnLog.readTurnEntries(log, turn)).items,
     } satisfies Turn.LogView;
   });
 
-  const sameItem = Schema.toEquivalence(Turn.LogItem);
-  const unavailable = () => new Turn.LogUnavailable({});
+  const isSameItem = Schema.toEquivalence(Turn.LogItem);
+  const toLogUnavailable = () => new Turn.LogUnavailable({});
 
   const watchLog = Effect.fn("TurnApplication.watchLog")(function* (turnId: Turn.Id) {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
@@ -253,15 +253,15 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const live = yield* signals.subscribe;
     const committed = yield* changeFeedSource
       .subscribe(Option.none())
-      .pipe(Effect.mapError(unavailable));
-    const turn = yield* readable(id);
+      .pipe(Effect.mapError(toLogUnavailable));
+    const turn = yield* requireReadableTurn(id);
     const handle = TurnLog.open(log, turn.participationId);
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Service;
     /** The reader still may read the thread, or following ends. */
-    const stillReadable = readableThread(turn.threadId).pipe(
+    const checkStillReadable = requireReadableThread(turn.threadId).pipe(
       Effect.provideService(Actor.Service, actor),
-      Effect.mapError(unavailable),
+      Effect.mapError(toLogUnavailable),
     );
 
     // The turn's entries sit together in its agent's log after `logAfter`, read as they come, and
@@ -270,7 +270,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
     const reader = TurnLog.reader();
     let after = turn.logAfter ?? undefined;
     let over = false;
-    const take = (batches: ReadonlyArray<Log.Batch<TurnLog.Entry>>) => {
+    const takeEntries = (batches: ReadonlyArray<Log.Batch<TurnLog.Entry>>) => {
       for (const batch of batches) {
         for (const entry of batch.entries) {
           if (entry.payload.turnId !== turn.id) {
@@ -285,38 +285,38 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       }
     };
     /** Read what the log holds past what was taken, until the turn's entries are over. */
-    const catchUp = Effect.gen(function* () {
+    const readLogSoFar = Effect.gen(function* () {
       while (!over) {
         const batches = yield* handle.read(
           after === undefined ? { limit: logPage } : { after, limit: logPage },
         );
         if (batches.length === 0) return;
-        take(batches);
+        takeEntries(batches);
       }
     });
     // The items as sent, so a change is told apart from what the reader has.
     let sent: ReadonlyArray<Turn.LogItem> = [];
-    const changes = (): ReadonlyArray<Turn.LogChange> => {
-      const items = reader.reading().items;
+    const collectChanges = (): ReadonlyArray<Turn.LogChange> => {
+      const items = reader.currentReading().items;
       const changed = items.flatMap((item, index) => {
         const before = sent[index];
-        return before !== undefined && sameItem(before, item) ? [] : [{ index, item }];
+        return before !== undefined && isSameItem(before, item) ? [] : [{ index, item }];
       });
       sent = items;
       return changed;
     };
-    const changed = (): ReadonlyArray<Turn.LogMessage> => {
-      const list = changes();
+    const changeMessages = (): ReadonlyArray<Turn.LogMessage> => {
+      const list = collectChanges();
       return list.length === 0 ? [] : [Turn.LogMessage.cases.Changed.make({ changes: list })];
     };
-    const ended = Turn.LogMessage.cases.Ended.make({});
+    const endedMessage = Turn.LogMessage.cases.Ended.make({});
 
-    yield* catchUp;
-    sent = reader.reading().items;
-    const opened = Turn.LogMessage.cases.Opened.make({ items: sent });
-    if (over || !Turn.active(turn.status)) return Stream.make(opened, ended);
+    yield* readLogSoFar;
+    sent = reader.currentReading().items;
+    const openedMessage = Turn.LogMessage.cases.Opened.make({ items: sent });
+    if (over || !Turn.active(turn.status)) return Stream.make(openedMessage, endedMessage);
     // What the response being written holds so far, since drafts carry only what follows it.
-    const written = (yield* turnQuery.currentDrafts(turn.id)).map((draft) =>
+    const draftsSoFar = (yield* turnQuery.currentDrafts(turn.id)).map((draft) =>
       Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
     );
 
@@ -324,13 +324,13 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       | { readonly _tag: "Logged"; readonly batch: Log.Batch<TurnLog.Entry> }
       | { readonly _tag: "Drafted"; readonly draft: Turn.LogMessage }
       | { readonly _tag: "AccessChanged" };
-    const logged = Stream.suspend(() =>
+    const loggedInputs = Stream.suspend(() =>
       handle.tail(after === undefined ? { limit: logPage } : { after, limit: logPage }),
     ).pipe(
       Stream.map((batch): Input => ({ _tag: "Logged", batch })),
-      Stream.mapError(unavailable),
+      Stream.mapError(toLogUnavailable),
     );
-    const drafted = live.pipe(
+    const draftedInputs = live.pipe(
       Stream.filter(
         (signal): signal is Extract<Signal.Value, { readonly _tag: "TurnDraft" }> =>
           signal._tag === "TurnDraft" && signal.turnId === turn.id,
@@ -346,7 +346,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
       })),
     );
     // Commits that change the reader's groups or grants, or everyone's, as a role's permissions do.
-    const accessChanged = committed.deliveries.pipe(
+    const accessChangedInputs = committed.deliveries.pipe(
       Stream.filter((delivery) =>
         delivery.events.some(
           ({ access }) =>
@@ -355,34 +355,36 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
         ),
       ),
       Stream.map((): Input => ({ _tag: "AccessChanged" })),
-      Stream.mapError(unavailable),
+      Stream.mapError(toLogUnavailable),
     );
     /**
      * What each input tells the reader, one at a time, so reads and what was sent agree. Once the
      * reader's access changes, it is checked before anything more is sent, drafts included.
      */
-    const step = (
+    const messagesFor = (
       input: Input,
     ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> => {
       switch (input._tag) {
         case "Drafted":
           return Effect.succeed([input.draft]);
         case "AccessChanged":
-          return Effect.as(stillReadable, []);
+          return Effect.as(checkStillReadable, []);
         case "Logged":
-          return stillReadable.pipe(
+          return checkStillReadable.pipe(
             Effect.map(() => {
-              take([input.batch]);
+              takeEntries([input.batch]);
               // The turn's end is in its log, committed with everything it wrote.
-              return over ? [...changed(), ended] : changed();
+              return over ? [...changeMessages(), endedMessage] : changeMessages();
             }),
           );
       }
     };
-    return Stream.make(opened, ...written).pipe(
+    return Stream.make(openedMessage, ...draftsSoFar).pipe(
       Stream.concat(
-        Stream.mergeAll([logged, drafted, accessChanged], { concurrency: "unbounded" }).pipe(
-          Stream.mapEffect(step),
+        Stream.mergeAll([loggedInputs, draftedInputs, accessChangedInputs], {
+          concurrency: "unbounded",
+        }).pipe(
+          Stream.mapEffect(messagesFor),
           Stream.flattenIterable,
           Stream.takeUntil((message) => message._tag === "Ended"),
         ),
@@ -392,12 +394,12 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
 
   const cancel = Effect.fn("TurnApplication.cancel")(
     function* (turnId: Turn.Id) {
-      const turn = yield* readable(yield* Schema.decodeEffect(Turn.Id)(turnId));
-      yield* authorization.require([directs(turn)]);
+      const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
+      yield* authorization.require([directAgentRequirement(turn)]);
       if (!Turn.active(turn.status))
         return yield* new NotActive({ turnId: turn.id, status: turn.status });
-      if (turn.status === "cancelling") return yield* presentOne(turn);
-      return yield* presentOne(yield* turnCommand.requestStop(turn, "requested"));
+      if (turn.status === "cancelling") return yield* toView(turn);
+      return yield* toView(yield* turnCommand.requestStop(turn, "requested"));
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -407,21 +409,21 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
   const retry = Effect.fn("TurnApplication.retry")(
     function* (turnId: Turn.Id) {
       const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
-      const turn = yield* readable(id);
-      yield* authorization.require([directs(turn)]);
+      const turn = yield* requireReadableTurn(id);
+      yield* authorization.require([directAgentRequirement(turn)]);
       // A turn is retried at most once, since its retry supersedes it, so the retry's ID comes from
       // the turn it retries and asking again returns that retry.
       const retryId = Turn.Id.make(yield* Request.derivedId(["turn.retry", workspaceId, turn.id]));
       if (Option.isSome(yield* turnStore.get(retryId)))
-        return yield* presentOne(yield* readable(retryId));
-      const reason = yield* retryBlock(turn);
+        return yield* toView(yield* requireReadableTurn(retryId));
+      const reason = yield* whyNotRetryable(turn);
       if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
       const handle = TurnLog.open(log, turn.participationId);
       // The same input, continuing after the failed or stopped turn in the agent's log: its
       // input starts after what that turn took in, from the latest checkpoint the log holds,
       // with the agent's current model access and environment. It is created after the turn
       // it retries, even on a clock that has not moved, so it is the agent's latest there.
-      const retried = TurnLog.read(yield* TurnLog.entriesOf(log, turn));
+      const retried = TurnLog.read(yield* TurnLog.readTurnEntries(log, turn));
       const now = yield* DateTime.now;
       const createdAt = DateTime.isGreaterThan(now, turn.createdAt)
         ? now
@@ -473,7 +475,7 @@ export const make = Effect.fn("TurnApplication.make")(function* () {
           content: [{ _tag: "Text", text: "Please try that again." }],
         },
       });
-      return yield* presentOne(created);
+      return yield* toView(created);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

@@ -124,7 +124,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         item: input(message.text),
       }));
     const [first, ...rest] = waiting.map(({ item }) => item);
-    const context = TurnLog.context(state.log, turnId);
+    const context = TurnLog.buildContext(state.log, turnId);
     return {
       turn: state.turn,
       instructions: context.own.started?.instructions ?? state.instructions,

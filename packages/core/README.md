@@ -292,14 +292,14 @@ retry, the thread's `History` before the first turn, `Checkpoint`s that replace 
 them, and its `Ended` with the outcome, the replies, and why it failed or was stopped
 ([core model](../../docs/core-model.md#agreed-an-agents-memory-in-a-thread-is-one-log-of-its-turns)).
 Only one turn writes there at a time, so a turn's entries sit together after its `logAfter`, read
-by `TurnLog.entriesOf`. `TurnLog.reader` is the one reading of a turn's entries, taking them as they
+by `TurnLog.readTurnEntries`. `TurnLog.reader` is the one reading of a turn's entries, taking them as they
 come, and `TurnLog.read` reads them at once: its harness events, how far input is taken in, its
 transcript and the view it leaves, the replies it owes, input asked of it, the items its readers
 see, what it started with, how it ended, its latest checkpoint's position, and its attempts since it
 last got further (a response finished, a tool call completed, or a checkpoint), with the latest
 interruption and whether the last attempt died without recording one, and how often its context
 proved full since its last finished response, as its harness reported or its provider refused,
-and whether a checkpoint is owed for it. `TurnLog.context` reads the
+and whether a checkpoint is owed for it. `TurnLog.buildContext` reads the
 log for a turn from its latest checkpoint: earlier turns as the view each left, without reasoning,
 followed by a note from `TurnLog.noteAuthor` when a turn that started failed or was stopped by
 request, then the turn's own work. The log has begun once a turn recorded the thread's history,
@@ -329,7 +329,7 @@ before its input (the agent's own as responses), which starting records in the l
 bounded size. A message longer than 40,000 characters is given in pieces. `prepare` also gives the
 waiting input piece by piece with where each came from, the size of the input asked of the turn,
 and what a provider last measured since the latest checkpoint, so the runner, which knows the
-model, can tell with `TurnLog.compaction` whether a checkpoint must come first: in tokens against a
+model, can tell with `TurnLog.proposeCompaction` whether a checkpoint must come first: in tokens against a
 budget, the newest exchanges within what it keeps, cut at an input or a response and never between
 two pieces of one waiting message, with the turn's own input kept verbatim when the cut falls
 inside its work, and everything kept without reasoning. The runner records it with a summary of

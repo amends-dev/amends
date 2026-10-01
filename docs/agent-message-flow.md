@@ -92,7 +92,7 @@ One entity per workspace and process means the process never runs against itself
 ## 3. The agent accepts the work (commit B)
 
 `TurnCommand.acceptWork` goes through each active agent's pending notifications a page at a time,
-groups them by thread, and calls `acceptThread` for each thread in a commit of its own, **acting
+groups them by thread, and calls `acceptThreadNotifications` for each thread in a commit of its own, **acting
 as the agent**: the agent is the actor and the performer of everything in the commit. The commit
 rechecks that the notifications are still pending and that the agent can still open the thread,
 then:
@@ -244,7 +244,7 @@ calls best effort. A real model adds its own time to step 4.
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Which messages ask an agent for work          | `requestsWork` in `ThreadCommand.publishMessage`; how it becomes a notification, `Notification.generated` |
 | When a process wakes                          | `wakesOn` in `TurnCommand.acceptWorkProcess`; processes are registered in `Core.processes`                |
-| How work is accepted into turns               | `acceptThread` in `TurnCommand`                                                                           |
+| How work is accepted into turns               | `acceptThreadNotifications` in `TurnCommand`                                                              |
 | Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                         |
 | How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                |
 | How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                              |

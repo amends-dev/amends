@@ -225,7 +225,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
     );
     return {
       ...limits,
-      compaction: TurnLog.compaction(plan.transcript, plan.waiting, {
+      compaction: TurnLog.proposeCompaction(plan.transcript, plan.waiting, {
         ...limits,
         keep: Math.floor(limits.keep / 2 ** (options.shrink ?? 0)),
         fixed: plan.fixed,

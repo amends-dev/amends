@@ -154,7 +154,7 @@ describe("TurnLog.read", () => {
   });
 });
 
-describe("TurnLog.context", () => {
+describe("TurnLog.buildContext", () => {
   const earlier = TurnId.Id.make("t0");
   const reasoning: Transcript.ResponsePart = { _tag: "Reasoning", text: "Thinking it over." };
   const response = (id: string, ...parts: ReadonlyArray<Transcript.ResponsePart>) =>
@@ -179,7 +179,7 @@ describe("TurnLog.context", () => {
     );
 
   it("reads earlier turns as they left the conversation, without their reasoning", () => {
-    const context = TurnLog.context(
+    const context = TurnLog.buildContext(
       recorded(
         { _tag: "History", turnId: earlier, items: [input("before")] },
         tookFor(earlier, "question"),
@@ -209,7 +209,7 @@ describe("TurnLog.context", () => {
       name: "search",
       params: {},
     } satisfies Transcript.ToolCall;
-    const stopped = TurnLog.context(
+    const stopped = TurnLog.buildContext(
       recorded(
         tookFor(earlier, "question"),
         block(earlier, "r0", 0, text("Half an ans")),
@@ -218,7 +218,7 @@ describe("TurnLog.context", () => {
       turnId,
     );
     expect(stopped.history).toEqual([input("question"), response("r0", text("Half an ans"))]);
-    const pending = TurnLog.context(
+    const pending = TurnLog.buildContext(
       recorded(tookFor(earlier, "question"), block(earlier, "r0", 0, call), finish(earlier, "r0")),
       turnId,
     );
@@ -226,7 +226,7 @@ describe("TurnLog.context", () => {
   });
 
   it("starts from the latest checkpoint, which replaces everything before it", () => {
-    const context = TurnLog.context(
+    const context = TurnLog.buildContext(
       recorded(
         tookFor(earlier, "old"),
         {
@@ -291,7 +291,7 @@ describe("TurnLog.context", () => {
       content: [{ _tag: "Text", text }],
     });
     const after = (ending: Pick<TurnLog.Ended, "outcome" | "reason" | "cancelReason">) =>
-      TurnLog.context(
+      TurnLog.buildContext(
         recorded(
           started(earlier),
           tookFor(earlier, "question"),
@@ -321,9 +321,9 @@ describe("TurnLog.context", () => {
       { _tag: "Requested", turnId: earlier, input: input("again") },
       ended(earlier, { outcome: "cancelled", reason: null, cancelReason: "requested" }),
     );
-    const context = TurnLog.context(unstarted, turnId);
+    const context = TurnLog.buildContext(unstarted, turnId);
     expect(context).toMatchObject({ begun: false, history: [] });
-    expect(TurnLog.context(recorded(started(earlier)), turnId).begun).toBe(true);
+    expect(TurnLog.buildContext(recorded(started(earlier)), turnId).begun).toBe(true);
   });
 
   it("knows what a provider last measured, until a checkpoint replaces what it measured", () => {
@@ -336,7 +336,9 @@ describe("TurnLog.context", () => {
       },
       earlier,
     );
-    expect(TurnLog.context(recorded(tookFor(earlier, "q"), measured), turnId).measured).toEqual({
+    expect(
+      TurnLog.buildContext(recorded(tookFor(earlier, "q"), measured), turnId).measured,
+    ).toEqual({
       responseId: "r0",
       tokens: 1_000,
     });
@@ -348,14 +350,14 @@ describe("TurnLog.context", () => {
       through: null,
     };
     expect(
-      TurnLog.context(recorded(tookFor(earlier, "q"), measured, checkpoint), turnId).measured,
+      TurnLog.buildContext(recorded(tookFor(earlier, "q"), measured, checkpoint), turnId).measured,
     ).toBeUndefined();
   });
 
   it("finds the log empty before a participation's first turn", () => {
-    expect(TurnLog.context([], turnId).begun).toBe(false);
+    expect(TurnLog.buildContext([], turnId).begun).toBe(false);
     expect(
-      TurnLog.context(recorded({ _tag: "Requested", turnId, input: input("again") }), turnId),
+      TurnLog.buildContext(recorded({ _tag: "Requested", turnId, input: input("again") }), turnId),
     ).toMatchObject({ begun: false, own: { requested: [input("again")] } });
   });
 });
@@ -415,7 +417,7 @@ describe("TurnLog.read attempts", () => {
   });
 });
 
-describe("TurnLog.compaction", () => {
+describe("TurnLog.proposeCompaction", () => {
   // Four characters make about a token, so each of these is one token.
   const answer = (
     id: string,
@@ -436,8 +438,8 @@ describe("TurnLog.compaction", () => {
   });
 
   it("summarizes the older part only once the transcript and waiting input outgrow the budget", () => {
-    expect(TurnLog.compaction(items, [], { budget: 10, keep: 2 })).toBeUndefined();
-    expect(TurnLog.compaction(items, [], { budget: 10, keep: 2, fixed: 40 })).toEqual({
+    expect(TurnLog.proposeCompaction(items, [], { budget: 10, keep: 2 })).toBeUndefined();
+    expect(TurnLog.proposeCompaction(items, [], { budget: 10, keep: 2, fixed: 40 })).toEqual({
       summarize: items.slice(0, 2),
       kept: items.slice(2),
       through: null,
@@ -446,9 +448,9 @@ describe("TurnLog.compaction", () => {
 
   it("counts what a provider measured, and the instructions when nothing did", () => {
     const measured = { responseId: Transcript.ResponseId.make("dddd"), tokens: 50 };
-    expect(TurnLog.compaction(items, [], { budget: 10, keep: 3, measured })).toBeDefined();
+    expect(TurnLog.proposeCompaction(items, [], { budget: 10, keep: 3, measured })).toBeDefined();
     expect(
-      TurnLog.compaction(items, [], { budget: 10, keep: 3, instructions: "x".repeat(40) }),
+      TurnLog.proposeCompaction(items, [], { budget: 10, keep: 3, instructions: "x".repeat(40) }),
     ).toBeDefined();
   });
 
@@ -469,7 +471,7 @@ describe("TurnLog.compaction", () => {
       answer("r2", reasoning, call("c2")),
       result("c2", "yyyy"),
     ];
-    const found = TurnLog.compaction([...items, ...turn], [], {
+    const found = TurnLog.proposeCompaction([...items, ...turn], [], {
       budget: 10,
       keep: 6,
       current: items.length,
@@ -483,7 +485,7 @@ describe("TurnLog.compaction", () => {
 
   it("summarizes waiting input too when it alone outgrows the budget, keeping the newest", () => {
     const backlog = [waiting(5, "eeee"), waiting(6, "ffff"), waiting(7, "gggg")];
-    expect(TurnLog.compaction(items, backlog, { budget: 5, keep: 2 })).toEqual({
+    expect(TurnLog.proposeCompaction(items, backlog, { budget: 5, keep: 2 })).toEqual({
       summarize: [...items, backlog[0]!.item],
       kept: [],
       through: 5,
@@ -492,7 +494,7 @@ describe("TurnLog.compaction", () => {
 
   it("never cuts between two pieces of one waiting message", () => {
     const pieces = [waiting(5, "eeee"), waiting(6, "ffff"), waiting(6, "gggg")];
-    expect(TurnLog.compaction(items, pieces, { budget: 5, keep: 1 })).toEqual({
+    expect(TurnLog.proposeCompaction(items, pieces, { budget: 5, keep: 1 })).toEqual({
       summarize: [...items, pieces[0]!.item],
       kept: [],
       through: 5,
@@ -506,7 +508,7 @@ describe("TurnLog.compaction", () => {
       content: [{ _tag: "Text", text: "Earlier: aaaa" }],
     };
     expect(
-      TurnLog.compaction([summary, ...exchange("cccc", "dddd")], [], {
+      TurnLog.proposeCompaction([summary, ...exchange("cccc", "dddd")], [], {
         budget: 2,
         keep: 10,
         force: true,
@@ -515,10 +517,10 @@ describe("TurnLog.compaction", () => {
   });
 });
 
-describe("TurnLog.pieces", () => {
+describe("TurnLog.splitIntoPieces", () => {
   it("gives long text in pieces rather than cutting it", () => {
-    expect(TurnLog.pieces("short", 10)).toEqual(["short"]);
-    expect(TurnLog.pieces("", 10)).toEqual([""]);
-    expect(TurnLog.pieces("0123456789abc", 5)).toEqual(["01234", "56789", "abc"]);
+    expect(TurnLog.splitIntoPieces("short", 10)).toEqual(["short"]);
+    expect(TurnLog.splitIntoPieces("", 10)).toEqual([""]);
+    expect(TurnLog.splitIntoPieces("0123456789abc", 5)).toEqual(["01234", "56789", "abc"]);
   });
 });
