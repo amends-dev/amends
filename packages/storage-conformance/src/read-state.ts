@@ -1,6 +1,6 @@
 import { Notification } from "@amends/core/notification";
 import { describe, expect, it } from "@effect/vitest";
-import { ReadState, ReadStateApplication } from "@amends/core/attention";
+import { ReadState, ReadStateApplication } from "@amends/core/read-state";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
 import {
   Group,

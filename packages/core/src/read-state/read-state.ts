@@ -3,6 +3,10 @@ import { GroupId } from "../group/id.ts";
 import { ThreadId } from "../thread/id.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
+import type { Notification } from "../notification/notification.ts";
+
+/** A person whose reading this is, as their notifications address them. Agents keep no read state. */
+export type Reader = Extract<Notification.Recipient, { readonly _tag: "Human" }>;
 
 /** How far a human member has read a thread, by timeline sequence. Private to that member. */
 export const ThreadPosition = Schema.Struct({

@@ -48,8 +48,8 @@ import { GroupProjection } from "./group/projection.ts";
 import { GroupMembershipProjection } from "./group/membership/projection.ts";
 import { GroupFollowApplication } from "./group/follow/application.ts";
 import { GroupFollowProjection } from "./group/follow/projection.ts";
-import { ReadStateApplication } from "./attention/application.ts";
-import { ThreadReading } from "./attention/reading.ts";
+import { ReadStateApplication } from "./read-state/application.ts";
+import { ReadStateCommand } from "./read-state/command.ts";
 import { GroupMembershipApplication } from "./group/membership/application.ts";
 import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
@@ -186,7 +186,7 @@ const turnCommand = TurnCommand.layer.pipe(
 );
 const turnQuery = TurnQuery.layer;
 const notificationSource = NotificationSource.layer.pipe(Layer.provide(threadQuery));
-const threadReading = ThreadReading.layer;
+const readStateCommand = ReadStateCommand.layer;
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
@@ -231,7 +231,7 @@ const operations = Layer.mergeAll(
       threadQuery,
       threadCommand,
       notificationSource,
-      threadReading,
+      readStateCommand,
       turnCommand,
       turnQuery,
       changeFeedSource,

@@ -43,6 +43,6 @@ export const make = Effect.fn("GroupQuery.make")(function* () {
 
   return Service.of({ requireAudience });
 });
-/** Internal reads shared by group, thread, and attention operations. @category layers */
+/** Internal reads shared by group, thread, and read-state operations. @category layers */
 export const layer = Layer.effect(Service, make());
 export * as GroupQuery from "./query.ts";

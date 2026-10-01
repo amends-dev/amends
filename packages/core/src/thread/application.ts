@@ -31,8 +31,9 @@ import { ThreadActivity } from "./activity/activity.ts";
 import { ThreadActivityKind } from "./activity/kind.ts";
 import { ThreadMessageActivity } from "./message/activity.ts";
 import { ThreadMessage } from "./message/message.ts";
-import { ThreadReading } from "../attention/reading.ts";
-import { ReadStateStore } from "../attention/store.ts";
+import { ReadStateCommand } from "../read-state/command.ts";
+import type { ReadState } from "../read-state/read-state.ts";
+import { ReadStateStore } from "../read-state/store.ts";
 import { Request } from "../request/request.ts";
 import {
   DirectMembersRequired,
@@ -56,7 +57,7 @@ export type Error =
   | GroupStore.Failure
   | GroupMembershipStore.Failure
   | GroupFollowStore.Failure
-  | ThreadReading.Error
+  | ReadStateCommand.Error
   | MemberStore.Failure
   | Schema.SchemaError
   | PlatformError.PlatformError
@@ -152,7 +153,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   const threadQuery = yield* ThreadQuery.Service;
   const threadStore = yield* ThreadStore.Service;
   const readStateStore = yield* ReadStateStore.Service;
-  const threadReading = yield* ThreadReading.Service;
+  const readStateCommand = yield* ReadStateCommand.Service;
   const threadMessageStore = yield* ThreadMessageStore.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
   const journal = yield* Journal.Service;
@@ -208,7 +209,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
   });
   /** Create the thread with its author's opening message, which the author has then read. */
   const createThread = Effect.fnUntraced(function* (
-    author: ThreadReading.Reader,
+    author: ReadState.Reader,
     groupId: Group.Id,
     participants: ReadonlyArray<Member.Id>,
     message: {
@@ -237,7 +238,7 @@ export const make = Effect.fn("ThreadApplication.make")(function* () {
         ),
       );
     // Posting reads the thread through the author's own message.
-    yield* threadReading.markRead(author, started.thread, started.activity.sequence);
+    yield* readStateCommand.markThreadRead(author, started.thread, started.activity.sequence);
     return { thread: started.thread, message: started.message } satisfies Thread.Started;
   });
   const startDirect = Effect.fn("ThreadApplication.startDirect")(

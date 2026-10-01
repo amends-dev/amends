@@ -21,7 +21,7 @@ import { TurnApplication } from "@amends/core/turn";
 import { ConnectionApplication } from "@amends/core/connection";
 import { EnvironmentApplication } from "@amends/core/environment";
 import { NotificationApplication } from "@amends/core/notification";
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateApplication } from "@amends/core/read-state";
 import {
   ThreadApplication,
   ThreadMessageApplication,

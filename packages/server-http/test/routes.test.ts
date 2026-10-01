@@ -21,7 +21,7 @@ import {
   ThreadParticipation,
   ThreadParticipationApplication,
 } from "@amends/core/thread";
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateApplication } from "@amends/core/read-state";
 import {
   Invitation,
   InvitationApplication,

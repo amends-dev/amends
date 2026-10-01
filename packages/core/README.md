@@ -396,8 +396,13 @@ activity of its own yet.
 
 ## Read state
 
-`@amends/core/attention` holds private read state: `ReadStateApplication.markThreadRead` and
+`@amends/core/read-state` holds private read state: `ReadStateApplication.markThreadRead` and
 `markGroupRead`, over the required `ReadStateStore` binding, which is kept outside the journal.
+Its internal `ReadStateCommand.markThreadRead` marks the reader's notifications from the thread
+seen and advances their position; marking a thread read, starting one, and replying all use it, so
+an author has read what they posted. It is one part of the
+[attention model](../../docs/core-model.md#agreed-attention-is-directed-followed-or-ambient): what
+makes ambient activity visible.
 The thread and group projections keep each thread's and group's latest message from recorded
 thread activity, through `ThreadStore.recordLatest` and `GroupStore.recordLatest`, and notifications from thread activity carry their thread and
 sequence, so reading a thread settles exactly its notifications. See

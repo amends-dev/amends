@@ -1,4 +1,4 @@
-import { ReadState, ReadStateStore } from "@amends/core/attention";
+import { ReadState, ReadStateStore } from "@amends/core/read-state";
 import { Group } from "@amends/core/group";
 import { Thread } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";

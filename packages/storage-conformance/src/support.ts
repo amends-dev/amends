@@ -1,6 +1,6 @@
 /** Fixtures the suites share: identities, bound stores, and cores and gateways over a host. */
 import * as Core from "@amends/core";
-import { ReadStateStore } from "@amends/core/attention";
+import { ReadStateStore } from "@amends/core/read-state";
 import {
   Assignment,
   AssignmentFacts,

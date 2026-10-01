@@ -6,7 +6,7 @@ import {
 } from "@amends/core/thread";
 import { inject } from "@effect/vitest";
 import * as Core from "@amends/core";
-import { ReadStateStore } from "@amends/core/attention";
+import { ReadStateStore } from "@amends/core/read-state";
 import { AssignmentStore, RoleStore } from "@amends/core/authorization";
 import { Identity, Performer } from "@amends/core/identity";
 import { Event, Checkpoint, Log, Store } from "@amends/core/journal";

@@ -1,4 +1,4 @@
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateApplication } from "@amends/core/read-state";
 import { ChangeFeed, ChangeFeedApplication } from "@amends/core/change-feed";
 import { Group, GroupApplication } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";

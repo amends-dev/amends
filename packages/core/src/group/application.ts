@@ -22,7 +22,7 @@ import { GroupMembership } from "./membership/membership.ts";
 import { GroupMembershipPermissions } from "./membership/permissions.ts";
 import { GroupMembershipStore } from "./membership/store.ts";
 import { GroupFollowStore } from "./follow/store.ts";
-import { ReadStateStore } from "../attention/store.ts";
+import { ReadStateStore } from "../read-state/store.ts";
 import { NotificationStore } from "../notification/store.ts";
 import { Changed, InactiveMember, MemberNotFound, NotFound, NotRenamable } from "./errors.ts";
 import { Notification } from "../notification/notification.ts";

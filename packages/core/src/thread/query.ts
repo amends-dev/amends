@@ -263,6 +263,6 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     readTimelineItem,
   });
 });
-/** Internal reads shared by thread, turn, attention, signal, and notification operations. @category layers */
+/** Internal reads shared by thread, turn, read-state, signal, and notification operations. @category layers */
 export const layer = Layer.effect(Service, make());
 export * as ThreadQuery from "./query.ts";

@@ -13,7 +13,7 @@ import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
 import { Signal } from "../signal/signal.ts";
 import { Signals } from "../signal/signals.ts";
-import { ThreadReading } from "./reading.ts";
+import { ReadStateCommand } from "./command.ts";
 import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 import { Notification } from "../notification/notification.ts";
 import { Store } from "../journal/store.ts";
@@ -24,7 +24,7 @@ export type Error =
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | Exclude<GroupQuery.AudienceError, GroupQuery.NotMember>
   | ThreadActivityStore.Failure
-  | ThreadReading.Error
+  | ReadStateCommand.Error
   | ReadStateStore.Failure
   | ReadStateStore.Conflict
   | Schema.SchemaError
@@ -48,7 +48,7 @@ export interface Interface {
   ) => Effect.Effect<void, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/attention/application/Service",
+  "@amends/core/read-state/application/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority per operation. @category constructors */
@@ -57,22 +57,23 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
   const threadQuery = yield* ThreadQuery.Service;
   const groupQuery = yield* GroupQuery.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
-  const threadReading = yield* ThreadReading.Service;
+  const readStateCommand = yield* ReadStateCommand.Service;
   const readStateStore = yield* ReadStateStore.Service;
   const signals = yield* Signals.Service;
   const { workspaceId } = yield* Store.Service;
 
-  const human = Effect.fnUntraced(function* () {
+  /** The acting person as a reader; agents keep no read state. */
+  const requireHumanReader = Effect.fnUntraced(function* () {
     const actor = yield* Actor.Service;
     if (actor.identity._tag !== "Human")
       return yield* new HumanRequired({ memberId: actor.memberId });
-    return Notification.ofMember(actor.memberId, actor.identity) satisfies ThreadReading.Reader;
+    return Notification.ofMember(actor.memberId, actor.identity) satisfies ReadState.Reader;
   });
   const markThreadRead = Effect.fn("ReadStateApplication.markThreadRead")(function* (
     input: ReadState.MarkThreadReadInput,
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkThreadReadInput)(input);
-    const reader = yield* human();
+    const reader = yield* requireHumanReader();
     const thread = yield* threadQuery
       .requireAccess(request.threadId)
       .pipe(
@@ -103,7 +104,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     };
     // Reading settles the inbox up to the position. Both are private state, written outside the
     // workspace's write order; the reader's other sessions hear of it as a signal.
-    yield* threadReading.markRead(reader, thread, position.readThrough);
+    yield* readStateCommand.markThreadRead(reader, thread, position.readThrough);
     yield* signals.publish(
       Signal.Value.cases.ThreadRead.make({
         workspaceId,
@@ -118,7 +119,7 @@ export const make = Effect.fn("ReadStateApplication.make")(function* () {
     input: ReadState.MarkGroupReadInput,
   ) {
     const request = yield* Schema.decodeEffect(ReadState.MarkGroupReadInput)(input);
-    const reader = yield* human();
+    const reader = yield* requireHumanReader();
     yield* groupQuery
       .requireAudience(request.groupId)
       .pipe(

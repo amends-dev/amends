@@ -1,5 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateApplication } from "@amends/core/read-state";
 import {
   ThreadApplication,
   ThreadMessageApplication,

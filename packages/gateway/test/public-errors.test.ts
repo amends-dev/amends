@@ -1,5 +1,5 @@
 import type { AssignmentApplication } from "@amends/core/authorization";
-import type { ReadStateApplication } from "@amends/core/attention";
+import type { ReadStateApplication } from "@amends/core/read-state";
 import type { ChangeFeedApplication } from "@amends/core/change-feed";
 import type { ConnectionApplication } from "@amends/core/connection";
 import type {

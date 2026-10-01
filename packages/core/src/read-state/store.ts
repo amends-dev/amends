@@ -42,6 +42,6 @@ export interface Interface {
   ) => Effect.Effect<void, Failure | Conflict>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/attention/store/Service",
+  "@amends/core/read-state/store/Service",
 ) {}
 export * as ReadStateStore from "./store.ts";

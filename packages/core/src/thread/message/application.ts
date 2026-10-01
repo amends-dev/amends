@@ -11,7 +11,7 @@ import { ThreadQuery } from "../query.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessagePermissions } from "./permissions.ts";
-import { ThreadReading } from "../../attention/reading.ts";
+import { ReadStateCommand } from "../../read-state/command.ts";
 import { Request } from "../../request/request.ts";
 import { ThreadMessageStore } from "./store.ts";
 import { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
@@ -19,7 +19,7 @@ import { Notification } from "../../notification/notification.ts";
 export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
 
 export type Error =
-  | ThreadReading.Error
+  | ReadStateCommand.Error
   | Authorization.Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
@@ -44,7 +44,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
-  const threadReading = yield* ThreadReading.Service;
+  const readStateCommand = yield* ReadStateCommand.Service;
   const threadMessageStore = yield* ThreadMessageStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -144,7 +144,7 @@ export const make = Effect.fn("ThreadMessageApplication.make")(function* () {
           ),
         );
       // Replying reads the thread through the author's own message.
-      yield* threadReading.markRead(
+      yield* readStateCommand.markThreadRead(
         Notification.ofMember(actor.memberId, actor.identity),
         thread,
         published.activity.sequence,

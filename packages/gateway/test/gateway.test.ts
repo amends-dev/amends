@@ -9,7 +9,7 @@ import {
   ThreadActivityStore,
 } from "@amends/core/thread";
 import { expect, it } from "@effect/vitest";
-import { ReadStateStore } from "@amends/core/attention";
+import { ReadStateStore } from "@amends/core/read-state";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";

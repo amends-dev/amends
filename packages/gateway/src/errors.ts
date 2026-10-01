@@ -24,7 +24,7 @@ import {
   Workspace,
   WorkspaceSettingsApplication,
 } from "@amends/core/workspace";
-import { ReadStateApplication } from "@amends/core/attention";
+import { ReadStateApplication } from "@amends/core/read-state";
 import { ConnectionApplication } from "@amends/core/connection";
 import { AgentApplication } from "@amends/core/agent";
 import { Turn, TurnApplication } from "@amends/core/turn";
