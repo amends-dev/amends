@@ -2,7 +2,7 @@ export { Turn } from "./turn.ts";
 export { TurnActivity } from "./activity.ts";
 export { TurnService } from "./service.ts";
 export { TurnCommand } from "./command.ts";
-export { TurnDispatch } from "./dispatch.ts";
+export { TurnJobs } from "./jobs.ts";
 export { TurnErrors } from "./errors.ts";
 export { TurnExecution } from "./execution.ts";
 export { TurnFacts } from "./facts.ts";

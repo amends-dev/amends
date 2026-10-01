@@ -9,7 +9,7 @@ import {
   Sharding,
   ShardingConfig,
 } from "effect/unstable/cluster";
-import { ClusterPruning } from "../src/pruning.ts";
+import { JobPruning } from "../../src/jobs/pruning.ts";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */
 const cluster = Sharding.layer.pipe(
@@ -22,13 +22,13 @@ const cluster = Sharding.layer.pipe(
 it.effect("handled requests are pruned every hour, once they are a week old", () =>
   Effect.gen(function* () {
     const calls: Array<{ readonly types: ReadonlyArray<string>; readonly before: number }> = [];
-    const pruning = ClusterPruning.layer({
+    const pruning = JobPruning.layer({
       prune: (types, before) =>
         Effect.sync(() => {
           calls.push({ types, before: DateTime.toEpochMillis(before) });
           return 0;
         }),
-      entityTypes: ["amends/WorkspaceProcess", "amends/Turn"],
+      entityTypes: ["amends/BackgroundJob", "amends/TurnJob"],
     }).pipe(Layer.provideMerge(cluster));
     yield* TestClock.adjust("3 hours").pipe(Effect.provide(pruning), Effect.scoped);
     const week = Duration.toMillis(Duration.days(7));
@@ -37,8 +37,8 @@ it.effect("handled requests are pruned every hour, once they are a week old", ()
     expect(calls).toEqual(
       [1, 2, 3].map((hours) => ({
         types: [
-          "amends/WorkspaceProcess",
-          "amends/Turn",
+          "amends/BackgroundJob",
+          "amends/TurnJob",
           "ClusterCron/amends/prune-handled-requests",
         ],
         before: hours * hour - week,

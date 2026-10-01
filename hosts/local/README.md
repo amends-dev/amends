@@ -63,13 +63,13 @@ redacted in configuration errors.
 
 ## Background work
 
-The host runs its workspaces' [background work](../../packages/cluster/README.md#background-work)
+The host runs its workspaces' [background jobs](../../packages/cluster/README.md#background-jobs)
 in its own process, on an Effect Cluster runner over the same database pool as its storage, so a
-wake a commit asks for is stored in that commit's transaction. Cluster keeps its own tables
+job request a commit makes is stored in that commit's transaction. Cluster keeps its own tables
 beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
-`cluster_migrations`), creating them at startup; reads for due wakes every two seconds; and holds
-one of the pool's connections for its shard locks. Every hour, one runner prunes wakes and turn requests handled more
-than seven days ago.
+`cluster_migrations`), creating them at startup; reads for due requests every two seconds; and holds
+one of the pool's connections for its shard locks. Every hour, one runner prunes job requests handled more than seven
+days ago.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
 share out the workspaces' background work, and when one stops answering, the others take its
@@ -78,32 +78,32 @@ process claims its address as it starts, holding one more pooled connection, and
 start while another process holds it: two processes at one address would share Cluster's machine
 ID, and the first to stop would remove the other's registration. The claim ends with its
 process, so a host restarted after a crash takes its address back at once, and its unfinished
-wakes run again. Restart a host by stopping the old process before starting the new one; wakes
+jobs run again. Restart a host by stopping the old process before starting the new one; requests
 sent meanwhile wait in the database.
 
 `bun run --filter @amends/host-local status` reports the background work of the database at
-`AMENDS_DATABASE_URL`: per process, the wakes due, scheduled, retrying, and dropped, then the
+`AMENDS_DATABASE_URL`: per process, the background job requests due, scheduled, retrying, and dropped, then the
 latest retries and drops with their workspaces. For output to process further, run
 `bun hosts/local/src/status.ts --json` from the repository root, which prefixes no lines.
 It only reads: it applies no migrations, so it is safe against a database another version of the
 host serves. Failures and drops are also logged as they happen.
 
 With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes coordinate through the database
-alone, so a wake for a workspace another process runs arrives at that process's next read,
+alone, so a request for a job another process runs arrives at that process's next read,
 within two seconds. With `socket`, each process also listens at its runner address and tells the
-process that runs a workspace about its wake at once, and checks that the others answer.
+process that runs a job about its request at once, and checks that the others answer.
 Cluster's socket messages are not authenticated: use `socket` only where runner addresses are
 reachable on a private network.
 
 ## Turns
 
-The host runs agents' [turns](../../packages/cluster/README.md#turns-on-effect-cluster) on the same Cluster runner as
-its background work: each turn is its own entity, so turns run side by side, and the request to
+The host runs agents' turns as [turn jobs](../../packages/cluster/README.md#turn-jobs) on the same Cluster runner as
+its background jobs: each turn is its own job, so turns run side by side, and the request to
 run one is stored in the commit that created it. A turn runs amends's own harness in process,
 with the agent's Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply
 in its thread. Environments with a sandbox cannot run turns yet. Several processes over one
-database share turns as they share wakes, and a turn cut short by a restart continues from its
-log. Handled requests to run turns are pruned with handled wakes.
+database share turn jobs as they share background jobs, and a turn cut short by a restart
+continues from its log. Handled turn job requests are pruned with the rest.
 
 ## Browser and desktop access
 
@@ -194,9 +194,9 @@ Authentication tests cover constructor and layer behavior, state isolation,
 single-use codes, exact expiry, repeated requests, concurrent completion, and
 failed or interrupted delivery. Configuration tests cover defaults, port, pool-size, runner-address, transport, and takeover
 bounds, the required database URL, empty values, and redacted errors. `background.test.ts` checks,
-over the host's database composition, that a wake asked for inside a commit is stored with it,
+over the host's database composition, that a background job request made inside a commit is stored with it,
 reaches the worker, and is absent if the commit rolls back; that a process refuses to start at a
-runner address another process holds; and that over sockets a wake reaches the process running
+runner address another process holds; and that over sockets a request reaches the process running
 its workspace well before that process's next read. `turns.test.ts` asks an agent in a thread over
 HTTP and waits for its reply, which its turn gets from a local chat-completions server, asks a
 second question while the agent answers the first and finds both answers posted, then retries a

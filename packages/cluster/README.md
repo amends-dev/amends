@@ -1,56 +1,94 @@
 # Cluster
 
-`@amends/cluster` runs the work outside requests on Effect Cluster: each workspace's
-[background processes](../core/README.md#background-work) and each [turn](../core/README.md#turns)
-an agent accepts, as entities whose requests a commit stores, with their retries and the pruning
-of what they handled. `TurnRunner` runs one turn with an agent's model access in a spawned
-[environment](../environment/README.md). A host composes it all over its
-[gateway](../gateway/README.md), as the [local host](../../hosts/local/README.md#turns) does.
+`@amends/cluster` runs **jobs**: work outside any request that a commit asks for and Effect Cluster
+delivers, runs, and retries. There are two kinds. A **background job** runs one of a workspace's
+[background processes](../core/README.md#background-work), such as `turn.accept`; a **turn job**
+runs one [turn](../core/README.md#turns) an agent accepted, through `TurnRunner`, which runs the
+turn with the agent's model access in a spawned [environment](../environment/README.md). A host
+composes them over its [gateway](../gateway/README.md), as the
+[local host](../../hosts/local/README.md#turns) does.
 
-| Module          | What it holds                                                                                            |
-| --------------- | -------------------------------------------------------------------------------------------------------- |
-| `background.ts` | `ClusterBackground`: the `amends/WorkspaceProcess` entity, its wakes, and their worker.                  |
-| `turns.ts`      | `ClusterTurns`: the `amends/Turn` entity, its `Run` and `Abandon` requests, and their worker.            |
-| `retry.ts`      | `ClusterRetry.delay`, the delay before both entities' retries.                                           |
-| `pruning.ts`    | `ClusterPruning`, the hourly job that removes handled requests.                                          |
-| `runner/`       | `TurnRunner`, which runs one turn, and the modules it is made of; see [running a turn](#running-a-turn). |
+| Module                   | What it holds                                                                                            |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `jobs/background-job.ts` | `BackgroundJob`: the `amends/BackgroundJob` entity, its `Run` requests, and their worker.                |
+| `jobs/turn-job.ts`       | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Abandon` requests, and their worker.              |
+| `jobs/retry.ts`          | `JobRetry.delay`, the delay before both kinds' retries.                                                  |
+| `jobs/pruning.ts`        | `JobPruning`, the hourly job that removes handled requests.                                              |
+| `runner/`                | `TurnRunner`, which runs one turn, and the modules it is made of; see [running a turn](#running-a-turn). |
 
 The package depends on Effect, core, the gateway, and the harness, environment, and connection
 contracts. It knows no harness or model provider: the host passes in the ones it installs.
 
-## Background work
+## Jobs
 
-`ClusterBackground` runs background work on the host's Effect Cluster (`Sharding`). Each
-workspace's process is an entity, `amends/WorkspaceProcess`, keyed by workspace and process,
-whose persisted `Wake` says when it should run. Cluster keeps an entity on one runner at a time,
-so a process runs one run at a time, and redelivers a wake whose run was cut short, so work
-resumes after a restart.
+Each kind of job is a Cluster entity, and each job one entity instance, whose persisted
+**requests** say what to do and when. A commit stores a request with itself, and the runner that
+owns the entity handles it when it arrives. Cluster keeps an entity on one runner at a time, so a
+job handles one request at a time, and redelivers a request whose handling was cut short, so work
+resumes after a restart. Each kind has the same three layers:
 
-- `layerWakes` provides `WorkspaceWakes.Service`. A commit's wake is keyed by its commit ID, so
-  a commit that asks twice asks once. Sent inside the commit, it is stored in the commit's
-  transaction when Cluster's message storage uses the same SQL client as the workspace's
-  storage; the host composing them owns that. Cluster saves such a persisted wake and only
-  notifies its runner best-effort, so a shard not yet assigned does not hold up the commit: the
-  runner that takes the shard reads the wake from storage. Cluster's own notice comes as it
-  saves the wake, before the commit can show it, so its read finds nothing; `layerWakes`
-  therefore asks the commit's `afterCommit` to have this process's runner read storage again
-  (`Sharding.pollStorage`) once the commit is done. A wake for a workspace another process runs
+- `layerRequests` provides the gateway's contract for the kind, through which core requests jobs
+  in a commit. Sent inside the commit, a request is stored in the commit's transaction when
+  Cluster's message storage uses the same SQL client as the workspace's storage; the host
+  composing them owns that. Cluster saves such a persisted request and only notifies its runner
+  best-effort, so a shard not yet assigned does not hold up the commit: the runner that takes the
+  shard reads the request from storage. Cluster's own notice comes as it saves the request,
+  before the commit can show it, so its read finds nothing; `layerRequests` therefore asks the
+  commit's `afterCommit` to have this process's runner read storage again
+  (`Sharding.pollStorage`) once the commit is done. A request for a job another process runs
   still waits for that process's next read, unless sockets carry it.
-- `layerWorker` registers the entity. When a wake arrives it calls `runBackground`, then asks
-  for the next run: at once after `Continue`, at the due time after `At`, and after a failure
-  once `ClusterRetry.delay` has passed, which doubles from two seconds up to five minutes and
-  which turns' retries share. Runs that ask for the same
-  later time share one wake, keyed by that time; a time the waking wake or the clock has
-  already reached takes a fresh key, since its wake may have run and a repeated key would be
-  dropped. Wakes are not coalesced: each commit's wake runs the process once, and a run that
-  finds nothing outstanding returns at once. A process this host does
-  not register is dropped after `maxUnknownRuns` (ten) failed runs, and a workspace that was
-  never created at once. It fails a wake it drops with `ClusterBackground.Dropped`, naming the
-  reason and the retries before it, so Cluster keeps the drop as the wake's reply, where
-  operators find it until handled wakes are pruned. A wake it could not act on stays
-  undelivered, so Cluster runs it again.
-- `layer` provides both. Every runner over the same storage runs the worker, as Cluster
-  requires of every entity type.
+- `layerWorker` registers the entity and handles its requests.
+- `layer` provides both. Every runner over the same storage runs the worker, as Cluster requires
+  of every entity type.
+
+A failed request asks for another after `JobRetry.delay`, which doubles from two seconds up to five
+minutes.
+
+### Background jobs
+
+A background job is one workspace's background process: an entity, `amends/BackgroundJob`, keyed
+by workspace and process, whose `Run` requests say when the process should run.
+`BackgroundJob.layerRequests` provides `WorkspaceBackgroundJobs.Service`; a commit's request is
+keyed by its commit ID, so a commit that asks twice asks once.
+
+When a `Run` arrives, the worker calls `runBackgroundProcess`, then asks for the next run: at once
+after `Continue`, at the due time after `At`, and after a failure once the retry delay has passed.
+Runs that ask for the same later time share one request, keyed by that time; a time the request or
+the clock has already reached takes a fresh key, since its request may have run and a repeated key
+would be dropped. Requests are not coalesced: each commit's request runs the process once, and a
+run that finds nothing outstanding returns at once. A process this host does not register is
+dropped after `maxUnknownRuns` (ten) failed runs, and a workspace that was never created at once.
+The worker fails a request it drops with `BackgroundJob.Dropped`, naming the reason and the retries
+before it, so Cluster keeps the drop as the request's reply, where operators find it until handled
+requests are pruned. A request it could not act on stays undelivered, so Cluster runs it again.
+
+### Turn jobs
+
+A turn job is one turn: an entity, `amends/TurnJob`, keyed by workspace and turn, whose requests ask
+it to run (`Run`) or to give up (`Abandon`), so a turn runs once at a time while different turns run
+side by side, and a run cut short continues after a restart.
+
+`TurnJob.layerRequests` provides `WorkspaceTurnJobs.Service`. Core requests a run in the commit
+that creates or retries a turn, through a journal reaction to `TurnFacts.Created` and
+`TurnFacts.Retried`, keyed `created`, so a commit asks once.
+
+The worker runs the turn through a `TurnRunner.Service`. A `Run` that fails before its turn
+finishes, such as when storage fails, asks for another `Run` (keyed `retry:<n>`) after the retry
+delay. After `maxFailedRuns` (eight) failed runs it asks for an `Abandon` instead, at once, which
+records the turn as failed through `TurnRunner.abandon`. An `Abandon` that fails too, as when
+storage stays down, asks for another (keyed `abandon:<n>`) after the retry delay, without running
+the turn, so a turn is never left active with nothing to run it. A turn whose workspace was never
+created is dropped. Failures are logged. These retries are apart from the runner's own, which runs
+a turn again in the same `Run` after an interruption worth retrying.
+
+### Pruning
+
+`JobPruning.layer({ prune, entityTypes, keep? })` removes the handled requests of the entity types
+it is given, such as `BackgroundJob.entity.type` and `TurnJob.entity.type`, with the pruning job's
+own past runs, once they are older than `keep` (seven days by default), every hour on one runner,
+through `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
+supplies `prune`. By then a request's key no longer needs to stop a repeat, since nothing asks
+again days later, and requests not yet handled are kept however old.
 
 ## Running a turn
 
@@ -147,44 +185,6 @@ summarized, and why. The harness's own reason, and a provider's message, which c
 and request details, go to the host's logs only, as do why an environment did not start or a
 transcript was refused. `abandon` fails a
 turn that runs could not finish.
-
-## Turns on Effect Cluster
-
-Each turn is an entity, `amends/Turn`, keyed by workspace and turn, whose persisted requests ask
-it to run (`Run`) or to give up (`Abandon`). Cluster keeps an entity on one runner at a time, so a turn runs once at a time while
-different turns run side by side, and redelivers a run cut short, so a turn continues after a
-restart.
-
-- `layerDispatch` provides the gateway's `WorkspaceTurnDispatch.Service`. Core asks for a run in the
-  commit that creates or retries a turn, through a journal reaction to `TurnFacts.Created` and
-  `TurnFacts.Retried`, and the request is keyed `created`, so a commit asks once. Sent inside the commit, it is stored in the commit's
-  transaction when Cluster's message storage uses the workspace storage's SQL client, and the
-  runner reads storage again once the commit is done, as with
-  [background wakes](#background-work).
-- `layerWorker` registers the entity over a `TurnRunner.Service`. A `Run` that fails before its
-  turn finishes, such as when storage fails, asks for another `Run` (keyed `retry:<n>`) after
-  `ClusterRetry.delay`, which doubles from two seconds up to five minutes. After
-  `maxFailedRuns` (eight) failed runs it asks for an `Abandon` instead, at once, which records the
-  turn as failed through `TurnRunner.abandon`. An `Abandon` that fails too, as when storage stays
-  down, asks for another (keyed `abandon:<n>`) after the same delay, without running the turn, so
-  a turn is never left active with nothing to run it. A turn whose workspace was never created
-  is dropped. Failures are logged. These retries are apart from the runner's own, which runs a
-  turn again in the same `Run` after an interruption worth retrying.
-- `layer` provides both. Every runner over the same storage runs the worker.
-
-Handled requests are pruned with background wakes when the host lists `TurnEntity.type` in
-[`ClusterPruning.layer`](#pruning).
-
-## Pruning
-
-`ClusterPruning.layer({ prune, entityTypes, keep? })` removes the handled requests of the entity
-types it is given, such as `ClusterBackground.WorkspaceProcess.type` and
-[turns'](#turns-on-effect-cluster), with the job's own past runs, once they
-are older than `keep` (seven days by default), every hour on one runner, through `ClusterCron`.
-Cluster removes neither, and only the host's storage knows how, so the host supplies `prune`. By
-then a request's key no longer needs to stop a repeat, since nothing asks again days later, and
-requests not yet handled are kept however old. `ClusterRetry.delay` is the delay before both
-entities' retries.
 
 ## Limits
 

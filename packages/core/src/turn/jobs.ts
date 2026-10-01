@@ -6,9 +6,9 @@ import { TurnFacts } from "./facts.ts";
 import type { Turn } from "./turn.ts";
 
 /**
- * Requests for a workspace's turns to run. Hosts supply it, bound to the workspace, and deliver
- * each request to whatever runs turns; a host that runs none accepts requests and runs nothing,
- * so accepted work waits queued.
+ * Turn jobs: requests for a workspace's turns to run. Hosts supply it, bound to the workspace, and
+ * deliver each request to whatever runs turn jobs; a host that runs none accepts requests and runs
+ * nothing, so accepted work waits queued.
  */
 export interface Interface {
   /**
@@ -19,7 +19,7 @@ export interface Interface {
 }
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/dispatch/Service",
+  "@amends/core/turn/jobs/Service",
 ) {}
 
 const decodeCreated = Schema.decodeUnknownSync(
@@ -36,4 +36,4 @@ export const reactions: ReadonlyArray<Reaction.Definition<Service>> = [
   { fact: TurnFacts.Retried.name, react: run },
 ];
 
-export * as TurnDispatch from "./dispatch.ts";
+export * as TurnJobs from "./jobs.ts";

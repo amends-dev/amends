@@ -1,8 +1,8 @@
 import { BackgroundProcess } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { ClusterBackground } from "@amends/cluster";
-import { Gateway, WorkspaceWakes } from "@amends/gateway";
+import { BackgroundJob } from "@amends/cluster";
+import { Gateway, WorkspaceBackgroundJobs } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { PostgresStorage } from "@amends/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
@@ -16,10 +16,10 @@ const workspaceId = Workspace.Id.make("workspace-one");
 const process = BackgroundProcess.Name.make("test.work");
 
 describe.skipIf(!available)("background work on the local host", () => {
-  // The host's database and cluster share one client, so Cluster stores a wake on the connection
+  // The host's database and cluster share one client, so Cluster stores a request on the connection
   // of the commit that asks for it.
   it.live(
-    "a wake asked for inside a commit is stored with it, and not if it rolls back",
+    "a request asked for inside a commit is stored with it, and not if it rolls back",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
@@ -31,14 +31,14 @@ describe.skipIf(!available)("background work on the local host", () => {
             asMember: unexpected,
             asMemberScoped: unexpected,
             executeTurns: unexpected,
-            runBackground: (_, name) =>
+            runBackgroundProcess: (_, name) =>
               Effect.sync(() => {
                 runs.push(name);
                 return BackgroundProcess.idle;
               }),
           });
           const context = yield* Layer.build(
-            ClusterBackground.layer.pipe(
+            BackgroundJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
               ),
@@ -47,25 +47,29 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
-          const wakes = Context.get(context, WorkspaceWakes.Service).forWorkspace(workspaceId);
+          const backgroundJobs = Context.get(context, WorkspaceBackgroundJobs.Service).forWorkspace(
+            workspaceId,
+          );
           const stored = Effect.flatMap(
             SqlClient.SqlClient,
             (sql) => sql<{ readonly count: number }>`
             SELECT count(*)::int AS count FROM cluster_messages
-            WHERE entity_type = 'amends/WorkspaceProcess'`,
+            WHERE entity_type = 'amends/BackgroundJob'`,
           ).pipe(
             Effect.map(([row]) => row?.count ?? 0),
             Effect.orDie,
             Effect.provide(context),
           );
           const rolledBack = yield* Effect.exit(
-            store.transaction(wakes.request(process).pipe(Effect.andThen(Effect.fail("abandon")))),
+            store.transaction(
+              backgroundJobs.request(process).pipe(Effect.andThen(Effect.fail("abandon"))),
+            ),
           );
           expect(Exit.isFailure(rolledBack)).toBe(true);
           expect(yield* stored).toBe(0);
-          yield* store.transaction(wakes.request(process));
+          yield* store.transaction(backgroundJobs.request(process));
           expect(yield* stored).toBe(1);
-          // The committed wake reaches the worker; the rolled-back one never existed.
+          // The committed request reaches the worker; the rolled-back one never existed.
           yield* Effect.sleep("3 seconds");
           expect(runs).toEqual([process]);
         }).pipe(Effect.scoped),
@@ -73,10 +77,10 @@ describe.skipIf(!available)("background work on the local host", () => {
     30_000,
   );
 
-  // Cluster looks for a wake as it stores it, before the commit can show it. Once the commit is
-  // done the runner reads again, so the wake does not wait for its next poll, here a minute away.
+  // Cluster looks for a request as it stores it, before the commit can show it. Once the commit is
+  // done the runner reads again, so the request does not wait for its next poll, here a minute away.
   it.live(
-    "a committed wake runs at once, not at the runner's next poll",
+    "a committed request runs at once, not at the runner's next poll",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
@@ -88,14 +92,14 @@ describe.skipIf(!available)("background work on the local host", () => {
             asMember: unexpected,
             asMemberScoped: unexpected,
             executeTurns: unexpected,
-            runBackground: () =>
+            runBackgroundProcess: () =>
               Effect.sync(() => {
                 runs += 1;
                 return BackgroundProcess.idle;
               }),
           });
           const context = yield* Layer.build(
-            ClusterBackground.layer.pipe(
+            BackgroundJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
               ),
@@ -106,17 +110,19 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
-          const wakes = Context.get(context, WorkspaceWakes.Service).forWorkspace(workspaceId);
-          // A commit goes on after it asks for a wake, as a real one does with its later facts
-          // and staged writes, so Cluster's own look comes before the wake is there to find.
+          const backgroundJobs = Context.get(context, WorkspaceBackgroundJobs.Service).forWorkspace(
+            workspaceId,
+          );
+          // A commit goes on after it makes a request, as a real one does with its later facts
+          // and staged writes, so Cluster's own look comes before the request is there to find.
           for (let commit = 1; commit <= 5; commit++) {
             yield* store.transaction(
-              wakes.request(process).pipe(Effect.andThen(Effect.sleep("100 millis"))),
+              backgroundJobs.request(process).pipe(Effect.andThen(Effect.sleep("100 millis"))),
             );
             const committedAt = yield* Clock.currentTimeMillis;
             while (runs < commit) {
               if ((yield* Clock.currentTimeMillis) - committedAt > 5_000)
-                return expect.fail(`Wake ${commit} waited for the runner's next poll`);
+                return expect.fail(`Request ${commit} waited for the runner's next poll`);
               yield* Effect.sleep("10 millis");
             }
           }
@@ -144,17 +150,17 @@ describe.skipIf(!available)("background work on the local host", () => {
     ),
   );
 
-  // Two processes over one database, linked by sockets: a wake for a workspace the other process
+  // Two processes over one database, linked by sockets: a request for a workspace the other process
   // runs reaches it at once, well before its next read of the database.
   it.live(
-    "over sockets, a wake reaches the process that runs its workspace without waiting for a read",
+    "over sockets, a request reaches the process that runs its workspace without waiting for a read",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
           const runs: Array<{ readonly runner: string; readonly key: string }> = [];
           const unexpected = () => Effect.die("Only background runs are expected");
           const runner = (name: string, port: number) =>
-            ClusterBackground.layer.pipe(
+            BackgroundJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(
                   Layer.succeed(
@@ -165,7 +171,7 @@ describe.skipIf(!available)("background work on the local host", () => {
                       asMember: unexpected,
                       asMemberScoped: unexpected,
                       executeTurns: unexpected,
-                      runBackground: (id) =>
+                      runBackgroundProcess: (id) =>
                         Effect.sync(() => {
                           runs.push({ runner: name, key: id });
                           return BackgroundProcess.idle;
@@ -185,7 +191,7 @@ describe.skipIf(!available)("background work on the local host", () => {
             );
           const first = yield* Layer.build(runner("first", 34471));
           yield* Layer.build(runner("second", 34472));
-          const wakes = Context.get(first, WorkspaceWakes.Service);
+          const backgroundJobs = Context.get(first, WorkspaceBackgroundJobs.Service);
           const workspaces = Array.from({ length: 20 }, (_, index) =>
             Workspace.Id.make(`workspace-${index}`),
           );
@@ -193,7 +199,7 @@ describe.skipIf(!available)("background work on the local host", () => {
             Effect.forEach(
               workspaces,
               (id) =>
-                wakes
+                backgroundJobs
                   .forWorkspace(id)
                   .request(process)
                   .pipe(

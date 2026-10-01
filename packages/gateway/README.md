@@ -30,7 +30,7 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`WorkspaceSignals.Service`, `WorkspaceWakes.Service`, `WorkspaceTurnDispatch.Service`, and
+`WorkspaceSignals.Service`, `WorkspaceBackgroundJobs.Service`, `WorkspaceTurnJobs.Service`, and
 `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
@@ -43,11 +43,11 @@ storage bindings. Each defaults to none. `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
-`WorkspaceStorage`, `WorkspaceSignals`, `WorkspaceWakes`, `WorkspaceTurnDispatch`, `SessionTokens`,
+`WorkspaceStorage`, `WorkspaceSignals`, `WorkspaceBackgroundJobs`, `WorkspaceTurnJobs`, `SessionTokens`,
 `SignIn`, and `WorkspaceDirectory` declare host-owned contracts. Their implementations and construction APIs
 belong to adapters or hosts; they have no default `make` or `layer` here, except
-`WorkspaceWakes.layerUnavailable` for hosts that run no background work and
-`WorkspaceTurnDispatch.layerNoRunner` for hosts that run no turns. `Service.of(...)`
+`WorkspaceBackgroundJobs.layerUnavailable` for hosts that run no background work and
+`WorkspaceTurnJobs.layerNoRunner` for hosts that run no turns. `Service.of(...)`
 is sufficient to type-check a supplied implementation.
 
 ## Surface
@@ -74,10 +74,10 @@ is sufficient to type-check a supplied implementation.
   the runtime lease and operation resources. Streaming ingress uses it to keep
   subscriptions alive until disconnect. Programs may additionally require `Scope`.
   `asMember` wraps this operation in a short scope for ordinary request/response work.
-- `runBackground(workspaceId, process)` runs one of the workspace's
+- `runBackgroundProcess(workspaceId, process)` runs one of the workspace's
   [background processes](../core/README.md#background-work) once, with no actor, and returns
-  what it left outstanding. It is for the host process that runs background work, when a wake
-  arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
+  what it left outstanding. It is for the host process that runs background jobs, when a job's
+  request arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
   workspace that was never created returns `WorkspaceNotFound` without being prepared.
 - `executeTurns(workspaceId, program)` runs [turn execution](../core/README.md#turns) for the
   host process that runs agents' accepted work. It is trusted and has no actor: each step acts as
@@ -87,10 +87,10 @@ is sufficient to type-check a supplied implementation.
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
 `WorkspaceSignals.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
-`WorkspaceWakes.Service`, whose `forWorkspace` returns its `BackgroundWakes.Service`,
-`WorkspaceTurnDispatch.Service`, whose `forWorkspace` returns its `TurnDispatch.Service`, delivering
+`WorkspaceBackgroundJobs.Service`, whose `forWorkspace` returns its `BackgroundJobs.Service`,
+`WorkspaceTurnJobs.Service`, whose `forWorkspace` returns its `TurnJobs.Service`, delivering
 requests to run new turns to whatever runs them, and `Crypto.Crypto`. A host that runs no turns
-provides `WorkspaceTurnDispatch.layerNoRunner`: agents still accept their work, which waits queued.
+provides `WorkspaceTurnJobs.layerNoRunner`: agents still accept their work, which waits queued.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
@@ -154,13 +154,13 @@ host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
-`WorkspaceWakes.Service` supplies each workspace's `BackgroundWakes.Service`: it stores a
+`WorkspaceBackgroundJobs.Service` supplies each workspace's `BackgroundJobs.Service`: it stores a
 commit's requests for [background work](../core/README.md#background-work) with that commit and
-delivers them to whichever process runs the workspace's background work. A host that runs no
-background work provides `WorkspaceWakes.layerUnavailable`, whose requests fail the commit that
+delivers them to whatever runs the workspace's background jobs. A host that runs no
+background jobs provides `WorkspaceBackgroundJobs.layerUnavailable`, whose requests fail the commit that
 makes them rather than accept work nothing would do.
 
-[`@amends/cluster`](../cluster/README.md) implements `WorkspaceWakes` and `WorkspaceTurnDispatch`
+[`@amends/cluster`](../cluster/README.md) implements `WorkspaceBackgroundJobs` and `WorkspaceTurnJobs`
 on Effect Cluster, with the workers that run what they store.
 
 `WorkspaceSignals.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,

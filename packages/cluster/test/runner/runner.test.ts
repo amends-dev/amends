@@ -339,7 +339,7 @@ const runnerOver = (
         inWorkspace: unexpected,
         asMember: unexpected,
         asMemberScoped: unexpected,
-        runBackground: unexpected,
+        runBackgroundProcess: unexpected,
         executeTurns: (_, program) =>
           Effect.provideService(program, TurnExecution.Service, turnExecution),
       }),

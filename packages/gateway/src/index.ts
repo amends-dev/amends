@@ -5,5 +5,5 @@ export { Gateway } from "./gateway.ts";
 export { SignIn } from "./sign-in.ts";
 export { WorkspaceSignals } from "./signals.ts";
 export { WorkspaceStorage } from "./storage.ts";
-export { WorkspaceTurnDispatch } from "./turn-dispatch.ts";
-export { WorkspaceWakes } from "./wakes.ts";
+export { WorkspaceTurnJobs } from "./turn-jobs.ts";
+export { WorkspaceBackgroundJobs } from "./background-jobs.ts";

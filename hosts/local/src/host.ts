@@ -1,6 +1,6 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
-import { ClusterBackground, ClusterPruning, ClusterTurns, TurnRunner } from "@amends/cluster";
+import { BackgroundJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
@@ -114,18 +114,18 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
  */
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer =>
   Layer.mergeAll(
-    ClusterBackground.layerWorker,
-    ClusterPruning.layer({
+    BackgroundJob.layerWorker,
+    JobPruning.layer({
       prune: PostgresClusterStorage.prune,
-      entityTypes: [ClusterBackground.WorkspaceProcess.type, ClusterTurns.TurnEntity.type],
+      entityTypes: [BackgroundJob.entity.type, TurnJob.entity.type],
     }),
-    ClusterTurns.layerWorker.pipe(Layer.provide(TurnRunner.layer(turnRunnerOptions))),
+    TurnJob.layerWorker.pipe(Layer.provide(TurnRunner.layer(turnRunnerOptions))),
   ).pipe(
     Layer.provideMerge(
       Gateway.layer(installed).pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
-        Layer.provide(ClusterBackground.layerWakes),
-        Layer.provide(ClusterTurns.layerDispatch),
+        Layer.provide(BackgroundJob.layerRequests),
+        Layer.provide(TurnJob.layerRequests),
       ),
     ),
     Layer.provide(BunCrypto.layer),

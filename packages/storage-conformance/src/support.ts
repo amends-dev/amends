@@ -37,7 +37,7 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { BackgroundWakes } from "@amends/core/background";
+import { BackgroundJobs } from "@amends/core/background";
 import {
   ConnectionCatalog,
   ConnectionCredentialStore,
@@ -45,7 +45,7 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnDispatch, TurnStore, TurnTimeline } from "@amends/core/turn";
+import { TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
@@ -53,8 +53,8 @@ import {
   Gateway,
   WorkspaceSignals,
   WorkspaceStorage,
-  WorkspaceTurnDispatch,
-  WorkspaceWakes,
+  WorkspaceTurnJobs,
+  WorkspaceBackgroundJobs,
 } from "@amends/gateway";
 import { Signals } from "@amends/core/signal";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
@@ -146,21 +146,24 @@ export const installed = {
 };
 
 /**
- * Wakes the suites deliver themselves: each request is accepted and nothing runs, so a suite runs
- * the background process it expects, as a host's runner would.
+ * Background jobs the suites run themselves: each request is accepted and nothing runs, so a suite
+ * runs the background process it expects, as a host's runner would.
  */
-export const manualWakes: WorkspaceWakes.Interface = {
-  forWorkspace: () => BackgroundWakes.Service.of({ request: () => Effect.void }),
+export const manualBackgroundJobs: WorkspaceBackgroundJobs.Interface = {
+  forWorkspace: () => BackgroundJobs.Service.of({ request: () => Effect.void }),
 };
-export const layerManualWakes = Layer.succeed(WorkspaceWakes.Service, manualWakes);
+export const layerManualBackgroundJobs = Layer.succeed(
+  WorkspaceBackgroundJobs.Service,
+  manualBackgroundJobs,
+);
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
   context: Context.Context<
     | WorkspaceStorage.Bindings
     | Signals.Service
-    | BackgroundWakes.Service
-    | TurnDispatch.Service
+    | BackgroundJobs.Service
+    | TurnJobs.Service
     | ConnectionCatalog.Service
     | EnvironmentCatalog.Service
   >,
@@ -191,8 +194,8 @@ export const bind = (
 export type Bound = ReturnType<typeof bind>;
 
 /**
- * A workspace's stores with its signals from the host, and wakes and turn dispatch the suites
- * deliver themselves: a commit's request is accepted and nothing runs, so a suite runs the process
+ * A workspace's stores with its signals from the host, and background and turn jobs the suites
+ * run themselves: a commit's request is accepted and nothing runs, so a suite runs the process
  * or the turn it expects, as a host's runner would.
  */
 const withHostServices = (
@@ -203,8 +206,8 @@ const withHostServices = (
   bind(
     context.pipe(
       Context.add(Signals.Service, workspaceSignals.forWorkspace(id)),
-      Context.add(BackgroundWakes.Service, manualWakes.forWorkspace(id)),
-      Context.add(TurnDispatch.Service, WorkspaceTurnDispatch.noRunner.forWorkspace(id)),
+      Context.add(BackgroundJobs.Service, manualBackgroundJobs.forWorkspace(id)),
+      Context.add(TurnJobs.Service, WorkspaceTurnJobs.noRunner.forWorkspace(id)),
       Context.add(ConnectionCatalog.Service, catalog),
       Context.add(EnvironmentCatalog.Service, environmentCatalog),
     ),
@@ -259,8 +262,8 @@ export const make = (harness: Harness) => {
         Layer.mergeAll(
           Layer.succeedContext(host),
           harness.crypto,
-          layerManualWakes,
-          WorkspaceTurnDispatch.layerNoRunner,
+          layerManualBackgroundJobs,
+          WorkspaceTurnJobs.layerNoRunner,
         ),
       ),
     );

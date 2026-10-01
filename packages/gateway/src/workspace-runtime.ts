@@ -1,7 +1,7 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
-import { BackgroundWakes } from "@amends/core/background";
-import { TurnDispatch } from "@amends/core/turn";
+import { BackgroundJobs } from "@amends/core/background";
+import { TurnJobs } from "@amends/core/turn";
 import { ConnectionCatalog } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
 import type { HarnessImplementation } from "@amends/harness";
@@ -25,8 +25,8 @@ import {
 } from "effect";
 import { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
-import { WorkspaceWakes } from "./wakes.ts";
-import { WorkspaceTurnDispatch } from "./turn-dispatch.ts";
+import { WorkspaceBackgroundJobs } from "./background-jobs.ts";
+import { WorkspaceTurnJobs } from "./turn-jobs.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
 export type Services = Layer.Success<typeof Core.layer> | Core.HostServices;
@@ -78,8 +78,8 @@ export interface Interface {
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
   const workspaceSignals = yield* WorkspaceSignals.Service;
-  const workspaceWakes = yield* WorkspaceWakes.Service;
-  const workspaceTurnDispatch = yield* WorkspaceTurnDispatch.Service;
+  const workspaceBackgroundJobs = yield* WorkspaceBackgroundJobs.Service;
+  const workspaceTurnJobs = yield* WorkspaceTurnJobs.Service;
   const crypto = yield* Crypto.Crypto;
   const hostContext = yield* Effect.context<never>();
   const connectionCatalog = ConnectionCatalog.make(options.connections ?? []);
@@ -98,8 +98,8 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
           Layer.succeed(Signals.Service, workspaceSignals.forWorkspace(workspaceId)),
-          Layer.succeed(BackgroundWakes.Service, workspaceWakes.forWorkspace(workspaceId)),
-          Layer.succeed(TurnDispatch.Service, workspaceTurnDispatch.forWorkspace(workspaceId)),
+          Layer.succeed(BackgroundJobs.Service, workspaceBackgroundJobs.forWorkspace(workspaceId)),
+          Layer.succeed(TurnJobs.Service, workspaceTurnJobs.forWorkspace(workspaceId)),
           Layer.succeed(ConnectionCatalog.Service, connectionCatalog),
           Layer.succeed(EnvironmentCatalog.Service, environmentCatalog),
         ),

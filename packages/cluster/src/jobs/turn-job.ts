@@ -1,25 +1,25 @@
 /**
- * Turns on Effect Cluster. Each turn is its own entity, so turns run side by side while each runs
- * once at a time: the commit that creates a turn stores a request to run it, and the runner that
- * owns the entity runs it when the request arrives. Cluster redelivers a request whose run was
- * cut short, so a turn continues from its log after a restart.
+ * Turn jobs on Effect Cluster: one per turn, an entity whose persisted requests ask it to run or to
+ * give up, so turns run side by side while each runs once at a time. The commit that creates a turn
+ * stores a request to run it, and the runner that owns the entity runs it when the request arrives.
+ * Cluster redelivers a request whose run was cut short, so a turn continues from its log after a
+ * restart.
  */
 import { Store } from "@amends/core/journal";
-import { Turn } from "@amends/core/turn";
-import { TurnDispatch } from "@amends/core/turn";
+import { Turn, TurnJobs } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
-import { WorkspaceTurnDispatch } from "@amends/gateway";
+import { WorkspaceTurnJobs } from "@amends/gateway";
 import { Cause, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
 import { Rpc } from "effect/unstable/rpc";
-import { ClusterRetry } from "./retry.ts";
-import { TurnRunner } from "./runner/runner.ts";
+import { TurnRunner } from "../runner/runner.ts";
+import { JobRetry } from "./retry.ts";
 
 /**
  * A request to run a workspace's turn at `at`. Its key identifies it among the turn's requests:
  * Cluster keeps one per key, so a worker that runs again after a crash asks for its retry once.
  */
-export class Run extends Schema.Class<Run>("amends/turn/Run")({
+export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
   workspaceId: Workspace.Id,
   turnId: Turn.Id,
   key: Schema.String,
@@ -39,7 +39,7 @@ export class Run extends Schema.Class<Run>("amends/turn/Run")({
  * A request to give up a turn whose runs kept failing, recording it as failed at `at`. Keyed as a
  * run is.
  */
-export class Abandon extends Schema.Class<Abandon>("amends/turn/Abandon")({
+export class Abandon extends Schema.Class<Abandon>("amends/TurnJob/Abandon")({
   workspaceId: Workspace.Id,
   turnId: Turn.Id,
   key: Schema.String,
@@ -56,7 +56,7 @@ export class Abandon extends Schema.Class<Abandon>("amends/turn/Abandon")({
 }
 
 /** One turn: asked to run, or to give up, one request at a time; its requests survive the runner. */
-export const TurnEntity = Entity.make("amends/Turn", [
+export const entity = Entity.make("amends/TurnJob", [
   Rpc.make("Run", { payload: Run }).annotate(ClusterSchema.Persisted, true),
   Rpc.make("Abandon", { payload: Abandon }).annotate(ClusterSchema.Persisted, true),
 ]);
@@ -77,23 +77,25 @@ export const maxFailedRuns = 8;
  *
  * @category layers
  */
-export const layerDispatch = Layer.effect(
-  WorkspaceTurnDispatch.Service,
+export const layerRequests = Layer.effect(
+  WorkspaceTurnJobs.Service,
   Effect.gen(function* () {
     const sharding = yield* Sharding.Sharding;
-    const turnClient = yield* TurnEntity.client;
-    return WorkspaceTurnDispatch.Service.of({
+    const turnJobClient = yield* entity.client;
+    return WorkspaceTurnJobs.Service.of({
       forWorkspace: (workspaceId) =>
-        TurnDispatch.Service.of({
+        TurnJobs.Service.of({
           request: Effect.fnUntraced(function* (turnId) {
             const storeTransaction = yield* Store.Transaction;
             const at = yield* DateTime.now;
-            yield* turnClient(entityId(workspaceId, turnId))
+            yield* turnJobClient(entityId(workspaceId, turnId))
               .Run(new Run({ workspaceId, turnId, key: "created", at, attempt: 0 }), {
                 discard: true,
               })
               .pipe(
-                Effect.mapError((cause) => new Store.Failure({ operation: "dispatch", cause })),
+                Effect.mapError(
+                  (cause) => new Store.Failure({ operation: "request turn job", cause }),
+                ),
               );
             yield* storeTransaction.afterCommit(sharding.pollStorage);
           }),
@@ -117,10 +119,10 @@ const isWorkspaceNotFound = (cause: Cause.Cause<{ readonly _tag: string }>) =>
  *
  * @category layers
  */
-export const layerWorker = TurnEntity.toLayer(
+export const layerWorker = entity.toLayer(
   Effect.gen(function* () {
     const turnRunner = yield* TurnRunner.Service;
-    const turnClient = yield* TurnEntity.client;
+    const turnJobClient = yield* entity.client;
     /** The fields that name a request's turn in the logs. */
     const turnFields = (request: Run | Abandon) => ({
       workspaceId: request.workspaceId,
@@ -128,8 +130,8 @@ export const layerWorker = TurnEntity.toLayer(
     });
     /** Ask to run the turn again once the delay for `failures` failed runs has passed. */
     const retryRun = Effect.fnUntraced(function* (request: Run, failures: number) {
-      const at = DateTime.addDuration(yield* DateTime.now, ClusterRetry.delay(failures));
-      yield* turnClient(entityId(request.workspaceId, request.turnId))
+      const at = DateTime.addDuration(yield* DateTime.now, JobRetry.delay(failures));
+      yield* turnJobClient(entityId(request.workspaceId, request.turnId))
         .Run(new Run({ ...turnFields(request), key: `retry:${failures}`, at, attempt: failures }), {
           discard: true,
         })
@@ -138,8 +140,8 @@ export const layerWorker = TurnEntity.toLayer(
     /** Ask to give the turn up: at once at first, then after the delay for `failures` failures. */
     const requestAbandon = Effect.fnUntraced(function* (request: Run | Abandon, failures: number) {
       const now = yield* DateTime.now;
-      const at = failures === 0 ? now : DateTime.addDuration(now, ClusterRetry.delay(failures));
-      yield* turnClient(entityId(request.workspaceId, request.turnId))
+      const at = failures === 0 ? now : DateTime.addDuration(now, JobRetry.delay(failures));
+      yield* turnJobClient(entityId(request.workspaceId, request.turnId))
         .Abandon(
           new Abandon({
             ...turnFields(request),
@@ -151,7 +153,7 @@ export const layerWorker = TurnEntity.toLayer(
         )
         .pipe(Effect.orDie);
     });
-    return TurnEntity.of({
+    return entity.of({
       Run: ({ payload: run }) =>
         Effect.gen(function* () {
           const exit = yield* Effect.exit(turnRunner.run(run.workspaceId, run.turnId));
@@ -200,6 +202,6 @@ export const layerWorker = TurnEntity.toLayer(
 );
 
 /** Stored requests and the worker that runs them, over the host's Cluster. @category layers */
-export const layer = Layer.merge(layerWorker, layerDispatch);
+export const layer = Layer.merge(layerWorker, layerRequests);
 
-export * as ClusterTurns from "./turns.ts";
+export * as TurnJob from "./turn-job.ts";

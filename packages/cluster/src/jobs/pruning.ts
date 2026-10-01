@@ -43,4 +43,4 @@ export const layer = <E, R>(options: {
   });
 };
 
-export * as ClusterPruning from "./pruning.ts";
+export * as JobPruning from "./pruning.ts";

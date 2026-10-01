@@ -38,7 +38,7 @@ const gateway = Layer.succeed(
     asMember: () => Effect.die("unused"),
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
-    runBackground: () => Effect.die("unused"),
+    runBackgroundProcess: () => Effect.die("unused"),
     executeTurns: () => Effect.die("unused"),
     asMemberScoped: <A, E>(
       _id: Workspace.Id,

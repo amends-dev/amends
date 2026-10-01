@@ -7,13 +7,13 @@ import { BuiltinRoles } from "@amends/core/authorization";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Thread, ThreadService, ThreadParticipation } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
-import { Gateway, WorkspaceTurnDispatch } from "@amends/gateway";
+import { Gateway, WorkspaceTurnJobs } from "@amends/gateway";
 import { Array, Context, DateTime, Effect, Layer, Option } from "effect";
 import { acceptInvitation, createWorkspace, invite, removeMember } from "./operations.ts";
 import {
   boundTo,
   future,
-  layerManualWakes,
+  layerManualBackgroundJobs,
   otherWorkspaceId,
   runHost,
   Support,
@@ -663,8 +663,8 @@ export const notifications = (harness: Harness) => {
                 Effect.provide(
                   Layer.mergeAll(
                     harness.crypto,
-                    layerManualWakes,
-                    WorkspaceTurnDispatch.layerNoRunner,
+                    layerManualBackgroundJobs,
+                    WorkspaceTurnJobs.layerNoRunner,
                   ),
                 ),
               );

@@ -8,4 +8,4 @@ import { Duration } from "effect";
 export const delay = (failures: number) =>
   Duration.seconds(Math.min(300, 2 ** Math.min(failures, 9)));
 
-export * as ClusterRetry from "./retry.ts";
+export * as JobRetry from "./retry.ts";

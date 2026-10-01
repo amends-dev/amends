@@ -48,7 +48,7 @@ const failTurn = (reason: string): Step => ({ _tag: "Fail", reason });
 
 /**
  * How long a turn rests before its next attempt after `attempts` that got nowhere: 2, 4, then 8
- * seconds. Apart from Cluster's retry of a run that failed, which `ClusterTurns` asks for.
+ * seconds. Apart from Cluster's retry of a run that failed, which `TurnJob` asks for.
  */
 export const interruptionDelay = (attempts: number) => Duration.seconds(2 ** Math.min(attempts, 6));
 

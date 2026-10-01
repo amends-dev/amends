@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import { Crypto, DateTime, Effect, Layer, Schema } from "effect";
 import { BackgroundProcess } from "../../src/background/process.ts";
 import { BackgroundRuns } from "../../src/background/runs.ts";
-import { BackgroundWakes } from "../../src/background/wakes.ts";
+import { BackgroundJobs } from "../../src/background/jobs.ts";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";
 import { Fact } from "../../src/journal/fact.ts";
 import { Journal } from "../../src/journal/journal.ts";
@@ -36,14 +36,17 @@ const tally = BackgroundProcess.make("test.tally", {
   run: Effect.succeed(BackgroundProcess.idle),
 });
 
-/** Wakes recorded with the commit that asked, or refused while `refusing` is set. */
-const recordedWakes = () => {
+/** Background job requests recorded with the commit that made them, or refused while `refusing` is set. */
+const recordedRequests = () => {
   const requested: Array<{ readonly process: string; readonly commit: string }> = [];
   const state = { refusing: false };
-  const service = BackgroundWakes.Service.of({
+  const service = BackgroundJobs.Service.of({
     request: Effect.fnUntraced(function* (process) {
       if (state.refusing)
-        return yield* new Store.Failure({ operation: "wake", cause: "Wakes are refused" });
+        return yield* new Store.Failure({
+          operation: "request background job",
+          cause: "Requests are refused",
+        });
       requested.push({ process, commit: (yield* Store.Transaction).id });
     }),
   });
@@ -61,15 +64,15 @@ const counter = Projection.make("counter", { version: 1 }).on(
  * Journals whose commits wake the processes, over one in-memory store: one with no projections,
  * and one that also runs a counter.
  */
-const journalWith = Effect.fnUntraced(function* (wakes: BackgroundWakes.Interface) {
+const journalWith = Effect.fnUntraced(function* (backgroundJobs: BackgroundJobs.Interface) {
   const fixture = yield* make();
   const host = Layer.mergeAll(
     Layer.succeed(Store.Service, fixture.store),
     Layer.succeed(Checkpoint.Service, fixture.checkpoints),
     Layer.succeed(Counter, fixture.counter),
-    Layer.succeed(BackgroundWakes.Service, wakes),
+    Layer.succeed(BackgroundJobs.Service, backgroundJobs),
   );
-  const reactions = BackgroundWakes.reactions([settle, tally]);
+  const reactions = BackgroundJobs.reactions([settle, tally]);
   return {
     fixture,
     plain: Journal.layer({ logId, projections: [], reactions }).pipe(
@@ -88,8 +91,8 @@ const publishing = <A, E, R>(program: Effect.Effect<A, E, R>) =>
 
 it.effect("a commit asks, in that commit, for each process its facts wake, once each", () =>
   Effect.gen(function* () {
-    const wakes = recordedWakes();
-    const { plain } = yield* journalWith(wakes.service);
+    const requests = recordedRequests();
+    const { plain } = yield* journalWith(requests.service);
     const commits = yield* Effect.gen(function* () {
       const journal = yield* Journal.Service;
       const first = yield* journal.commit(
@@ -106,7 +109,7 @@ it.effect("a commit asks, in that commit, for each process its facts wake, once 
       );
       return [first, second] as const;
     }).pipe(publishing, Effect.provide(plain));
-    expect(wakes.requested).toEqual([
+    expect(requests.requested).toEqual([
       { process: "test.settle", commit: commits[0] },
       { process: "test.tally", commit: commits[0] },
       { process: "test.tally", commit: commits[1] },
@@ -114,45 +117,48 @@ it.effect("a commit asks, in that commit, for each process its facts wake, once 
   }),
 );
 
-it.effect("a wake that cannot be stored fails the commit, which publishes nothing", () =>
+it.effect("a request that cannot be stored fails the commit, which publishes nothing", () =>
   Effect.gen(function* () {
-    const wakes = recordedWakes();
-    wakes.state.refusing = true;
-    const { plain } = yield* journalWith(wakes.service);
+    const requests = recordedRequests();
+    requests.state.refusing = true;
+    const { plain } = yield* journalWith(requests.service);
     const outcome = yield* Effect.gen(function* () {
       const journal = yield* Journal.Service;
       const failure = yield* Effect.flip(journal.commit(journal.publish(Counted, 1)));
       return { failure, entries: yield* journal.log.read({ limit: 10 }) };
     }).pipe(publishing, Effect.provide(plain));
-    expect(outcome.failure).toMatchObject({ _tag: "JournalStore.Failure", operation: "wake" });
+    expect(outcome.failure).toMatchObject({
+      _tag: "JournalStore.Failure",
+      operation: "request background job",
+    });
     expect(outcome.entries).toEqual([]);
   }),
 );
 
-it.effect("a retried publication and a projection's rebuild wake nothing again", () =>
+it.effect("a retried publication and a projection's rebuild request nothing again", () =>
   Effect.gen(function* () {
-    const wakes = recordedWakes();
-    const { plain, counting, fixture } = yield* journalWith(wakes.service);
+    const requests = recordedRequests();
+    const { plain, counting, fixture } = yield* journalWith(requests.service);
     const once = { idempotencyKey: Store.IdempotencyKey.make("count-once") };
     yield* Effect.gen(function* () {
       const journal = yield* Journal.Service;
       yield* journal.commit(journal.publish(Counted, 2, once));
       yield* journal.commit(journal.publish(Counted, 2, once));
     }).pipe(publishing, Effect.provide(plain));
-    expect(wakes.requested.map((wake) => wake.process)).toEqual(["test.tally"]);
+    expect(requests.requested.map((request) => request.process)).toEqual(["test.tally"]);
     // A journal that also runs a counter rebuilds it from the log, applying the count again.
     yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
       Effect.provide(counting),
     );
     expect(yield* fixture.counter.get).toBe(2);
-    expect(wakes.requested.map((wake) => wake.process)).toEqual(["test.tally"]);
+    expect(requests.requested.map((request) => request.process)).toEqual(["test.tally"]);
   }),
 );
 
 const runsWith = <E, R>(processes: ReadonlyArray<BackgroundProcess.Definition<E, R>>) =>
   Effect.gen(function* () {
-    const wakes = recordedWakes();
-    const { plain } = yield* journalWith(wakes.service);
+    const requests = recordedRequests();
+    const { plain } = yield* journalWith(requests.service);
     return BackgroundRuns.layer(processes).pipe(
       Layer.provideMerge(plain),
       Layer.provide(Layer.succeed(Crypto.Crypto, testCrypto)),

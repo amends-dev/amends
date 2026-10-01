@@ -18,8 +18,8 @@ import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import type { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
-import type { WorkspaceTurnDispatch } from "./turn-dispatch.ts";
-import type { WorkspaceWakes } from "./wakes.ts";
+import type { WorkspaceTurnJobs } from "./turn-jobs.ts";
+import type { WorkspaceBackgroundJobs } from "./background-jobs.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
 export interface Interface {
@@ -64,11 +64,11 @@ export interface Interface {
   ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember>;
   /**
    * Run one of a workspace's background processes once, for the host process that runs its
-   * background work when a wake arrives, and report what it left outstanding. It has no actor:
+   * background jobs when a job's request arrives, and report what it left outstanding. It has no actor:
    * the process acts as itself. A workspace that was never created returns WorkspaceNotFound
    * without being prepared.
    */
-  readonly runBackground: (
+  readonly runBackgroundProcess: (
     workspaceId: Workspace.Id,
     process: string,
   ) => Effect.Effect<
@@ -167,8 +167,8 @@ export const make = Effect.fn("Gateway.make")(function* (
   never,
   | WorkspaceStorage.Service
   | WorkspaceSignals.Service
-  | WorkspaceWakes.Service
-  | WorkspaceTurnDispatch.Service
+  | WorkspaceBackgroundJobs.Service
+  | WorkspaceTurnJobs.Service
   | Crypto.Crypto
   | Scope.Scope
 > {
@@ -359,10 +359,9 @@ export const make = Effect.fn("Gateway.make")(function* (
   const asMember: Interface["asMember"] = (workspaceId, identity, program) =>
     Effect.scoped(asMemberScoped(workspaceId, identity, program));
 
-  const runBackground: Interface["runBackground"] = Effect.fn("Gateway.runBackground")(function* (
-    workspaceId: Workspace.Id,
-    process: string,
-  ) {
+  const runBackgroundProcess: Interface["runBackgroundProcess"] = Effect.fn(
+    "Gateway.runBackgroundProcess",
+  )(function* (workspaceId: Workspace.Id, process: string) {
     yield* requireCreated(workspaceId);
     const run = Effect.flatMap(BackgroundRuns.Service, (backgroundRuns) =>
       backgroundRuns.run(process),
@@ -383,7 +382,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     inWorkspace,
     asMember,
     asMemberScoped,
-    runBackground,
+    runBackgroundProcess,
     executeTurns,
   });
 });

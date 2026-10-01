@@ -3,7 +3,7 @@ import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
-import { TurnDispatch } from "./turn/dispatch.ts";
+import { TurnJobs } from "./turn/jobs.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
@@ -14,7 +14,7 @@ import { EnvironmentPermissions } from "./environment/permissions.ts";
 import { EnvironmentProjection } from "./environment/projection.ts";
 import { EnvironmentQuery } from "./environment/query.ts";
 import { BackgroundRuns } from "./background/runs.ts";
-import { BackgroundWakes } from "./background/wakes.ts";
+import { BackgroundJobs } from "./background/jobs.ts";
 import { ThreadService } from "./thread/service.ts";
 import { ThreadCommand } from "./thread/command.ts";
 import { GroupCommand } from "./group/command.ts";
@@ -167,8 +167,8 @@ export const processes = [TurnCommand.acceptWorkProcess, TurnCommand.stopDeparte
 const journal = Journal.layer({
   logId: journalLog,
   projections,
-  reactions: [...BackgroundWakes.reactions(processes), ...TurnDispatch.reactions] as ReadonlyArray<
-    Reaction.Definition<BackgroundWakes.Service | TurnDispatch.Service>
+  reactions: [...BackgroundJobs.reactions(processes), ...TurnJobs.reactions] as ReadonlyArray<
+    Reaction.Definition<BackgroundJobs.Service | TurnJobs.Service>
   >,
 }).pipe(Layer.provideMerge(Log.layer));
 
@@ -262,7 +262,7 @@ export const layer = Layer.mergeAll(operations, background).pipe(
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
- * store, cryptography, the workspace's signals, and its background wakes. Adding a required store changes this type
+ * store, cryptography, the workspace's signals, and its background and turn jobs. Adding a required store changes this type
  * and makes incomplete host compositions fail type checking.
  *
  * @category models

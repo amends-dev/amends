@@ -6,8 +6,9 @@ import { Store } from "../journal/store.ts";
 import type { BackgroundProcess } from "./process.ts";
 
 /**
- * Requests for one workspace's background processes to run. Hosts supply it, bound to the
- * workspace, and deliver each request to whichever process runs that workspace's background work.
+ * Background jobs: requests for one workspace's background processes to run. Hosts supply it,
+ * bound to the workspace, and deliver each request to whatever runs the workspace's background
+ * jobs.
  */
 export interface Interface {
   /**
@@ -22,12 +23,12 @@ export interface Interface {
 }
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/background/wakes/Service",
+  "@amends/core/background/jobs/Service",
 ) {}
 
 /**
- * The journal reactions that wake each process when a commit publishes a fact it wakes on, once
- * per process however many such facts the commit publishes.
+ * The journal reactions that request each process's background job when a commit publishes a fact
+ * it wakes on, once per process however many such facts the commit publishes.
  */
 export const reactions = (
   processes: ReadonlyArray<
@@ -51,4 +52,4 @@ export const reactions = (
   );
 };
 
-export * as BackgroundWakes from "./wakes.ts";
+export * as BackgroundJobs from "./jobs.ts";

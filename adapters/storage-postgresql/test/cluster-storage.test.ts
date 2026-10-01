@@ -1,8 +1,8 @@
 import { BackgroundProcess, BackgroundRuns } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { ClusterBackground } from "@amends/cluster";
-import { Gateway, GatewayErrors, WorkspaceWakes } from "@amends/gateway";
+import { BackgroundJob } from "@amends/cluster";
+import { Gateway, GatewayErrors, WorkspaceBackgroundJobs } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";
@@ -24,9 +24,9 @@ const cluster = (url: string) => {
     asMember: unexpected,
     asMemberScoped: unexpected,
     executeTurns: unexpected,
-    runBackground: () => Effect.succeed(BackgroundProcess.idle),
+    runBackgroundProcess: () => Effect.succeed(BackgroundProcess.idle),
   });
-  return ClusterBackground.layer.pipe(
+  return BackgroundJob.layer.pipe(
     Layer.provide(Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer)),
     Layer.provideMerge(
       SingleRunner.layer({
@@ -40,9 +40,9 @@ const cluster = (url: string) => {
   );
 };
 
-const wakeIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
-  Effect.flatMap(WorkspaceWakes.Service, (workspaceWakes) =>
-    workspaceWakes.forWorkspace(id).request(process, { at }),
+const requestIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
+  Effect.flatMap(WorkspaceBackgroundJobs.Service, (workspaceBackgroundJobs) =>
+    workspaceBackgroundJobs.forWorkspace(id).request(process, { at }),
   ).pipe(
     Effect.provideService(Store.Transaction, {
       id: Commit.Id.make(commit),
@@ -51,7 +51,7 @@ const wakeIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
     }),
   );
 
-const wake = (commit: string, at?: DateTime.Utc) => wakeIn(workspaceId, commit, at);
+const request = (commit: string, at?: DateTime.Utc) => requestIn(workspaceId, commit, at);
 
 const count = (query: string) =>
   Effect.flatMap(SqlClient.SqlClient, (sql) => sql.unsafe<{ readonly count: number }>(query)).pipe(
@@ -61,7 +61,7 @@ const count = (query: string) =>
 
 describe.skipIf(!available)("PostgreSQL", () => {
   it.live(
-    "pruning removes handled wakes stored before a time, with their replies, in batches",
+    "pruning removes handled requests stored before a time, with their replies, in batches",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
@@ -70,9 +70,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
             "SELECT count(*)::int AS count FROM cluster_messages WHERE processed",
           );
           yield* Effect.gen(function* () {
-            for (const commit of ["one", "two", "three", "four", "five"]) yield* wake(commit);
+            for (const commit of ["one", "two", "three", "four", "five"]) yield* request(commit);
             // Not due for a day, so not handled, and kept however old it is.
-            yield* wake("later", DateTime.add(yield* DateTime.now, { days: 1 }));
+            yield* request("later", DateTime.add(yield* DateTime.now, { days: 1 }));
             const deadline = (yield* Clock.currentTimeMillis) + 10_000;
             while ((yield* handled) < 5 && (yield* Clock.currentTimeMillis) < deadline)
               yield* Effect.sleep("100 millis");
@@ -84,7 +84,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 UPDATE cluster_messages SET entity_type = 'other/Entity'
                 WHERE id = (SELECT min(id) FROM cluster_messages WHERE processed)`,
             ).pipe(Effect.orDie);
-            const types = [ClusterBackground.WorkspaceProcess.type];
+            const types = [BackgroundJob.entity.type];
             const now = yield* DateTime.now;
             expect(
               yield* PostgresClusterStorage.prune(types, DateTime.subtract(now, { hours: 1 })),
@@ -150,7 +150,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             asMember: unexpected,
             asMemberScoped: unexpected,
             executeTurns: unexpected,
-            runBackground: (id) =>
+            runBackgroundProcess: (id) =>
               id === "missing"
                 ? Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId: id }))
                 : id === "failing"
@@ -159,7 +159,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           // Reading rarely, so the retry a failed run schedules stays waiting through the test.
           const context = yield* Layer.build(
-            ClusterBackground.layer.pipe(
+            BackgroundJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
               ),
@@ -177,8 +177,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const now = yield* DateTime.now;
           yield* Effect.gen(function* () {
             for (const id of ["missing", "failing", "fine"])
-              yield* wakeIn(Workspace.Id.make(id), `commit-${id}`);
-            yield* wakeIn(
+              yield* requestIn(Workspace.Id.make(id), `commit-${id}`);
+            yield* requestIn(
               Workspace.Id.make("later"),
               "commit-later",
               DateTime.add(now, { hours: 1 }),
