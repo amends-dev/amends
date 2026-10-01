@@ -17,7 +17,7 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import { EnvironmentCatalog } from "./catalog.ts";
-import { EnvironmentCompatibility } from "./compatibility.ts";
+
 import { Environment } from "./environment.ts";
 import {
   Changed,
@@ -30,6 +30,7 @@ import {
 } from "./errors.ts";
 import { EnvironmentFacts } from "./facts.ts";
 import { EnvironmentPermissions } from "./permissions.ts";
+import { EnvironmentQuery } from "./query.ts";
 import { EnvironmentStore } from "./store.ts";
 export {
   Changed,
@@ -102,6 +103,7 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
   const environmentStore = yield* EnvironmentStore.Service;
   const connectionStore = yield* ConnectionStore.Service;
   const environmentCatalog = yield* EnvironmentCatalog.Service;
+  const environmentQuery = yield* EnvironmentQuery.Service;
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -112,29 +114,8 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
   const connectionTarget = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
 
-  /** Readiness from the host's catalogs and the account connection, as the environment is now. */
-  const assessReadiness = Effect.fnUntraced(function* (record: Environment.Record) {
-    const connectionId = record.sandbox?.connectionId ?? null;
-    const found = connectionId === null ? Option.none() : yield* connectionStore.get(connectionId);
-    return EnvironmentCompatibility.readiness(
-      record,
-      {
-        harness: environmentCatalog.harness(record.harnessId),
-        sandbox:
-          record.sandbox === null
-            ? Option.none()
-            : environmentCatalog.sandbox(record.sandbox.providerId),
-      },
-      {
-        record: found,
-        declaration: Option.flatMap(found, (connection) =>
-          connectionCatalog.get(connection.implementationId),
-        ),
-      },
-    );
-  });
   const toView = (record: Environment.Record, manageable: boolean) =>
-    Effect.map(assessReadiness(record), (readiness) =>
+    Effect.map(environmentQuery.assessReadiness(record), (readiness) =>
       Environment.view(record, manageable, readiness),
     );
   /** The environment as the actor sees it, including whether they may manage it. */
@@ -156,15 +137,12 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
     permission: Permission.Definition<"Environment">,
   ) {
     const record = yield* requireActiveEnvironment(environmentId);
-    const [readable = false, permitted = false] = yield* authorization.permitted([
+    yield* Authorization.requireVisible(
+      authorization,
       Requirement.make(EnvironmentPermissions.Read, environmentTarget(environmentId)),
       Requirement.make(permission, environmentTarget(environmentId)),
-    ]);
-    if (!readable) return yield* new NotFound({ environmentId });
-    if (!permitted)
-      yield* authorization.require([
-        Requirement.make(permission, environmentTarget(environmentId)),
-      ]);
+      () => new NotFound({ environmentId }),
+    );
     return record;
   });
 
@@ -228,12 +206,6 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
     setup: settings.setup,
     retention: settings.retention,
   });
-  const commitAsActor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Publication.withActor,
-      Effect.provideService(Crypto.Crypto, crypto),
-      journal.commit,
-    );
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -320,9 +292,9 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
     journal.commit,
   );
 
-  const rename = Effect.fn("EnvironmentService.rename")(function* (input: Environment.RenameInput) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Environment.RenameInput))(input);
-    return yield* Effect.gen(function* () {
+  const rename = Effect.fn("EnvironmentService.rename")(
+    function* (input: Environment.RenameInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Environment.RenameInput))(input);
       const record = yield* requirePermittedEnvironment(
         request.environmentId,
         EnvironmentPermissions.Manage,
@@ -336,14 +308,15 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
         name: request.name,
       });
       return yield* toView(Environment.change(record, { name: request.name }), true);
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const configure = Effect.fn("EnvironmentService.configure")(function* (
-    input: Environment.ConfigureInput,
-  ) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Environment.ConfigureInput))(input);
-    return yield* Effect.gen(function* () {
+  const configure = Effect.fn("EnvironmentService.configure")(
+    function* (input: Environment.ConfigureInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Environment.ConfigureInput))(input);
       const record = yield* requirePermittedEnvironment(
         request.environmentId,
         EnvironmentPermissions.Manage,
@@ -360,16 +333,22 @@ export const make = Effect.fn("EnvironmentService.make")(function* () {
         sandbox,
       });
       return yield* toView(Environment.change(record, { sandbox }), true);
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const remove = Effect.fn("EnvironmentService.remove")(function* (environmentId: Environment.Id) {
-    const id = yield* Schema.decodeEffect(Environment.Id)(environmentId);
-    return yield* Effect.gen(function* () {
+  const remove = Effect.fn("EnvironmentService.remove")(
+    function* (environmentId: Environment.Id) {
+      const id = yield* Schema.decodeEffect(Environment.Id)(environmentId);
       yield* requirePermittedEnvironment(id, EnvironmentPermissions.Manage);
       yield* journal.publish(EnvironmentFacts.Removed, { workspaceId, environmentId: id });
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
   return Service.of({
     implementations: {

@@ -7,4 +7,5 @@ export { EnvironmentFacts } from "./facts.ts";
 export { EnvironmentId } from "./id.ts";
 export { EnvironmentPermissions } from "./permissions.ts";
 export { EnvironmentProjection } from "./projection.ts";
+export { EnvironmentQuery } from "./query.ts";
 export { EnvironmentStore } from "./store.ts";

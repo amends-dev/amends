@@ -134,13 +134,12 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     permission: Permission.Definition<"Connection">,
   ) {
     const record = yield* requireActiveConnection(connectionId);
-    const [readable = false, permitted = false] = yield* authorization.permitted([
+    yield* Authorization.requireVisible(
+      authorization,
       Requirement.make(ConnectionPermissions.Read, connectionTarget(connectionId)),
       Requirement.make(permission, connectionTarget(connectionId)),
-    ]);
-    if (!readable) return yield* new NotFound({ connectionId });
-    if (!permitted)
-      yield* authorization.require([Requirement.make(permission, connectionTarget(connectionId))]);
+      () => new NotFound({ connectionId }),
+    );
     return record;
   });
   const checkSettings = (
@@ -155,12 +154,6 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       onNone: () => Effect.fail(new UnknownImplementation({ implementationId: id })),
       onSome: Effect.succeed,
     });
-  const commitAsActor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Publication.withActor,
-      Effect.provideService(Crypto.Crypto, crypto),
-      journal.commit,
-    );
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -245,9 +238,9 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     journal.commit,
   );
 
-  const rename = Effect.fn("ConnectionService.rename")(function* (input: Connection.RenameInput) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Connection.RenameInput))(input);
-    return yield* Effect.gen(function* () {
+  const rename = Effect.fn("ConnectionService.rename")(
+    function* (input: Connection.RenameInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Connection.RenameInput))(input);
       const record = yield* requirePermittedConnection(
         request.connectionId,
         ConnectionPermissions.Manage,
@@ -261,14 +254,15 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         name: request.name,
       });
       return toView(Connection.change(record, { name: request.name }), true);
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const configure = Effect.fn("ConnectionService.configure")(function* (
-    input: Connection.ConfigureInput,
-  ) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Connection.ConfigureInput))(input);
-    return yield* Effect.gen(function* () {
+  const configure = Effect.fn("ConnectionService.configure")(
+    function* (input: Connection.ConfigureInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Connection.ConfigureInput))(input);
       const record = yield* requirePermittedConnection(
         request.connectionId,
         ConnectionPermissions.Manage,
@@ -280,14 +274,17 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         settings: request.settings,
       });
       return toView(Connection.change(record, { settings: request.settings }), true);
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const setCredential = Effect.fn("ConnectionService.setCredential")(function* (
-    input: Connection.SetCredentialInput,
-  ) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Connection.SetCredentialInput))(input);
-    return yield* Effect.gen(function* () {
+  const setCredential = Effect.fn("ConnectionService.setCredential")(
+    function* (input: Connection.SetCredentialInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Connection.SetCredentialInput))(
+        input,
+      );
       const record = yield* requirePermittedConnection(
         request.connectionId,
         ConnectionPermissions.Manage,
@@ -319,14 +316,15 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId } }),
         true,
       );
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const clearCredential = Effect.fn("ConnectionService.clearCredential")(function* (
-    connectionId: Connection.Id,
-  ) {
-    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
-    return yield* Effect.gen(function* () {
+  const clearCredential = Effect.fn("ConnectionService.clearCredential")(
+    function* (connectionId: Connection.Id) {
+      const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
       const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
       if (record.authentication._tag !== "ApiKey")
         return yield* new UnsupportedAuthentication({
@@ -341,18 +339,24 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         Connection.change(record, { authentication: { _tag: "ApiKey", credentialId: null } }),
         true,
       );
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const remove = Effect.fn("ConnectionService.remove")(function* (connectionId: Connection.Id) {
-    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
-    return yield* Effect.gen(function* () {
+  const remove = Effect.fn("ConnectionService.remove")(
+    function* (connectionId: Connection.Id) {
+      const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
       const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
       if (record.authentication._tag === "ApiKey" && record.authentication.credentialId !== null)
         yield* connectionCredentialStore.remove(record.authentication.credentialId);
       yield* journal.publish(ConnectionFacts.Removed, { workspaceId, connectionId: id });
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
   return Service.of({
     implementations: connectionCatalog.list,

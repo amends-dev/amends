@@ -12,6 +12,7 @@ import { ConnectionProjection } from "./connection/projection.ts";
 import { EnvironmentService } from "./environment/service.ts";
 import { EnvironmentPermissions } from "./environment/permissions.ts";
 import { EnvironmentProjection } from "./environment/projection.ts";
+import { EnvironmentQuery } from "./environment/query.ts";
 import { BackgroundRuns } from "./background/runs.ts";
 import { BackgroundWakes } from "./background/wakes.ts";
 import { ThreadService } from "./thread/service.ts";
@@ -225,6 +226,7 @@ const operations = Layer.mergeAll(
     Layer.mergeAll(
       Delegation.layer,
       groupQuery,
+      EnvironmentQuery.layer,
       groupCommand,
       threadQuery,
       threadCommand,

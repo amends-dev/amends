@@ -17,6 +17,7 @@ import { ConnectionPermissions } from "../connection/permissions.ts";
 import { ConnectionStore } from "../connection/store.ts";
 import { EnvironmentCatalog } from "../environment/catalog.ts";
 import { EnvironmentCompatibility } from "../environment/compatibility.ts";
+import { EnvironmentQuery } from "../environment/query.ts";
 import { Environment } from "../environment/environment.ts";
 import { EnvironmentPermissions } from "../environment/permissions.ts";
 import { EnvironmentStore } from "../environment/store.ts";
@@ -150,6 +151,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
   const environmentStore = yield* EnvironmentStore.Service;
   const connectionStore = yield* ConnectionStore.Service;
   const environmentCatalog = yield* EnvironmentCatalog.Service;
+  const environmentQuery = yield* EnvironmentQuery.Service;
   const connectionCatalog = yield* ConnectionCatalog.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
@@ -186,12 +188,12 @@ export const make = Effect.fn("AgentService.make")(function* () {
   ) {
     const loaded = yield* requireActiveAgent(agentId);
     const target = memberTarget(loaded.record.memberId);
-    const [readable = false, permitted = false] = yield* authorization.permitted([
+    yield* Authorization.requireVisible(
+      authorization,
       Requirement.make(AgentPermissions.Read, target),
       Requirement.make(permission, target),
-    ]);
-    if (!readable) return yield* new NotFound({ agentId });
-    if (!permitted) yield* authorization.require([Requirement.make(permission, target)]);
+      () => new NotFound({ agentId }),
+    );
     return loaded;
   });
 
@@ -203,27 +205,9 @@ export const make = Effect.fn("AgentService.make")(function* () {
     const found = yield* connectionStore.get(connectionId);
     return Option.filter(found, (record) => record.status === "active");
   });
-  /** An environment as readiness sees it now, with its account connection looked up. */
+  /** An environment as readiness sees it now. */
   const toEnvironmentView = Effect.fnUntraced(function* (record: Environment.Record) {
-    const accountId = record.sandbox?.connectionId ?? null;
-    const account = accountId === null ? Option.none() : yield* connectionStore.get(accountId);
-    const readiness = EnvironmentCompatibility.readiness(
-      record,
-      {
-        harness: environmentCatalog.harness(record.harnessId),
-        sandbox:
-          record.sandbox === null
-            ? Option.none()
-            : environmentCatalog.sandbox(record.sandbox.providerId),
-      },
-      {
-        record: account,
-        declaration: Option.flatMap(account, (found) =>
-          connectionCatalog.get(found.implementationId),
-        ),
-      },
-    );
-    return Environment.view(record, false, readiness);
+    return Environment.view(record, false, yield* environmentQuery.assessReadiness(record));
   });
   const toConnectionView = (record: Connection.Record) =>
     Connection.view(
@@ -398,13 +382,6 @@ export const make = Effect.fn("AgentService.make")(function* () {
     if (first !== undefined) return yield* new Incompatible({ reasons: [first, ...rest] });
   });
 
-  const commitAsActor = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-    effect.pipe(
-      Publication.withActor,
-      Effect.provideService(Crypto.Crypto, crypto),
-      journal.commit,
-    );
-
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
     const loaded: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
@@ -503,9 +480,9 @@ export const make = Effect.fn("AgentService.make")(function* () {
     journal.commit,
   );
 
-  const configure = Effect.fn("AgentService.configure")(function* (input: Agent.ConfigureInput) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Agent.ConfigureInput))(input);
-    return yield* Effect.gen(function* () {
+  const configure = Effect.fn("AgentService.configure")(
+    function* (input: Agent.ConfigureInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Agent.ConfigureInput))(input);
       const { record, name } = yield* requirePermittedAgent(
         request.agentId,
         AgentPermissions.Configure,
@@ -532,12 +509,15 @@ export const make = Effect.fn("AgentService.make")(function* () {
         ...configuration,
       });
       return yield* viewForActor(next, name);
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
-  const rename = Effect.fn("AgentService.rename")(function* (input: Agent.RenameInput) {
-    const request = yield* Schema.decodeEffect(Schema.toType(Agent.RenameInput))(input);
-    return yield* Effect.gen(function* () {
+  const rename = Effect.fn("AgentService.rename")(
+    function* (input: Agent.RenameInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Agent.RenameInput))(input);
       const { record, name } = yield* requirePermittedAgent(
         request.agentId,
         AgentPermissions.Configure,
@@ -550,8 +530,11 @@ export const make = Effect.fn("AgentService.make")(function* () {
         name: request.name,
       });
       return yield* viewForActor(record, request.name);
-    }).pipe(commitAsActor);
-  });
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
 
   const remove = Effect.fn("AgentService.remove")(function* (agentId: Agent.Id) {
     const id = yield* Schema.decodeEffect(Agent.Id)(agentId);

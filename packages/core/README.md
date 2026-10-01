@@ -200,7 +200,8 @@ which declares the sandbox capability for this provider, and a template only whe
 takes one. The harness, provider, and placement are fixed once created; `configure` replaces the
 rest of the sandbox settings. Reads return `Environment.View` with `manageable` and readiness,
 `Ready` or `Incomplete` with issue codes, from the catalog and the account connection's own
-readiness; nothing contacts the provider.
+readiness; nothing contacts the provider. `EnvironmentQuery.assessReadiness` is that one
+assessment, which agents read too when they report whether they can run.
 
 Every workspace starts with `Environment.InProcessId`, amends's own harness in process without a
 sandbox, recorded at initialization with no creator. It is an ordinary environment afterwards.

@@ -141,4 +141,20 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
  */
 export const layer = Layer.effect(Service, make());
 
+/**
+ * Require an action on a target the actor may read, in one grant resolution. A target they can't
+ * read fails with `hidden`, so they learn nothing of it; one they can read but not act on is
+ * denied.
+ */
+export const requireVisible = Effect.fnUntraced(function* <E>(
+  authorization: Interface,
+  read: Requirement.Value,
+  action: Requirement.Value,
+  hidden: () => E,
+) {
+  const [readable = false, permitted = false] = yield* authorization.permitted([read, action]);
+  if (!readable) return yield* Effect.fail(hidden());
+  if (!permitted) yield* authorization.require([action]);
+});
+
 export * as Authorization from "./authorization.ts";
