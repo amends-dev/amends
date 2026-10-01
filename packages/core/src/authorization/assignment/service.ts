@@ -15,7 +15,7 @@ import { PermissionCatalog } from "../permission-catalog.ts";
 import { Requirement } from "../requirement.ts";
 import { BuiltinRoles } from "../role/builtin.ts";
 import { Assignment } from "./assignment.ts";
-import { AssignmentFacts } from "./facts.ts";
+import { AssignmentCommand } from "./command.ts";
 import { AssignmentPermissions } from "./permissions.ts";
 import { AssignmentStore } from "./store.ts";
 import { Changed, InactiveMember, MemberNotFound, NotFound } from "./errors.ts";
@@ -58,7 +58,7 @@ export interface Interface {
   ) => Effect.Effect<Assignment.Record, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/assignment-application/Service",
+  "@amends/core/authorization/assignment/service/Service",
 ) {}
 
 /** @category constructors */
@@ -69,6 +69,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   | MemberStore.Service
   | Authorization.Service
   | Delegation.Service
+  | AssignmentCommand.Service
   | Journal.Service
   | Crypto.Crypto
   | PermissionCatalog.Service
@@ -78,6 +79,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
   const memberStore = yield* MemberStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
+  const assignmentCommand = yield* AssignmentCommand.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const permissionCatalog = yield* PermissionCatalog.Service;
@@ -148,27 +150,6 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       canManage: record.status === "active" && (yield* isAllowedBy(authorizeRecipient(memberId))),
     });
   });
-  const createRoleAssignment = Effect.fn("AssignmentService.createRoleAssignment")(function* (
-    input: Assignment.AssignInput,
-  ) {
-    const record = Assignment.Record.make({
-      id: Assignment.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      memberId: input.memberId,
-      status: "active",
-      source: Assignment.Source.cases.Role.make({
-        roleId: input.roleId,
-        scope: { _tag: "Workspace", workspaceId },
-      }),
-    });
-    yield* journal.publish(AssignmentFacts.Created, {
-      workspaceId,
-      assignmentId: record.id,
-      memberId: record.memberId,
-      source: record.source,
-    });
-    return record;
-  });
   const isWorkspaceRole = (record: Assignment.Record) =>
     record.source._tag === "Role" && record.source.scope._tag === "Workspace";
   const assign = Effect.fn("AssignmentService.assign")(
@@ -183,7 +164,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
           record.source.roleId === request.roleId,
       );
       if (existing !== undefined) return existing;
-      return yield* createRoleAssignment(request);
+      return yield* assignmentCommand.assignRole(request.memberId, request.roleId);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -199,12 +180,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
       if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
       if (record.status === "revoked") return record;
-      yield* journal.publish(AssignmentFacts.Revoked, {
-        workspaceId,
-        assignmentId: id,
-        memberId: record.memberId,
-      });
-      return Object.assign({}, record, { status: "revoked" as const }) satisfies Assignment.Record;
+      return yield* assignmentCommand.revokeAssignment(record);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -228,13 +204,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
         ({ source }) => source._tag === "Role" && source.roleId === request.roleId,
       );
       if (current.length === 1 && same !== undefined) return same;
-      for (const record of current)
-        yield* journal.publish(AssignmentFacts.Revoked, {
-          workspaceId,
-          assignmentId: record.id,
-          memberId: record.memberId,
-        });
-      return yield* createRoleAssignment(request);
+      for (const record of current) yield* assignmentCommand.revokeAssignment(record);
+      return yield* assignmentCommand.assignRole(request.memberId, request.roleId);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

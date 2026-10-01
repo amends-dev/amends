@@ -4,6 +4,7 @@
  */
 export { Assignment } from "./assignment/assignment.ts";
 export { AssignmentService } from "./assignment/service.ts";
+export { AssignmentCommand } from "./assignment/command.ts";
 export { AssignmentPermissions } from "./assignment/permissions.ts";
 export { AssignmentFacts } from "./assignment/facts.ts";
 export { AssignmentProjection } from "./assignment/projection.ts";

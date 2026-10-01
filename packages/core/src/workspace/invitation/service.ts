@@ -1,10 +1,10 @@
 import { Request } from "../../request/request.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { AssignmentFacts } from "../../authorization/assignment/facts.ts";
+
 import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
+import { AssignmentCommand } from "../../authorization/assignment/command.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
 import { Group } from "../../group/group.ts";
@@ -79,6 +79,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   | GroupStore.Service
   | Authorization.Service
   | Delegation.Service
+  | AssignmentCommand.Service
   | Journal.Service
   | Crypto.Crypto
   | Store.Service
@@ -88,6 +89,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   const groupStore = yield* GroupStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
+  const assignmentCommand = yield* AssignmentCommand.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -216,15 +218,7 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         identity: member.identity,
         ...(name === undefined ? {} : { name }),
       });
-      yield* journal.publish(AssignmentFacts.Created, {
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        memberId: member.id,
-        source: Assignment.Source.cases.Role.make({
-          roleId: details.roleId,
-          scope: { _tag: "Workspace", workspaceId },
-        }),
-      });
+      yield* assignmentCommand.assignRole(member.id, details.roleId);
       yield* journal.publish(InvitationFacts.Accepted, {
         _tag: "Accepted",
         workspaceId,

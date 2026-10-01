@@ -2,11 +2,12 @@ import type { HarnessImplementation } from "@amends/harness";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Assignment } from "../authorization/assignment/assignment.ts";
-import { AssignmentFacts } from "../authorization/assignment/facts.ts";
+
 import { AssignmentPermissions } from "../authorization/assignment/permissions.ts";
 import { AssignmentStore } from "../authorization/assignment/store.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Delegation } from "../authorization/delegation.ts";
+import { AssignmentCommand } from "../authorization/assignment/command.ts";
 import type { Permission } from "../authorization/permission.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { RoleStore } from "../authorization/role/store.ts";
@@ -141,6 +142,7 @@ const isAwaitingSetup = (reason: EnvironmentCompatibility.Reason) =>
 export const make = Effect.fn("AgentService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
+  const assignmentCommand = yield* AssignmentCommand.Service;
   const agentStore = yield* AgentStore.Service;
   const memberStore = yield* MemberStore.Service;
   const memberService = yield* MemberService.Service;
@@ -453,15 +455,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         identity: Identity.MemberReference.cases.Agent.make({ id: created.id }),
         name: request.name,
       });
-      yield* journal.publish(AssignmentFacts.Created, {
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        workspaceId,
-        memberId: created.memberId,
-        source: Assignment.Source.cases.Role.make({
-          roleId: request.roleId,
-          scope: { _tag: "Workspace", workspaceId },
-        }),
-      });
+      yield* assignmentCommand.assignRole(created.memberId, request.roleId);
       // An agent joins the general group as every member does.
       if (Option.isSome(yield* groupStore.get(Group.GeneralId)))
         yield* journal.publish(GroupMembershipFacts.Added, {

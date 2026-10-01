@@ -1,13 +1,13 @@
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { Assignment } from "../../authorization/assignment/assignment.ts";
-import { AssignmentFacts } from "../../authorization/assignment/facts.ts";
+
 import { AssignmentStore } from "../../authorization/assignment/store.ts";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
+import { AssignmentCommand } from "../../authorization/assignment/command.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { BuiltinRoles } from "../../authorization/role/builtin.ts";
-import type { Role } from "../../authorization/role/role.ts";
+
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
@@ -54,6 +54,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   | AssignmentStore.Service
   | Authorization.Service
   | Delegation.Service
+  | AssignmentCommand.Service
   | Journal.Service
   | Crypto.Crypto
   | Store.Service
@@ -63,6 +64,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
   const assignmentStore = yield* AssignmentStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
+  const assignmentCommand = yield* AssignmentCommand.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -114,20 +116,6 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     });
   }).pipe(Effect.withSpan("OwnershipService.get"));
   const builtins = [BuiltinRoles.MemberId, BuiltinRoles.AdministratorId, BuiltinRoles.OwnerId];
-  const createAssignment = Effect.fn("OwnershipService.createAssignment")(function* (
-    memberId: Member.Id,
-    roleId: Role.Id,
-  ) {
-    yield* journal.publish(AssignmentFacts.Created, {
-      assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      memberId,
-      source: Assignment.Source.cases.Role.make({
-        roleId,
-        scope: { _tag: "Workspace", workspaceId },
-      }),
-    });
-  });
   const transfer = Effect.fn("OwnershipService.transfer")(
     function* (input: Ownership.TransferInput) {
       yield* authorization.require([requirement]);
@@ -160,15 +148,11 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
             source.scope._tag === "Workspace" &&
             builtins.includes(source.roleId)
           )
-            yield* journal.publish(AssignmentFacts.Revoked, {
-              workspaceId,
-              assignmentId: assignment.id,
-              memberId: assignment.memberId,
-            });
+            yield* assignmentCommand.revokeAssignment(assignment);
         }
       }
-      yield* createAssignment(state.owner.id, BuiltinRoles.AdministratorId);
-      yield* createAssignment(recipient.id, BuiltinRoles.OwnerId);
+      yield* assignmentCommand.assignRole(state.owner.id, BuiltinRoles.AdministratorId);
+      yield* assignmentCommand.assignRole(recipient.id, BuiltinRoles.OwnerId);
       yield* journal.publish(WorkspaceFacts.OwnershipTransferred, {
         workspaceId,
         previousOwnerMemberId: state.owner.id,

@@ -55,6 +55,7 @@ import { GroupMembershipPermissions } from "./group/membership/permissions.ts";
 import { GroupPermissions } from "./group/permissions.ts";
 import { AssignmentProjection } from "./authorization/assignment/projection.ts";
 import { AssignmentService } from "./authorization/assignment/service.ts";
+import { AssignmentCommand } from "./authorization/assignment/command.ts";
 import { AssignmentPermissions } from "./authorization/assignment/permissions.ts";
 import { Delegation } from "./authorization/delegation.ts";
 import { Authorization } from "./authorization/authorization.ts";
@@ -225,6 +226,7 @@ const operations = Layer.mergeAll(
   Layer.provide(
     Layer.mergeAll(
       Delegation.layer,
+      AssignmentCommand.layer,
       groupQuery,
       EnvironmentQuery.layer,
       groupCommand,

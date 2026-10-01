@@ -548,7 +548,9 @@ outside it, which group operations enforce by requiring membership as well as th
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
 clients can offer just the actions the member may take. `Delegation` supplies the shared
-rules used by assignments, invitations, and member removal. Role definition editing
+rules used by assignments, invitations, and member removal. `AssignmentCommand.assignRole` and
+`revokeAssignment` record a workspace role's assignment and its end, for assignment changes,
+ownership transfer, accepted invitations, new agents, and workspace creation alike. Role definition editing
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)
 for the implemented bundles and current invitation restrictions.
 

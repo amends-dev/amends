@@ -1,10 +1,10 @@
 import { Crypto, DateTime, Effect, Option, Schema } from "effect";
-import { Assignment } from "../authorization/assignment/assignment.ts";
-import { AssignmentFacts } from "../authorization/assignment/facts.ts";
+
 import { PermissionCatalog } from "../authorization/permission-catalog.ts";
 import { BuiltinRoles } from "../authorization/role/builtin.ts";
+import { AssignmentCommand } from "../authorization/assignment/command.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
-import { Scope } from "../authorization/scope.ts";
+
 import { Environment } from "../environment/environment.ts";
 import { EnvironmentFacts } from "../environment/facts.ts";
 import { GroupFacts } from "../group/facts.ts";
@@ -49,6 +49,8 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const permissionCatalog = yield* PermissionCatalog.Service;
+  // Creation runs before the workspace's operations exist, so it builds the command it shares.
+  const assignmentCommand = yield* AssignmentCommand.make();
   const provenance = yield* Publication.make(workspaceId, {
     _tag: "Identity",
     identity: Identity.Reference.cases.Human.make({ id: createdBy }),
@@ -83,15 +85,7 @@ export const initialize = Effect.fn("WorkspaceInitialization.initialize")(functi
         workspaceId: record.id,
         revision: BuiltinRoles.revision,
       });
-      yield* journal.publish(AssignmentFacts.Created, {
-        workspaceId: record.id,
-        assignmentId: Assignment.Id.make(yield* crypto.randomUUIDv4),
-        memberId: ownerMemberId,
-        source: Assignment.Source.cases.Role.make({
-          roleId: BuiltinRoles.OwnerId,
-          scope: Scope.Value.cases.Workspace.make({ workspaceId: record.id }),
-        }),
-      });
+      yield* assignmentCommand.assignRole(ownerMemberId, BuiltinRoles.OwnerId);
       const createdAt = yield* DateTime.now;
       yield* journal
         .publish(GroupFacts.Created, {
