@@ -4,18 +4,17 @@
  */
 import type { ModelInference } from "@amends/connection/model-inference";
 import { TurnExecution, type Turn, type TurnLog } from "@amends/core/turn";
-import type { Harness, HarnessErrors } from "@amends/harness";
+import type { HarnessErrors } from "@amends/harness";
 import { Data, Duration } from "effect";
 import { ContextBudget } from "./context-budget.ts";
-import type { ModelAccess, Settings } from "./settings.ts";
+import type { Settings } from "./settings.ts";
 
 /** The checkpoint a conversation needs before its model reads it. */
 export type Compaction = TurnLog.Compaction;
 
-/** The turn's work with what runs it: its plan, harness, model, and token budget. */
+/** The turn's work with what runs it: its plan, its model's code, and its token budget. */
 export interface Work {
   readonly plan: TurnExecution.Plan;
-  readonly harness: Harness.Interface<ModelAccess>;
   readonly model: ModelInference.Implementation;
   readonly budget: number;
 }
@@ -65,13 +64,6 @@ export const decide = (
   if (TurnExecution.Preparation.$is("Unrunnable")(preparation))
     return Step.Fail({ reason: preparation.reason });
   const plan = preparation.plan;
-  if (plan.environment.sandbox !== null)
-    return Step.Fail({ reason: "Environments with a sandbox can't run turns yet." });
-  const harness = settings.harnesses.get(plan.environment.harnessId);
-  if (harness === undefined)
-    return Step.Fail({
-      reason: `The ${plan.environment.harnessId} harness doesn't run on this server.`,
-    });
   const model = settings.models.get(plan.connection.implementationId);
   if (model === undefined)
     return Step.Fail({ reason: `${plan.connection.name}'s models can't run on this server.` });
@@ -98,7 +90,7 @@ export const decide = (
     shrink: overflow.pending ? overflow.count - 1 : 0,
   });
   if (overflow.pending && compaction === undefined) return Step.Fail({ reason: tooLongReason });
-  const work = { plan, harness, model, budget };
+  const work = { plan, model, budget };
   return compaction === undefined ? Step.Work(work) : Step.Summarize({ ...work, compaction });
 };
 

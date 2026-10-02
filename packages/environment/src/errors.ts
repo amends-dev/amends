@@ -1,8 +1,20 @@
 import { Schema } from "effect";
 
+/** The environment's harness is not one this host installed. */
+export class HarnessUnavailable extends Schema.TaggedError<HarnessUnavailable>()(
+  "Environment.HarnessUnavailable",
+  { harnessId: Schema.String },
+) {}
+
+/** The environment's sandbox provider is not one this host runs environments with. */
+export class SandboxUnavailable extends Schema.TaggedError<SandboxUnavailable>()(
+  "Environment.SandboxUnavailable",
+  { providerId: Schema.String },
+) {}
+
 /** A setup command the definition requires failed, so spawning failed. */
 export class SetupFailed extends Schema.TaggedError<SetupFailed>()("Environment.SetupFailed", {
-  argv: Schema.Array(Schema.String),
+  command: Schema.String,
   exitCode: Schema.Int,
   stdout: Schema.String,
   stderr: Schema.String,
@@ -13,8 +25,5 @@ export class ForeignReference extends Schema.TaggedError<ForeignReference>()(
   "Environment.ForeignReference",
   { definitionId: Schema.String },
 ) {}
-
-/** The running environment was released; nothing more runs in it. */
-export class Released extends Schema.TaggedError<Released>()("Environment.Released", {}) {}
 
 export * as EnvironmentErrors from "./errors.ts";

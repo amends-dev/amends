@@ -1,8 +1,8 @@
-import { HarnessEvent } from "@amends/harness";
-import type { Harness, HarnessErrors, HarnessTool, Transcript } from "@amends/harness";
+import type { ModelInference } from "@amends/connection/model-inference";
+import type { Harness, Transcript } from "@amends/harness";
 import { Sandbox, SandboxErrors } from "@amends/sandbox";
-import { Effect, Exit, Queue, Ref, Schema, Scope, Stream } from "effect";
-import type { Cause } from "effect";
+import { Context, Crypto, Effect, Layer, Ref, Schema } from "effect";
+import type { Scope } from "effect";
 import { EnvironmentErrors } from "./errors.ts";
 
 export const DefinitionId = Schema.NonEmptyString.pipe(Schema.brand("EnvironmentDefinitionId"));
@@ -15,33 +15,36 @@ export type DefinitionId = typeof DefinitionId.Type;
  */
 export type Retention = "stop" | "destroy";
 
-/** The sandbox part of a definition. */
-export interface SandboxSetup {
-  readonly provider: Sandbox.Provider;
-  /** How a new sandbox is acquired: its template, environment, and labels. */
-  readonly options?: Pick<Sandbox.AcquireOptions, "template" | "env" | "labels"> | undefined;
+/** The sandbox a stored environment runs with. */
+export interface SandboxDefinition {
+  /** The sandbox provider, by the ID it declares, such as `daytona`. */
+  readonly providerId: string;
+  /** The provider's starting point for a new sandbox, such as an image or a snapshot name. */
+  readonly template: string | null;
+  /** Environment variables every command in a new sandbox receives. */
+  readonly env: Readonly<Record<string, string>>;
   /**
-   * Installation and initialization the harness depends on, run in order on every spawn before
-   * the harness starts. Each must succeed, and be safe to repeat on a sandbox acquired again.
+   * Shell commands that install and initialize what the harness depends on, run in order on every
+   * spawn before the harness starts. Each must succeed, and be safe to repeat on a sandbox acquired
+   * again.
    */
-  readonly setup?: ReadonlyArray<Sandbox.Command> | undefined;
+  readonly setup: ReadonlyArray<string>;
   readonly retention: Retention;
 }
 
 /**
- * A reusable environment: a harness, the sandbox it runs with, and the setup that prepares them.
- * Without a sandbox, execution runs in process. `R` is what the harness's sessions need, such as
- * model access, which whoever spawns supplies.
+ * An environment as a workspace stores it: the harness it runs, by the ID the harness declares, and
+ * the sandbox it runs with. Without a sandbox, the harness runs in process.
  */
-export interface Definition<R = never> {
-  readonly id: DefinitionId;
-  readonly harness: Harness.Interface<R>;
-  readonly sandbox?: SandboxSetup | undefined;
+export interface Definition {
+  readonly id: string;
+  readonly harnessId: string;
+  readonly sandbox: SandboxDefinition | null;
 }
 
 /**
- * Identifies a running environment so it can be acquired again, as a turn records its
- * `environmentId`. It names what was asked for; it does not prove the sandbox or its files survived.
+ * Identifies a running environment so it can be acquired again: the definition and, with a sandbox,
+ * the sandbox's ID. It names what was asked for; it does not prove the sandbox or its files survived.
  */
 export const Reference = Schema.Struct({
   definitionId: DefinitionId,
@@ -60,109 +63,85 @@ export const Filesystem = Schema.TaggedUnion({
 });
 export type Filesystem = typeof Filesystem.Type;
 
-/**
- * What spawning actually provided. The filesystem and the harness's context are reported apart:
- * files can come back while the harness still needs its history set up.
- */
-export const Acquisition = Schema.Struct({
-  filesystem: Filesystem,
-  /** Whether the harness kept an earlier session's context, or needs history setup. */
-  harness: Schema.Literals(["retained", "needs-setup"]),
-});
-export interface Acquisition extends Schema.Schema.Type<typeof Acquisition> {}
-
-/** What the environment reports about itself. */
-export const Lifecycle = Schema.TaggedUnion({
-  /** Spawning finished: the environment can take history and input. */
-  Ready: { reference: Reference, acquisition: Acquisition },
-  /**
-   * The sandbox captured its files. Its place among the harness's events is the history position
-   * the snapshot belongs to.
-   */
-  SnapshotTaken: { snapshot: Sandbox.SnapshotReference },
-  /** The environment was released and its retention applied; nothing follows. */
-  Released: {},
-});
-export type Lifecycle = typeof Lifecycle.Type;
-
-/**
- * One event from a running environment: a harness event as the harness reported it, or the
- * environment's own. The envelope names the source without changing the harness's schema.
- */
-export const Event = Schema.TaggedUnion({
-  Harness: { event: HarnessEvent.Event },
-  Environment: { event: Lifecycle },
-});
-export type Event = typeof Event.Type;
-
-/** What spawning receives: never conversation history or work to do. */
 export interface SpawnOptions {
   /** A running environment to acquire again, as recorded when it was spawned. */
   readonly reacquire?: Reference | undefined;
   /** A snapshot to restore when no sandbox is asked for, or the one asked for is gone. */
   readonly restore?: Sandbox.SnapshotReference | undefined;
-  /** The harness session's ID, unique among the sessions whose events share one log. */
-  readonly sessionId: string;
+}
+
+/** What a harness session needs from the turn that starts it. */
+export interface SessionOptions {
+  /** The model access the session runs with: the connection's code and access, and the model. */
+  readonly model: {
+    readonly inference: ModelInference.Implementation;
+    readonly access: ModelInference.Access;
+    readonly selection: ModelInference.Selection;
+  };
   readonly instructions?: string | undefined;
-  readonly tools?: HarnessTool.Tools | undefined;
   /** The most tokens one model request may carry, for the harness to keep within. */
   readonly contextLimit?: number | undefined;
-  /** What a provider measured of the transcript the harness is prepared with. */
+  /** What a provider measured of the transcript the session is prepared with. */
   readonly measured?: Transcript.Measured | undefined;
 }
 
 /**
- * A spawned environment. History setup and input go through it to the harness, as the harness
- * session's operations do; after `release`, they fail with `Released`.
+ * A spawned environment. A turn starts a harness session in it for each attempt, and releases it
+ * once the turn is done with it.
  */
 export interface Running {
   readonly reference: Reference;
-  readonly acquisition: Acquisition;
-  readonly prepare: (
-    transcript: ReadonlyArray<Transcript.Item>,
-  ) => Effect.Effect<
-    void,
-    | HarnessErrors.AlreadyPrepared
-    | HarnessErrors.InvalidTranscript
-    | HarnessErrors.Unsupported
-    | EnvironmentErrors.Released
-  >;
-  readonly submit: (
-    batch: HarnessEvent.InputBatch,
-  ) => Effect.Effect<
-    void,
-    HarnessErrors.NotPrepared | HarnessErrors.ExecutionFailed | EnvironmentErrors.Released
-  >;
-  readonly resolve: (
-    callId: Transcript.ToolCallId,
-    outcome: Transcript.ToolOutcome,
-  ) => Effect.Effect<
-    void,
-    | HarnessErrors.NotPrepared
-    | HarnessErrors.NotPending
-    | HarnessErrors.ExecutionFailed
-    | EnvironmentErrors.Released
-  >;
-  readonly resume: Effect.Effect<
-    void,
-    HarnessErrors.NotPrepared | HarnessErrors.ExecutionFailed | EnvironmentErrors.Released
-  >;
+  readonly filesystem: Filesystem;
   /**
-   * Everything the environment reports, in order, for one consumer: `Ready` first, then harness
-   * events and snapshots, then `Released`. It fails when the harness stops.
+   * Starts a harness session with the turn's model access, under a session ID of its own. The
+   * session lives until the caller's scope closes; the turn sets up its history with `prepare`.
    */
-  readonly events: Stream.Stream<Event, HarnessErrors.ExecutionFailed>;
-  /** Captures the sandbox's files, reporting `SnapshotTaken`. */
+  readonly startSession: (
+    options: SessionOptions,
+  ) => Effect.Effect<Harness.Session, never, Scope.Scope>;
+  /** Captures the sandbox's files. */
   readonly snapshot: Effect.Effect<
     Sandbox.SnapshotReference,
-    SandboxErrors.Unsupported | SandboxErrors.ProviderFailure | EnvironmentErrors.Released
+    SandboxErrors.Unsupported | SandboxErrors.ProviderFailure
   >;
   /**
-   * Ends the harness session and applies the definition's retention to the sandbox. The turn
-   * releases; what happens to the sandbox is the environment's policy. Repeating it after it
-   * succeeded does nothing, and after a failure retries what remains.
+   * Applies the environment's retention to its sandbox: stops it, keeping its files, or destroys
+   * it. Repeating it after it succeeded does nothing, and after a failure retries. An environment
+   * never released keeps its sandbox as it is, for a later run to acquire again.
    */
   readonly release: Effect.Effect<void, SandboxErrors.ProviderFailure>;
+}
+
+export type SpawnError =
+  | EnvironmentErrors.HarnessUnavailable
+  | EnvironmentErrors.SandboxUnavailable
+  | EnvironmentErrors.ForeignReference
+  | EnvironmentErrors.SetupFailed
+  | SandboxErrors.SnapshotUnavailable
+  | SandboxErrors.ProviderFailure;
+
+export interface Interface {
+  /**
+   * Spawn a running environment for `definition`: find the harness and sandbox provider this host
+   * installed, acquire the sandbox `reacquire` names if it still exists or a new one, restored
+   * from `restore` when given, and run its setup. Spawning receives no conversation history or
+   * work. A setup failure fails the spawn, stopping a reacquired sandbox or destroying a new one.
+   */
+  readonly spawn: (
+    definition: Definition,
+    options?: SpawnOptions,
+  ) => Effect.Effect<Running, SpawnError>;
+}
+
+export class Service extends Context.Service<Service, Interface>()("@amends/environment/Service") {}
+
+/**
+ * The code a host runs environments with: the harnesses it runs in process, whose sessions use the
+ * Effect AI model a connection supplies, and its sandbox providers, each found by its ID.
+ */
+export interface Installed {
+  readonly harnesses: ReadonlyArray<Harness.Interface<ModelInference.Services>>;
+  readonly sandboxes?: ReadonlyArray<Sandbox.Provider> | undefined;
 }
 
 const toFilesystem = (
@@ -179,23 +158,28 @@ const abandon = (acquired: Sandbox.Acquired) =>
     acquired.filesystem === "retained" ? acquired.sandbox.stop : acquired.sandbox.destroy,
   );
 
-/** Acquires the sandbox and runs the definition's setup in it. */
-const prepareSandbox = Effect.fnUntraced(function* (setup: SandboxSetup, options: SpawnOptions) {
-  const acquired = yield* setup.provider.acquire({
-    ...setup.options,
+/** Acquires the sandbox a definition asks for and runs its setup in it, in order. */
+const acquireSandbox = Effect.fnUntraced(function* (
+  provider: Sandbox.Provider,
+  definition: SandboxDefinition,
+  options: SpawnOptions,
+) {
+  const acquired = yield* provider.acquire({
     id: options.reacquire?.sandboxId,
     snapshot: options.restore,
+    template: definition.template ?? undefined,
+    env: definition.env,
   });
   yield* Effect.forEach(
-    setup.setup ?? [],
+    definition.setup,
     (command) =>
       acquired.sandbox
-        .exec(command)
+        .exec({ argv: ["sh", "-c", command] })
         .pipe(
           Effect.flatMap((result) =>
             result.exitCode === 0
               ? Effect.void
-              : Effect.fail(new EnvironmentErrors.SetupFailed({ argv: command.argv, ...result })),
+              : Effect.fail(new EnvironmentErrors.SetupFailed({ command, ...result })),
           ),
         ),
     { discard: true },
@@ -203,106 +187,92 @@ const prepareSandbox = Effect.fnUntraced(function* (setup: SandboxSetup, options
   return acquired;
 });
 
-/**
- * Spawns a running environment from `definition`: acquires or reacquires its sandbox, restoring
- * `restore` where needed, runs its setup, then starts the harness. It receives no conversation
- * history or work; a setup failure fails the spawn, stopping a reacquired sandbox or destroying a
- * new one. The harness always starts a new session, so its context needs history setup.
- * The harness session lives until `release` or the enclosing scope closes; closing the scope
- * leaves the sandbox as it is, for recovery to acquire again.
- */
-export const spawn = Effect.fnUntraced(function* <R>(
-  definition: Definition<R>,
-  options: SpawnOptions,
-) {
-  const reacquire = options.reacquire;
-  if (reacquire !== undefined && reacquire.definitionId !== definition.id)
-    return yield* new EnvironmentErrors.ForeignReference({ definitionId: reacquire.definitionId });
-  const setup = definition.sandbox;
-  if (setup === undefined && options.restore !== undefined)
-    return yield* new SandboxErrors.SnapshotUnavailable({
-      reason: "This environment has no sandbox to restore into.",
-    });
-  const acquired = setup === undefined ? undefined : yield* prepareSandbox(setup, options);
-  const sandbox = acquired?.sandbox;
-
-  const sessionScope = yield* Scope.make();
-  yield* Effect.addFinalizer(() => Scope.close(sessionScope, Exit.void));
-  const session = yield* definition.harness
-    .start({
-      sessionId: options.sessionId,
-      instructions: options.instructions,
-      tools: options.tools,
-      contextLimit: options.contextLimit,
-      measured: options.measured,
-    })
-    .pipe(
-      Scope.provide(sessionScope),
-      Effect.onInterrupt(() => (acquired === undefined ? Effect.void : abandon(acquired))),
-    );
-
-  const reference: Reference = {
-    definitionId: definition.id,
-    ...(sandbox !== undefined && { sandboxId: sandbox.id }),
-  };
-  const acquisition: Acquisition = {
-    filesystem:
-      acquired === undefined
-        ? { _tag: "None" }
-        : toFilesystem(acquired.filesystem, options.restore),
-    harness: "needs-setup",
-  };
-
-  const events = yield* Queue.unbounded<Event, HarnessErrors.ExecutionFailed | Cause.Done>();
-  const report = (event: Lifecycle) =>
-    Queue.offer(events, { _tag: "Environment", event }).pipe(Effect.asVoid);
-  yield* report({ _tag: "Ready", reference, acquisition });
-  yield* session.events.pipe(
-    Stream.runForEach((event) => Queue.offer(events, { _tag: "Harness", event })),
-    Effect.catch((failure) => Queue.fail(events, failure)),
-    Effect.forkIn(sessionScope),
+/** @category constructors */
+export const make = Effect.fnUntraced(function* (installed: Installed) {
+  const crypto = yield* Crypto.Crypto;
+  const harnesses = new Map(
+    installed.harnesses.map((harness) => [harness.declaration.id as string, harness]),
+  );
+  const sandboxes = new Map(
+    (installed.sandboxes ?? []).map((provider) => [provider.name, provider]),
   );
 
-  const released = yield* Ref.make(false);
-  const sandboxReleased = yield* Ref.make(sandbox === undefined);
-  const announced = yield* Ref.make(false);
-  const live = <A, E>(
-    effect: Effect.Effect<A, E>,
-  ): Effect.Effect<A, E | EnvironmentErrors.Released> =>
-    Effect.gen(function* () {
-      if (yield* Ref.get(released)) return yield* new EnvironmentErrors.Released();
-      return yield* effect;
-    });
+  /** The running environment over a started harness and, if any, its acquired sandbox. */
+  const makeRunning = Effect.fnUntraced(function* (
+    harness: Harness.Interface<ModelInference.Services>,
+    reference: Reference,
+    filesystem: Filesystem,
+    sandbox: { readonly running: Sandbox.Running; readonly retention: Retention } | undefined,
+  ) {
+    const released = yield* Ref.make(sandbox === undefined);
+    const running: Running = {
+      reference,
+      filesystem,
+      startSession: Effect.fnUntraced(function* (options: SessionOptions) {
+        const sessionId = `session-${yield* Effect.orDie(crypto.randomUUIDv4)}`;
+        const model = yield* Layer.build(
+          options.model.inference.languageModel(options.model.access, options.model.selection),
+        );
+        return yield* harness
+          .start({
+            sessionId,
+            instructions: options.instructions,
+            contextLimit: options.contextLimit,
+            measured: options.measured,
+          })
+          .pipe(Effect.provideContext(model));
+      }),
+      snapshot:
+        sandbox === undefined
+          ? Effect.fail(new SandboxErrors.Unsupported({ capability: "snapshots" }))
+          : sandbox.running.snapshot,
+      release: Effect.gen(function* () {
+        if (sandbox === undefined || (yield* Ref.get(released))) return;
+        yield* sandbox.retention === "destroy" ? sandbox.running.destroy : sandbox.running.stop;
+        yield* Ref.set(released, true);
+      }),
+    };
+    return running;
+  });
 
-  const running: Running = {
-    reference,
-    acquisition,
-    prepare: (transcript) => live(session.prepare(transcript)),
-    submit: (batch) => live(session.submit(batch)),
-    resolve: (callId, outcome) => live(session.resolve(callId, outcome)),
-    resume: live(session.resume),
-    events: Stream.fromQueue(events),
-    snapshot: live(
-      sandbox === undefined
-        ? Effect.fail(new SandboxErrors.Unsupported({ capability: "snapshots" }))
-        : sandbox.snapshot.pipe(
-            Effect.tap((snapshot) => report({ _tag: "SnapshotTaken", snapshot })),
-          ),
-    ),
-    release: Effect.gen(function* () {
-      yield* Ref.set(released, true);
-      yield* Scope.close(sessionScope, Exit.void);
-      if (sandbox !== undefined && !(yield* Ref.get(sandboxReleased))) {
-        yield* setup?.retention === "destroy" ? sandbox.destroy : sandbox.stop;
-        yield* Ref.set(sandboxReleased, true);
-      }
-      if (!(yield* Ref.getAndSet(announced, true))) {
-        yield* report({ _tag: "Released" });
-        yield* Queue.end(events);
-      }
-    }),
-  };
-  return running;
+  const spawn = Effect.fn("Environment.spawn")(function* (
+    definition: Definition,
+    options: SpawnOptions = {},
+  ) {
+    const harness = harnesses.get(definition.harnessId);
+    if (harness === undefined)
+      return yield* new EnvironmentErrors.HarnessUnavailable({ harnessId: definition.harnessId });
+    const definitionId = DefinitionId.make(definition.id);
+    const reacquire = options.reacquire;
+    if (reacquire !== undefined && reacquire.definitionId !== definitionId)
+      return yield* new EnvironmentErrors.ForeignReference({
+        definitionId: reacquire.definitionId,
+      });
+    if (definition.sandbox === null) {
+      if (options.restore !== undefined)
+        return yield* new SandboxErrors.SnapshotUnavailable({
+          reason: "This environment has no sandbox to restore into.",
+        });
+      return yield* makeRunning(harness, { definitionId }, { _tag: "None" }, undefined);
+    }
+    const provider = sandboxes.get(definition.sandbox.providerId);
+    if (provider === undefined)
+      return yield* new EnvironmentErrors.SandboxUnavailable({
+        providerId: definition.sandbox.providerId,
+      });
+    const acquired = yield* acquireSandbox(provider, definition.sandbox, options);
+    return yield* makeRunning(
+      harness,
+      { definitionId, sandboxId: acquired.sandbox.id },
+      toFilesystem(acquired.filesystem, options.restore),
+      { running: acquired.sandbox, retention: definition.sandbox.retention },
+    );
+  });
+
+  return Service.of({ spawn });
 });
+
+/** @category layers */
+export const layer = (installed: Installed) => Layer.effect(Service, make(installed));
 
 export * as Environment from "./environment.ts";

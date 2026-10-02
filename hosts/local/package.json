@@ -14,6 +14,7 @@
     "@amends/connection-anthropic": "workspace:*",
     "@amends/connection-openai-compatible": "workspace:*",
     "@amends/core": "workspace:*",
+    "@amends/environment": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/harness-amends": "workspace:*",
     "@amends/sandbox-daytona": "workspace:*",

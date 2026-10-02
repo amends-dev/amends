@@ -211,6 +211,7 @@
         "@amends/connection-anthropic": "workspace:*",
         "@amends/connection-openai-compatible": "workspace:*",
         "@amends/core": "workspace:*",
+        "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness-amends": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
@@ -274,6 +275,7 @@
       "name": "@amends/environment",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
         "effect": "catalog:",

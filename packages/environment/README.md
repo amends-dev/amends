@@ -1,67 +1,70 @@
 # Environment
 
-`@amends/environment` composes a [harness](../harness/README.md) with a
-[sandbox](../sandbox/README.md) into a running environment, as the
+`@amends/environment` runs the environments a workspace stores: it finds the
+[harness](../harness/README.md) and [sandbox](../sandbox/README.md) provider a host installed,
+spawns the runtime, starts harness sessions in it with the turn's model access, and applies
+retention when released, as the
 [core model](../../docs/core-model.md#agreed-spawning-history-setup-and-input-submission-are-separate-stages)
-describes: it spawns the runtime, passes history and input through to the harness, reports what it
-acquired, takes snapshots, and applies retention when released. [Turn execution](../cluster/README.md#running-a-turn)
-spawns one for each session of a turn, without a sandbox so far.
+describes. [Turn execution](../cluster/README.md#running-a-turn) spawns one for each run of a
+turn and starts a session in it for each attempt. [Harnesses in sandboxes](../../docs/sandbox-harnesses.md)
+plans how harnesses come to run inside a sandbox.
 
-## Definitions and running environments
+## The service
 
-An `Environment.Definition<R>` is a reusable composition: an `id`, a harness, and optionally a
-sandbox with its provider, acquisition options, setup commands, and retention. Without a sandbox,
-execution runs in process. `R` is what the harness's sessions need, such as the `LanguageModel`
-amends's own harness uses, which whoever spawns supplies. Definitions are values in code; how they
-are stored in a workspace is not designed yet.
+`Environment.layer({ harnesses, sandboxes })` provides `Environment.Service` from the code a host
+installs: the harnesses it runs in process, each found by the ID its declaration gives, whose
+sessions use the Effect AI model a connection supplies (`ModelInference.Services`), and its sandbox
+providers, each found by name. A host lists the harnesses' declarations in its catalog from the same
+list, so what a workspace can choose and what runs agree.
 
-`Environment.spawn(definition, options)` returns an `Environment.Running`, whose `reference`
-identifies it for acquiring again, as a turn records its `environmentId`: the definition and, with
-a sandbox, the sandbox's ID. A reference names what was asked for, not proof that it survived.
+`spawn(definition, options)` takes an environment as a workspace stores it, an
+`Environment.Definition`: its `id`, its `harnessId`, and its sandbox, if any, with the provider,
+template, variables, setup commands, and retention. Core's environment records fit it as they are.
 
 ## Spawning
 
 Spawning receives no conversation history or work to do, only what the runtime needs:
 
-1. With a sandbox, acquire it: the one `reacquire` names if it still exists, otherwise a new one,
+1. Find the harness and, with a sandbox, its provider. One this host did not install fails the spawn
+   with `HarnessUnavailable` or `SandboxUnavailable`.
+2. With a sandbox, acquire it: the one `reacquire` names if it still exists, otherwise a new one,
    restored from `restore` when given. Restoring into a definition without a sandbox is
-   `SnapshotUnavailable`.
-2. Run the definition's setup commands in order. One that exits nonzero fails the spawn with
-   `SetupFailed`, carrying its output; a sandbox the spawn created is destroyed, and one it
-   reacquired is stopped.
-3. Start a harness session with the given session ID, instructions, and tools.
+   `SnapshotUnavailable`, and a reference from another definition is `ForeignReference`.
+3. Run the definition's setup commands in order, each with `sh -c`. One that exits nonzero fails
+   the spawn with `SetupFailed`, carrying its output; a sandbox the spawn created is destroyed, and
+   one it reacquired is stopped.
 
-`acquisition` reports the filesystem and the harness's context apart, as the core model requires:
-the filesystem is `None` without a sandbox, `Retained`, `Restored` with the snapshot it came from,
-or `Fresh`. The harness is always `needs-setup`: every spawn starts a new session, so the turn sets
-up history in every case. A reference from another definition is `ForeignReference`.
+The `Environment.Running` it returns has a `reference`, which identifies it for acquiring again: the
+definition and, with a sandbox, the sandbox's ID. A reference names what was asked for, not proof that
+it survived. `filesystem` says where its files came from, as the core model requires: `None` without a
+sandbox, `Retained`, `Restored` with the snapshot it came from, or `Fresh`. The turn records both in
+its log, and a later run of the turn spawns with that reference to acquire the same sandbox.
 
-## Using a running environment
+## Sessions and release
 
-`prepare`, `submit`, `resolve`, and `resume` are the harness session's own operations, passed
-through. `events` reports, in order: `Ready` with the reference and acquisition; each harness event
-unchanged inside a `Harness` envelope; `SnapshotTaken` when `snapshot` captures the sandbox's
-files, whose place among the harness events is the history position it belongs to; and `Released`.
-It fails when the harness stops. `snapshot` without a sandbox is `Unsupported`.
+`startSession(options)` starts a harness session with the turn's model access: the connection's model
+code, its access, and the selected model, from which the environment builds Effect AI's services for the
+session. It gives the session an ID of its own, the agent's instructions, and the context limit and
+measurement the turn computed. The session lives until the caller's scope closes, and the turn talks
+to it directly: `prepare`, `submit`, `resolve`, `resume`, and `events` are the
+[harness contract](../harness/README.md#sessions) itself.
 
-`release` ends the harness session and applies the definition's retention: `stop` keeps the
-sandbox's files for acquiring again, and `destroy` deletes the sandbox. Afterwards the operations
-fail with `Released`. If the provider fails, release reports it and a later release retries what
-remains. Closing the scope that spawned it ends the harness session but leaves the sandbox as it
-is, so recovery can acquire it again.
+`snapshot` captures the sandbox's files; without a sandbox it is `Unsupported`. `release` applies the
+definition's retention once the turn is done: `stop` keeps the sandbox's files for acquiring again,
+and `destroy` deletes the sandbox. Repeating it after it succeeded does nothing, and after a failure
+retries. A run cut short never releases, so the sandbox stays as it is for the next run to acquire.
 
 ## Provisional and open
 
 These are implementation choices where the core model leaves the contract open:
 
-- Retention is only `stop` or `destroy`. Keeping a runtime running for reuse is not supported,
-  so no harness context is ever retained.
-- Setup runs on every spawn, including onto a retained or restored filesystem, so its commands
-  must be safe to repeat.
-- The lifecycle events are `Ready`, `SnapshotTaken`, and `Released`; a setup failure is the spawn's
-  error rather than an event. The environment reports no sandbox events.
+- Retention is only `stop` or `destroy`. Keeping a runtime running for reuse is not supported, so no
+  harness context is ever retained, and every session prepares its history from the transcript.
+- Setup runs on every spawn, including onto a retained or restored filesystem, so its commands must
+  be safe to repeat.
+- A sandbox provider is installed as one provider, not per account, so providers that run under a
+  workspace's account, such as Daytona, are not installed yet.
 
-Not implemented, because what they depend on does not exist yet: configuring the harness with the
-amends MCP endpoint and a turn's credentials, validating the agent's model access and settings
-against the harness and connection, compatibility checks between agents and environments, and a
-way for a harness that runs inside the sandbox to reach it.
+Not implemented, because what they depend on does not exist yet: harnesses that run inside a sandbox,
+configuring the harness with the amends MCP endpoint and a turn's credentials, and environment
+transfer.

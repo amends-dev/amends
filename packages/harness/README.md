@@ -79,8 +79,9 @@ connection the host installed, or `Interfaces`, provider interfaces it speaks it
 
 ## Sessions
 
-`Harness.Interface<R>` names an implementation, declares its `Capabilities`, and starts sessions
-that live until their scope closes. `R` is what sessions need from their environment, such as model
+`Harness.Interface<R>` is an implementation: its `declaration`, which a host lists in its catalog
+from the same value it runs, its `Capabilities`, and how it starts sessions that live until their
+scope closes. `R` is what sessions need from their environment, such as model
 access. `StartOptions` carries the session ID, which prefixes the IDs a session assigns so they stay
 unique across the sessions sharing one log, and the agent's instructions and `HarnessTool.Tools`.
 It can also carry a `contextLimit`, the most tokens one model request may carry, with what a

@@ -5,9 +5,9 @@ AI's `LanguageModel`. It implements the [harness contract](../harness/README.md)
 same events any other harness would, so its work can continue in another session, environment, or
 harness that accepts a transcript.
 
-`AmendsHarness.make()` returns a `Harness.Interface<LanguageModel.LanguageModel>`. Sessions use the
-`LanguageModel` in their context, so model access is whatever provider layer the environment supplies
-for the agent's connection and model; the harness itself depends on no provider. It declares both
+`AmendsHarness.harness` is a `Harness.Interface<LanguageModel.LanguageModel>`. Sessions use the
+`LanguageModel` in their context, so model access is whatever provider layer the
+[environment](../environment/README.md) builds for the agent's connection and model; the harness itself depends on no provider. It declares both
 capabilities: it continues any valid transcript and takes results for calls left pending.
 
 ## The loop
@@ -59,7 +59,7 @@ the failed session would have sent, signature included.
 
 ## Declaration
 
-`AmendsHarness.declaration` is what a host registers: placement `in-process` only, and
+`AmendsHarness.harness.declaration` is what a host lists in its catalog: placement `in-process` only, and
 `LanguageModel` model access, so any model connection the host installed works. It declares no
 reasoning levels, since the loop requests none.
 

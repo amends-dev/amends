@@ -90,11 +90,12 @@ again days later, and requests not yet handled are kept however old.
 
 ## Running a turn
 
-`TurnRunner.layer({ harnesses, models })` provides a runner over `Gateway.Service` and
-`Crypto.Crypto`. `harnesses` are the harnesses the host runs in process, found by name, and
-`models` the model inference code behind its connections, found by implementation ID. A harness
-here takes Effect AI's `LanguageModel`, which the connection's implementation builds from the
-connection's settings and key.
+`TurnRunner.layer({ models })` provides a runner over `Gateway.Service` and the
+[environment](../environment/README.md) service. `models` is the model inference code behind the
+host's connections, found by implementation ID: the runner measures a turn against its model's
+limits, writes checkpoint summaries with it, and hands it to the environment, which builds a
+session's Effect AI model access from it and the connection's settings and key. The harnesses the
+host runs are the environment service's.
 
 `run(workspaceId, turnId)` takes the turn from where its last commit left it. It loops: prepare
 the turn, decide the next step from what preparing read alone, perform it, and prepare again,
@@ -102,11 +103,11 @@ until the turn ends. The pieces, each in its own module:
 
 | Module                             | What it does                                                                                                                                  |
 | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `runner.ts`                        | The loop, and `abandon`.                                                                                                                      |
+| `runner.ts`                        | The loop, the run's environment, and `abandon`.                                                                                               |
 | `next-step.ts`                     | `NextStep.decide`, a pure function from a preparation to the next step: done, confirm a stop, fail, give up, start, rest, summarize, or work. |
 | `turn-steps.ts`                    | The commits a run makes for its turn through the gateway, as `turnSteps.prepare`, `turnSteps.close`, and the rest.                            |
 | `attempt.ts`                       | One attempt: recorded, raced against the turn being asked to stop, its failure recorded as an interruption that says what comes next.         |
-| `session.ts`                       | A harness session: spawn, continue the conversation, give the harness its input, record until idle, then close or take more input.            |
+| `session.ts`                       | A harness session: start it, continue the conversation, give the harness its input, record until idle, then close or take more input.         |
 | `checkpoint.ts`                    | A summary of older history, recorded as the turn's checkpoint.                                                                                |
 | `drafts.ts`                        | Text still being written, shown to readers as drafts.                                                                                         |
 | `settings.ts`, `context-budget.ts` | The runner's options and defaults; how much of its model's context a turn may use.                                                            |
@@ -117,8 +118,8 @@ holding the workspace only while it runs:
 1. `prepare` the turn. A finished turn is left as it is, one asked to stop is confirmed
    stopped (`confirmStopped`), and one whose agent, connection, key, or environment is gone is failed with the
    reason `prepare` gives.
-2. Fail the turn if its environment has a sandbox, its harness is not among `harnesses`, or its
-   connection's implementation is not among `models`. Otherwise `start` a queued turn with the
+2. Fail the turn if its connection's implementation is not among `models`. Otherwise `start` a
+   queued turn with the
    model access and environment it prepared with, which records them with the agent's
    instructions in the agent's log, and prepare again, since starting a participation's first turn
    records the thread's history there first.
@@ -136,19 +137,23 @@ holding the workspace only while it runs:
    worth, each reading the summary so far, and the run prepares again. A pass that fails or stays silent past
    `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
    turn; nothing is left out instead.
-5. Spawn the environment with a new session ID, the instructions the turn started with, and the
-   turn's budget as the session's context limit, with what a provider measured of the transcript,
-   and prepare the harness with the transcript `prepare` gave, read from the agent's log for the thread, so a run
-   continuing an interrupted turn repeats no input and asks for a fresh response in place of one
-   left unfinished.
+5. For the run's first session, spawn the turn's environment, acquiring the one its log last
+   recorded, and record what was acquired (`recordEnvironment`): the environment's reference and
+   where its files came from. A harness or sandbox provider the environment service lacks fails
+   the turn, as does any other spawn failure. The run releases the environment, applying its
+   retention, once the turn ends; a run cut short leaves it for the next run to acquire. Then start
+   a harness session in it with the turn's model access, the instructions the turn started with,
+   and the turn's budget as the session's context limit, with what a provider measured of the
+   transcript, and prepare the harness with the transcript `prepare` gave, read from the agent's log
+   for the thread, so a run continuing an interrupted turn repeats no input and asks for a fresh
+   response in place of one left unfinished.
 6. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
    what it accepted from the thread, as one batch recorded first (`recordSubmission`). A batch is named
    by its turn and the positions it follows and reaches, and its first record stands: submitting
    the same input again after a restart hands the harness the batch as recorded. Without new input, `resume` a conversation that awaits
    a response.
-7. Record what the environment and its harness report (`recordEvents`) until the harness is idle: each completed
-   block, finished response, tool start and result, and the environment becoming ready; text and
-   reasoning deltas are not recorded. Text deltas are shown to the thread's readers instead, as
+7. Record what the harness reports (`recordEvents`) until it is idle: each completed block,
+   finished response, tool start and result; text and reasoning deltas are not recorded. Text deltas are shown to the thread's readers instead, as
    drafts: at most every 150 milliseconds, each block's new text in pieces of up to 1,500
    characters, at the offset it continues. A block that completes first replaces its draft, and a
    draft that fails is not retried. Then `close` the turn, which publishes the replies it owes. When closing finds

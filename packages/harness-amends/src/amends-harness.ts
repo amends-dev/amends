@@ -24,22 +24,13 @@ import {
 import { type HarnessEvent } from "@amends/harness";
 import { AmendsPrompt } from "./prompt.ts";
 
-/** Amends's own harness: an agent loop run in process through Effect AI. */
-export const name = Harness.Name.make("amends");
-
-/**
- * The loop keeps no state beyond its transcript, so it continues any valid transcript, and a call
- * an earlier session left pending waits for its result.
- */
-export const capabilities: Harness.Capabilities = { transcript: true, pendingToolCalls: true };
-
 /**
  * What a host registers: the loop runs in process, over the Effect AI model a connection's
  * implementation supplies, so any model connection the host installed works. Running it inside a
  * sandbox, and reasoning levels, are not supported yet.
  */
-export const declaration: HarnessImplementation.Declaration = {
-  id: name,
+const declaration: HarnessImplementation.Declaration = {
+  id: Harness.Name.make("amends"),
   name: "Amends",
   description: "Amends's own agent loop, over the model a connection provides.",
   placement: ["in-process"],
@@ -567,13 +558,15 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
 });
 
 /**
- * The amends harness. Its sessions use the `LanguageModel` in their environment, which the
- * environment builds from the agent's model connection and selection.
+ * Amends's own harness: an agent loop run in process through Effect AI. Its sessions use the
+ * `LanguageModel` in their environment, which the environment builds from the agent's model
+ * connection and selection. The loop keeps no state beyond its transcript, so it continues any
+ * valid transcript, and a call an earlier session left pending waits for its result.
  */
-export const make = (): Harness.Interface<LanguageModel.LanguageModel> => ({
-  name,
-  capabilities,
+export const harness: Harness.Interface<LanguageModel.LanguageModel> = {
+  declaration,
+  capabilities: { transcript: true, pendingToolCalls: true },
   start,
-});
+};
 
 export * as AmendsHarness from "./amends-harness.ts";

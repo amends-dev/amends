@@ -52,13 +52,15 @@ currently run through TypeScript. Check compatibility before changing this setup
   `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`.
   `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
-  `environment` composes a harness with an optional sandbox into a running environment.
+  `environment` runs the environments a workspace stores: it finds the harness and sandbox provider
+  a host installed, spawns and releases the runtime, and starts harness sessions in it with a turn's
+  model access.
   `cluster` runs jobs, the work outside requests, on Effect Cluster: an agent job for each agent,
   which accepts its work and stops its departed turns, and a turn job for each turn, entities whose
   requests a commit stores, with their retries and pruning. Jobs enter workspaces through the
-  gateway like any other caller. Its turn runner prepares each turn from core, spawns its environment with the
-  agent's model access, records what the harness reports, and closes it; hosts pass in the
-  harnesses and model code they install.
+  gateway like any other caller. Its turn runner prepares each turn from core, spawns the turn's environment once per run and
+  starts a harness session in it for each attempt, records what the harness reports, and closes it;
+  hosts install their harnesses through the environment service and pass the runner their model code.
   `connection` is the contract connection implementations fulfil: the declaration a host
   registers in its catalog, and each capability's code, such as model inference.
 - `adapters/*`: implementations of gateway contracts over one external system, with

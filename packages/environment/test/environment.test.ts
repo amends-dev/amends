@@ -1,19 +1,21 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Stream } from "effect";
-import { LanguageModel } from "effect/ai";
-import type { AiError, Response } from "effect/ai";
+import { Crypto, Effect, Layer, Stream } from "effect";
+import { LanguageModel, Model } from "effect/ai";
+import type { AiError, Prompt, Response } from "effect/ai";
+import { ConnectionImplementation } from "@amends/connection";
+import type { ModelInference } from "@amends/connection/model-inference";
 import { Environment, EnvironmentErrors } from "@amends/environment";
-import { HarnessEvent, Transcript } from "@amends/harness";
-import { type HarnessTool } from "@amends/harness";
+import { HarnessEvent } from "@amends/harness";
+import type { Harness } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { SandboxErrors } from "@amends/sandbox";
 import type { Sandbox } from "@amends/sandbox";
 
 type Script = Stream.Stream<Response.StreamPartEncoded, AiError.AiError>;
 
-/** A model that answers each request with the next script and keeps every prompt. */
+/** A connection's model code whose model answers each request with the next script. */
 const scripted = Effect.fnUntraced(function* (scripts: ReadonlyArray<Script>) {
-  const prompts: Array<unknown> = [];
+  const prompts: Array<Prompt.Prompt> = [];
   const model = yield* LanguageModel.make({
     generateText: () => Effect.die(new Error("The harness streams.")),
     streamText: (options) =>
@@ -22,7 +24,31 @@ const scripted = Effect.fnUntraced(function* (scripts: ReadonlyArray<Script>) {
         return scripts[prompts.length - 1] ?? Stream.die(new Error("No script left."));
       }),
   });
-  return { model, prompts };
+  const inference: ModelInference.Implementation = {
+    declaration: ConnectionImplementation.Declaration.make({
+      id: ConnectionImplementation.Id.make("test"),
+      name: "Test",
+      description: "Scripted answers.",
+      capabilities: { modelInference: { interface: "test" } },
+      settings: [],
+      authentication: [{ _tag: "None" }],
+    }),
+    languageModel: () =>
+      Layer.mergeAll(
+        Layer.succeed(LanguageModel.LanguageModel, model),
+        Layer.succeed(Model.ProviderName, "test"),
+        Layer.succeed(Model.ModelName, "test-model"),
+      ),
+    limits: () => ({ contextTokens: 100_000, outputTokens: undefined }),
+  };
+  const session: Environment.SessionOptions = {
+    model: {
+      inference,
+      access: { settings: {}, credential: undefined },
+      selection: { model: "m" },
+    },
+  };
+  return { session, prompts };
 });
 
 const reply = (text: string): Script =>
@@ -46,8 +72,8 @@ interface FakeSandbox {
 }
 
 /**
- * An in-memory sandbox provider recording what the environment asks of it. `exec` answers with
- * `results[argv[0]]`, or success.
+ * An in-memory sandbox provider recording what the environment asks of it. `exec` answers a shell
+ * command with `results[command]`, or success.
  */
 const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
   const sandboxes = new Map<string, FakeSandbox>();
@@ -61,8 +87,9 @@ const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
       workdir: "/work",
       exec: (command) =>
         Effect.sync(() => {
-          calls.push(`exec ${id} ${command.argv.join(" ")}`);
-          return results[command.argv[0]] ?? { exitCode: 0, stdout: "", stderr: "" };
+          const shell = command.argv.at(-1) ?? "";
+          calls.push(`exec ${id} ${shell}`);
+          return results[shell] ?? { exitCode: 0, stdout: "", stderr: "" };
         }),
       spawn: () => Effect.die(new Error("unused")),
       expose: () => Effect.die(new Error("unused")),
@@ -113,149 +140,129 @@ const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
   return { provider, sandboxes, calls };
 };
 
-const inProcess: Environment.Definition<LanguageModel.LanguageModel> = {
-  id: Environment.DefinitionId.make("in-process"),
-  harness: AmendsHarness.make(),
-};
-
-const withSandbox = (
-  provider: Sandbox.Provider,
-  retention: Environment.Retention,
-  setup: ReadonlyArray<Sandbox.Command> = [],
-): Environment.Definition<LanguageModel.LanguageModel> => ({
-  id: Environment.DefinitionId.make("sandboxed"),
-  harness: AmendsHarness.make(),
-  sandbox: { provider, retention, setup },
+const crypto = Crypto.make({
+  randomBytes: (size) => globalThis.crypto.getRandomValues(new Uint8Array(size)),
+  digest: () => Effect.die(new Error("Unexpected digest")),
 });
 
-const untilIdle = (running: Environment.Running) =>
-  running.events.pipe(
-    Stream.takeUntil(
-      (event) =>
-        Environment.Event.isAnyOf(["Harness"])(event) &&
-        HarnessEvent.Event.isAnyOf(["Idle"])(event.event),
-    ),
-    Stream.runCollect,
+/** The environments a host with amends's harness and these sandbox providers spawns. */
+const environments = (sandboxes: ReadonlyArray<Sandbox.Provider> = []) =>
+  Environment.make({ harnesses: [AmendsHarness.harness], sandboxes }).pipe(
+    Effect.provideService(Crypto.Crypto, crypto),
   );
 
-const harnessEvents = (events: ReadonlyArray<Environment.Event>) =>
-  events.flatMap((event) => (Environment.Event.isAnyOf(["Harness"])(event) ? [event.event] : []));
+const inProcess: Environment.Definition = { id: "in-process", harnessId: "amends", sandbox: null };
+
+const withSandbox = (
+  retention: Environment.Retention,
+  setup: ReadonlyArray<string> = [],
+): Environment.Definition => ({
+  id: "sandboxed",
+  harnessId: "amends",
+  sandbox: { providerId: "fake", template: null, env: {}, setup, retention },
+});
+
+const untilIdle = (session: Harness.Session) =>
+  session.events.pipe(Stream.takeUntil(HarnessEvent.Event.isAnyOf(["Idle"])), Stream.runCollect);
 
 describe("Environment.spawn", () => {
-  it.effect("runs in process: ready first, then history, input, and release", () =>
+  it.effect("runs in process: a session per call, with the turn's model access", () =>
     Effect.gen(function* () {
-      const { model } = yield* scripted([reply("Hello")]);
-      const running = yield* Environment.spawn(inProcess, { sessionId: "s1" }).pipe(
-        Effect.provideService(LanguageModel.LanguageModel, model),
-      );
+      const { session, prompts } = yield* scripted([reply("Hello")]);
+      const service = yield* environments();
+      const running = yield* service.spawn(inProcess);
       expect(running.reference).toEqual({ definitionId: "in-process" });
-      expect(running.acquisition).toEqual({
-        filesystem: { _tag: "None" },
-        harness: "needs-setup",
-      });
+      expect(running.filesystem).toEqual({ _tag: "None" });
       expect(yield* running.snapshot.pipe(Effect.flip)).toBeInstanceOf(SandboxErrors.Unsupported);
 
-      yield* running.prepare([]);
-      yield* running.submit(batch("b1", "Hi"));
-      const events = yield* untilIdle(running);
-      expect(events[0]).toEqual({
-        _tag: "Environment",
-        event: { _tag: "Ready", reference: running.reference, acquisition: running.acquisition },
-      });
-      expect(harnessEvents(events).map((event) => event._tag)).toEqual([
+      const harness = yield* running.startSession({ ...session, instructions: "Be brief." });
+      yield* harness.prepare([]);
+      yield* harness.submit(batch("b1", "Hi"));
+      const events = yield* untilIdle(harness);
+      expect(events.map((event) => event._tag)).toEqual([
         "InputIncorporated",
         "TextDelta",
         "BlockCompleted",
         "ResponseFinished",
         "Idle",
       ]);
+      expect(events[3]).toMatchObject({ model: { provider: "test", model: "test-model" } });
+      expect(prompts[0]?.content[0]).toMatchObject({ role: "system", content: "Be brief." });
+      yield* running.release;
+    }),
+  );
 
-      yield* running.release;
-      expect(yield* Stream.runCollect(running.events)).toEqual([
-        { _tag: "Environment", event: { _tag: "Released" } },
-      ]);
-      yield* running.release;
-      expect(yield* running.submit(batch("b2", "More")).pipe(Effect.flip)).toBeInstanceOf(
-        EnvironmentErrors.Released,
+  it.effect("refuses a harness or sandbox provider this host did not install", () =>
+    Effect.gen(function* () {
+      const service = yield* environments();
+      expect(
+        yield* service.spawn({ ...inProcess, harnessId: "elsewhere" }).pipe(Effect.flip),
+      ).toEqual(new EnvironmentErrors.HarnessUnavailable({ harnessId: "elsewhere" }));
+      expect(yield* service.spawn(withSandbox("stop")).pipe(Effect.flip)).toEqual(
+        new EnvironmentErrors.SandboxUnavailable({ providerId: "fake" }),
       );
     }),
   );
 
   it.effect("cannot restore a snapshot into an environment without a sandbox", () =>
     Effect.gen(function* () {
-      const { model } = yield* scripted([]);
-      const failure = yield* Environment.spawn(inProcess, {
-        sessionId: "s1",
-        restore: { provider: "fake", id: "snapshot-0" },
-      }).pipe(Effect.provideService(LanguageModel.LanguageModel, model), Effect.flip);
+      const service = yield* environments();
+      const failure = yield* service
+        .spawn(inProcess, { restore: { provider: "fake", id: "snapshot-0" } })
+        .pipe(Effect.flip);
       expect(failure).toBeInstanceOf(SandboxErrors.SnapshotUnavailable);
     }),
   );
 
   it.effect("runs setup in its sandbox before the harness starts, and stops it on release", () =>
     Effect.gen(function* () {
-      const { model } = yield* scripted([]);
       const fake = fakeProvider();
-      const definition = withSandbox(fake.provider, "stop", [
-        { argv: ["install", "tools"] },
-        { argv: ["init"] },
-      ]);
-      const running = yield* Environment.spawn(definition, { sessionId: "s1" }).pipe(
-        Effect.provideService(LanguageModel.LanguageModel, model),
-      );
+      const service = yield* environments([fake.provider]);
+      const running = yield* service.spawn(withSandbox("stop", ["install tools", "init"]));
       expect(running.reference).toEqual({ definitionId: "sandboxed", sandboxId: "sandbox-0" });
-      expect(running.acquisition.filesystem).toEqual({ _tag: "Fresh" });
+      expect(running.filesystem).toEqual({ _tag: "Fresh" });
       expect(fake.calls).toEqual(["exec sandbox-0 install tools", "exec sandbox-0 init"]);
 
-      const snapshot = yield* running.snapshot;
       yield* running.release;
-      expect(fake.calls.at(-1)).toBe("stop sandbox-0");
+      yield* running.release;
+      expect(fake.calls.filter((call) => call === "stop sandbox-0")).toHaveLength(1);
       expect(fake.sandboxes.get("sandbox-0")?.status).toBe("stopped");
-      expect(yield* Stream.runCollect(running.events)).toEqual([
-        { _tag: "Environment", event: expect.objectContaining({ _tag: "Ready" }) },
-        { _tag: "Environment", event: { _tag: "SnapshotTaken", snapshot } },
-        { _tag: "Environment", event: { _tag: "Released" } },
-      ]);
     }),
   );
 
   it.effect("reports whether it retained, restored, or replaced the sandbox asked for", () =>
     Effect.gen(function* () {
-      const { model } = yield* scripted([]);
       const fake = fakeProvider();
-      const spawn = (
-        definition: Environment.Definition<LanguageModel.LanguageModel>,
-        options: Omit<Environment.SpawnOptions, "sessionId">,
-      ) =>
-        Environment.spawn(definition, { sessionId: "s", ...options }).pipe(
-          Effect.provideService(LanguageModel.LanguageModel, model),
-        );
-      const keep = withSandbox(fake.provider, "stop", [{ argv: ["init"] }]);
-      const first = yield* spawn(keep, {});
+      const service = yield* environments([fake.provider]);
+      const keep = withSandbox("stop", ["init"]);
+      const first = yield* service.spawn(keep);
       const snapshot = yield* first.snapshot;
       yield* first.release;
 
-      const retained = yield* spawn(keep, { reacquire: first.reference });
+      const retained = yield* service.spawn(keep, { reacquire: first.reference });
       expect(retained.reference).toEqual(first.reference);
-      expect(retained.acquisition).toEqual({
-        filesystem: { _tag: "Retained" },
-        harness: "needs-setup",
-      });
+      expect(retained.filesystem).toEqual({ _tag: "Retained" });
       expect(fake.calls.filter((call) => call === "exec sandbox-0 init")).toHaveLength(2);
 
-      const discard = withSandbox(fake.provider, "destroy");
-      const destroyed = yield* spawn(discard, {
-        reacquire: { definitionId: discard.id, sandboxId: first.reference.sandboxId! },
+      const discard = withSandbox("destroy");
+      const destroyed = yield* service.spawn(discard, {
+        reacquire: {
+          definitionId: Environment.DefinitionId.make(discard.id),
+          sandboxId: first.reference.sandboxId!,
+        },
       });
       yield* destroyed.release;
       expect(fake.sandboxes.has("sandbox-0")).toBe(false);
 
-      const restored = yield* spawn(keep, { reacquire: first.reference, restore: snapshot });
-      expect(restored.acquisition.filesystem).toEqual({ _tag: "Restored", snapshot });
+      const restored = yield* service.spawn(keep, {
+        reacquire: first.reference,
+        restore: snapshot,
+      });
+      expect(restored.filesystem).toEqual({ _tag: "Restored", snapshot });
       expect(restored.reference.sandboxId).not.toBe(first.reference.sandboxId);
 
-      const fresh = yield* spawn(keep, { reacquire: first.reference });
-      expect(fresh.acquisition.filesystem).toEqual({ _tag: "Fresh" });
+      const fresh = yield* service.spawn(keep, { reacquire: first.reference });
+      expect(fresh.filesystem).toEqual({ _tag: "Fresh" });
     }),
   );
 
@@ -263,17 +270,15 @@ describe("Environment.spawn", () => {
     "fails the spawn when setup fails, destroying a new sandbox but not a reacquired one",
     () =>
       Effect.gen(function* () {
-        const { model } = yield* scripted([]);
-        const fake = fakeProvider({ broken: { exitCode: 2, stdout: "", stderr: "no such tool" } });
-        const spawn = (options: Omit<Environment.SpawnOptions, "sessionId">) =>
-          Environment.spawn(withSandbox(fake.provider, "stop", [{ argv: ["broken", "--flag"] }]), {
-            sessionId: "s",
-            ...options,
-          }).pipe(Effect.provideService(LanguageModel.LanguageModel, model), Effect.flip);
+        const fake = fakeProvider({
+          "broken --flag": { exitCode: 2, stdout: "", stderr: "no such tool" },
+        });
+        const service = yield* environments([fake.provider]);
+        const definition = withSandbox("stop", ["broken --flag"]);
 
-        expect(yield* spawn({})).toEqual(
+        expect(yield* service.spawn(definition).pipe(Effect.flip)).toEqual(
           new EnvironmentErrors.SetupFailed({
-            argv: ["broken", "--flag"],
+            command: "broken --flag",
             exitCode: 2,
             stdout: "",
             stderr: "no such tool",
@@ -282,12 +287,14 @@ describe("Environment.spawn", () => {
         expect(fake.calls.at(-1)).toBe("destroy sandbox-0");
 
         fake.sandboxes.set("kept", { files: new Map(), status: "stopped" });
-        yield* spawn({
-          reacquire: {
-            definitionId: Environment.DefinitionId.make("sandboxed"),
-            sandboxId: "kept" as Sandbox.Id,
-          },
-        });
+        yield* service
+          .spawn(definition, {
+            reacquire: {
+              definitionId: Environment.DefinitionId.make(definition.id),
+              sandboxId: "kept" as Sandbox.Id,
+            },
+          })
+          .pipe(Effect.flip);
         expect(fake.calls.at(-1)).toBe("stop kept");
         expect(fake.sandboxes.has("kept")).toBe(true);
       }),
@@ -295,67 +302,50 @@ describe("Environment.spawn", () => {
 
   it.effect("refuses to reacquire another definition's running environment", () =>
     Effect.gen(function* () {
-      const { model } = yield* scripted([]);
-      const failure = yield* Environment.spawn(inProcess, {
-        sessionId: "s1",
-        reacquire: { definitionId: Environment.DefinitionId.make("elsewhere") },
-      }).pipe(Effect.provideService(LanguageModel.LanguageModel, model), Effect.flip);
+      const service = yield* environments();
+      const failure = yield* service
+        .spawn(inProcess, {
+          reacquire: { definitionId: Environment.DefinitionId.make("elsewhere") },
+        })
+        .pipe(Effect.flip);
       expect(failure).toEqual(
         new EnvironmentErrors.ForeignReference({ definitionId: "elsewhere" }),
       );
     }),
   );
 
-  it.effect("recovers by spawning again from the recorded reference and events", () =>
+  it.effect("continues in a reacquired sandbox from the events a session recorded", () =>
     Effect.gen(function* () {
-      const lookup: HarnessTool.Tools = {
-        definitions: [{ name: "lookup", parameters: { type: "object" } }],
-        invoke: () => Effect.succeed({ isError: false, content: [{ _tag: "Text", text: "noon" }] }),
-      };
       const fake = fakeProvider();
-      const definition = withSandbox(fake.provider, "stop");
-      const first = yield* scripted([
-        Stream.fromIterable([
-          { type: "tool-call", id: "c1", name: "lookup", params: {} },
-          { type: "finish", reason: "tool-calls", usage: { inputTokens: {}, outputTokens: {} } },
-        ]),
-      ]);
-      const interrupted = yield* Environment.spawn(definition, {
-        sessionId: "s1",
-        tools: lookup,
-      }).pipe(Effect.provideService(LanguageModel.LanguageModel, first.model));
-      yield* interrupted.prepare([]);
-      yield* interrupted.submit(batch("b1", "When is high tide?"));
-      const recorded: Array<Environment.Event> = [];
-      yield* interrupted.events.pipe(
-        Stream.runForEach((event) => Effect.sync(() => recorded.push(event))),
-        Effect.ignore,
+      const service = yield* environments([fake.provider]);
+      const definition = withSandbox("stop");
+      const first = yield* scripted([reply("High tide is at noon.")]);
+      const earlier = yield* service.spawn(definition);
+      const recorded = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const harness = yield* earlier.startSession(first.session);
+          yield* harness.prepare([]);
+          yield* harness.submit(batch("b1", "When is high tide?"));
+          return yield* untilIdle(harness);
+        }),
       );
-      yield* interrupted.release;
+      yield* earlier.release;
 
-      const second = yield* scripted([reply("High tide is at noon.")]);
-      const recovered = yield* Environment.spawn(definition, {
-        sessionId: "s2",
-        reacquire: interrupted.reference,
-        tools: lookup,
-      }).pipe(Effect.provideService(LanguageModel.LanguageModel, second.model));
-      expect(recovered.acquisition.filesystem).toEqual({ _tag: "Retained" });
-      const transcript = HarnessEvent.transcript(harnessEvents(recorded));
-      expect(transcript.map((item) => item._tag)).toEqual(["Input", "Response", "ToolResult"]);
-      yield* recovered.prepare(transcript);
-      yield* recovered.resume;
-      const events = harnessEvents(yield* untilIdle(recovered));
-      expect(events.slice(-3, -1)).toMatchObject([
-        {
-          _tag: "BlockCompleted",
-          responseId: "s2/1",
-          block: { _tag: "Text", text: "High tide is at noon." },
-        },
-        { _tag: "ResponseFinished", responseId: "s2/1" },
-      ]);
-      expect(Transcript.summarize(HarnessEvent.transcript(events, transcript))).toMatchObject({
-        success: { pending: [], awaitsResponse: false },
-      });
+      const second = yield* scripted([reply("Low tide is at six.")]);
+      const later = yield* service.spawn(definition, { reacquire: earlier.reference });
+      expect(later.filesystem).toEqual({ _tag: "Retained" });
+      const harness = yield* later.startSession(second.session);
+      yield* harness.prepare(HarnessEvent.transcript(recorded));
+      yield* harness.submit(batch("b2", "And low tide?"));
+      yield* untilIdle(harness);
+      // The later session's model reads the earlier exchange before the new question.
+      expect(
+        second.prompts[0]?.content.map((message) =>
+          typeof message.content === "string"
+            ? message.content
+            : message.content.map((part) => (part.type === "text" ? part.text : "")).join(""),
+        ),
+      ).toEqual(["Alice: When is high tide?", "High tide is at noon.", "Alice: And low tide?"]);
     }),
   );
 });

@@ -97,6 +97,8 @@ export interface Plan {
     readonly credential: Redacted.Redacted<string> | undefined;
   };
   readonly environment: Environment.Record;
+  /** The running environment the turn's latest attempt worked in, to acquire again. */
+  readonly reacquire: EnvironmentRuntime.Reference | undefined;
   /**
    * What the turn continues from, before its own work, read from its agent's log for the thread
    * since the latest checkpoint; for the first turn there, the thread's messages before its input.
@@ -224,12 +226,23 @@ export interface Interface {
     },
   ) => Effect.Effect<readonly [Transcript.Input, ...Array<Transcript.Input>], Error>;
   /**
-   * Record what the environment and its harness reported, in order. A batch the harness says it
-   * took in must be one submitted, as it was recorded; it counts as taken in from then on.
+   * Record what the harness reported, in order. A batch the harness says it took in must be one
+   * submitted, as it was recorded; it counts as taken in from then on.
    */
   readonly recordEvents: (
     turnId: Turn.Id,
-    events: ReadonlyArray<EnvironmentRuntime.Event>,
+    events: ReadonlyArray<HarnessEvent.Event>,
+  ) => Effect.Effect<void, Error>;
+  /**
+   * Record the running environment an attempt works in, as spawning acquired it, so a later attempt
+   * acquires the same one again.
+   */
+  readonly recordEnvironment: (
+    turnId: Turn.Id,
+    acquired: {
+      readonly reference: EnvironmentRuntime.Reference;
+      readonly filesystem: EnvironmentRuntime.Filesystem;
+    },
   ) => Effect.Effect<void, Error>;
   /**
    * Show the turn's readers more of a response before it completes, as a signal: nothing is
@@ -523,6 +536,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         credential,
       },
       environment: environment.value,
+      reacquire: context.own.environment,
       history,
       transcript,
       pending:
@@ -679,36 +693,43 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const recordEvents = Effect.fn("TurnExecution.recordEvents")(function* (
     turnId: Turn.Id,
-    events: ReadonlyArray<EnvironmentRuntime.Event>,
+    events: ReadonlyArray<HarnessEvent.Event>,
   ) {
     yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* requireStatus(turn, ["running", "cancelling"]);
         // Input the harness took in is a batch execution submitted, exactly as recorded.
         for (const event of events) {
-          if (
-            !EnvironmentRuntime.Event.isAnyOf(["Harness"])(event) ||
-            !HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event.event)
-          )
-            continue;
-          const recorded = yield* findSubmittedBatch(turn, event.event.batch.id);
+          if (!HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event)) continue;
+          const recorded = yield* findSubmittedBatch(turn, event.batch.id);
           if (recorded === undefined)
             return yield* new InvalidResponse({
               message: "Incorporated input was never submitted",
             });
-          if (!sameInput(recorded.items, event.event.batch.items))
+          if (!sameInput(recorded.items, event.batch.items))
             return yield* new InvalidResponse({
               message: "The harness took in other input than it was given",
             });
         }
         if (events.length > 0)
           yield* openAgentLog(turn).appendAll(
-            events.map((event): TurnLog.Entry =>
-              EnvironmentRuntime.Event.isAnyOf(["Harness"])(event)
-                ? { _tag: "Harness", turnId: turn.id, event: event.event }
-                : { _tag: "Environment", turnId: turn.id, event: event.event },
-            ),
+            events.map((event): TurnLog.Entry => ({ _tag: "Harness", turnId: turn.id, event })),
           );
+      }),
+    );
+  });
+
+  const recordEnvironment = Effect.fn("TurnExecution.recordEnvironment")(function* (
+    turnId: Turn.Id,
+    acquired: {
+      readonly reference: EnvironmentRuntime.Reference;
+      readonly filesystem: EnvironmentRuntime.Filesystem;
+    },
+  ) {
+    yield* runAsAgent(turnId)((turn) =>
+      Effect.gen(function* () {
+        yield* requireStatus(turn, ["running", "cancelling"]);
+        yield* openAgentLog(turn).append({ _tag: "Environment", turnId: turn.id, ...acquired });
       }),
     );
   });
@@ -894,6 +915,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     recordCheckpoint,
     recordSubmission,
     recordEvents,
+    recordEnvironment,
     showDraft,
     recordInterruption,
     readEntries,

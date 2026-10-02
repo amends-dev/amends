@@ -22,6 +22,9 @@ export interface Limits {
   readonly outputTokens: number | undefined;
 }
 
+/** Effect AI's model access: the model, and the names of its provider and model. */
+export type Services = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName;
+
 /**
  * The code behind an implementation with model inference support. It turns a connection's access
  * and an agent's selection into Effect AI model access, which a harness such as amends's own uses,
@@ -30,10 +33,7 @@ export interface Limits {
  */
 export interface Implementation {
   readonly declaration: ConnectionImplementation.Declaration;
-  readonly languageModel: (
-    access: Access,
-    selection: Selection,
-  ) => Layer.Layer<LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName>;
+  readonly languageModel: (access: Access, selection: Selection) => Layer.Layer<Services>;
   readonly limits: (access: Access, selection: Selection) => Limits;
 }
 

@@ -61,7 +61,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   models, but the compatibility check accepts any model name, and nothing checks one with its
   provider.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
-  sandboxes outside tests. No harness runs inside a sandbox yet, and an environment's retention
+  sandboxes outside tests. No harness runs inside a sandbox yet ([harnesses in sandboxes](sandbox-harnesses.md)
+  plans it), and the environment service the host composes installs no sandbox provider, so a
+  sandbox environment's turn fails once it starts. An environment's retention
   can only stop or destroy its sandbox, so no harness context survives a release. Environments
   do not yet supply the MCP endpoint or a turn's credentials. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
   is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes

@@ -28,7 +28,7 @@ remaining gaps with links to their owning code.
 | [Connection](../packages/connection/README.md)                                     | The connection implementation contract: declarations for a host's catalog, and model inference.                     |
 | [Anthropic connection](../adapters/connection-anthropic/README.md)                 | Anthropic model connections over Effect AI.                                                                         |
 | [OpenAI-compatible connection](../adapters/connection-openai-compatible/README.md) | Chat-completions model connections, such as OpenAI, OpenRouter, or a local server.                                  |
-| [Environment](../packages/environment/README.md)                                   | Spawning a harness with a sandbox, acquisition outcomes, snapshots, and release.                                    |
+| [Environment](../packages/environment/README.md)                                   | Running stored environments: installed harnesses and sandboxes, spawning, sessions, and release.                    |
 | [Cluster](../packages/cluster/README.md)                                           | Work outside requests on Effect Cluster: agent jobs, turn jobs that run agents' turns, retries, and pruning.        |
 | [Sandbox](../packages/sandbox/README.md)                                           | The sandbox provider contract: acquisition, commands, processes, ports, files, and snapshots.                       |
 | [Sandbox conformance](../packages/sandbox-conformance/README.md)                   | Test suites every sandbox provider runs, and the harness a provider supplies.                                       |
@@ -60,6 +60,8 @@ drawings, generation, and visual review in the UI workshop.
   model-connection detour.
   [Turns](turns.md) covers agents' turns in threads, where agents are at work, and turn logs.
   [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
+  [Harnesses in sandboxes](sandbox-harnesses.md) plans running agents' harnesses inside sandboxes,
+  its goal, and its milestones.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not

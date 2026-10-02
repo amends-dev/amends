@@ -204,8 +204,6 @@ const batch = (id: string, text: string) => ({
   items: [input(text)] as const,
 });
 /** Harness events as execution reports them, in the environment's envelope. */
-const reported = (...events: ReadonlyArray<HarnessEvent.Event>) =>
-  events.map((event) => ({ _tag: "Harness" as const, event }));
 const took = (taken: HarnessEvent.InputBatch): HarnessEvent.Event => ({
   _tag: "InputIncorporated",
   batch: taken,
@@ -331,10 +329,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      turnId,
-                      reported(took(first), ...answered("r1", "An early answer.")),
-                    );
+                    yield* turnExecution.recordEvents(turnId, [
+                      took(first),
+                      ...answered("r1", "An early answer."),
+                    ]);
                   }),
                 ),
               );
@@ -367,10 +365,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: more.activity.sequence,
                       items: second.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      turnId,
-                      reported(took(second), ...answered("r2", "The plan, with its risks.")),
-                    );
+                    yield* turnExecution.recordEvents(turnId, [
+                      took(second),
+                      ...answered("r2", "The plan, with its risks."),
+                    ]);
                     return yield* turnExecution.close(turnId);
                   }),
                 ),
@@ -501,7 +499,7 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* turnExecution.recordEvents(turnId, reported(took(first)));
+                    yield* turnExecution.recordEvents(turnId, [took(first)]);
                   }),
                 );
                 expect(brief(yield* next)).toBe("changed 0:InputTaken");
@@ -521,10 +519,7 @@ export const turns = (harness: ConformanceHarness) => {
                 expect(brief(yield* late)).toBe("opened InputTaken");
                 expect(brief(yield* late)).toBe("drafted The ");
                 yield* run((turnExecution) =>
-                  turnExecution.recordEvents(
-                    turnId,
-                    reported(...answered("r1", "The plan is on track.")),
-                  ),
+                  turnExecution.recordEvents(turnId, answered("r1", "The plan is on track.")),
                 );
                 expect(brief(yield* next)).toBe("changed 1:The plan is on track. (reply)");
                 expect(brief(yield* late)).toBe("changed 1:The plan is on track. (reply)");
@@ -736,7 +731,7 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* turnExecution.recordEvents(queued!.id, reported(took(first)));
+                    yield* turnExecution.recordEvents(queued!.id, [took(first)]);
                     yield* turnExecution.fail(queued!.id, "The model provider is unavailable.");
                   }),
                 ),
@@ -818,10 +813,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: request.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      retried.id,
-                      reported(took(request), ...answered("r1", "The notes.")),
-                    );
+                    yield* turnExecution.recordEvents(retried.id, [
+                      took(request),
+                      ...answered("r1", "The notes."),
+                    ]);
                     yield* turnExecution.close(retried.id);
                   }),
                 ),
@@ -876,19 +871,16 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: asked.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      first!.id,
-                      reported(
-                        took(asked),
-                        {
-                          _tag: "BlockCompleted",
-                          responseId: Transcript.ResponseId.make("s1/1"),
-                          part: 0,
-                          block: reasoning,
-                        },
-                        ...answered("s1/1", "Thursday.", 1),
-                      ),
-                    );
+                    yield* turnExecution.recordEvents(first!.id, [
+                      took(asked),
+                      {
+                        _tag: "BlockCompleted",
+                        responseId: Transcript.ResponseId.make("s1/1"),
+                        part: 0,
+                        block: reasoning,
+                      },
+                      ...answered("s1/1", "Thursday.", 1),
+                    ]);
                     yield* turnExecution.close(first!.id);
                   }),
                 ),
@@ -935,15 +927,15 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: more.activity.sequence,
                       items: followUp.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      second!.id,
-                      reported(took(followUp), {
+                    yield* turnExecution.recordEvents(second!.id, [
+                      took(followUp),
+                      {
                         _tag: "BlockCompleted",
                         responseId: Transcript.ResponseId.make("s2/1"),
                         part: 0,
                         block: { _tag: "Text", text: "The rollback plan is" },
-                      }),
-                    );
+                      },
+                    ]);
                   }),
                 ),
               );
@@ -1019,10 +1011,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: last.activity.sequence,
                       items: dateOnly.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      third!.id,
-                      reported(took(dateOnly), ...answered("s3/1", "Thursday.")),
-                    );
+                    yield* turnExecution.recordEvents(third!.id, [
+                      took(dateOnly),
+                      ...answered("s3/1", "Thursday."),
+                    ]);
                     yield* turnExecution.close(third!.id);
                   }),
                 ),
@@ -1157,13 +1149,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: asked.activity.sequence,
                       items: took.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      first!.id,
-                      reported(
-                        { _tag: "InputIncorporated", batch: took },
-                        ...answered("s1/1", "Here is the summary."),
-                      ),
-                    );
+                    yield* turnExecution.recordEvents(first!.id, [
+                      { _tag: "InputIncorporated", batch: took },
+                      ...answered("s1/1", "Here is the summary."),
+                    ]);
                     yield* turnExecution.close(first!.id);
                   }),
                 ),

@@ -14,7 +14,7 @@ const Of = { turnId: TurnId.Id };
  * One entry of an agent's log for a thread, naming the turn that wrote it. Together the entries
  * are everything the agent did there: each turn's start and end, the input execution submitted,
  * with the timeline position it covers; each attempt to run it; what the harness reported, block
- * by block, whichever harness ran it and wherever; what the environment reported about itself;
+ * by block, whichever harness ran it and wherever; the running environment it worked in;
  * interruptions; input asked of a turn directly, such as a retry; the thread's history before the
  * first turn; and checkpoints that replace what came before.
  */
@@ -35,8 +35,11 @@ export const Entry = Schema.TaggedUnion({
   },
   /** An event the harness reported. */
   Harness: { ...Of, event: HarnessEvent.Event },
-  /** An event the environment reported about itself, such as becoming ready. */
-  Environment: { ...Of, event: Environment.Lifecycle },
+  /**
+   * The running environment an attempt works in, as spawning acquired it, and where its files came
+   * from; a later attempt acquires the same one again.
+   */
+  Environment: { ...Of, reference: Environment.Reference, filesystem: Environment.Filesystem },
   /**
    * Execution stopped before the turn finished, and why, in words and as a kind; a retryable stop
    * continues the same turn.
@@ -189,6 +192,8 @@ export interface Reading {
     | undefined;
   /** How the turn ended, once it has. */
   readonly ended: Ended | undefined;
+  /** The running environment the turn's latest attempt worked in, to acquire again. */
+  readonly environment: Environment.Reference | undefined;
   /** Where the latest checkpoint the turn recorded sits in the log. */
   readonly checkpoint: Log.Position | undefined;
   /**
@@ -236,6 +241,7 @@ export const reader = (): Reader => {
   let answer: Reply | undefined;
   let started: Reading["started"];
   let ended: Ended | undefined;
+  let environment: Environment.Reference | undefined;
   let checkpoint: Log.Position | undefined;
   let attempts = 0;
   let interruption: Interruption | undefined;
@@ -287,7 +293,9 @@ export const reader = (): Reader => {
         if (answer !== undefined) replies.push(answer);
         answer = undefined;
       },
-      Environment: () => undefined,
+      Environment: (entry) => {
+        environment = entry.reference;
+      },
       History: () => undefined,
       Harness: (entry) => {
         const event = entry.event;
@@ -359,6 +367,7 @@ export const reader = (): Reader => {
       ),
       started,
       ended,
+      environment,
       checkpoint,
       attempts,
       interruption,

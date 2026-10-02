@@ -1,6 +1,7 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
+import { Environment } from "@amends/environment";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
@@ -53,9 +54,12 @@ export interface Options {
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
 }
 
+/** The harnesses this host runs agents' turns with: amends's own, in process. */
+const harnesses = [AmendsHarness.harness];
+
 /**
  * What this host installs, as its catalogs declare them: model connections and a Daytona account;
- * amends's own harness; and sandboxes as local directories, for development, and on Daytona.
+ * its harnesses; and sandboxes as local directories, for development, and on Daytona.
  */
 export const installed = {
   connections: [
@@ -63,13 +67,12 @@ export const installed = {
     OpenAiCompatibleConnection.declaration,
     DaytonaConnection.declaration,
   ],
-  harnesses: [AmendsHarness.declaration],
+  harnesses: harnesses.map((harness) => harness.declaration),
   sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
 };
 
-/** The code that runs agents' turns: amends's harness in process, with either model connection. */
+/** The code that runs agents' turns with either model connection. */
 export const turnRunnerOptions: TurnRunner.Options = {
-  harnesses: [AmendsHarness.make()],
   models: [AnthropicConnection.modelInference, OpenAiCompatibleConnection.modelInference],
 };
 
@@ -119,7 +122,10 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
       prune: PostgresClusterStorage.prune,
       entityTypes: [AgentJob.entity.type, TurnJob.entity.type],
     }),
-    TurnJob.layerWorker.pipe(Layer.provide(TurnRunner.layer(turnRunnerOptions))),
+    TurnJob.layerWorker.pipe(
+      Layer.provide(TurnRunner.layer(turnRunnerOptions)),
+      Layer.provide(Environment.layer({ harnesses })),
+    ),
   ).pipe(
     Layer.provideMerge(
       Gateway.layer(installed).pipe(
