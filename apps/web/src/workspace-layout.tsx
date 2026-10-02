@@ -225,6 +225,8 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                 identity: session.session?.humanId ?? "",
                 appearance: appearance.preference(),
                 onAppearanceChange: appearance.setPreference,
+                palette: appearance.palette(),
+                onPaletteChange: appearance.setPalette,
                 onOpenSettings: () => navigate(path("settings")),
                 onChangeName: () => {
                   name.reset();

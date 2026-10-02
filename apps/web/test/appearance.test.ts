@@ -11,6 +11,10 @@ it("persists preference, follows media changes, and synchronizes external storag
   const source = createAppearanceSource();
   expect(source.read()).toBe("system");
   expect(source.system()).toBe("light");
+  expect(source.readPalette()).toBe("neutral");
+  source.writePalette("linen");
+  expect(localStorage.getItem("amends.palette")).toBe("linen");
+  expect(createAppearanceSource().readPalette()).toBe("linen");
   source.write("dark");
   expect(localStorage.getItem("amends.appearance")).toBe("dark");
   expect(createAppearanceSource().read()).toBe("dark");
@@ -28,9 +32,17 @@ it("persists preference, follows media changes, and synchronizes external storag
   expect(source.read()).toBe("light");
   localStorage.setItem("amends.appearance", "invalid");
   expect(source.read()).toBe("system");
+  localStorage.setItem("amends.palette", "sage");
+  window.dispatchEvent(
+    new StorageEvent("storage", { key: "amends.palette", storageArea: localStorage }),
+  );
+  expect(changed).toHaveBeenCalledTimes(3);
+  expect(source.readPalette()).toBe("sage");
+  localStorage.setItem("amends.palette", "invalid");
+  expect(source.readPalette()).toBe("neutral");
   stop();
   media.dispatchEvent(new Event("change"));
-  expect(changed).toHaveBeenCalledTimes(2);
+  expect(changed).toHaveBeenCalledTimes(3);
 });
 it("keeps appearance usable in memory when storage is blocked", () => {
   vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
@@ -43,4 +55,6 @@ it("keeps appearance usable in memory when storage is blocked", () => {
   expect(source.read()).toBe("system");
   source.write("dark");
   expect(source.read()).toBe("dark");
+  source.writePalette("slate");
+  expect(source.readPalette()).toBe("slate");
 });

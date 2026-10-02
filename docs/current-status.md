@@ -257,10 +257,11 @@ dark status values follow its rules without frames of their own, and the older f
 
 ## Shared client foundation
 
-UI's `Theme` supplies the chosen mode's variables and body typography, and its Shell and
+UI's `Theme` supplies the chosen mode and palette's variables and body typography, and its Shell and
 Centered patterns lay out pages inside and outside a workspace. Web and desktop compose those
 parts without local styles. Appearance preferences
-are persisted per app origin; System follows operating-system appearance.
+are persisted per app origin; System follows operating-system appearance. The account menu offers
+the original Neutral palette and experimental Linen, Sage, and Slate palettes, each in both modes.
 
 [Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
 compose headless session/API state from [client](../apps/client/README.md) and

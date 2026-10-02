@@ -11,10 +11,13 @@ import {
 
 export type AppearancePreference = "light" | "dark" | "system";
 export type SystemAppearance = Exclude<AppearancePreference, "system">;
+export type PalettePreference = "neutral" | "linen" | "sage" | "slate";
 /** Platform adapters tolerate unavailable storage and own system/window listeners. */
 export interface AppearanceSource {
   readonly read: () => AppearancePreference;
   readonly write: (preference: AppearancePreference) => void;
+  readonly readPalette: () => PalettePreference;
+  readonly writePalette: (palette: PalettePreference) => void;
   readonly system: () => SystemAppearance;
   readonly subscribe: (changed: () => void) => () => void;
 }
@@ -22,6 +25,8 @@ export interface AppearanceScope {
   readonly preference: Accessor<AppearancePreference>;
   readonly resolved: Accessor<SystemAppearance>;
   readonly setPreference: (value: AppearancePreference) => void;
+  readonly palette: Accessor<PalettePreference>;
+  readonly setPalette: (value: PalettePreference) => void;
 }
 const Context = createContext<AppearanceScope>();
 
@@ -32,6 +37,7 @@ export function AppearanceProvider(props: ParentProps<{ source?: AppearanceSourc
     source?.read() ?? "system",
   );
   const [system, setSystem] = createSignal<SystemAppearance>(source?.system() ?? "light");
+  const [palette, setPalette] = createSignal<PalettePreference>(source?.readPalette() ?? "neutral");
   let alive = true;
   onCleanup(() => {
     alive = false;
@@ -42,6 +48,7 @@ export function AppearanceProvider(props: ParentProps<{ source?: AppearanceSourc
       if (alive) {
         setPreference(source.read());
         setSystem(source.system());
+        setPalette(source.readPalette());
       }
     };
     onCleanup(source.subscribe(update));
@@ -56,6 +63,12 @@ export function AppearanceProvider(props: ParentProps<{ source?: AppearanceSourc
       value={{
         preference,
         resolved,
+        palette,
+        setPalette: (value) => {
+          if (!alive) return;
+          source?.writePalette(value);
+          setPalette(value);
+        },
         setPreference: (value) => {
           if (!alive) return;
           source?.write(value);

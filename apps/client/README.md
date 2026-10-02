@@ -149,11 +149,12 @@ initial read still exposes `Failed`; a rejected credential still clears the sess
 ## Appearance
 
 AppearanceProvider is independent of session lifetime and supplies `useAppearance()`.
-The app injects an AppearanceSource with read/write/system/subscribe operations;
-the provider owns preference and resolved light/dark state. The source handles storage
+The app injects an AppearanceSource with read/write, readPalette/writePalette, system, and subscribe operations;
+the provider owns preference, resolved light/dark state, and the independent palette choice
+(Neutral, Linen, Sage, or Slate). The source handles storage
 failures and platform listeners. Without a source, state stays in memory and system
 appearance resolves to light. Dispose/remount to change the source. Client owns no
-palette, styling, or platform appearance API.
+color values, styling, or platform appearance API.
 
 ## Operations
 

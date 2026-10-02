@@ -131,15 +131,16 @@ and are not shown.
 ## Account and appearance
 
 The rail's avatar opens the account menu: the reader's name in this workspace and the address they
-sign in with, Appearance (System, Light, or Dark), Switch workspace, Workspace settings,
+sign in with, Appearance (System, Light, or Dark), Color palette (Neutral, Linen, Sage, or Slate), Switch workspace, Workspace settings,
 Change your name (a compact modal), and Sign out. There is no profile photo or Google-account
 integration.
 
 The application owns an appearance source for storage and system appearance. Client stores
-light/dark/system state without UI dependencies, and the app applies the resolved mode through
-the UI `Theme`. System is
-the default. Preference persists under `amends.appearance` in local storage, survives sign-out,
-and synchronizes same-origin windows. Web and desktop origins remain independent. Blocked storage
+light/dark/system state and the palette choice without UI dependencies, and the app applies both through
+the UI `Theme`. System and Neutral are the defaults. Linen explores warm paper and terracotta,
+Sage soft green and forest, and Slate cool blue and ink; each has light and dark colors.
+Mode persists under `amends.appearance` and palette under `amends.palette` in local storage; both survive sign-out
+and synchronize same-origin windows. Web and desktop origins remain independent. Blocked storage
 retains the choice in memory.
 
 When workspace changes stop arriving for two seconds, a note at the bottom of the screen says

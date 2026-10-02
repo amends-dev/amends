@@ -220,12 +220,16 @@ it("navigates workspace sections with persistent chrome and retains appearance a
   fireEvent.keyDown(await screen.findByRole("menuitemradio", { name: "Dark" }), { key: "Enter" });
   await waitFor(() => expect(document.querySelector('[data-mode="dark"]')).not.toBeNull());
   fireEvent.keyDown(account, { key: "Enter" });
+  fireEvent.keyDown(await screen.findByRole("menuitemradio", { name: "Slate" }), { key: "Enter" });
+  await waitFor(() => expect(document.querySelector('[data-palette="slate"]')).not.toBeNull());
+  fireEvent.keyDown(account, { key: "Enter" });
   fireEvent.keyDown(await screen.findByRole("menuitem", { name: "Sign out" }), { key: "Enter" });
   await screen.findByRole("heading", { name: "Sign in to amends" });
   // Signing out leaves no way back to the page for whoever signs in next.
   expect(window.location.hash).toBe("#/sign-in");
   // Sign-in keeps the dark appearance chosen inside the workspace.
   expect(document.querySelector('[data-mode="dark"]')).not.toBeNull();
+  expect(document.querySelector('[data-palette="slate"]')).not.toBeNull();
 });
 
 it("redirects the Settings entry to its workspace section and keeps the rail's selection on descendants", async () => {

@@ -106,9 +106,25 @@ export const AccountMenu = {
   render: () => <Conversation menu />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Account: Jordan Mercier" }));
+    await userEvent.click(await canvas.findByRole("button", { name: "Account: Jordan Mercier" }));
     const menu = within(await within(document.body).findByRole("menu"));
     await expect(menu.getByText("jordan@mercier.example")).toBeVisible();
     await userEvent.click(menu.getByRole("menuitemradio", { name: "Dark" }));
+    await userEvent.click(await canvas.findByRole("button", { name: "Account: Jordan Mercier" }));
+    await userEvent.click(
+      within(await within(document.body).findByRole("menu")).getByRole("menuitemradio", {
+        name: "Linen",
+      }),
+    );
+    await userEvent.click(await canvas.findByRole("button", { name: "Account: Jordan Mercier" }));
+    const reopened = within(await within(document.body).findByRole("menu"));
+    await expect(reopened.getByRole("menuitemradio", { name: "Linen" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    await expect(reopened.getByRole("menuitemradio", { name: "Dark" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
   },
 } satisfies Story;

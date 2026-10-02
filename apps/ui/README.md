@@ -29,7 +29,12 @@ patterns, and screens as they are introduced.
 
 - **Color** ([tokens](src/foundations/color/tokens.ts)): semantic roles for surfaces, text,
   borders, actions, the modal scrim, eight avatar tones, and three status tones. Every value is
-  the exact light or dark color the mocks use. The status tones (`status.success`, `caution`, and
+  the exact light or dark color the mocks use in the default Neutral palette. Optional
+  [palettes](src/foundations/color/palettes.ts) explore Linen (paper and terracotta), Sage (green
+  and forest), and Slate (blue and ink), each in both modes. These are intentional color
+  experiments beyond the mocks; layout, typography, avatar identity, and status tones stay the same.
+  Their primary, secondary, and muted text on all palette surfaces, and text on primary buttons,
+  meet a minimum 4.5:1 contrast ratio, checked in foundation tests. The status tones (`status.success`, `caution`, and
   `danger`, each a `mark`, `text`, `surface`, and `border`) come from the Lunacy "Status v01"
   board: a mark is the only saturated color, and text, surface, and border make a notice in the
   tone. Offline has no tone; its mark is a ring in `text.muted`. `border.danger` stays the strong
@@ -44,9 +49,10 @@ patterns, and screens as they are introduced.
   steps. Corners are square throughout; there is no radius scale.
 - **Elevation** ([tokens](src/foundations/elevation/tokens.ts)): shadows for modals, popovers,
   and toasts only. Panels are flat and separated by dividers.
-- **Theme** ([Theme](src/foundations/theme/theme.tsx)): `<Theme mode="light">` applies a mode's
+- **Theme** ([Theme](src/foundations/theme/theme.tsx)): `<Theme mode="light" palette="linen">` applies a mode and palette's
   variables, the typeface, and body text. A nested Theme starts its own scope. Styles read values from
-  `vars` in `@amends/ui/foundations/theme`. CSS variable names start with `amends-`.
+  `vars` in `@amends/ui/foundations/theme`. Omitting `palette` selects Neutral, including in nested
+  scopes. CSS variable names start with `amends-`.
 - **Icons** (**Foundations / Icons**): every drawing from [`@amends/icons`](../icons/README.md),
   searchable, with sizes, weights, and accessible names. Review new drawings here.
 
@@ -420,4 +426,7 @@ bun run check
 ```
 
 Storybook serves at `http://127.0.0.1:6010` with hot reload on port 6011. The **Mode** toolbar
-switches between light, dark, and both side by side.
+switches between light, dark, and both side by side. **Palette** applies a color family to any
+story. **Foundations / Theme / Try palettes** compares them in a populated conversation;
+switching colors and mode preserves the draft. The workspace account menu offers palette
+selection when its caller supplies `onPaletteChange`.
