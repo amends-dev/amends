@@ -1,6 +1,6 @@
 # Harnesses in sandboxes
 
-Status: agreed on 2026-10-02; milestones 1 to 3 are built. This plans how agents' turns run inside a sandbox, such as
+Status: agreed on 2026-10-02; milestones 1 to 4 are built. This plans how agents' turns run inside a sandbox, such as
 amends's own harness or opencode on Daytona, so that adding another harness or sandbox provider
 means adding one adapter. The [core model](core-model.md) states the ownership this follows.
 
@@ -112,6 +112,11 @@ compaction, so a conversation longer than its model's window is not yet covered 
    replaced by a new one, and the agent's input says its files are gone. A run that ends a turn
    without spawning, or abandons it, releases the sandbox an earlier run left. The local host's
    end-to-end tests kill a host partway, and destroy a sandbox partway.
-4. Daytona with a real model.
+4. Daytona with a real model. Built: a sandbox implementation makes its provider for the connection
+   an environment's sandbox runs under, which core reads with its key as it reads the model
+   connection's, and the local host installs Daytona's. The harness server needed no change: on
+   Daytona it uploads and starts in seconds, and is reached through the preview URL on any port.
+   Opt-in live tests run a turn on Daytona whose model refuses its key, and one a real model
+   answers, through OpenRouter or Anthropic, in about 13 seconds; each destroys its sandbox.
 5. The opencode adapter, which proves the goal: only the adapter, its registration, and the stored
    environment change.

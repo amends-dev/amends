@@ -188,7 +188,10 @@ in the `backend` project with live time, since they wait on real processes. The 
 tests run everywhere, each over a temporary directory and a random port, and need `python3`. The
 Daytona provider's tests create real sandboxes, take minutes, and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, for example from the repository's Git-ignored `.env`;
-otherwise, as in CI, they are reported as skipped.
+otherwise, as in CI, they are reported as skipped. The same flag runs the local host's turns on
+Daytona: one whose model refuses its key, and, with `OPENROUTER_API_KEY` (and optionally
+`OPENROUTER_BASE_URL` and `OPENROUTER_MODEL`) or `ANTHROPIC_API_KEY` too, one that a real model
+answers.
 
 ## Storage conformance
 

@@ -236,6 +236,7 @@
       },
       "devDependencies": {
         "@amends/api-http": "workspace:*",
+        "@daytona/sdk": "0.218.0",
         "@effect/sql-pg": "catalog:",
       },
     },
@@ -327,6 +328,7 @@
       "name": "@amends/sandbox",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -355,6 +357,7 @@
       "dependencies": {
         "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
+        "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",

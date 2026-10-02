@@ -3,7 +3,7 @@ import { Environment as EnvironmentRuntime } from "@amends/environment";
 import { type HarnessErrors, HarnessEvent } from "@amends/harness";
 import { Transcript } from "@amends/harness";
 import { type Redacted, Predicate } from "effect";
-import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import { type PlatformError } from "effect";
 import { AgentStore } from "../agent/store.ts";
 import { Authorization } from "../authorization/authorization.ts";
@@ -77,26 +77,33 @@ export type CloseError =
   | ThreadCommand.Error;
 
 /**
- * Everything execution needs to run a turn: the agent's instructions, the model access it runs
- * with and the connection's settings and key to reach it, its environment, the transcript it
+ * A connection as execution uses it: its name, its implementation, and its settings and key to
+ * reach the external system. The key is only ever handed to execution, redacted.
+ */
+export interface ConnectionAccess {
+  /** The name its readers know it by, for wording what went wrong with it. */
+  readonly name: string;
+  readonly implementationId: string;
+  readonly settings: Readonly<Record<string, string>>;
+  readonly credential: Redacted.Redacted<string> | undefined;
+}
+
+/**
+ * Everything execution needs to run a turn: the agent's instructions, the model connection it
+ * runs with, its environment and the connection its sandbox runs under, the transcript it
  * continues, the input the harness has not taken in yet as one batch and piece by piece, its own
  * entries so far, how its attempts have gone, and what a provider last measured, from which
- * execution tells, against its model's limits, whether a checkpoint must come first. The key is
- * only ever handed to execution, redacted.
+ * execution tells, against its model's limits, whether a checkpoint must come first.
  */
 export interface Plan {
   readonly turn: Turn.Record;
   /** The agent's instructions: as they were when the turn started, once it has. */
   readonly instructions: string;
   readonly selection: Turn.Selection;
-  readonly connection: {
-    /** The name its readers know it by, for wording what went wrong with it. */
-    readonly name: string;
-    readonly implementationId: string;
-    readonly settings: Readonly<Record<string, string>>;
-    readonly credential: Redacted.Redacted<string> | undefined;
-  };
+  readonly connection: ConnectionAccess;
   readonly environment: Environment.Record;
+  /** The account connection the environment's sandbox runs under, for a provider that needs one. */
+  readonly sandboxConnection: ConnectionAccess | undefined;
   /** The running environment the turn's latest attempt worked in, to acquire again. */
   readonly reacquire: EnvironmentRuntime.Reference | undefined;
   /**
@@ -232,15 +239,18 @@ export interface Interface {
    */
   readonly recordSession: (turnId: Turn.Id, sessionId: string) => Effect.Effect<void, Error>;
   /**
-   * The running environment the turn last acquired, and its environment as stored now, whatever
-   * its status, for releasing one a run that ended short left behind. None when it acquired none.
+   * The running environment the turn last acquired, its environment as stored now, whatever its
+   * status, and the connection its sandbox runs under while that can still be used, for releasing
+   * one a run that ended short left behind. None when it acquired none.
    */
-  readonly readAcquiredEnvironment: (
-    turnId: Turn.Id,
-  ) => Effect.Effect<
-    | { readonly environment: Environment.Record; readonly reference: EnvironmentRuntime.Reference }
+  readonly readAcquiredEnvironment: (turnId: Turn.Id) => Effect.Effect<
+    | {
+        readonly environment: Environment.Record;
+        readonly reference: EnvironmentRuntime.Reference;
+        readonly sandboxConnection: ConnectionAccess | undefined;
+      }
     | undefined,
-    Error | EnvironmentStore.Failure
+    Error | EnvironmentStore.Failure | ConnectionStore.Failure | ConnectionCredentialStore.Failure
   >;
   /** Record that execution begins a harness session for a running turn, or a summary for it. */
   readonly recordAttempt: (
@@ -514,6 +524,33 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
+  const sandboxConnectionGone =
+    "The connection the agent's environment runs under is no longer available.";
+
+  /**
+   * A connection's access, with its key read from protected storage, or in words why it can't be
+   * used: `gone` when it no longer exists or is inactive, or its key missing or unreadable here.
+   */
+  const readConnectionAccess = Effect.fnUntraced(function* (
+    connectionId: Connection.Id,
+    gone: string,
+  ) {
+    const connection = yield* connectionStore.get(connectionId);
+    if (Option.isNone(connection) || connection.value.status !== "active") return Result.fail(gone);
+    const { name, implementationId, settings, authentication } = connection.value;
+    let credential: Redacted.Redacted<string> | undefined;
+    if (Connection.Authentication.isAnyOf(["ApiKey"])(authentication)) {
+      if (authentication.credentialId === null) return Result.fail(`${name} needs its API key.`);
+      const stored = yield* connectionCredentialStore
+        .get(authentication.credentialId)
+        .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
+      if (Option.isNone(stored))
+        return Result.fail(`${name}'s API key can't be read on this server.`);
+      credential = stored.value.secret;
+    }
+    return Result.succeed<ConnectionAccess>({ name, implementationId, settings, credential });
+  });
+
   const prepare = Effect.fn("TurnExecution.prepare")(function* (turnId: Turn.Id) {
     const turn = yield* requireTurn(turnId);
     if (!Turn.active(turn.status)) return Preparation.Finished();
@@ -527,28 +564,21 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       reasoning: agent.value.model.reasoning,
       environmentId: agent.value.environmentId,
     };
-    const connection = yield* connectionStore.get(selection.connectionId);
-    if (Option.isNone(connection) || connection.value.status !== "active")
-      return Preparation.Unrunnable({
-        reason: "The agent's model connection is no longer available.",
-      });
-    const authentication = connection.value.authentication;
-    let credential: Redacted.Redacted<string> | undefined;
-    if (Connection.Authentication.isAnyOf(["ApiKey"])(authentication)) {
-      if (authentication.credentialId === null)
-        return Preparation.Unrunnable({ reason: `${connection.value.name} needs its API key.` });
-      const stored = yield* connectionCredentialStore
-        .get(authentication.credentialId)
-        .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
-      if (Option.isNone(stored))
-        return Preparation.Unrunnable({
-          reason: `${connection.value.name}'s API key can't be read on this server.`,
-        });
-      credential = stored.value.secret;
-    }
+    const connection = yield* readConnectionAccess(
+      selection.connectionId,
+      "The agent's model connection is no longer available.",
+    );
+    if (Result.isFailure(connection)) return Preparation.Unrunnable({ reason: connection.failure });
     const environment = yield* environmentStore.get(selection.environmentId);
     if (Option.isNone(environment) || environment.value.status !== "active")
       return Preparation.Unrunnable({ reason: "The agent's environment is no longer available." });
+    const sandboxConnectionId = environment.value.sandbox?.connectionId ?? null;
+    const sandboxConnection =
+      sandboxConnectionId === null
+        ? undefined
+        : yield* readConnectionAccess(sandboxConnectionId, sandboxConnectionGone);
+    if (sandboxConnection !== undefined && Result.isFailure(sandboxConnection))
+      return Preparation.Unrunnable({ reason: sandboxConnection.failure });
     if (Option.isNone(environmentCatalog.harness(environment.value.harnessId)))
       return Preparation.Unrunnable({
         reason: `The ${environment.value.harnessId} harness is not installed on this server.`,
@@ -579,13 +609,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       turn,
       instructions: context.own.started?.instructions ?? agent.value.instructions,
       selection,
-      connection: {
-        name: connection.value.name,
-        implementationId: connection.value.implementationId,
-        settings: connection.value.settings,
-        credential,
-      },
+      connection: connection.success,
       environment: environment.value,
+      sandboxConnection: sandboxConnection?.success,
       reacquire: context.own.environment,
       session: context.own.session,
       history,
@@ -812,7 +838,20 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const reference = TurnLog.read(yield* readOwnEntries(turn)).environment;
     if (reference === undefined) return undefined;
     const environment = yield* environmentStore.get(Environment.Id.make(reference.definitionId));
-    return Option.isNone(environment) ? undefined : { environment: environment.value, reference };
+    if (Option.isNone(environment)) return undefined;
+    const sandboxConnectionId = environment.value.sandbox?.connectionId ?? null;
+    const sandboxConnection =
+      sandboxConnectionId === null
+        ? undefined
+        : yield* readConnectionAccess(sandboxConnectionId, sandboxConnectionGone);
+    return {
+      environment: environment.value,
+      reference,
+      sandboxConnection:
+        sandboxConnection !== undefined && Result.isSuccess(sandboxConnection)
+          ? sandboxConnection.success
+          : undefined,
+    };
   });
 
   const recordAttempt = Effect.fn("TurnExecution.recordAttempt")(function* (

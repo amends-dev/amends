@@ -1,3 +1,4 @@
+import type { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { Harness, HarnessErrors } from "@amends/harness";
 import type { HarnessImplementation, Transcript } from "@amends/harness";
@@ -76,6 +77,8 @@ export interface SpawnOptions {
   readonly reacquire?: Reference | undefined;
   /** A snapshot to restore when no sandbox is asked for, or the one asked for is gone. */
   readonly restore?: Sandbox.SnapshotReference | undefined;
+  /** The access of the connection the sandbox runs under, for a provider that runs under one. */
+  readonly sandboxConnection?: ConnectionImplementation.Access | undefined;
 }
 
 /** What a harness session needs from the turn that starts it. */
@@ -88,7 +91,7 @@ export interface SessionOptions {
   /** The model access the session runs with: the connection's code and access, and the model. */
   readonly model: {
     readonly inference: ModelInference.Implementation;
-    readonly access: ModelInference.Access;
+    readonly access: ConnectionImplementation.Access;
     readonly selection: ModelInference.Selection;
   };
   readonly instructions?: string | undefined;
@@ -153,25 +156,27 @@ export type SpawnError =
 
 export interface Interface {
   /**
-   * Spawn a running environment for `definition`: find the harness and sandbox provider this host
-   * installed, acquire the sandbox `reacquire` names if it still exists or a new one, restored
-   * from `restore` when given, run its setup, and, when the harness runs inside it, make sure a
-   * harness server runs there, keeping one already running. Spawning receives no conversation history or
-   * work. A failure after acquiring fails the spawn, stopping a reacquired sandbox or destroying a
-   * new one.
+   * Spawn a running environment for `definition`: find the harness and sandbox implementation
+   * this host installed, make its provider with the sandbox's connection for the scope, acquire the
+   * sandbox `reacquire` names if it still exists or a new one, restored from `restore` when given,
+   * run its setup, and, when the harness runs inside it, make sure a harness server runs there,
+   * keeping one already running. Spawning receives no conversation history or work. A failure
+   * after acquiring fails the spawn, stopping a reacquired sandbox or destroying a new one.
    */
   readonly spawn: (
     definition: Definition,
     options?: SpawnOptions,
-  ) => Effect.Effect<Running, SpawnError>;
+  ) => Effect.Effect<Running, SpawnError, Scope.Scope>;
   /**
    * Applies `definition`'s retention to the sandbox `reference` names, without spawning, for one a
-   * run that ended short left behind. Without a sandbox, or one this host does not run, it does
-   * nothing. A sandbox already gone comes back new from its provider, and is destroyed.
+   * run that ended short left behind, through the provider made with `sandboxConnection`. Without a
+   * sandbox, or one this host does not run, it does nothing. A sandbox already gone comes back new
+   * from its provider, and is destroyed.
    */
   readonly release: (
     definition: Definition,
     reference: Reference,
+    sandboxConnection?: ConnectionImplementation.Access,
   ) => Effect.Effect<void, SandboxErrors.SnapshotUnavailable | SandboxErrors.ProviderFailure>;
 }
 
@@ -179,12 +184,12 @@ export class Service extends Context.Service<Service, Interface>()("@amends/envi
 
 /**
  * The code a host runs environments with: the harnesses it runs in process, whose sessions use the
- * Effect AI model a connection supplies, its sandbox providers, each found by its ID, and the
- * harness server it uploads to run harnesses inside sandboxes.
+ * Effect AI model a connection supplies, its sandbox implementations, each found by the ID it
+ * declares, and the harness server it uploads to run harnesses inside sandboxes.
  */
 export interface Installed {
   readonly harnesses: ReadonlyArray<Harness.Interface<ModelInference.Services>>;
-  readonly sandboxes?: ReadonlyArray<Sandbox.Provider> | undefined;
+  readonly sandboxes?: ReadonlyArray<Sandbox.Implementation> | undefined;
   readonly harnessServer?: HarnessServer.Program | undefined;
 }
 
@@ -249,7 +254,10 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
     installed.harnesses.map((harness) => [harness.declaration.id as string, harness]),
   );
   const sandboxes = new Map(
-    (installed.sandboxes ?? []).map((provider) => [provider.name, provider]),
+    (installed.sandboxes ?? []).map((implementation) => [
+      implementation.declaration.id as string,
+      implementation,
+    ]),
   );
 
   /** Where the definition's harness runs, if this host installed what it needs. */
@@ -376,16 +384,18 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
         undefined,
       );
     }
-    const provider = sandboxes.get(placed.sandbox.providerId);
-    if (provider === undefined)
+    const implementation = sandboxes.get(placed.sandbox.providerId);
+    if (implementation === undefined)
       return yield* new EnvironmentErrors.SandboxUnavailable({
         providerId: placed.sandbox.providerId,
       });
+    const provider = yield* implementation.provider(options.sandboxConnection);
     const acquired = yield* provider.acquire({
       id: reacquire?.sandboxId,
       snapshot: options.restore,
       template: placed.sandbox.template ?? undefined,
       env: placed.sandbox.env,
+      labels: { "amends-environment": definitionId },
     });
     const sandbox = acquired.sandbox;
     const sessions = yield* Effect.gen(function* () {
@@ -412,16 +422,22 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
   const release = Effect.fn("Environment.release")(function* (
     definition: Definition,
     reference: Reference,
+    sandboxConnection?: ConnectionImplementation.Access,
   ) {
-    const provider =
+    const implementation =
       definition.sandbox === null ? undefined : sandboxes.get(definition.sandbox.providerId);
-    if (definition.sandbox === null || provider === undefined || reference.sandboxId === undefined)
+    if (
+      definition.sandbox === null ||
+      implementation === undefined ||
+      reference.sandboxId === undefined
+    )
       return;
+    const provider = yield* implementation.provider(sandboxConnection);
     const acquired = yield* provider.acquire({ id: reference.sandboxId });
     if (acquired.filesystem !== "retained") return yield* acquired.sandbox.destroy;
     if (definition.sandbox.harness === "in-sandbox") yield* stopHarnessServer(acquired.sandbox);
     yield* applyRetention(acquired.sandbox, definition.sandbox.retention);
-  });
+  }, Effect.scoped);
 
   return Service.of({ spawn, release });
 });

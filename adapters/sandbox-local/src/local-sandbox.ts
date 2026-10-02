@@ -274,4 +274,16 @@ export const make = Effect.fnUntraced(function* (options: Options) {
   } satisfies Sandbox.Provider;
 });
 
+/**
+ * What a host installs: one provider over `root` for every environment, since local sandboxes run
+ * under no account.
+ */
+export const implementation = Effect.fnUntraced(function* (options: Options) {
+  const provider = yield* make(options);
+  return {
+    declaration,
+    provider: () => Effect.succeed(provider),
+  } satisfies Sandbox.Implementation;
+});
+
 export * as LocalSandbox from "./local-sandbox.ts";

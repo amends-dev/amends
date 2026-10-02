@@ -137,7 +137,8 @@ holding the workspace only while it runs:
    worth, each reading the summary so far, and the run prepares again. A pass that fails or stays silent past
    `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
    turn; nothing is left out instead.
-5. For the run's first session, spawn the turn's environment, acquiring the one its log last
+5. For the run's first session, spawn the turn's environment, with a provider made for the
+   connection its sandbox runs under that lasts as long as the run, acquiring the one its log last
    recorded, record what was acquired (`recordEnvironment`): the environment's reference and
    where its files came from, and prepare again, since a new sandbox in place of one that is gone
    adds a note to the turn's input that the agent's earlier files are gone. A harness or sandbox

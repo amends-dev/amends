@@ -82,7 +82,8 @@ export const installed = {
 
 /**
  * The environments this host runs: amends's harness in process, sandboxes as directories under
- * `directory`, and the harness server it builds to run harnesses inside them.
+ * `directory` and on each workspace's Daytona account, and the harness server it builds to run
+ * harnesses inside them.
  *
  * @category layers
  */
@@ -90,11 +91,14 @@ export const layerEnvironments = (directory: string) =>
   Layer.effect(
     Environment.Service,
     Effect.gen(function* () {
-      const localSandbox = yield* LocalSandbox.make({ root: directory });
+      const sandboxes = [
+        yield* LocalSandbox.implementation({ root: directory }),
+        yield* DaytonaSandbox.implementation(),
+      ];
       const harnessServer = yield* LocalHarnessServer.make({
         directory: join(directory, "harness-server"),
       });
-      return yield* Environment.make({ harnesses, sandboxes: [localSandbox], harnessServer });
+      return yield* Environment.make({ harnesses, sandboxes, harnessServer });
     }),
   ).pipe(Layer.provide([BunServices.layer, FetchHttpClient.layer]));
 

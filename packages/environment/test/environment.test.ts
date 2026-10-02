@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, Deferred, Effect, Fiber, Layer, Stream } from "effect";
+import { Crypto, Deferred, Effect, Fiber, Layer, Redacted, Stream } from "effect";
 import { HttpClient, HttpClientError, HttpClientResponse, HttpRouter } from "effect/http";
 import { LanguageModel, Model } from "effect/ai";
 import type { AiError, Prompt, Response } from "effect/ai";
@@ -8,7 +8,7 @@ import type { ModelInference } from "@amends/connection/model-inference";
 import { Environment, EnvironmentErrors, HarnessServer } from "@amends/environment";
 import { Harness, HarnessErrors, HarnessEvent } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
-import { SandboxErrors } from "@amends/sandbox";
+import { SandboxErrors, SandboxImplementation } from "@amends/sandbox";
 import type { Sandbox } from "@amends/sandbox";
 
 type Script = Stream.Stream<Response.StreamPartEncoded, AiError.AiError>;
@@ -268,16 +268,34 @@ const program: HarnessServer.Program = {
  * The environments a host with amends's harness, these sandbox providers, and a harness server
  * running amends's harness spawns, reaching harness servers through `httpClient`.
  */
+/**
+ * The environment service with these providers installed, each made for any connection; `made`
+ * receives the connections they were made with.
+ */
 const environments = (
-  sandboxes: ReadonlyArray<Sandbox.Provider> = [],
+  providers: ReadonlyArray<Sandbox.Provider> = [],
   options: {
     readonly harnessServer?: HarnessServer.Program;
     readonly httpClient?: HttpClient.HttpClient;
+    readonly made?: Array<ConnectionImplementation.Access | undefined>;
   } = {},
 ) =>
   Environment.make({
     harnesses: [AmendsHarness.harness],
-    sandboxes,
+    sandboxes: providers.map((provider): Sandbox.Implementation => ({
+      declaration: {
+        id: SandboxImplementation.Id.make(provider.name),
+        name: provider.name,
+        description: "",
+        capabilities: provider.capabilities,
+        account: false,
+      },
+      provider: (connection) =>
+        Effect.sync(() => {
+          options.made?.push(connection);
+          return provider;
+        }),
+    })),
     harnessServer: options.harnessServer ?? program,
   }).pipe(
     Effect.provideService(Crypto.Crypto, crypto),
@@ -842,6 +860,20 @@ describe("Environment.release", () => {
       yield* service.release(keep, left.reference);
       expect(fake.servers.size).toBe(0);
       expect(fake.calls.at(-1)).toBe("stop sandbox-0");
+    }),
+  );
+
+  it.effect("makes the provider with the sandbox's connection, to spawn and to release", () =>
+    Effect.gen(function* () {
+      const fake = fakeProvider();
+      const made: Array<ConnectionImplementation.Access | undefined> = [];
+      const service = yield* environments([fake.provider], { made });
+      const account = { settings: { target: "eu" }, credential: Redacted.make("key") };
+      const definition = withSandbox("stop");
+      const left = yield* service.spawn(definition, { sandboxConnection: account });
+      yield* service.release(definition, left.reference, account);
+      expect(made).toEqual([account, account]);
+      expect(fake.calls).toEqual(["stop sandbox-0"]);
     }),
   );
 

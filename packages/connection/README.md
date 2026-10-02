@@ -34,7 +34,8 @@ implementations that need them.
 
 `@amends/connection/model-inference` holds what an implementation with model inference supplies:
 a `ModelInference.Implementation` with its declaration, `languageModel(access, selection)`, and
-`limits(access, selection)`. `access` is the connection's settings and credential; `selection` is
+`limits(access, selection)`. `access` is the connection's settings and credential,
+`ConnectionImplementation.Access`, which every capability's code takes; `selection` is
 the model an agent chose, by the provider's own identifier. `languageModel` returns Effect AI model
 access, a `LanguageModel` with its provider and model names, which a harness such as
 [amends's own](../harness-amends/README.md) uses. `limits` says how much the model takes: its

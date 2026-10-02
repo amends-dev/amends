@@ -2,7 +2,7 @@ import type * as Core from "@amends/core";
 import { AgentService } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { ConnectionService } from "@amends/core/connection";
-import { Environment } from "@amends/core/environment";
+import { Environment, EnvironmentService } from "@amends/core/environment";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
@@ -17,9 +17,11 @@ import {
 import { Turn, TurnService, TurnExecution, TurnLog } from "@amends/core/turn";
 import type { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
-import { HarnessEvent, Transcript } from "@amends/harness";
+import { Harness, HarnessEvent, Transcript } from "@amends/harness";
+import { Environment as EnvironmentRuntime } from "@amends/environment";
+import { Sandbox, SandboxImplementation } from "@amends/sandbox";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, Queue, Stream } from "effect";
+import { Effect, Option, Queue, Redacted, Stream } from "effect";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -32,6 +34,7 @@ import {
   runAgentJobs,
   Support,
   testImplementation,
+  testSandboxAccount,
 } from "./support.ts";
 
 const as = <A, E, R extends Core.Operations | Actor.Service>(
@@ -829,6 +832,132 @@ export const turns = (harness: ConformanceHarness) => {
           ),
         ),
       60_000,
+    );
+
+    it.effect(
+      "a turn whose sandbox runs under an account runs with that connection's key, once it has one",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const workspace = yield* Operations.createWorkspace(alice.id);
+              const connect = <A, E>(
+                use: (service: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
+              ) => as(workspace.id, alice, Effect.flatMap(ConnectionService.Service, use));
+              const models = yield* connect((service) =>
+                service.create({
+                  name: "Models",
+                  implementationId: testImplementation.id,
+                  settings: { endpoint: "https://models.example" },
+                  authentication: "None",
+                }),
+              );
+              const account = yield* connect((service) =>
+                service.create({
+                  name: "Cloud account",
+                  implementationId: testSandboxAccount.id,
+                  settings: {},
+                  authentication: "ApiKey",
+                }),
+              );
+              const box = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(EnvironmentService.Service, (environmentService) =>
+                  environmentService.create({
+                    name: "Cloud box",
+                    harnessId: Harness.Name.make("boxed"),
+                    sandbox: {
+                      providerId: SandboxImplementation.Id.make("test-cloud"),
+                      harness: "in-sandbox",
+                      connectionId: account.id,
+                      template: null,
+                      env: {},
+                      setup: [],
+                      retention: "stop",
+                    },
+                  }),
+                ),
+              );
+              const agent = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(AgentService.Service, (agentService) =>
+                  agentService.create({
+                    name: "Scout",
+                    instructions: "Help the team.",
+                    model: { connectionId: models.id, model: "model-x", reasoning: null },
+                    environmentId: box.id,
+                    roleId: BuiltinRoles.MemberId,
+                  }),
+                ),
+              );
+              const started = yield* start(workspace.id, "Scout, build it.", [agent.memberId]);
+              yield* runAgentJobs(workspace.id);
+              const [turn] = yield* turnsOf(workspace.id, started.thread.id);
+              const run = <A, E>(
+                use: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>,
+              ) => execute(workspace.id, Effect.flatMap(TurnExecution.Service, use));
+
+              // Without the account's key the turn can't run.
+              expect(yield* run((turnExecution) => turnExecution.prepare(turn!.id))).toEqual(
+                TurnExecution.Preparation.Unrunnable({
+                  reason: "Cloud account needs its API key.",
+                }),
+              );
+              const keyed = yield* connect((service) =>
+                service.setCredential({
+                  connectionId: account.id,
+                  secret: Redacted.make("cloud-key"),
+                }),
+              ).pipe(
+                Effect.as(true),
+                Effect.catchTag("ConnectionService.CredentialsUnavailable", () =>
+                  Effect.succeed(false),
+                ),
+              );
+              if (!keyed) return;
+              // With it, the plan carries the account's access for the sandbox's provider.
+              const prepared = yield* run((turnExecution) => turnExecution.prepare(turn!.id));
+              expect(prepared).toMatchObject({
+                _tag: "Ready",
+                plan: {
+                  sandboxConnection: {
+                    name: "Cloud account",
+                    implementationId: "test-cloud",
+                    settings: {},
+                  },
+                },
+              });
+              const sandboxConnection =
+                prepared._tag === "Ready" ? prepared.plan.sandboxConnection : undefined;
+              expect(sandboxConnection?.credential?.pipe(Redacted.value)).toBe("cloud-key");
+              // So does what releasing a sandbox a run left reads, once the turn acquired one.
+              const acquired = yield* run((turnExecution) =>
+                Effect.gen(function* () {
+                  yield* turnExecution.start(turn!.id, {
+                    connectionId: models.id,
+                    model: "model-x",
+                    reasoning: null,
+                    environmentId: box.id,
+                  });
+                  yield* turnExecution.recordEnvironment(turn!.id, {
+                    reference: {
+                      definitionId: EnvironmentRuntime.DefinitionId.make(box.id),
+                      sandboxId: Sandbox.Id.make("box-1"),
+                    },
+                    filesystem: { _tag: "Fresh" },
+                  });
+                  return yield* turnExecution.readAcquiredEnvironment(turn!.id);
+                }),
+              );
+              expect(acquired?.sandboxConnection?.credential?.pipe(Redacted.value)).toBe(
+                "cloud-key",
+              );
+            }),
+          ),
+        ),
     );
 
     it.effect(

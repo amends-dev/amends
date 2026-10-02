@@ -1,4 +1,5 @@
 import { posix } from "node:path";
+import type { ConnectionImplementation } from "@amends/connection";
 import { Sandbox, SandboxErrors, SandboxImplementation } from "@amends/sandbox";
 import {
   Daytona,
@@ -11,7 +12,7 @@ import {
   DaytonaTimeoutError,
 } from "@daytona/sdk";
 import type { DaytonaConfig, Sandbox as Remote } from "@daytona/sdk";
-import { Crypto, Data, Effect, Option, Queue, Stream } from "effect";
+import { Crypto, Data, Effect, Option, Queue, Redacted, Stream } from "effect";
 
 export const name = "daytona";
 
@@ -321,6 +322,35 @@ export const make = Effect.fnUntraced(function* (options: Options = {}) {
           ).pipe(Effect.asVoid)
         : Effect.fail(unavailable(`The ${snapshot.provider} provider took this snapshot.`)),
   } satisfies Sandbox.Provider;
+});
+
+/** The Daytona client configuration for a connection: its key, and its API URL and target if set. */
+const clientOf = (connection: ConnectionImplementation.Access): DaytonaConfig => ({
+  ...(connection.credential === undefined ? {} : { apiKey: Redacted.value(connection.credential) }),
+  ...(connection.settings["apiUrl"] ? { apiUrl: connection.settings["apiUrl"] } : {}),
+  ...(connection.settings["target"] ? { target: connection.settings["target"] } : {}),
+});
+
+/**
+ * What a host installs: a provider for each workspace's Daytona account, made from its
+ * connection's key, API URL, and target, with these options.
+ */
+export const implementation = Effect.fnUntraced(function* (options: Omit<Options, "client"> = {}) {
+  const crypto = yield* Crypto.Crypto;
+  return {
+    declaration,
+    provider: (connection) =>
+      connection === undefined
+        ? Effect.fail(
+            new SandboxErrors.ProviderFailure({
+              reason: "Daytona sandboxes run under a Daytona account.",
+              retryable: false,
+            }),
+          )
+        : make({ ...options, client: clientOf(connection) }).pipe(
+            Effect.provideService(Crypto.Crypto, crypto),
+          ),
+  } satisfies Sandbox.Implementation;
 });
 
 export * as DaytonaSandbox from "./daytona-sandbox.ts";

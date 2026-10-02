@@ -89,6 +89,7 @@ const plan = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Plan =
     credential: undefined,
   },
   environment,
+  sandboxConnection: undefined,
   reacquire: undefined,
   session: undefined,
   history: [],

@@ -64,6 +64,13 @@ const selection = Schema.decodeUnknownSync(Turn.Selection)({
   reasoning: null,
   environmentId: "environment-one",
 });
+/** The account the sandboxed environment's provider runs under. */
+const sandboxConnection: TurnExecution.ConnectionAccess = {
+  name: "Sandbox account",
+  implementationId: "test-cloud",
+  settings: { account: "acme" },
+  credential: undefined,
+};
 const environment = (sandbox: boolean) =>
   Schema.decodeUnknownSync(Environment.Record)({
     id: "environment-one",
@@ -151,6 +158,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         credential: undefined,
       },
       environment: environment(options.sandbox ?? false),
+      sandboxConnection: options.sandbox ? sandboxConnection : undefined,
       reacquire: context.own.environment,
       session: context.own.session,
       history: context.history,
@@ -233,7 +241,11 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         const reference = TurnLog.read(state.log).environment;
         return reference === undefined
           ? undefined
-          : { environment: environment(options.sandbox ?? false), reference };
+          : {
+              environment: environment(options.sandbox ?? false),
+              reference,
+              sandboxConnection: options.sandbox ? sandboxConnection : undefined,
+            };
       }),
     showDraft: (_, piece) =>
       Effect.sync(() => {
@@ -372,9 +384,9 @@ const sandboxEnvironments = (sessions: Pick<EnvironmentRuntime.Running, "attachS
     sandboxId: "box",
   });
   const environments: EnvironmentRuntime.Interface = {
-    spawn: () =>
+    spawn: (_, options) =>
       Effect.sync(() => {
-        calls.push("spawn");
+        calls.push(`spawn under ${options?.sandboxConnection?.settings["account"]}`);
         return {
           reference,
           filesystem: { _tag: "Retained" },
@@ -384,7 +396,11 @@ const sandboxEnvironments = (sessions: Pick<EnvironmentRuntime.Running, "attachS
           release: Effect.sync(() => void calls.push("release")),
         };
       }),
-    release: (_, released) => Effect.sync(() => void calls.push(`release ${released.sandboxId}`)),
+    release: (_, released, connection) =>
+      Effect.sync(
+        () =>
+          void calls.push(`release ${released.sandboxId} under ${connection?.settings["account"]}`),
+      ),
   };
   return { environments, calls, reference };
 };
@@ -1171,7 +1187,7 @@ describe("TurnRunner", () => {
         ]);
         expect(state.replies).toEqual(["High tide is at noon."]);
         expect(prompts).toEqual([]);
-        expect(calls).toEqual(["spawn", "release"]);
+        expect(calls).toEqual(["spawn under acme", "release"]);
       }),
   );
 
@@ -1207,11 +1223,11 @@ describe("TurnRunner", () => {
 
       yield* runner.run(workspaceId, turnId);
       expect(state.steps).toEqual(["stopped"]);
-      expect(calls).toEqual(["release box"]);
+      expect(calls).toEqual(["release box under acme"]);
 
       // Abandoning a turn releases it too.
       yield* runner.abandon(workspaceId, turnId);
-      expect(calls).toEqual(["release box", "release box"]);
+      expect(calls).toEqual(["release box under acme", "release box under acme"]);
     }),
   );
 });

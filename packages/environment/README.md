@@ -14,8 +14,9 @@ plans how harnesses come to run inside a sandbox.
 `Environment.layer({ harnesses, sandboxes, harnessServer })` provides `Environment.Service` from the
 code a host installs: the harnesses it runs in process, each found by the ID its declaration gives,
 whose sessions use the Effect AI model a connection supplies (`ModelInference.Services`); its
-sandbox providers, each found by name; and the [harness server](#the-harness-server) it uploads to
-run harnesses inside sandboxes. A host lists the harnesses' declarations in its catalog from the
+sandbox implementations (`Sandbox.Implementation`), each found by the ID it declares, which make a
+provider for the connection a sandbox runs under; and the [harness server](#the-harness-server) it
+uploads to run harnesses inside sandboxes. A host lists the harnesses' declarations in its catalog from the
 same code, so what a workspace can choose and what runs agree.
 
 `spawn(definition, options)` takes an environment as a workspace stores it, an
@@ -30,8 +31,9 @@ Spawning receives no conversation history or work to do, only what the runtime n
 1. Find the harness and, with a sandbox, its provider. One this host did not install fails the spawn
    with `HarnessUnavailable` or `SandboxUnavailable`; a harness that runs inside the sandbox must be
    one the harness server runs.
-2. With a sandbox, acquire it: the one `reacquire` names if it still exists, otherwise a new one,
-   restored from `restore` when given. Restoring into a definition without a sandbox is
+2. With a sandbox, make the provider with the sandbox's connection, `sandboxConnection`, for the
+   caller's scope, and acquire it: the one `reacquire` names if it still exists, otherwise a new
+   one, labelled `amends-environment` with the definition's ID, restored from `restore` when given. Restoring into a definition without a sandbox is
    `SnapshotUnavailable`, and a reference from another definition is `ForeignReference`.
 3. Run the definition's setup commands in order, each with `sh -c`. One that exits nonzero fails
    the spawn with `SetupFailed`, carrying its output.
@@ -70,8 +72,8 @@ definition's retention once the turn is done, after stopping the harness server 
 `stop` keeps the sandbox's files for acquiring again, and `destroy` deletes the sandbox. Repeating it
 after it succeeded does nothing, and after a failure retries. A run cut short never releases, so the
 sandbox stays as it is for the next run to acquire. The service's own `release(definition,
-reference)` does the same for a sandbox a run left without spawning it, as when a turn ends while
-nothing runs it; one the provider no longer has comes back new, and is destroyed.
+reference, sandboxConnection)` does the same for a sandbox a run left without spawning it, as when
+a turn ends while nothing runs it; one the provider no longer has comes back new, and is destroyed.
 
 ## The harness server
 
@@ -124,8 +126,9 @@ These are implementation choices where the core model leaves the contract open:
   harness context is ever retained, and every session prepares its history from the transcript.
 - Setup runs on every spawn, including onto a retained or restored filesystem, so its commands must
   be safe to repeat.
-- A sandbox provider is installed as one provider, not per account, so providers that run under a
-  workspace's account, such as Daytona, are not installed yet.
+- Each turn acquires a sandbox of its own, so with `stop` every turn leaves a stopped sandbox,
+  which a hosted provider keeps until it deletes it, as Daytona does after its own interval.
+- Each new sandbox receives the harness server, about 65 MB, which takes seconds to upload.
 
 - The model connection's key reaches the sandbox in the session's `Start` request.
 - The harness server's port is reachable wherever the sandbox exposes it; the token in its state

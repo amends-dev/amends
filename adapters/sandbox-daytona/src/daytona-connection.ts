@@ -1,6 +1,4 @@
 import { ConnectionImplementation } from "@amends/connection";
-import type { DaytonaConfig } from "@daytona/sdk";
-import { Redacted } from "effect";
 import { name } from "./daytona-sandbox.ts";
 
 /**
@@ -31,18 +29,5 @@ export const declaration: ConnectionImplementation.Declaration = {
   ],
   authentication: [{ _tag: "ApiKey", label: "API key" }],
 };
-
-/** A connection's settings and key, as a provider is made from them. */
-export interface Access {
-  readonly settings: Readonly<Record<string, string>>;
-  readonly credential?: Redacted.Redacted<string> | undefined;
-}
-
-/** The Daytona client configuration for a connection: its key, and its API URL and target if set. */
-export const client = (access: Access): DaytonaConfig => ({
-  ...(access.credential === undefined ? {} : { apiKey: Redacted.value(access.credential) }),
-  ...(access.settings["apiUrl"] ? { apiUrl: access.settings["apiUrl"] } : {}),
-  ...(access.settings["target"] ? { target: access.settings["target"] } : {}),
-});
 
 export * as DaytonaConnection from "./daytona-connection.ts";

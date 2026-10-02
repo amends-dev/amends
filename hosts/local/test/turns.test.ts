@@ -17,6 +17,8 @@ import { Identity } from "@amends/core/identity";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Fiber, Layer, Redacted, Schedule, Stream } from "effect";
+import { Base64 } from "effect/encoding";
+import { Daytona } from "@daytona/sdk";
 import { HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
@@ -33,13 +35,21 @@ const asToken = (token: string) =>
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
 /**
  * The real routes, gateway, PostgreSQL storage, and turn runner behind a Bun test server, with
- * local sandboxes in `sandboxDirectory`.
+ * local sandboxes in `sandboxDirectory`, and connections' keys sealed with `credentialKey`.
  */
-const server = (url: string, sandboxDirectory?: string) =>
+const server = (
+  url: string,
+  sandboxDirectory?: string,
+  credentialKey?: Redacted.Redacted<string>,
+) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url), { pollInterval: "100 millis", sandboxDirectory }),
+        LocalHost.layer(Redacted.make(url), {
+          pollInterval: "100 millis",
+          sandboxDirectory,
+          credentialKey,
+        }),
         DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer)),
       ),
     ),
@@ -594,5 +604,211 @@ describe.skipIf(!available)("PostgreSQL", () => {
         }).pipe(Effect.scoped),
       ),
     90_000,
+  );
+});
+
+/**
+ * Real Daytona sandboxes, when `AMENDS_TEST_DAYTONA=1` asks for them and `DAYTONA_API_KEY` is set:
+ * they take minutes and cost money, so an ordinary run skips them.
+ */
+const daytona =
+  process.env["AMENDS_TEST_DAYTONA"] === "1" && (process.env["DAYTONA_API_KEY"] ?? "") !== "";
+
+/** A model connection to make, with its key, and the model an agent selects through it. */
+interface ModelAccount {
+  readonly name: string;
+  readonly implementationId: string;
+  readonly settings: Record<string, string>;
+  readonly key: string;
+  readonly model: string;
+}
+
+/** Anthropic's, with a key it refuses. */
+const refusedAnthropic: ModelAccount = {
+  name: "Anthropic",
+  implementationId: "anthropic",
+  settings: {},
+  key: "sk-ant-not-a-real-key",
+  model: "claude-haiku-4-5-20251001",
+};
+
+/**
+ * A real model, for a reply: OpenRouter's through the OpenAI-compatible connection when
+ * `OPENROUTER_API_KEY` is set, with `OPENROUTER_BASE_URL` and `OPENROUTER_MODEL`, or Anthropic's
+ * when `ANTHROPIC_API_KEY` is.
+ */
+const realModel: ModelAccount | undefined = process.env["OPENROUTER_API_KEY"]
+  ? {
+      name: "OpenRouter",
+      implementationId: "openai-compatible",
+      settings: { baseUrl: process.env["OPENROUTER_BASE_URL"] || "https://openrouter.ai/api/v1" },
+      key: process.env["OPENROUTER_API_KEY"],
+      model: process.env["OPENROUTER_MODEL"] || "anthropic/claude-haiku-4.5",
+    }
+  : process.env["ANTHROPIC_API_KEY"]
+    ? { ...refusedAnthropic, key: process.env["ANTHROPIC_API_KEY"] }
+    : undefined;
+
+/** The Daytona sandboxes labelled with this environment that are not destroyed or on their way. */
+const daytonaSandboxes = (environmentId: string) =>
+  Effect.promise(async () => {
+    const found = [];
+    for await (const sandbox of new Daytona().list({
+      labels: { "amends-environment": environmentId },
+    }))
+      if (sandbox.state !== "destroyed" && sandbox.state !== "destroying") found.push(sandbox);
+    return found;
+  });
+
+/** Delete what a failed run left in Daytona for this environment. */
+const deleteDaytonaSandboxes = (environmentId: string) =>
+  Effect.flatMap(daytonaSandboxes(environmentId), (sandboxes) =>
+    Effect.promise(() => Promise.all(sandboxes.map((sandbox) => sandbox.delete().catch(() => {})))),
+  );
+
+/**
+ * Ask Scout, whose environment runs amends's harness inside a Daytona sandbox under the workspace's
+ * Daytona account, with the model `account` gives. Waits for the turn to end and for the
+ * environment's retention to destroy the sandbox, then says how the turn ended, the thread's
+ * messages, and the sandboxes left. Whatever a failed run leaves in Daytona is deleted.
+ */
+const askOnDaytona = (url: string, account: ModelAccount, question: string) =>
+  Effect.gen(function* () {
+    const directory = yield* sandboxDirectory;
+    const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
+    let environmentId: string | undefined;
+    return yield* Effect.gen(function* () {
+      const asAlice = yield* client(alice);
+      const { id: workspaceId } = yield* asAlice.workspaces.create({
+        headers: {},
+        payload: { name: "Studio" },
+      });
+      /** A connection with its key. */
+      const connect = (
+        name: string,
+        implementationId: string,
+        settings: Record<string, string>,
+        secret: string,
+      ) =>
+        Effect.gen(function* () {
+          const connection = yield* asAlice.connections.create({
+            params: { workspaceId },
+            headers: {},
+            payload: {
+              name,
+              implementationId: ConnectionImplementation.Id.make(implementationId),
+              settings,
+              authentication: "ApiKey",
+            },
+          });
+          yield* asAlice.connections.setCredential({
+            params: { workspaceId, connectionId: connection.id },
+            payload: { secret: Redacted.make(secret) },
+          });
+          return connection;
+        });
+      const models = yield* connect(
+        account.name,
+        account.implementationId,
+        account.settings,
+        account.key,
+      );
+      const daytonaAccount = yield* connect(
+        "Daytona",
+        "daytona",
+        {},
+        process.env["DAYTONA_API_KEY"]!,
+      );
+      const environment = yield* asAlice.environments.create({
+        params: { workspaceId },
+        headers: {},
+        payload: {
+          name: "Daytona",
+          harnessId: Environment.inProcessHarness,
+          sandbox: {
+            providerId: SandboxImplementation.Id.make("daytona"),
+            harness: "in-sandbox",
+            connectionId: daytonaAccount.id,
+            template: null,
+            env: {},
+            setup: [],
+            retention: "destroy",
+          },
+        },
+      });
+      environmentId = environment.id;
+      const agent = yield* asAlice.agents.create({
+        params: { workspaceId },
+        headers: {},
+        payload: {
+          name: "Scout",
+          instructions: "Answer in one short sentence.",
+          model: { connectionId: models.id, model: account.model, reasoning: null },
+          environmentId: environment.id,
+          roleId: BuiltinRoles.MemberId,
+        },
+      });
+      const started = yield* asAlice.threads.start({
+        params: { workspaceId, groupId: Group.GeneralId },
+        headers: {},
+        payload: { text: question, mentions: [agent.memberId] },
+      });
+      const params = { workspaceId, threadId: started.thread.id };
+      // The turn spawns a Daytona sandbox under the workspace's account, uploads the harness
+      // server, and runs amends's harness there, which asks Anthropic.
+      const [turn] = yield* asAlice.turns.listByThread({ params, query: { limit: 10 } }).pipe(
+        Effect.repeat({
+          until: (turns) =>
+            turns[0] !== undefined && !["queued", "running"].includes(turns[0].status),
+          schedule: Schedule.spaced("1 second"),
+          times: 300,
+        }),
+      );
+      const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+      const left = yield* until(daytonaSandboxes(environment.id), (found) => found.length === 0);
+      return { turn, messages: texts(timeline), left: left.map((sandbox) => sandbox.id) };
+    }).pipe(
+      Effect.provide(server(url, directory, credentialKey)),
+      Effect.ensuring(
+        Effect.suspend(() =>
+          environmentId === undefined
+            ? Effect.void
+            : Effect.ignore(deleteDaytonaSandboxes(environmentId)),
+        ),
+      ),
+    );
+  }).pipe(Effect.scoped);
+
+describe.skipIf(!available || !daytona)("PostgreSQL with Daytona", () => {
+  it.live(
+    "a turn on Daytona whose model refuses its key fails, and its sandbox is destroyed",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const asked = yield* askOnDaytona(url, refusedAnthropic, "Scout, are you there?");
+          // The harness inside the sandbox asked Anthropic, which refused the key.
+          expect(asked.turn).toMatchObject({
+            status: "failed",
+            failure: "Anthropic didn't accept its API key.",
+          });
+          expect(asked.left).toEqual([]);
+        }),
+      ),
+    600_000,
+  );
+
+  it.live.skipIf(realModel === undefined)(
+    "an agent whose harness runs inside a Daytona sandbox replies with a real model",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const asked = yield* askOnDaytona(url, realModel!, "Scout, what is two plus two?");
+          expect(asked.turn).toMatchObject({ status: "completed", failure: null });
+          expect(asked.messages[0]).toBe("Scout, what is two plus two?");
+          expect(asked.messages[1]).toMatch(/4|four/i);
+          expect(asked.left).toEqual([]);
+        }),
+      ),
+    600_000,
   );
 });

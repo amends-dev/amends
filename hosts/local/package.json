@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@amends/api-http": "workspace:*",
+    "@daytona/sdk": "0.218.0",
     "@effect/sql-pg": "catalog:"
   }
 }

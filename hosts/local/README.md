@@ -102,12 +102,12 @@ The host runs agents' turns as [turn jobs](../../packages/cluster/README.md#turn
 its background jobs: each turn is its own job, so turns run side by side, and the request to
 run one is stored in the commit that created it. A turn runs amends's own harness with the agent's
 Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply in its thread.
-The harness runs in process, or, in an environment that says so, inside a local sandbox: a
-directory under `AMENDS_SANDBOX_DIRECTORY`, where the turn runs the
-[harness server](../harness-server/README.md). The host compiles the harness server with the Bun
-running it the first time a sandbox needs one started, into `harness-server/` in that directory, and
-uploads it into the sandbox's temporary directory, which is the sandbox's own. Daytona
-environments' turns fail, since the host does not install that provider yet. Several processes over one
+The harness runs in process, or, in an environment that says so, inside a sandbox, where the turn
+runs the [harness server](../harness-server/README.md): a local one, a directory under
+`AMENDS_SANDBOX_DIRECTORY`, or a Daytona one, under the workspace's Daytona connection, which the
+environment names. The host compiles the harness server with the Bun running it the first time a
+sandbox on each platform needs one started, into `harness-server/` in that directory, and uploads it
+into the sandbox's temporary directory. Several processes over one
 database share turn jobs as they share background jobs, and a turn cut short by a restart
 continues from its log. When a host dies while a turn works inside a sandbox, the harness server
 goes on with the session, and the process that takes the turn over attaches to it and collects what

@@ -324,7 +324,9 @@ a turn ends, including a queued turn stopped by a reader or because its agent le
 `TurnCommand.endTurn`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
 thread's timeline, and appends `Ended` to its agent's log. `prepare` assembles what a run needs from
 the stores: the agent's instructions and the model access and environment the turn started with
-or, before it starts, the agent's current ones, the running environment to acquire again (`reacquire`), the connection's settings and key, the history and
+or, before it starts, the agent's current ones, the running environment to acquire again (`reacquire`), the model connection's settings and key, and the
+connection's the environment's sandbox runs under (`sandboxConnection`), each failing the turn
+when it is gone or its key is missing or unreadable here, the history and
 transcript read from the log, input asked of the turn and the thread's accepted input not yet taken
 in, all of it however long the backlog, as one batch named for what it covers, so a run that hands
 it over again names it the same, the session a run left to attach to, the turn's own entries, and

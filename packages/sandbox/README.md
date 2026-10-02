@@ -62,6 +62,11 @@ under an `account`, a workspace connection whose implementation declares the san
 for this provider; and, if it takes a starting point for new sandboxes, how to describe that
 `template`.
 
+`Sandbox.Implementation` is what a host installs: the declaration, and `provider(connection)`,
+which makes the provider for the access of the connection its sandboxes run under, or without one
+for a provider that runs under no account. The provider lasts for the scope it is made in, so a
+host can make one for each workspace's account when it needs it.
+
 ## Errors
 
 `ProviderFailure` says the provider could not do what was asked and whether retrying unchanged can

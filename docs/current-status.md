@@ -54,15 +54,17 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   and an optional sandbox under an account connection, and every workspace starts with an
   in-process one; they are managed over HTTP and on the [Environments page](environments.md).
   Only amends's own harness is installed. It runs in process, where a sandbox is only where its
-  tools would act, and none acts there yet, or inside a local sandbox, served by the
-  [harness server](../packages/environment/README.md#the-harness-server); a Daytona environment's
-  turn fails, since the host does not install that provider yet. Environments hold no defaults for
+  tools would act, and none acts there yet, or inside a local or Daytona sandbox, served by the
+  [harness server](../packages/environment/README.md#the-harness-server), a Daytona one under the
+  workspace's Daytona connection; opt-in live tests run turns there with a real model. Each turn
+  acquires a sandbox of its own, so
+  with `stop` retention every turn leaves a stopped sandbox. Environments hold no defaults for
   optional settings, since no installed harness takes reasoning levels. Model providers suggest
   models, but the compatibility check accepts any model name, and nothing checks one with its
   provider.
-- The [sandbox contract](../packages/sandbox/README.md) has two providers, and the local host
-  installs only the local one; Daytona and opencode are the next milestones of
-  [harnesses in sandboxes](sandbox-harnesses.md). A harness server in a sandbox listens on a port
+- The [sandbox contract](../packages/sandbox/README.md) has two providers, local and Daytona, and
+  the local host installs both, making a Daytona provider for each workspace's account as a turn
+  needs it; opencode is the next milestone of [harnesses in sandboxes](sandbox-harnesses.md). A harness server in a sandbox listens on a port
   with a token of its own, and a session a dead host left goes on there for the next run to attach
   to; a local sandbox's processes end when its host stops cleanly, so there the next run starts the
   session again. A session no run comes back to keeps its server running until its sandbox stops.

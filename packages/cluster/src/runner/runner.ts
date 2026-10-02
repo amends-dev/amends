@@ -85,7 +85,11 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       Effect.flatMap((acquired) =>
         acquired === undefined
           ? Effect.void
-          : environments.release(acquired.environment, acquired.reference),
+          : environments.release(
+              acquired.environment,
+              acquired.reference,
+              acquired.sandboxConnection,
+            ),
       ),
       Effect.catch((failure) =>
         Effect.logWarning("Turn environment was not released", { ...turnSteps.ids, failure }),
@@ -137,7 +141,10 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       ) {
         if (environment === undefined) {
           const spawned = yield* Effect.result(
-            environments.spawn(step.plan.environment, { reacquire: step.plan.reacquire }),
+            environments.spawn(step.plan.environment, {
+              reacquire: step.plan.reacquire,
+              sandboxConnection: step.plan.sandboxConnection,
+            }),
           );
           if (Result.isFailure(spawned)) {
             yield* Effect.logWarning("Turn environment did not start", {
@@ -190,6 +197,8 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
         );
       else if (endedHere) yield* releaseAcquired(turnSteps);
     },
+    // The sandbox provider the run's environment was spawned with lasts as long as the run.
+    Effect.scoped,
     Effect.provideService(Crypto.Crypto, crypto),
   );
 
