@@ -7,7 +7,7 @@ import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
-import { committed, withChangeFeed, type Sidebar } from "./change-feed.ts";
+import { committed, notificationsSeen, withChangeFeed, type Sidebar } from "./change-feed.ts";
 
 const response = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -468,12 +468,9 @@ it("lists the inbox at its hash route, and opening one marks it seen and shows i
             : inbox,
         ),
       );
-    if (request.method === "POST" && path.endsWith("/notifications/n1/acknowledge")) {
-      inbox[0]!.notification.state = {
-        _tag: "Acknowledged",
-        outcome: { _tag: "Seen" },
-        acknowledgedAt: at,
-      } as { _tag: string };
+    if (request.method === "POST" && path.endsWith("/notifications/n1/seen")) {
+      inbox[0]!.notification.state = { _tag: "Seen", seenAt: at } as { _tag: string };
+      feed.streams.at(-1)?.send(notificationsSeen("one", "owner-one", ["n1"]));
       return Promise.resolve(response(inbox[0]!.notification));
     }
     const answer = conversation(path);

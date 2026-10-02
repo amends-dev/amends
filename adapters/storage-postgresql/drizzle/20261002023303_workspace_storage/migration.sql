@@ -128,7 +128,7 @@ CREATE TABLE "group_read_times" (
 	"workspace_id" text,
 	"member_id" text,
 	"group_id" text,
-	"caught_up_at" timestamp with time zone NOT NULL,
+	"read_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "group_read_times_pkey" PRIMARY KEY("workspace_id","member_id","group_id")
 );
 --> statement-breakpoint
@@ -257,8 +257,7 @@ CREATE TABLE "notifications" (
 	"thread_group_id" text,
 	"thread_sequence" integer,
 	CONSTRAINT "notifications_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "notification_state" CHECK (("state" IN ('Pending', 'Informational') AND "discard_reason" IS NULL AND "accepted_turn_id" IS NULL AND "accepted_at" IS NULL) OR ("state" = 'Discarded' AND "discard_reason" IN ('participation-ended', 'access-lost') AND "accepted_turn_id" IS NULL AND "accepted_at" IS NULL) OR ("state" = 'Accepted' AND "recipient_kind" = 'Agent' AND "discard_reason" IS NULL AND "accepted_turn_id" IS NOT NULL AND "accepted_at" IS NOT NULL)),
-	CONSTRAINT "notification_seen_state" CHECK ("seen_at" IS NULL OR ("recipient_kind" = 'Human' AND "state" = 'Pending')),
+	CONSTRAINT "notification_state" CHECK (("discard_reason" IS NOT NULL) = ("state" = 'Discarded') AND ("accepted_turn_id" IS NOT NULL AND "accepted_at" IS NOT NULL) = ("state" = 'Accepted') AND ("accepted_turn_id" IS NULL) = ("accepted_at" IS NULL) AND ("seen_at" IS NOT NULL) = ("state" = 'Seen') AND ("state" <> 'Accepted' OR "recipient_kind" = 'Agent') AND ("state" <> 'Seen' OR "recipient_kind" = 'Human')),
 	CONSTRAINT "notification_recipient" CHECK (CASE "recipient_kind" WHEN 'Triage' THEN "recipient_id" IS NULL AND "recipient_member_id" IS NULL WHEN 'Contact' THEN "recipient_id" IS NOT NULL AND "recipient_member_id" IS NULL ELSE "recipient_id" IS NOT NULL AND "recipient_member_id" IS NOT NULL END),
 	CONSTRAINT "notification_thread" CHECK (("thread_id" IS NULL AND "thread_group_id" IS NULL AND "thread_sequence" IS NULL) OR ("thread_id" IS NOT NULL AND "thread_group_id" IS NOT NULL AND "thread_sequence" > 0)),
 	CONSTRAINT "notifications_recipient_kind" CHECK (("recipient_kind" = 'Triage' AND "recipient_id" IS NULL) OR ("recipient_kind" IN ('Human', 'Agent', 'Contact') AND "recipient_id" IS NOT NULL AND "recipient_id" <> ''))
@@ -403,9 +402,9 @@ CREATE UNIQUE INDEX "active_member_identity" ON "members" ("workspace_id","ident
 CREATE INDEX "members_by_identity" ON "members" ("identity_kind","identity_id","workspace_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "notifications_by_source_recipient" ON "notifications" ("workspace_id","source_log_id","source_entry_id","recipient_kind",coalesce("recipient_id", ''));--> statement-breakpoint
 CREATE INDEX "notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"recorded_at","id" COLLATE "C");--> statement-breakpoint
-CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"recorded_at","id" COLLATE "C") WHERE "state" = 'Pending' AND "seen_at" IS NULL;--> statement-breakpoint
-CREATE INDEX "pending_notifications_by_group" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_group_id") WHERE "state" = 'Pending' AND "seen_at" IS NULL;--> statement-breakpoint
-CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_id","thread_sequence") WHERE "state" = 'Pending' AND "seen_at" IS NULL;--> statement-breakpoint
+CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"recorded_at","id" COLLATE "C") WHERE "state" = 'Pending';--> statement-breakpoint
+CREATE INDEX "pending_notifications_by_group" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_group_id") WHERE "state" = 'Pending';--> statement-breakpoint
+CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_id","thread_sequence") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE INDEX "pending_agent_notifications_by_participation" ON "notifications" ("workspace_id","participation_id") WHERE "state" = 'Pending' AND "recipient_kind" = 'Agent';--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_occurrence" ON "thread_activities" ("workspace_id","occurrence");--> statement-breakpoint

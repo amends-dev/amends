@@ -41,7 +41,6 @@ import { ThreadActivityProjection } from "./thread/activity/projection.ts";
 import { Layer } from "effect";
 import { ChangeFeedService } from "./change-feed/service.ts";
 import { ChangeFeedSource } from "./change-feed/source.ts";
-import { SignalService } from "./signal/service.ts";
 import { GroupService } from "./group/service.ts";
 import { GroupQuery } from "./group/query.ts";
 import { GroupProjection } from "./group/projection.ts";
@@ -213,7 +212,6 @@ const operations = Layer.mergeAll(
   ReadStateService.layer,
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
-  SignalService.layer,
   ConnectionService.layer,
   EnvironmentService.layer,
   AgentService.layer.pipe(Layer.provide(MemberService.layer)),

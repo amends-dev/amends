@@ -5,8 +5,8 @@ import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
 
 /**
- * Register inbox reads, with or without sources, source resolution, and acknowledgment, resolving the principal and
- * workspace membership per request.
+ * Register the inbox, its pending count, and marking notifications seen, resolving the
+ * principal and workspace membership per request.
  *
  * @category layers
  */
@@ -16,18 +16,6 @@ export const layer = HttpApiBuilder.group(
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     return handlers.handleAll({
-      list: ({ params, query: { pendingOnly, ...options } }) =>
-        Effect.flatMap(Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
-              pendingOnly
-                ? notificationService.listPending(options)
-                : notificationService.list(options),
-            ),
-          ),
-        ),
       inbox: ({ params, query }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
@@ -48,48 +36,25 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
-      acknowledgeThrough: ({ params, payload }) =>
+      markSeenThrough: ({ params, payload }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
             Effect.flatMap(NotificationService.Service, (notificationService) =>
-              Effect.map(
-                notificationService.acknowledgeThrough(payload.through),
-                (acknowledged) => ({
-                  acknowledged,
-                }),
-              ),
+              Effect.map(notificationService.markSeenThrough(payload.through), (marked) => ({
+                marked,
+              })),
             ),
           ),
         ),
-      get: ({ params }) =>
+      markSeen: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
             params.workspaceId,
             principal,
             Effect.flatMap(NotificationService.Service, (notificationService) =>
-              notificationService.get(params.notificationId),
-            ),
-          ),
-        ),
-      source: ({ params }) =>
-        Effect.flatMap(Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
-              notificationService.resolveSource(params.notificationId),
-            ),
-          ),
-        ),
-      acknowledge: ({ params }) =>
-        Effect.flatMap(Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(NotificationService.Service, (notificationService) =>
-              notificationService.acknowledge(params.notificationId),
+              notificationService.markSeen(params.notificationId),
             ),
           ),
         ),

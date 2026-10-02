@@ -43,36 +43,32 @@ const isAfter = (record: Notification.Record, cursor: NotificationStore.Cursor) 
 const isBefore = (record: Notification.Record, cursor: NotificationStore.Cursor) =>
   byRecorded(record, Object.assign({}, record, cursor)) < 0;
 
-/** A record as reads show it: a pending notification its human recipient saw reads as Seen. */
-const withSeen = (space: MemoryDatabase.Space) => (record: Notification.Record) => {
+/**
+ * A record as stored: one projected as Pending reads as Seen, with its first time, once its human
+ * recipient has seen it, as when projections are rebuilt after they saw it.
+ */
+const withSeen = (space: MemoryDatabase.Space, record: Notification.Record) => {
   const seen = space.notificationsSeen.get(record.id);
-  return seen === undefined || record.state._tag !== "Pending"
+  return seen === undefined || record.recipient._tag !== "Human" || record.state._tag !== "Pending"
     ? record
     : Object.assign({}, record, {
-        state: Notification.State.cases.Acknowledged.make({
-          outcome: { _tag: "Seen" },
-          acknowledgedAt: DateTime.makeUnsafe(seen),
-        }),
+        state: Notification.State.cases.Seen.make({ seenAt: DateTime.makeUnsafe(seen) }),
       });
 };
 
 /**
- * Notification records and recipient reads over the workspace transaction, with each human
- * recipient's private Seen kept beside them.
+ * Notification records and recipient reads over the workspace transaction. Each human
+ * recipient's Seen is also kept beside them, where rebuilding projections leaves it.
  *
  * @category constructors
  */
 export const make = Effect.fn("Notifications.make")(function* () {
   const { workspaceId, read, write, exclusive } = yield* Binding.Service;
-  /** Every record as reads show it. */
-  const all = Effect.flatMap(read, (space) =>
-    Effect.map(rows.all(space.records.notifications), (records) => records.map(withSeen(space))),
-  );
+  const all = Effect.flatMap(read, (space) => rows.all(space.records.notifications));
 
-  const list = Effect.fnUntraced(function* (
+  const listPending = Effect.fnUntraced(function* (
     recipient: Notification.Recipient,
     options: NotificationStore.ReadOptions,
-    pendingOnly: boolean,
   ) {
     const target = inboxKey(yield* validateRecipient(recipient));
     const request = yield* validateOptions(options);
@@ -82,7 +78,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       .filter(
         (record) =>
           inboxKey(record.recipient) === target &&
-          (!pendingOnly || record.state._tag === "Pending") &&
+          record.state._tag === "Pending" &&
           (after === undefined || isAfter(record, after)),
       )
       .toSorted(byRecorded)
@@ -125,10 +121,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
           operation,
           message: "Expected a notification in this workspace",
         });
-      if (record.state._tag === "Acknowledged")
+      if (record.state._tag === "Seen" || record.state._tag === "Accepted")
         return yield* new NotificationStore.Conflict({
           operation,
-          message: "Seen is recorded with markSeen",
+          message: "Seen and Accepted are recorded with markSeen and accept",
         });
       records.push(record);
     }
@@ -151,7 +147,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       written.push([
         record.id,
         yield* rows
-          .encode(record)
+          .encode(withSeen(space, record))
           .pipe(Effect.mapError(storeFailure(NotificationStore, operation))),
       ]);
     }
@@ -163,16 +159,12 @@ export const make = Effect.fn("Notifications.make")(function* () {
       function* (input) {
         const id = yield* Schema.decodeEffect(Notification.Id)(input);
         const space = yield* read;
-        return Option.map(yield* rows.get(space.records.notifications, id), withSeen(space));
+        return yield* rows.get(space.records.notifications, id);
       },
       Effect.mapError(storeFailure(NotificationStore, "get")),
     ),
-    listByRecipient: Effect.fn("Notifications.listByRecipient")(
-      (recipient, options) => list(recipient, options, false),
-      Effect.mapError(storeFailure(NotificationStore, "listByRecipient")),
-    ),
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
-      (recipient, options) => list(recipient, options, true),
+      listPending,
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
     ),
     listLatestByRecipient: Effect.fn("Notifications.listLatestByRecipient")(
@@ -243,24 +235,35 @@ export const make = Effect.fn("Notifications.make")(function* () {
       // a departure that settles one first makes this conflict, and one after keeps its Seen.
       yield* exclusive((space) =>
         Effect.gen(function* () {
-          // Check every notification before recording any of them.
-          for (const id of ids) {
+          // Check every notification before recording any of them; one seen before keeps its time.
+          const pending: Array<Notification.Record> = [];
+          for (const id of new Set(ids)) {
             const found = yield* rows
               .get(space.records.notifications, id)
               .pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
+            const record = Option.getOrUndefined(found);
             if (
-              Option.isNone(found) ||
-              found.value.recipient._tag !== "Human" ||
-              found.value.state._tag !== "Pending"
+              record === undefined ||
+              record.recipient._tag !== "Human" ||
+              (record.state._tag !== "Pending" && record.state._tag !== "Seen")
             )
               return yield* new NotificationStore.Conflict({
                 operation: "markSeen",
                 message: "Expected a pending notification of a human recipient",
               });
+            if (record.state._tag === "Pending") pending.push(record);
           }
-          for (const id of ids)
-            if (!space.notificationsSeen.has(id))
-              space.notificationsSeen.set(id, DateTime.toEpochMillis(seenAt));
+          for (const record of pending) {
+            const row = yield* rows
+              .encode(
+                Object.assign({}, record, {
+                  state: Notification.State.cases.Seen.make({ seenAt }),
+                }),
+              )
+              .pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
+            space.records.notifications.set(record.id, row);
+            space.notificationsSeen.set(record.id, DateTime.toEpochMillis(seenAt));
+          }
         }),
       ).pipe(
         // The binding's own errors, such as another host writing, are failures of the call.
@@ -300,15 +303,12 @@ export const make = Effect.fn("Notifications.make")(function* () {
           });
         accepted.push(record);
       }
-      const acknowledgedAt = DateTime.toUtc(acceptedInput);
+      const acceptedAt = DateTime.toUtc(acceptedInput);
       for (const record of accepted) {
         const row = yield* rows
           .encode(
             Object.assign({}, record, {
-              state: Notification.State.cases.Acknowledged.make({
-                outcome: { _tag: "Accepted", turnId },
-                acknowledgedAt,
-              }),
+              state: Notification.State.cases.Accepted.make({ turnId, acceptedAt }),
             }),
           )
           .pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
@@ -364,8 +364,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
             (recipient._tag !== "Human" && recipient._tag !== "Agent") ||
             recipient.memberId !== memberId ||
             record.thread?.groupId !== groupId ||
-            record.state._tag !== "Pending" ||
-            space.notificationsSeen.has(record.id)
+            record.state._tag !== "Pending"
           )
             continue;
           const reason = recipient._tag === "Agent" ? "participation-ended" : "access-lost";

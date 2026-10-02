@@ -7,7 +7,6 @@ import type { HarnessImplementation } from "@amends/harness";
 import type { SandboxImplementation } from "@amends/sandbox";
 import type { ConnectionImplementation } from "@amends/connection";
 import { Journal } from "@amends/core/journal";
-import { Signals } from "@amends/core/signal";
 import { Workspace } from "@amends/core/workspace";
 import {
   Context,
@@ -22,7 +21,6 @@ import {
   Schedule,
   Scope,
 } from "effect";
-import { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
 
 /** Internal workspace context; gateway methods restrict which services callers can use. */
@@ -74,7 +72,6 @@ export interface Interface {
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
-  const workspaceSignals = yield* WorkspaceSignals.Service;
   const agentJobs = yield* AgentJobs.Service;
   const turnJobs = yield* TurnJobs.Service;
   const crypto = yield* Crypto.Crypto;
@@ -94,7 +91,6 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
         Layer.mergeAll(
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
-          Layer.succeed(Signals.Service, workspaceSignals.forWorkspace(workspaceId)),
           Layer.succeed(AgentJobs.Service, agentJobs),
           Layer.succeed(TurnJobs.Service, turnJobs),
           Layer.succeed(ConnectionCatalog.Service, connectionCatalog),

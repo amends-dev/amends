@@ -47,6 +47,7 @@ import { Cause, Context, DateTime, Effect, Exit, Layer, Option, Schema } from "e
 import {
   type Bound,
   boundTo,
+  listOldestFirst,
   otherWorkspaceId,
   placed,
   placedIn,
@@ -54,8 +55,8 @@ import {
   runHost,
   Support,
   testProvenance,
-  workspaceId,
   threadInternals,
+  workspaceId,
 } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -284,7 +285,8 @@ export const threadReads = (harness: Harness) => {
               );
               const before = yield* history(bound);
               const beforeParts = yield* bound.participations.listByThread(first.thread.id);
-              const beforeNotifications = yield* bound.notifications.listByRecipient(
+              const beforeNotifications = yield* listOldestFirst(
+                bound.notifications,
                 Notification.ofMember(readerId, readerIdentity),
                 {
                   limit: 100,
@@ -323,7 +325,8 @@ export const threadReads = (harness: Harness) => {
                 beforeParts,
               );
               expect(
-                yield* bound.notifications.listByRecipient(
+                yield* listOldestFirst(
+                  bound.notifications,
                   Notification.ofMember(readerId, readerIdentity),
                   { limit: 100 },
                 ),
@@ -837,7 +840,8 @@ export const threadReads = (harness: Harness) => {
                 ),
               ).toBe(false);
               expect(
-                yield* bound.notifications.listByRecipient(
+                yield* listOldestFirst(
+                  bound.notifications,
                   Notification.ofMember(memberId, identity),
                   {
                     limit: 10,

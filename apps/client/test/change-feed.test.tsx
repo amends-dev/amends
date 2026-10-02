@@ -11,12 +11,13 @@ import {
   useMarkThreadRead,
   useSettings,
   useTyping,
-  useWorkspaceFeed,
-  WorkspaceFeedProvider,
+  useChangeFeed,
+  ChangeFeedProvider,
   type SessionStore,
   type SettingsController,
-  type WorkspaceFeedScope,
+  type ChangeFeedScope,
 } from "../src/index.ts";
+import { eventStream } from "./event-stream.ts";
 
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>
@@ -63,38 +64,6 @@ const committed = (cursor: string, ...events: Array<ReturnType<typeof event>>) =
   notifications: [],
 });
 
-/** One server-sent event stream the test writes to and ends. */
-function stream(request: Request) {
-  const encoder = new TextEncoder();
-  let controller!: ReadableStreamDefaultController<Uint8Array>;
-  const body = new ReadableStream<Uint8Array>({
-    start: (value) => {
-      controller = value;
-    },
-  });
-  request.signal.addEventListener("abort", () => {
-    try {
-      controller.error(request.signal.reason);
-    } catch {
-      /* Already ended. */
-    }
-  });
-  const write = (event: string, data: unknown) =>
-    controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-  return {
-    request,
-    response: new Response(body, { headers: { "content-type": "text/event-stream" } }),
-    send: (message: unknown) => write("message", message),
-    unavailable: () => {
-      write("effect/httpapi/stream/failure", [
-        { _tag: "Fail", error: { _tag: "ChangeFeed.Unavailable" } },
-      ]);
-      controller.close();
-    },
-    close: () => controller.close(),
-  };
-}
-
 function fixture(
   options: {
     changes?: (request: Request) => Response | undefined;
@@ -105,7 +74,7 @@ function fixture(
   } = {},
 ) {
   let name = "Studio";
-  const streams: Array<ReturnType<typeof stream>> = [];
+  const streams: Array<ReturnType<typeof eventStream>> = [];
   const reads: Array<string> = [];
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init),
@@ -113,7 +82,7 @@ function fixture(
     if (path.endsWith("/changes")) {
       const replaced = options.changes?.(request);
       if (replaced) return Promise.resolve(replaced);
-      const created = stream(request);
+      const created = eventStream(request);
       streams.push(created);
       return Promise.resolve(created.response);
     }
@@ -167,11 +136,9 @@ function fixture(
     },
   };
   const [shown, setShown] = createSignal(true);
-  let feed!: WorkspaceFeedScope,
-    settings!: SettingsController,
-    typing!: ReturnType<typeof useTyping>;
+  let feed!: ChangeFeedScope, settings!: SettingsController, typing!: ReturnType<typeof useTyping>;
   function Consumer() {
-    feed = useWorkspaceFeed();
+    feed = useChangeFeed();
     settings = useSettings("one", "workspace");
     typing = useTyping("one");
     options.mount?.();
@@ -187,9 +154,9 @@ function fixture(
     >
       <DirectoryProvider>
         <Show when={shown()}>
-          <WorkspaceFeedProvider workspaceId="one">
+          <ChangeFeedProvider workspaceId="one">
             <Consumer />
-          </WorkspaceFeedProvider>
+          </ChangeFeedProvider>
         </Show>
       </DirectoryProvider>
     </ClientProvider>
@@ -396,14 +363,13 @@ it("shows who is typing until their signal runs out or their message arrives, ne
   await waitFor(() => expect(f.typing("thread")).toEqual([]), { timeout: 2000 });
 });
 
-it("a read mark refreshes the reads it changes once, not again when its own signal comes back", async () => {
-  const marked = Promise.withResolvers<Response>();
+it("a read mark refreshes the reads it changes when its signal arrives, from any session", async () => {
   const [through, setThrough] = createSignal<number>();
   const f = fixture({
     respond: (request, path) => {
       if (path === "/workspaces/one/groups") return Promise.resolve(json([]));
       if (request.method === "POST" && path === "/workspaces/one/threads/thread/read")
-        return marked.promise;
+        return Promise.resolve(new Response(null, { status: 204 }));
       return undefined;
     },
     mount: () => {
@@ -427,15 +393,12 @@ it("a read mark refreshes the reads it changes once, not again when its own sign
   });
   setThrough(3);
   await waitFor(() => expect(f.count("/threads/thread/read")).toBe(1));
-  // The server's signal can arrive before its answer to the mark does.
-  stream.send(read(3));
+  // The mark itself refreshes nothing: its signal does, once.
   await new Promise((resolve) => setTimeout(resolve, 50));
   expect(f.count("/groups")).toBe(1);
-  marked.resolve(new Response(null, { status: 204 }));
+  stream.send(read(3));
   await waitFor(() => expect(f.count("/groups")).toBe(2));
-  await new Promise((resolve) => setTimeout(resolve, 50));
-  expect(f.count("/groups")).toBe(2);
-  // Reading further on another device is news to this one.
+  // Reading further on another device refreshes this one the same way.
   stream.send(read(5));
   await waitFor(() => expect(f.count("/groups")).toBe(3));
 });

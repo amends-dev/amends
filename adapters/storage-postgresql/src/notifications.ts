@@ -4,7 +4,7 @@ import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Turn } from "@amends/core/turn";
-import { and, asc, desc, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -24,12 +24,16 @@ const decodeRows = Schema.decodeUnknownEffect(
       recordedAt: Schema.DateTimeUtcFromDate,
       state: Schema.Union([
         Notification.State.cases.Pending,
+        Schema.Struct({
+          ...Notification.State.cases.Seen.fields,
+          seenAt: Schema.DateTimeUtcFromDate,
+        }),
+        Schema.Struct({
+          ...Notification.State.cases.Accepted.fields,
+          acceptedAt: Schema.DateTimeUtcFromDate,
+        }),
         Notification.State.cases.Discarded,
         Notification.State.cases.Informational,
-        Schema.Struct({
-          ...Notification.State.cases.Acknowledged.fields,
-          acknowledgedAt: Schema.DateTimeUtcFromDate,
-        }),
       ]),
     }),
   ),
@@ -40,7 +44,7 @@ const decode = (rows: ReadonlyArray<unknown>) =>
   );
 
 type NotificationRow = typeof notifications.$inferSelect;
-/** A row as reads show it: a pending notification its human recipient saw reads as Seen. */
+/** A row as reads show it. */
 const toEncodedRecord = (row: NotificationRow) => ({
   id: row.id,
   workspaceId: row.workspaceId,
@@ -65,23 +69,13 @@ const toEncodedRecord = (row: NotificationRow) => ({
         },
       }),
   state:
-    row.state === "Accepted"
-      ? {
-          _tag: "Acknowledged",
-          outcome: { _tag: "Accepted", turnId: row.acceptedTurnId },
-          acknowledgedAt: row.acceptedAt,
-        }
-      : row.state === "Discarded"
-        ? { _tag: "Discarded", reason: row.discardReason }
-        : row.state === "Informational"
-          ? row.discardReason === null && row.seenAt === null
-            ? { _tag: "Informational" }
-            : undefined
-          : row.discardReason !== null
-            ? undefined
-            : row.seenAt === null
-              ? { _tag: "Pending" }
-              : { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: row.seenAt },
+    row.state === "Seen"
+      ? { _tag: "Seen", seenAt: row.seenAt }
+      : row.state === "Accepted"
+        ? { _tag: "Accepted", turnId: row.acceptedTurnId, acceptedAt: row.acceptedAt }
+        : row.state === "Discarded"
+          ? { _tag: "Discarded", reason: row.discardReason }
+          : { _tag: row.state },
 });
 
 /** A membership for people and agents, a contact, or triage. */
@@ -105,12 +99,10 @@ export const make = Effect.fn("Notifications.make")(function* () {
   /** Whose inbox a row is in, as the recipient indexes key it. */
   const inbox = sql`coalesce(${notifications.recipientMemberId}, ${notifications.recipientId}, '')`;
   const recorded = () => db.select().from(notifications);
-  /** The pending indexes leave out what a human has seen, so pending reads never scan it. */
-  const pendingOnly = and(eq(notifications.state, "Pending"), isNull(notifications.seenAt));
-  const list = Effect.fnUntraced(function* (
+  const pendingOnly = eq(notifications.state, "Pending");
+  const listPending = Effect.fnUntraced(function* (
     recipient: Notification.Recipient,
     options: NotificationStore.ReadOptions,
-    pending: boolean,
   ) {
     const target = yield* validateRecipient(recipient);
     const request = yield* validateOptions(options);
@@ -122,7 +114,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
             inWorkspace,
             eq(notifications.recipientKind, target._tag),
             eq(inbox, inboxOf(target)),
-            pending ? pendingOnly : undefined,
+            pendingOnly,
             // A row comparison bounds the index scan; the equivalent OR form only filters it.
             after === undefined
               ? undefined
@@ -177,11 +169,16 @@ export const make = Effect.fn("Notifications.make")(function* () {
           operation,
           message: "Expected a notification in this workspace",
         });
-      if (record.state._tag === "Acknowledged")
+      if (record.state._tag === "Seen" || record.state._tag === "Accepted")
         return yield* new NotificationStore.Conflict({
           operation,
-          message: "Seen is recorded with markSeen",
+          message: "Seen and Accepted are recorded with markSeen and accept",
         });
+      // A rebuild inserts notifications again; the Seen that outlived their rows comes back.
+      const seenAt =
+        record.recipient._tag === "Human" && record.state._tag === "Pending"
+          ? sql`(SELECT seen_at FROM notification_seen WHERE workspace_id = ${workspaceId} AND notification_id = ${record.id})`
+          : null;
       rows.push({
         workspaceId,
         id: record.id,
@@ -199,12 +196,11 @@ export const make = Effect.fn("Notifications.make")(function* () {
             ? record.recipient.memberId
             : null,
         recordedAt: DateTime.toDate(record.recordedAt),
-        state: record.state._tag,
-        // A rebuild inserts notifications again; the Seen that outlived their rows comes back.
-        seenAt:
-          record.recipient._tag === "Human" && record.state._tag === "Pending"
-            ? sql`(SELECT seen_at FROM notification_seen WHERE workspace_id = ${workspaceId} AND notification_id = ${record.id})`
-            : null,
+        state:
+          seenAt === null
+            ? record.state._tag
+            : sql`CASE WHEN ${seenAt} IS NULL THEN 'Pending' ELSE 'Seen' END`,
+        seenAt,
       });
     }
     if (rows.length === 0) return;
@@ -229,14 +225,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
       },
       Effect.mapError(storeFailure(NotificationStore, "get")),
     ),
-    listByRecipient: Effect.fn("Notifications.listByRecipient")(
-      (recipient, options) => list(recipient, options, false),
-      Effect.mapError(storeFailure(NotificationStore, "listByRecipient")),
-    ),
     countPendingByRecipient: Effect.fn("Notifications.countPendingByRecipient")(
       function* (recipient) {
         const target = yield* validateRecipient(recipient);
-        // The pending recipient index answers this without reading what the recipient has seen.
         const [row] = yield* guard(
           db
             .select({ count: sql<number>`count(*)::int` })
@@ -303,7 +294,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       Effect.mapError(storeFailure(NotificationStore, "listPendingByThread")),
     ),
     listPendingByRecipient: Effect.fn("Notifications.listPendingByRecipient")(
-      (recipient, options) => list(recipient, options, true),
+      listPending,
       Effect.mapError(storeFailure(NotificationStore, "listPendingByRecipient")),
     ),
     listLatestByRecipient: Effect.fn("Notifications.listLatestByRecipient")(
@@ -333,7 +324,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
               inWorkspace,
               inIds(notifications.id, unique),
               eq(notifications.recipientKind, "Human"),
-              eq(notifications.state, "Pending"),
+              inArray(notifications.state, ["Pending", "Seen"]),
             ),
           ),
       ).pipe(Effect.mapError(storeFailure(NotificationStore, "markSeen")));
@@ -342,13 +333,13 @@ export const make = Effect.fn("Notifications.make")(function* () {
           operation: "markSeen",
           message: "Expected a pending notification of a human recipient",
         });
-      // The row keeps the first time for pending reads, and notification_seen keeps it through
-      // rebuilds. Updating the row first serializes concurrent calls on its lock, so both agree.
+      // The row keeps the first time, and notification_seen keeps it through rebuilds. Updating
+      // the row first serializes concurrent calls on its lock, and the later one finds it Seen.
       const seen = sql.param(DateTime.toDate(seenAt), notificationSeen.seenAt);
       yield* guard(
         db.execute(sql`
           WITH seen AS (
-            UPDATE notifications SET seen_at = coalesce(seen_at, ${seen}::timestamptz)
+            UPDATE notifications SET state = 'Seen', seen_at = ${seen}::timestamptz
             WHERE workspace_id = ${workspaceId} AND id = any(${sql.param(unique)}::text[])
               AND recipient_kind = 'Human' AND state = 'Pending'
             RETURNING id, seen_at
@@ -436,8 +427,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         const groupId = yield* Schema.decodeEffect(Group.Id)(groupInput).pipe(
           Effect.mapError(storeConflict(NotificationStore, "discardPendingForGroup")),
         );
-        // The same predicate as the pending counts, so pending_notifications_by_group finds them:
-        // an agent never has Seen, so its pending rows match it too.
+        // The same predicate as the pending counts, so pending_notifications_by_group finds them.
         const settlements = [
           { kind: "Human", reason: "access-lost" },
           { kind: "Agent", reason: "participation-ended" },

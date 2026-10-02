@@ -24,7 +24,6 @@ import {
   ThreadParticipationService,
 } from "@amends/core/thread";
 import { Request } from "@amends/core/request";
-import { SignalService } from "@amends/core/signal";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/unstable/httpapi";
 
@@ -67,18 +66,13 @@ export const InvalidActor = Authorization.InvalidActor.pipe(HttpApiSchema.status
 export const UnknownPermission = PermissionCatalog.Unknown.pipe(HttpApiSchema.status(400));
 export const MemberNotFound = MemberService.NotFound.pipe(HttpApiSchema.status(404));
 export const NotificationNotFound = NotificationService.NotFound.pipe(HttpApiSchema.status(404));
-/** The notification is the caller's, but its source cannot be read now. */
-export const NotificationSourceUnavailable = NotificationService.SourceUnavailable.pipe(
-  HttpApiSchema.status(404),
-);
-/** Only a person acknowledges a notification; an agent's are handled by its work. */
+/** Only a person marks a notification seen; an agent's are handled by its work. */
 export const NotificationHumanRecipientRequired = NotificationService.HumanRecipientRequired.pipe(
   HttpApiSchema.status(403),
 );
 export const NotificationAlreadyHandled = NotificationService.AlreadyHandled.pipe(
   HttpApiSchema.status(409),
 );
-export const TypingThreadNotFound = SignalService.ThreadNotFound.pipe(HttpApiSchema.status(404));
 export const OwnerProtected = MemberService.OwnerProtected.pipe(HttpApiSchema.status(409));
 export const AlreadyRemoved = MemberService.AlreadyRemoved.pipe(HttpApiSchema.status(409));
 export const InvitationNotFound = InvitationService.NotFound.pipe(HttpApiSchema.status(404));
@@ -155,6 +149,7 @@ export const message = [
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
+export const typing = [ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404))] as const;
 export const participation = [
   ThreadParticipationService.ThreadNotFound.pipe(HttpApiSchema.status(404)),
   ThreadParticipationService.NotFound.pipe(HttpApiSchema.status(404)),

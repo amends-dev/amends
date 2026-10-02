@@ -1,7 +1,11 @@
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { seenRequest, seenThroughRequest, type Notification } from "../api/conversations.ts";
+import {
+  markSeenRequest,
+  markSeenThroughRequest,
+  type Notification,
+} from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
@@ -20,7 +24,7 @@ export function useMarkSeen(workspaceId: string, notificationId: string): SeenCo
   const [seen, setSeen] = createSignal(false),
     [error, setError] = createSignal<WorkspaceFailure>();
   const request = useRequest(
-    seenRequest(useApiClient(), workspaceId),
+    markSeenRequest(useApiClient(), workspaceId),
     (exit) => {
       if (Exit.isSuccess(exit)) setSeen(true);
       else setError(workspaceFailure(exit.cause));
@@ -54,7 +58,7 @@ export function useMarkAllSeen(
   const session = useSession();
   const [error, setError] = createSignal<WorkspaceFailure>();
   const request = useRequest(
-    seenThroughRequest(useApiClient(), workspaceId),
+    markSeenThroughRequest(useApiClient(), workspaceId),
     (exit) => {
       if (Exit.isSuccess(exit)) return;
       const failure = workspaceFailure(exit.cause);

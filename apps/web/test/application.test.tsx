@@ -7,7 +7,7 @@ import { FetchHttpClient } from "effect/unstable/http";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
 import { Session, type SessionStore } from "@amends/client";
-import { committed, withChangeFeed, type Sidebar } from "./change-feed.ts";
+import { committed, notificationsSeen, withChangeFeed, type Sidebar } from "./change-feed.ts";
 
 const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });
 function memoryStore(initial?: Session) {
@@ -895,7 +895,7 @@ const mentioned = () => ({
 });
 it("lists the inbox at its route, and opening one marks it seen and shows its thread beside it", async () => {
   const inbox = [mentioned()];
-  const acknowledged: Array<string> = [];
+  const markedSeen: Array<string> = [];
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
@@ -907,13 +907,10 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
             : inbox,
         ),
       );
-    if (request.method === "POST" && path.endsWith("/notifications/n1/acknowledge")) {
-      acknowledged.push(path);
-      inbox[0]!.notification.state = {
-        _tag: "Acknowledged",
-        outcome: { _tag: "Seen" },
-        acknowledgedAt: at,
-      } as { _tag: string };
+    if (request.method === "POST" && path.endsWith("/notifications/n1/seen")) {
+      markedSeen.push(path);
+      inbox[0]!.notification.state = { _tag: "Seen", seenAt: at } as { _tag: string };
+      feed.streams.at(-1)?.send(notificationsSeen("one", "owner-one", ["n1"]));
       return Promise.resolve(response(inbox[0]!.notification));
     }
     // The reply in the thread mentions the reader, as the notification says.
@@ -951,9 +948,7 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
   );
   // Opening it marks it seen at once.
   await waitFor(() => expect(within(list).queryByRole("img", { name: "unread" })).toBeNull());
-  await waitFor(() =>
-    expect(acknowledged).toEqual(["/workspaces/one/notifications/n1/acknowledge"]),
-  );
+  await waitFor(() => expect(markedSeen).toEqual(["/workspaces/one/notifications/n1/seen"]));
   const thread = await screen.findByLabelText("Thread", { selector: "aside" });
   await within(thread).findByText("Can you look at the terms?");
   // The message that notified the reader is set apart, and the panel says why it came.
@@ -1083,7 +1078,7 @@ const managed = {
     createdAt: at,
   },
   latestActivityAt: null,
-  caughtUpAt: null,
+  readAt: null,
   newActivity: false,
   following: false,
   pending: 0,

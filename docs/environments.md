@@ -65,4 +65,4 @@ response reuses its request key. When the host refuses sandbox settings, such as
 longer available, the message sits beside the field it concerns and the draft stays. The change
 feed refreshes environments on each `environment.*` commit, on connection changes, whose
 readiness an account environment follows, and on access changes; see
-[live updates](live-updates.md).
+[change feed](change-feed.md).

@@ -1,4 +1,3 @@
-/** Ephemeral signals: typing and read-state changes for connected readers, never stored. */
+/** Ephemeral signals: typing, turn drafts, and read-state changes for connected readers, never stored. */
 export { Signal } from "./signal.ts";
-export { Signals } from "./signals.ts";
-export { SignalService } from "./service.ts";
+export { SignalHub } from "./hub.ts";

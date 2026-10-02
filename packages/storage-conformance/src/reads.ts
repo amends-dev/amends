@@ -66,10 +66,15 @@ export const reads = (harness: Harness) => {
                       workspace,
                     );
                     const notificationService = yield* NotificationService.Service;
-                    expect(yield* notificationService.list({ limit: 10 })).toEqual([]);
-                    expect(yield* notificationService.listPending({ limit: 10 })).toEqual([]);
+                    expect(yield* notificationService.inbox({ limit: 10 })).toEqual([]);
                     expect(
-                      yield* Effect.flip(notificationService.get(Notification.Id.make("missing"))),
+                      yield* notificationService.inbox({ limit: 10, pendingOnly: true }),
+                    ).toEqual([]);
+                    expect(yield* notificationService.countPending).toBe(0);
+                    expect(
+                      yield* Effect.flip(
+                        notificationService.markSeen(Notification.Id.make("missing")),
+                      ),
                     ).toMatchObject({ _tag: "NotificationService.NotFound" });
                     const stream = yield* (yield* ChangeFeedService.Service).watch();
                     expect(yield* stream.pipe(Stream.take(1), Stream.runCollect)).toMatchObject([

@@ -1,14 +1,15 @@
 /**
  * Notices between pools over one channel: commits that append to a log, so waiting readers look
- * again, and ephemeral signals, relayed to subscribers in every process. A commit notifies right
- * after COMMIT succeeds, on its own connection, rather than inside its transaction, where the
+ * again, and signals, published to subscribers in every process. A commit notifies right after
+ * COMMIT succeeds, on its own connection, rather than inside its transaction, where the
  * notification lock would serialize every notifying commit on the server; a notice lost between
- * the two leaves readers to their poll. One listener per pool, on one connection, dispatches both.
+ * the two leaves readers to their poll. One listener per pool, on one connection, routes both.
  */
 import { PgClient } from "@effect/sql-pg";
 import type { Entry } from "@amends/core/journal";
+import { Signal, SignalHub } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
-import { Deferred, Duration, Effect, Queue, RcRef } from "effect";
+import { Deferred, Duration, Effect, Option, Queue, RcRef, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 
 /** The channel every notice uses. */
@@ -18,8 +19,9 @@ export const channel = "amends_notices";
 export const appendNotice = (workspaceId: Workspace.Id, logId: Entry.LogId): string =>
   JSON.stringify(["append", workspaceId, logId]);
 
-const signalNotice = (workspaceId: Workspace.Id, signal: unknown): string =>
-  JSON.stringify(["signal", workspaceId, signal]);
+const signalCodec = Schema.toCodecJson(Signal.Value);
+const encodeSignal = Schema.encodeEffect(signalCodec);
+const decodeSignal = Schema.decodeUnknownEffect(signalCodec);
 
 /** A notice's kind, workspace, and subject, or undefined for one this version does not know. */
 const parse = (payload: string) => {
@@ -46,30 +48,27 @@ export interface Interface {
    */
   readonly listening: Effect.Effect<void, never, Scope.Scope>;
   /**
-   * The signal for this log's next append. It also completes whenever the listener connects,
-   * since notices sent while it was not listening are lost. Take it before checking the log, so
-   * an append between the check and the wait still wakes the caller. Hold a `listening` lease
-   * while waiting.
+   * Completes at this log's next append. It also completes whenever the listener connects, since
+   * notices sent while it was not listening are lost. Take it before checking the log, so an
+   * append between the check and the wait still wakes the caller. Hold a `listening` lease while
+   * waiting.
    */
-  readonly next: (workspaceId: Workspace.Id, logId: Entry.LogId) => Deferred.Deferred<void>;
-  /** Relay an encoded signal to the workspace's subscribers in every pool, best effort. */
-  readonly signal: (workspaceId: Workspace.Id, encoded: unknown) => Effect.Effect<void>;
+  readonly nextAppend: (workspaceId: Workspace.Id, logId: Entry.LogId) => Deferred.Deferred<void>;
+  /** Publish a signal to its workspace's subscribers in every pool, best effort. */
+  readonly publishSignal: (signal: Signal.Value) => Effect.Effect<void>;
   /**
-   * The encoded signals relayed for a workspace from now until the scope closes, in a bounded
-   * queue that drops the oldest when the subscriber falls behind. Keeps the pool listening.
+   * A workspace's signals from every pool, from now until the scope closes; a subscriber that
+   * falls behind misses the oldest. Keeps the pool listening.
    */
-  readonly signals: (
+  readonly subscribeSignals: (
     workspaceId: Workspace.Id,
-  ) => Effect.Effect<Queue.Dequeue<unknown>, never, Scope.Scope>;
+  ) => Effect.Effect<Stream.Stream<Signal.Value>, never, Scope.Scope>;
 }
 
 export interface Options {
   /** How long to wait before listening again after the listener's connection fails. */
   readonly retry?: Duration.Input | undefined;
 }
-
-/** Signals a subscriber may fall behind by before it misses the oldest. */
-const capacity = 256;
 
 /**
  * Construct the notice router and its listener over the pool's client.
@@ -80,25 +79,27 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
   const client = yield* PgClient.PgClient;
   const retry = Duration.fromInputUnsafe(options.retry ?? "1 second");
   const waiting = new Map<string, Deferred.Deferred<void>>();
-  const subscribers = new Map<string, Set<Queue.Queue<unknown>>>();
+  const signals = yield* SignalHub.makeLocal;
   const wake = (key: string) => {
-    const signal = waiting.get(key);
-    if (signal === undefined) return;
+    const appended = waiting.get(key);
+    if (appended === undefined) return;
     waiting.delete(key);
-    Deferred.doneUnsafe(signal, Effect.void);
+    Deferred.doneUnsafe(appended, Effect.void);
   };
   const wakeAll = () => {
     for (const key of waiting.keys()) wake(key);
   };
-  const dispatch = (payload: string) => {
+  const route = (payload: string) => {
     const notice = parse(payload);
     if (notice === undefined) return Effect.void;
     if (notice.kind === "append") {
       wake(payload);
       return Effect.void;
     }
-    return Effect.forEach(subscribers.get(notice.workspaceId) ?? [], (queue) =>
-      Queue.offer(queue, notice.subject),
+    // A signal this version cannot read is skipped.
+    return decodeSignal(notice.subject).pipe(
+      Effect.option,
+      Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: signals.publish })),
     );
   };
 
@@ -108,7 +109,7 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
       // Appends made while not listening sent notices nobody received.
       wakeAll();
       yield* Deferred.succeed(ready, undefined);
-      while (true) yield* dispatch((yield* Queue.take(notices)).payload);
+      while (true) yield* route((yield* Queue.take(notices)).payload);
     }).pipe(
       Effect.scoped,
       Effect.exit,
@@ -133,37 +134,27 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
   });
   const listening = RcRef.get(listener);
 
-  const next = (workspaceId: Workspace.Id, logId: Entry.LogId) => {
+  const nextAppend = (workspaceId: Workspace.Id, logId: Entry.LogId) => {
     const key = appendNotice(workspaceId, logId);
     const existing = waiting.get(key);
     if (existing !== undefined) return existing;
-    const signal = Deferred.makeUnsafe<void>();
-    waiting.set(key, signal);
-    return signal;
+    const appended = Deferred.makeUnsafe<void>();
+    waiting.set(key, appended);
+    return appended;
   };
 
-  const signal = (workspaceId: Workspace.Id, encoded: unknown) =>
-    client
-      .notify(channel, signalNotice(workspaceId, encoded))
-      .pipe(Effect.catchCause((cause) => Effect.logWarning("Signal not relayed", cause)));
-
-  const signals = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
-    yield* listening;
-    const queue = yield* Queue.sliding<unknown>(capacity);
-    const set = subscribers.get(workspaceId) ?? new Set();
-    set.add(queue);
-    subscribers.set(workspaceId, set);
-    yield* Effect.addFinalizer(() =>
-      Effect.suspend(() => {
-        set.delete(queue);
-        if (set.size === 0) subscribers.delete(workspaceId);
-        return Queue.shutdown(queue);
-      }),
+  const publishSignal = (signal: Signal.Value) =>
+    encodeSignal(signal).pipe(
+      Effect.flatMap((encoded) =>
+        client.notify(channel, JSON.stringify(["signal", signal.workspaceId, encoded])),
+      ),
+      Effect.catchCause((cause) => Effect.logWarning("Signal not published", cause)),
     );
-    return queue;
-  });
 
-  return { listening, next, signal, signals } satisfies Interface;
+  const subscribeSignals = (workspaceId: Workspace.Id) =>
+    Effect.andThen(listening, signals.subscribe(workspaceId));
+
+  return { listening, nextAppend, publishSignal, subscribeSignals } satisfies Interface;
 });
 
 export * as PostgresNotices from "./notices.ts";

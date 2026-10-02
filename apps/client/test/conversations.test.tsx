@@ -40,7 +40,7 @@ import {
   type Thread,
   type ThreadTimeline,
 } from "../src/index.ts";
-import { affectedKeys, signalKeys } from "../src/api/changes.ts";
+import { affectedKeys, signalKeys } from "../src/api/change-feed.ts";
 
 afterEach(cleanup);
 const json = (body: unknown) =>
@@ -226,7 +226,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/groups",
     "workspace/one/inbox",
   ]);
-  expect(signalKeys("one", { _tag: "GroupCaughtUp" })).toEqual(["workspace/one/groups"]);
+  expect(signalKeys("one", { _tag: "GroupRead" })).toEqual(["workspace/one/groups"]);
   expect(signalKeys("one", { _tag: "Typing" })).toEqual([]);
 });
 
@@ -336,24 +336,20 @@ const notification = (index: number, state: { _tag: string } = { _tag: "Pending"
     source: item(index + 1),
   };
 };
-/** Serves the inbox newest first, pending only when asked, and records acknowledgments. */
+/** Serves the inbox newest first, pending only when asked, and marks notifications seen. */
 function inboxHost(inbox: Array<ReturnType<typeof notification>>) {
   const requests: Array<URL> = [];
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
     requests.push(url);
-    const acknowledged = /\/notifications\/([^/]+)\/acknowledge$/.exec(url.pathname);
-    if (request.method === "POST" && acknowledged) {
+    const markedSeen = /\/notifications\/([^/]+)\/seen$/.exec(url.pathname);
+    if (request.method === "POST" && markedSeen) {
       const entry = inbox.find(
-        (value) => value.notification.id === decodeURIComponent(acknowledged[1] ?? ""),
+        (value) => value.notification.id === decodeURIComponent(markedSeen[1] ?? ""),
       );
       if (!entry) return Promise.resolve(new Response(null, { status: 404 }));
-      entry.notification.state = {
-        _tag: "Acknowledged",
-        outcome: { _tag: "Seen" },
-        acknowledgedAt: minute(59),
-      } as { _tag: string };
+      entry.notification.state = { _tag: "Seen", seenAt: minute(59) } as { _tag: string };
       return Promise.resolve(json(entry.notification));
     }
     const limit = Number(url.searchParams.get("limit"));
@@ -402,19 +398,22 @@ it("an inbox opens at its newest notifications, pages back, and a refresh keeps 
   expect(ids()).toHaveLength(61);
 });
 
-it("marks everything seen through the newest shown, then refreshes the inbox", async () => {
+it("marks everything seen through the newest shown, leaving the refresh to its signal", async () => {
   const inbox = [notification(0), notification(1), notification(2)];
   const posts: Array<unknown> = [];
-  const { fetch: serve } = inboxHost(inbox);
+  const { fetch: serve, requests } = inboxHost(inbox);
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
-    if (request.method === "POST" && new URL(request.url).pathname.endsWith("/acknowledge")) {
+    if (
+      request.method === "POST" &&
+      new URL(request.url).pathname.endsWith("/notifications/seen")
+    ) {
       const body = (await request.json()) as { through: { id: string } };
       posts.push(body);
       for (const entry of inbox)
         if (entry.notification.id <= body.through.id)
-          entry.notification.state = { _tag: "Acknowledged" } as { _tag: string };
-      return json({ acknowledged: 3 });
+          entry.notification.state = { _tag: "Seen" } as { _tag: string };
+      return json({ marked: 3 });
     }
     return serve(input, init);
   });
@@ -425,14 +424,21 @@ it("marks everything seen through the newest shown, then refreshes the inbox", a
   });
   await waitFor(() => expect(view().value()).toHaveLength(3));
   const newest = view().value()![0]!.notification;
+  const reads = requests.length;
   seen.markAllSeen(newest);
+  await waitFor(() =>
+    expect(posts).toEqual([{ through: { recordedAt: minute(2), id: "notification-002" } }]),
+  );
+  await waitFor(() => expect(seen.pending()).toBe(false));
+  // The reader's sessions refresh the inbox when its signal arrives through the change feed.
+  expect(requests.length).toBe(reads);
+  view().retry();
   await waitFor(() => expect(view().value()).toEqual([]));
-  expect(posts).toEqual([{ through: { recordedAt: minute(2), id: "notification-002" } }]);
   expect(seen.error()).toBeUndefined();
 });
 
-it("a pending inbox asks for pending notifications and drops one once the reader has seen it", async () => {
-  const inbox = [notification(0), notification(1, { _tag: "Acknowledged" }), notification(2)];
+it("a pending inbox asks for pending notifications, and no longer lists one the reader saw", async () => {
+  const inbox = [notification(0), notification(1, { _tag: "Seen" }), notification(2)];
   const { fetch, requests } = inboxHost(inbox);
   let seen!: SeenController;
   const view = mount(fetch, () => {
@@ -447,7 +453,8 @@ it("a pending inbox asks for pending notifications and drops one once the reader
   expect(requests[0]?.searchParams.get("pendingOnly")).toBe("true");
   seen.markSeen();
   await waitFor(() => expect(seen.seen()).toBe(true));
-  // Seeing it refreshes the inbox, which no longer lists it.
+  // Its signal refreshes the inbox through the change feed, which then no longer lists it.
+  view().retry();
   await waitFor(() => expect(ids()).toEqual(["notification-000"]));
   expect(seen.error()).toBeUndefined();
 });
@@ -712,7 +719,7 @@ it("adds, removes, and leaves a group's members, refreshing its roster each time
             createdAt: minute(0),
           },
           latestActivityAt: null,
-          caughtUpAt: null,
+          readAt: null,
           newActivity: false,
           following: false,
           pending: 0,
@@ -930,7 +937,7 @@ it("renames a group it may rename, from the name it started from, saving only a 
         {
           group,
           latestActivityAt: null,
-          caughtUpAt: null,
+          readAt: null,
           newActivity: false,
           following: false,
           pending: 0,
@@ -1250,7 +1257,7 @@ it("follows and unfollows a thread and a group as the reader, showing each chang
             createdAt: minute(0),
           },
           latestActivityAt: null,
-          caughtUpAt: null,
+          readAt: null,
           newActivity: false,
           following,
           pending: 0,
@@ -1369,7 +1376,7 @@ it("a follow the read does not show settles on what the read says, and one that 
             createdAt: minute(0),
           },
           latestActivityAt: null,
-          caughtUpAt: null,
+          readAt: null,
           newActivity: false,
           following: false,
           pending: 0,
@@ -1463,7 +1470,7 @@ it("offers no following in a direct conversation, where everyone takes part in e
             createdAt: minute(0),
           },
           latestActivityAt: null,
-          caughtUpAt: null,
+          readAt: null,
           newActivity: false,
           following: false,
           pending: 0,

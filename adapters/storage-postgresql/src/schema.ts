@@ -50,8 +50,14 @@ export const targetKinds = [
   "Environment",
 ] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
-/** What the journal settles; a human recipient's Seen is private state in notification_seen. */
-export const notificationStates = ["Pending", "Discarded", "Informational", "Accepted"] as const;
+/** A notification's state; a human recipient's Seen is also kept in notification_seen. */
+export const notificationStates = [
+  "Pending",
+  "Seen",
+  "Accepted",
+  "Discarded",
+  "Informational",
+] as const;
 
 /** A grant's scope: the whole workspace, or one exact target within it. The workspace is the row's. */
 const scopeColumns = {
@@ -310,8 +316,7 @@ export const notifications = pgTable(
     recipientMemberId: text("recipient_member_id"),
     recordedAt: instant("recorded_at").notNull(),
     state: text("state", { enum: notificationStates }).notNull(),
-    // When a human saw a pending notification: a copy of notification_seen, which keeps it across
-    // rebuilds, so that pending indexes leave seen notifications out.
+    // When a human saw it: a copy of notification_seen, which keeps it across rebuilds.
     seenAt: instant("seen_at"),
     // The thread, its group, and the timeline position of thread-activity notifications.
     threadId: text("thread_id"),
@@ -320,13 +325,10 @@ export const notifications = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.workspaceId, table.id] }),
+    // Each state holds its own columns and no other's.
     check(
       "notification_state",
-      sql`(${table.state} IN ('Pending', 'Informational') AND ${table.discardReason} IS NULL AND ${table.acceptedTurnId} IS NULL AND ${table.acceptedAt} IS NULL) OR (${table.state} = 'Discarded' AND ${table.discardReason} IN ('participation-ended', 'access-lost') AND ${table.acceptedTurnId} IS NULL AND ${table.acceptedAt} IS NULL) OR (${table.state} = 'Accepted' AND ${table.recipientKind} = 'Agent' AND ${table.discardReason} IS NULL AND ${table.acceptedTurnId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL)`,
-    ),
-    check(
-      "notification_seen_state",
-      sql`${table.seenAt} IS NULL OR (${table.recipientKind} = 'Human' AND ${table.state} = 'Pending')`,
+      sql`(${table.discardReason} IS NOT NULL) = (${table.state} = 'Discarded') AND (${table.acceptedTurnId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL) = (${table.state} = 'Accepted') AND (${table.acceptedTurnId} IS NULL) = (${table.acceptedAt} IS NULL) AND (${table.seenAt} IS NOT NULL) = (${table.state} = 'Seen') AND (${table.state} <> 'Accepted' OR ${table.recipientKind} = 'Agent') AND (${table.state} <> 'Seen' OR ${table.recipientKind} = 'Human')`,
     ),
     check(
       "notification_recipient",
@@ -356,7 +358,7 @@ export const notifications = pgTable(
         table.recordedAt,
         sql`${table.id} COLLATE "C"`,
       )
-      .where(sql`${table.state} = 'Pending' AND ${table.seenAt} IS NULL`),
+      .where(sql`${table.state} = 'Pending'`),
     check(
       "notification_thread",
       sql`(${table.threadId} IS NULL AND ${table.threadGroupId} IS NULL AND ${table.threadSequence} IS NULL) OR (${table.threadId} IS NOT NULL AND ${table.threadGroupId} IS NOT NULL AND ${table.threadSequence} > 0)`,
@@ -369,7 +371,7 @@ export const notifications = pgTable(
         sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
         table.threadGroupId,
       )
-      .where(sql`${table.state} = 'Pending' AND ${table.seenAt} IS NULL`),
+      .where(sql`${table.state} = 'Pending'`),
     // A reader's pending notifications from one thread, settled when they read it.
     index("pending_notifications_by_thread")
       .on(
@@ -379,7 +381,7 @@ export const notifications = pgTable(
         table.threadId,
         table.threadSequence,
       )
-      .where(sql`${table.state} = 'Pending' AND ${table.seenAt} IS NULL`),
+      .where(sql`${table.state} = 'Pending'`),
     // An ended participation's pending agent input, settled in the commit that ends it.
     index("pending_agent_notifications_by_participation")
       .on(table.workspaceId, table.participationId)
@@ -617,7 +619,7 @@ export const groupReadTimes = pgTable(
     workspaceId: text("workspace_id").notNull(),
     memberId: text("member_id").notNull(),
     groupId: text("group_id").notNull(),
-    caughtUpAt: instant("caught_up_at").notNull(),
+    readAt: instant("read_at").notNull(),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.memberId, t.groupId] })],
 );

@@ -52,7 +52,7 @@ const listing = {
 const item = (group: Record<string, unknown>, latest?: number) => ({
   group: { workspaceId: "one", createdBy: "owner", createdAt: at(0), ...group },
   latestActivityAt: latest === undefined ? null : at(latest),
-  caughtUpAt: null,
+  readAt: null,
   newActivity: false,
   following: false,
   pending: 0,

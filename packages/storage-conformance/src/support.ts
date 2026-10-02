@@ -12,7 +12,7 @@ import {
 import { GroupQuery, GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
 import { type Actor, Identity, Performer } from "@amends/core/identity";
 import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends/core/notification";
 import {
   type ThreadActivity,
   ThreadActivityKind,
@@ -49,8 +49,7 @@ import { AgentJobs, AgentWork, TurnJobs, TurnStore, TurnTimeline } from "@amends
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
-import { Gateway, WorkspaceSignals, WorkspaceStorage } from "@amends/gateway";
-import { Signals } from "@amends/core/signal";
+import { Gateway, WorkspaceStorage } from "@amends/gateway";
 import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 
@@ -198,7 +197,6 @@ export const runAgentJobs = Effect.fnUntraced(function* (
 export const bind = (
   context: Context.Context<
     | WorkspaceStorage.Bindings
-    | Signals.Service
     | AgentJobs.Service
     | TurnJobs.Service
     | ConnectionCatalog.Service
@@ -231,18 +229,25 @@ export const bind = (
 export type Bound = ReturnType<typeof bind>;
 
 /**
- * A workspace's stores with its signals from the host, and agent and turn jobs the suites run
- * themselves: a suite does the agent work its commits asked for, and runs the turn it expects, as
- * a host's jobs would.
+ * A recipient's notifications oldest first, as a suite reads all of them: the inbox's newest-first
+ * page, reversed.
  */
-const withHostServices = (
-  context: Context.Context<WorkspaceStorage.Bindings>,
-  workspaceSignals: WorkspaceSignals.Interface,
-  id: Workspace.Id,
+export const listOldestFirst = (
+  notificationStore: NotificationStore.Interface,
+  recipient: Notification.Recipient,
+  options: { readonly limit: number },
 ) =>
+  Effect.map(notificationStore.listLatestByRecipient(recipient, options), (latest) =>
+    latest.toReversed(),
+  );
+
+/**
+ * A workspace's stores and signal hub, with agent and turn jobs the suites run themselves: a suite
+ * does the agent work its commits asked for, and runs the turn it expects, as a host's jobs would.
+ */
+const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>) =>
   bind(
     context.pipe(
-      Context.add(Signals.Service, workspaceSignals.forWorkspace(id)),
       Context.add(AgentJobs.Service, recordedAgentJobs),
       Context.add(TurnJobs.Service, TurnJobs.noRunner),
       Context.add(ConnectionCatalog.Service, catalog),
@@ -252,16 +257,12 @@ const withHostServices = (
 
 /** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
-  Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
-    withHostServices(context, Context.get(host, WorkspaceSignals.Service), id),
-  );
+  Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), withHostServices);
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = (id: Workspace.Id) =>
-  Effect.flatMap(Effect.context<WorkspaceStorage.Service | WorkspaceSignals.Service>(), (host) =>
-    Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), (context) =>
-      withHostServices(context, Context.get(host, WorkspaceSignals.Service), id),
-    ),
+  Effect.flatMap(WorkspaceStorage.Service, (workspaceStorage) =>
+    Effect.map(workspaceStorage.forWorkspace(id), withHostServices),
   );
 
 /**

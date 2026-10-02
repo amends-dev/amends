@@ -12,7 +12,7 @@ import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import type { Signal } from "../signal/signal.ts";
-import { Signals } from "../signal/signals.ts";
+import { SignalHub } from "../signal/hub.ts";
 import { ThreadQuery } from "../thread/query.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
@@ -116,7 +116,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
   const turnCommand = yield* TurnCommand.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
-  const signals = yield* Signals.Service;
+  const signalHub = yield* SignalHub.Service;
   const turnQuery = yield* TurnQuery.Service;
   const changeFeedSource = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
@@ -250,7 +250,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     const id = yield* Schema.decodeEffect(Turn.Id)(turnId);
     // Register for drafts and commits before reading, so none that follows is missed: a change to
     // the reader's access committed after the read below is delivered, and rechecked.
-    const live = yield* signals.subscribe;
+    const live = yield* signalHub.subscribe;
     const committed = yield* changeFeedSource
       .subscribe(Option.none())
       .pipe(Effect.mapError(toLogUnavailable));

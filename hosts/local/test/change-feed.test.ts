@@ -60,7 +60,7 @@ const listen = (
     const scope = yield* Scope.fork(yield* Scope.Scope);
     const queue = yield* Queue.unbounded<ChangeFeed.Message>();
     yield* Stream.unwrap(
-      api.changes.watch({
+      api.changeFeed.watch({
         params: { workspaceId },
         query: after === undefined ? {} : { after },
       }),
@@ -211,7 +211,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             params: { workspaceId: workspace.id, memberId: member.id },
           });
           expect(
-            yield* bob.changes
+            yield* bob.changeFeed
               .watch({ params: { workspaceId: workspace.id }, query: {} })
               .pipe(Effect.flip),
           ).toMatchObject({ _tag: "Gateway.NotMember" });
@@ -253,7 +253,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         );
         const threadId = started.thread.id;
         const watching = yield* listen(bob, workspace.id);
-        yield* alice.changes.typing({ params: { workspaceId: workspace.id, threadId } });
+        yield* alice.threads.typing({ params: { workspaceId: workspace.id, threadId } });
         const typing = yield* watching.next;
         expect(typing).toMatchObject({
           _tag: "Signal",
@@ -261,12 +261,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
           signal: { _tag: "Typing", threadId, groupId: started.thread.groupId },
         });
         expect(
-          yield* alice.changes
+          yield* alice.threads
             .typing({
               params: { workspaceId: workspace.id, threadId: Thread.Id.make("missing") },
             })
             .pipe(Effect.flip),
-        ).toMatchObject({ _tag: "SignalService.ThreadNotFound", threadId: "missing" });
+        ).toMatchObject({ _tag: "ThreadMessageService.NotFound", threadId: "missing" });
         const http = yield* HttpClient.HttpClient;
         const path = `/workspaces/${workspace.id}/threads/${threadId}/typing`;
         expect((yield* http.post(path)).status).toBe(401);
@@ -316,7 +316,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const openapi = yield* (yield* http.get("/openapi.json")).json;
           expect(openapi).toMatchObject({
             paths: {
-              "/workspaces/{workspaceId}/changes": { get: { operationId: "changes.watch" } },
+              "/workspaces/{workspaceId}/changes": { get: { operationId: "changeFeed.watch" } },
             },
           });
         }).pipe(Effect.timeout("10 seconds"), Effect.scoped, Effect.provide(server(url))),
@@ -353,7 +353,9 @@ describe.skipIf(!available)("PostgreSQL", () => {
         }
         const refused = (api: typeof alice) =>
           Effect.flip(
-            Effect.scoped(api.changes.watch({ params: { workspaceId: workspace.id }, query: {} })),
+            Effect.scoped(
+              api.changeFeed.watch({ params: { workspaceId: workspace.id }, query: {} }),
+            ),
           );
         const first = yield* listen(alice, workspace.id);
         yield* listen(alice, workspace.id);

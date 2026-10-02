@@ -4,7 +4,6 @@ import type { ChangeFeedService } from "@amends/core/change-feed";
 import type { ConnectionService } from "@amends/core/connection";
 import type { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
 import type { NotificationService } from "@amends/core/notification";
-import type { SignalService } from "@amends/core/signal";
 import type {
   ThreadService,
   ThreadMessageService,
@@ -65,7 +64,6 @@ it("every error a core operation can fail with is public or internal, so none be
   expectTypeOf<Unclassified<GroupFollowService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<GroupMembershipService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<NotificationService.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<SignalService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ThreadService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ThreadMessageService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ThreadParticipationService.Interface>>().toEqualTypeOf<never>();

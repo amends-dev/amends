@@ -109,7 +109,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         ).toContainEqual({
           group,
           latestActivityAt: null,
-          caughtUpAt: null,
+          readAt: null,
           newActivity: false,
           following: false,
           pending: 0,
@@ -180,32 +180,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         expect(listed).toMatchObject([{ thread: started.thread, readThrough: null, unread: true }]);
 
-        // The mention reached Alice's inbox and resolves to the message that made it.
-        const inbox = yield* asAlice.notifications.list({
+        // The mention reached Alice's inbox, which shows it with the message that made it.
+        const inbox = yield* asAlice.notifications.inbox({
           params: { workspaceId },
           query: { limit: 10, pendingOnly: true },
         });
-        expect(inbox).toHaveLength(1);
-        const notificationId = inbox[0]!.id;
-        expect(
-          yield* asAlice.notifications.source({ params: { workspaceId, notificationId } }),
-        ).toMatchObject({ message: { id: started.message.id } });
+        expect(inbox).toMatchObject([{ source: { message: { id: started.message.id } } }]);
+        const notificationId = inbox[0]!.notification.id;
         expect(yield* asAlice.notifications.count({ params: { workspaceId } })).toEqual({
           pending: 1,
         });
-        // Her inbox shows it with the message, newest first.
-        expect(
-          yield* asAlice.notifications.inbox({ params: { workspaceId }, query: { limit: 10 } }),
-        ).toMatchObject([
-          { notification: { id: notificationId }, source: { message: { id: started.message.id } } },
-        ]);
-        const seen = yield* asAlice.notifications.acknowledge({
+        const seen = yield* asAlice.notifications.markSeen({
           params: { workspaceId, notificationId },
         });
-        expect(seen.state).toMatchObject({ _tag: "Acknowledged", outcome: { _tag: "Seen" } });
-        // Acknowledging again, as another device might, keeps the first acknowledgment.
+        expect(seen.state).toMatchObject({ _tag: "Seen" });
+        // Marking it again, as another device might, keeps the first time.
         expect(
-          yield* asAlice.notifications.acknowledge({ params: { workspaceId, notificationId } }),
+          yield* asAlice.notifications.markSeen({ params: { workspaceId, notificationId } }),
         ).toEqual(seen);
         expect(
           yield* asAlice.notifications.inbox({
@@ -218,11 +209,11 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         // Seeing everything through it again has nothing left to mark.
         expect(
-          yield* asAlice.notifications.acknowledgeThrough({
+          yield* asAlice.notifications.markSeenThrough({
             params: { workspaceId },
             payload: { through: { recordedAt: seen.recordedAt, id: seen.id } },
           }),
-        ).toEqual({ acknowledged: 0 });
+        ).toEqual({ marked: 0 });
         expect(
           yield* asAlice.notifications.inbox({ params: { workspaceId }, query: { limit: 10 } }),
         ).toMatchObject([{ notification: seen }]);
@@ -301,7 +292,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         yield* asBob.groups.markRead({ params: { workspaceId, groupId } });
         const [row] = yield* asBob.groups.list({ params: { workspaceId }, query: { limit: 10 } });
         expect(row).toMatchObject({ newActivity: false });
-        expect(row!.caughtUpAt).not.toBeNull();
+        expect(row!.readAt).not.toBeNull();
 
         // Bob stops following the thread; he still reads it through the group.
         const own = participants.find(
@@ -575,8 +566,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
             "/workspaces/{workspaceId}/threads/{threadId}/timeline": {
               get: { operationId: "threads.timeline" },
             },
-            "/workspaces/{workspaceId}/notifications/{notificationId}/source": {
-              get: { operationId: "notifications.source" },
+            "/workspaces/{workspaceId}/notifications/inbox": {
+              get: { operationId: "notifications.inbox" },
             },
           },
           components: {

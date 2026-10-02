@@ -52,27 +52,20 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * internal reads do not authorize callers; application operations must do so.
  * Every storage adapter implements this contract.
  *
- * The journal settles notifications as Pending or Discarded, and an agent's as Acknowledged with
- * outcome Accepted when a turn takes them. A human recipient's Seen is private
- * state beside them, written by markSeen and kept when projections are rebuilt: reads show a
- * seen pending notification as Acknowledged with outcome Seen and its time, and pending reads and
- * counts leave it out.
+ * The journal settles notifications as Pending, Discarded, or Informational, and an agent's as
+ * Accepted when a turn takes them. A human recipient's Seen is private state, written by markSeen
+ * outside the journal and kept when projections are rebuilt: a notification projected again as
+ * Pending reads as Seen, with its first time, once its recipient has seen it.
  */
 export interface Interface {
   /** Find a notification in this workspace; None if absent. */
   readonly get: (id: Notification.Id) => Effect.Effect<Option.Option<Notification.Record>, Failure>;
 
   /**
-   * Match the recipient's kind and ID. Return at most limit records after the
-   * exclusive cursor, ordered by recordedAt ascending, then ID in binary lexical
-   * order. Each call reads its current view; pages do not constitute a fixed snapshot.
+   * The recipient's pending notifications, matching their kind and ID: at most limit records
+   * after the exclusive cursor, ordered by recordedAt ascending, then ID in binary lexical order.
+   * Each call reads its current view; pages do not constitute a fixed snapshot.
    */
-  readonly listByRecipient: (
-    recipient: Notification.Recipient,
-    options: ReadOptions,
-  ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
-
-  /** Same ordering and pagination, restricted to Pending records. */
   readonly listPendingByRecipient: (
     recipient: Notification.Recipient,
     options: ReadOptions,
@@ -122,9 +115,9 @@ export interface Interface {
    * Projection write, enlisted with the source activity and checkpoint.
    * Validate before writing. Invalid records, foreign workspaces, reused IDs,
    * and duplicate (source log, source entry, recipient kind, recipient ID)
-   * associations conflict atomically, and so does an Acknowledged record: Seen is recorded with
-   * markSeen. Never upsert or retry internally; reject missing, foreign, or expired transaction
-   * handles.
+   * associations conflict atomically, and so does a Seen or Accepted record: markSeen and accept
+   * record those. Never upsert or retry internally; reject missing, foreign, or expired
+   * transaction handles.
    */
   readonly insert: (
     record: Notification.Record,

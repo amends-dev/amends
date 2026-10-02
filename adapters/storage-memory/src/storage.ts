@@ -17,6 +17,7 @@ import { Journal } from "./journal.ts";
 import { Members } from "./members.ts";
 import { Notifications } from "./notifications.ts";
 import { ReadStates } from "./read-states.ts";
+import { MemorySignalHub } from "./signal-hub.ts";
 import { Roles } from "./roles.ts";
 import { ThreadActivities } from "./thread-activities.ts";
 import { ThreadMessages } from "./thread-messages.ts";
@@ -26,7 +27,7 @@ import { TurnRecords } from "./turn-records.ts";
 import { Workspaces } from "./workspaces.ts";
 
 /**
- * Provide every store core requires over the same workspace binding.
+ * Provide every store core requires, and the signal hub, over the same workspace binding.
  * Adding a store adds a line here.
  *
  * @category layers
@@ -53,6 +54,7 @@ const layerStores = Layer.mergeAll(
   Environments.layer,
   Agents.layer,
   TurnRecords.layer,
+  MemorySignalHub.layer,
 );
 
 /**

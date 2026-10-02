@@ -6,7 +6,7 @@ import { MembersGroup } from "./members.ts";
 import { NotificationsGroup } from "./notifications.ts";
 import { SessionGroup } from "./session.ts";
 import { WorkspacesGroup } from "./workspaces.ts";
-import { ChangesGroup } from "./changes.ts";
+import { ChangeFeedGroup } from "./change-feed.ts";
 import { AgentsGroup } from "./agents.ts";
 import { ConnectionsGroup } from "./connections.ts";
 import { EnvironmentsGroup } from "./environments.ts";
@@ -29,5 +29,5 @@ export class Api extends HttpApi.make("amends")
   .add(EnvironmentsGroup)
   .add(AgentsGroup)
   .add(TurnsGroup)
-  .add(ChangesGroup)
+  .add(ChangeFeedGroup)
   .annotateMerge(OpenApi.annotations({ title: "Amends API" })) {}

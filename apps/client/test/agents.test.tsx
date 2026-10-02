@@ -3,7 +3,7 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { createSignal } from "solid-js";
 import { FetchHttpClient } from "effect/unstable/http";
-import { affectedKeys } from "../src/api/changes.ts";
+import { affectedKeys } from "../src/api/change-feed.ts";
 import {
   ClientProvider,
   DirectoryProvider,

@@ -28,8 +28,9 @@ const reading = ThreadActivityStore.ReadOptions.fields;
 
 /**
  * Conversations: a group's threads, starting them, their timelines and participants, replying,
- * following, and read positions. Reading a thread requires current membership of its group and
- * creates no participation; missing and unreadable threads answer alike.
+ * saying one is typing, following, and read positions. Reading a thread requires current
+ * membership of its group and creates no participation; missing and unreadable threads answer
+ * alike.
  */
 export class ThreadsGroup extends HttpApiGroup.make("threads")
   .add(
@@ -106,6 +107,11 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
         identifier: "PublishedMessage",
       }),
       error: [...ApiErrors.member, ...ApiErrors.message],
+    }),
+    HttpApiEndpoint.post("typing", "/threads/:threadId/typing", {
+      params: thread,
+      success: HttpApiSchema.NoContent,
+      error: [...ApiErrors.member, ...ApiErrors.typing],
     }),
     HttpApiEndpoint.post("follow", "/threads/:threadId/follow", {
       params: thread,

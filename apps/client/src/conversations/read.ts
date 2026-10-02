@@ -48,7 +48,7 @@ export function useMarkThreadRead(
   useReadMarks(workspaceId, through, (value) => ({ kind: "thread", threadId, through: value }));
 }
 /**
- * While mounted and visible, mark a group caught up whenever `unreadSince` names new activity in
+ * While mounted and visible, mark a group read whenever `unreadSince` names new activity in
  * it: a time, in epoch milliseconds, that grows with newer activity, or undefined when nothing is
  * new to the reader.
  */

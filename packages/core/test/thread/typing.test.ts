@@ -1,15 +1,19 @@
 import { expect, it } from "@effect/vitest";
-import { DateTime, Effect, Layer } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer } from "effect";
 import { TestClock } from "effect/testing";
 import { Authorization } from "../../src/authorization/authorization.ts";
 import type { Requirement } from "../../src/authorization/requirement.ts";
 import { Group } from "../../src/group/group.ts";
 import { Actor } from "../../src/identity/actor.ts";
 import { Identity } from "../../src/identity/identity.ts";
-import { SignalService } from "../../src/signal/service.ts";
-import { Signal } from "../../src/signal/signal.ts";
-import { Signals } from "../../src/signal/signals.ts";
+import { Journal } from "../../src/journal/journal.ts";
 import { Store } from "../../src/journal/store.ts";
+import { ReadStateCommand } from "../../src/read-state/command.ts";
+import { SignalHub } from "../../src/signal/hub.ts";
+import { Signal } from "../../src/signal/signal.ts";
+import { ThreadCommand } from "../../src/thread/command.ts";
+import { ThreadMessageService } from "../../src/thread/message/service.ts";
+import { ThreadMessageStore } from "../../src/thread/message/store.ts";
 import { ThreadQuery } from "../../src/thread/query.ts";
 import { Thread } from "../../src/thread/thread.ts";
 import { Member } from "../../src/workspace/member/member.ts";
@@ -32,11 +36,18 @@ const thread = (id: string): Thread.Record => ({
 });
 const readable = new Set(["open", "other"]);
 
+/** A service typing never calls: every method dies. */
+const unused = <I, S extends object>(key: Context.Key<I, S>) =>
+  Layer.succeed(
+    key,
+    new Proxy({} as S, { get: () => () => Effect.die(`Typing uses nothing of ${key.key}`) }),
+  );
+
 /** The operation over fake access and authorization, recording what it publishes. */
 const run = <A, E>(
   use: (
     published: ReadonlyArray<Signal.Value>,
-  ) => Effect.Effect<A, E, SignalService.Service | Actor.Service>,
+  ) => Effect.Effect<A, E, ThreadMessageService.Service | Actor.Service>,
   options: { readonly deny?: boolean } = {},
 ) =>
   Effect.gen(function* () {
@@ -67,7 +78,7 @@ const run = <A, E>(
         }),
       permitted: () => Effect.die("Unexpected permitted check"),
     });
-    const signals = Signals.Service.of({
+    const signalHub = SignalHub.Service.of({
       publish: (signal) =>
         Effect.sync(() => {
           published.push(signal);
@@ -76,13 +87,18 @@ const run = <A, E>(
     });
     const result = yield* use(published).pipe(
       Effect.provide(
-        SignalService.layer.pipe(
+        ThreadMessageService.layer.pipe(
           Layer.provide(
             Layer.mergeAll(
               Layer.succeed(ThreadQuery.Service, threadQuery),
               Layer.succeed(Authorization.Service, authorization),
-              Layer.succeed(Signals.Service, signals),
+              Layer.succeed(SignalHub.Service, signalHub),
               Layer.succeed(Store.Service, (yield* make(workspaceId)).store),
+              unused(ThreadCommand.Service),
+              unused(ReadStateCommand.Service),
+              unused(ThreadMessageStore.Service),
+              unused(Journal.Service),
+              unused(Crypto.Crypto),
             ),
           ),
         ),
@@ -92,8 +108,8 @@ const run = <A, E>(
     return { result, requirements };
   });
 const typing = (threadId: string) =>
-  Effect.flatMap(SignalService.Service, (signalService) =>
-    signalService.typing(Thread.Id.make(threadId)),
+  Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+    threadMessageService.typing(Thread.Id.make(threadId)),
   );
 
 it.effect(
@@ -141,7 +157,7 @@ it.effect("inaccessible threads and missing permission publish nothing", () =>
     yield* run((published) =>
       Effect.gen(function* () {
         expect(yield* Effect.flip(typing("hidden"))).toEqual(
-          new SignalService.ThreadNotFound({ threadId: Thread.Id.make("hidden") }),
+          new ThreadMessageService.NotFound({ threadId: Thread.Id.make("hidden") }),
         );
         expect(published).toEqual([]);
       }),

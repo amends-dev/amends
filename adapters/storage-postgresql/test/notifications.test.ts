@@ -39,7 +39,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             yield* sql`UPDATE notifications SET source_entry_id = '' WHERE workspace_id = ${workspaceId} AND id = ${value.id}`;
             const reads: ReadonlyArray<Effect.Effect<unknown, NotificationStore.Failure>> = [
               bound.notifications.get(value.id),
-              bound.notifications.listByRecipient(human, { limit: 20 }),
+              bound.notifications.listLatestByRecipient(human, { limit: 20 }),
               bound.notifications.listPendingByRecipient(human, { limit: 20 }),
             ];
             for (const operation of reads)

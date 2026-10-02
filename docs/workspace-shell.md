@@ -144,7 +144,7 @@ and synchronize same-origin windows. Web and desktop origins remain independent.
 retains the choice in memory.
 
 When workspace changes stop arriving for two seconds, a note at the bottom of the screen says
-"Connecting…" or "Reconnecting…" until they resume; see [live updates](live-updates.md).
+"Connecting…" or "Reconnecting…" until they resume; see [change feed](change-feed.md).
 
 ## Verification
 

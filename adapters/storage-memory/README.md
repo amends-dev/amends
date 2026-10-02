@@ -1,6 +1,6 @@
 # Memory storage
 
-Workspace storage, the workspace directory, and the signal hub held in process memory. This is the reference
+Workspace storage, with each workspace's signal hub, and the workspace directory held in process memory. This is the reference
 implementation of the storage contracts: it passes the
 [conformance suites](../../packages/storage-conformance/README.md) like the PostgreSQL adapter, and
 enforces the same rules with plain maps and no query language. Nothing survives the process,
@@ -41,16 +41,18 @@ and keeps it until it ends. `Store.append` takes only its log's lock, not the wo
 commits only that log. A commit therefore replaces the logs it held and keeps what other
 writers committed to the rest meanwhile. Reads outside a
 transaction see committed state; inside one, they see its copy. A handle from another connection,
-workspace, or closed transaction fails. `waitForAppend` waits on a signal that each appending
-commit replaces.
+workspace, or closed transaction fails. `waitForAppend` waits on a deferred that each appending
+commit completes and replaces.
 
-`MemorySignals` delivers [signals](../../packages/core/README.md#signals) between the hosts over
-one `MemoryDatabase`: publishing offers the signal to each of the workspace's subscribers at that
-moment, each through a queue of 256 that drops the oldest when it falls behind. Nothing is kept.
+Each workspace's signal hub, bound with its stores, delivers
+[signals](../../packages/core/README.md#signals) between the hosts over one `MemoryDatabase`,
+through the database's `SignalHub.makeLocal`: publishing offers the signal to each of the
+workspace's subscribers at that moment, each of whom misses the oldest once 256 behind. Nothing is
+kept.
 
 ## Composition
 
-`layer` provides the storage, directory, and signal hub contracts over a new connection; a host provides
+`layer` provides the storage, with its signal hubs, and directory contracts over a new connection; a host provides
 `MemoryDatabase.layer` beneath it. Building `layer` again over the same database is another
 host.
 

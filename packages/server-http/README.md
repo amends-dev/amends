@@ -11,8 +11,8 @@ points; credential verification belongs to the authentication middleware, and
 domain rules belong to core.
 
 Notification handlers enter through `Gateway.asMember` and call
-`NotificationService.get`, `list`, `listPending`, `inbox`, `resolveSource`, or `acknowledge`. The
-contract decodes the page size, cursor, and optional pending-only filter; core derives the
+`NotificationService.inbox`, `countPending`, `markSeen`, or `markSeenThrough`. The contract
+decodes the page size, cursor, and optional pending-only filter; core derives the
 recipient from the actor and checks active membership and recipient ownership. The HTTP layer adds
 no notification generation or delivery.
 
@@ -23,7 +23,7 @@ combine the path's group or thread ID with the body into the operation's input a
 `Idempotency-Key` header as its request key; core authorizes, validates, and chooses who takes
 part. Management reads of groups the caller does not belong to are not exposed.
 
-`ChangesHandlers.watch` enters through `Gateway.asMember` and calls
+`ChangeFeedHandlers.watch` enters through `Gateway.asMember` and calls
 `ChangeFeedService.watch`. Effect's HTTP server transfers the request scope
 to the response stream, keeping the workspace services and subscription alive until
 completion or disconnect. The `after` query resumes from a cursor. HTTP owns SSE

@@ -3,10 +3,9 @@ import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
 import { Group, GroupService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { NotificationService } from "@amends/core/notification";
-import { Signal, SignalService } from "@amends/core/signal";
-import { Thread, ThreadService } from "@amends/core/thread";
+import { Signal, SignalHub } from "@amends/core/signal";
+import { Thread, ThreadMessageService, ThreadService } from "@amends/core/thread";
 import { Member } from "@amends/core/workspace";
-import { WorkspaceSignals } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Queue, Schema, Stream } from "effect";
 import type { Harness, Host } from "./harness.ts";
@@ -59,16 +58,17 @@ const signalsOf = <E>(next: Effect.Effect<ChangeFeed.Message, E>) =>
       ? Effect.succeed(message.signal)
       : Effect.die(new Error(`Expected a signal, got ${message._tag}`)),
   );
-/** A marker only the member receives: their own caught-up time for a group nobody reads. */
+/** A marker only the member receives: their own read time for a group nobody reads. */
 const markerFor = (memberId: Member.Id) =>
-  Signal.Value.cases.GroupCaughtUp.make({
+  Signal.Value.cases.GroupRead.make({
     workspaceId,
     memberId,
     groupId: Group.Id.make("marker"),
-    caughtUpAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+    readAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
   });
+/** A workspace's signal hub on a host, as storage binds it. */
 const hubOf = (host: Context.Context<Host>, id = workspaceId) =>
-  Context.get(host, WorkspaceSignals.Service).forWorkspace(id);
+  Effect.map(forWorkspace(host, id), (bound) => Context.get(bound.context, SignalHub.Service));
 
 /** Ephemeral signals through the host's hub: delivery across hosts, by workspace and by reach. */
 export const signals = (harness: Harness) => {
@@ -155,26 +155,29 @@ export const signals = (harness: Harness) => {
                 readThrough: n,
               });
             const subscribe = (host: Context.Context<Host>, id = workspaceId) =>
-              Effect.flatMap(hubOf(host, id).subscribe, buffer);
+              hubOf(host, id).pipe(
+                Effect.flatMap((signalHub) => signalHub.subscribe),
+                Effect.flatMap(buffer),
+              );
             const there = yield* subscribe(second);
             const alsoHere = yield* subscribe(first);
             const elsewhere = yield* subscribe(second, otherWorkspaceId);
-            yield* hubOf(first).publish(signal(1));
-            yield* hubOf(second).publish(signal(2));
-            const marker = Signal.Value.cases.GroupCaughtUp.make({
+            yield* (yield* hubOf(first)).publish(signal(1));
+            yield* (yield* hubOf(second)).publish(signal(2));
+            const marker = Signal.Value.cases.GroupRead.make({
               workspaceId: otherWorkspaceId,
               memberId: reader.memberId,
               groupId: Group.Id.make("marker"),
-              caughtUpAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
+              readAt: DateTime.makeUnsafe("2026-09-20T12:00:00.000Z"),
             });
-            yield* hubOf(first, otherWorkspaceId).publish(marker);
+            yield* (yield* hubOf(first, otherWorkspaceId)).publish(marker);
             for (const next of [there, alsoHere])
               expect([yield* next, yield* next]).toEqual([signal(1), signal(2)]);
             // Another workspace's subscribers hear nothing of this one.
             expect(yield* until(elsewhere, marker)).toEqual([]);
             // Nothing is kept for later subscribers.
             const late = yield* subscribe(second);
-            yield* hubOf(first).publish(signal(3));
+            yield* (yield* hubOf(first)).publish(signal(3));
             expect(yield* late).toEqual(signal(3));
           }).pipe(Effect.scoped),
         ),
@@ -193,8 +196,8 @@ export const signals = (harness: Harness) => {
           const before = yield* DateTime.now;
           yield* as("first")(
             owner,
-            Effect.flatMap(SignalService.Service, (signalService) =>
-              signalService.typing(threadId),
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.typing(threadId),
             ),
           );
           const typing = yield* readerFeed;
@@ -212,7 +215,7 @@ export const signals = (harness: Harness) => {
             [outsider, outsiderFeed],
             [unpermitted, unpermittedFeed],
           ] as const) {
-            yield* hubOf(first).publish(markerFor(actor.memberId));
+            yield* (yield* hubOf(first)).publish(markerFor(actor.memberId));
             expect(yield* until(next, markerFor(actor.memberId))).toEqual([]);
           }
         }).pipe(Effect.scoped),
@@ -227,13 +230,13 @@ export const signals = (harness: Harness) => {
             as("first")(
               actor,
               Effect.flip(
-                Effect.flatMap(SignalService.Service, (signalService) =>
-                  signalService.typing(thread),
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.typing(thread),
                 ),
               ),
             );
           const notFound = (thread: Thread.Id) =>
-            new SignalService.ThreadNotFound({ threadId: thread });
+            new ThreadMessageService.NotFound({ threadId: thread });
           expect(yield* typing(outsider)).toEqual(notFound(threadId));
           const missing = Thread.Id.make("missing");
           expect(yield* typing(reader, missing)).toEqual(notFound(missing));
@@ -252,14 +255,16 @@ export const signals = (harness: Harness) => {
           const [notification] = yield* as("first")(
             reader,
             Effect.flatMap(NotificationService.Service, (notificationService) =>
-              notificationService.list({ limit: 10 }),
+              Effect.map(notificationService.inbox({ limit: 10 }), (items) =>
+                items.map((item) => item.notification),
+              ),
             ),
           );
           if (notification === undefined) return yield* Effect.die("Expected a notification");
           yield* as("first")(
             reader,
             Effect.gen(function* () {
-              yield* (yield* NotificationService.Service).acknowledge(notification.id);
+              yield* (yield* NotificationService.Service).markSeen(notification.id);
               const readStateService = yield* ReadStateService.Service;
               yield* readStateService.markThreadRead({ threadId, throughSequence: 1 });
               yield* readStateService.markGroupRead({ groupId });
@@ -273,10 +278,10 @@ export const signals = (harness: Harness) => {
                 notificationIds: [notification.id],
               },
               { _tag: "ThreadRead", memberId: reader.memberId, threadId, readThrough: 1 },
-              { _tag: "GroupCaughtUp", memberId: reader.memberId, groupId },
+              { _tag: "GroupRead", memberId: reader.memberId, groupId },
             ]);
           // Someone reading the same thread hears none of it.
-          yield* hubOf(first).publish(markerFor(owner.memberId));
+          yield* (yield* hubOf(first)).publish(markerFor(owner.memberId));
           expect(yield* until(ownerFeed, markerFor(owner.memberId))).toEqual([]);
         }).pipe(Effect.scoped),
       ),

@@ -1,4 +1,4 @@
 import { Suites } from "@amends/storage-conformance";
 import { harness } from "./harness.ts";
 
-Suites.notificationAcknowledgment(harness);
+Suites.notificationSeen(harness);

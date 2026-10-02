@@ -24,8 +24,8 @@ import { MemberProjection } from "../../src/workspace/member/projection.ts";
 import { MemberStore } from "../../src/workspace/member/store.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
 import { make, type Fixture } from "../memory-store.ts";
-import { TestSignals } from "../signals.ts";
-import { Signals } from "../../src/signal/signals.ts";
+import { TestSignalHub } from "../signal-hub.ts";
+import { SignalHub } from "../../src/signal/hub.ts";
 
 const workspaceId = Workspace.Id.make("workspace");
 const otherWorkspaceId = Workspace.Id.make("other-workspace");
@@ -85,12 +85,12 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     );
   const notifications = Layer.succeed(NotificationStore.Service, {
     get: (id) => Effect.succeed(Option.fromUndefinedOr(records.find((value) => value.id === id))),
-    listByRecipient: list,
     listPendingByRecipient: list,
     listLatestByRecipient: list,
     listLatestPendingByRecipient: list,
     listPendingByThread: unexpected,
-    countPendingByRecipient: unexpected,
+    countPendingByRecipient: (recipient) =>
+      Effect.succeed(records.filter((value) => sameRecipient(value.recipient, recipient)).length),
     countPendingByGroup: unexpected,
     insert: unexpected,
     insertMany: unexpected,
@@ -126,7 +126,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
         readTimelineItem: unexpected,
       }),
     ),
-    Layer.provide(TestSignals.layer),
+    Layer.provide(TestSignalHub.layer),
     Layer.provide(
       Layer.succeed(
         Crypto.Crypto,
@@ -149,8 +149,12 @@ const run = <A, E>(
     Effect.provide(configured(fixture, overrides)),
     Effect.provideService(Actor.Service, actor),
   );
+/** A page of the inbox as the actor reads it: their notifications, without sources here. */
+const inboxOf = (...records: ReadonlyArray<Notification.Record>) =>
+  records.map((notification) => ({ notification }));
+
 it.effect(
-  "notification reads require the current actor, need no role grant, and leave the journal unchanged",
+  "inbox reads require the current actor, need no role grant, and leave the journal unchanged",
   () =>
     Effect.gen(function* () {
       expectTypeOf<Layer.Services<typeof NotificationService.layer>>().toEqualTypeOf<
@@ -158,11 +162,11 @@ it.effect(
         | Authorization.Service
         | Journal.Service
         | ThreadQuery.Service
-        | Signals.Service
+        | SignalHub.Service
         | Store.Service
       >();
       expectTypeOf<
-        Effect.Services<ReturnType<NotificationService.Interface["get"]>>
+        Effect.Services<ReturnType<NotificationService.Interface["inbox"]>>
       >().toEqualTypeOf<Actor.Service>();
       const fixture = yield* make(workspaceId);
       yield* seed(fixture);
@@ -171,9 +175,11 @@ it.effect(
         fixture,
         Effect.gen(function* () {
           const notificationService = yield* NotificationService.Service;
-          expect(yield* notificationService.get(mine.id)).toEqual(mine);
-          expect(yield* notificationService.list(page)).toEqual([mine]);
-          expect(yield* notificationService.listPending(page)).toEqual([mine]);
+          expect(yield* notificationService.inbox(page)).toEqual(inboxOf(mine));
+          expect(yield* notificationService.inbox({ ...page, pendingOnly: true })).toEqual(
+            inboxOf(mine),
+          );
+          expect(yield* notificationService.countPending).toBe(1);
           expect(yield* (yield* Journal.Service).log.read({ limit: 10 })).toEqual([]);
         }),
       );
@@ -198,19 +204,14 @@ it.effect(
           ] as const) {
             expect(
               yield* notificationService
-                .get(expected.id)
+                .inbox(page)
                 .pipe(Effect.provideService(Actor.Service, actor)),
-            ).toEqual(expected);
+            ).toEqual(inboxOf(expected));
             expect(
               yield* notificationService
-                .list(page)
+                .inbox({ ...page, pendingOnly: true })
                 .pipe(Effect.provideService(Actor.Service, actor)),
-            ).toEqual([expected]);
-            expect(
-              yield* notificationService
-                .listPending(page)
-                .pipe(Effect.provideService(Actor.Service, actor)),
-            ).toEqual([expected]);
+            ).toEqual(inboxOf(expected));
           }
         }),
       );
@@ -228,7 +229,7 @@ it.effect(
         Effect.gen(function* () {
           const notificationService = yield* NotificationService.Service;
           for (const id of [theirs.id, agents.id, Notification.Id.make("absent")]) {
-            expect(yield* Effect.flip(notificationService.get(id))).toEqual(
+            expect(yield* Effect.flip(notificationService.markSeen(id))).toEqual(
               new NotificationService.NotFound({
                 workspaceId,
                 notificationId: id,
@@ -257,11 +258,14 @@ it.effect(
           fixture,
           Effect.gen(function* () {
             const notificationService = yield* NotificationService.Service;
-            for (const operation of [
-              notificationService.get(mine.id).pipe(Effect.asVoid),
-              notificationService.list(page).pipe(Effect.asVoid),
-              notificationService.listPending(page).pipe(Effect.asVoid),
-            ]) {
+            const operations: ReadonlyArray<
+              Effect.Effect<void, { readonly _tag: string }, Actor.Service>
+            > = [
+              notificationService.markSeen(mine.id).pipe(Effect.asVoid),
+              notificationService.inbox(page).pipe(Effect.asVoid),
+              notificationService.countPending.pipe(Effect.asVoid),
+            ];
+            for (const operation of operations) {
               const error = yield* Effect.flip(operation);
               expect(error._tag).toBe(
                 actor.workspaceId === otherWorkspaceId
@@ -271,13 +275,17 @@ it.effect(
             }
           }),
           actor,
-          { get: unexpected, listByRecipient: unexpected, listPendingByRecipient: unexpected },
+          {
+            get: unexpected,
+            listLatestByRecipient: unexpected,
+            countPendingByRecipient: unexpected,
+          },
         );
       }
     }),
 );
 
-it.effect("notification reads join an outer commit and observe staged membership removal", () =>
+it.effect("inbox reads join an outer commit and observe staged membership removal", () =>
   Effect.gen(function* () {
     const fixture = yield* make(workspaceId);
     yield* seed(fixture);
@@ -290,12 +298,12 @@ it.effect("notification reads join an outer commit and observe staged membership
           journal.commit(
             Effect.gen(function* () {
               const storeTransaction = yield* Store.Transaction;
-              expect(yield* notificationService.get(mine.id)).toEqual(mine);
+              expect(yield* notificationService.inbox(page)).toEqual(inboxOf(mine));
               expect((yield* Store.Transaction).id).toBe(storeTransaction.id);
               yield* journal
                 .publish(MemberFacts.Removed, { workspaceId, memberId: alice.memberId })
                 .pipe(Effect.provideService(Publication.Service, testProvenance(workspaceId)));
-              return yield* notificationService.listPending(page);
+              return yield* notificationService.countPending;
             }),
           ),
         );
@@ -303,15 +311,15 @@ it.effect("notification reads join an outer commit and observe staged membership
           _tag: "Authorization.InvalidActor",
           reason: "membership-removed",
         });
-        expect(yield* notificationService.listPending(page)).toEqual([mine]);
+        expect(yield* notificationService.countPending).toBe(1);
         expect(yield* journal.log.read({ limit: 10 })).toEqual([]);
       }),
       alice,
       {
-        get: () =>
+        listLatestByRecipient: () =>
           Effect.gen(function* () {
             expect(Option.isSome(yield* Effect.serviceOption(Store.Transaction))).toBe(true);
-            return Option.some(mine);
+            return [mine];
           }),
       },
     );
@@ -319,23 +327,23 @@ it.effect("notification reads join an outer commit and observe staged membership
 );
 
 it.effect(
-  "notification lists forward validated pagination with the actor's recipient, ignoring caller-selected recipients",
+  "the inbox forwards validated paging with the actor's recipient, ignoring caller-selected recipients",
   () =>
     Effect.gen(function* () {
       const fixture = yield* make(workspaceId);
       yield* seed(fixture);
       const options = {
         limit: 1,
-        after: { recordedAt: mine.recordedAt, id: Notification.Id.make("earlier") },
+        before: { recordedAt: mine.recordedAt, id: Notification.Id.make("later") },
       };
       const calls: Array<{
         pending: boolean;
         recipient: Notification.Recipient;
-        options: NotificationStore.ReadOptions;
+        options: NotificationStore.LatestOptions;
       }> = [];
-      const list =
+      const latest =
         (pending: boolean) =>
-        (recipient: Notification.Recipient, request: NotificationStore.ReadOptions) =>
+        (recipient: Notification.Recipient, request: NotificationStore.LatestOptions) =>
           Effect.sync(() => {
             calls.push({ pending, recipient, options: request });
             return [mine];
@@ -345,11 +353,13 @@ it.effect(
         Effect.gen(function* () {
           const notificationService = yield* NotificationService.Service;
           const input = { ...options, recipient: bob.identity };
-          expect(yield* notificationService.list(input)).toEqual([mine]);
-          expect(yield* notificationService.listPending(input)).toEqual([mine]);
+          expect(yield* notificationService.inbox(input)).toEqual(inboxOf(mine));
+          expect(yield* notificationService.inbox({ ...input, pendingOnly: true })).toEqual(
+            inboxOf(mine),
+          );
         }),
         alice,
-        { listByRecipient: list(false), listPendingByRecipient: list(true) },
+        { listLatestByRecipient: latest(false), listLatestPendingByRecipient: latest(true) },
       );
       // The actor's inbox is their membership's.
       const recipient = Notification.ofMember(alice.memberId, alice.identity);
@@ -366,22 +376,24 @@ it.effect("invalid notification IDs and paging are rejected before store reads",
     yield* seed(fixture);
     const invalid = record("invalid");
     Reflect.set(invalid, "id", "");
-    const after = { recordedAt: mine.recordedAt, id: mine.id };
-    Reflect.set(after, "recordedAt", "not-a-date");
+    const before = { recordedAt: mine.recordedAt, id: mine.id };
+    Reflect.set(before, "recordedAt", "not-a-date");
     yield* run(
       fixture,
       Effect.gen(function* () {
         const notificationService = yield* NotificationService.Service;
-        expect((yield* Effect.flip(notificationService.get(invalid.id)))._tag).toBe("SchemaError");
-        for (const options of [{ limit: 0 }, { limit: -1 }, { limit: 1.5 }, { limit: 1, after }]) {
-          expect((yield* Effect.flip(notificationService.list(options)))._tag).toBe("SchemaError");
-          expect((yield* Effect.flip(notificationService.listPending(options)))._tag).toBe(
-            "SchemaError",
-          );
-        }
+        expect((yield* Effect.flip(notificationService.markSeen(invalid.id)))._tag).toBe(
+          "SchemaError",
+        );
+        for (const options of [{ limit: 0 }, { limit: -1 }, { limit: 1.5 }, { limit: 1, before }])
+          expect((yield* Effect.flip(notificationService.inbox(options)))._tag).toBe("SchemaError");
       }),
       alice,
-      { get: unexpected, listByRecipient: unexpected, listPendingByRecipient: unexpected },
+      {
+        get: unexpected,
+        listLatestByRecipient: unexpected,
+        listLatestPendingByRecipient: unexpected,
+      },
     );
   }),
 );
@@ -396,12 +408,12 @@ it.effect("notification storage failures retain their cause", () =>
       fixture,
       Effect.gen(function* () {
         const notificationService = yield* NotificationService.Service;
-        expect(yield* Effect.flip(notificationService.get(mine.id))).toBe(failure);
-        expect(yield* Effect.flip(notificationService.list(page))).toBe(failure);
-        expect(yield* Effect.flip(notificationService.listPending(page))).toBe(failure);
+        expect(yield* Effect.flip(notificationService.markSeen(mine.id))).toBe(failure);
+        expect(yield* Effect.flip(notificationService.inbox(page))).toBe(failure);
+        expect(yield* Effect.flip(notificationService.countPending)).toBe(failure);
       }),
       alice,
-      { get: fail, listByRecipient: fail, listPendingByRecipient: fail },
+      { get: fail, listLatestByRecipient: fail, countPendingByRecipient: fail },
     );
   }),
 );

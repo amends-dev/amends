@@ -31,6 +31,7 @@ import {
   forWorkspace,
   future,
   journalLog,
+  listOldestFirst,
   otherWorkspaceId,
   publishedMessage,
   request,
@@ -304,7 +305,8 @@ export const journal = (harness: Harness) => {
                 ),
                 activities,
                 notifications: yield* Effect.forEach(actors, (actor) =>
-                  bound.notifications.listByRecipient(
+                  listOldestFirst(
+                    bound.notifications,
                     Notification.ofMember(actor.memberId, actor.identity),
                     { limit: 100 },
                   ),

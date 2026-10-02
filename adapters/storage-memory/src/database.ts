@@ -5,10 +5,9 @@
  * enforce with plain maps.
  */
 import type { Commit, Entry, Store } from "@amends/core/journal";
-import type { Signal } from "@amends/core/signal";
+import { SignalHub } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
 import { Context, Deferred, Effect, Layer, Semaphore } from "effect";
-import type { Queue } from "effect";
 
 /** One commit's entries in one log, at one position. Stored batches are never changed. */
 export interface Batch {
@@ -69,7 +68,7 @@ export interface Space {
   readonly records: { readonly [K in Projection]: Map<string, string> };
   /** Private read state by member and thread: the sequence read through. Kept through rebuilds. */
   readonly threadPositions: Map<string, number>;
-  /** Private read state by member and group: when they caught up, in epoch milliseconds. */
+  /** Private read state by member and group: when they last read it, in epoch milliseconds. */
   readonly groupTimes: Map<string, number>;
   /** Private Seen by notification ID: when its human recipient first saw it. Kept through rebuilds. */
   readonly notificationsSeen: Map<string, number>;
@@ -92,8 +91,8 @@ export interface Interface {
   readonly logLocks: Map<string, Semaphore.Semaphore>;
   /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
-  /** Each workspace's signal subscribers, across every host; signals themselves are never kept. */
-  readonly listeners: Map<Workspace.Id, Set<Queue.Queue<Signal.Value>>>;
+  /** Every workspace's signals, across every host; signals themselves are never kept. */
+  readonly signals: SignalHub.Local;
   /** Issue an identifier unique within this storage, for commits and entries. */
   readonly nextId: (prefix: string) => string;
 }
@@ -207,7 +206,7 @@ export const logLock = (database: Interface, workspaceId: Workspace.Id, logId: s
 };
 
 /** Wake every reader waiting for an append. */
-export const signalAppend = (database: Interface) => {
+export const wakeAppendReaders = (database: Interface) => {
   const previous = database.appended;
   database.appended = Deferred.makeUnsafe<void>();
   Deferred.doneUnsafe(previous, Effect.void);
@@ -225,7 +224,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
     writers: new Map(),
     logLocks: new Map(),
     appended: yield* Deferred.make<void>(),
-    listeners: new Map(),
+    signals: yield* SignalHub.makeLocal,
     nextId: (prefix) => `${prefix}-${++issued}`,
   });
 });

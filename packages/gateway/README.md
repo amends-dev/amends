@@ -30,8 +30,7 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`WorkspaceSignals.Service`, core's `AgentJobs.Service` and `TurnJobs.Service`, and
-`Crypto.Crypto`, in the host's scope. It captures
+core's `AgentJobs.Service` and `TurnJobs.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `options.connections` lists
@@ -43,7 +42,7 @@ storage bindings. Each defaults to none. `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
-`WorkspaceStorage`, `WorkspaceSignals`, `SessionTokens`, `SignIn`, and `WorkspaceDirectory` declare
+`WorkspaceStorage`, `SessionTokens`, `SignIn`, and `WorkspaceDirectory` declare
 host-owned contracts. Their implementations and construction APIs belong to adapters or hosts; they
 have no default `make` or `layer` here. `Service.of(...)` is sufficient to type-check a supplied
 implementation.
@@ -77,9 +76,8 @@ host changed the workspace uses it prepared again. Both apply one error policy, 
 [public outcomes](#public-outcomes).
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
-part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
-`WorkspaceSignals.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
-core's `AgentJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
+part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`): its stores and
+its `SignalHub.Service`; core's `AgentJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
 each naming its workspace, and `Crypto.Crypto`. The gateway passes the job services to each
 workspace's core as they are. A host that runs no jobs provides each one's `layerNoRunner`:
 requests are accepted and nothing runs, so work waits in agents' inboxes, or queued.
@@ -113,8 +111,7 @@ follower, and the next request boots it again, finding its projections live. Mem
 therefore follows the workspaces in recent use rather than every workspace acquired since
 startup. Change-feed subscribers share their runtime's follower, and each process follows
 the journal itself, so subscribers on different hosts see the same commits. Signals reach
-them through the host's `WorkspaceSignals`, which relays between the processes over the same
-storage. Host shutdown
+them through the workspace's signal hub, which storage relays between the processes over it. Host shutdown
 closes runtime resources and subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
 fails its waiting requests as a defect. A later acquisition can retry; no operation
@@ -149,12 +146,12 @@ contracts.
 [`@amends/cluster`](../cluster/README.md) implements core's `AgentJobs` and `TurnJobs` on
 Effect Cluster, with the workers that run what they store through `inWorkspace`.
 
-`WorkspaceSignals.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
-between every process over the same storage. It is separate from `WorkspaceStorage` because
-it stores nothing: an adapter may relay through its database, as PostgreSQL does with
-`NOTIFY`, or through any broker the host composes. Its `Signals.Service` is best effort; a
-publish never fails, and a subscriber that falls behind or loses its connection misses
-signals.
+Storage binds each workspace's `SignalHub.Service`, which delivers
+[ephemeral signals](../core/README.md#signals), such as typing, between every process over the
+same storage. It stores nothing: the memory adapter hands signals to the hosts in its process, and
+PostgreSQL relays them with `NOTIFY` on the channel that also wakes readers waiting for appends.
+Delivery is best effort; a publish never fails, and a subscriber that falls behind or loses its
+connection misses signals.
 
 ## Public outcomes
 

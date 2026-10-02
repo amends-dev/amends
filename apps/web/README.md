@@ -92,6 +92,6 @@ compose the Workspace and Members sections, which the Settings sidebar lists, an
 local mode and palette persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode and chosen palette through the UI Theme.
 The account menu offers Neutral, Linen, Sage, and Slate independently of Light, Dark, or System.
-`src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
-stay current over the change feed; the layout shows `LiveStatus` from `useLiveStatus()`. See
-[live updates](../../docs/live-updates.md).
+`src/routes.tsx` mounts `ChangeFeedProvider` around the workspace layout, so workspace pages
+stay current over the change feed; the layout shows `LiveStatus` from `useChangeFeedStatus()`. See
+[change feed](../../docs/change-feed.md).

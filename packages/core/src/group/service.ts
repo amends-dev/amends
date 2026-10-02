@@ -82,7 +82,7 @@ export interface Interface {
   /** Current readable groups only, ordered by group ID. Honors an existing transaction. */
   /**
    * A page of the actor's current groups that `group.read` covers, in group-ID order, each with
-   * its latest activity, the actor's caught-up time, whether it has new activity for them, and
+   * its latest activity, when the actor last read it, whether it has new activity for them, and
    * whether they follow it. Each page reads a fixed number of times, however large.
    */
   readonly listMine: (
@@ -249,9 +249,9 @@ export const make = Effect.fn("GroupService.make")(function* () {
     const latest = new Map(
       (yield* groupStore.getLatest(ids)).map((value) => [value.groupId, value.occurredAt] as const),
     );
-    const caughtUp = new Map(
-      (yield* readStateStore.getGroupsCaughtUp(memberId, ids)).map(
-        (value) => [value.groupId, value.caughtUpAt] as const,
+    const readTimes = new Map(
+      (yield* readStateStore.getGroupReads(memberId, ids)).map(
+        (value) => [value.groupId, value.readAt] as const,
       ),
     );
     const following = new Set(
@@ -274,14 +274,14 @@ export const make = Effect.fn("GroupService.make")(function* () {
       const admission = admissions.get(groupId);
       if (group === undefined || admission === undefined) continue;
       const latestActivityAt = latest.get(groupId) ?? null;
-      const caughtUpAt = caughtUp.get(groupId) ?? null;
+      const readAt = readTimes.get(groupId) ?? null;
       items.push({
         group,
         latestActivityAt,
-        caughtUpAt,
+        readAt,
         newActivity:
           latestActivityAt !== null &&
-          DateTime.isGreaterThan(latestActivityAt, caughtUpAt ?? admission.admittedAt),
+          DateTime.isGreaterThan(latestActivityAt, readAt ?? admission.admittedAt),
         following: following.has(admission.id),
         pending: pending.get(groupId) ?? 0,
         // Direct groups keep the members they started with, and are named by them.

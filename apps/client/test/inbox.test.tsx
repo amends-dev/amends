@@ -8,9 +8,11 @@ import {
   DirectoryProvider,
   Session,
   useInboxView,
+  ChangeFeedProvider,
   type InboxFilter,
   type SessionStore,
 } from "../src/index.ts";
+import { eventStream } from "./event-stream.ts";
 
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>
@@ -51,7 +53,7 @@ const groups = [
       createdAt: at(0),
     },
     latestActivityAt: null,
-    caughtUpAt: null,
+    readAt: null,
     newActivity: false,
     following: true,
     pending: 1,
@@ -110,21 +112,30 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     notification("n2", 2, 2, "Here is the draft."),
     notification("n1", 1, 1, "Starting the review."),
   ];
-  const acknowledged: string[] = [];
+  const markedSeen: string[] = [];
   const through: unknown[] = [];
+  const streams: Array<ReturnType<typeof eventStream>> = [];
+  /** The server tells the reader's sessions what they saw, as it does after marking it. */
+  const announceSeen = (notificationIds: ReadonlyArray<string>) =>
+    streams.at(-1)?.send({
+      _tag: "Signal",
+      workspaceId: "one",
+      signal: { _tag: "NotificationsSeen", workspaceId: "one", memberId: "owner", notificationIds },
+    });
   const settle = (id: string) => {
     const entry = inbox.find((item) => item.notification.id === id);
-    if (entry)
-      entry.notification.state = {
-        _tag: "Acknowledged",
-        outcome: { _tag: "Seen" },
-        acknowledgedAt: at(9),
-      };
+    if (entry) entry.notification.state = { _tag: "Seen", seenAt: at(9) };
   };
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const url = new URL(request.url);
     const path = url.pathname;
+    if (path === "/workspaces/one/changes") {
+      const created = eventStream(request);
+      streams.push(created);
+      created.send({ _tag: "Ready", workspaceId: "one", cursor: null, reset: false });
+      return created.response;
+    }
     if (path === "/me/workspaces") return json(listing);
     if (path === "/workspaces/one/members") return json(members);
     if (path === "/workspaces/one/groups") return json(groups);
@@ -139,16 +150,18 @@ function fixture(options: { readonly fail?: boolean } = {}) {
         pending: inbox.filter((item) => item.notification.state._tag === "Pending").length,
       });
     if (request.method === "POST" && options.fail) return json({}, 503);
-    const acknowledge = /\/notifications\/([^/]+)\/acknowledge$/.exec(path);
-    if (request.method === "POST" && acknowledge) {
-      acknowledged.push(acknowledge[1]!);
-      settle(acknowledge[1]!);
-      return json(inbox.find((item) => item.notification.id === acknowledge[1])!.notification);
+    const markSeen = /\/notifications\/([^/]+)\/seen$/.exec(path);
+    if (request.method === "POST" && markSeen) {
+      markedSeen.push(markSeen[1]!);
+      settle(markSeen[1]!);
+      announceSeen([markSeen[1]!]);
+      return json(inbox.find((item) => item.notification.id === markSeen[1])!.notification);
     }
-    if (request.method === "POST" && path === "/workspaces/one/notifications/acknowledge") {
+    if (request.method === "POST" && path === "/workspaces/one/notifications/seen") {
       through.push(await request.json());
       for (const item of inbox) settle(item.notification.id);
-      return json({ acknowledged: 3 });
+      announceSeen(inbox.map((item) => item.notification.id));
+      return json({ marked: 3 });
     }
     return json({}, 404);
   });
@@ -169,7 +182,9 @@ function fixture(options: { readonly fail?: boolean } = {}) {
       )}
     >
       <DirectoryProvider>
-        <Consumer />
+        <ChangeFeedProvider workspaceId="one">
+          <Consumer />
+        </ChangeFeedProvider>
       </DirectoryProvider>
     </ClientProvider>
   ));
@@ -179,7 +194,7 @@ function fixture(options: { readonly fail?: boolean } = {}) {
     },
     setFilter,
     setRetain,
-    acknowledged,
+    markedSeen,
     through,
     failed,
   };
@@ -212,7 +227,7 @@ it("marks a notification seen as it opens, and keeps it in Unread while it stays
   f.view.open("n2");
   // Seen at once, before the inbox refreshes.
   expect(f.view.entries().find((entry) => entry.id === "n2")?.unread).toBe(false);
-  await waitFor(() => expect(f.acknowledged).toEqual(["n2"]));
+  await waitFor(() => expect(f.markedSeen).toEqual(["n2"]));
   await waitFor(() => expect(f.view.unread()).toBe(2));
   // The refreshed Unread no longer holds it, but the open one stays in place.
   expect(f.view.entries().map((entry) => entry.id)).toEqual(["n3", "n2", "n1"]);
@@ -221,7 +236,7 @@ it("marks a notification seen as it opens, and keeps it in Unread while it stays
   expect(f.view.entries().map((entry) => entry.id)).toEqual(["n3", "n1"]);
   // Opening one already seen asks nothing more.
   f.view.open("n2");
-  expect(f.acknowledged).toEqual(["n2"]);
+  expect(f.markedSeen).toEqual(["n2"]);
 });
 
 it("marks everything seen through the newest notification listed", async () => {

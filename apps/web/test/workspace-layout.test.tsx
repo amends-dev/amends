@@ -5,7 +5,7 @@ import {
   DirectoryProvider,
   Session,
   useDirectory,
-  WorkspaceFeedProvider,
+  ChangeFeedProvider,
   type DirectoryScope,
 } from "@amends/client";
 import { Layer, Schema } from "effect";
@@ -69,9 +69,9 @@ it("retains the shell and an open account menu through directory refresh and rec
           <Route
             path="/workspaces/:workspaceId"
             component={() => (
-              <WorkspaceFeedProvider workspaceId="one">
+              <ChangeFeedProvider workspaceId="one">
                 <WorkspaceLayout>Content</WorkspaceLayout>
-              </WorkspaceFeedProvider>
+              </ChangeFeedProvider>
             )}
           />
         </MemoryRouter>

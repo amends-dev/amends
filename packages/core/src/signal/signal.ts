@@ -34,12 +34,12 @@ export const Value = Schema.TaggedUnion({
     threadId: ThreadId.Id,
     readThrough: Schema.Int.check(Schema.isGreaterThan(0)),
   },
-  /** A member caught up with a group: for their sessions. */
-  GroupCaughtUp: {
+  /** A member read a group: for their sessions. */
+  GroupRead: {
     workspaceId: WorkspaceId.Id,
     memberId: MemberId.Id,
     groupId: GroupId.Id,
-    caughtUpAt: Schema.DateTimeUtcFromString,
+    readAt: Schema.DateTimeUtcFromString,
   },
   /** A member saw notifications: for their sessions. */
   NotificationsSeen: {
@@ -87,18 +87,19 @@ const threadReaders = (signal: {
 });
 
 /**
- * Typing and turns' progress reach the thread's readers, as its messages do; read state reaches
- * only its member's own sessions.
+ * Who on the workspace's change feed may receive a signal. Typing reaches the thread's readers, as
+ * its messages do; read state reaches only its member's own sessions. A turn's drafts reach no
+ * one there: only readers following its log, which checks their access itself.
  */
-export const reachOf = (signal: Value): Reach =>
+export const changeFeedReachOf = (signal: Value): Reach | undefined =>
   Value.match(signal, {
     Typing: threadReaders,
-    TurnDraft: threadReaders,
+    TurnDraft: () => undefined,
     ThreadRead: ({ memberId }): Reach => ({
       audience: [Member.audienceOf(memberId)],
       requirement: undefined,
     }),
-    GroupCaughtUp: ({ memberId }): Reach => ({
+    GroupRead: ({ memberId }): Reach => ({
       audience: [Member.audienceOf(memberId)],
       requirement: undefined,
     }),
@@ -107,11 +108,5 @@ export const reachOf = (signal: Value): Reach =>
       requirement: undefined,
     }),
   });
-
-/**
- * Whether the workspace's change feed carries a signal. A turn's drafts go only to readers
- * following its log, so a response being written reaches no one else.
- */
-export const inChangeFeed = (signal: Value): boolean => signal._tag !== "TurnDraft";
 
 export * as Signal from "./signal.ts";

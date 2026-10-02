@@ -1,6 +1,6 @@
 export { AgentsGroup } from "./agents.ts";
 export { Api } from "./api.ts";
-export { ChangesGroup } from "./changes.ts";
+export { ChangeFeedGroup } from "./change-feed.ts";
 export { ConnectionsGroup } from "./connections.ts";
 export { EnvironmentsGroup } from "./environments.ts";
 export { Authentication, Principal, Unauthorized } from "./authentication.ts";

@@ -23,9 +23,9 @@ contacts, or triage. Authorized group-thread discovery,
 metadata, timeline pages, and current-participant summaries are also implemented. Human replies publish through
 `ThreadMessageService`, admitting the author and eligible mentions in the same commit.
 `ThreadParticipationService` implements self-follow/unfollow, quiet follow activity, and pending
-agent-input settlement. `NotificationService.resolveSource` resolves owned notifications under
-current thread access, without acknowledgment or participation changes. Human acknowledgment is
-implemented through `NotificationService.acknowledge`, as private `Seen` state outside the
+agent-input settlement. `NotificationService.inbox` shows each of the reader's notifications with
+its source under current thread access, without marking it seen or changing participation. A
+person marks one seen with `NotificationService.markSeen`, as private `Seen` state outside the
 journal. Agents accept their work notifications into turns, one active turn per agent per
 thread, and a turn closes by publishing the agent's reply from its log; see
 [core's turns](../packages/core/README.md#turns). Other participation management, the task and
@@ -2678,14 +2678,13 @@ Discovery filters unreadable threads. Timeline pages follow an exclusive sequenc
 resolve message content or a historical follow summary under the same check. Participant summaries expose member references
 and joining details, while routing identities and ended participation remain internal.
 Reading requires no participation, creates none, and neither acknowledges input nor requests work.
-`NotificationService.resolveSource` applies the same current group access and `thread.read`
-after checking notification ownership and historical source references. It returns the same typed
-timeline item without acknowledging input or changing participation. Historical notifications,
-including discarded agent input, remain readable after unfollowing while access permits; group
-departure or a revoked read grant blocks source resolution. This is implemented through core and
-the gateway; HTTP/UI integration remains future work. Subscriptions retain their separate
-authorization contract. See [thread reads](thread-workflows.md#reading-conversations)
-and [source resolution](thread-workflows.md#resolving-a-notification-source).
+`NotificationService.inbox` applies the same current group access and `thread.read` to each
+notification's source, which only its recipient's inbox lists. It shows the same typed timeline
+item without marking anything seen or changing participation. Historical notifications,
+including discarded agent input, keep their source after unfollowing while access permits; group
+departure or a revoked read grant hides it. Subscriptions retain their separate authorization
+contract. See [thread reads](thread-workflows.md#reading-conversations)
+and [notification sources](thread-workflows.md#notification-sources).
 
 ### Threads inherit their group's access audience
 
@@ -2867,7 +2866,7 @@ A thread is unread for a member when its latest sequence is past their read posi
 have never read counts only when it has activity after they joined the group, so joining a group
 with many older threads does not mark them all unread. Each thread keeps the sequence and time of
 its latest message, and each group the time of its latest message in any thread; quiet participation
-changes do not count. A member's caught-up time for a group, set when they view or mark the group
+changes do not count. A member's read time for a group, set when they view or mark the group
 read, shows whether the group has newer activity. Thread lists order by latest activity. Beside
 that, a group counts the member's pending notifications from its threads: activity addressed to
 them rather than merely unseen, as a badge beside a bold group in a sidebar.
@@ -2881,7 +2880,7 @@ private state like the position, not a journal fact: reading never takes the wor
 order, and rebuilding projections keeps both. Agents have no read positions: turns track their
 input progress.
 
-Read positions and caught-up times are private, per-member state rather than journal facts. They
+Read positions and read times are private, per-member state rather than journal facts. They
 change on every view, carry no audit value, and must not compete with conversation writes for the
 workspace's write order. Rebuilding projections from the journal does not restore them. Their
 store contract needs only keyed records, batch reads, and a forward-only update.
@@ -3119,9 +3118,8 @@ responsibility for the input represented by its source activity. Its acknowledgm
 contains the accepting `turnId`. A human acknowledgment in amends records when the person
 saw the notification. A contact's outward-delivery acknowledgment instead references the
 channel delivery that accepted responsibility. Several notifications can carry the same
-delivery reference. These are different outcomes. Human handling now stores
-`Acknowledged { outcome: { _tag: "Seen" }, acknowledgedAt }`; turn, delivery, and informational
-outcome schemas remain open. Neither agent nor contact handoff implies that execution or transport has completed.
+delivery reference. These are different outcomes, each its own state: a person's is
+`Seen { seenAt }`, and an agent's `Accepted { turnId, acceptedAt }`; delivery remains open. Neither agent nor contact handoff implies that execution or transport has completed.
 Attempting delivery without preserving the accepted work is insufficient acknowledgment.
 
 Several notifications can be accepted by one turn. Notification creation does not imply
@@ -3138,8 +3136,7 @@ rebuilding projections keeps it. Active membership and ownership are required, w
 thread-access requirement. Acknowledgments that hand off work, a turn accepting input or a channel
 delivery accepting a reply, will be journal facts recorded in the same commit as the turn or
 delivery by the workflows that own them; the notification domain does not orchestrate that work.
-The human operation is available through core and the gateway, with HTTP/UI actions still pending.
-See [acknowledgment](thread-workflows.md#acknowledging-a-notification).
+See [marking a notification seen](thread-workflows.md#marking-a-notification-seen).
 
 Other recipients' storage, acknowledgment fields, and retry mechanics remain open. Discarded and
 informational notifications must not remain pending or repeatedly trigger processing. An

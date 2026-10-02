@@ -51,6 +51,7 @@ import {
   boundTo,
   failingLate,
   journalLog,
+  listOldestFirst,
   otherWorkspaceId,
   placed,
   runHost,
@@ -159,7 +160,7 @@ export const threads = (harness: Harness) => {
       };
     });
     const notifications = (bound: Bound, memberId: Member.Id, identity: Identity.MemberReference) =>
-      bound.notifications.listByRecipient(Notification.ofMember(memberId, identity), {
+      listOldestFirst(bound.notifications, Notification.ofMember(memberId, identity), {
         limit: 100,
       });
     const sorted = (values: ReadonlyArray<ThreadParticipation.Record>) =>

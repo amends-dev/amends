@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
-import { affectedKeys } from "../src/api/changes.ts";
+import { affectedKeys } from "../src/api/change-feed.ts";
 import { drafted, writing, type Drafts } from "../src/api/drafts.ts";
 import {
   ClientProvider,
@@ -11,7 +11,7 @@ import {
   useThreadConversation,
   useThreadTurnControls,
   useTurnLog,
-  WorkspaceFeedProvider,
+  ChangeFeedProvider,
   type SessionStore,
   type ThreadTurnEntry,
   type TurnControls,
@@ -405,9 +405,9 @@ function followed(
       )}
     >
       <DirectoryProvider>
-        <WorkspaceFeedProvider workspaceId="one">
+        <ChangeFeedProvider workspaceId="one">
           <Consumer />
-        </WorkspaceFeedProvider>
+        </ChangeFeedProvider>
       </DirectoryProvider>
     </ClientProvider>
   ));

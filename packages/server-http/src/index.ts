@@ -5,7 +5,7 @@ export { MeHandlers } from "./me.ts";
 export { MembersHandlers } from "./members.ts";
 export { NotificationsHandlers } from "./notifications.ts";
 export { Routes } from "./routes.ts";
-export { ChangesHandlers } from "./changes.ts";
+export { ChangeFeedHandlers } from "./change-feed.ts";
 export { ConnectionsHandlers } from "./connections.ts";
 export { AgentsHandlers } from "./agents.ts";
 export { EnvironmentsHandlers } from "./environments.ts";

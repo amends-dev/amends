@@ -59,7 +59,7 @@ drawings, generation, and visual review in the UI workshop.
   [Agents](agents.md) covers adding and configuring agents, fitting environments, and the
   model-connection detour.
   [Turns](turns.md) covers agents' turns in threads, where agents are at work, and turn logs.
-  [Live updates](live-updates.md) covers the change-feed client, invalidation, and reconnection.
+  [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not

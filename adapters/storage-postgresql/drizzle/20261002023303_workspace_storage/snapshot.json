@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "e5856eb1-8a98-4c27-b8f2-330e4428b0e4",
+  "id": "5e70b49a-1b84-47b6-b66d-bbf3e050d908",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1261,7 +1261,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "caught_up_at",
+      "name": "read_at",
       "entityType": "columns",
       "schema": "public",
       "table": "group_read_times"
@@ -4178,7 +4178,7 @@
         }
       ],
       "isUnique": false,
-      "where": "\"state\" = 'Pending' AND \"seen_at\" IS NULL",
+      "where": "\"state\" = 'Pending'",
       "with": "",
       "method": "btree",
       "concurrently": false,
@@ -4220,7 +4220,7 @@
         }
       ],
       "isUnique": false,
-      "where": "\"state\" = 'Pending' AND \"seen_at\" IS NULL",
+      "where": "\"state\" = 'Pending'",
       "with": "",
       "method": "btree",
       "concurrently": false,
@@ -4269,7 +4269,7 @@
         }
       ],
       "isUnique": false,
-      "where": "\"state\" = 'Pending' AND \"seen_at\" IS NULL",
+      "where": "\"state\" = 'Pending'",
       "with": "",
       "method": "btree",
       "concurrently": false,
@@ -5213,15 +5213,8 @@
       "table": "members"
     },
     {
-      "value": "(\"state\" IN ('Pending', 'Informational') AND \"discard_reason\" IS NULL AND \"accepted_turn_id\" IS NULL AND \"accepted_at\" IS NULL) OR (\"state\" = 'Discarded' AND \"discard_reason\" IN ('participation-ended', 'access-lost') AND \"accepted_turn_id\" IS NULL AND \"accepted_at\" IS NULL) OR (\"state\" = 'Accepted' AND \"recipient_kind\" = 'Agent' AND \"discard_reason\" IS NULL AND \"accepted_turn_id\" IS NOT NULL AND \"accepted_at\" IS NOT NULL)",
+      "value": "(\"discard_reason\" IS NOT NULL) = (\"state\" = 'Discarded') AND (\"accepted_turn_id\" IS NOT NULL AND \"accepted_at\" IS NOT NULL) = (\"state\" = 'Accepted') AND (\"accepted_turn_id\" IS NULL) = (\"accepted_at\" IS NULL) AND (\"seen_at\" IS NOT NULL) = (\"state\" = 'Seen') AND (\"state\" <> 'Accepted' OR \"recipient_kind\" = 'Agent') AND (\"state\" <> 'Seen' OR \"recipient_kind\" = 'Human')",
       "name": "notification_state",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "notifications"
-    },
-    {
-      "value": "\"seen_at\" IS NULL OR (\"recipient_kind\" = 'Human' AND \"state\" = 'Pending')",
-      "name": "notification_seen_state",
       "entityType": "checks",
       "schema": "public",
       "table": "notifications"

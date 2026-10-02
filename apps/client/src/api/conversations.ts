@@ -14,7 +14,6 @@ import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
 import type { ApiClient } from "./client.ts";
 import { command } from "./failures.ts";
-import { expecting, groupCaughtUp, notificationSeen, threadRead } from "./echoes.ts";
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "./keys.ts";
 import { requestAtom } from "./request.ts";
 import { refreshResult } from "./refresh.ts";
@@ -374,48 +373,37 @@ export const pendingCountRead = (client: ApiClient, workspaceId: string) =>
 
 /**
  * Record that the reader saw everything still pending for them up to the newest notification
- * they are shown, then invalidate their inbox and pending counts. What arrived after it stays.
+ * they are shown; what arrived after it stays. Their sessions, this one included, refresh the
+ * inbox and pending counts when its signal arrives through the change feed.
  */
-export const seenThroughRequest = (client: ApiClient, workspace: string) =>
+export const markSeenThroughRequest = (client: ApiClient, workspace: string) =>
   requestAtom(client, (through: Pick<Notification.Record, "recordedAt" | "id">) =>
     Effect.gen(function* () {
       const api = yield* client;
-      const { acknowledged } = yield* api.notifications.acknowledgeThrough({
+      const { marked } = yield* api.notifications.markSeenThrough({
         params: { workspaceId: yield* command(Workspace.Id)(workspace) },
         payload: { through: { recordedAt: through.recordedAt, id: through.id } },
       });
-      yield* Reactivity.invalidate([
-        workspaceKey(workspace, "inbox"),
-        workspaceKey(workspace, "groups"),
-      ]);
-      return acknowledged;
+      return marked;
     }),
   );
 
 /**
- * Record that the reader saw a notification, then invalidate their inbox and pending counts; their
- * own signal for it then refreshes nothing more. Seeing it again keeps the first time.
+ * Record that the reader saw a notification; seeing it again keeps the first time. Their
+ * sessions, this one included, refresh the inbox and pending counts when its signal arrives
+ * through the change feed.
  */
-export const seenRequest = (client: ApiClient, workspace: string) =>
-  requestAtom(client, (notificationId: string, get) =>
-    expecting(
-      get,
-      workspace,
-      notificationSeen(notificationId),
-      Effect.gen(function* () {
-        const api = yield* client;
-        yield* api.notifications.acknowledge({
-          params: {
-            workspaceId: yield* command(Workspace.Id)(workspace),
-            notificationId: yield* command(Notification.Id)(notificationId),
-          },
-        });
-        yield* Reactivity.invalidate([
-          workspaceKey(workspace, "inbox"),
-          workspaceKey(workspace, "groups"),
-        ]);
-      }),
-    ),
+export const markSeenRequest = (client: ApiClient, workspace: string) =>
+  requestAtom(client, (notificationId: string) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      yield* api.notifications.markSeen({
+        params: {
+          workspaceId: yield* command(Workspace.Id)(workspace),
+          notificationId: yield* command(Notification.Id)(notificationId),
+        },
+      });
+    }),
   );
 
 /**
@@ -645,45 +633,32 @@ export const postRequest = (client: ApiClient, workspace: string) =>
     }).pipe(Effect.map((posted): Posted => posted)),
   );
 
-/** What the reader has read: a thread through a timeline position, or a group caught up now. */
+/** What the reader has read: a thread through a timeline position, or a group read now. */
 export type ReadMark =
   | { readonly kind: "thread"; readonly threadId: string; readonly through: number }
   | { readonly kind: "group"; readonly groupId: string };
 /**
- * Record a read mark, then invalidate the unread state and pending counts it changes, so they show
- * even while the change feed is away. The reader's own read signal for it then refreshes nothing
- * more. Positions only move forward on the server.
+ * Record a read mark; positions only move forward on the server. The reader's sessions, this one
+ * included, refresh the unread state and pending counts it changes when its signal arrives
+ * through the change feed.
  */
 export const readRequest = (client: ApiClient, workspace: string) =>
-  requestAtom(client, (mark: ReadMark, get) =>
-    expecting(
-      get,
-      workspace,
-      mark.kind === "thread"
-        ? threadRead(mark.threadId, mark.through)
-        : groupCaughtUp(mark.groupId),
-      Effect.gen(function* () {
-        const api = yield* client;
-        const workspaceId = yield* command(Workspace.Id)(workspace);
-        if (mark.kind === "thread")
-          yield* api.threads.markRead({
-            params: { workspaceId, threadId: yield* command(Thread.Id)(mark.threadId) },
-            payload: {
-              throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through),
-            },
-          });
-        else
-          yield* api.groups.markRead({
-            params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
-          });
-        // Reading a thread settles the reader's notifications from it.
-        yield* Reactivity.invalidate([
-          workspaceKey(workspace, "groups"),
-          collectionKey(workspace, "streams"),
-          ...(mark.kind === "thread" ? [workspaceKey(workspace, "inbox")] : []),
-        ]);
-      }),
-    ),
+  requestAtom(client, (mark: ReadMark) =>
+    Effect.gen(function* () {
+      const api = yield* client;
+      const workspaceId = yield* command(Workspace.Id)(workspace);
+      if (mark.kind === "thread")
+        yield* api.threads.markRead({
+          params: { workspaceId, threadId: yield* command(Thread.Id)(mark.threadId) },
+          payload: {
+            throughSequence: yield* command(Thread.Latest.fields.sequence)(mark.through),
+          },
+        });
+      else
+        yield* api.groups.markRead({
+          params: { workspaceId, groupId: yield* command(Group.Id)(mark.groupId) },
+        });
+    }),
   );
 
 /** Following a thread, which makes the reader take part in it, or a team group, or stopping. */

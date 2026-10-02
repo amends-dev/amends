@@ -15,6 +15,7 @@ import {
   boundTo,
   future,
   layerRecordedAgentJobs,
+  listOldestFirst,
   otherWorkspaceId,
   runHost,
   Support,
@@ -23,6 +24,10 @@ import {
 import type { Harness } from "./harness.ts";
 
 /** Notification storage: isolation, paging, batches, staged reads, and gateway reads. */
+
+/** Inbox items for these notifications, whose sources here are entries no log holds. */
+const inboxOf = (...records: ReadonlyArray<Notification.Record>) =>
+  records.map((notification) => ({ notification }));
 
 export const notifications = (harness: Harness) => {
   const { core, initialized, runGateway } = Support.make(harness);
@@ -96,14 +101,14 @@ export const notifications = (harness: Harness) => {
                   expect(yield* a.notifications.get(Notification.Id.make("absent"))).toEqual(
                     Option.none(),
                   );
-                  expect(yield* a.notifications.listByRecipient(human, page)).toEqual([one]);
+                  expect(yield* listOldestFirst(a.notifications, human, page)).toEqual([one]);
                   expect(yield* a.notifications.listPendingByRecipient(agent, page)).toEqual([two]);
-                  expect(yield* a.notifications.listByRecipient(another, page)).toEqual([three]);
-                  expect(yield* a.notifications.listByRecipient(contact, page)).toEqual([four]);
+                  expect(yield* listOldestFirst(a.notifications, another, page)).toEqual([three]);
+                  expect(yield* listOldestFirst(a.notifications, contact, page)).toEqual([four]);
                   expect(yield* a.notifications.listPendingByRecipient(triage, page)).toEqual([
                     five,
                   ]);
-                  expect(yield* b.notifications.listByRecipient(triage, page)).toEqual([]);
+                  expect(yield* listOldestFirst(b.notifications, triage, page)).toEqual([]);
                   expect(yield* b.notifications.listPendingByRecipient(human, page)).toEqual([
                     foreign,
                   ]);
@@ -168,7 +173,7 @@ export const notifications = (harness: Harness) => {
         ),
     );
 
-    it.effect("both notification lists paginate exclusively by instant and binary ID order", () =>
+    it.effect("pending notifications paginate exclusively by instant and binary ID order", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
@@ -183,20 +188,16 @@ export const notifications = (harness: Harness) => {
             yield* bound.store.transaction(
               Effect.forEach([...expected].reverse(), bound.notifications.insert),
             );
-            for (const read of [
-              bound.notifications.listByRecipient,
-              bound.notifications.listPendingByRecipient,
-            ]) {
-              expect(yield* read(human, page)).toEqual(expected);
-              let after: NotificationStore.Cursor | undefined;
-              for (const next of expected) {
-                expect(
-                  yield* read(human, { limit: 1, ...(after === undefined ? {} : { after }) }),
-                ).toEqual([next]);
-                after = { recordedAt: next.recordedAt, id: next.id };
-              }
-              expect(yield* read(human, { limit: 1, after })).toEqual([]);
+            const read = bound.notifications.listPendingByRecipient;
+            expect(yield* read(human, page)).toEqual(expected);
+            let after: NotificationStore.Cursor | undefined;
+            for (const next of expected) {
+              expect(
+                yield* read(human, { limit: 1, ...(after === undefined ? {} : { after }) }),
+              ).toEqual([next]);
+              after = { recordedAt: next.recordedAt, id: next.id };
             }
+            expect(yield* read(human, { limit: 1, after })).toEqual([]);
           }),
         ),
       ),
@@ -251,7 +252,7 @@ export const notifications = (harness: Harness) => {
               const seenAt = DateTime.add(recordedAt, { minutes: 1 });
               yield* bound.notifications.markSeen([Notification.Id.make("é")], seenAt);
               const seen = record("é", {
-                state: { _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt: seenAt },
+                state: { _tag: "Seen", seenAt },
               });
               expect(yield* bound.notifications.listLatestByRecipient(human, page)).toEqual(
                 newestFirst.map((value) => (value.id === seen.id ? seen : value)),
@@ -296,7 +297,7 @@ export const notifications = (harness: Harness) => {
               expect(yield* bound.notifications.get(Notification.Id.make("duplicate"))).toEqual(
                 Option.none(),
               );
-              expect(yield* bound.notifications.listByRecipient(human, page)).toHaveLength(2);
+              expect(yield* listOldestFirst(bound.notifications, human, page)).toHaveLength(2);
             }),
           ),
         ),
@@ -369,7 +370,7 @@ export const notifications = (harness: Harness) => {
               for (const rejected of conflicting.slice(0, 1))
                 expect(yield* bound.notifications.get(rejected.id)).toEqual(Option.none());
             }
-            expect(yield* bound.notifications.listByRecipient(human, page)).toHaveLength(2);
+            expect(yield* listOldestFirst(bound.notifications, human, page)).toHaveLength(2);
           }),
         ),
       ),
@@ -435,7 +436,7 @@ export const notifications = (harness: Harness) => {
                   entryId: entry.id,
                 });
                 expect(yield* bound.notifications.get(value.id)).toEqual(Option.some(value));
-                expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([value]);
+                expect(yield* listOldestFirst(bound.notifications, human, page)).toEqual([value]);
                 return value;
               });
               expect(
@@ -443,7 +444,7 @@ export const notifications = (harness: Harness) => {
                   bound.store.transaction(write.pipe(Effect.andThen(Effect.fail("rollback")))),
                 ),
               ).toBe("rollback");
-              expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([]);
+              expect(yield* listOldestFirst(bound.notifications, human, page)).toEqual([]);
               expect(yield* bound.store.read(sourceLog, { limit: 10 })).toEqual([]);
               expect(yield* bound.checkpoints.get(key)).toEqual(Option.none());
               const saved = yield* bound.store.transaction(write);
@@ -472,7 +473,7 @@ export const notifications = (harness: Harness) => {
                 (value) => Reflect.set(value.recipient, "_tag", "Unknown"),
                 (value) => Reflect.set(value.recipient, "id", ""),
                 (value) => Reflect.set(value, "recordedAt", "not-a-date"),
-                (value) => Reflect.set(value.state, "_tag", "Acknowledged"),
+                (value) => Reflect.set(value.state, "_tag", "Unknown"),
               ];
               yield* bound.store.transaction(
                 Effect.gen(function* () {
@@ -483,12 +484,12 @@ export const notifications = (harness: Harness) => {
                       _tag: "NotificationStore.Conflict",
                       operation: "insert",
                     });
-                    expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([]);
+                    expect(yield* listOldestFirst(bound.notifications, human, page)).toEqual([]);
                   }
                   yield* bound.notifications.insert(record("valid"));
                 }),
               );
-              expect(yield* bound.notifications.listByRecipient(human, page)).toEqual([
+              expect(yield* listOldestFirst(bound.notifications, human, page)).toEqual([
                 record("valid"),
               ]);
             }),
@@ -509,25 +510,21 @@ export const notifications = (harness: Harness) => {
               Reflect.set(badCursor, "recordedAt", "not-a-date");
               const badRecipient = { ...human };
               Reflect.set(badRecipient, "_tag", "Unknown");
-              for (const read of [
-                bound.notifications.listByRecipient,
-                bound.notifications.listPendingByRecipient,
+              const read = bound.notifications.listPendingByRecipient;
+              for (const options of [
+                { limit: 0 },
+                { limit: -1 },
+                { limit: 1.5 },
+                { limit: 1, after: badCursor },
               ]) {
-                for (const options of [
-                  { limit: 0 },
-                  { limit: -1 },
-                  { limit: 1.5 },
-                  { limit: 1, after: badCursor },
-                ]) {
-                  expect(yield* Effect.flip(read(human, options))).toMatchObject({
-                    _tag: "NotificationStore.Failure",
-                  });
-                }
-                expect(yield* Effect.flip(read(badRecipient, page))).toMatchObject({
+                expect(yield* Effect.flip(read(human, options))).toMatchObject({
                   _tag: "NotificationStore.Failure",
                 });
-                expect(yield* read(human, page)).toEqual([]);
               }
+              expect(yield* Effect.flip(read(badRecipient, page))).toMatchObject({
+                _tag: "NotificationStore.Failure",
+              });
+              expect(yield* read(human, page)).toEqual([]);
               for (const read of [
                 bound.notifications.listLatestByRecipient,
                 bound.notifications.listLatestPendingByRecipient,
@@ -568,14 +565,14 @@ export const notifications = (harness: Harness) => {
               const native = Context.get(expired, Store.Transaction);
               const failures = [
                 a.notifications.get(value.id).pipe(Effect.provide(expired)),
-                a.notifications.listByRecipient(human, page).pipe(Effect.provide(expired)),
+                listOldestFirst(a.notifications, human, page).pipe(Effect.provide(expired)),
                 a.notifications.listPendingByRecipient(human, page).pipe(Effect.provide(expired)),
                 a.notifications.insert(value).pipe(Effect.provide(expired)),
                 a.notifications
                   .insert(value)
                   .pipe(Effect.provideService(Store.Transaction, native)),
                 a.store.transaction(b.notifications.get(value.id)),
-                a.store.transaction(b.notifications.listByRecipient(human, page)),
+                a.store.transaction(listOldestFirst(b.notifications, human, page)),
                 a.store.transaction(
                   b.notifications.insert(record("guarded", { workspaceId: otherWorkspaceId })),
                 ),
@@ -606,7 +603,7 @@ export const notifications = (harness: Harness) => {
             const found = Option.getOrThrow(yield* bound.notifications.get(input.id));
             expect(found).toEqual(record("isolated"));
             Reflect.set(found.recipient, "id", "changed-again");
-            const [listed] = yield* bound.notifications.listByRecipient(human, page);
+            const [listed] = yield* listOldestFirst(bound.notifications, human, page);
             if (listed === undefined) return yield* Effect.die("Expected a notification");
             Reflect.set(listed.state, "_tag", "Changed");
             expect(yield* bound.notifications.get(input.id)).toEqual(
@@ -618,7 +615,7 @@ export const notifications = (harness: Harness) => {
     );
 
     it.effect(
-      "gateway notification reads enforce recipient and workspace isolation with real pagination",
+      "gateway inbox reads enforce recipient and workspace isolation with real pagination",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -670,36 +667,43 @@ export const notifications = (harness: Harness) => {
                 humanIdentity,
                 Effect.gen(function* () {
                   const notificationService = yield* NotificationService.Service;
-                  expect(yield* notificationService.get(first.id)).toEqual(first);
-                  expect(yield* notificationService.list({ limit: 1 })).toEqual([first]);
-                  expect(yield* notificationService.list(page)).toEqual([first, second]);
-                  expect(yield* notificationService.listPending(page)).toEqual([first, second]);
+                  expect(yield* notificationService.inbox({ limit: 1 })).toEqual(inboxOf(second));
+                  expect(yield* notificationService.inbox(page)).toEqual(inboxOf(second, first));
+                  expect(yield* notificationService.inbox({ ...page, pendingOnly: true })).toEqual(
+                    inboxOf(second, first),
+                  );
                   const options = {
                     limit: 1,
-                    after: { recordedAt: first.recordedAt, id: first.id },
+                    before: { recordedAt: second.recordedAt, id: second.id },
                   };
-                  expect(yield* notificationService.list(options)).toEqual([second]);
-                  expect(yield* notificationService.listPending(options)).toEqual([second]);
+                  expect(yield* notificationService.inbox(options)).toEqual(inboxOf(first));
+                  expect(
+                    yield* notificationService.inbox({ ...options, pendingOnly: true }),
+                  ).toEqual(inboxOf(first));
+                  expect(yield* notificationService.countPending).toBe(2);
                 }),
               );
               const list = Effect.flatMap(NotificationService.Service, (notificationService) =>
-                notificationService.list(page),
+                notificationService.inbox(page),
               );
-              expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual([forAgent]);
-              expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual([
-                foreign,
-              ]);
+              expect(yield* gateway.asMember(workspaceId, agentIdentity, list)).toEqual(
+                inboxOf(forAgent),
+              );
+              expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual(
+                inboxOf(foreign),
+              );
               for (const id of [
                 forAgent.id,
                 forAnother.id,
                 earlier.id,
                 Notification.Id.make("missing"),
               ]) {
-                const get = Effect.flatMap(NotificationService.Service, (notificationService) =>
-                  notificationService.get(id),
+                const markSeen = Effect.flatMap(
+                  NotificationService.Service,
+                  (notificationService) => notificationService.markSeen(id),
                 );
                 expect(
-                  yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, get)),
+                  yield* Effect.flip(gateway.asMember(workspaceId, humanIdentity, markSeen)),
                 ).toMatchObject({
                   _tag: "NotificationService.NotFound",
                   workspaceId,
@@ -720,57 +724,57 @@ export const notifications = (harness: Harness) => {
               ).toMatchObject({
                 _tag: "Gateway.NotMember",
               });
-              expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual([
-                foreign,
-              ]);
+              expect(yield* gateway.asMember(otherWorkspaceId, humanIdentity, list)).toEqual(
+                inboxOf(foreign),
+              );
             }).pipe(Effect.scoped),
           ),
         ),
     );
 
-    it.effect(
-      "notification application reads see staged inserts in the outer commit and respect rollback",
-      () =>
-        harness.withStorage((storage) =>
-          runHost(
-            storage,
-            Effect.gen(function* () {
-              const bound = yield* boundTo(workspaceId);
-              const workspace = yield* initialized(bound, humanIdentity.id);
-              const actor = Actor.Value.make({
-                workspaceId,
-                memberId: workspace.ownerMemberId,
-                identity: humanIdentity,
-              });
-              const value = record("staged", {
-                recipient: Notification.ofMember(actor.memberId, humanIdentity),
-              });
-              yield* Effect.gen(function* () {
-                const notificationService = yield* NotificationService.Service;
-                const journal = yield* Journal.Service;
-                expect(
-                  yield* Effect.flip(
-                    journal.commit(
-                      Effect.gen(function* () {
-                        yield* bound.notifications.insert(value);
-                        expect(yield* notificationService.get(value.id)).toEqual(value);
-                        expect(yield* notificationService.list(page)).toEqual([value]);
-                        expect(yield* notificationService.listPending(page)).toEqual([value]);
-                        return yield* Effect.fail("rollback");
-                      }),
-                    ),
+    it.effect("inbox reads see staged inserts in the outer commit and respect rollback", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const bound = yield* boundTo(workspaceId);
+            const workspace = yield* initialized(bound, humanIdentity.id);
+            const actor = Actor.Value.make({
+              workspaceId,
+              memberId: workspace.ownerMemberId,
+              identity: humanIdentity,
+            });
+            const value = record("staged", {
+              recipient: Notification.ofMember(actor.memberId, humanIdentity),
+            });
+            yield* Effect.gen(function* () {
+              const notificationService = yield* NotificationService.Service;
+              const journal = yield* Journal.Service;
+              expect(
+                yield* Effect.flip(
+                  journal.commit(
+                    Effect.gen(function* () {
+                      yield* bound.notifications.insert(value);
+                      expect(yield* notificationService.inbox(page)).toEqual(inboxOf(value));
+                      expect(
+                        yield* notificationService.inbox({ ...page, pendingOnly: true }),
+                      ).toEqual(inboxOf(value));
+                      expect(yield* notificationService.countPending).toBe(1);
+                      return yield* Effect.fail("rollback");
+                    }),
                   ),
-                ).toBe("rollback");
-                expect(yield* notificationService.list(page)).toEqual([]);
-                expect(yield* Effect.flip(notificationService.get(value.id))).toMatchObject({
-                  _tag: "NotificationService.NotFound",
-                });
-                yield* journal.commit(bound.notifications.insert(value));
-                expect(yield* notificationService.get(value.id)).toEqual(value);
-              }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
-            }),
-          ),
+                ),
+              ).toBe("rollback");
+              expect(yield* notificationService.inbox(page)).toEqual([]);
+              expect(yield* Effect.flip(notificationService.markSeen(value.id))).toMatchObject({
+                _tag: "NotificationService.NotFound",
+              });
+              yield* journal.commit(bound.notifications.insert(value));
+              expect(yield* notificationService.inbox(page)).toEqual(inboxOf(value));
+            }).pipe(Effect.provide(core(bound)), Effect.provideService(Actor.Service, actor));
+          }),
         ),
+      ),
     );
 
     it.effect("settling an ended participation discards only its pending agent input", () =>
@@ -953,7 +957,11 @@ export const notifications = (harness: Harness) => {
             // What he can no longer open stops waiting for him, and stays as history.
             expect(yield* count).toBe(1);
             const all = yield* asBob(
-              NotificationService.Service.use((notifications) => notifications.list(page)),
+              NotificationService.Service.use((notifications) =>
+                Effect.map(notifications.inbox(page), (items) =>
+                  items.map((item) => item.notification),
+                ),
+              ),
             );
             const settledIn = (groupId: Group.Id) =>
               all.filter((note) => note.thread?.groupId === groupId).map((note) => note.state);
@@ -999,7 +1007,11 @@ export const notifications = (harness: Harness) => {
                 ),
               );
             const pending = asBob(
-              NotificationService.Service.use((notifications) => notifications.listPending(page)),
+              NotificationService.Service.use((notifications) =>
+                Effect.map(notifications.inbox({ ...page, pendingOnly: true }), (items) =>
+                  items.map((item) => item.notification),
+                ),
+              ),
             );
             const sidebar = asBob(GroupService.Service.use((groups) => groups.listMine(page)));
             const first = yield* join;
