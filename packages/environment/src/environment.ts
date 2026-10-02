@@ -1,9 +1,11 @@
 import type { ModelInference } from "@amends/connection/model-inference";
-import type { Harness, Transcript } from "@amends/harness";
+import { Harness, HarnessErrors } from "@amends/harness";
+import type { HarnessImplementation, Transcript } from "@amends/harness";
 import { Sandbox, SandboxErrors } from "@amends/sandbox";
 import { Context, Crypto, Effect, Layer, Ref, Schema } from "effect";
 import type { Scope } from "effect";
 import { EnvironmentErrors } from "./errors.ts";
+import { HarnessServer } from "./harness-server.ts";
 
 export const DefinitionId = Schema.NonEmptyString.pipe(Schema.brand("EnvironmentDefinitionId"));
 export type DefinitionId = typeof DefinitionId.Type;
@@ -19,6 +21,11 @@ export type Retention = "stop" | "destroy";
 export interface SandboxDefinition {
   /** The sandbox provider, by the ID it declares, such as `daytona`. */
   readonly providerId: string;
+  /**
+   * Where the harness runs: in process, where the sandbox is only where its tools act, or inside
+   * the sandbox, served by the harness server.
+   */
+  readonly harness: HarnessImplementation.Placement;
   /** The provider's starting point for a new sandbox, such as an image or a snapshot name. */
   readonly template: string | null;
   /** Environment variables every command in a new sandbox receives. */
@@ -95,10 +102,11 @@ export interface Running {
   /**
    * Starts a harness session with the turn's model access, under a session ID of its own. The
    * session lives until the caller's scope closes; the turn sets up its history with `prepare`.
+   * Starting one in the sandbox fails with `ExecutionFailed` when the harness server cannot start.
    */
   readonly startSession: (
     options: SessionOptions,
-  ) => Effect.Effect<Harness.Session, never, Scope.Scope>;
+  ) => Effect.Effect<Harness.Session, HarnessErrors.ExecutionFailed, Scope.Scope>;
   /** Captures the sandbox's files. */
   readonly snapshot: Effect.Effect<
     Sandbox.SnapshotReference,
@@ -117,6 +125,7 @@ export type SpawnError =
   | EnvironmentErrors.SandboxUnavailable
   | EnvironmentErrors.ForeignReference
   | EnvironmentErrors.SetupFailed
+  | EnvironmentErrors.UnsupportedPlatform
   | SandboxErrors.SnapshotUnavailable
   | SandboxErrors.ProviderFailure;
 
@@ -124,8 +133,9 @@ export interface Interface {
   /**
    * Spawn a running environment for `definition`: find the harness and sandbox provider this host
    * installed, acquire the sandbox `reacquire` names if it still exists or a new one, restored
-   * from `restore` when given, and run its setup. Spawning receives no conversation history or
-   * work. A setup failure fails the spawn, stopping a reacquired sandbox or destroying a new one.
+   * from `restore` when given, run its setup, and upload the harness server when the harness runs
+   * inside it. Spawning receives no conversation history or work. A failure after acquiring fails
+   * the spawn, stopping a reacquired sandbox or destroying a new one.
    */
   readonly spawn: (
     definition: Definition,
@@ -137,11 +147,13 @@ export class Service extends Context.Service<Service, Interface>()("@amends/envi
 
 /**
  * The code a host runs environments with: the harnesses it runs in process, whose sessions use the
- * Effect AI model a connection supplies, and its sandbox providers, each found by its ID.
+ * Effect AI model a connection supplies, its sandbox providers, each found by its ID, and the
+ * harness server it uploads to run harnesses inside sandboxes.
  */
 export interface Installed {
   readonly harnesses: ReadonlyArray<Harness.Interface<ModelInference.Services>>;
   readonly sandboxes?: ReadonlyArray<Sandbox.Provider> | undefined;
+  readonly harnessServer?: HarnessServer.Program | undefined;
 }
 
 const toFilesystem = (
@@ -158,22 +170,12 @@ const abandon = (acquired: Sandbox.Acquired) =>
     acquired.filesystem === "retained" ? acquired.sandbox.stop : acquired.sandbox.destroy,
   );
 
-/** Acquires the sandbox a definition asks for and runs its setup in it, in order. */
-const acquireSandbox = Effect.fnUntraced(function* (
-  provider: Sandbox.Provider,
-  definition: SandboxDefinition,
-  options: SpawnOptions,
-) {
-  const acquired = yield* provider.acquire({
-    id: options.reacquire?.sandboxId,
-    snapshot: options.restore,
-    template: definition.template ?? undefined,
-    env: definition.env,
-  });
-  yield* Effect.forEach(
-    definition.setup,
+/** Runs a definition's setup commands in a sandbox, in order, each with `sh -c`. */
+const runSetup = (sandbox: Sandbox.Running, setup: ReadonlyArray<string>) =>
+  Effect.forEach(
+    setup,
     (command) =>
-      acquired.sandbox
+      sandbox
         .exec({ argv: ["sh", "-c", command] })
         .pipe(
           Effect.flatMap((result) =>
@@ -183,9 +185,33 @@ const acquireSandbox = Effect.fnUntraced(function* (
           ),
         ),
     { discard: true },
-  ).pipe(Effect.onError(() => abandon(acquired)));
-  return acquired;
-});
+  );
+
+/** A session in the sandbox fails as `ended` when its harness server cannot be started. */
+const serverFailed = (error: SandboxErrors.ProviderFailure) =>
+  new HarnessErrors.ExecutionFailed({
+    reason: `The harness server couldn't start: ${error.reason}`,
+    retryable: error.retryable,
+    problem: "ended",
+  });
+
+/**
+ * Where a definition's harness runs on this host: in process without a sandbox, in process with a
+ * sandbox where its tools act, or inside its sandbox, served by the harness server.
+ */
+type Placed =
+  | { readonly _tag: "InProcess"; readonly harness: Harness.Interface<ModelInference.Services> }
+  | {
+      readonly _tag: "WithSandbox";
+      readonly harness: Harness.Interface<ModelInference.Services>;
+      readonly sandbox: SandboxDefinition;
+    }
+  | {
+      readonly _tag: "InSandbox";
+      readonly harnessId: Harness.Name;
+      readonly program: HarnessServer.Program;
+      readonly sandbox: SandboxDefinition;
+    };
 
 /** @category constructors */
 export const make = Effect.fnUntraced(function* (installed: Installed) {
@@ -197,9 +223,62 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
     (installed.sandboxes ?? []).map((provider) => [provider.name, provider]),
   );
 
-  /** The running environment over a started harness and, if any, its acquired sandbox. */
+  /** Where the definition's harness runs, if this host installed what it needs. */
+  const placeHarness = (definition: Definition): Placed | undefined => {
+    const { sandbox } = definition;
+    if (sandbox?.harness === "in-sandbox") {
+      const program = installed.harnessServer;
+      const harnessId = Harness.Name.make(definition.harnessId);
+      return program?.harnesses.includes(harnessId)
+        ? { _tag: "InSandbox", harnessId, program, sandbox }
+        : undefined;
+    }
+    const harness = harnesses.get(definition.harnessId);
+    if (harness === undefined) return undefined;
+    return sandbox === null
+      ? { _tag: "InProcess", harness }
+      : { _tag: "WithSandbox", harness, sandbox };
+  };
+
+  /** Starts a session of a harness this host runs in process, with Effect AI model access. */
+  const startInProcess = (harness: Harness.Interface<ModelInference.Services>) =>
+    Effect.fnUntraced(function* (options: SessionOptions) {
+      const sessionId = `session-${yield* Effect.orDie(crypto.randomUUIDv4)}`;
+      const model = yield* Layer.build(
+        options.model.inference.languageModel(options.model.access, options.model.selection),
+      );
+      return yield* harness
+        .start({
+          sessionId,
+          instructions: options.instructions,
+          contextLimit: options.contextLimit,
+          measured: options.measured,
+        })
+        .pipe(Effect.provideContext(model));
+    });
+
+  /** Starts a session in a harness server the sandbox runs from `executable`, one per session. */
+  const startInSandbox = (harnessId: Harness.Name, sandbox: Sandbox.Running, executable: string) =>
+    Effect.fnUntraced(function* (options: SessionOptions) {
+      const process = yield* sandbox
+        .spawn({ argv: [executable] })
+        .pipe(Effect.mapError(serverFailed));
+      return yield* HarnessServer.startSession(process, {
+        harnessId,
+        instructions: options.instructions,
+        contextLimit: options.contextLimit,
+        measured: options.measured,
+        model: {
+          implementationId: options.model.inference.declaration.id,
+          access: options.model.access,
+          selection: options.model.selection,
+        },
+      });
+    });
+
+  /** The running environment over how it starts sessions and, if any, its acquired sandbox. */
   const makeRunning = Effect.fnUntraced(function* (
-    harness: Harness.Interface<ModelInference.Services>,
+    startSession: Running["startSession"],
     reference: Reference,
     filesystem: Filesystem,
     sandbox: { readonly running: Sandbox.Running; readonly retention: Retention } | undefined,
@@ -208,20 +287,7 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
     const running: Running = {
       reference,
       filesystem,
-      startSession: Effect.fnUntraced(function* (options: SessionOptions) {
-        const sessionId = `session-${yield* Effect.orDie(crypto.randomUUIDv4)}`;
-        const model = yield* Layer.build(
-          options.model.inference.languageModel(options.model.access, options.model.selection),
-        );
-        return yield* harness
-          .start({
-            sessionId,
-            instructions: options.instructions,
-            contextLimit: options.contextLimit,
-            measured: options.measured,
-          })
-          .pipe(Effect.provideContext(model));
-      }),
+      startSession,
       snapshot:
         sandbox === undefined
           ? Effect.fail(new SandboxErrors.Unsupported({ capability: "snapshots" }))
@@ -239,8 +305,8 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
     definition: Definition,
     options: SpawnOptions = {},
   ) {
-    const harness = harnesses.get(definition.harnessId);
-    if (harness === undefined)
+    const placed = placeHarness(definition);
+    if (placed === undefined)
       return yield* new EnvironmentErrors.HarnessUnavailable({ harnessId: definition.harnessId });
     const definitionId = DefinitionId.make(definition.id);
     const reacquire = options.reacquire;
@@ -248,24 +314,43 @@ export const make = Effect.fnUntraced(function* (installed: Installed) {
       return yield* new EnvironmentErrors.ForeignReference({
         definitionId: reacquire.definitionId,
       });
-    if (definition.sandbox === null) {
+    if (placed._tag === "InProcess") {
       if (options.restore !== undefined)
         return yield* new SandboxErrors.SnapshotUnavailable({
           reason: "This environment has no sandbox to restore into.",
         });
-      return yield* makeRunning(harness, { definitionId }, { _tag: "None" }, undefined);
+      return yield* makeRunning(
+        startInProcess(placed.harness),
+        { definitionId },
+        { _tag: "None" },
+        undefined,
+      );
     }
-    const provider = sandboxes.get(definition.sandbox.providerId);
+    const provider = sandboxes.get(placed.sandbox.providerId);
     if (provider === undefined)
       return yield* new EnvironmentErrors.SandboxUnavailable({
-        providerId: definition.sandbox.providerId,
+        providerId: placed.sandbox.providerId,
       });
-    const acquired = yield* acquireSandbox(provider, definition.sandbox, options);
+    const acquired = yield* provider.acquire({
+      id: reacquire?.sandboxId,
+      snapshot: options.restore,
+      template: placed.sandbox.template ?? undefined,
+      env: placed.sandbox.env,
+    });
+    const sandbox = acquired.sandbox;
+    const startSession = yield* Effect.gen(function* () {
+      yield* runSetup(sandbox, placed.sandbox.setup);
+      if (placed._tag === "WithSandbox") return startInProcess(placed.harness);
+      const executable = yield* HarnessServer.upload(sandbox, placed.program).pipe(
+        Effect.provideService(Crypto.Crypto, crypto),
+      );
+      return startInSandbox(placed.harnessId, sandbox, executable);
+    }).pipe(Effect.onError(() => abandon(acquired)));
     return yield* makeRunning(
-      harness,
-      { definitionId, sandboxId: acquired.sandbox.id },
+      startSession,
+      { definitionId, sandboxId: sandbox.id },
       toFilesystem(acquired.filesystem, options.restore),
-      { running: acquired.sandbox, retention: definition.sandbox.retention },
+      { running: sandbox, retention: placed.sandbox.retention },
     );
   });
 

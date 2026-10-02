@@ -19,6 +19,8 @@ export interface Options {
   readonly runnerTakeover: Duration.Duration;
   /** The key that seals connections' credentials at rest; without one, none can be stored. */
   readonly credentialKey: Redacted.Redacted<string> | undefined;
+  /** The directory local sandboxes live in; the host's default when not set. */
+  readonly sandboxDirectory: string | undefined;
 }
 
 const port = Config.schema(
@@ -94,6 +96,10 @@ const credentialKey = Config.schema(
   "AMENDS_CREDENTIAL_KEY",
 ).pipe(Config.option);
 
+const sandboxDirectory = Config.schema(Schema.NonEmptyString, "AMENDS_SANDBOX_DIRECTORY").pipe(
+  Config.option,
+);
+
 /** Read and validate startup options without opening a database or server. */
 export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return<
   Options,
@@ -107,6 +113,7 @@ export const load = Effect.fn("LocalConfig.load")(function* (): Effect.fn.Return
     runnerTransport: yield* runnerTransport,
     runnerTakeover: yield* runnerTakeover,
     credentialKey: Option.getOrUndefined(yield* credentialKey),
+    sandboxDirectory: Option.getOrUndefined(yield* sandboxDirectory),
   };
 });
 

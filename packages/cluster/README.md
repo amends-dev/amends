@@ -140,7 +140,8 @@ holding the workspace only while it runs:
 5. For the run's first session, spawn the turn's environment, acquiring the one its log last
    recorded, and record what was acquired (`recordEnvironment`): the environment's reference and
    where its files came from. A harness or sandbox provider the environment service lacks fails
-   the turn, as does any other spawn failure. The run releases the environment, applying its
+   the turn, as do a sandbox system the harness server is not built for and any other spawn
+   failure. The run releases the environment, applying its
    retention, once the turn ends; a run cut short leaves it for the next run to acquire. Then start
    a harness session in it with the turn's model access, the instructions the turn started with,
    and the turn's budget as the session's context limit, with what a provider measured of the
@@ -192,8 +193,7 @@ turn that runs could not finish.
 
 ## Limits
 
-Turns are conversation only. Agents have no tools, so a turn left waiting on a tool call fails,
-and environments with a sandbox fail their turns. A turn records each completed block and what
+Turns are conversation only. Agents have no tools, so a turn left waiting on a tool call fails. A turn records each completed block and what
 the environment reported, and shows text still streaming to readers only as best-effort drafts,
 each giving way to its block once logged. Stop requests are noticed by polling, within
 `checkInterval`; a stopped response keeps only the blocks it completed.
@@ -207,6 +207,7 @@ bun run test
 
 `test/runner/runner.test.ts` runs the runner over turn execution in memory, amends's own harness, and a
 scripted model: drafts as a response streams, a model gone silent interrupted until retries run out, a queued turn from start to reply with what the
-environment reported, input accepted while it works and while it waits, each answer owed, stopping, retrying from the log, failing without retry, a sandbox environment, and turns
+environment reported, input accepted while it works and while it waits, each answer owed, stopping, retrying from the log, failing without retry, a sandbox this host does not run, and turns
 already finished or stopping. The [local host's](../../hosts/local/README.md#verify) `turns.test.ts`
-runs a turn end to end over PostgreSQL and Cluster against a local chat-completions server.
+runs a turn end to end over PostgreSQL and Cluster against a local chat-completions server, in
+process and inside a local sandbox.

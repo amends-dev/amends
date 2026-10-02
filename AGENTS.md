@@ -54,7 +54,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
   `environment` runs the environments a workspace stores: it finds the harness and sandbox provider
   a host installed, spawns and releases the runtime, and starts harness sessions in it with a turn's
-  model access.
+  model access, in process or inside the sandbox through the harness server, whose protocol it
+  also holds.
   `cluster` runs jobs, the work outside requests, on Effect Cluster: an agent job for each agent,
   which accepts its work and stops its departed turns, and a turn job for each turn, entities whose
   requests a commit stores, with their retries and pruning. Jobs enter workspaces through the
@@ -77,7 +78,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves
   the HTTP API over the PostgreSQL adapter at `AMENDS_DATABASE_URL`, with development
-  sign-in and credentials.
+  sign-in and credentials, and `hosts/harness-server`, the program a host compiles and uploads
+  into a sandbox to run a harness there.
   Hosts may install their runtime's dependencies and consume shared packages. A host
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may

@@ -57,7 +57,9 @@ const describeSpawnFailure = (failure: Environment.SpawnError): string => {
     case "Environment.HarnessUnavailable":
       return `The ${failure.harnessId} harness doesn't run on this server.`;
     case "Environment.SandboxUnavailable":
-      return "Environments with a sandbox can't run turns yet.";
+      return `The ${failure.providerId} sandbox doesn't run on this server.`;
+    case "Environment.UnsupportedPlatform":
+      return `The harness can't run on the sandbox's system, ${failure.platform}.`;
     default:
       return "The agent's environment couldn't start.";
   }

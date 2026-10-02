@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
@@ -11,8 +13,8 @@ import {
   PostgresDatabase,
   layer as postgres,
 } from "@amends/storage-postgresql";
-import { BunClusterSocket, BunCrypto } from "@effect/platform-bun";
-import { Duration, Layer, Option, type Redacted } from "effect";
+import { BunClusterSocket, BunCrypto, BunServices } from "@effect/platform-bun";
+import { Duration, Effect, Layer, Option, type Redacted } from "effect";
 import {
   type MessageStorage,
   RunnerAddress,
@@ -21,6 +23,7 @@ import {
   SingleRunner,
 } from "effect/cluster";
 import type { SqlClient } from "effect/sql";
+import { LocalHarnessServer } from "./harness-server.ts";
 
 /** Gateway and directory owned by one host lifetime. */
 export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
@@ -52,6 +55,11 @@ export interface Options {
    * host stores no credentials.
    */
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
+  /**
+   * The directory local sandboxes live in, beside the harness server builds this host uploads
+   * into them; `amends-sandboxes` in the system's temporary directory by default.
+   */
+  readonly sandboxDirectory?: string | undefined;
 }
 
 /** The harnesses this host runs agents' turns with: amends's own, in process. */
@@ -70,6 +78,24 @@ export const installed = {
   harnesses: harnesses.map((harness) => harness.declaration),
   sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
 };
+
+/**
+ * The environments this host runs: amends's harness in process, sandboxes as directories under
+ * `directory`, and the harness server it builds to run harnesses inside them.
+ *
+ * @category layers
+ */
+export const layerEnvironments = (directory: string) =>
+  Layer.effect(
+    Environment.Service,
+    Effect.gen(function* () {
+      const localSandbox = yield* LocalSandbox.make({ root: directory });
+      const harnessServer = yield* LocalHarnessServer.make({
+        directory: join(directory, "harness-server"),
+      });
+      return yield* Environment.make({ harnesses, sandboxes: [localSandbox], harnessServer });
+    }),
+  ).pipe(Layer.provide(BunServices.layer));
 
 /** The code that runs agents' turns with either model connection. */
 export const turnRunnerOptions: TurnRunner.Options = {
@@ -124,7 +150,9 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     }),
     TurnJob.layerWorker.pipe(
       Layer.provide(TurnRunner.layer(turnRunnerOptions)),
-      Layer.provide(Environment.layer({ harnesses })),
+      Layer.provide(
+        layerEnvironments(options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes")),
+      ),
     ),
   ).pipe(
     Layer.provideMerge(

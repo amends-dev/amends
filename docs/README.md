@@ -28,7 +28,7 @@ remaining gaps with links to their owning code.
 | [Connection](../packages/connection/README.md)                                     | The connection implementation contract: declarations for a host's catalog, and model inference.                     |
 | [Anthropic connection](../adapters/connection-anthropic/README.md)                 | Anthropic model connections over Effect AI.                                                                         |
 | [OpenAI-compatible connection](../adapters/connection-openai-compatible/README.md) | Chat-completions model connections, such as OpenAI, OpenRouter, or a local server.                                  |
-| [Environment](../packages/environment/README.md)                                   | Running stored environments: installed harnesses and sandboxes, spawning, sessions, and release.                    |
+| [Environment](../packages/environment/README.md)                                   | Running stored environments: harnesses and sandboxes, spawning, sessions, and the harness server.                   |
 | [Cluster](../packages/cluster/README.md)                                           | Work outside requests on Effect Cluster: agent jobs, turn jobs that run agents' turns, retries, and pruning.        |
 | [Sandbox](../packages/sandbox/README.md)                                           | The sandbox provider contract: acquisition, commands, processes, ports, files, and snapshots.                       |
 | [Sandbox conformance](../packages/sandbox-conformance/README.md)                   | Test suites every sandbox provider runs, and the harness a provider supplies.                                       |
@@ -37,6 +37,7 @@ remaining gaps with links to their owning code.
 | [Memory storage](../adapters/storage-memory/README.md)                             | The in-memory reference implementation of the storage contracts.                                                    |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)                             | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md)               | Runtime composition, configuration, startup, and development identity.                                              |
+| [Harness server](../hosts/harness-server/README.md)                                | The program a host uploads into a sandbox to run a harness there.                                                   |
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)                           | Platform-owned routing and composition of client and UI.                                                            |
 | [Desktop](../apps/desktop/README.md)                                               | Tauri prerequisites, host connection, and native verification.                                                      |
 | [Client](../apps/client/README.md)                                                 | Headless credential scopes, API/query state, view hooks, and route helpers.                                         |

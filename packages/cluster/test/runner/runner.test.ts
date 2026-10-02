@@ -1015,10 +1015,7 @@ describe("TurnRunner", () => {
 
       yield* runner.run(workspaceId, turnId);
 
-      expect(state.steps).toEqual([
-        "start",
-        "fail: Environments with a sandbox can't run turns yet.",
-      ]);
+      expect(state.steps).toEqual(["start", "fail: The local sandbox doesn't run on this server."]);
       expect(prompts).toEqual([]);
     }),
   );

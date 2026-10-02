@@ -1,8 +1,12 @@
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   Api,
   Authentication,
   ConnectionImplementation,
   Environment,
+  SandboxImplementation,
   type ThreadTimeline,
   Turn,
 } from "@amends/api-http";
@@ -26,12 +30,15 @@ const asToken = (token: string) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
-/** The real routes, gateway, PostgreSQL storage, and turn runner behind a Bun test server. */
-const server = (url: string) =>
+/**
+ * The real routes, gateway, PostgreSQL storage, and turn runner behind a Bun test server, with
+ * local sandboxes in `sandboxDirectory`.
+ */
+const server = (url: string, sandboxDirectory?: string) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url), { pollInterval: "100 millis" }),
+        LocalHost.layer(Redacted.make(url), { pollInterval: "100 millis", sandboxDirectory }),
         DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer)),
       ),
     ),
@@ -91,8 +98,11 @@ const fakeModels = (...replies: ReadonlyArray<Reply>) =>
     (models) => Effect.promise(models.stop),
   );
 
-/** Alice's workspace with Scout, an agent whose model connection is the fake provider. */
-const workspaceWithScout = (baseUrl: string) =>
+/**
+ * Alice's workspace with Scout, an agent whose model connection is the fake provider, in the
+ * environment every workspace starts with or one with this sandbox.
+ */
+const workspaceWithScout = (baseUrl: string, sandbox?: Environment.NewSandbox) =>
   Effect.gen(function* () {
     const asAlice = yield* client(alice);
     const workspace = yield* asAlice.workspaces.create({
@@ -110,6 +120,14 @@ const workspaceWithScout = (baseUrl: string) =>
         authentication: "None",
       },
     });
+    const environment =
+      sandbox === undefined
+        ? undefined
+        : yield* asAlice.environments.create({
+            params: { workspaceId },
+            headers: {},
+            payload: { name: "Sandboxed", harnessId: Environment.inProcessHarness, sandbox },
+          });
     const agent = yield* asAlice.agents.create({
       params: { workspaceId },
       headers: {},
@@ -117,7 +135,7 @@ const workspaceWithScout = (baseUrl: string) =>
         name: "Scout",
         instructions: "Answer in one sentence.",
         model: { connectionId: connection.id, model: "fake-model", reasoning: null },
-        environmentId: Environment.InProcessId,
+        environmentId: environment?.id ?? Environment.InProcessId,
         roleId: BuiltinRoles.MemberId,
       },
     });
@@ -137,6 +155,12 @@ const until = <A, E, R>(read: Effect.Effect<A, E, R>, done: (value: A) => boolea
 
 const texts = (items: ReadonlyArray<ThreadTimeline.Item>) =>
   items.flatMap((item) => ("message" in item ? [item.message.text] : []));
+
+/** A directory for one test's local sandboxes, removed afterwards. */
+const sandboxDirectory = Effect.acquireRelease(
+  Effect.sync(() => mkdtempSync(join(tmpdir(), "amends-host-sandboxes-"))),
+  (directory) => Effect.sync(() => rmSync(directory, { recursive: true, force: true })),
+);
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
@@ -346,6 +370,48 @@ describe.skipIf(!available)("PostgreSQL", () => {
             ),
           ).toMatchObject({ _tag: "TurnService.NotActive", status: "cancelled" });
         }).pipe(Effect.scoped, Effect.provide(server(url))),
+      ),
+    40_000,
+  );
+
+  it.live(
+    "an agent whose harness runs inside a local sandbox replies the same way",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const directory = yield* sandboxDirectory;
+          yield* Effect.gen(function* () {
+            const models = yield* fakeModels({ answer: "The plan is on track." });
+            const { asAlice, workspaceId, ask } = yield* workspaceWithScout(models.baseUrl, {
+              providerId: SandboxImplementation.Id.make("local"),
+              harness: "in-sandbox",
+              connectionId: null,
+              template: null,
+              env: {},
+              setup: ["echo ready > setup.txt"],
+              retention: "destroy",
+            });
+            const started = yield* ask("Scout, how is the plan going?");
+            const params = { workspaceId, threadId: started.thread.id };
+            const turnsNow = asAlice.turns.listByThread({ params, query: { limit: 10 } });
+            // The turn spawns a sandbox, uploads the harness server into it, and runs amends's
+            // harness there, which asks the same model.
+            yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
+
+            const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+            expect(texts(timeline)).toEqual([
+              "Scout, how is the plan going?",
+              "The plan is on track.",
+            ]);
+            expect(models.requests[0]).toMatchObject([
+              { role: "system", content: "Answer in one sentence." },
+              { role: "user" },
+            ]);
+            // The environment's retention destroys the sandbox once the turn ends.
+            const sandboxes = Effect.sync(() => readdirSync(join(directory, "sandboxes")));
+            expect(yield* until(sandboxes, (entries) => entries.length === 0)).toEqual([]);
+          }).pipe(Effect.provide(server(url, directory)));
+        }).pipe(Effect.scoped),
       ),
     40_000,
   );

@@ -17,6 +17,7 @@
     "@amends/environment": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/harness-amends": "workspace:*",
+    "@amends/harness-server": "workspace:*",
     "@amends/sandbox-daytona": "workspace:*",
     "@amends/sandbox-local": "workspace:*",
     "@amends/server-http": "workspace:*",

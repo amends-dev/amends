@@ -1,6 +1,6 @@
 # Harnesses in sandboxes
 
-Status: agreed on 2026-10-02, not built. This plans how agents' turns run inside a sandbox, such as
+Status: agreed on 2026-10-02; milestones 1 and 2 are built. This plans how agents' turns run inside a sandbox, such as
 amends's own harness or opencode on Daytona, so that adding another harness or sandbox provider
 means adding one adapter. The [core model](core-model.md) states the ownership this follows.
 
@@ -16,12 +16,12 @@ and the four runs differ only in the stored environment.
 
 The host talks to every harness that runs in a sandbox the same way: the
 [harness contract](../packages/harness/README.md) itself, carried over Effect RPC. Inside the
-sandbox, a runner that amends ships serves that contract and hosts the harness's adapter, which
-drives the agent there and translates in both directions.
+sandbox, the harness server that amends ships serves that contract and hosts the harness's adapter,
+which drives the agent there and translates in both directions.
 
 ```text
 host                                         sandbox
-turn runner                                  runner (amends binary)
+turn runner                                  harness server (amends binary)
   └─ environment                               ├─ amends adapter: amends's loop, unchanged
        └─ remote harness ── Effect RPC ──────> ├─ opencode adapter: drives opencode
             prepare, submit, resolve, resume   └─ ACP adapter: any agent speaking ACP
@@ -31,7 +31,7 @@ turn runner                                  runner (amends binary)
 | Built once                                                         | Chosen by the stored environment                   |
 | ------------------------------------------------------------------ | -------------------------------------------------- |
 | The environment: spawning, reacquiring, setup, retention           | The sandbox provider: local or Daytona             |
-| The runner and its RPC server, which keeps events until recorded   | The harness adapter: amends or opencode            |
+| The harness server, which keeps events until recorded              | The harness adapter: amends or opencode            |
 | The remote harness on the host                                     | The model connection: Anthropic, OpenAI-compatible |
 | How the turn runner uses an environment, records, closes, recovers |                                                    |
 
@@ -64,7 +64,7 @@ acquired, so a later attempt or run reacquires the same sandbox rather than star
    calls, and the finished response; the text being written shows while it streams.
 2. Asking the turn to stop ends the agent's work within seconds.
 3. With its host killed partway through, the turn continues from another host, which reconnects to
-   the runner. No input is submitted twice and no tool call runs twice.
+   the harness server. No input is submitted twice and no tool call runs twice.
 4. With its sandbox destroyed partway through, the next attempt continues the conversation in a new
    sandbox, rebuilt from the log, and the agent is told its earlier files are gone.
 5. A second message in the thread is answered knowing the first.
@@ -81,20 +81,24 @@ compaction, so a conversation longer than its model's window is not yet covered 
 
 - Daytona with amends's harness is built first, since both ends are ours; the goal is met when
   opencode passes the same suite.
-- The model connection's key reaches the sandbox as an environment variable. A model proxy on the
-  host, which gives the sandbox a base URL and a token for the turn instead, is the next goal.
-- The host uploads its own build of the runner when it spawns an environment, unless the sandbox
-  already has that version, so the runner and the host always agree.
+- The model connection's key reaches the sandbox itself, in the session's start request. A model
+  proxy on the host, which gives the sandbox a base URL and a token for the turn instead, is the
+  next goal.
+- The host uploads its own build of the harness server when it spawns an environment, unless the
+  sandbox already has that version, so the harness server and the host always agree.
 
 ## Milestones
 
 1. The environment does its own work for in-process runs: it resolves the harness the host
    installed, configures the turn's model access, starts a session per attempt, and records what it
    acquired. Nothing visible changes, and the turn runner slims down.
-2. The remote harness: the RPC contract, the runner with amends's adapter, and the host side, on the
-   local sandbox in CI.
-3. Recovery: the runner listens on a port with a token for the turn; reconnecting and resuming
-   events; rebuilding into a fresh sandbox.
+2. The remote harness: the RPC contract, the harness server with amends's harness, and the host
+   side, on the local sandbox in CI. Built: [`HarnessServer`](../packages/environment/README.md#the-harness-server)
+   over standard input and output, one process per session, and the local host's end-to-end turn
+   inside a local sandbox. The connection's key travels in the session's start request rather
+   than an environment variable, since a Daytona process's environment is on its command line.
+3. Recovery: the harness server listens on a port with a token for the turn; reconnecting and
+   resuming events; rebuilding into a fresh sandbox; releasing sandboxes that crashed runs left.
 4. Daytona with a real model.
 5. The opencode adapter, which proves the goal: only the adapter, its registration, and the stored
    environment change.

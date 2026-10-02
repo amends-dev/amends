@@ -33,7 +33,7 @@ const declaration: HarnessImplementation.Declaration = {
   id: Harness.Name.make("amends"),
   name: "Amends",
   description: "Amends's own agent loop, over the model a connection provides.",
-  placement: ["in-process"],
+  placement: ["in-process", "in-sandbox"],
   models: { _tag: "LanguageModel" },
 };
 

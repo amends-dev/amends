@@ -20,6 +20,12 @@ export class SetupFailed extends Schema.TaggedError<SetupFailed>()("Environment.
   stderr: Schema.String,
 }) {}
 
+/** The harness server has no build for the sandbox's operating system and processor. */
+export class UnsupportedPlatform extends Schema.TaggedError<UnsupportedPlatform>()(
+  "Environment.UnsupportedPlatform",
+  { platform: Schema.String },
+) {}
+
 /** The running environment to reacquire belongs to another definition. */
 export class ForeignReference extends Schema.TaggedError<ForeignReference>()(
   "Environment.ForeignReference",

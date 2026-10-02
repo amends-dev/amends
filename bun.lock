@@ -203,6 +203,18 @@
         "vite-plugin-solid": "^2.11.14",
       },
     },
+    "hosts/harness-server": {
+      "name": "@amends/harness-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection-anthropic": "workspace:*",
+        "@amends/connection-openai-compatible": "workspace:*",
+        "@amends/environment": "workspace:*",
+        "@amends/harness-amends": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+      },
+    },
     "hosts/local": {
       "name": "@amends/host-local",
       "version": "0.0.0",
@@ -214,6 +226,7 @@
         "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness-amends": "workspace:*",
+        "@amends/harness-server": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
         "@amends/sandbox-local": "workspace:*",
         "@amends/server-http": "workspace:*",
@@ -389,6 +402,8 @@
     "@amends/harness": ["@amends/harness@workspace:packages/harness"],
 
     "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
+
+    "@amends/harness-server": ["@amends/harness-server@workspace:hosts/harness-server"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
 

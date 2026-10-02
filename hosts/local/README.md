@@ -22,15 +22,16 @@ The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `bun run dev` restarts the host when its source changes.
 
-| Setting                     | Default           | Accepted value                                              |
-| --------------------------- | ----------------- | ----------------------------------------------------------- |
-| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port.  |
-| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                     |
-| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                            |
-| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.          |
-| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                      |
-| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.               |
-| `AMENDS_CREDENTIAL_KEY`     | Unset             | 32 bytes as base64, such as from `openssl rand -base64 32`. |
+| Setting                     | Default           | Accepted value                                                                  |
+| --------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port.                      |
+| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                                         |
+| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                                                |
+| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.                              |
+| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                                          |
+| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.                                   |
+| `AMENDS_CREDENTIAL_KEY`     | Unset             | 32 bytes as base64, such as from `openssl rand -base64 32`.                     |
+| `AMENDS_SANDBOX_DIRECTORY`  | Temporary         | A directory; `amends-sandboxes` in the system's temporary directory by default. |
 
 `AMENDS_CREDENTIAL_KEY` seals connections' credentials at rest; without it the host stores none,
 and setting one reports `CredentialsUnavailable`. Keep it secret and stable: a changed key cannot
@@ -99,9 +100,14 @@ reachable on a private network.
 
 The host runs agents' turns as [turn jobs](../../packages/cluster/README.md#turn-jobs) on the same Cluster runner as
 its background jobs: each turn is its own job, so turns run side by side, and the request to
-run one is stored in the commit that created it. A turn runs amends's own harness in process,
-with the agent's Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply
-in its thread. Environments with a sandbox cannot run turns yet. Several processes over one
+run one is stored in the commit that created it. A turn runs amends's own harness with the agent's
+Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply in its thread.
+The harness runs in process, or, in an environment that says so, inside a local sandbox: a
+directory under `AMENDS_SANDBOX_DIRECTORY`, where the turn runs the
+[harness server](../harness-server/README.md). The host compiles the harness server with the Bun
+running it the first time a sandbox needs it, into `harness-server/` in that directory, and
+uploads it into the sandbox's temporary directory unless that build is already there. Daytona
+environments' turns fail, since the host does not install that provider yet. Several processes over one
 database share turn jobs as they share background jobs, and a turn cut short by a restart
 continues from its log. Handled turn job requests are pruned with the rest.
 
@@ -121,16 +127,17 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                                                                                                                                                                     |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                                                                 |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                                                                       |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                                                                              |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                                                                |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work and turns, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `turnRunnerOptions`, with the environment service over the host's harnesses, is what runs turns. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                                                                           |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                                                                 |
-| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                                                                                                                                 |
+| Module                             | Responsibility                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                                                                                                                           |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                                                                                                                                 |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                                                                                                                                        |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                                                                                                                          |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work and turns, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `turnRunnerOptions`, with `layerEnvironments`, the environment service over the host's harnesses, local sandboxes, and harness server, is what runs turns. |
+| `harness-server.ts`                | `LocalHarnessServer.make({ directory })`, compiling the harness server for each platform a sandbox needs, once per process, versioned by a digest of the build.                                                                                                                                                                                                              |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                                                                                                                                     |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                                                                                                                           |
+| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                                                                                                                                                                                           |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires

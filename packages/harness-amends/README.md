@@ -59,8 +59,10 @@ the failed session would have sent, signature included.
 
 ## Declaration
 
-`AmendsHarness.harness.declaration` is what a host lists in its catalog: placement `in-process` only, and
-`LanguageModel` model access, so any model connection the host installed works. It declares no
+`AmendsHarness.harness.declaration` is what a host lists in its catalog: placement `in-process` and
+`in-sandbox`, and `LanguageModel` model access, so any model connection the host installed works.
+Inside a sandbox the same loop runs in the [harness server](../environment/README.md#the-harness-server),
+which builds its model access from the connection's code there. It declares no
 reasoning levels, since the loop requests none.
 
 ## Limits

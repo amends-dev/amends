@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, Effect, Layer, Stream } from "effect";
+import { Crypto, Effect, Exit, Layer, Queue, Scope, Sink, Stdio, Stream } from "effect";
+import type { Cause } from "effect";
 import { LanguageModel, Model } from "effect/ai";
 import type { AiError, Prompt, Response } from "effect/ai";
 import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
-import { Environment, EnvironmentErrors } from "@amends/environment";
-import { HarnessEvent } from "@amends/harness";
-import type { Harness } from "@amends/harness";
+import { Environment, EnvironmentErrors, HarnessServer } from "@amends/environment";
+import { Harness, HarnessErrors, HarnessEvent } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { SandboxErrors } from "@amends/sandbox";
 import type { Sandbox } from "@amends/sandbox";
@@ -48,7 +48,7 @@ const scripted = Effect.fnUntraced(function* (scripts: ReadonlyArray<Script>) {
       selection: { model: "m" },
     },
   };
-  return { session, prompts };
+  return { session, prompts, inference };
 });
 
 const reply = (text: string): Script =>
@@ -71,14 +71,58 @@ interface FakeSandbox {
   status: "running" | "stopped";
 }
 
+const probe = 'uname -s; uname -m; printf "%s" "${TMPDIR:-/tmp}"';
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+/**
+ * A harness server running in this process as a sandbox's process would: requests arrive on its
+ * standard input and responses leave on its standard output, both queues here.
+ */
+const serverProcess = Effect.fnUntraced(function* (served: HarnessServer.Served) {
+  const scope = yield* Scope.make();
+  const input = yield* Queue.unbounded<Uint8Array, Cause.Done>();
+  const output = yield* Queue.unbounded<Sandbox.Output, Cause.Done>();
+  const stdio = Stdio.make({
+    args: Effect.succeed([]),
+    stdin: Stream.fromQueue(input),
+    stdout: () =>
+      Sink.forEach((chunk: string | Uint8Array) =>
+        Queue.offer(output, {
+          stream: "stdout",
+          text: typeof chunk === "string" ? chunk : decoder.decode(chunk),
+        }),
+      ),
+    stderr: () => Sink.drain,
+  });
+  yield* Layer.launch(HarnessServer.layer(served)).pipe(
+    Effect.provideService(Stdio.Stdio, stdio),
+    Effect.provideService(Crypto.Crypto, crypto),
+    Effect.ensuring(Queue.end(output)),
+    Effect.forkIn(scope),
+  );
+  const process: Sandbox.Process = {
+    output: Stream.fromQueue(output),
+    exit: Effect.succeed(0),
+    kill: Scope.close(scope, Exit.void),
+    write: (text) => Queue.offer(input, encoder.encode(text)).pipe(Effect.asVoid),
+  };
+  return process;
+});
+
 /**
  * An in-memory sandbox provider recording what the environment asks of it. `exec` answers a shell
- * command with `results[command]`, or success.
+ * command with `results[command]`, or success; `test -x` looks for the file. A process it spawns is
+ * a harness server serving `served`.
  */
-const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
+const fakeProvider = (
+  results: Record<string, Sandbox.ExecResult> = {},
+  served?: HarnessServer.Served,
+) => {
   const sandboxes = new Map<string, FakeSandbox>();
   const snapshots = new Map<string, Map<string, Uint8Array>>();
   const calls: Array<string> = [];
+  const processes: Array<Sandbox.Process> = [];
   let next = 0;
   const open = (id: string): Sandbox.Running => {
     const state = () => sandboxes.get(id)!;
@@ -89,9 +133,21 @@ const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
         Effect.sync(() => {
           const shell = command.argv.at(-1) ?? "";
           calls.push(`exec ${id} ${shell}`);
+          if (command.argv[0] === "test")
+            return { exitCode: state().files.has(shell) ? 0 : 1, stdout: "", stderr: "" };
           return results[shell] ?? { exitCode: 0, stdout: "", stderr: "" };
         }),
-      spawn: () => Effect.die(new Error("unused")),
+      spawn: (command) =>
+        served === undefined
+          ? Effect.die(new Error("This sandbox runs no processes."))
+          : serverProcess(served).pipe(
+              Effect.tap((process) =>
+                Effect.sync(() => {
+                  calls.push(`spawn ${id} ${command.argv.join(" ")}`);
+                  processes.push(process);
+                }),
+              ),
+            ),
       expose: () => Effect.die(new Error("unused")),
       readFile: (path) => {
         const data = state().files.get(path);
@@ -99,7 +155,11 @@ const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
           ? Effect.fail(new SandboxErrors.FileNotFound({ path }))
           : Effect.succeed(data);
       },
-      writeFile: (path, data) => Effect.sync(() => void state().files.set(path, data)),
+      writeFile: (path, data) =>
+        Effect.sync(() => {
+          calls.push(`write ${id} ${path.replace(/[0-9a-f-]{36}$/u, "<id>")}`);
+          state().files.set(path, data);
+        }),
       snapshot: Effect.sync(() => {
         const snapshot = `snapshot-${next++}`;
         snapshots.set(snapshot, new Map(state().files));
@@ -137,7 +197,7 @@ const fakeProvider = (results: Record<string, Sandbox.ExecResult> = {}) => {
       }),
     deleteSnapshot: (snapshot) => Effect.sync(() => void snapshots.delete(snapshot.id)),
   };
-  return { provider, sandboxes, calls };
+  return { provider, sandboxes, calls, processes };
 };
 
 const crypto = Crypto.make({
@@ -145,9 +205,22 @@ const crypto = Crypto.make({
   digest: () => Effect.die(new Error("Unexpected digest")),
 });
 
-/** The environments a host with amends's harness and these sandbox providers spawns. */
-const environments = (sandboxes: ReadonlyArray<Sandbox.Provider> = []) =>
-  Environment.make({ harnesses: [AmendsHarness.harness], sandboxes }).pipe(
+/** The harness server's builds, each a few bytes standing in for the executable. */
+const program: HarnessServer.Program = {
+  harnesses: [Harness.Name.make("amends")],
+  binary: (platform) =>
+    Effect.succeed({ version: `v1-${platform}`, data: encoder.encode(platform) }),
+};
+
+/**
+ * The environments a host with amends's harness, these sandbox providers, and a harness server
+ * running amends's harness spawns.
+ */
+const environments = (
+  sandboxes: ReadonlyArray<Sandbox.Provider> = [],
+  harnessServer: HarnessServer.Program = program,
+) =>
+  Environment.make({ harnesses: [AmendsHarness.harness], sandboxes, harnessServer }).pipe(
     Effect.provideService(Crypto.Crypto, crypto),
   );
 
@@ -159,8 +232,24 @@ const withSandbox = (
 ): Environment.Definition => ({
   id: "sandboxed",
   harnessId: "amends",
-  sandbox: { providerId: "fake", template: null, env: {}, setup, retention },
+  sandbox: { providerId: "fake", harness: "in-process", template: null, env: {}, setup, retention },
 });
+
+/** An environment whose harness runs inside its sandbox, on Linux. */
+const inSandbox: Environment.Definition = {
+  id: "in-sandbox",
+  harnessId: "amends",
+  sandbox: {
+    providerId: "fake",
+    harness: "in-sandbox",
+    template: null,
+    env: {},
+    setup: ["install tools"],
+    retention: "destroy",
+  },
+};
+const linux = { [probe]: { exitCode: 0, stdout: "Linux\nx86_64\n/tmp/", stderr: "" } };
+const executable = "/tmp/amends-harness-server/v1-linux-x64/harness-server";
 
 const untilIdle = (session: Harness.Session) =>
   session.events.pipe(Stream.takeUntil(HarnessEvent.Event.isAnyOf(["Idle"])), Stream.runCollect);
@@ -346,6 +435,126 @@ describe("Environment.spawn", () => {
             : message.content.map((part) => (part.type === "text" ? part.text : "")).join(""),
         ),
       ).toEqual(["Alice: When is high tide?", "High tide is at noon.", "Alice: And low tide?"]);
+    }),
+  );
+});
+
+describe("Environment.spawn with the harness in its sandbox", () => {
+  it.effect("uploads the harness server and runs each session in a process of it", () =>
+    Effect.gen(function* () {
+      const { session, prompts, inference } = yield* scripted([reply("Hello")]);
+      const fake = fakeProvider(linux, { harnesses: [AmendsHarness.harness], models: [inference] });
+      const service = yield* environments([fake.provider]);
+      const running = yield* service.spawn(inSandbox);
+      expect(fake.calls).toEqual([
+        "exec sandbox-0 install tools",
+        `exec sandbox-0 ${probe}`,
+        `exec sandbox-0 ${executable}`,
+        `write sandbox-0 ${executable}.<id>`,
+        `exec sandbox-0 ${executable}`,
+      ]);
+
+      const events = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const harness = yield* running.startSession({ ...session, instructions: "Be brief." });
+          yield* harness.prepare([]);
+          yield* harness.submit(batch("b1", "Hi"));
+          return yield* untilIdle(harness);
+        }),
+      );
+      expect(fake.calls.at(-1)).toBe(`spawn sandbox-0 ${executable}`);
+      expect(events.map((event) => event._tag)).toEqual([
+        "InputIncorporated",
+        "TextDelta",
+        "BlockCompleted",
+        "ResponseFinished",
+        "Idle",
+      ]);
+      expect(events[3]).toMatchObject({ model: { provider: "test", model: "test-model" } });
+      expect(prompts[0]?.content[0]).toMatchObject({ role: "system", content: "Be brief." });
+      yield* running.release;
+      expect(fake.sandboxes.has("sandbox-0")).toBe(false);
+    }),
+  );
+
+  it.effect("skips uploading a version the sandbox already has", () =>
+    Effect.gen(function* () {
+      const fake = fakeProvider(linux);
+      fake.sandboxes.set("kept", {
+        files: new Map([[executable, new Uint8Array()]]),
+        status: "stopped",
+      });
+      const service = yield* environments([fake.provider]);
+      yield* service.spawn(inSandbox, {
+        reacquire: {
+          definitionId: Environment.DefinitionId.make("in-sandbox"),
+          sandboxId: "kept" as Sandbox.Id,
+        },
+      });
+      expect(fake.calls.some((call) => call.startsWith("write"))).toBe(false);
+    }),
+  );
+
+  it.effect("refuses a harness its harness server doesn't run, before acquiring a sandbox", () =>
+    Effect.gen(function* () {
+      const fake = fakeProvider(linux);
+      const service = yield* environments([fake.provider], { ...program, harnesses: [] });
+      expect(yield* service.spawn(inSandbox).pipe(Effect.flip)).toEqual(
+        new EnvironmentErrors.HarnessUnavailable({ harnessId: "amends" }),
+      );
+      expect(fake.calls).toEqual([]);
+    }),
+  );
+
+  it.effect("fails the spawn on a platform the harness server isn't built for", () =>
+    Effect.gen(function* () {
+      const fake = fakeProvider({
+        [probe]: { exitCode: 0, stdout: "Linux\nriscv64\n/tmp", stderr: "" },
+      });
+      const service = yield* environments([fake.provider]);
+      expect(yield* service.spawn(inSandbox).pipe(Effect.flip)).toEqual(
+        new EnvironmentErrors.UnsupportedPlatform({ platform: "Linux riscv64" }),
+      );
+      expect(fake.calls.at(-1)).toBe("destroy sandbox-0");
+    }),
+  );
+
+  it.effect("fails the session as ended, worth retrying, once the server's process ends", () =>
+    Effect.gen(function* () {
+      const { session, inference } = yield* scripted([]);
+      const fake = fakeProvider(linux, { harnesses: [AmendsHarness.harness], models: [inference] });
+      const service = yield* environments([fake.provider]);
+      const running = yield* service.spawn(inSandbox);
+      const failure = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const harness = yield* running.startSession(session);
+          yield* harness.prepare([]);
+          yield* fake.processes[0]!.kill;
+          return yield* harness.submit(batch("b1", "Hi")).pipe(Effect.flip);
+        }),
+      );
+      expect(failure).toMatchObject({
+        _tag: "Harness.ExecutionFailed",
+        problem: "ended",
+        retryable: true,
+      });
+    }),
+  );
+
+  it.effect("fails starting a session whose model code the server wasn't built with", () =>
+    Effect.gen(function* () {
+      const { session } = yield* scripted([]);
+      const fake = fakeProvider(linux, { harnesses: [AmendsHarness.harness], models: [] });
+      const service = yield* environments([fake.provider]);
+      const running = yield* service.spawn(inSandbox);
+      const failure = yield* Effect.scoped(running.startSession(session)).pipe(Effect.flip);
+      expect(failure).toEqual(
+        new HarnessErrors.ExecutionFailed({
+          reason: "The harness server doesn't run test models.",
+          retryable: false,
+          problem: "unexpected",
+        }),
+      );
     }),
   );
 });

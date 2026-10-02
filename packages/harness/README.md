@@ -94,7 +94,8 @@ A `Harness.Session` follows the core model's stages:
 
 1. `prepare(transcript)` sets the conversation to continue, once, before anything else. It starts
    no work. An invalid transcript fails with `InvalidTranscript`; a harness that cannot continue it
-   fails with `Unsupported`.
+   fails with `Unsupported`; one that could not set up its own session, such as a harness in a
+   sandbox whose process ended, fails with `ExecutionFailed`.
 2. `submit(batch)` hands over input, which the session takes in once no call is waiting and before
    its next model request.
 3. `resolve(callId, outcome)` answers a call the prepared transcript left pending, such as an

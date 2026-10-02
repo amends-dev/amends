@@ -17,8 +17,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   participants or muting.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
   local host [runs them](../packages/cluster/README.md), each closing with the agent's reply.
-  Turns are conversation only: agents have no tools, and environments with a sandbox fail their
-  turns. A turn posts every answer it completed when it closes, one message each, so an answer
+  Turns are conversation only: agents have no tools. A turn posts every answer it completed when it closes, one message each, so an answer
   given before more input arrived is posted after that input; a turn that fails or is stopped
   posts nothing, even answers it completed. Each turn continues from the agent's log for the thread, read from its latest
   checkpoint, and reads every message it has not seen, however many. When a turn's history and
@@ -54,16 +53,19 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
   and an optional sandbox under an account connection, and every workspace starts with an
   in-process one; they are managed over HTTP and on the [Environments page](environments.md).
-  Turns spawn in-process environments only; one with a sandbox cannot run a turn yet. Only
-  amends's own harness is installed, and it runs in process only, so a sandbox
-  is where its tools would act, and none acts there yet. Environments hold no defaults for
+  Only amends's own harness is installed. It runs in process, where a sandbox is only where its
+  tools would act, and none acts there yet, or inside a local sandbox, served by the
+  [harness server](../packages/environment/README.md#the-harness-server); a Daytona environment's
+  turn fails, since the host does not install that provider yet. Environments hold no defaults for
   optional settings, since no installed harness takes reasoning levels. Model providers suggest
   models, but the compatibility check accepts any model name, and nothing checks one with its
   provider.
-- The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
-  sandboxes outside tests. No harness runs inside a sandbox yet ([harnesses in sandboxes](sandbox-harnesses.md)
-  plans it), and the environment service the host composes installs no sandbox provider, so a
-  sandbox environment's turn fails once it starts. An environment's retention
+- The [sandbox contract](../packages/sandbox/README.md) has two providers, and the local host
+  installs only the local one. A harness server in a sandbox talks over its process's standard
+  input and output, one process per session, so a session does not survive its host; reconnecting,
+  a port with a token for the turn, and Daytona are the next milestones of
+  [harnesses in sandboxes](sandbox-harnesses.md). A sandbox left by a run that crashed is not
+  released, and the model connection's key reaches the sandbox in the session's start request. An environment's retention
   can only stop or destroy its sandbox, so no harness context survives a release. Environments
   do not yet supply the MCP endpoint or a turn's credentials. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
   is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes

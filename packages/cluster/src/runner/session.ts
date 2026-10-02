@@ -83,7 +83,6 @@ const continueConversation = Effect.fnUntraced(function* (
   session: Harness.Session,
   transcript: TurnExecution.Plan["transcript"],
 ) {
-  const cannotContinue = "The agent's conversation so far couldn't be continued.";
   const transcriptState = Transcript.summarize(transcript);
   if (Result.isFailure(transcriptState)) {
     yield* Effect.logWarning("Turn transcript is invalid", {
@@ -96,16 +95,27 @@ const continueConversation = Effect.fnUntraced(function* (
     return yield* new CannotRun({
       reason: "The turn is waiting on tool calls, which can't run yet.",
     });
-  const prepared = yield* Effect.result(session.prepare(transcript));
-  if (Result.isFailure(prepared)) {
-    yield* Effect.logWarning("Turn transcript was refused", {
-      ...turnSteps.ids,
-      failure: prepared.failure,
-    });
-    return yield* new CannotRun({ reason: cannotContinue });
-  }
+  // A harness that refuses the transcript can't continue it; one that failed may on a retry.
+  yield* session.prepare(transcript).pipe(
+    Effect.catchTags({
+      "Harness.AlreadyPrepared": Effect.die,
+      "Harness.InvalidTranscript": (refusal) => refuseTranscript(turnSteps, refusal),
+      "Harness.Unsupported": (refusal) => refuseTranscript(turnSteps, refusal),
+    }),
+  );
   return transcriptState.success.awaitsResponse;
 });
+
+const cannotContinue = "The agent's conversation so far couldn't be continued.";
+
+/** The harness refused the conversation so far, which fails the turn. */
+const refuseTranscript = (
+  turnSteps: TurnSteps.Interface,
+  refusal: HarnessErrors.InvalidTranscript | HarnessErrors.Unsupported,
+) =>
+  Effect.logWarning("Turn transcript was refused", { ...turnSteps.ids, failure: refusal }).pipe(
+    Effect.andThen(Effect.fail(new CannotRun({ reason: cannotContinue }))),
+  );
 
 /**
  * Give the harness input the turn accepted, recorded first so its taking in counts: the batch as

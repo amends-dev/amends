@@ -44,13 +44,17 @@ export interface StartOptions {
 export interface Session {
   /**
    * Sets the conversation to continue, before any other operation. Preparing starts no work: a
-   * transcript that awaits a response gets one after `resume`.
+   * transcript that awaits a response gets one after `resume`. It fails with `ExecutionFailed`
+   * when the harness could not set up its own session, such as one running in a sandbox that ended.
    */
   readonly prepare: (
     transcript: ReadonlyArray<Transcript.Item>,
   ) => Effect.Effect<
     void,
-    HarnessErrors.AlreadyPrepared | HarnessErrors.InvalidTranscript | HarnessErrors.Unsupported
+    | HarnessErrors.AlreadyPrepared
+    | HarnessErrors.InvalidTranscript
+    | HarnessErrors.Unsupported
+    | HarnessErrors.ExecutionFailed
   >;
   /**
    * Hands over input. The session takes it in once no tool call is waiting, before its next
