@@ -1,4 +1,4 @@
-import { AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles, Assignment } from "@amends/core/authorization";
 
 import { Actor, Identity } from "@amends/core/identity";
 
@@ -8,7 +8,7 @@ import { InvitationService, MemberService } from "@amends/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 
-import { DateTime, Effect, Option } from "effect";
+import { DateTime, Effect, Option, Result } from "effect";
 
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
@@ -145,8 +145,8 @@ export const invitationReplay = (harness: Harness) => {
                 () => Operations.removeMember(workspace.id, alice, member.id).pipe(Effect.result),
                 { concurrency: "unbounded" },
               );
-              expect(results.filter((result) => result._tag === "Success")).toHaveLength(1);
-              expect(results.find((result) => result._tag === "Failure")).toMatchObject({
+              expect(results.filter((result) => Result.isSuccess(result))).toHaveLength(1);
+              expect(results.find((result) => Result.isFailure(result))).toMatchObject({
                 _tag: "Failure",
                 failure: { _tag: "MemberService.AlreadyRemoved" },
               });
@@ -245,7 +245,9 @@ export const invitationReplay = (harness: Harness) => {
               const assignment = (yield* bound.assignments.listActiveByMember(
                 workspace.ownerMemberId,
               )).find(
-                ({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId,
+                ({ source }) =>
+                  Assignment.Source.isAnyOf(["Role"])(source) &&
+                  source.roleId === BuiltinRoles.OwnerId,
               );
               if (assignment === undefined) throw new Error("Missing Owner assignment");
               yield* Effect.flatMap(Journal.Service, (journal) =>

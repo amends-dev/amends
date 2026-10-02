@@ -108,7 +108,7 @@ it.effect(
           const journal = yield* Journal.Service;
           yield* fixture.loseNextAcknowledgment;
           const failure = yield* Effect.flip(journal.publish(Changed, 7, { idempotencyKey: key }));
-          if (failure._tag !== "JournalStore.CommitUncertain")
+          if (!Schema.is(Store.CommitUncertain)(failure))
             return yield* Effect.die("Expected uncertain commit");
           const retry = yield* journal.publish(Changed, 7, { idempotencyKey: key });
           expect(retry.commitId).toBe(failure.commitId);

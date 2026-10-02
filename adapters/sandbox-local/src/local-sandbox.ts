@@ -1,7 +1,20 @@
 import { constants } from "node:os";
 import { Sandbox, SandboxErrors, SandboxImplementation } from "@amends/sandbox";
-import { Crypto, Effect, Exit, FileSystem, Path, Queue, Schema, Scope, Stream } from "effect";
-import type { Cause, PlatformError } from "effect";
+import {
+  Crypto,
+  Effect,
+  Exit,
+  FileSystem,
+  Path,
+  Queue,
+  Schema,
+  Scope,
+  Stream,
+  type Cause,
+  type PlatformError,
+  Predicate,
+} from "effect";
+
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 export const name = "local";
@@ -35,7 +48,7 @@ const encoder = new TextEncoder();
  * this provider. Effect's spawner names the signal only in the message of its failure's cause.
  */
 const signaled = (error: PlatformError.PlatformError) => {
-  const cause = error.reason._tag === "BadArgument" ? undefined : error.reason.cause;
+  const cause = Predicate.isTagged(error.reason, "BadArgument") ? undefined : error.reason.cause;
   const signal = cause instanceof Error ? /signal: '(\w+)'/.exec(cause.message)?.[1] : undefined;
   const number = signal === undefined ? undefined : constants.signals[signal as NodeJS.Signals];
   return number === undefined ? Effect.fail(failure(error)) : Effect.succeed(128 + number);
@@ -173,7 +186,7 @@ export const make = Effect.fnUntraced(function* (options: Options) {
         fs.readFile(resolve(target)).pipe(
           Effect.map((data) => new Uint8Array(data.buffer, data.byteOffset, data.byteLength)),
           Effect.mapError((error) =>
-            error.reason._tag === "NotFound"
+            Predicate.isTagged(error.reason, "NotFound")
               ? new SandboxErrors.FileNotFound({ path: target })
               : failure(error),
           ),

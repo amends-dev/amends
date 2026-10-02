@@ -1,3 +1,6 @@
+import { Identity } from "../../identity/identity.ts";
+import { Assignment } from "../../authorization/assignment/assignment.ts";
+import { Scope } from "../../authorization/scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 
@@ -94,7 +97,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
     const actor = yield* Actor.Service;
     const canTransfer =
       actor.memberId === state.owner.id &&
-      actor.identity._tag === "Human" &&
+      Identity.MemberReference.isAnyOf(["Human"])(actor.identity) &&
       (yield* authorization.require([requirement]).pipe(
         Effect.as(true),
         Effect.catchTag("Authorization.Denied", () => Effect.succeed(false)),
@@ -103,7 +106,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       ? (yield* memberStore.list).filter(
           (member) =>
             member.status === "active" &&
-            member.identity._tag === "Human" &&
+            Identity.MemberReference.isAnyOf(["Human"])(member.identity) &&
             member.id !== state.owner.id,
         )
       : [];
@@ -122,7 +125,10 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       const request = yield* Schema.decodeEffect(Ownership.TransferInput)(input);
       const state = yield* readCurrentOwnership;
       const actor = yield* Actor.Service;
-      if (actor.memberId !== state.owner.id || actor.identity._tag !== "Human")
+      if (
+        actor.memberId !== state.owner.id ||
+        !Identity.MemberReference.isAnyOf(["Human"])(actor.identity)
+      )
         return yield* new NotOwner({ workspaceId });
       if (request.expectedOwnerAssignmentId !== state.assignment.id)
         return yield* new Changed({ workspaceId });
@@ -131,7 +137,7 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
       const recipient = yield* requireMember(request.memberId);
       if (recipient.status !== "active")
         return yield* new InvalidRecipient({ memberId: recipient.id, reason: "removed" });
-      if (recipient.identity._tag !== "Human")
+      if (!Identity.MemberReference.isAnyOf(["Human"])(recipient.identity))
         return yield* new InvalidRecipient({ memberId: recipient.id, reason: "agent" });
       const ownerRole = yield* delegation.loadRole(BuiltinRoles.OwnerId);
       yield* delegation.loadRole(BuiltinRoles.AdministratorId);
@@ -144,8 +150,8 @@ export const make = Effect.fn("OwnershipService.make")(function* (): Effect.fn.R
         for (const assignment of records) {
           const source = assignment.source;
           if (
-            source._tag === "Role" &&
-            source.scope._tag === "Workspace" &&
+            Assignment.Source.isAnyOf(["Role"])(source) &&
+            Scope.Value.isAnyOf(["Workspace"])(source.scope) &&
             builtins.includes(source.roleId)
           )
             yield* assignmentCommand.revokeAssignment(assignment);

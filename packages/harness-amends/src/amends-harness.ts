@@ -1,4 +1,16 @@
-import { Cause, Effect, Option, Queue, Ref, Result, Schema, Semaphore, Stream } from "effect";
+import {
+  Cause,
+  Data,
+  Effect,
+  Match,
+  Option,
+  Queue,
+  Ref,
+  Result,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect";
 import type { JsonSchema } from "effect";
 import { LanguageModel, Model, Tool } from "effect/unstable/ai";
 import type { Response, Toolkit } from "effect/unstable/ai";
@@ -9,7 +21,7 @@ import {
   Transcript,
   type HarnessImplementation,
 } from "@amends/harness";
-import type { HarnessEvent } from "@amends/harness";
+import { type HarnessEvent } from "@amends/harness";
 import { AmendsPrompt } from "./prompt.ts";
 
 /** Amends's own harness: an agent loop run in process through Effect AI. */
@@ -125,11 +137,16 @@ const usageOf = (usage: Response.Usage): HarnessEvent.Usage => ({
   }),
 });
 
-interface Streamed {
-  readonly _tag: "Text" | "Reasoning";
+interface StreamBuffer {
   text: string;
   metadata: Response.ProviderMetadata;
 }
+
+type Streamed = Data.TaggedEnum<{
+  Text: { readonly buffer: StreamBuffer };
+  Reasoning: { readonly buffer: StreamBuffer };
+}>;
+const Streamed = Data.taggedEnum<Streamed>();
 
 const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
   const model = yield* LanguageModel.LanguageModel;
@@ -195,16 +212,28 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     const current = yield* Ref.get(state);
     const responseId = Transcript.ResponseId.make(`${options.sessionId}/${current.responses + 1}`);
     const parts: Array<Streamed | Transcript.ToolCall> = [];
-    const streaming = new Map<string, number>();
+    const streaming = new Map<string, { readonly index: number; readonly buffer: StreamBuffer }>();
     const completed = new Set<number>();
     let finish: HarnessEvent.FinishReason = "unknown";
     let usage: HarnessEvent.Usage | undefined;
     let modelId = modelName;
 
     const blockOf = (part: Streamed | Transcript.ToolCall): Transcript.ResponsePart =>
-      part._tag === "ToolCall"
-        ? part
-        : { _tag: part._tag, text: part.text, ...withNative(part.metadata) };
+      Match.value(part).pipe(
+        Match.tagsExhaustive({
+          Text: ({ buffer }): Transcript.ResponsePart => ({
+            _tag: "Text",
+            text: buffer.text,
+            ...withNative(buffer.metadata),
+          }),
+          Reasoning: ({ buffer }): Transcript.ResponsePart => ({
+            _tag: "Reasoning",
+            text: buffer.text,
+            ...withNative(buffer.metadata),
+          }),
+          ToolCall: (part) => part,
+        }),
+      );
     /** Report the block at `index` as completed, once. */
     const complete = (index: number) => {
       const part = parts[index];
@@ -216,30 +245,35 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     const completeAll = (only?: Streamed["_tag"]) =>
       Effect.forEach(
         parts.flatMap((part, index) =>
-          completed.has(index) || (only !== undefined && part._tag !== only) ? [] : [index],
+          completed.has(index) || (only !== undefined && !Streamed.$is(only)(part)) ? [] : [index],
         ),
         complete,
         { discard: true },
       );
-    const open = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) => {
-      const index = parts.push({ _tag: kind, text: "", metadata }) - 1;
-      streaming.set(`${kind}:${id}`, index);
-      return index;
+    const openBlock = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) => {
+      const buffer: StreamBuffer = { text: "", metadata };
+      const opened = { index: parts.push(Streamed[kind]({ buffer })) - 1, buffer };
+      streaming.set(`${kind}:${id}`, opened);
+      return opened;
     };
-    const streamed = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) => {
-      const index = streaming.get(`${kind}:${id}`) ?? open(kind, id, {});
-      const part = parts[index] as Streamed;
-      part.metadata = merge(part.metadata, metadata);
-      return { index, part };
+    /** A delta or end can arrive without a start, so open its buffer if needed. */
+    const mergeBlockMetadata = (
+      kind: Streamed["_tag"],
+      id: string,
+      metadata: Response.ProviderMetadata,
+    ) => {
+      const opened = streaming.get(`${kind}:${id}`) ?? openBlock(kind, id, {});
+      opened.buffer.metadata = merge(opened.buffer.metadata, metadata);
+      return opened;
     };
-    const delta = (
+    const appendDelta = (
       kind: Streamed["_tag"],
       id: string,
       text: string,
       metadata: Response.ProviderMetadata,
     ) => {
-      const { index, part } = streamed(kind, id, metadata);
-      part.text += text;
+      const { index, buffer } = mergeBlockMetadata(kind, id, metadata);
+      buffer.text += text;
       return emit({
         _tag: kind === "Text" ? "TextDelta" : "ReasoningDelta",
         responseId,
@@ -247,8 +281,11 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
         delta: text,
       });
     };
-    const end = (kind: Streamed["_tag"], id: string, metadata: Response.ProviderMetadata) =>
-      complete(streamed(kind, id, metadata).index);
+    const completeStreamedBlock = (
+      kind: Streamed["_tag"],
+      id: string,
+      metadata: Response.ProviderMetadata,
+    ) => complete(mergeBlockMetadata(kind, id, metadata).index);
     /**
      * Reasoning its provider ended, which completes once the response moves on to text, a tool
      * call, other reasoning, or its end: a provider may end a reasoning block and go on with it
@@ -272,33 +309,33 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
         Stream.runForEach((part): Effect.Effect<void, HarnessErrors.ExecutionFailed> => {
           switch (part.type) {
             case "text-start":
-              open("Text", part.id, part.metadata);
+              openBlock("Text", part.id, part.metadata);
               return Effect.void;
             case "text-delta":
               return part.delta === ""
-                ? delta("Text", part.id, part.delta, part.metadata)
-                : Effect.andThen(settle, delta("Text", part.id, part.delta, part.metadata));
+                ? appendDelta("Text", part.id, part.delta, part.metadata)
+                : Effect.andThen(settle, appendDelta("Text", part.id, part.delta, part.metadata));
             case "text-end":
-              return end("Text", part.id, part.metadata);
+              return completeStreamedBlock("Text", part.id, part.metadata);
             case "reasoning-start": {
               // Reasoning that goes on under the ID it ended with continues its block.
-              const index = streaming.get(`Reasoning:${part.id}`);
-              if (index !== undefined && ended.delete(index)) {
-                streamed("Reasoning", part.id, part.metadata);
+              const opened = streaming.get(`Reasoning:${part.id}`);
+              if (opened !== undefined && ended.delete(opened.index)) {
+                mergeBlockMetadata("Reasoning", part.id, part.metadata);
                 return Effect.void;
               }
               return Effect.andThen(
                 settle,
                 Effect.sync(() => {
-                  open("Reasoning", part.id, part.metadata);
+                  openBlock("Reasoning", part.id, part.metadata);
                 }),
               );
             }
             case "reasoning-delta":
-              return delta("Reasoning", part.id, part.delta, part.metadata);
+              return appendDelta("Reasoning", part.id, part.delta, part.metadata);
             case "reasoning-end":
               return Effect.sync(() => {
-                ended.add(streamed("Reasoning", part.id, part.metadata).index);
+                ended.add(mergeBlockMetadata("Reasoning", part.id, part.metadata).index);
               });
             case "tool-params-start":
             case "tool-params-delta":
@@ -351,7 +388,9 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     yield* lock.withPermit(
       Effect.gen(function* () {
         const latest = yield* Ref.get(state);
-        const calls = response.parts.flatMap((part) => (part._tag === "ToolCall" ? [part.id] : []));
+        const calls = response.parts.flatMap((part) =>
+          Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) ? [part.id] : [],
+        );
         yield* Ref.set(state, {
           ...latest,
           transcript: [...latest.transcript, response],
@@ -429,7 +468,9 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     if (yield* lock.withPermit(overLimit)) return false;
     const response = yield* respond;
     yield* Effect.forEach(
-      response.parts.flatMap((part) => (part._tag === "ToolCall" ? [part] : [])),
+      response.parts.flatMap((part) =>
+        Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) ? [part] : [],
+      ),
       execute,
       { concurrency: "unbounded", discard: true },
     );

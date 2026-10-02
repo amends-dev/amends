@@ -3,15 +3,15 @@
  * again; it stopped short in a way worth retrying, so the run rests before preparing again; or it
  * can't run, for this reason, which fails it.
  */
-export type Ending =
-  | { readonly _tag: "Finished" }
-  | { readonly _tag: "Again" }
-  | { readonly _tag: "Interrupted" }
-  | { readonly _tag: "Unrunnable"; readonly reason: string };
+import { Data } from "effect";
 
-export const finished: Ending = { _tag: "Finished" };
-export const again: Ending = { _tag: "Again" };
-export const interrupted: Ending = { _tag: "Interrupted" };
-export const unrunnable = (reason: string): Ending => ({ _tag: "Unrunnable", reason });
+export type Ending = Data.TaggedEnum<{
+  Finished: {};
+  Again: {};
+  Interrupted: {};
+  Unrunnable: { readonly reason: string };
+}>;
+
+export const { Finished, Again, Interrupted, Unrunnable, $is, $match } = Data.taggedEnum<Ending>();
 
 export * as Ending from "./ending.ts";

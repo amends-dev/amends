@@ -1,5 +1,5 @@
 import { Checkpoint, Store } from "@amends/core/journal";
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Schema, Option } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
 import { compareBinary, keyOf, Rows } from "./rows.ts";
@@ -41,7 +41,7 @@ export const make = Effect.fn("Checkpoints.make")(function* () {
     listLive: Effect.fn("Checkpoints.listLive")(
       function* (logId) {
         const live = yield* liveRows.get((yield* read).records.liveProjections, keyOf(logId));
-        return live._tag === "Some"
+        return Option.isSome(live)
           ? live.value.toSorted((left, right) => compareBinary(left.name, right.name))
           : [];
       },

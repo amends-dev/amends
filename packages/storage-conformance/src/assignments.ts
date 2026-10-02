@@ -7,7 +7,7 @@ import { Log, Store } from "@amends/core/journal";
 import type { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 
-import { Effect, Option } from "effect";
+import { Effect, Option, Result } from "effect";
 
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
@@ -278,11 +278,13 @@ export const assignments = (harness: Harness) => {
                     () => Operations.change(workspace.id, alice, input).pipe(Effect.result),
                     { concurrency: "unbounded" },
                   );
-                  expect(results.filter(({ _tag }) => _tag === "Success")).toHaveLength(1);
-                  const rejected = results.find((result) => result._tag === "Failure");
+                  expect(results.filter(Result.isSuccess)).toHaveLength(1);
+                  const rejected = results.find((result) => Result.isFailure(result));
                   // A writer that waited sees the winner's change; one that gave up reports contention.
                   expect(["AssignmentService.Changed", "Gateway.Conflict"]).toContain(
-                    rejected?._tag === "Failure" ? rejected.failure._tag : undefined,
+                    rejected !== undefined && Result.isFailure(rejected)
+                      ? rejected.failure._tag
+                      : undefined,
                   );
                   expect(yield* bound.assignments.listActiveByMember(viewer.id)).toHaveLength(1);
                   return { workspace, viewer, replaced: access.assignments };

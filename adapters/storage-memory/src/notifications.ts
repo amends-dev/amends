@@ -4,7 +4,7 @@ import { Notification, NotificationStore } from "@amends/core/notification";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
 import { Turn } from "@amends/core/turn";
 import { Member } from "@amends/core/workspace";
-import { DateTime, Effect, Layer, Option, Schema } from "effect";
+import { DateTime, Effect, Layer, Option, Schema, Predicate } from "effect";
 import { Binding } from "./binding.ts";
 import type { MemoryDatabase } from "./database.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
@@ -20,9 +20,9 @@ const rows = Rows.make(Schema.fromJsonString(Notification.Record));
 const inboxKey = (recipient: Notification.Recipient) =>
   keyOf(
     recipient._tag,
-    recipient._tag === "Triage"
+    Notification.Recipient.isAnyOf(["Triage"])(recipient)
       ? ""
-      : recipient._tag === "Contact"
+      : Notification.Recipient.isAnyOf(["Contact"])(recipient)
         ? recipient.id
         : recipient.memberId,
   );
@@ -32,7 +32,7 @@ const sourceKey = ({ source, recipient }: Notification.Record) =>
     source.logId,
     source.entryId,
     recipient._tag,
-    recipient._tag === "Triage" ? "" : recipient.id,
+    Notification.Recipient.isAnyOf(["Triage"])(recipient) ? "" : recipient.id,
   );
 /** Recorded time, then ID in binary order. */
 const byRecorded = (left: Notification.Record, right: Notification.Record) =>
@@ -49,7 +49,9 @@ const isBefore = (record: Notification.Record, cursor: NotificationStore.Cursor)
  */
 const withSeen = (space: MemoryDatabase.Space, record: Notification.Record) => {
   const seen = space.notificationsSeen.get(record.id);
-  return seen === undefined || record.recipient._tag !== "Human" || record.state._tag !== "Pending"
+  return seen === undefined ||
+    !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
+    !Notification.State.isAnyOf(["Pending"])(record.state)
     ? record
     : Object.assign({}, record, {
         state: Notification.State.cases.Seen.make({ seenAt: DateTime.makeUnsafe(seen) }),
@@ -78,7 +80,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       .filter(
         (record) =>
           inboxKey(record.recipient) === target &&
-          record.state._tag === "Pending" &&
+          Notification.State.isAnyOf(["Pending"])(record.state) &&
           (after === undefined || isAfter(record, after)),
       )
       .toSorted(byRecorded)
@@ -98,7 +100,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       .filter(
         (record) =>
           inboxKey(record.recipient) === target &&
-          (!pendingOnly || record.state._tag === "Pending") &&
+          (!pendingOnly || Notification.State.isAnyOf(["Pending"])(record.state)) &&
           (before === undefined || isBefore(record, before)),
       )
       .toSorted((left, right) => byRecorded(right, left))
@@ -121,7 +123,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           operation,
           message: "Expected a notification in this workspace",
         });
-      if (record.state._tag === "Seen" || record.state._tag === "Accepted")
+      if (Notification.State.isAnyOf(["Seen", "Accepted"])(record.state))
         return yield* new NotificationStore.Conflict({
           operation,
           message: "Seen and Accepted are recorded with markSeen and accept",
@@ -185,7 +187,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
           .filter(
             (record) =>
               inboxKey(record.recipient) === target &&
-              record.state._tag === "Pending" &&
+              Notification.State.isAnyOf(["Pending"])(record.state) &&
               record.thread !== undefined &&
               record.thread.threadId === threadId &&
               record.thread.sequence <= through,
@@ -202,7 +204,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
       function* (recipient) {
         const target = inboxKey(yield* validateRecipient(recipient));
         return (yield* all).filter(
-          (record) => inboxKey(record.recipient) === target && record.state._tag === "Pending",
+          (record) =>
+            inboxKey(record.recipient) === target &&
+            Notification.State.isAnyOf(["Pending"])(record.state),
         ).length;
       },
       Effect.mapError(storeFailure(NotificationStore, "countPendingByRecipient")),
@@ -215,7 +219,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         for (const record of yield* all)
           if (
             inboxKey(record.recipient) === target &&
-            record.state._tag === "Pending" &&
+            Notification.State.isAnyOf(["Pending"])(record.state) &&
             record.thread !== undefined &&
             groupIds.has(record.thread.groupId)
           )
@@ -244,14 +248,14 @@ export const make = Effect.fn("Notifications.make")(function* () {
             const record = Option.getOrUndefined(found);
             if (
               record === undefined ||
-              record.recipient._tag !== "Human" ||
-              (record.state._tag !== "Pending" && record.state._tag !== "Seen")
+              !Notification.Recipient.isAnyOf(["Human"])(record.recipient) ||
+              !Notification.State.isAnyOf(["Pending", "Seen"])(record.state)
             )
               return yield* new NotificationStore.Conflict({
                 operation: "markSeen",
                 message: "Expected a pending notification of a human recipient",
               });
-            if (record.state._tag === "Pending") pending.push(record);
+            if (Notification.State.isAnyOf(["Pending"])(record.state)) pending.push(record);
           }
           for (const record of pending) {
             const row = yield* rows
@@ -268,7 +272,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
       ).pipe(
         // The binding's own errors, such as another host writing, are failures of the call.
         Effect.mapError((error) =>
-          error._tag === "JournalStore.Failure" || error._tag === "JournalStore.Conflict"
+          Schema.is(Store.Failure)(error) || Schema.is(Store.Conflict)(error)
             ? new NotificationStore.Failure({ operation: "markSeen", cause: error })
             : error,
         ),
@@ -293,9 +297,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
         const first = accepted[0]?.recipient;
         if (
           record === undefined ||
-          record.recipient._tag !== "Agent" ||
-          record.state._tag !== "Pending" ||
-          (first?._tag === "Agent" && first.memberId !== record.recipient.memberId)
+          !Notification.Recipient.isAnyOf(["Agent"])(record.recipient) ||
+          !Notification.State.isAnyOf(["Pending"])(record.state) ||
+          (Predicate.isTagged(first, "Agent") && first.memberId !== record.recipient.memberId)
         )
           return yield* new NotificationStore.Conflict({
             operation: "accept",
@@ -330,8 +334,8 @@ export const make = Effect.fn("Notifications.make")(function* () {
         for (const record of records) {
           if (
             record.participationId !== participationId ||
-            record.recipient._tag !== "Agent" ||
-            record.state._tag !== "Pending"
+            !Notification.Recipient.isAnyOf(["Agent"])(record.recipient) ||
+            !Notification.State.isAnyOf(["Pending"])(record.state)
           )
             continue;
           const row = yield* rows
@@ -361,13 +365,15 @@ export const make = Effect.fn("Notifications.make")(function* () {
         for (const record of records) {
           const { recipient } = record;
           if (
-            (recipient._tag !== "Human" && recipient._tag !== "Agent") ||
+            !Notification.Recipient.isAnyOf(["Human", "Agent"])(recipient) ||
             recipient.memberId !== memberId ||
             record.thread?.groupId !== groupId ||
-            record.state._tag !== "Pending"
+            !Notification.State.isAnyOf(["Pending"])(record.state)
           )
             continue;
-          const reason = recipient._tag === "Agent" ? "participation-ended" : "access-lost";
+          const reason = Notification.Recipient.isAnyOf(["Agent"])(recipient)
+            ? "participation-ended"
+            : "access-lost";
           const row = yield* rows
             .encode({ ...record, state: { _tag: "Discarded", reason } })
             .pipe(Effect.mapError(storeFailure(NotificationStore, "discardPendingForGroup")));

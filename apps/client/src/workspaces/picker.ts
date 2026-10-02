@@ -14,7 +14,7 @@ import { refreshResult } from "../api/refresh.ts";
 import { acceptInvitation, suggestedName } from "./api.ts";
 import { toDate } from "../conversations/time.ts";
 import { useApiClient, useSession } from "../provider.tsx";
-import { useDirectory } from "../session/directory.tsx";
+import { useDirectory, DirectoryState } from "../session/directory.tsx";
 
 export interface WorkspacePickerController {
   /** Active memberships; the app gives each its link. */
@@ -36,7 +36,7 @@ export function useWorkspacePicker(): WorkspacePickerController {
   const directory = useDirectory();
   const ready = () => {
     const state = directory.state();
-    return state._tag === "Ready" ? state : undefined;
+    return DirectoryState.$is("Ready")(state) ? state : undefined;
   };
   const workspaces = createMemo(() =>
     (ready()?.listing.memberships ?? [])
@@ -113,7 +113,7 @@ export function useWorkspaceAccess(workspaceId: Accessor<string>): Accessor<Work
   const directory = useDirectory();
   return createMemo((): WorkspaceAccess => {
     const state = directory.state();
-    if (state._tag !== "Ready") return { reason: "unknown" };
+    if (!DirectoryState.$is("Ready")(state)) return { reason: "unknown" };
     const invitation = state.listing.invitations.find(
       (entry) => entry.details.workspaceId === workspaceId(),
     );

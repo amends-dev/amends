@@ -89,7 +89,7 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
       for (const record of records) {
         if (
           record.status !== "active" ||
-          record.participant._tag !== "Member" ||
+          !ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant) ||
           record.participant.groupMembershipId !== id
         )
           continue;

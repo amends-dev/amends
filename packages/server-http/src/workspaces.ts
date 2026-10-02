@@ -1,3 +1,4 @@
+import { Identity } from "@amends/core/identity";
 import { Api, ApiErrors, Principal } from "@amends/api-http";
 import { Gateway } from "@amends/gateway";
 import { OwnershipService, WorkspaceSettingsService } from "@amends/core/workspace";
@@ -58,7 +59,8 @@ export const layer = HttpApiBuilder.group(
       transferOwnership: ({ params, payload }) =>
         Effect.gen(function* () {
           const principal = yield* Principal;
-          if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
+          if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
+            return yield* new ApiErrors.HumanRequired();
           return yield* gateway.asMember(
             params.workspaceId,
             principal,
@@ -70,7 +72,8 @@ export const layer = HttpApiBuilder.group(
       create: ({ headers, payload }) =>
         Effect.gen(function* () {
           const principal = yield* Principal;
-          if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
+          if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
+            return yield* new ApiErrors.HumanRequired();
           return yield* gateway.createWorkspace(principal.id, payload, {
             requestKey: headers["idempotency-key"],
           });

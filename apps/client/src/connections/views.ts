@@ -10,7 +10,7 @@ import type {
   SettingIssue,
 } from "@amends/ui/screens/connections";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Effect, Option } from "effect";
+import { Cause, Effect, Option, Predicate } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useApiClient } from "../provider.tsx";
@@ -19,9 +19,9 @@ import {
   connectionsReads,
   credentialsUnavailable,
   newConnectionRequestKey,
-  type Connection,
+  Connection,
   type ConnectionCommand,
-  type ConnectionImplementation,
+  ConnectionImplementation,
   type ConnectionsReads,
   reloadConnections,
 } from "./api.ts";
@@ -57,7 +57,7 @@ const settingIssue = (setting: ConnectionSettingField, value: string): SettingIs
 };
 
 const methodOf = (authentication: ConnectionImplementation.Authentication): ConnectionMethod =>
-  authentication._tag === "ApiKey" ? "api-key" : "none";
+  ConnectionImplementation.Authentication.isAnyOf(["ApiKey"])(authentication) ? "api-key" : "none";
 const providerOf = (
   declaration: ConnectionImplementation.Declaration,
 ): ConnectionProviderOption => ({
@@ -101,17 +101,16 @@ export interface ConnectionListEntry {
 
 /** A connection's setup from its readiness, as its list entry gives it. */
 const listSetup = (view: Connection.View): Pick<ConnectionListEntry, "setup" | "missing"> => {
-  const readiness = [view.readiness.modelInference, view.readiness.sandbox].find(
-    (entry) => entry?._tag === "Incomplete",
+  const readiness = [view.readiness.modelInference, view.readiness.sandbox].find((entry) =>
+    Predicate.isTagged(entry, "Incomplete"),
   );
-  const missing =
-    readiness?._tag === "Incomplete"
-      ? { settings: readiness.settings, key: readiness.credential }
-      : { settings: [], key: false };
+  const missing = Predicate.isTagged(readiness, "Incomplete")
+    ? { settings: readiness.settings, key: readiness.credential }
+    : { settings: [], key: false };
   return {
     setup: !view.installed
       ? "unavailable"
-      : readiness?._tag === "Incomplete"
+      : Predicate.isTagged(readiness, "Incomplete")
         ? "needs-setup"
         : "configured",
     missing,
@@ -184,18 +183,17 @@ export function useConnections(
           value,
         }));
     // Every capability needs the same settings and key today, so any incomplete one says what.
-    const readiness = [view.readiness.modelInference, view.readiness.sandbox].find(
-      (entry) => entry?._tag === "Incomplete",
+    const readiness = [view.readiness.modelInference, view.readiness.sandbox].find((entry) =>
+      Predicate.isTagged(entry, "Incomplete"),
     );
-    const missing =
-      readiness?._tag === "Incomplete"
-        ? {
-            settings: readiness.settings.map(
-              (key) => provider?.settings.find((setting) => setting.key === key)?.label ?? key,
-            ),
-            key: readiness.credential,
-          }
-        : { settings: [], key: false };
+    const missing = Predicate.isTagged(readiness, "Incomplete")
+      ? {
+          settings: readiness.settings.map(
+            (key) => provider?.settings.find((setting) => setting.key === key)?.label ?? key,
+          ),
+          key: readiness.credential,
+        }
+      : { settings: [], key: false };
     return {
       id: view.id,
       name: view.name,
@@ -208,12 +206,16 @@ export function useConnections(
       setup:
         !view.installed || !provider
           ? "unavailable"
-          : readiness?._tag === "Incomplete"
+          : Predicate.isTagged(readiness, "Incomplete")
             ? "needs-setup"
             : "configured",
       missing,
-      method: view.authentication._tag === "ApiKey" ? "api-key" : "none",
-      keySaved: view.authentication._tag === "ApiKey" && view.authentication.configured,
+      method: Connection.View.fields.authentication.isAnyOf(["ApiKey"])(view.authentication)
+        ? "api-key"
+        : "none",
+      keySaved:
+        Connection.View.fields.authentication.isAnyOf(["ApiKey"])(view.authentication) &&
+        view.authentication.configured,
       manageable: view.manageable,
       createdBy: memberName(members.member(view.createdBy)),
       createdAt: toDate(view.createdAt),

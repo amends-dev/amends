@@ -20,7 +20,7 @@ import {
   turnRead,
   turnRefusal,
   controlTurn,
-  type Turn,
+  Turn,
   type TurnCommand,
   turnLogFeed,
 } from "./api.ts";
@@ -314,14 +314,14 @@ export function useTurnLog(
     if (current.startedAt !== undefined) items.push({ kind: "started", at: current.startedAt });
     for (const item of logged) {
       const at = toDate(item.at);
-      if (item._tag === "InputTaken")
+      if (Turn.LogItem.isAnyOf(["InputTaken"])(item))
         items.push({
           kind: "input",
           at,
           messages: item.messages,
           first: !items.some((entry) => entry.kind === "input"),
         });
-      else if (item._tag === "Responded")
+      else if (Turn.LogItem.isAnyOf(["Responded"])(item))
         items.push({
           kind: "response",
           at,
@@ -362,7 +362,7 @@ export function useTurnLog(
     // A block's draft gives way to the block once the log holds it.
     const logged = new Set(
       (following.items ?? []).flatMap((item) =>
-        item._tag === "Responded"
+        Turn.LogItem.isAnyOf(["Responded"])(item)
           ? item.parts.map((part) => `${item.responseId}\u0000${part}`)
           : [],
       ),

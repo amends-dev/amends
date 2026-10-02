@@ -4,10 +4,21 @@
  * and records what it reports until it is idle. Then it closes the turn; when more input came for
  * the agent while it worked, the harness takes that in and works again, in the same session.
  */
-import type { TurnExecution } from "@amends/core/turn";
+import { TurnExecution } from "@amends/core/turn";
 import { Environment } from "@amends/environment";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
-import { Clock, Crypto, Duration, Effect, Layer, Pull, Result, Schema, Stream } from "effect";
+import {
+  Clock,
+  Crypto,
+  Duration,
+  Effect,
+  Layer,
+  Pull,
+  Result,
+  Schema,
+  Stream,
+  Predicate,
+} from "effect";
 import { ContextBudget } from "./context-budget.ts";
 import { Drafts } from "./drafts.ts";
 import { Ending } from "./ending.ts";
@@ -48,19 +59,19 @@ export const run = Effect.fnUntraced(
     if (pending !== undefined || awaitsResponse) {
       if (pending !== undefined) yield* submitInput(turnSteps, runningEnvironment, pending);
       else yield* runningEnvironment.resume.pipe(Effect.catchTags(dieOnUnexpected));
-      if ((yield* recordUntilIdle) === "full") return Ending.again;
+      if ((yield* recordUntilIdle) === "full") return Ending.Again();
     }
     // Then close the turn, unless more input came for its agent: take that in and work again.
     for (;;) {
       const closing = yield* turnSteps.close;
-      if (closing._tag !== "InputPending") return Ending.finished;
+      if (!TurnExecution.Closing.$is("InputPending")(closing)) return Ending.Finished();
       const moreInput = yield* takeMoreInput(turnSteps, settings, work, runningEnvironment);
       if (moreInput !== "submitted") return moreInput;
-      if ((yield* recordUntilIdle) === "full") return Ending.again;
+      if ((yield* recordUntilIdle) === "full") return Ending.Again();
     }
   },
   Effect.catchTag("Session.CannotRun", (cannot) =>
-    Effect.succeed(Ending.unrunnable(cannot.reason)),
+    Effect.succeed(Ending.Unrunnable({ reason: cannot.reason })),
   ),
 );
 
@@ -153,8 +164,8 @@ const submitInput = Effect.fnUntraced(function* (
  * deltas, which only show readers a block while it streams.
  */
 const withoutDeltas = (event: Environment.Event): ReadonlyArray<Environment.Event> =>
-  event._tag === "Harness" &&
-  (event.event._tag === "TextDelta" || event.event._tag === "ReasoningDelta")
+  Environment.Event.isAnyOf(["Harness"])(event) &&
+  HarnessEvent.Event.isAnyOf(["TextDelta", "ReasoningDelta"])(event.event)
     ? []
     : [event];
 
@@ -201,19 +212,31 @@ const makeEventRecorder = Effect.fnUntraced(function* (
             }),
           );
       for (const item of chunk) {
-        if (item._tag !== "Harness") continue;
+        if (!Environment.Event.isAnyOf(["Harness"])(item)) continue;
         const event = item.event;
-        if (event._tag === "ToolCallStarted") runningToolCalls.add(event.callId);
-        else if (event._tag === "ToolCallCompleted") runningToolCalls.delete(event.result.callId);
+        if (HarnessEvent.Event.isAnyOf(["ToolCallStarted"])(event))
+          runningToolCalls.add(event.callId);
+        else if (HarnessEvent.Event.isAnyOf(["ToolCallCompleted"])(event))
+          runningToolCalls.delete(event.result.callId);
         drafts.applyEvent(event);
       }
       yield* drafts.showWhenDue;
       const events = chunk.flatMap(withoutDeltas);
       if (events.length > 0) yield* turnSteps.recordEvents(events);
-      if (events.some((item) => item._tag === "Harness" && item.event._tag === "ContextFull"))
+      if (
+        events.some(
+          (item) =>
+            Environment.Event.isAnyOf(["Harness"])(item) &&
+            HarnessEvent.Event.isAnyOf(["ContextFull"])(item.event),
+        )
+      )
         return "full" as const;
       const lastEvent = events.at(-1);
-      if (lastEvent?._tag === "Harness" && lastEvent.event._tag === "Idle") return "idle" as const;
+      if (
+        Predicate.isTagged(lastEvent, "Harness") &&
+        HarnessEvent.Event.isAnyOf(["Idle"])(lastEvent.event)
+      )
+        return "idle" as const;
     }
   });
   return { recordUntilIdle };
@@ -234,19 +257,19 @@ const takeMoreInput = Effect.fnUntraced(function* (
   const waitingSince = yield* Clock.currentTimeMillis;
   for (;;) {
     const preparation = yield* turnSteps.prepare;
-    if (preparation._tag !== "Ready") return Ending.again;
+    if (!TurnExecution.Preparation.$is("Ready")(preparation)) return Ending.Again();
     const { plan } = preparation;
     if (plan.pending !== undefined) {
       const { compaction } = ContextBudget.measureAgainstBudget(plan, work.model, settings.policy);
-      if (compaction !== undefined) return Ending.again;
+      if (compaction !== undefined) return Ending.Again();
       yield* submitInput(turnSteps, runningEnvironment, plan.pending);
       return "submitted" as const;
     }
     if ((yield* Clock.currentTimeMillis) - waitingSince >= Duration.toMillis(settings.inputWait))
-      return Ending.unrunnable("Input the agent accepted never arrived.");
+      return Ending.Unrunnable({ reason: "Input the agent accepted never arrived." });
     yield* Effect.sleep(settings.checkInterval);
     const closing = yield* turnSteps.close;
-    if (closing._tag !== "InputPending") return Ending.finished;
+    if (!TurnExecution.Closing.$is("InputPending")(closing)) return Ending.Finished();
   }
 });
 

@@ -40,7 +40,7 @@ export const record = Effect.fnUntraced(function* (
     kept: compaction.kept,
     through: compaction.through,
   });
-  return Ending.again;
+  return Ending.Again();
 });
 
 export * as Checkpoint from "./checkpoint.ts";

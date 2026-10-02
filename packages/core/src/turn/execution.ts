@@ -1,9 +1,10 @@
-import type { Environment as EnvironmentRuntime } from "@amends/environment";
-import type { HarnessErrors, HarnessEvent } from "@amends/harness";
+import { Connection } from "../connection/connection.ts";
+import { Environment as EnvironmentRuntime } from "@amends/environment";
+import { type HarnessErrors, HarnessEvent } from "@amends/harness";
 import { Transcript } from "@amends/harness";
-import type { Redacted } from "effect";
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { type Redacted, Predicate } from "effect";
+import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { type PlatformError } from "effect";
 import { AgentStore } from "../agent/store.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { ConnectionCredentialStore } from "../connection/credential-store.ts";
@@ -137,11 +138,13 @@ export interface Plan {
  * What a turn needs next: nothing, since it finished; confirming that it stopped, since it was
  * asked to; failing it, since what it would run with is gone; or running it with its plan.
  */
-export type Preparation =
-  | { readonly _tag: "Finished" }
-  | { readonly _tag: "Stopping" }
-  | { readonly _tag: "Unrunnable"; readonly reason: string }
-  | { readonly _tag: "Ready"; readonly plan: Plan };
+export type Preparation = Data.TaggedEnum<{
+  Finished: {};
+  Stopping: {};
+  Unrunnable: { readonly reason: string };
+  Ready: { readonly plan: Plan };
+}>;
+export const Preparation = Data.taggedEnum<Preparation>();
 
 /** How many activities one read takes; reads go on until the range is done. */
 const pageSize = 100;
@@ -158,11 +161,13 @@ const historyEntrySize = 200_000;
  * all taken in, so execution continues with what is pending; it stopped as asked; or the agent
  * could no longer post where it worked, which failed it.
  */
-export type Closing =
-  | { readonly _tag: "Closed"; readonly messageIds: ReadonlyArray<ThreadMessage.Id> }
-  | { readonly _tag: "InputPending" }
-  | { readonly _tag: "Stopped" }
-  | { readonly _tag: "Failed"; readonly reason: string };
+export type Closing = Data.TaggedEnum<{
+  Closed: { readonly messageIds: ReadonlyArray<ThreadMessage.Id> };
+  InputPending: {};
+  Stopped: {};
+  Failed: { readonly reason: string };
+}>;
+export const Closing = Data.taggedEnum<Closing>();
 
 /**
  * What execution records as it runs a turn: each step is its own commit, attributed to the turn's
@@ -378,7 +383,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const memberIds = [
       ...new Set(
         list.flatMap(({ message }) =>
-          message.author._tag === "Member" ? [message.author.memberId] : [],
+          ThreadMessage.Author.isAnyOf(["Member"])(message.author) ? [message.author.memberId] : [],
         ),
       ),
     ];
@@ -386,7 +391,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       (yield* memberStore.getMany(memberIds)).map((member) => [member.id as string, member.name]),
     );
     return (author: ThreadMessage.Author): Transcript.Author =>
-      author._tag === "Member"
+      ThreadMessage.Author.isAnyOf(["Member"])(author)
         ? { id: author.memberId, name: named.get(author.memberId) ?? "A member" }
         : { id: author.contactId, name: "A contact" };
   });
@@ -435,7 +440,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const earlier = yield* readMessagesBetween(turn, { through: turn.inputAfterSequence });
     const author = yield* nameAuthors(earlier);
     return earlier.flatMap(({ message }): ReadonlyArray<Transcript.Item> =>
-      message.author._tag === "Member" && message.author.memberId === turn.memberId
+      ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
+      message.author.memberId === turn.memberId
         ? TurnLog.splitIntoPieces(message.text, pieceSize).map((text, index) => ({
             _tag: "Response",
             id: `message:${message.id}${index === 0 ? "" : `/${index}`}` as Transcript.ResponseId,
@@ -447,11 +453,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const prepare = Effect.fn("TurnExecution.prepare")(function* (turnId: Turn.Id) {
     const turn = yield* requireTurn(turnId);
-    if (!Turn.active(turn.status)) return { _tag: "Finished" } as const;
-    if (turn.status === "cancelling") return { _tag: "Stopping" } as const;
-    const unrunnableBecause = (reason: string) => ({ _tag: "Unrunnable", reason }) as const;
+    if (!Turn.active(turn.status)) return Preparation.Finished();
+    if (turn.status === "cancelling") return Preparation.Stopping();
     const agent = yield* agentStore.get(turn.agentId);
-    if (Option.isNone(agent)) return unrunnableBecause("The agent no longer exists.");
+    if (Option.isNone(agent))
+      return Preparation.Unrunnable({ reason: "The agent no longer exists." });
     const selection: Turn.Selection = turn.selection ?? {
       connectionId: agent.value.model.connectionId,
       model: agent.value.model.model,
@@ -460,28 +466,30 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     };
     const connection = yield* connectionStore.get(selection.connectionId);
     if (Option.isNone(connection) || connection.value.status !== "active")
-      return unrunnableBecause("The agent's model connection is no longer available.");
+      return Preparation.Unrunnable({
+        reason: "The agent's model connection is no longer available.",
+      });
     const authentication = connection.value.authentication;
     let credential: Redacted.Redacted<string> | undefined;
-    if (authentication._tag === "ApiKey") {
+    if (Connection.Authentication.isAnyOf(["ApiKey"])(authentication)) {
       if (authentication.credentialId === null)
-        return unrunnableBecause(`${connection.value.name} needs its API key.`);
+        return Preparation.Unrunnable({ reason: `${connection.value.name} needs its API key.` });
       const stored = yield* connectionCredentialStore
         .get(authentication.credentialId)
         .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
       if (Option.isNone(stored))
-        return unrunnableBecause(
-          `${connection.value.name}'s API key can't be read on this server.`,
-        );
+        return Preparation.Unrunnable({
+          reason: `${connection.value.name}'s API key can't be read on this server.`,
+        });
       credential = stored.value.secret;
     }
     const environment = yield* environmentStore.get(selection.environmentId);
     if (Option.isNone(environment) || environment.value.status !== "active")
-      return unrunnableBecause("The agent's environment is no longer available.");
+      return Preparation.Unrunnable({ reason: "The agent's environment is no longer available." });
     if (Option.isNone(environmentCatalog.harness(environment.value.harnessId)))
-      return unrunnableBecause(
-        `The ${environment.value.harnessId} harness is not installed on this server.`,
-      );
+      return Preparation.Unrunnable({
+        reason: `The ${environment.value.harnessId} harness is not installed on this server.`,
+      });
     const context = yield* readContext(turn);
     const incorporated = context.own.incorporatedThrough(turn.inputAfterSequence);
     const messages = (yield* readMessagesBetween(turn, {
@@ -489,7 +497,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       through: turn.acceptedThroughSequence,
     })).filter(
       ({ message }) =>
-        !(message.author._tag === "Member" && message.author.memberId === turn.memberId),
+        !(
+          ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
+          message.author.memberId === turn.memberId
+        ),
     );
     const author = yield* nameAuthors(messages);
     const waiting = messages.flatMap(({ sequence, message }) =>
@@ -532,7 +543,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       measured: context.measured,
       overflow: context.own.overflow,
     };
-    return { _tag: "Ready", plan } as const;
+    return Preparation.Ready({ plan });
   });
 
   const start = Effect.fn("TurnExecution.start")(function* (
@@ -625,7 +636,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   ) {
     const found = yield* openAgentLog(turn).getAppend(submissionKeyOf(batchId));
     const entry = Option.getOrUndefined(found)?.[0]?.payload;
-    return entry?._tag === "Submitted" ? entry : undefined;
+    return Predicate.isTagged(entry, "Submitted") ? entry : undefined;
   });
 
   const recordSubmission = Effect.fn("TurnExecution.recordSubmission")(function* (
@@ -675,7 +686,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         yield* requireStatus(turn, ["running", "cancelling"]);
         // Input the harness took in is a batch execution submitted, exactly as recorded.
         for (const event of events) {
-          if (event._tag !== "Harness" || event.event._tag !== "InputIncorporated") continue;
+          if (
+            !EnvironmentRuntime.Event.isAnyOf(["Harness"])(event) ||
+            !HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event.event)
+          )
+            continue;
           const recorded = yield* findSubmittedBatch(turn, event.event.batch.id);
           if (recorded === undefined)
             return yield* new InvalidResponse({
@@ -689,7 +704,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         if (events.length > 0)
           yield* openAgentLog(turn).appendAll(
             events.map((event): TurnLog.Entry =>
-              event._tag === "Harness"
+              EnvironmentRuntime.Event.isAnyOf(["Harness"])(event)
                 ? { _tag: "Harness", turnId: turn.id, event: event.event }
                 : { _tag: "Environment", turnId: turn.id, event: event.event },
             ),
@@ -770,12 +785,12 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             outcome: "cancelled",
             cancelReason: turn.cancelReason,
           });
-          return { _tag: "Stopped" } as const;
+          return Closing.Stopped();
         }
         yield* requireStatus(turn, ["running"]);
         const reading = TurnLog.read(yield* readOwnEntries(turn));
         if (reading.incorporatedThrough(turn.inputAfterSequence) < turn.acceptedThroughSequence)
-          return { _tag: "InputPending" } as const;
+          return Closing.InputPending();
         // Work its agent has not accepted yet is still this turn's to consider before closing;
         // accepting it extends the turn, and execution takes it in.
         const waiting = yield* notificationStore.listPendingByThread(
@@ -783,13 +798,13 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           turn.threadId,
           Number.MAX_SAFE_INTEGER,
         );
-        if (waiting.length > 0) return { _tag: "InputPending" } as const;
+        if (waiting.length > 0) return Closing.InputPending();
         const messageIds: Array<ThreadMessage.Id> = [];
         if (reading.replies.length > 0) {
           const failTurn = (reason: string) =>
             Effect.gen(function* () {
               yield* turnCommand.endTurn(turn, { outcome: "failed", reason });
-              return { _tag: "Failed", reason } as const;
+              return Closing.Failed({ reason });
             });
           const thread = yield* threadQuery.requireAccess(turn.threadId).pipe(
             Effect.asSome,
@@ -843,7 +858,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           }
         }
         yield* turnCommand.endTurn(turn, { outcome: "completed", messageIds });
-        return { _tag: "Closed", messageIds } as const;
+        return Closing.Closed({ messageIds });
       }),
     );
   });

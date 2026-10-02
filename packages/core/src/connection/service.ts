@@ -1,4 +1,4 @@
-import type { ConnectionImplementation } from "@amends/connection";
+import { ConnectionImplementation } from "@amends/connection";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
@@ -210,7 +210,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       )
         return yield* viewForActor(yield* readRetriedConnection(connectionId));
       const declaration = yield* requireImplementation(request.implementationId);
-      if (!declaration.authentication.some((method) => method._tag === request.authentication))
+      if (
+        !declaration.authentication.some(
+          ConnectionImplementation.Authentication.isAnyOf([request.authentication]),
+        )
+      )
         return yield* new UnsupportedAuthentication({
           implementationId: declaration.id,
           method: request.authentication,
@@ -290,7 +294,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         ConnectionPermissions.Manage,
       );
       const declaration = yield* requireImplementation(record.implementationId);
-      if (record.authentication._tag !== "ApiKey")
+      if (!Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication))
         return yield* new UnsupportedAuthentication({
           implementationId: declaration.id,
           method: record.authentication._tag,
@@ -326,7 +330,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     function* (connectionId: Connection.Id) {
       const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
       const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
-      if (record.authentication._tag !== "ApiKey")
+      if (!Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication))
         return yield* new UnsupportedAuthentication({
           implementationId: record.implementationId,
           method: record.authentication._tag,
@@ -349,7 +353,10 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     function* (connectionId: Connection.Id) {
       const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
       const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
-      if (record.authentication._tag === "ApiKey" && record.authentication.credentialId !== null)
+      if (
+        Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication) &&
+        record.authentication.credentialId !== null
+      )
         yield* connectionCredentialStore.remove(record.authentication.credentialId);
       yield* journal.publish(ConnectionFacts.Removed, { workspaceId, connectionId: id });
     },

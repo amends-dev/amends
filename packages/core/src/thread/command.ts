@@ -1,5 +1,7 @@
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { DateTime, PlatformError } from "effect";
+import { Identity } from "../identity/identity.ts";
+import { Notification } from "../notification/notification.ts";
+import { Context, Crypto, Effect, Layer, Option, Schema, Predicate } from "effect";
+import { type DateTime, type PlatformError } from "effect";
 import { Group } from "../group/group.ts";
 import type { Event } from "../journal/event.ts";
 import { Journal } from "../journal/journal.ts";
@@ -156,7 +158,7 @@ export class Service extends Context.Service<Service, Interface>()(
 ) {}
 /** The participant an author publishes as. */
 const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.Reference =>
-  author._tag === "Member"
+  ThreadMessage.Author.isAnyOf(["Member"])(author)
     ? { _tag: "Member", memberId: author.memberId }
     : { _tag: "Contact", contactId: author.contactId };
 /** @category constructors */
@@ -194,7 +196,8 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       ),
     );
     const joining = requested.flatMap((reference) =>
-      reference._tag === "Member" && !existing.has(ThreadParticipation.keyOf(reference))
+      ThreadParticipation.Reference.isAnyOf(["Member"])(reference) &&
+      !existing.has(ThreadParticipation.keyOf(reference))
         ? [reference.memberId]
         : [],
     );
@@ -208,7 +211,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
         continue;
       }
       let participant: ThreadParticipation.Participant;
-      if (reference._tag === "Member") {
+      if (ThreadParticipation.Reference.isAnyOf(["Member"])(reference)) {
         const candidate = candidates.get(reference.memberId);
         if (candidate === undefined)
           return yield* new Unavailable({ memberId: reference.memberId });
@@ -339,7 +342,9 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
           const writer = admitted.participants.find(
             (p) => ThreadParticipation.keyOf(p.participant) === author,
           )?.participant;
-          const byAgent = writer?._tag === "Member" && writer.identity._tag === "Agent";
+          const byAgent =
+            Predicate.isTagged(writer, "Member") &&
+            Identity.MemberReference.isAnyOf(["Agent"])(writer.identity);
           const recipients = admitted.participants
             .filter((p) => {
               if (ThreadParticipation.keyOf(p.participant) === author) return false;
@@ -354,7 +359,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
               return {
                 participationId: p.id,
                 recipient,
-                requestsWork: recipient._tag === "Agent" && !byAgent,
+                requestsWork: Notification.Recipient.isAnyOf(["Agent"])(recipient) && !byAgent,
               };
             });
           return {

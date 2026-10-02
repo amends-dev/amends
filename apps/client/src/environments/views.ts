@@ -12,7 +12,7 @@ import type {
   VariableIssue,
 } from "@amends/ui/screens/environments";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Effect, Option } from "effect";
+import { Cause, Effect, Option, Predicate } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useApiClient } from "../provider.tsx";
@@ -22,7 +22,7 @@ import {
   environmentsReads,
   newEnvironmentRequestKey,
   reloadEnvironments,
-  type Environment,
+  Environment,
   type EnvironmentCommand,
   type EnvironmentsReads,
 } from "./api.ts";
@@ -110,7 +110,9 @@ export function useEnvironmentList(workspaceId: string) {
       : Option.getOrUndefined(AsyncResult.value(read()))?.map((view) => ({
           id: view.id,
           name: view.name,
-          issues: view.readiness._tag === "Incomplete" ? view.readiness.issues : [],
+          issues: Environment.Readiness.isAnyOf(["Incomplete"])(view.readiness)
+            ? view.readiness.issues
+            : [],
         })),
   );
   return {
@@ -178,7 +180,7 @@ export function useEnvironments(
                 id: connection.id,
                 name: connection.name,
                 providerId: provider,
-                ready: connection.readiness.sandbox?._tag === "Ready",
+                ready: Predicate.isTagged(connection.readiness.sandbox, "Ready"),
               },
             ];
       }),
@@ -214,7 +216,9 @@ export function useEnvironments(
               commands: sandbox.setup,
               retention: sandbox.retention,
             },
-      issues: view.readiness._tag === "Incomplete" ? view.readiness.issues : [],
+      issues: Environment.Readiness.isAnyOf(["Incomplete"])(view.readiness)
+        ? view.readiness.issues
+        : [],
       manageable: view.manageable,
       createdBy: view.createdBy === null ? undefined : memberName(members.member(view.createdBy)),
       createdAt: toDate(view.createdAt),

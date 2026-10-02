@@ -50,7 +50,7 @@ import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
 import { Gateway, WorkspaceStorage } from "@amends/gateway";
-import { Clock, Context, DateTime, Effect, Layer, type Option, Schema } from "effect";
+import { Clock, Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -448,7 +448,7 @@ export const replacing = <Id, A, E>(
   getMany: (ids: ReadonlyArray<Id>) =>
     Effect.map(store.getMany(ids.filter((requested) => requested !== id)), (rows) =>
       ids.includes(id)
-        ? [...rows, ...(replacement._tag === "Some" ? [replacement.value] : [])]
+        ? [...rows, ...(Option.isSome(replacement) ? [replacement.value] : [])]
         : rows,
     ),
 });

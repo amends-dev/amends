@@ -1,7 +1,7 @@
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, Schema } from "effect";
 import { AssignmentFacts } from "../../src/authorization/assignment/facts.ts";
 import { AssignmentProjection } from "../../src/authorization/assignment/projection.ts";
 import { AssignmentStore } from "../../src/authorization/assignment/store.ts";
@@ -543,8 +543,8 @@ it.effect(
           expect(Option.map(direct, (a) => a.source)).toEqual(Option.some(directSource));
           if (
             Option.isNone(direct) ||
-            direct.value.source._tag !== "Direct" ||
-            direct.value.source.grant.scope._tag !== "Target"
+            !Assignment.Source.isAnyOf(["Direct"])(direct.value.source) ||
+            !Scope.Value.isAnyOf(["Target"])(direct.value.source.grant.scope)
           )
             throw new Error("Missing direct target");
           Reflect.set(direct.value.source.grant.scope.target, "workspaceId", foreign);
@@ -555,7 +555,7 @@ it.effect(
           for (const assignment of list) Reflect.set(assignment, "status", "revoked");
           const byRole = yield* assignmentStore.listActiveByRole(roleId);
           for (const assignment of byRole) {
-            if (assignment.source._tag === "Role")
+            if (Assignment.Source.isAnyOf(["Role"])(assignment.source))
               Reflect.set(assignment.source.scope, "workspaceId", foreign);
           }
           expect(Option.map(yield* roleStore.get(roleId), (r) => r.permissions)).toEqual(
@@ -611,13 +611,13 @@ it.effect(
           for (const operation of operations) {
             const closedError = yield* Effect.flip(operation.pipe(Effect.provide(expired)));
             expect(
-              closedError._tag === "RoleStore.Failure" ||
-                closedError._tag === "AssignmentStore.Failure",
+              Schema.is(RoleStore.Failure)(closedError) ||
+                Schema.is(AssignmentStore.Failure)(closedError),
             ).toBe(true);
             const foreignError = yield* Effect.flip(foreign.store.transaction(operation));
             expect(
-              foreignError._tag === "RoleStore.Failure" ||
-                foreignError._tag === "AssignmentStore.Failure",
+              Schema.is(RoleStore.Failure)(foreignError) ||
+                Schema.is(AssignmentStore.Failure)(foreignError),
             ).toBe(true);
           }
           expect((yield* fixture.snapshot).roles.size).toBe(0);

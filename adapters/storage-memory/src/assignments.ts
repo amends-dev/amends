@@ -35,7 +35,7 @@ export const make = Effect.fn("Assignments.make")(function* () {
         "listActiveByRole",
         (record) =>
           record.status === "active" &&
-          record.source._tag === "Role" &&
+          Assignment.Source.isAnyOf(["Role"])(record.source) &&
           record.source.roleId === roleId,
       ),
     insert: Effect.fn("Assignments.insert")(function* (input) {

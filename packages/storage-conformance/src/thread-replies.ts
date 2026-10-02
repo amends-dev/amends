@@ -75,7 +75,8 @@ export const threadReplies = (harness: Harness) => {
   describe.skipIf(!harness.available)(`${harness.name}: thread replies`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
-      if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+      if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
+        throw new Error("Expected a member participant");
       return record.participant;
     };
 

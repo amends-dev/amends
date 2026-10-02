@@ -13,7 +13,7 @@ import { Store } from "../journal/store.ts";
 
 import { Member } from "../workspace/member/member.ts";
 import { ChangeFeed } from "./change-feed.ts";
-import type { ChangeFeedEvents } from "./events.ts";
+import { ChangeFeedEvents } from "./events.ts";
 import { ChangeFeedSource } from "./source.ts";
 import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
@@ -139,7 +139,9 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
                   )
                 : Stream.empty;
             const removed = delivery.events.some(
-              (p) => p.access?._tag === "Removed" && p.access.memberId === actor.memberId,
+              (p) =>
+                ChangeFeedEvents.Access.$is("Removed")(p.access) &&
+                p.access.memberId === actor.memberId,
             );
             return removed
               ? message.pipe(Stream.concat(Stream.fail(new ChangeFeed.Unavailable({}))))

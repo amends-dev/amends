@@ -54,7 +54,7 @@ const until = Effect.fnUntraced(function* <E>(
 /** A feed's signals; any commit fails the test, since none is expected while it is read. */
 const signalsOf = <E>(next: Effect.Effect<ChangeFeed.Message, E>) =>
   Effect.flatMap(next, (message) =>
-    message._tag === "Signal"
+    ChangeFeed.Message.isAnyOf(["Signal"])(message)
       ? Effect.succeed(message.signal)
       : Effect.die(new Error(`Expected a signal, got ${message._tag}`)),
   );
@@ -208,7 +208,8 @@ export const signals = (harness: Harness) => {
             threadId,
             memberId: owner.memberId,
           });
-          if (typing._tag !== "Typing") return yield* Effect.die("Expected typing");
+          if (!Signal.Value.isAnyOf(["Typing"])(typing))
+            return yield* Effect.die("Expected typing");
           expect(DateTime.isGreaterThan(typing.until, before)).toBe(true);
           // Outside the group, or without permission to read the thread, it never arrives.
           for (const [actor, next] of [

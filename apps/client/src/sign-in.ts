@@ -20,7 +20,7 @@ export type SignInState = Data.TaggedEnum<{
     readonly resent: boolean;
   };
 }>;
-const SignInState = Data.taggedEnum<SignInState>();
+export const SignInState = Data.taggedEnum<SignInState>();
 
 export interface SignInController {
   readonly state: Accessor<SignInState>;
@@ -63,9 +63,7 @@ export function useSignIn(): SignInController {
   /** The step, when it is `tag` and nothing runs. */
   const idle = <Tag extends SignInState["_tag"]>(tag: Tag) => {
     const current = state();
-    return current._tag === tag && !current.pending
-      ? (current as Extract<SignInState, { _tag: Tag }>)
-      : undefined;
+    return SignInState.$is(tag)(current) && !current.pending ? current : undefined;
   };
   const askForCode = (email: string, resent: boolean) =>
     setState(SignInState.Code({ email, code: "", pending: undefined, error: undefined, resent }));

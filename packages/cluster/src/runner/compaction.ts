@@ -4,7 +4,7 @@
  * so a long conversation keeps what matters within its budget without leaving anything out.
  */
 import { TurnLog } from "@amends/core/turn";
-import { HarnessErrors, type Transcript } from "@amends/harness";
+import { HarnessErrors, Transcript } from "@amends/harness";
 import { Duration, Effect, Result, Schema } from "effect";
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai";
 
@@ -50,31 +50,32 @@ Rules:
 - Do not mention that this is a summary.`;
 
 /** One entry of a transcript as text the summarizer reads: who said what, and what the agent did. */
-const renderItem = (item: Transcript.Item): string => {
-  switch (item._tag) {
-    case "Input": {
+const renderItem = (item: Transcript.Item): string =>
+  Transcript.Item.match(item, {
+    Input: (item) => {
       const text = item.content.map((part) => part.text).join("\n");
       return item.author.id === TurnLog.checkpointAuthor.id
         ? `<prior-summary>\n${text}\n</prior-summary>`
         : `${item.author.name}: ${text}`;
-    }
-    case "Response":
+    },
+    Response: (item) => {
       return item.parts
         .flatMap((part) =>
-          part._tag === "Text"
+          Transcript.ResponsePart.isAnyOf(["Text"])(part)
             ? [`You: ${part.text}`]
-            : part._tag === "ToolCall"
+            : Transcript.ResponsePart.isAnyOf(["ToolCall"])(part)
               ? [`You called ${part.name} with ${JSON.stringify(part.params)}`]
               : [],
         )
         .join("\n");
-    case "ToolResult":
+    },
+    ToolResult: (item) => {
       return `${item.name} ${item.isError ? "failed" : "returned"}: ${[
         ...item.content.map((part) => part.text),
         ...(item.structured === undefined ? [] : [JSON.stringify(item.structured)]),
       ].join("\n")}`;
-  }
-};
+    },
+  });
 
 /**
  * The transcript's text in passes of at most `size` characters, oldest first, breaking between

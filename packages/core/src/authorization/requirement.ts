@@ -12,7 +12,7 @@ export const Value = Schema.Struct({
   target: Target.Reference,
 }).check(
   Schema.makeFilter(({ permission, target }) =>
-    permission.targetKind === target._tag
+    Target.Reference.isAnyOf([permission.targetKind])(target)
       ? undefined
       : {
           path: ["target"],

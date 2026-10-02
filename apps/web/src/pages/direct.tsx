@@ -1,3 +1,4 @@
+import { Predicate } from "effect";
 import {
   paths,
   useDirectMessage,
@@ -63,7 +64,7 @@ function Draft(props: { readonly memberIds: ReadonlyArray<string> }) {
         mentionCandidates={props.memberIds.map((id) => ({
           id,
           name: people.name(id),
-          agent: people.member(id)?.identity._tag === "Agent",
+          agent: Predicate.isTagged(people.member(id)?.identity, "Agent"),
         }))}
       />
     </GroupPane>

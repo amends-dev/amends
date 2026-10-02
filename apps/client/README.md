@@ -70,8 +70,12 @@ completes it. `revision` counts refreshes, so rename drafts rebase on the name n
 `refreshResult(atom)` refreshes a read from inside an operation and waits for the result that
 refresh produces. `workspaceFailure(cause)` classifies a failure as `changed`, `denied`, `gone`,
 `invalid`, or `failed`, from a map keyed by every failure the contract reports, so a new one fails
-to compile until it is placed. Readers' inputs decode through `command(schema)`, which reports a
-mismatch as `invalid` before any request.
+to compile until it is placed. A schema derived from those keys checks that the error's tag is a
+recognized string; it does not validate the rest of the error payload. The first recognized
+failure in a cause wins, including one mapped to `failed`. Unrecognized failures, defects, and
+interruptions are skipped; without a recognized failure, the result is `failed`.
+Readers' inputs decode through `command(schema)`, which reports a mismatch as `invalid` before
+any request.
 
 ## Session
 
@@ -102,6 +106,11 @@ Only the modules in `api/` and each feature's `api.ts` import the HTTP contract 
 schemas. Client imports UI's types only, as a development dependency, and no UI code, icons,
 styling, router, Storybook, platform entry points, or backend implementations; UI imports no
 client code. `bun run check:packages` enforces both across source and manifests.
+
+Feature API modules also expose the existing schema helpers their views use to branch
+on decoded values. The client exports `DirectoryState`, `SignInState`, and
+`CreateWorkspaceState` as constructor bundles alongside their types, so app pages
+can use their `$is` guards without comparing `_tag` directly.
 
 ## Verification
 

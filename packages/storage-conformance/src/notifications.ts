@@ -812,7 +812,7 @@ export const notifications = (harness: Harness) => {
               bound.notifications.discardPendingForParticipation(participationId),
             );
             expect(yield* bound.notifications.listPendingByRecipient(agent, page)).toEqual(
-              kept.filter((note) => note.recipient._tag === "Agent"),
+              kept.filter((note) => Notification.Recipient.isAnyOf(["Agent"])(note.recipient)),
             );
           }),
         ),
@@ -882,8 +882,8 @@ export const notifications = (harness: Harness) => {
                   Group.Id.make("left"),
                 ),
               );
-              const [agentThere, agentElsewhere] = kept.filter(
-                (note) => note.recipient._tag === "Agent",
+              const [agentThere, agentElsewhere] = kept.filter((note) =>
+                Notification.Recipient.isAnyOf(["Agent"])(note.recipient),
               );
               expect(yield* bound.notifications.get(agentThere!.id)).toEqual(
                 Option.some(

@@ -242,7 +242,7 @@ export const threadReads = (harness: Harness) => {
                   return {
                     participationId: p.id,
                     recipient,
-                    requestsWork: recipient._tag === "Agent",
+                    requestsWork: Notification.Recipient.isAnyOf(["Agent"])(recipient),
                   };
                 });
               yield* journal.publish(ThreadActivityFacts.Recorded, {
@@ -1272,7 +1272,10 @@ export const threadReads = (harness: Harness) => {
             // With the first participant lapsed, filling a page reads on and stops at its limit.
             const everyone = yield* run(bound, owner, participants(second.thread.id));
             const lapsed = everyone[0];
-            if (lapsed === undefined || lapsed.participant._tag !== "Member")
+            if (
+              lapsed === undefined ||
+              !ThreadParticipation.Reference.isAnyOf(["Member"])(lapsed.participant)
+            )
               return yield* Effect.die("Expected a member first");
             const lapsedAdmission = Option.getOrThrow(
               yield* bound.groupMemberships.findActive(group.id, lapsed.participant.memberId),

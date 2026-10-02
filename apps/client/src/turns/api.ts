@@ -9,7 +9,7 @@ import { retryDelay } from "../live/api.ts";
 import { watchWake } from "../live/wake.ts";
 import { drafted, type Drafts } from "./drafts.ts";
 
-export type { Turn };
+export { Turn };
 
 /**
  * The workspace's active turns in threads the reader may open, for marks where agents are at work.
@@ -161,20 +161,19 @@ const run = Effect.fnUntraced(function* (
   let attempt = 0;
   const receive = (message: Turn.LogMessage) =>
     Effect.sync(() => {
-      switch (message._tag) {
-        case "Opened":
+      Turn.LogMessage.match(message, {
+        Opened: (message) => {
           attempt = 0;
           return set({ items: message.items, connection: "live", updatedAt: new Date() });
-        case "Changed":
-          return set({
+        },
+        Changed: (message) =>
+          set({
             items: changed(state.items ?? [], message.changes),
             updatedAt: new Date(),
-          });
-        case "Drafted":
-          return set({ drafts: drafted(state.drafts, { ...message, turnId }) });
-        case "Ended":
-          return set({ ended: true, drafts: new Map() });
-      }
+          }),
+        Drafted: (message) => set({ drafts: drafted(state.drafts, { ...message, turnId }) }),
+        Ended: () => set({ ended: true, drafts: new Map() }),
+      });
     });
   while (true) {
     yield* Queue.clear(wake);

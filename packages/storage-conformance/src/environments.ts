@@ -246,7 +246,8 @@ export const environments = (harness: ConformanceHarness) => {
               const keyed = yield* connect(workspace.id, (service) => service.get(account.id));
               const read = yield* as(workspace.id, alice, (service) => service.get(box.id));
               expect(read.readiness).toEqual(
-                keyed.authentication._tag === "ApiKey" && keyed.authentication.configured
+                Connection.View.fields.authentication.isAnyOf(["ApiKey"])(keyed.authentication) &&
+                  keyed.authentication.configured
                   ? { _tag: "Ready" }
                   : { _tag: "Incomplete", issues: ["connection-incomplete"] },
               );

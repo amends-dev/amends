@@ -6,7 +6,7 @@ import { WorkspaceInitialization } from "@amends/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 
-import { Context, Deferred, Effect, Fiber, Option } from "effect";
+import { Context, Deferred, Effect, Fiber, Option, Result } from "effect";
 
 import type { Harness } from "./harness.ts";
 import {
@@ -35,8 +35,8 @@ export const transactions = (harness: Harness) => {
               (creator) => initialized(bound, creator).pipe(Effect.result),
               { concurrency: "unbounded" },
             );
-            expect(results.filter((result) => result._tag === "Success")).toHaveLength(1);
-            expect(results.filter((result) => result._tag === "Failure")).toHaveLength(1);
+            expect(results.filter((result) => Result.isSuccess(result))).toHaveLength(1);
+            expect(results.filter((result) => Result.isFailure(result))).toHaveLength(1);
             const before = yield* bound.workspace.get;
             const log = yield* bound.store.read(journalLog, { limit: 10 });
             expect(yield* Effect.flip(initialized(bound, bob.id))).toMatchObject({

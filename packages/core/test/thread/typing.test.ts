@@ -144,7 +144,10 @@ it.effect("repeats within two seconds are dropped per thread, and later ones go 
       yield* TestClock.adjust("1 second");
       yield* typing("open");
       yield* typing("other");
-      expect(published.map((s) => s._tag === "Typing" && s.threadId)).toEqual(["open", "other"]);
+      expect(published.map((s) => Signal.Value.isAnyOf(["Typing"])(s) && s.threadId)).toEqual([
+        "open",
+        "other",
+      ]);
       yield* TestClock.adjust("1 second");
       yield* typing("open");
       expect(published).toHaveLength(3);

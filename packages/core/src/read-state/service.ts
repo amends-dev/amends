@@ -1,3 +1,4 @@
+import { Identity } from "../identity/identity.ts";
 import { Context, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
@@ -65,7 +66,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
   /** The acting person as a reader; agents keep no read state. */
   const requireHumanReader = Effect.fnUntraced(function* () {
     const actor = yield* Actor.Service;
-    if (actor.identity._tag !== "Human")
+    if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
       return yield* new HumanRequired({ memberId: actor.memberId });
     return Notification.ofMember(actor.memberId, actor.identity) satisfies ReadState.Reader;
   });

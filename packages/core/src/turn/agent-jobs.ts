@@ -1,3 +1,4 @@
+import { Notification } from "../notification/notification.ts";
 import { Context, Effect, Layer, Schema } from "effect";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
 import type { Event } from "../journal/event.ts";
@@ -60,7 +61,7 @@ const decodeMember = Schema.decodeUnknownSync(Schema.Struct({ memberId: MemberId
 const acceptRequestedWork = Effect.fnUntraced(function* (event: Event.Record) {
   const agentJobs = yield* Service;
   for (const { recipient, requestsWork } of decodeRecipients(event.payload).recipients)
-    if (requestsWork && recipient._tag === "Agent")
+    if (requestsWork && Notification.Recipient.isAnyOf(["Agent"])(recipient))
       yield* agentJobs.requestAcceptWork({
         workspaceId: event.provenance.workspaceId,
         memberId: recipient.memberId,

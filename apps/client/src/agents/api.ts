@@ -1,13 +1,19 @@
-import { Agent, ApiErrors, Connection, Workspace } from "@amends/api-http";
+import {
+  Agent,
+  ApiErrors,
+  Connection,
+  Workspace,
+  EnvironmentCompatibility,
+} from "@amends/api-http";
 import type { AgentIssue, AgentProblem } from "@amends/ui/screens/agents";
-import { Cause, Effect, Option, Schema } from "effect";
+import { Cause, Effect, Option, Schema, Match } from "effect";
 import type { Api, ApiClient } from "../api/client.ts";
 import { command } from "../api/failures.ts";
 import { workspaceKey } from "../api/keys.ts";
 import { refreshResult } from "../api/refresh.ts";
 import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 
-export type { Agent };
+export { Agent, EnvironmentCompatibility };
 
 const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
   const params = { workspaceId };
@@ -156,24 +162,18 @@ export const reloadAgents = (reads: AgentsReads) =>
   );
 
 /** An agent's readiness issue, or a compatibility reason, as a code the screens word. */
-export const issueCode = (issue: Agent.Issue): AgentIssue => {
-  switch (issue._tag) {
-    case "ConnectionNotReady":
-      return "connection-not-ready";
-    case "ConnectionUnavailable":
-      return "connection-unavailable";
-    case "EnvironmentUnavailable":
-      return "environment-unavailable";
-    case "EnvironmentNotReady":
-      return "environment-not-ready";
-    case "NoModelInference":
-      return "no-model-inference";
-    case "InterfaceUnsupported":
-      return "interface-unsupported";
-    case "ReasoningUnsupported":
-      return "reasoning-unsupported";
-  }
-};
+export const issueCode = (issue: Agent.Issue): AgentIssue =>
+  Match.value(issue).pipe(
+    Match.tagsExhaustive({
+      ConnectionNotReady: () => "connection-not-ready" as const,
+      ConnectionUnavailable: () => "connection-unavailable" as const,
+      EnvironmentUnavailable: () => "environment-unavailable" as const,
+      EnvironmentNotReady: () => "environment-not-ready" as const,
+      NoModelInference: () => "no-model-inference" as const,
+      InterfaceUnsupported: () => "interface-unsupported" as const,
+      ReasoningUnsupported: () => "reasoning-unsupported" as const,
+    }),
+  );
 /**
  * The problems a failed command names, in the order the host reported them: the connection or the
  * environment is no longer available to the reader, the environment cannot run the model access,
@@ -189,14 +189,7 @@ export const agentProblems = (cause: Cause.Cause<unknown>): ReadonlyArray<AgentP
       return [{ kind: "environment-unavailable" }];
     if (Schema.is(ApiErrors.AgentIncompatible)(error))
       return [{ kind: "incompatible", reasons: error.reasons.map(issueCode) }];
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      "_tag" in error &&
-      error._tag === "Delegation.Denied" &&
-      "reason" in error &&
-      error.reason === "administrator-role"
-    )
+    if (Schema.is(ApiErrors.DelegationDenied)(error) && error.reason === "administrator-role")
       return [{ kind: "role-denied" }];
     return [];
   });

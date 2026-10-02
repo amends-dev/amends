@@ -297,7 +297,8 @@ const listen = Effect.fnUntraced(function* (options?: ChangeFeed.WatchOptions) {
   return { next: Queue.take(queue), fiber, queue };
 });
 const committed = (message: ChangeFeed.Message) => {
-  if (message._tag !== "Committed") throw new Error(`Expected a commit, got ${message._tag}`);
+  if (!ChangeFeed.Message.isAnyOf(["Committed"])(message))
+    throw new Error(`Expected a commit, got ${message._tag}`);
   return message;
 };
 const signal = (value: Signal.Value) =>
@@ -322,7 +323,8 @@ const signalsUntil = Effect.fnUntraced(function* (
   const received: Array<Signal.Value> = [];
   for (;;) {
     const message = yield* next;
-    if (message._tag !== "Signal") throw new Error(`Expected a signal, got ${message._tag}`);
+    if (!ChangeFeed.Message.isAnyOf(["Signal"])(message))
+      throw new Error(`Expected a signal, got ${message._tag}`);
     if (sameSignal(message.signal, marker)) return received;
     received.push(message.signal);
   }

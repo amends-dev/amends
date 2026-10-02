@@ -25,7 +25,7 @@ const toRecord = ({ authorKind, authorMemberId, authorContactId, ...row }: Row) 
 const authorColumns = (
   author: ThreadMessage.Author,
 ): Pick<typeof threadMessages.$inferInsert, "authorKind" | "authorMemberId" | "authorContactId"> =>
-  author._tag === "Member"
+  ThreadMessage.Author.isAnyOf(["Member"])(author)
     ? { authorKind: "Member", authorMemberId: author.memberId, authorContactId: null }
     : { authorKind: "Contact", authorMemberId: null, authorContactId: author.contactId };
 const decodeRows = (rows: ReadonlyArray<Row>) =>

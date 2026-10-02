@@ -1,3 +1,4 @@
+import { Performer } from "../../src/identity/performer.ts";
 import { Subject } from "@amends/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Cause, Context, Crypto, DateTime, Deferred, Effect, Exit, Option, Schema } from "effect";
@@ -255,7 +256,7 @@ it.effect("publication owns nested attribution before projections and committed 
           .pipe(Effect.provideService(Publication.Service, provenance));
         expect(event.provenance).not.toBe(provenance);
         expect(Object.isFrozen(event.provenance)).toBe(true);
-        if (event.provenance.performedBy._tag === "System")
+        if (Performer.Reference.isAnyOf(["System"])(event.provenance.performedBy))
           return yield* Effect.die("Expected identity");
         expect(event.provenance.performedBy.identity).not.toBe(identity);
         expect(Object.isFrozen(event.provenance.performedBy.identity)).toBe(true);

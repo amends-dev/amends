@@ -170,13 +170,13 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
     if (details.recipientId !== recipient) return yield* new NotRecipient({ invitationId: id });
     // Repeated acceptance returns the original receipt, without restoring grants
     // or reactivating a membership that has since been removed.
-    if (state._tag === "Accepted") {
+    if (Invitation.State.isAnyOf(["Accepted"])(state)) {
       const member = yield* memberStore.get(state.memberId);
       if (Option.isNone(member))
         return yield* Effect.die("An accepted invitation's member is missing");
       return member.value;
     }
-    if (state._tag === "Revoked")
+    if (Invitation.State.isAnyOf(["Revoked"])(state))
       return yield* new Unavailable({ invitationId: id, reason: "revoked" });
     const acceptedAt = yield* DateTime.now;
     if (!DateTime.isGreaterThan(details.expiresAt, acceptedAt))
@@ -246,8 +246,8 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
       yield* authorization.require([manage]);
       const invitation = yield* requireInvitation(id);
       const actor = yield* authorizeInvitation(invitation.details);
-      if (invitation.state._tag === "Revoked") return invitation;
-      if (invitation.state._tag === "Accepted")
+      if (Invitation.State.isAnyOf(["Revoked"])(invitation.state)) return invitation;
+      if (Invitation.State.isAnyOf(["Accepted"])(invitation.state))
         return yield* new Unavailable({ invitationId: id, reason: "accepted" });
       const state = Invitation.State.cases.Revoked.make({
         revokedBy: actor.memberId,

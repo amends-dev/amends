@@ -113,7 +113,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
       const own = participant.participant;
       if (
         participant.threadId !== thread.id ||
-        own._tag !== "Member" ||
+        !ThreadParticipation.Participant.isAnyOf(["Member"])(own) ||
         own.memberId !== actor.memberId
       )
         return yield* new NotFound(request);

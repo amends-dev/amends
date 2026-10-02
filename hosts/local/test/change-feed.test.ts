@@ -70,7 +70,8 @@ const listen = (
       Scope.provide(scope),
     );
     const ready = yield* Queue.take(queue);
-    if (ready._tag !== "Ready") return yield* Effect.die("Expected Ready first");
+    if (!ChangeFeed.Message.isAnyOf(["Ready"])(ready))
+      return yield* Effect.die("Expected Ready first");
     expect(ready).toMatchObject({ workspaceId, reset: after === undefined });
     return { ready, next: Queue.take(queue), close: Scope.close(scope, Exit.void) };
   });
@@ -106,7 +107,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const invitation = yield* issue(workspace.id);
           const received = yield* first.next;
           expect(yield* second.next).toEqual(received);
-          if (received._tag !== "Committed") return yield* Effect.die("Expected commit");
+          if (!ChangeFeed.Message.isAnyOf(["Committed"])(received))
+            return yield* Effect.die("Expected commit");
           expect(received.events).toHaveLength(1);
           expect(received.notifications).toEqual([]);
           const issued = received.events[0];
@@ -125,7 +127,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           });
           const accepted = yield* first.next;
           expect(yield* second.next).toEqual(accepted);
-          if (accepted._tag !== "Committed") return yield* Effect.die("Expected commit");
+          if (!ChangeFeed.Message.isAnyOf(["Committed"])(accepted))
+            return yield* Effect.die("Expected commit");
           expect(accepted.workspaceId).toBe(workspace.id);
           expect(accepted.events.map((event) => event.name)).toContain(MemberFacts.Added.name);
           expect(accepted.events.map((event) => event.name)).toContain(
@@ -155,7 +158,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(yield* resumed.next).toEqual(missedEvent);
           const reconnected = yield* listen(alice, workspace.id);
           expect(reconnected.ready.cursor).toBe(
-            missedEvent._tag === "Committed" ? missedEvent.cursor : null,
+            ChangeFeed.Message.isAnyOf(["Committed"])(missedEvent) ? missedEvent.cursor : null,
           );
           const after = yield* issue(workspace.id, "eve");
           const afterEvent = yield* reconnected.next;
@@ -173,10 +176,12 @@ describe.skipIf(!available)("PostgreSQL", () => {
             payload: {},
           });
           const joined = yield* second.next;
-          if (joined._tag !== "Committed") return yield* Effect.die("Expected commit");
+          if (!ChangeFeed.Message.isAnyOf(["Committed"])(joined))
+            return yield* Effect.die("Expected commit");
           expect(joined.events.map((event) => event.name)).toContain(InvitationFacts.Accepted.name);
           const seenByBob = yield* asBob.next;
-          if (seenByBob._tag !== "Committed") return yield* Effect.die("Expected commit");
+          if (!ChangeFeed.Message.isAnyOf(["Committed"])(seenByBob))
+            return yield* Effect.die("Expected commit");
           expect(seenByBob.cursor).toBe(joined.cursor);
           expect(seenByBob.events.map((event) => event.name).toSorted()).toEqual(
             joined.events

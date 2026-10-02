@@ -111,8 +111,8 @@ export const make = Effect.fn("AgentWork.make")(function* () {
       if (Option.isNone(found)) continue;
       const record = found.value;
       if (
-        record.state._tag === "Pending" &&
-        record.recipient._tag === "Agent" &&
+        Notification.State.isAnyOf(["Pending"])(record.state) &&
+        Notification.Recipient.isAnyOf(["Agent"])(record.recipient) &&
         record.recipient.memberId === agent.memberId &&
         record.thread?.threadId === threadId &&
         record.participationId !== undefined

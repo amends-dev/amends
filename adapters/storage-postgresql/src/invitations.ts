@@ -84,7 +84,10 @@ export const make = Effect.fn("Invitations.make")(function* () {
       const record = yield* validateRecord(input).pipe(
         Effect.mapError(storeConflict(InvitationStore, "insert")),
       );
-      if (record.details.workspaceId !== workspaceId || record.state._tag !== "Pending")
+      if (
+        record.details.workspaceId !== workspaceId ||
+        !Invitation.State.isAnyOf(["Pending"])(record.state)
+      )
         return yield* new InvitationStore.Conflict({
           operation: "insert",
           message: "Expected a pending invitation in this workspace",
@@ -115,7 +118,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
         db
           .update(invitations)
           .set(
-            state._tag === "Accepted"
+            Invitation.State.isAnyOf(["Accepted"])(state)
               ? {
                   state: "Accepted",
                   acceptedMemberId: state.memberId,

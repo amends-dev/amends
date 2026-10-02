@@ -1,3 +1,4 @@
+import { Environment as EnvironmentRuntime } from "@amends/environment";
 import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { Environment } from "@amends/core/environment";
@@ -9,8 +10,19 @@ import { Gateway, type GatewayErrors } from "@amends/gateway";
 import type { Harness, HarnessEvent, Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, DateTime, Deferred, Effect, Fiber, Layer, Queue, Schema, Stream } from "effect";
-import type { Cause } from "effect";
+import {
+  Crypto,
+  DateTime,
+  Deferred,
+  Effect,
+  Fiber,
+  Layer,
+  Queue,
+  Schema,
+  Stream,
+  Predicate,
+} from "effect";
+import { type Cause } from "effect";
 import { TestClock } from "effect/testing";
 import { AiError, LanguageModel, Model } from "effect/unstable/ai";
 import type { Prompt, Response } from "effect/unstable/ai";
@@ -160,9 +172,9 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     get: () => Effect.sync(() => state.turn),
     prepare: () =>
       Effect.sync((): TurnExecution.Preparation => {
-        if (!Turn.active(state.turn.status)) return { _tag: "Finished" };
-        if (state.turn.status === "cancelling") return { _tag: "Stopping" };
-        return { _tag: "Ready", plan: plan() };
+        if (!Turn.active(state.turn.status)) return TurnExecution.Preparation.Finished();
+        if (state.turn.status === "cancelling") return TurnExecution.Preparation.Stopping();
+        return TurnExecution.Preparation.Ready({ plan: plan() });
       }),
     start: (_, chosen) =>
       Effect.gen(function* () {
@@ -182,9 +194,10 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
       Effect.sync(() => {
         state.steps.push(`submitted ${batch.batchId}`);
         const found = state.log.find(
-          ({ entry }) => entry._tag === "Submitted" && entry.batchId === batch.batchId,
+          ({ entry }) =>
+            TurnLog.Entry.isAnyOf(["Submitted"])(entry) && entry.batchId === batch.batchId,
         )?.entry;
-        if (found?._tag === "Submitted") return found.items;
+        if (Predicate.isTagged(found, "Submitted")) return found.items;
         record({ _tag: "Submitted", turnId, ...batch });
         return batch.items;
       }),
@@ -193,7 +206,7 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         for (const event of events) {
           state.steps.push(`report ${event.event._tag}`);
           record(
-            event._tag === "Harness"
+            EnvironmentRuntime.Event.isAnyOf(["Harness"])(event)
               ? { _tag: "Harness", turnId, event: event.event }
               : { _tag: "Environment", turnId, event: event.event },
           );
@@ -221,14 +234,14 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         state.steps.push("close");
         if (state.turn.status === "cancelling") {
           change({ status: "cancelled" });
-          return { _tag: "Stopped" } as const;
+          return TurnExecution.Closing.Stopped();
         }
         yield* require(["running"]);
         if (incorporated() < state.turn.acceptedThroughSequence || state.unaccepted)
-          return { _tag: "InputPending" } as const;
+          return TurnExecution.Closing.InputPending();
         state.replies = TurnLog.read(state.log).replies.map((reply) => reply.text);
         change({ status: "completed" });
-        return { _tag: "Closed", messageIds: [] } as const;
+        return TurnExecution.Closing.Closed({ messageIds: [] });
       }),
     fail: (_, reason) =>
       Effect.gen(function* () {
@@ -395,7 +408,9 @@ describe("TurnRunner", () => {
         "ResponseFinished",
         "Idle",
       ]);
-      expect(state.log.find(({ entry }) => entry._tag === "Environment")?.entry).toMatchObject({
+      expect(
+        state.log.find(({ entry }) => TurnLog.Entry.isAnyOf(["Environment"])(entry))?.entry,
+      ).toMatchObject({
         event: { _tag: "Ready" },
       });
       expect(texts(prompts[0])).toEqual(["Be brief.", "Alice: What is the tide at noon?"]);

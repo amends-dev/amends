@@ -1,4 +1,4 @@
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema, Stream } from "effect";
+import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Schema, Stream } from "effect";
 import type { PlatformError, Scope } from "effect";
 import { AgentPermissions } from "../agent/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
@@ -11,7 +11,7 @@ import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
-import type { Signal } from "../signal/signal.ts";
+import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
 import { ThreadQuery } from "../thread/query.ts";
 import { ThreadId } from "../thread/id.ts";
@@ -278,7 +278,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
             return;
           }
           reader.add({ entry: entry.payload, at: entry.recordedAt, position: batch.position });
-          if (entry.payload._tag === "Ended") over = true;
+          if (TurnLog.Entry.isAnyOf(["Ended"])(entry.payload)) over = true;
         }
         after = batch.position;
         if (over) return;
@@ -320,30 +320,33 @@ export const make = Effect.fn("TurnService.make")(function* () {
       Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
     );
 
-    type Input =
-      | { readonly _tag: "Logged"; readonly batch: Log.Batch<TurnLog.Entry> }
-      | { readonly _tag: "Drafted"; readonly draft: Turn.LogMessage }
-      | { readonly _tag: "AccessChanged" };
+    type Input = Data.TaggedEnum<{
+      Logged: { readonly batch: Log.Batch<TurnLog.Entry> };
+      Drafted: { readonly draft: Turn.LogMessage };
+      AccessChanged: {};
+    }>;
+    const Input = Data.taggedEnum<Input>();
     const loggedInputs = Stream.suspend(() =>
       handle.tail(after === undefined ? { limit: logPage } : { after, limit: logPage }),
     ).pipe(
-      Stream.map((batch): Input => ({ _tag: "Logged", batch })),
+      Stream.map((batch): Input => Input.Logged({ batch })),
       Stream.mapError(toLogUnavailable),
     );
     const draftedInputs = live.pipe(
       Stream.filter(
         (signal): signal is Extract<Signal.Value, { readonly _tag: "TurnDraft" }> =>
-          signal._tag === "TurnDraft" && signal.turnId === turn.id,
+          Signal.Value.isAnyOf(["TurnDraft"])(signal) && signal.turnId === turn.id,
       ),
-      Stream.map((signal): Input => ({
-        _tag: "Drafted",
-        draft: Turn.LogMessage.cases.Drafted.make({
-          responseId: signal.responseId,
-          part: signal.part,
-          offset: signal.offset,
-          text: signal.text,
+      Stream.map((signal): Input =>
+        Input.Drafted({
+          draft: Turn.LogMessage.cases.Drafted.make({
+            responseId: signal.responseId,
+            part: signal.part,
+            offset: signal.offset,
+            text: signal.text,
+          }),
         }),
-      })),
+      ),
     );
     // Commits that change the reader's groups or grants, or everyone's, as a role's permissions do.
     const accessChangedInputs = committed.deliveries.pipe(
@@ -354,7 +357,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
             (access.memberId === undefined || access.memberId === actor.memberId),
         ),
       ),
-      Stream.map((): Input => ({ _tag: "AccessChanged" })),
+      Stream.map((): Input => Input.AccessChanged()),
       Stream.mapError(toLogUnavailable),
     );
     /**
@@ -363,22 +366,19 @@ export const make = Effect.fn("TurnService.make")(function* () {
      */
     const messagesFor = (
       input: Input,
-    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> => {
-      switch (input._tag) {
-        case "Drafted":
-          return Effect.succeed([input.draft]);
-        case "AccessChanged":
-          return Effect.as(checkStillReadable, []);
-        case "Logged":
-          return checkStillReadable.pipe(
+    ): Effect.Effect<ReadonlyArray<Turn.LogMessage>, Turn.LogUnavailable> =>
+      Input.$match(input, {
+        Drafted: ({ draft }) => Effect.succeed([draft]),
+        AccessChanged: () => Effect.as(checkStillReadable, []),
+        Logged: ({ batch }) =>
+          checkStillReadable.pipe(
             Effect.map(() => {
-              takeEntries([input.batch]);
+              takeEntries([batch]);
               // The turn's end is in its log, committed with everything it wrote.
               return over ? [...changeMessages(), endedMessage] : changeMessages();
             }),
-          );
-      }
-    };
+          ),
+      });
     return Stream.make(openedMessage, ...draftsSoFar).pipe(
       Stream.concat(
         Stream.mergeAll([loggedInputs, draftedInputs, accessChangedInputs], {
@@ -386,7 +386,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
         }).pipe(
           Stream.mapEffect(messagesFor),
           Stream.flattenIterable,
-          Stream.takeUntil((message) => message._tag === "Ended"),
+          Stream.takeUntil(Turn.LogMessage.isAnyOf(["Ended"])),
         ),
       ),
     );

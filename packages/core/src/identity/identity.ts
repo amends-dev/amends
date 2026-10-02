@@ -27,6 +27,6 @@ export type Reference = typeof Reference.Type;
 
 /** A human or agent in person, across their memberships. */
 export const audienceOf = (identity: MemberReference): Audience.Scope =>
-  Audience.make(identity._tag === "Human" ? "human" : "agent", identity.id);
+  Audience.make(MemberReference.isAnyOf(["Human"])(identity) ? "human" : "agent", identity.id);
 
 export * as Identity from "./identity.ts";

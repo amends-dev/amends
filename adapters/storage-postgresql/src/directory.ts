@@ -1,4 +1,4 @@
-import type { Identity } from "@amends/core/identity";
+import { Identity } from "@amends/core/identity";
 import { Member, Workspace } from "@amends/core/workspace";
 import { WorkspaceDirectory } from "@amends/gateway";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
@@ -66,7 +66,8 @@ export const make = Effect.fn("PostgresDirectory.make")(function* () {
         ),
         Effect.orDie,
       );
-    if (identity._tag !== "Human") return { memberships, invitations: [] };
+    if (!Identity.MemberReference.isAnyOf(["Human"])(identity))
+      return { memberships, invitations: [] };
     const now = yield* DateTime.now;
     const pending = yield* Invitations.select(
       db,

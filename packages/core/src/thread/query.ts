@@ -145,7 +145,9 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   const keepCurrent = Effect.fnUntraced(function* (
     rows: ReadonlyArray<ThreadParticipation.Record>,
   ) {
-    const joined = rows.flatMap((p) => (p.participant._tag === "Member" ? [p.participant] : []));
+    const joined = rows.flatMap((p) =>
+      ThreadParticipation.Participant.isAnyOf(["Member"])(p.participant) ? [p.participant] : [],
+    );
     const admissions = new Map(
       (yield* groupMembershipStore.getMany(joined.map((p) => p.groupMembershipId))).map(
         (admission) => [admission.id, admission] as const,
@@ -154,7 +156,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const found = yield* getMembersById(joined.map((p) => p.memberId));
     return rows.filter(
       (p) =>
-        p.participant._tag !== "Member" ||
+        !ThreadParticipation.Participant.isAnyOf(["Member"])(p.participant) ||
         (admissions.get(p.participant.groupMembershipId)?.status === "active" &&
           found.get(p.participant.memberId)?.status === "active"),
     );

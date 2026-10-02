@@ -1,4 +1,4 @@
-import { Thread, ThreadStore } from "@amends/core/thread";
+import { Thread, ThreadStore, ThreadMessage } from "@amends/core/thread";
 import { Group } from "@amends/core/group";
 import { Store } from "@amends/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -33,7 +33,7 @@ const creatorColumns = (
   typeof threads.$inferInsert,
   "createdByKind" | "createdByMemberId" | "createdByContactId"
 > =>
-  creator._tag === "Member"
+  ThreadMessage.Author.isAnyOf(["Member"])(creator)
     ? { createdByKind: "Member", createdByMemberId: creator.memberId, createdByContactId: null }
     : { createdByKind: "Contact", createdByMemberId: null, createdByContactId: creator.contactId };
 const decodeLatest = Schema.decodeUnknownEffect(

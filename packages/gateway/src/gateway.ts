@@ -11,9 +11,8 @@ import {
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
 import type { AgentJobs, TurnJobs } from "@amends/core/turn";
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { Cause } from "effect";
-import type { Scope } from "effect";
+import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "effect";
+import { type Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
@@ -78,8 +77,8 @@ const isStaleError = (error: unknown): boolean => isBehind(error) || isUnregiste
 const isStaleCause = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
     (reason) =>
-      (reason._tag === "Fail" && isStaleError(reason.error)) ||
-      (reason._tag === "Die" && isStaleError(reason.defect)),
+      (Cause.isFailReason(reason) && isStaleError(reason.error)) ||
+      (Cause.isDieReason(reason) && isStaleError(reason.defect)),
   );
 
 /**
@@ -125,6 +124,14 @@ const toPublicErrors = <A, E, R>(
   });
 
 export type Options = WorkspaceRuntime.Options;
+
+/** Whether membership is known, refused, or must be resolved after preparation. */
+type Admission = Data.TaggedEnum<{
+  Member: { readonly member: Member.Record };
+  Refused: {};
+  Prepare: {};
+}>;
+const Admission = Data.taggedEnum<Admission>();
 
 /**
  * Construct one gateway and its workspace runtimes in the host scope. Identities come
@@ -176,13 +183,13 @@ export const make = Effect.fn("Gateway.make")(function* (
     const membership = yield* Effect.orDie(
       Context.get(bindings, MemberStore.Service).findActive(identity),
     );
-    if (Option.isSome(membership)) return { _tag: "Member", member: membership.value } as const;
+    if (Option.isSome(membership)) return Admission.Member({ member: membership.value });
     const live = yield* Effect.orDie(
       Context.get(bindings, Checkpoint.Service).listLive(Core.journalLog),
     );
-    if (live.length > 0) return { _tag: "Refused" } as const;
+    if (live.length > 0) return Admission.Refused();
     const head = yield* Effect.orDie(Context.get(bindings, Store.Service).head(Core.journalLog));
-    return Option.isNone(head) ? ({ _tag: "Refused" } as const) : ({ _tag: "Prepare" } as const);
+    return Option.isNone(head) ? Admission.Refused() : Admission.Prepare();
   });
 
   /**
@@ -196,7 +203,7 @@ export const make = Effect.fn("Gateway.make")(function* (
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
   ) {
-    if (yield* runtimes.isPrepared(workspaceId)) return { _tag: "Prepare" } as const;
+    if (yield* runtimes.isPrepared(workspaceId)) return Admission.Prepare();
     return yield* findMembershipInStorage(workspaceId, identity).pipe(
       Effect.setContext(hostContext),
     );
@@ -301,9 +308,11 @@ export const make = Effect.fn("Gateway.make")(function* (
   ) {
     const operation: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope> = program;
     const admission = yield* checkAdmission(workspaceId, identity);
-    if (admission._tag === "Refused") return yield* new GatewayErrors.NotMember({ workspaceId });
-    const admittedMember =
-      admission._tag === "Member" ? Option.some(admission.member) : Option.none<Member.Record>();
+    if (Admission.$is("Refused")(admission))
+      return yield* new GatewayErrors.NotMember({ workspaceId });
+    const admittedMember = Admission.$is("Member")(admission)
+      ? Option.some(admission.member)
+      : Option.none<Member.Record>();
     return yield* runInWorkspace(
       workspaceId,
       withActor(workspaceId, identity, operation, admittedMember),

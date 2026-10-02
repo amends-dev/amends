@@ -47,7 +47,8 @@ const listen = <E, R>(
     return Queue.take(queue).pipe(Effect.timeout("10 seconds"));
   });
 const committed = (message: ChangeFeed.Message) => {
-  if (message._tag !== "Committed") throw new Error(`Expected a commit, got ${message._tag}`);
+  if (!ChangeFeed.Message.isAnyOf(["Committed"])(message))
+    throw new Error(`Expected a commit, got ${message._tag}`);
   return message;
 };
 const watch = (options?: ChangeFeed.WatchOptions) =>
@@ -121,7 +122,7 @@ export const changeFeed = (harness: Harness) => {
           );
           const fromOwn = committed(yield* next);
           expect(Number(fromOwn.cursor)).toBeGreaterThan(Number(fromOther.cursor));
-          if (ready._tag !== "Ready" || ready.cursor === null)
+          if (!ChangeFeed.Message.isAnyOf(["Ready"])(ready) || ready.cursor === null)
             return yield* Effect.die("Expected a cursor at the initialized workspace");
           expect(Number(fromOther.cursor)).toBeGreaterThan(Number(ready.cursor));
         }),

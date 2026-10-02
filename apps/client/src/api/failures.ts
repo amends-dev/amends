@@ -1,4 +1,4 @@
-import { Cause, Effect, Schema } from "effect";
+import { Cause, Effect, Record, Schema } from "effect";
 import type { ApiClient } from "./client.ts";
 
 /**
@@ -150,14 +150,16 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   // A response that fails its schema; readers' inputs fail as Client.InvalidCommand instead.
   SchemaError: "failed",
 };
-const isFailure = (error: unknown): error is { readonly _tag: keyof typeof failures } =>
-  typeof error === "object" &&
-  error !== null &&
-  "_tag" in error &&
-  Object.hasOwn(failures, error._tag as string);
-/** Classify an operation's cause; transport failures, malformed responses, and defects fail. */
+const hasKnownFailureTag = Schema.is(
+  Schema.Struct({ _tag: Schema.Literals(Record.keys(failures)) }),
+);
+/**
+ * Classify the first failure with a recognized tag, including tags mapped to `failed`.
+ * Unknown failures, defects, and interruptions are skipped; no recognized failure means `failed`.
+ */
 export const workspaceFailure = (cause: Cause.Cause<unknown>): WorkspaceFailure => {
   for (const reason of cause.reasons)
-    if (Cause.isFailReason(reason) && isFailure(reason.error)) return failures[reason.error._tag];
+    if (Cause.isFailReason(reason) && hasKnownFailureTag(reason.error))
+      return failures[reason.error._tag];
   return "failed";
 };

@@ -1,5 +1,12 @@
-import { Api, Authentication, ConnectionImplementation, Environment } from "@amends/api-http";
-import type { ThreadTimeline, Turn } from "@amends/api-http";
+import {
+  Api,
+  Authentication,
+  ConnectionImplementation,
+  Environment,
+  type ThreadTimeline,
+  Turn,
+} from "@amends/api-http";
+
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
@@ -220,8 +227,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
           expect(messages.at(-1)?._tag).toBe("Ended");
           let items: Array<Turn.LogItem> = [];
           for (const message of messages)
-            if (message._tag === "Opened") items = [...message.items];
-            else if (message._tag === "Changed")
+            if (Turn.LogMessage.isAnyOf(["Opened"])(message)) items = [...message.items];
+            else if (Turn.LogMessage.isAnyOf(["Changed"])(message))
               for (const { index, item } of message.changes) items[index] = item;
           expect(items).toMatchObject([
             { _tag: "InputTaken", messages: 1 },

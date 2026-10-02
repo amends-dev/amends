@@ -60,7 +60,8 @@ const credentialOf = (bound: Support.Bound, connectionId: Connection.Id) =>
     .pipe(
       Effect.map((found) =>
         Option.flatMap(found, (record) =>
-          record.authentication._tag === "ApiKey" && record.authentication.credentialId !== null
+          Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication) &&
+          record.authentication.credentialId !== null
             ? Option.some(record.authentication.credentialId)
             : Option.none(),
         ),

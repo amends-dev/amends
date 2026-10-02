@@ -1,3 +1,4 @@
+import { Target } from "./target.ts";
 import { Schema } from "effect";
 import { Permission } from "./permission.ts";
 import type { Requirement } from "./requirement.ts";
@@ -25,7 +26,10 @@ export const makeSchema = (permission: Permission.Definition) => {
       if (name !== definition.name) {
         return { path: ["permission"], issue: `Expected permission ${definition.name}` };
       }
-      if (scope._tag === "Target" && scope.target._tag !== definition.targetKind) {
+      if (
+        Scope.Value.isAnyOf(["Target"])(scope) &&
+        !Target.Reference.isAnyOf([definition.targetKind])(scope.target)
+      ) {
         return {
           path: ["scope", "target"],
           issue: `Permission ${definition.name} requires a ${definition.targetKind} target`,

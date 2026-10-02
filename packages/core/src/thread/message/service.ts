@@ -1,3 +1,4 @@
+import { Identity } from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Requirement } from "../../authorization/requirement.ts";
@@ -105,7 +106,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
       const thread = yield* requirePublishable(request.threadId);
       const actor = yield* Actor.Service;
-      if (actor.identity._tag !== "Human")
+      if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const messageId = yield* deriveReplyId(options.requestKey);
       const retried = yield* findRetriedReply(options.requestKey, messageId);
@@ -135,18 +136,26 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         current.flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? []),
       );
       const joining = selected.flatMap((reference) =>
-        reference._tag === "Member" && !participating.has(reference.memberId)
+        ThreadParticipation.Reference.isAnyOf(["Member"])(reference) &&
+        !participating.has(reference.memberId)
           ? [reference.memberId]
           : [],
       );
       const eligible = yield* threadQuery.eligibleMembers(thread.groupId, joining);
       for (const reference of selected) {
-        if (reference._tag !== "Member" || participating.has(reference.memberId)) continue;
+        if (
+          !ThreadParticipation.Reference.isAnyOf(["Member"])(reference) ||
+          participating.has(reference.memberId)
+        )
+          continue;
         const entry = eligible.get(reference.memberId);
         if (entry === undefined)
           return yield* new ParticipantUnavailable({ memberId: reference.memberId });
         // Mentioning an agent directs it; replying where it already takes part does not.
-        if (entry.member.identity._tag === "Agent" && request.mentions.includes(reference.memberId))
+        if (
+          Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) &&
+          request.mentions.includes(reference.memberId)
+        )
           yield* authorization.require([
             Requirement.make(AgentPermissions.Use, {
               _tag: "Member",

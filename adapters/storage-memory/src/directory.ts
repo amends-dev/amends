@@ -1,5 +1,5 @@
-import type { Identity } from "@amends/core/identity";
-import { Member, Workspace } from "@amends/core/workspace";
+import { Identity } from "@amends/core/identity";
+import { Member, Workspace, Invitation } from "@amends/core/workspace";
 import { WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { MemoryConnection } from "./connection.ts";
@@ -33,16 +33,19 @@ export const make = Effect.fn("MemoryDirectory.make")(function* () {
       const activeMemberCount = all.filter((member) => member.status === "active").length;
       if (Option.isSome(workspace))
         for (const member of all.toSorted((left, right) => compareBinary(left.id, right.id)))
-          if (member.identity._tag === identity._tag && member.identity.id === identity.id)
+          if (
+            Identity.MemberReference.isAnyOf([identity._tag])(member.identity) &&
+            member.identity.id === identity.id
+          )
             memberships.push({ workspace: workspace.value, member, activeMemberCount });
-      if (identity._tag !== "Human") continue;
+      if (!Identity.MemberReference.isAnyOf(["Human"])(identity)) continue;
       const pending = yield* Invitations.rows.all(space.records.invitations);
       invitations.push(
         ...pending
           .filter(
             (invitation) =>
               invitation.details.recipientId === identity.id &&
-              invitation.state._tag === "Pending" &&
+              Invitation.State.isAnyOf(["Pending"])(invitation.state) &&
               DateTime.isGreaterThan(invitation.details.expiresAt, now),
           )
           .toSorted((left, right) => compareBinary(left.details.id, right.details.id))

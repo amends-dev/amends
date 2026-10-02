@@ -1,6 +1,7 @@
 import {
   Cause,
   Context,
+  Data,
   Duration,
   Effect,
   Exit,
@@ -87,9 +88,11 @@ interface Prepared extends Delivery {
   readonly unreadable: ReadonlyArray<Unreadable>;
 }
 
-type Item =
-  | { readonly _tag: "Delivery"; readonly sequence: bigint; readonly delivery: Prepared }
-  | { readonly _tag: "Stopped" };
+type Item = Data.TaggedEnum<{
+  Delivery: { readonly sequence: bigint; readonly delivery: Prepared };
+  Stopped: {};
+}>;
+const Item = Data.taggedEnum<Item>();
 
 interface Follower {
   readonly hub: PubSub.PubSub<Item>;
@@ -183,7 +186,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
           Effect.suspend(() => {
             state.sequence += 1n;
             state.position = Option.some(delivery.position);
-            return PubSub.publish(hub, { _tag: "Delivery", sequence: state.sequence, delivery });
+            return PubSub.publish(hub, Item.Delivery({ sequence: state.sequence, delivery }));
           }),
         ),
       ),
@@ -205,7 +208,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
         gate.withPermits(1)(
           Effect.suspend(() => {
             state.stopped = true;
-            return PubSub.publish(hub, { _tag: "Stopped" });
+            return PubSub.publish(hub, Item.Stopped());
           }),
         ),
       ),
@@ -265,7 +268,7 @@ export const make = Effect.fn("ChangeFeedSource.make")(function* (
     );
     const live = Stream.fromEffectRepeat(PubSub.take(subscription)).pipe(
       Stream.flatMap((item): Stream.Stream<Prepared, ChangeFeed.Unavailable> => {
-        if (item._tag === "Stopped") return Stream.fail(toUnavailable());
+        if (Item.$is("Stopped")(item)) return Stream.fail(toUnavailable());
         const lagged = item.sequence !== expected;
         expected = item.sequence + 1n;
         const current = Stream.suspend(() =>

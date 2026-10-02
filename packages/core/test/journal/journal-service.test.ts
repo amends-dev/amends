@@ -103,7 +103,7 @@ it.effect.each(["make", "layer"] as const)(
               onSuccess: () => undefined,
             }),
           );
-        if (error?._tag !== "Projection.Failure") throw new Error("Expected projection failure");
+        if (!Schema.is(Projection.Failure)(error)) throw new Error("Expected projection failure");
         expect(error.cause).toBe(rejection);
         expect(error.key.name).toBe("audit");
         expect(error.phase).toBe("apply");

@@ -1,4 +1,4 @@
-import { Effect, Option, Schema } from "effect";
+import { Data, Effect, Option, Schema } from "effect";
 import { AgentFacts } from "../agent/facts.ts";
 import { TurnFacts } from "../turn/facts.ts";
 import { AgentPermissions } from "../agent/permissions.ts";
@@ -42,10 +42,12 @@ import { ChangeFeed } from "./change-feed.ts";
  * How a fact changes what one reader may see: their group admissions, their grants (or anyone's,
  * without a member), or their workspace membership ending.
  */
-export type Access =
-  | { readonly _tag: "Groups"; readonly memberId: Member.Id }
-  | { readonly _tag: "Grants"; readonly memberId: Member.Id | undefined }
-  | { readonly _tag: "Removed"; readonly memberId: Member.Id };
+export type Access = Data.TaggedEnum<{
+  Groups: { readonly memberId: Member.Id };
+  Grants: { readonly memberId: Member.Id | undefined };
+  Removed: { readonly memberId: Member.Id };
+}>;
+export const Access = Data.taggedEnum<Access>();
 
 /** A notification the event created, for the reader holding its recipient's scope. */
 export interface Addressed {
@@ -181,7 +183,7 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(MemberFacts.Removed, {
     requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
-    access: ({ memberId }) => ({ _tag: "Removed", memberId }),
+    access: ({ memberId }) => Access.Removed({ memberId }),
   }),
   registerFact(MemberFacts.Renamed, {
     requirement: ({ memberId }, workspaceId) => readMemberRequirement(memberId, workspaceId),
@@ -199,17 +201,17 @@ const registry: ReadonlyArray<Registered> = [
   // Marks a built-in role revision; the renames and permission changes it made come with it.
   registerFact(RoleFacts.BuiltinsRevised),
   registerFact(RoleFacts.PermissionsChanged, {
-    access: () => ({ _tag: "Grants", memberId: undefined }),
+    access: () => Access.Grants({ memberId: undefined }),
   }),
   registerFact(AssignmentFacts.Created, {
     requirement: ({ memberId }, workspaceId) => readAccessRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
-    access: ({ memberId }) => ({ _tag: "Grants", memberId }),
+    access: ({ memberId }) => Access.Grants({ memberId }),
   }),
   registerFact(AssignmentFacts.Revoked, {
     requirement: ({ memberId }, workspaceId) => readAccessRequirement(memberId, workspaceId),
     concerns: ({ memberId }) => memberId,
-    access: ({ memberId }) => ({ _tag: "Grants", memberId }),
+    access: ({ memberId }) => Access.Grants({ memberId }),
   }),
   registerFact(GroupFacts.Created, {
     requirement: ({ id }, workspaceId) => readGroupRequirement(id, workspaceId),
@@ -219,11 +221,11 @@ const registry: ReadonlyArray<Registered> = [
   }),
   registerFact(GroupMembershipFacts.Added, {
     requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
-    access: ({ memberId }) => ({ _tag: "Groups", memberId }),
+    access: ({ memberId }) => Access.Groups({ memberId }),
   }),
   registerFact(GroupMembershipFacts.Removed, {
     requirement: ({ groupId }, workspaceId) => readGroupRequirement(groupId, workspaceId),
-    access: ({ memberId }) => ({ _tag: "Groups", memberId }),
+    access: ({ memberId }) => Access.Groups({ memberId }),
   }),
   // Connections reach those who may read them; no fact carries a secret.
   registerFact(ConnectionFacts.Created, {
@@ -311,7 +313,7 @@ const registry: ReadonlyArray<Registered> = [
       readThreadRequirement(activity.threadId, workspaceId),
     notifications: (event) =>
       event.payload.recipients.flatMap((selected) =>
-        selected.recipient._tag === "Human" || selected.recipient._tag === "Agent"
+        Notification.Recipient.isAnyOf(["Human", "Agent"])(selected.recipient)
           ? [
               {
                 scope: Member.audienceOf(selected.recipient.memberId),

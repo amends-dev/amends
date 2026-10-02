@@ -1,3 +1,4 @@
+import { Target } from "./target.ts";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
@@ -98,7 +99,7 @@ export const make = Effect.fn("Authorization.make")(function* (): Effect.fn.Retu
       yield* requireWorkspace(workspaceId, requirement.target.workspaceId);
       const permission = yield* permissionCatalog.get(requirement.permission.name);
       // Requirements name permissions as the catalog declares them; another target kind is a bug.
-      if (permission.targetKind !== requirement.target._tag)
+      if (!Target.Reference.isAnyOf([permission.targetKind])(requirement.target))
         return yield* Effect.die(
           `Permission ${permission.name} requires a ${permission.targetKind} target`,
         );

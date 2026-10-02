@@ -80,9 +80,9 @@ const toEncodedRecord = (row: NotificationRow) => ({
 
 /** A membership for people and agents, a contact, or triage. */
 const inboxOf = (recipient: Notification.Recipient) =>
-  recipient._tag === "Triage"
+  Notification.Recipient.isAnyOf(["Triage"])(recipient)
     ? ""
-    : recipient._tag === "Contact"
+    : Notification.Recipient.isAnyOf(["Contact"])(recipient)
       ? recipient.id
       : recipient.memberId;
 
@@ -169,14 +169,15 @@ export const make = Effect.fn("Notifications.make")(function* () {
           operation,
           message: "Expected a notification in this workspace",
         });
-      if (record.state._tag === "Seen" || record.state._tag === "Accepted")
+      if (Notification.State.isAnyOf(["Seen", "Accepted"])(record.state))
         return yield* new NotificationStore.Conflict({
           operation,
           message: "Seen and Accepted are recorded with markSeen and accept",
         });
       // A rebuild inserts notifications again; the Seen that outlived their rows comes back.
       const seenAt =
-        record.recipient._tag === "Human" && record.state._tag === "Pending"
+        Notification.Recipient.isAnyOf(["Human"])(record.recipient) &&
+        Notification.State.isAnyOf(["Pending"])(record.state)
           ? sql`(SELECT seen_at FROM notification_seen WHERE workspace_id = ${workspaceId} AND notification_id = ${record.id})`
           : null;
       rows.push({
@@ -188,13 +189,16 @@ export const make = Effect.fn("Notifications.make")(function* () {
         threadId: record.thread?.threadId ?? null,
         threadGroupId: record.thread?.groupId ?? null,
         threadSequence: record.thread?.sequence ?? null,
-        discardReason: record.state._tag === "Discarded" ? record.state.reason : null,
+        discardReason: Notification.State.isAnyOf(["Discarded"])(record.state)
+          ? record.state.reason
+          : null,
         recipientKind: record.recipient._tag,
-        recipientId: record.recipient._tag === "Triage" ? null : record.recipient.id,
-        recipientMemberId:
-          record.recipient._tag === "Human" || record.recipient._tag === "Agent"
-            ? record.recipient.memberId
-            : null,
+        recipientId: Notification.Recipient.isAnyOf(["Triage"])(record.recipient)
+          ? null
+          : record.recipient.id,
+        recipientMemberId: Notification.Recipient.isAnyOf(["Human", "Agent"])(record.recipient)
+          ? record.recipient.memberId
+          : null,
         recordedAt: DateTime.toDate(record.recordedAt),
         state:
           seenAt === null

@@ -151,7 +151,8 @@ it.effect("resolution expands role and direct assignments at their individual sc
     expect(
       grants.filter(
         (grant) =>
-          grant.permission === MemberPermissions.Read.name && grant.scope._tag === "Workspace",
+          grant.permission === MemberPermissions.Read.name &&
+          Scope.Value.isAnyOf(["Workspace"])(grant.scope),
       ),
     ).toHaveLength(2);
   }),

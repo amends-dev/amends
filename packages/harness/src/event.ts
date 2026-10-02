@@ -156,9 +156,14 @@ export const transcript = (
     }
     const answered = new Map(results.map((result) => [result.callId as string, result]));
     const kept = parts.filter(
-      (part) => part._tag !== "ToolCall" || answered.has(part.id) || started.has(part.id),
+      (part) =>
+        !Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) ||
+        answered.has(part.id) ||
+        started.has(part.id),
     );
-    const calls = kept.flatMap((part) => (part._tag === "ToolCall" ? [part] : []));
+    const calls = kept.flatMap((part) =>
+      Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) ? [part] : [],
+    );
     if (calls.length === 0 && !(last && options.unfinished === "keep")) return;
     items.push(
       { _tag: "Response", id, parts: kept },
@@ -167,40 +172,40 @@ export const transcript = (
   };
 
   for (const event of events) {
-    switch (event._tag) {
-      case "InputIncorporated":
+    Event.match(event, {
+      InputIncorporated: (event) => {
         close(false, false);
         items.push(...event.batch.items);
-        break;
-      case "BlockCompleted":
+      },
+      BlockCompleted: (event) => {
         if (current !== undefined && current.id !== event.responseId) close(false, false);
         current ??= { id: event.responseId, blocks: new Map(), results: [] };
         current.blocks.set(event.part, event.block);
-        break;
-      case "ResponseFinished":
+      },
+      ResponseFinished: (event) => {
         if (current !== undefined && current.id !== event.responseId) close(false, false);
         current ??= { id: event.responseId, blocks: new Map(), results: [] };
         close(true, true);
-        break;
-      case "ToolCallStarted":
+      },
+      ToolCallStarted: (event) => {
         started.add(event.callId);
-        break;
-      case "ToolCallCompleted": {
+      },
+      ToolCallCompleted: (event) => {
         const inCurrent =
           current !== undefined &&
           [...current.blocks.values()].some(
-            (part) => part._tag === "ToolCall" && part.id === event.result.callId,
+            (part) =>
+              Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) &&
+              part.id === event.result.callId,
           );
         if (current !== undefined && inCurrent) current.results.push(event.result);
         else items.push(event.result);
-        break;
-      }
-      case "TextDelta":
-      case "ReasoningDelta":
-      case "ContextFull":
-      case "Idle":
-        break;
-    }
+      },
+      TextDelta: () => undefined,
+      ReasoningDelta: () => undefined,
+      ContextFull: () => undefined,
+      Idle: () => undefined,
+    });
   }
   close(false, true);
   if (options.unfinished === "keep") {
@@ -214,6 +219,8 @@ export const transcript = (
 
 /** A response's text blocks, in order, as one text. */
 export const textOf = (parts: ReadonlyArray<Transcript.ResponsePart>): string =>
-  parts.flatMap((part) => (part._tag === "Text" ? [part.text] : [])).join("");
+  parts
+    .flatMap((part) => (Transcript.ResponsePart.isAnyOf(["Text"])(part) ? [part.text] : []))
+    .join("");
 
 export * as HarnessEvent from "./event.ts";
