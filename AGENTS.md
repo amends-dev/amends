@@ -126,6 +126,29 @@ Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.
 `bun run check:packages` checks shared-package dependency declarations.
 
+## Design and review
+
+Code is judged by how a newcomer reads it, not only by whether it works. Hold to these when
+writing code, and when asked whether code is well structured:
+
+- One word per concept in every layer: work a commit asks for and Cluster runs is a job, from
+  core to the cluster package. A second name for the same thing, or one name for two things, is a
+  defect to fix.
+- A layer, wrapper, or factory that only forwards is removed, not kept for symmetry with another.
+- Small or closely related code goes into an existing package as a module or folder. Add a
+  package only when dependency direction requires one, and say why.
+- A flow reads top to bottom. Long work is a loop over named steps, and a decision is a pure
+  function, separate from the code that performs it.
+- Names say what things do, as [Effect](#effect) describes; names a letter apart that do
+  different things, such as `expose` and `exposed`, are defects.
+- When something needs a paragraph or a vocabulary table to explain, change the code so it does
+  not.
+
+When reviewing, first sketch how the part would look if built today from what it does, then list
+how the current code differs. Walk its main flow as a newcomer and note every point that raises
+"why is this here?". Guides and patterns already in the repository describe what exists; they are
+not reasons to keep it.
+
 ## Documentation
 
 [docs/README.md](docs/README.md) indexes current guides, design intent, and historical
