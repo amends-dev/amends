@@ -3,7 +3,7 @@ import type * as Core from "@amends/core";
 import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
 import { Actor, Identity } from "@amends/core/identity";
 import { Member, Workspace } from "@amends/core/workspace";
-import { Credentials, Gateway, type GatewayErrors } from "@amends/gateway";
+import { SessionTokens, Gateway, type GatewayErrors } from "@amends/gateway";
 import { expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
 import type { Scope } from "effect";
@@ -38,7 +38,7 @@ const gateway = Layer.succeed(
     asMember: () => Effect.die("unused"),
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
-    runBackground: () => Effect.die("unused"),
+    runBackgroundProcess: () => Effect.die("unused"),
     executeTurns: () => Effect.die("unused"),
     asMemberScoped: <A, E>(
       _id: Workspace.Id,
@@ -48,12 +48,12 @@ const gateway = Layer.succeed(
       Effect.provide(
         Effect.provideService(program, Actor.Service, actor),
         failing,
-      ) as Effect.Effect<A, GatewayErrors.ExposedError<E> | GatewayErrors.NotMember, Scope.Scope>,
+      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>,
   }),
 );
 const credentials = Layer.succeed(
-  Credentials.Service,
-  Credentials.Service.of({ resolve: () => Effect.succeed(alice) }),
+  SessionTokens.Service,
+  SessionTokens.Service.of({ resolve: () => Effect.succeed(alice) }),
 );
 const client = HttpApiTest.groups(Api, ["changes"]).pipe(
   Effect.provide(

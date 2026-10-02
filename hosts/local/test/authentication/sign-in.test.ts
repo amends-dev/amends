@@ -1,15 +1,15 @@
 import { expect, it } from "@effect/vitest";
 import { Identity } from "@amends/core/identity";
-import { Credentials, SignIn } from "@amends/gateway";
+import { SessionTokens, SignIn } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Cause, Clock, Crypto, Deferred, Effect, Exit, Fiber, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";
 import { DevelopmentSignIn } from "../../src/authentication/sign-in.ts";
-import { DevelopmentCredentials } from "../../src/authentication/credentials.ts";
+import { DevelopmentSessionTokens } from "../../src/authentication/session-tokens.ts";
 import { DevelopmentAuthentication } from "../../src/authentication/authentication.ts";
 
 it.effect.each(["make", "layer"] as const)(
-  "sign-in %s issues usable credentials and enforces one-time codes and expiry",
+  "sign-in %s issues usable session tokens and enforces one-time codes and expiry",
   (construction) =>
     Effect.gen(function* () {
       const delivered = new Map<SignIn.Email, SignIn.Code>();
@@ -24,7 +24,7 @@ it.effect.each(["make", "layer"] as const)(
       };
       const program = Effect.gen(function* () {
         const signIn = yield* SignIn.Service;
-        const credentials = yield* Credentials.Service;
+        const sessionTokens = yield* SessionTokens.Service;
         const alice = SignIn.Email.make("alice@example.com");
         const bob = SignIn.Email.make("bob@example.com");
         expect(delivered.size).toBe(0);
@@ -40,7 +40,7 @@ it.effect.each(["make", "layer"] as const)(
         yield* TestClock.adjust("599999 millis");
         const session = yield* signIn.complete(alice, aliceCode);
         expect(session).toEqual({ token: alice, humanId: Identity.HumanId.make(alice) });
-        expect(yield* credentials.resolve(Redacted.make(session.token))).toEqual(
+        expect(yield* sessionTokens.resolve(Redacted.make(session.token))).toEqual(
           Identity.Reference.cases.Human.make({ id: session.humanId }),
         );
         expect(yield* Effect.flip(signIn.complete(alice, aliceCode))).toMatchObject({
@@ -57,8 +57,8 @@ it.effect.each(["make", "layer"] as const)(
           _tag: "SignIn.Rejected",
           reason: "unknown",
         });
-        expect(yield* Effect.flip(credentials.resolve(Redacted.make("")))).toMatchObject({
-          _tag: "Credentials.Rejected",
+        expect(yield* Effect.flip(sessionTokens.resolve(Redacted.make("")))).toMatchObject({
+          _tag: "SessionTokens.Rejected",
           reason: "malformed",
         });
       });
@@ -67,7 +67,7 @@ it.effect.each(["make", "layer"] as const)(
           ? Effect.flatMap(DevelopmentSignIn.make(deliver), (signIn) =>
               program.pipe(
                 Effect.provideService(SignIn.Service, signIn),
-                Effect.provideService(Credentials.Service, DevelopmentCredentials.make()),
+                Effect.provideService(SessionTokens.Service, DevelopmentSessionTokens.make()),
               ),
             )
           : program.pipe(Effect.provide(DevelopmentAuthentication.layer(deliver)));

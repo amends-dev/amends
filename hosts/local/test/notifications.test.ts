@@ -3,7 +3,7 @@ import { Identity } from "@amends/core/identity";
 import { Entry, Store } from "@amends/core/journal";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Member, MemberStore, Workspace } from "@amends/core/workspace";
-import { Credentials } from "@amends/gateway";
+import { SessionTokens } from "@amends/gateway";
 import { PostgresDatabase, PostgresStorage } from "@amends/storage-postgresql";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
@@ -25,7 +25,7 @@ const asToken = (token: string) =>
   );
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
 
-/** Real HTTP, gateway and storage; explicit credentials also exercise an agent principal. */
+/** Real HTTP, gateway and storage; explicit session tokens also exercise an agent principal. */
 const server = (url: string) => {
   const identities = new Map<string, Identity.MemberReference>([
     ["human", alice],
@@ -33,13 +33,13 @@ const server = (url: string) => {
     ["agent", agent],
     ["outsider", outsider],
   ]);
-  const credentials = Layer.succeed(
-    Credentials.Service,
-    Credentials.Service.of({
+  const sessionTokens = Layer.succeed(
+    SessionTokens.Service,
+    SessionTokens.Service.of({
       resolve: (token) => {
         const identity = identities.get(Redacted.value(token));
         return identity === undefined
-          ? Effect.fail(new Credentials.Rejected({ reason: "unknown" }))
+          ? Effect.fail(new SessionTokens.Rejected({ reason: "unknown" }))
           : Effect.succeed(identity);
       },
     }),
@@ -52,7 +52,7 @@ const server = (url: string) => {
       Layer.mergeAll(
         LocalHost.layer(Redacted.make(url)),
         DevelopmentSignIn.layer().pipe(Layer.provide(BunCrypto.layer)),
-        credentials,
+        sessionTokens,
       ),
     ),
     Layer.provideMerge(BunHttpServer.layerTest),

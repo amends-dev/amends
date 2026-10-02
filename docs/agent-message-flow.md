@@ -17,15 +17,15 @@ turn is one conversation with a model.
 
 ## The path
 
-| #   | Step                       | Runs in                                         | Commit               | Hands off through                                                                                       |
-| --- | -------------------------- | ----------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------- |
-| 1   | The person's request       | HTTP handler, then core                         | A                    | A pending notification for the agent, and a stored `Wake` for `turn.accept`, both written by commit A   |
-| 2   | `turn.accept` wakes        | Cluster entity `amends/WorkspaceProcess`        | none                 | `TurnCommand.acceptWork`, which reads the agent's pending notifications                                 |
-| 3   | The agent accepts the work | `TurnCommand.acceptWork`, as the agent          | B                    | A turn, the notifications settled as accepted, and a stored `Run` for the turn, all written by commit B |
-| 4   | The turn runs              | Cluster entity `amends/Turn`, then `TurnRunner` | C, then one per step | The turn's log, which every step reads its next move from                                               |
-| 5   | The turn closes            | `TurnExecution.close`                           | D                    | The reply message, `turn.completed`, and a stored `Wake` for `turn.accept`                              |
-| 6   | `turn.accept` runs again   | As step 2                                       | none                 | Nothing, usually: it finds no work left                                                                 |
-| 7   | Readers see each change    | Change feed, turn log stream, signals           | none                 | Client invalidation and the side panel's log                                                            |
+| #   | Step                       | Runs in                                      | Commit               | Hands off through                                                                                              |
+| --- | -------------------------- | -------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1   | The person's request       | HTTP handler, then core                      | A                    | A pending notification for the agent, and a background job request for `turn.accept`, both written by commit A |
+| 2   | `turn.accept` runs         | Background job `amends/BackgroundJob`        | none                 | `TurnCommand.acceptWork`, which reads the agent's pending notifications                                        |
+| 3   | The agent accepts the work | `TurnCommand.acceptWork`, as the agent       | B                    | A turn, the notifications settled as accepted, and a stored `Run` for the turn, all written by commit B        |
+| 4   | The turn runs              | Turn job `amends/TurnJob`, then `TurnRunner` | C, then one per step | The turn's log, which every step reads its next move from                                                      |
+| 5   | The turn closes            | `TurnExecution.close`                        | D                    | The reply message, `turn.completed`, and a background job request for `turn.accept`                            |
+| 6   | `turn.accept` runs again   | As step 2                                    | none                 | Nothing, usually: it finds no work left                                                                        |
+| 7   | Readers see each change    | Change feed, turn log stream, signals        | none                 | Client invalidation and the side panel's log                                                                   |
 
 Commits A to D are the commits that publish journal facts. Between C and D the runner also makes
 a commit for each step it records, described in [step 4](#4-the-turn-runs).
@@ -58,35 +58,38 @@ Publishing that fact does two things in the same transaction, in this order
   nothing. The thread, group, and activity read models update.
 - **Reactions** run after the projections ([journal](journal.md#reactions)). `turn.accept` is
   registered to wake on `thread.activity.recorded` when any recipient has `requestsWork`
-  (`BackgroundProcess.on` in `TurnCommand.acceptWorkProcess`), so the reaction asks the host's
-  `WorkspaceWakes` for a wake, once per process per commit. The host stores that wake as a
-  **persisted Cluster message** for the entity `amends/WorkspaceProcess`, keyed by workspace and
-  process name, with the primary key `commit:<commit id>`. The local host gives Cluster and the
-  workspace storage one SQL client, so the message is a row written in the commit's own
-  transaction ([gateway](../packages/gateway/README.md#background-work-on-effect-cluster)).
+  (`BackgroundProcess.on` in `TurnCommand.acceptWorkProcess`), so the reaction requests its
+  **background job** from the host's `BackgroundJobs`, naming the workspace the fact belongs to, once per process per commit. The
+  host stores that request as a **persisted Cluster message**, a `Run` for the entity
+  `amends/BackgroundJob`, keyed by workspace and process name, with the primary key
+  `commit:<commit id>`. The local host gives Cluster and the workspace storage one SQL client, so
+  the message is a row written in the commit's own transaction
+  ([cluster](../packages/cluster/README.md#background-jobs)).
 
-The wake is a reaction and not a projection because a projection also runs when a read model is
+The request is a reaction and not a projection because a projection also runs when a read model is
 rebuilt from the journal, and a rebuild must not ask for work again. A reaction runs only when a
 commit first publishes the fact. If commit A fails, none of it happened: no message, no
-notification, no wake. If it succeeds, the wake exists. The HTTP response returns here; the agent
+notification, no request. If it succeeds, the request exists. The HTTP response returns here; the agent
 has not started.
 
-## 2. `turn.accept` wakes
+## 2. `turn.accept` runs as a background job
 
-Cluster keeps an entity on one runner at a time and serves its messages one at a time. The
-runner that owns the `amends/WorkspaceProcess` entity for this workspace and `turn.accept` picks
-up the stored message when it next reads storage, every `pollInterval` (two seconds by default on
-the local host), and `ClusterBackground.layerWorker` handles it:
+Cluster keeps an entity on one runner at a time and serves its messages one at a time. Once
+commit A is done, its `afterCommit` has the local runner read storage, and the runner that owns
+the `amends/BackgroundJob` entity for this workspace and `turn.accept` picks up the stored
+request; `BackgroundJob.layerWorker` handles it. Without that read it would wait for the
+runner's next poll, every `pollInterval` (two seconds by default on the local host), since
+Cluster's own look, made as it stored the message, came before the commit could show it:
 
-1. `gateway.runBackground(workspaceId, "turn.accept")` leases the workspace's prepared runtime,
+1. `gateway.runBackgroundProcess(workspaceId, "turn.accept")` leases the workspace's prepared runtime,
    booting it if need be.
 2. `BackgroundRuns.run` runs the registered process once, as the system performer `turn.accept`.
    The process is `TurnCommand.acceptWork`.
 3. The worker then asks for the next run from what the process left outstanding: `Continue` runs
-   again at once, `At` at that time, `Idle` waits for the next wake.
+   again at once, `At` at that time, `Idle` waits for the next request.
 
-The wake carries no work. A process finds what is outstanding from stored records each time, so
-a late, repeated, or redelivered wake does no harm and a run after a restart is an ordinary run.
+The request carries no work. A process finds what is outstanding from stored records each time,
+so a late, repeated, or redelivered request does no harm and a run after a restart is an ordinary run.
 One entity per workspace and process means the process never runs against itself.
 
 ## 3. The agent accepts the work (commit B)
@@ -109,14 +112,14 @@ notifications as accepted into that turn in the same commit, so there is no stat
 exists and its notification is still pending, or the reverse. Several pending notifications on a
 thread join one turn.
 
-A second reaction, `TurnDispatch.reactions` on `turn.created` and `turn.retried`, asks the host's
-`WorkspaceTurns` to run the turn, which stores a persisted `Run` message for the entity
-`amends/Turn`, keyed by workspace and turn, in this same transaction.
+A second reaction, `TurnJobs.reactions` on `turn.created` and `turn.retried`, requests the turn's
+**turn job** from the host's `TurnJobs`, which stores a persisted `Run` message for the
+entity `amends/TurnJob`, keyed by workspace and turn, in this same transaction.
 
 ## 4. The turn runs
 
-`ClusterTurns.layerWorker` handles the `Run` message on the turn's entity and calls
-`TurnRunner.run` ([execution](../packages/execution/README.md)). Turns are separate entities, so
+`TurnJob.layerWorker` handles the `Run` message on the turn's entity and calls
+`TurnRunner.run` ([cluster](../packages/cluster/README.md#running-a-turn)). Turns are separate entities, so
 different turns run side by side while one turn runs once at a time.
 
 The runner never touches storage. Every step goes through `gateway.executeTurns` to
@@ -182,61 +185,62 @@ followed over its own stream.
 | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Another message while the turn works     | Steps 1 to 3 run again; `turn.input-accepted` extends the running turn, and `close` returns `InputPending` for what it has not taken in.                                                                         |
 | Stop                                     | `TurnService.cancel` publishes `turn.cancel-requested`. A queued turn ends at once; a running one is noticed by the runner, which checks every `checkInterval` (one second), and confirms with `confirmStopped`. |
-| Retry                                    | `TurnService.retry` publishes `turn.retried` for a new queued turn, and the dispatch reaction stores its `Run`.                                                                                                  |
+| Retry                                    | `TurnService.retry` publishes `turn.retried` for a new queued turn, and the turn job reaction stores its `Run`.                                                                                                  |
 | The agent leaves the thread or the group | `turn.stop-departed` wakes on the departure facts and stops the agent's active turns there.                                                                                                                      |
 | An agent posts a message                 | Its recipients are informational for agents, so nothing wakes another agent.                                                                                                                                     |
 
 ## Failure and recovery
 
-| Where                        | What happens                                                                                                                                                         |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Commit A fails               | Nothing is stored, including the wake.                                                                                                                               |
-| Wake stored, nothing running | It stays unhandled in Cluster's storage until a runner owns the shard and reads it.                                                                                  |
-| `turn.accept` run fails      | The worker asks for another run after a backoff that doubles from two seconds to five minutes. An unknown process is dropped after ten failed runs.                  |
-| Commit B fails               | No turn, notifications still pending, no `Run`; the next run accepts them.                                                                                           |
-| A turn's run fails           | The worker stores another `Run` after the same backoff; after eight failed runs it fails the turn (`abandon`), asking again with backoff until that is recorded.     |
-| A turn's run is cut short    | Cluster redelivers it; the runner continues from the log. Interruptions worth retrying count against `retries` (three) in the log, so a restart does not reset them. |
-| Model silent, context full   | The runner records the interruption, and retries or checkpoints; see [execution](../packages/execution/README.md#running-a-turn).                                    |
+| Where                           | What happens                                                                                                                                                         |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Commit A fails                  | Nothing is stored, including the request.                                                                                                                            |
+| Request stored, nothing running | It stays unhandled in Cluster's storage until a runner owns the shard and reads it.                                                                                  |
+| `turn.accept` run fails         | The worker asks for another run after a backoff that doubles from two seconds to five minutes. An unknown process is dropped after ten failed runs.                  |
+| Commit B fails                  | No turn, notifications still pending, no `Run`; the next run accepts them.                                                                                           |
+| A turn's run fails              | The worker stores another `Run` after the same delay; after eight failed runs it stores an `Abandon`, which fails the turn, asking again until that is recorded.     |
+| A turn's run is cut short       | Cluster redelivers it; the runner continues from the log. Interruptions worth retrying count against `retries` (three) in the log, so a restart does not reset them. |
+| Model silent, context full      | The runner records the interruption, and retries or checkpoints; see [cluster](../packages/cluster/README.md#running-a-turn).                                        |
 
 ## Timing
 
-Two runs of the local host, each asking an agent in a new thread with a scripted model that
-answers at once, one with the host's default `pollInterval` and one with the host test's 100 ms.
-Times are from the message being published:
+The local host with its default `pollInterval` of two seconds, asking an agent in a new thread
+four times with a scripted model that answers at once. Times are from the message being
+published, before and after the Cluster senders read storage again once their commit is done:
 
-| Step                       | `pollInterval` 100 ms | `pollInterval` 2 s (default) |
-| -------------------------- | --------------------- | ---------------------------- |
-| `turn.created` (commit B)  | 107 ms                | 1.76 s                       |
-| `turn.started` (commit C)  | 203 ms                | 3.78 s                       |
-| Reply published (commit D) | 280 ms                | 3.89 s                       |
+| Step                       | Before         | After        |
+| -------------------------- | -------------- | ------------ |
+| `turn.created` (commit B)  | 30 ms to 1.9 s | 36 to 59 ms  |
+| `turn.started` (commit C)  | 1.9 to 3.9 s   | 68 to 92 ms  |
+| Reply published (commit D) | 2.0 to 4.0 s   | 94 to 193 ms |
 
-In both runs the time before the reply was almost entirely the two Cluster hops, the wake and the
-turn's `Run`, and each took about one poll interval; the steps inside the runner took tens of
-milliseconds. Two measurements do not establish why: Cluster also notifies the runner when it
-stores a message, which the [gateway guide](../packages/gateway/README.md#background-work-on-effect-cluster)
-calls best effort. A real model adds its own time to step 4.
+Before, each Cluster hop, the background job's `Run` and the turn job's `Run`, usually took until the runner's next
+poll. Cluster notifies the runner as it stores a message, but inside the commit's transaction, so
+the runner's read, on another connection, came before the commit and found nothing; it found
+the message only when the commit happened to finish first. Now `afterCommit` has the runner read
+again once the commit is done, and the steps inside the runner take tens of milliseconds. A real
+model adds its own time to step 4.
 
 ## Words that mean several things
 
 | Word      | Meanings                                                                                                                                                                                                                                           |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | run       | `BackgroundRuns.run(name)`, a host running a registered process once; a process's `run` effect; `TurnCommand.acceptWork`, `turn.accept`'s body; the `Run` message that asks a turn's entity to run; `TurnRunner.run`, running one turn to its end. |
-| execution | `TurnExecution` in core, the interface the runner calls through the gateway; and the `@amends/execution` package, which holds `TurnRunner` and `ClusterTurns`.                                                                                     |
+| execution | `TurnExecution` in core, the interface the runner calls through the gateway. The runner itself is `TurnRunner`, in `@amends/cluster`.                                                                                                              |
 | process   | A `BackgroundProcess`: a workspace's sweep such as `turn.accept`. Not an operating system process, which other guides also call a process.                                                                                                         |
-| wake      | A stored request for a `BackgroundProcess` to run (`BackgroundWakes`, the Cluster `Wake` message).                                                                                                                                                 |
-| dispatch  | A stored request for one turn to run (`TurnDispatch`, the Cluster `Run` message).                                                                                                                                                                  |
-| reaction  | What a commit does when it first publishes a fact, such as storing a wake. Not replayed. Projections are the replayed ones.                                                                                                                        |
+| job       | Work outside any request that a commit asks for and Cluster runs: a background job runs a `BackgroundProcess` (`BackgroundJob`), a turn job runs one turn (`TurnJob`).                                                                             |
+| request   | What a commit stores to have a job do something: a `Run` for either kind, or a turn job's `Abandon`. Core asks through `BackgroundJobs` and `TurnJobs`.                                                                                            |
+| reaction  | What a commit does when it first publishes a fact, such as requesting a job. Not replayed. Projections are the replayed ones.                                                                                                                      |
 
-## The two Cluster entities
+## The two kinds of job
 
-|                  | `amends/WorkspaceProcess` (`ClusterBackground`, in gateway)      | `amends/Turn` (`ClusterTurns`, in execution)                                 |
-| ---------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| One entity per   | Workspace and process                                            | Workspace and turn                                                           |
-| Message          | `Wake`, keyed `commit:<id>` (and the time, for a later wake)     | `Run`, keyed `created`, or `retry:<n>`                                       |
-| Runs             | A sweep: never two at once per workspace and process             | A turn: turns in parallel, each once at a time                               |
-| After a run      | Schedules the next from `Idle`, `Continue`, or `At`              | Nothing, unless the run failed                                               |
-| A run that fails | Retries without limit, with backoff                              | Retries eight times, then fails the turn, retrying that until it is recorded |
-| Lives in         | Gateway, beside the `WorkspaceWakes` host contract it implements | Execution, since it needs `TurnRunner`, which gateway cannot depend on       |
+|                  | Background job: `BackgroundJob`, entity `amends/BackgroundJob`                     | Turn job: `TurnJob`, entity `amends/TurnJob`                                 |
+| ---------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| One job per      | Workspace and process                                                              | Workspace and turn                                                           |
+| Requests         | `Run`, keyed `commit:<id>` (and the time, for a later run)                         | `Run`, keyed `created` or `retry:<n>`; `Abandon`, keyed `abandon:<n>`        |
+| Runs             | A sweep: never two at once per workspace and process                               | A turn: turns in parallel, each once at a time                               |
+| After a run      | Schedules the next from `Idle`, `Continue`, or `At`                                | Nothing, unless the run failed                                               |
+| A run that fails | Retries without limit, after `JobRetry.delay`                                      | Retries eight times, then asks to `Abandon` the turn, until that is recorded |
+| Lives in         | `@amends/cluster` (`jobs/background-job.ts`), implementing core's `BackgroundJobs` | `@amends/cluster` (`jobs/turn-job.ts`), implementing core's `TurnJobs`       |
 
 ## Where to change things
 
@@ -248,8 +252,8 @@ calls best effort. A real model adds its own time to step 4.
 | Which facts run reactions                     | `reactions` given to `Journal.layer` in `core.ts`                                                            |
 | How a turn runs                               | `TurnRunner.run`, and the step it calls in `TurnExecution`                                                   |
 | How the reply is published, and the turn ends | `TurnExecution.close`, `TurnCommand.endTurn`                                                                 |
-| Retry, backoff, pruning of wakes and requests | `ClusterBackground`, `ClusterTurns`                                                                          |
-| What the host supplies                        | `LocalHost.layer`: `layerWakes`, `layerDispatch`, and the two workers                                        |
+| Retry, delay, pruning of job requests         | `BackgroundJob`, `TurnJob`, `JobRetry`, `JobPruning`                                                         |
+| What the host supplies                        | `LocalHost.layer`: each job's `layerRequests` and `layerWorker`, and `JobPruning.layer`                      |
 
 To find what reacts to a fact, find references to its constant, such as `ThreadActivityFacts.Recorded`:
 projections, reactions, the change feed, and `wakesOn` triggers all name it.
@@ -258,8 +262,9 @@ projections, reactions, the change feed, and `wakesOn` triggers all name it.
 
 - `hosts/local/test/turns.test.ts` runs the path over PostgreSQL and Cluster: the question, the
   reply, and the timeline's `turn.created`, `turn.started`, reply, `turn.ended`.
-- `hosts/local/test/background.test.ts` checks a wake is stored with its commit and not if the
+- `hosts/local/test/background.test.ts` checks a background job request is stored with its commit and not if the
   commit rolls back.
-- `packages/gateway/test/cluster-background.test.ts` covers wake dedupe, rescheduling, backoff,
-  dropping, and pruning.
-- `packages/execution/test/runner.test.ts` runs the runner over turn execution in memory.
+- `packages/cluster/test/jobs/background-job.test.ts` covers request dedupe, rescheduling, retry
+  delays, and dropping; `turn-job.test.ts` covers turn retries and abandoning; `pruning.test.ts`
+  covers pruning.
+- `packages/cluster/test/runner/runner.test.ts` runs the runner over turn execution in memory.

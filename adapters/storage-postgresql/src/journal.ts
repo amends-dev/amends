@@ -486,6 +486,7 @@ export const make = Effect.fn("Journal.make")(function* () {
       transaction(program, (session) => ({
         id: session.commit.id,
         append: (request) => guard(append(session, request), true),
+        afterCommit: (effect) => Binding.afterCommit(session, effect),
       })),
     append: Effect.fn("Journal.appendAlone")(function* (request) {
       if (Option.isSome(yield* Effect.serviceOption(Store.Transaction)))
@@ -499,6 +500,7 @@ export const make = Effect.fn("Journal.make")(function* () {
         (session) => ({
           id: session.commit.id,
           append: (input) => guard(append(session, input), true),
+          afterCommit: (effect) => Binding.afterCommit(session, effect),
         }),
         { log: request.logId },
       );

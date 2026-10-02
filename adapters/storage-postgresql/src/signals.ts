@@ -1,6 +1,6 @@
 import { Signal, Signals } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
-import { SignalHub } from "@amends/gateway";
+import { WorkspaceSignals } from "@amends/gateway";
 import { Effect, Layer, Option, Schema, Stream } from "effect";
 import { PostgresDatabase } from "./database.ts";
 
@@ -33,7 +33,7 @@ export const make = Effect.fn("PostgresSignals.make")(function* () {
         ),
       ),
     });
-  return SignalHub.Service.of({ forWorkspace });
+  return WorkspaceSignals.Service.of({ forWorkspace });
 });
 
 /**
@@ -41,6 +41,6 @@ export const make = Effect.fn("PostgresSignals.make")(function* () {
  *
  * @category layers
  */
-export const layer = Layer.effect(SignalHub.Service, make());
+export const layer = Layer.effect(WorkspaceSignals.Service, make());
 
 export * as PostgresSignals from "./signals.ts";

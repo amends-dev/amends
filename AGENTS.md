@@ -40,7 +40,7 @@ currently run through TypeScript. Check compatibility before changing this setup
   reads in one `query.ts` service; a command may read through the query, a query never
   writes, and a step with one caller stays a private function of that caller. `gateway` is how a host enters core: it bootstraps
   a workspace and resolves an authenticated identity into the actor, and it holds
-  the host contracts for storage, sign-in, credential resolution, and the workspace
+  the host contracts for storage, sign-in, session token resolution, and the workspace
   directory. `api-http` is the HTTP contract shared by servers and clients, and
   `server-http` implements it over the gateway, including its authentication. Another protocol adds its own contract and handler packages
   over the same gateway rather than new gateway methods. `storage-conformance` holds
@@ -53,9 +53,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
   `environment` composes a harness with an optional sandbox into a running environment.
-  `execution` runs agents' turns: it prepares each from core, spawns its environment with the
-  agent's model access, records what the harness reports, and closes it, each turn its own
-  Cluster entity; hosts pass in the harnesses and model code they install.
+  `cluster` runs jobs, the work outside requests, on Effect Cluster: a background job for each
+  workspace's background process and a turn job for each agent's turn, entities whose requests a
+  commit stores, with their retries and pruning. Its turn runner prepares each turn from core, spawns its environment with the
+  agent's model access, records what the harness reports, and closes it; hosts pass in the
+  harnesses and model code they install.
   `connection` is the contract connection implementations fulfil: the declaration a host
   registers in its catalog, and each capability's code, such as model inference.
 - `adapters/*`: implementations of gateway contracts over one external system, with
@@ -123,6 +125,29 @@ that UI component in its workshop before composing it into an app page.
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.
 `bun run check:packages` checks shared-package dependency declarations.
+
+## Design and review
+
+Code is judged by how a newcomer reads it, not only by whether it works. Hold to these when
+writing code, and when asked whether code is well structured:
+
+- One word per concept in every layer: work a commit asks for and Cluster runs is a job, from
+  core to the cluster package. A second name for the same thing, or one name for two things, is a
+  defect to fix.
+- A layer, wrapper, or factory that only forwards is removed, not kept for symmetry with another.
+- Small or closely related code goes into an existing package as a module or folder. Add a
+  package only when dependency direction requires one, and say why.
+- A flow reads top to bottom. Long work is a loop over named steps, and a decision is a pure
+  function, separate from the code that performs it.
+- Names say what things do, as [Effect](#effect) describes; names a letter apart that do
+  different things, such as `expose` and `exposed`, are defects.
+- When something needs a paragraph or a vocabulary table to explain, change the code so it does
+  not.
+
+When reviewing, first sketch how the part would look if built today from what it does, then list
+how the current code differs. Walk its main flow as a newcomer and note every point that raises
+"why is this here?". Guides and patterns already in the repository describe what exists; they are
+not reasons to keep it.
 
 ## Documentation
 

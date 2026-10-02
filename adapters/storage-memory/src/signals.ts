@@ -1,7 +1,7 @@
 import { Signals } from "@amends/core/signal";
 import type { Signal } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
-import { SignalHub } from "@amends/gateway";
+import { WorkspaceSignals } from "@amends/gateway";
 import { Effect, Layer, Queue, Stream } from "effect";
 import { MemoryDatabase } from "./database.ts";
 
@@ -37,7 +37,7 @@ export const make = Effect.fn("MemorySignals.make")(function* () {
         return Stream.fromQueue(queue);
       }),
     });
-  return SignalHub.Service.of({ forWorkspace });
+  return WorkspaceSignals.Service.of({ forWorkspace });
 });
 
 /**
@@ -45,6 +45,6 @@ export const make = Effect.fn("MemorySignals.make")(function* () {
  *
  * @category layers
  */
-export const layer = Layer.effect(SignalHub.Service, make());
+export const layer = Layer.effect(WorkspaceSignals.Service, make());
 
 export * as MemorySignals from "./signals.ts";

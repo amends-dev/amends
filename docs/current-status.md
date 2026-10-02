@@ -16,7 +16,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
-  local host [runs them](../packages/execution/README.md), each closing with the agent's reply.
+  local host [runs them](../packages/cluster/README.md), each closing with the agent's reply.
   Turns are conversation only: agents have no tools, and environments with a sandbox fail their
   turns. A turn posts every answer it completed when it closes, one message each, so an answer
   given before more input arrived is posted after that input; a turn that fails or is stopped
@@ -82,13 +82,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   turn to override, and no profile photos. Agents run only when their work arrives in a thread, and a removed agent's membership
   cannot be reactivated, as a person's cannot.
 - Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them on an Effect Cluster runner; `turn.accept` and `turn.stop-departed` are the
-  ones registered. Turns run
-  on the same runner, each as its own entity. Several host
+  local host runs them as background jobs on an Effect Cluster runner; `turn.accept` and
+  `turn.stop-departed` are the ones registered. Turns run on the same runner, each as its own
+  turn job. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
-  the takeover time, 35 seconds by default. Cluster's socket transport, which delivers wakes
-  between processes at once, is not authenticated and belongs on a private network. Wakes are not
-  coalesced: a burst of commits that each ask for a run runs the process once per commit.
+  the takeover time, 35 seconds by default. Cluster's socket transport, which delivers job requests
+  between processes at once, is not authenticated and belongs on a private network. Background job
+  requests are not coalesced: a burst of commits that each ask for a run runs the process once
+  per commit.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping

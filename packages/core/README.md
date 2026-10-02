@@ -28,7 +28,7 @@ The current domains contain these features:
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
 | `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
-| `background`    | Processes the domains run outside requests, the wakes commits ask for, and the runs hosts perform.               |
+| `background`    | Processes the domains run outside requests, the background jobs commits request, and the runs hosts perform.     |
 | `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
@@ -122,8 +122,9 @@ turn's runner or harness reports.
 
 A host binds the journal store to one workspace, and that binding is the only place a service
 learns which workspace it serves: services that need the workspace ID read it from `Store.Service`.
-Projection stores, signals, wakes, and turn dispatch are bound the same way and carry no ID of
-their own.
+Projection stores and signals are bound the same way and carry no ID of their own. Background and turn
+job requests name their workspace, taken from the fact that asks for them, since the host runs
+every workspace's jobs.
 
 ## Groups
 
@@ -365,12 +366,12 @@ posted, and why it failed or was stopped. Each carries what its item shows, so `
 resolves it without reading anything more. It informs no one and is not new activity; the replies
 are. A client folds a turn's items into one row at its `turn.created` position.
 
-The commit that creates or retries a turn asks `TurnDispatch` to run it, through a journal
+The commit that creates or retries a turn asks `TurnJobs` to run it, through a journal
 reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
-the turn. The gateway binds
-`TurnDispatch` to its host's `WorkspaceTurns`; [execution](../execution/README.md) runs harnesses
+the turn. The host supplies
+`TurnJobs`, and `TurnJobs.layerNoRunner` accepts requests and runs nothing; [cluster](../cluster/README.md) runs harnesses
 and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
-from a person's message through the wake, acceptance, and dispatch to the reply.
+from a person's message through its background job, acceptance, and turn job to the reply.
 
 `TurnService` lets a reader who may read a thread `get` and `listByThread` its turns, as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
@@ -412,7 +413,7 @@ sequence, so reading a thread settles exactly its notifications. See
 ## Identity and target boundaries
 
 `Identity.Reference` identifies a Human, Agent, or Contact. `Identity.MemberReference`
-is the Human/Agent subset used by members, actors, credential resolution, and the
+is the Human/Agent subset used by members, actors, session token resolution, and the
 gateway. External authors use `Performer.Reference.Identity` with a Contact;
 `Performer.Reference.Member` always carries a member identity. Attribution does
 not grant authority, and a contact identity does not select an external reply destination.
@@ -706,20 +707,21 @@ and registers it in `Core.processes`, as the turn domain registers `turn.accept`
 - `wakesOn` lists the facts whose publication asks for it to run, built with
   `BackgroundProcess.on(fact, when?)`, which can accept only some payloads.
 
-A commit that publishes such a fact asks for the process to run through `BackgroundWakes.Service`,
+A commit that publishes such a fact requests the process's background job through `BackgroundJobs.Service`,
 once per process per commit, in that same commit: the request is stored with the commit and
 discarded if it rolls back, and a request that cannot be stored fails the commit. This is a
 journal [reaction](../../docs/journal.md#reactions), so neither replay nor a retried publication
-that returns its original event asks again. `BackgroundWakes.Service` is a required host binding,
-bound to the workspace, which delivers each request to whichever process runs the workspace's
-background work.
+that returns its original event asks again. Each request names the workspace of the fact that
+asked for it. `BackgroundJobs.Service` is a required host service, shared by every workspace, which
+delivers each request to whatever runs background jobs; `BackgroundJobs.layerUnavailable` refuses
+them, for a host that runs none.
 
 `BackgroundRuns.Service` is how that process runs one: `run(name)` runs a registered process once,
 attributed to it as a `System` performer named after it, and returns its outcome. An unregistered
 name fails with `BackgroundRuns.Unknown`, a process's own failure with `BackgroundRuns.Failure`,
 and two processes sharing a name stop the workspace's core from starting. It is part of `Core.layer`
 but not of `Core.Operations`, since no actor runs it. The gateway runs it for hosts through
-[`runBackground`](../gateway/README.md#background-work-on-effect-cluster).
+[`runBackgroundProcess`](../cluster/README.md#background-jobs).
 
 ## Module dependencies and exports
 

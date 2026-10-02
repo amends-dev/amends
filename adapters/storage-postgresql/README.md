@@ -342,8 +342,8 @@ stay, however old, and so do other entity types'. Each statement removes at most
 messages, a thousand by default.
 
 `PostgresClusterStorage.backgroundStatus(options?)` reports the workspaces' background work from
-those tables: per process, the wakes due, scheduled, and retrying, when the longest-waiting due
-wake became due, and how many wakes were dropped; then the latest retries and drops, with their
+those tables: per background process, the job requests due, scheduled, and retrying, when the
+longest-waiting due request became due, and how many requests were dropped; then the latest retries and drops, with their
 workspaces. It reports nothing before any host has run background work over the database. It
 needs only a SQL client, such as `PostgresDatabase.layerClient`, so reading it changes no schema.
 
@@ -351,7 +351,7 @@ needs only a SQL client, such as `PostgresDatabase.layerClient`, so reading it c
 processes over the database never run Cluster at one address: it fails with `AddressTaken`
 while another process holds it. The claim is a session-level advisory lock on a connection it
 keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
-dies. `cluster-storage.test.ts` checks pruning and the status over real wakes, and the claim
+dies. `cluster-storage.test.ts` checks pruning and the status over real background job requests, and the claim
 across pools.
 
 ## Composition

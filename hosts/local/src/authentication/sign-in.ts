@@ -19,8 +19,8 @@ export const codeLifetime = Duration.minutes(10);
 
 /**
  * Development sign-in. Codes live in memory and expire after ten minutes; the
- * session token is the address itself, which development credential resolution
- * trusts as the human ID. Nothing here verifies that the person controls the
+ * session token is the address itself, which development session tokens
+ * trust as the human ID. Nothing here verifies that the person controls the
  * address.
  *
  * @category constructors

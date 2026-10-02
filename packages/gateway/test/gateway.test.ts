@@ -1,6 +1,7 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnStore } from "@amends/core/turn";
+import { BackgroundJobs } from "@amends/core/background";
+import { TurnJobs, TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
@@ -41,9 +42,7 @@ import {
 import { TestClock } from "effect/testing";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
-import { SignalHub } from "../src/signals.ts";
-import { WorkspaceTurns } from "../src/turns.ts";
-import { WorkspaceWakes } from "../src/wakes.ts";
+import { WorkspaceSignals } from "../src/signals.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
 import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
@@ -76,6 +75,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           Effect.provideService(Store.Transaction, {
             id: Commit.Id.make("replay"),
             append: unexpected,
+            afterCommit: unexpected,
           }),
         ),
       get: unexpected,
@@ -309,7 +309,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
   );
 };
 /** Signals no test here observes: published into nothing, and no subscriber ever hears one. */
-const quiet = SignalHub.Service.of({
+const quiet = WorkspaceSignals.Service.of({
   forWorkspace: (workspaceId) => ({
     workspaceId,
     publish: () => Effect.void,
@@ -319,9 +319,9 @@ const quiet = SignalHub.Service.of({
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
-    Layer.succeed(SignalHub.Service, quiet),
-    WorkspaceWakes.layerUnavailable,
-    WorkspaceTurns.layerIdle,
+    Layer.succeed(WorkspaceSignals.Service, quiet),
+    BackgroundJobs.layerUnavailable,
+    TurnJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,
       Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),
@@ -355,7 +355,7 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           program: Effect.Effect<A, E>,
         ): Effect.Effect<
           A,
-          GatewayErrors.ExposedError<E> | GatewayErrors.NotMember | GatewayErrors.WorkspaceNotFound
+          GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember | GatewayErrors.WorkspaceNotFound
         > =>
           entry === "inWorkspace"
             ? gateway.inWorkspace(workspaceId, program)
@@ -888,6 +888,7 @@ it.effect(
             Effect.provideService(Store.Transaction, {
               id: Commit.Id.make("request"),
               append: unexpected,
+              afterCommit: unexpected,
             }),
           );
         yield* inRequest(gateway.inWorkspace(workspaceId, Effect.void));
@@ -920,9 +921,9 @@ it.effect("host shutdown closes runtimes even with an outstanding request lease"
     Effect.gen(function* () {
       const owner = yield* Scope.fork(yield* Scope.Scope);
       const runtimes = yield* WorkspaceRuntime.make().pipe(Scope.provide(owner));
-      yield* runtimes.forWorkspace(workspaceId);
+      yield* runtimes.lease(workspaceId);
       yield* Scope.close(owner, Exit.void);
-      expect(Exit.hasInterrupts(yield* Effect.exit(runtimes.forWorkspace(workspaceId)))).toBe(true);
+      expect(Exit.hasInterrupts(yield* Effect.exit(runtimes.lease(workspaceId)))).toBe(true);
     }),
   ).pipe(Effect.provide(host({ forWorkspace: () => Effect.succeed(bindings()) }))),
 );

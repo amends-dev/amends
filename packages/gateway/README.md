@@ -13,7 +13,7 @@ The gateway implementation and its host contracts remain focused leaf modules.
 `gateway.ts` owns workspace entry, `storage.ts` binds workspace stores,
 `workspace-runtime.ts` owns prepared workspace services while they are in use,
 `directory.ts` describes cross-workspace discovery, and `sign-in.ts` and
-`credentials.ts` describe token issuance and resolution. Add a feature directory
+`session-tokens.ts` describe token issuance and resolution. Add a feature directory
 when one of these concepts needs related modules.
 
 `SignIn.Session` contains `token` and `humanId`. Its schema encodes `humanId` as
@@ -30,7 +30,8 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`SignalHub.Service`, `WorkspaceWakes.Service`, and `Crypto.Crypto`, in the host's scope. It captures
+`WorkspaceSignals.Service`, core's `BackgroundJobs.Service` and `TurnJobs.Service`, and
+`Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `options.connections` lists
@@ -42,11 +43,10 @@ storage bindings. Each defaults to none. `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
-`WorkspaceStorage`, `SignalHub`, `WorkspaceWakes`, `Credentials`, `SignIn`, and
-`WorkspaceDirectory` declare host-owned contracts. Their implementations and construction APIs
-belong to adapters or hosts; they have no default `make` or `layer` here, except
-`WorkspaceWakes.layerUnavailable` for hosts that run no background work. `Service.of(...)`
-is sufficient to type-check a supplied implementation.
+`WorkspaceStorage`, `WorkspaceSignals`, `SessionTokens`, `SignIn`, and `WorkspaceDirectory` declare
+host-owned contracts. Their implementations and construction APIs belong to adapters or hosts; they
+have no default `make` or `layer` here. `Service.of(...)` is sufficient to type-check a supplied
+implementation.
 
 ## Surface
 
@@ -72,10 +72,10 @@ is sufficient to type-check a supplied implementation.
   the runtime lease and operation resources. Streaming ingress uses it to keep
   subscriptions alive until disconnect. Programs may additionally require `Scope`.
   `asMember` wraps this operation in a short scope for ordinary request/response work.
-- `runBackground(workspaceId, process)` runs one of the workspace's
+- `runBackgroundProcess(workspaceId, process)` runs one of the workspace's
   [background processes](../core/README.md#background-work) once, with no actor, and returns
-  what it left outstanding. It is for the host process that runs background work, when a wake
-  arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
+  what it left outstanding. It is for the host process that runs background jobs, when a job's
+  request arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
   workspace that was never created returns `WorkspaceNotFound` without being prepared.
 - `executeTurns(workspaceId, program)` runs [turn execution](../core/README.md#turns) for the
   host process that runs agents' accepted work. It is trusted and has no actor: each step acts as
@@ -84,11 +84,13 @@ is sufficient to type-check a supplied implementation.
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
-`SignalHub.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
-`WorkspaceWakes.Service`, whose `forWorkspace` returns its `BackgroundWakes.Service`,
-`WorkspaceTurns.Service`, whose `forWorkspace` returns its `TurnDispatch.Service`, delivering
-requests to run new turns to whatever runs them, and `Crypto.Crypto`. A host that runs no turns
-provides `WorkspaceTurns.layerIdle`: agents still accept their work, which waits queued.
+`WorkspaceSignals.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
+core's `BackgroundJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
+each naming its workspace, and `Crypto.Crypto`. The gateway passes the job services to each
+workspace's core as they are. A host that runs no background jobs provides
+`BackgroundJobs.layerUnavailable`, whose requests fail the commit that makes them rather than accept
+work nothing would do; one that runs no turns provides `TurnJobs.layerNoRunner`: agents still
+accept their work, which waits queued.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
@@ -119,7 +121,7 @@ follower, and the next request boots it again, finding its projections live. Mem
 therefore follows the workspaces in recent use rather than every workspace acquired since
 startup. Change-feed subscribers share their runtime's follower, and each process follows
 the journal itself, so subscribers on different hosts see the same commits. Signals reach
-them through the host's `SignalHub`, which relays between the processes over the same
+them through the host's `WorkspaceSignals`, which relays between the processes over the same
 storage. Host shutdown
 closes runtime resources and subscriptions, including leased ones. A request cancellation does not cancel shared
 boot. A failed boot closes acquired resources, evicts the failed acquisition, and
@@ -152,48 +154,10 @@ host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
-`WorkspaceWakes.Service` supplies each workspace's `BackgroundWakes.Service`: it stores a
-commit's requests for [background work](../core/README.md#background-work) with that commit and
-delivers them to whichever process runs the workspace's background work. A host that runs no
-background work provides `WorkspaceWakes.layerUnavailable`, whose requests fail the commit that
-makes them rather than accept work nothing would do.
+[`@amends/cluster`](../cluster/README.md) implements core's `BackgroundJobs` and `TurnJobs` on
+Effect Cluster, with the workers that run what they store.
 
-### Background work on Effect Cluster
-
-`ClusterBackground` runs background work on the host's Effect Cluster (`Sharding`). Each
-workspace's process is an entity, `amends/WorkspaceProcess`, keyed by workspace and process,
-whose persisted `Wake` says when it should run. Cluster keeps an entity on one runner at a time,
-so a process runs one run at a time, and redelivers a wake whose run was cut short, so work
-resumes after a restart.
-
-- `layerWakes` provides `WorkspaceWakes.Service`. A commit's wake is keyed by its commit ID, so
-  a commit that asks twice asks once. Sent inside the commit, it is stored in the commit's
-  transaction when Cluster's message storage uses the same SQL client as the workspace's
-  storage; the host composing them owns that. Cluster saves such a persisted wake and only
-  notifies its runner best-effort, so a shard not yet assigned does not hold up the commit: the
-  runner that takes the shard reads the wake from storage.
-- `layerWorker` registers the entity. When a wake arrives it calls `runBackground`, then asks
-  for the next run: at once after `Continue`, at the due time after `At`, and after a backoff
-  that doubles from two seconds up to five minutes after a failure. Runs that ask for the same
-  later time share one wake, keyed by that time; a time the waking wake or the clock has
-  already reached takes a fresh key, since its wake may have run and a repeated key would be
-  dropped. Wakes are not coalesced: each commit's wake runs the process once, and a run that
-  finds nothing outstanding returns at once. A process this host does
-  not register is dropped after `unknownAttempts` (ten) failed runs, and a workspace that was
-  never created at once. It fails a wake it drops with `ClusterBackground.Dropped`, naming the
-  reason and the retries before it, so Cluster keeps the drop as the wake's reply, where
-  operators find it until handled wakes are pruned. A wake it could not act on stays
-  undelivered, so Cluster runs it again.
-- `layer` provides both. Every runner over the same storage runs the worker, as Cluster
-  requires of every entity type.
-- `layerPruning({ prune, keep?, entityTypes? })` removes handled wakes once they are older than
-  `keep` (seven days by default), with the job's own past runs and the handled messages of any
-  other `entityTypes`, such as [turns'](../execution/README.md#turns-on-effect-cluster), every
-  hour on one runner, through `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
-  supplies `prune`. By then a wake's key no longer needs to stop a repeat: commits are not
-  retried days later, and wakes not yet handled are kept however old.
-
-`SignalHub.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
+`WorkspaceSignals.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because
 it stores nothing: an adapter may relay through its database, as PostgreSQL does with
 `NOTIFY`, or through any broker the host composes. Its `Signals.Service` is best effort; a
@@ -210,7 +174,7 @@ when a commit's outcome is unknown, and `InvalidInput` when core rejects
 caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its
 cause for host logging. `GatewayErrors.PublicError` is the schema of these
-outcomes, and `GatewayErrors.ExposedError<E>` computes a program's public error
+outcomes, and `GatewayErrors.PublicErrorOf<E>` computes a program's public error
 type from core's. A domain error core adds reaches callers only once it is listed there;
 otherwise it becomes a defect, which HTTP answers with 500. A server-http test checks that every
 error an HTTP route declares is public here or raised by the HTTP layer itself, and a gateway

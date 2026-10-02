@@ -20,7 +20,7 @@ import {
   workspaceId,
 } from "./support.ts";
 
-/** Atomic commits: concurrent writers, rollback, interruption, and foreign handles. */
+/** Atomic commits: concurrent writers, rollback, interruption, foreign handles, and work after a commit. */
 export const transactions = (harness: Harness) => {
   const { core, initialized } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: transactions`, () => {
@@ -96,6 +96,59 @@ export const transactions = (harness: Harness) => {
           yield* initialized(bound);
         }),
       ),
+    );
+
+    it.effect(
+      "work asked to run after a commit runs once it is done, in order, and never after a rollback",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const bound = yield* forWorkspace(yield* storage.connect(), workspaceId);
+            const ran: Array<string> = [];
+            const note = (name: string) =>
+              Effect.sync(() => {
+                ran.push(name);
+              });
+            const afterCommit = (effect: Effect.Effect<void>) =>
+              Effect.flatMap(Store.Transaction, (storeTransaction) =>
+                storeTransaction.afterCommit(effect),
+              );
+            yield* bound.store.transaction(
+              Effect.gen(function* () {
+                yield* afterCommit(note("first"));
+                yield* afterCommit(note("second"));
+                expect(ran).toEqual([]);
+              }),
+            );
+            expect(ran).toEqual(["first", "second"]);
+            const rolledBack = yield* Effect.exit(
+              bound.store.transaction(
+                afterCommit(note("rolled back")).pipe(Effect.andThen(Effect.fail("abandon"))),
+              ),
+            );
+            expect(rolledBack._tag).toBe("Failure");
+            expect(ran).toEqual(["first", "second"]);
+            // A failure is logged and stops neither the commit nor the work after it, which may
+            // commit again, since the workspace is no longer held.
+            yield* bound.store.transaction(
+              afterCommit(Effect.die("broken")).pipe(
+                Effect.andThen(
+                  afterCommit(
+                    bound.store
+                      .transaction(note("committed again"))
+                      .pipe(Effect.orDie, Effect.timeout("5 seconds"), Effect.orDie),
+                  ),
+                ),
+              ),
+            );
+            expect(ran).toEqual(["first", "second", "committed again"]);
+            const expired = yield* bound.store.transaction(Store.Transaction);
+            expect(yield* Effect.flip(expired.afterCommit(note("late")))).toMatchObject({
+              _tag: "JournalStore.Failure",
+            });
+            expect(ran).toEqual(["first", "second", "committed again"]);
+          }),
+        ),
     );
 
     it.effect(

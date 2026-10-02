@@ -127,12 +127,12 @@ may read, and every invitation for holders of `invitation.manage`.
 `@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one
 workspace's storage, resolves an authenticated identity into the actor, and runs
 core's services with only public outcomes. It also holds the host
-contracts: workspace storage, sign-in, credential resolution, and the workspace
+contracts: workspace storage, sign-in, session token resolution, and the workspace
 directory. `@amends/api-http` declares the HTTP contract shared by servers and
 browser clients, and `@amends/server-http` implements it over the gateway,
-including the contract's bearer authentication over credential resolution.
+including the contract's bearer authentication over session token resolution.
 Additional protocols add their own contract and handler packages over the same
-gateway, adapting the same credential resolution to their own authentication.
+gateway, adapting the same session token resolution to their own authentication.
 
 `@amends/storage-conformance` holds the [test suites](./storage-conformance/README.md)
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs

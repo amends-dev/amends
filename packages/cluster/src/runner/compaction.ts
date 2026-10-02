@@ -18,7 +18,7 @@ export class Failed extends Schema.TaggedError<Failed>()("Compaction.Failed", {
   problem: HarnessErrors.Problem,
 }) {}
 
-const instructions = `You keep an agent's memory of a long conversation in a team thread. Summarize the conversation you are given so the agent can continue it without the original. Use exactly this Markdown structure, keeping every section, even when empty:
+const summaryInstructions = `You keep an agent's memory of a long conversation in a team thread. Summarize the conversation you are given so the agent can continue it without the original. Use exactly this Markdown structure, keeping every section, even when empty:
 
 ## Objective
 - What the people in the thread want from the agent, in one or two sentences.
@@ -50,7 +50,7 @@ Rules:
 - Do not mention that this is a summary.`;
 
 /** One entry of a transcript as text the summarizer reads: who said what, and what the agent did. */
-const rendered = (item: Transcript.Item): string => {
+const renderItem = (item: Transcript.Item): string => {
   switch (item._tag) {
     case "Input": {
       const text = item.content.map((part) => part.text).join("\n");
@@ -76,21 +76,14 @@ const rendered = (item: Transcript.Item): string => {
   }
 };
 
-/** A transcript as text the summarizer reads. */
-export const render = (items: ReadonlyArray<Transcript.Item>): string =>
-  items
-    .map(rendered)
-    .filter((text) => text !== "")
-    .join("\n\n");
-
 /**
  * The transcript's text in passes of at most `size` characters, oldest first, breaking between
  * entries where it can and inside an entry only when one alone is longer.
  */
-export const passes = (items: ReadonlyArray<Transcript.Item>, size: number): Array<string> => {
+const splitIntoPasses = (items: ReadonlyArray<Transcript.Item>, size: number): Array<string> => {
   const result: Array<string> = [];
   let current = "";
-  for (const text of items.map(rendered).filter((text) => text !== "")) {
+  for (const text of items.map(renderItem).filter((text) => text !== "")) {
     const joined = current === "" ? text : `${current}\n\n${text}`;
     if (joined.length <= size) {
       current = joined;
@@ -108,16 +101,11 @@ export const passes = (items: ReadonlyArray<Transcript.Item>, size: number): Arr
   return result;
 };
 
-/**
- * Summarize a history with the turn's model: each pass reads the summary so far and the next part,
- * oldest first, until the whole is covered. A pass that fails, or sends nothing within `timeout`,
- * fails the summary.
- */
 /** One summary request over a conversation, which fails or stays silent past `timeout` as `Failed`. */
-const ask = (conversation: string, timeout: Duration.Input) =>
+const requestSummary = (conversation: string, timeout: Duration.Input) =>
   LanguageModel.generateText({
     prompt: Prompt.fromMessages([
-      Prompt.systemMessage({ content: instructions }),
+      Prompt.systemMessage({ content: summaryInstructions }),
       Prompt.userMessage({
         content: [Prompt.textPart({ text: `<conversation>\n${conversation}\n</conversation>` })],
       }),
@@ -149,30 +137,35 @@ const ask = (conversation: string, timeout: Duration.Input) =>
  * The fewest characters a pass is split down to when its model refuses it as too long, as text
  * denser than four characters a token makes a pass larger than it looks.
  */
-export const smallestPass = 1_000;
+const minPassSize = 1_000;
 
+/**
+ * Summarize a history with the turn's model: each pass reads the summary so far and the next part,
+ * oldest first, until the whole is covered. A pass that fails, or sends nothing within `timeout`,
+ * fails the summary.
+ */
 export const summarize = Effect.fn("Compaction.summarize")(function* (
   items: ReadonlyArray<Transcript.Item>,
   options: { readonly passSize: number; readonly timeout: Duration.Input },
 ) {
   let summary: string | undefined;
-  const queue = passes(items, options.passSize);
-  for (let part = queue.shift(); part !== undefined; part = queue.shift()) {
+  const remaining = splitIntoPasses(items, options.passSize);
+  for (let pass = remaining.shift(); pass !== undefined; pass = remaining.shift()) {
     const conversation =
-      summary === undefined ? part : `<prior-summary>\n${summary}\n</prior-summary>\n\n${part}`;
-    const attempt = yield* Effect.result(ask(conversation, options.timeout));
+      summary === undefined ? pass : `<prior-summary>\n${summary}\n</prior-summary>\n\n${pass}`;
+    const answer = yield* Effect.result(requestSummary(conversation, options.timeout));
     // A pass its model refuses as too long is summarized in halves instead.
     if (
-      Result.isFailure(attempt) &&
-      attempt.failure.problem === "model-context" &&
-      part.length > smallestPass
+      Result.isFailure(answer) &&
+      answer.failure.problem === "model-context" &&
+      pass.length > minPassSize
     ) {
-      const half = Math.ceil(part.length / 2);
-      queue.unshift(part.slice(0, half), part.slice(half));
+      const half = Math.ceil(pass.length / 2);
+      remaining.unshift(pass.slice(0, half), pass.slice(half));
       continue;
     }
-    if (Result.isFailure(attempt)) return yield* attempt.failure;
-    const written = attempt.success;
+    if (Result.isFailure(answer)) return yield* answer.failure;
+    const written = answer.success;
     if (!/\S/u.test(written))
       return yield* new Failed({
         reason: "The model wrote an empty summary.",

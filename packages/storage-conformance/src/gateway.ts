@@ -381,11 +381,11 @@ export const gateway = (harness: Harness) => {
               const gateway = yield* Gateway.Service;
               const workspace = yield* Operations.createWorkspace(alice.id);
               expect(
-                yield* Effect.flip(gateway.runBackground(workspace.id, "test.unregistered")),
+                yield* Effect.flip(gateway.runBackgroundProcess(workspace.id, "test.unregistered")),
               ).toMatchObject({ _tag: "BackgroundRuns.Unknown", process: "test.unregistered" });
               const missing = Workspace.Id.make("never-created");
               expect(
-                yield* Effect.flip(gateway.runBackground(missing, "test.unregistered")),
+                yield* Effect.flip(gateway.runBackgroundProcess(missing, "test.unregistered")),
               ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: missing }));
               expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toMatchObject({
                 memberships: [{ workspace }],

@@ -31,14 +31,14 @@ construction. Constructors own defaults, state allocation, and initialization.
 
 Group related implementations in a capability directory when they need several
 modules. The local host's `authentication/` contains `DevelopmentSignIn`,
-`DevelopmentCredentials`, and their composition, `DevelopmentAuthentication`.
+`DevelopmentSessionTokens`, and their composition, `DevelopmentAuthentication`.
 The names describe the development trust model; another host can supply different
 implementations of the same gateway contracts.
 
 `DevelopmentSignIn.make(deliver?)` constructs sign-in with fresh pending-code
-state; `DevelopmentCredentials.make()` constructs the credential resolver.
+state; `DevelopmentSessionTokens.make()` constructs the token resolver.
 Their respective `layer` exports delegate to those constructors.
-`DevelopmentAuthentication.layer(deliver?)` composes both services. Credential
+`DevelopmentAuthentication.layer(deliver?)` composes both services. Token
 and code validation happen during operations. Construction issues no token or code.
 
 `LocalHost` and `LocalServer` are composition modules, so they expose layers without

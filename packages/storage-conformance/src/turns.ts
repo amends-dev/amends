@@ -46,9 +46,11 @@ const turnsOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
 const execute = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, TurnExecution.Service>) =>
   Effect.flatMap(Gateway.Service, (gateway) => gateway.executeTurns(id, program));
 const accept = (id: Workspace.Id) =>
-  Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackground(id, "turn.accept"));
+  Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackgroundProcess(id, "turn.accept"));
 const stopDeparted = (id: Workspace.Id) =>
-  Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackground(id, "turn.stop-departed"));
+  Effect.flatMap(Gateway.Service, (gateway) =>
+    gateway.runBackgroundProcess(id, "turn.stop-departed"),
+  );
 const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,

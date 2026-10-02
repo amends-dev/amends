@@ -3,7 +3,7 @@
  * default `cluster` prefix. Cluster never removes a message or its reply, so the host prunes
  * the ones it has handled.
  */
-import { ClusterBackground } from "@amends/gateway";
+import { BackgroundJob } from "@amends/cluster";
 import { Clock, DateTime, Effect, Option, Schema } from "effect";
 import { Snowflake } from "effect/unstable/cluster";
 import { SqlClient } from "effect/unstable/sql";
@@ -76,32 +76,32 @@ export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(fun
   );
 });
 
-/** One background process's wakes across every workspace. */
+/** One background process's job requests across every workspace. */
 export interface ProcessStatus {
   readonly process: string;
-  /** Wakes due now that no runner has handled yet. */
+  /** Requests due now that no runner has handled yet. */
   readonly due: number;
-  /** Wakes set for later: a process's next run, or a retry after a failed one. */
+  /** Requests set for later: a process's next run, or a retry after a failed one. */
   readonly scheduled: number;
-  /** Of the wakes not yet handled, those that follow a failed run. */
+  /** Of the requests not yet handled, those that follow a failed run. */
   readonly retrying: number;
-  /** When the longest-waiting due wake became due. */
+  /** When the longest-waiting due request became due. */
   readonly oldestDue: Option.Option<DateTime.Utc>;
-  /** Wakes the worker gave up on, among those not yet pruned. */
+  /** Requests the worker gave up on, among those not yet pruned. */
   readonly dropped: number;
 }
-/** A wake waiting to run again after failed runs. */
+/** A request waiting to run again after failed runs. */
 export interface Retry {
   readonly process: string;
   readonly workspaceId: string;
   readonly attempt: number;
   readonly at: DateTime.Utc;
 }
-/** A wake the worker gave up on. */
+/** A request the worker gave up on. */
 export interface Drop {
   readonly process: string;
   readonly workspaceId: string;
-  readonly reason: ClusterBackground.Dropped["reason"];
+  readonly reason: BackgroundJob.Dropped["reason"];
   readonly attempt: number;
   readonly at: DateTime.Utc;
 }
@@ -112,20 +112,20 @@ export interface Status {
   readonly drops: ReadonlyArray<Drop>;
 }
 
-const WakeFields = Schema.Struct({
+const RunFields = Schema.Struct({
   workspaceId: Schema.String,
   process: Schema.String,
   attempt: Schema.Int,
   at: Schema.Finite,
 });
 const DropReply = Schema.TaggedStruct("Failure", {
-  cause: Schema.Tuple([Schema.TaggedStruct("Fail", { error: ClusterBackground.Dropped })]),
+  cause: Schema.Tuple([Schema.TaggedStruct("Fail", { error: BackgroundJob.Dropped })]),
 });
 const fromJson = <S extends Schema.Top>(schema: S) =>
   Schema.decodeUnknownEffect(Schema.fromJsonString(schema));
 
 /**
- * What background work waits, retries, and was dropped, from the wakes Cluster keeps: per
+ * What background work waits, retries, and was dropped, from the background jobs' requests Cluster keeps: per
  * process, and the latest `limit` (twenty by default) retries and drops. Empty before any host
  * has run background work over this database. It only reads, over any client of the database,
  * such as `PostgresDatabase.layerClient`, which leaves the schema as it is.
@@ -138,7 +138,7 @@ export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStat
   const [tables] = yield* sql<{ readonly present: boolean }>`
     SELECT to_regclass('cluster_messages') IS NOT NULL AS present`;
   if (tables?.present !== true) return { processes: [], retries: [], drops: [] } satisfies Status;
-  const entityType = ClusterBackground.WorkspaceProcess.type;
+  const entityType = BackgroundJob.entity.type;
   const now = yield* Clock.currentTimeMillis;
   const waiting = yield* sql<{
     readonly process: string;
@@ -159,7 +159,7 @@ export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStat
   const dropped = yield* sql<{ readonly process: string; readonly dropped: number }>`
     SELECT m.payload::jsonb->>'process' AS process, count(*)::int AS dropped
     FROM cluster_replies r JOIN cluster_messages m ON m.id = r.request_id
-    WHERE m.entity_type = ${entityType} AND r.kind = 0 AND r.payload LIKE ${`%${ClusterBackground.droppedTag}%`}
+    WHERE m.entity_type = ${entityType} AND r.kind = 0 AND r.payload LIKE ${`%${BackgroundJob.droppedTag}%`}
     GROUP BY 1`;
   const retried = yield* sql<{ readonly payload: string }>`
     SELECT payload FROM cluster_messages
@@ -169,7 +169,7 @@ export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStat
   const lost = yield* sql<{ readonly payload: string; readonly reply: string }>`
     SELECT m.payload, r.payload AS reply
     FROM cluster_replies r JOIN cluster_messages m ON m.id = r.request_id
-    WHERE m.entity_type = ${entityType} AND r.kind = 0 AND r.payload LIKE ${`%${ClusterBackground.droppedTag}%`}
+    WHERE m.entity_type = ${entityType} AND r.kind = 0 AND r.payload LIKE ${`%${BackgroundJob.droppedTag}%`}
     ORDER BY m.id DESC LIMIT ${limit}`;
   const processes = new Map<string, ProcessStatus>();
   const status = (process: string) =>
@@ -196,23 +196,23 @@ export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStat
   for (const row of dropped)
     processes.set(row.process, Object.assign({}, status(row.process), { dropped: row.dropped }));
   const retries = yield* Effect.forEach(retried, (row) =>
-    Effect.map(fromJson(WakeFields)(row.payload), (wake) => ({
-      process: wake.process,
-      workspaceId: wake.workspaceId,
-      attempt: wake.attempt,
-      at: DateTime.makeUnsafe(wake.at),
+    Effect.map(fromJson(RunFields)(row.payload), (run) => ({
+      process: run.process,
+      workspaceId: run.workspaceId,
+      attempt: run.attempt,
+      at: DateTime.makeUnsafe(run.at),
     })),
   );
   const drops = yield* Effect.forEach(lost, (row) =>
     Effect.gen(function* () {
-      const wake = yield* fromJson(WakeFields)(row.payload);
+      const run = yield* fromJson(RunFields)(row.payload);
       const [{ error }] = (yield* fromJson(DropReply)(row.reply)).cause;
       return {
-        process: wake.process,
-        workspaceId: wake.workspaceId,
+        process: run.process,
+        workspaceId: run.workspaceId,
         reason: error.reason,
         attempt: error.attempt,
-        at: DateTime.makeUnsafe(wake.at),
+        at: DateTime.makeUnsafe(run.at),
       };
     }),
   );

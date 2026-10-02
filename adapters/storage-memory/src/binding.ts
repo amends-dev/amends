@@ -20,8 +20,24 @@ export interface TransactionState {
   readonly space: MemoryDatabase.Space;
   /** Logs this transaction holds against their other writers, released when it ends. */
   readonly held: Set<string>;
+  /** What `afterCommit` asked to run once the transaction commits, in order. */
+  readonly afterCommit: Array<Effect.Effect<void>>;
   active: boolean;
 }
+
+/** Ask for `effect` to run once the session's transaction commits; a closed session's handle is expired. */
+export const afterCommit = (session: TransactionState, effect: Effect.Effect<void>) =>
+  Effect.suspend(() => {
+    if (!session.active)
+      return Effect.fail(
+        new Store.Failure({
+          operation: "afterCommit",
+          cause: "Missing, closed, or foreign workspace transaction",
+        }),
+      );
+    session.afterCommit.push(effect);
+    return Effect.void;
+  });
 
 /** The session a program runs under; statements check it against their own binding. */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
@@ -176,6 +192,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
           },
           space: MemoryDatabase.copy(MemoryDatabase.committed(database, workspaceId)),
           held: new Set(),
+          afterCommit: [],
         };
         const exit = yield* Effect.exit(
           restore(
@@ -201,6 +218,8 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
           yield* MemoryDatabase.logLock(database, workspaceId, logId).release(1);
         if (exclusive) yield* release;
         if (Exit.isFailure(exit)) return yield* Effect.failCause(exit.cause);
+        // Committed, with the workspace and its logs released.
+        yield* Store.runAfterCommit(state.afterCommit);
         return exit.value;
       }),
     );

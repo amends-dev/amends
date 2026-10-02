@@ -4,7 +4,7 @@
 [sandbox](../sandbox/README.md) into a running environment, as the
 [core model](../../docs/core-model.md#agreed-spawning-history-setup-and-input-submission-are-separate-stages)
 describes: it spawns the runtime, passes history and input through to the harness, reports what it
-acquired, takes snapshots, and applies retention when released. [Turn execution](../execution/README.md)
+acquired, takes snapshots, and applies retention when released. [Turn execution](../cluster/README.md#running-a-turn)
 spawns one for each session of a turn, without a sandbox so far.
 
 ## Definitions and running environments
