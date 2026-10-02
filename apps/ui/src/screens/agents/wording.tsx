@@ -133,6 +133,12 @@ export type AgentsError =
   | "failed"
   | "refresh-failed"
   | "outdated";
+/** A change's failure, or a refresh's, with the action it belongs to and what the server refused. */
+export interface AgentsFailure {
+  readonly action: AgentsAction | "refresh";
+  readonly error: AgentsError;
+  readonly problems: readonly AgentProblem[];
+}
 /** What the server refused, worded at the field it concerns. */
 export type AgentProblem =
   | { readonly kind: "connection-unavailable" }

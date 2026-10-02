@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { Schema } from "effect";
 import { createSignal } from "solid-js";
 import { SignIn } from "../src/api/contracts.ts";
-import { SessionProvider, useSession, type SessionScope } from "../src/session/provider.tsx";
+import { ClientProvider, useSession, type SessionScope } from "../src/provider.tsx";
 import { createBrowserSessionStore, type SessionStore } from "../src/session/store.ts";
 import { resolveApiBaseUrl } from "../src/configuration.ts";
 import { paths, returnPath } from "../src/routing/paths.ts";
@@ -103,15 +103,15 @@ it("continues in memory when browser storage is blocked", () => {
   function Consumer() {
     const current = useSession();
     return (
-      <button onClick={() => current.replace(session("alice"))}>
+      <button onClick={() => current.signIn(session("alice"))}>
         {current.session?.humanId ?? "anonymous"}
       </button>
     );
   }
   render(() => (
-    <SessionProvider store={store}>
+    <ClientProvider apiBaseUrl="https://host.test" sessionStore={store}>
       <Consumer />
-    </SessionProvider>
+    </ClientProvider>
   ));
   fireEvent.click(screen.getByRole("button", { name: "anonymous" }));
   expect(screen.getByRole("button", { name: "alice" })).toBeInTheDocument();
@@ -132,22 +132,21 @@ it("remounts credential owners and ignores completions from obsolete or disposed
     );
   }
   const view = render(() => (
-    <SessionProvider store={fixture.store}>
+    <ClientProvider apiBaseUrl="https://host.test" sessionStore={fixture.store}>
       <Consumer />
-    </SessionProvider>
+    </ClientProvider>
   ));
   const guest = scopes[0];
   if (!guest) throw new Error("Missing initial session scope");
   fireEvent.input(screen.getByRole("textbox"), { target: { value: "private draft" } });
-  guest.replace(session("alice"));
+  guest.signIn(session("alice"));
   expect(screen.getByRole("textbox")).toHaveValue("");
-  expect(guest.isCurrent()).toBe(false);
-  guest.replace(session("stale"));
+  guest.signIn(session("stale"));
   expect(fixture.store.read()?.token).toBe("alice");
   const current = scopes[1];
   if (!current) throw new Error("Missing new session scope");
   view.unmount();
-  current.replace(session("disposed"));
+  current.signIn(session("disposed"));
   expect(fixture.store.read()?.token).toBe("alice");
 });
 

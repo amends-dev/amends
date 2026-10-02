@@ -1,9 +1,8 @@
 import { useAtomValue } from "@effect/atom-solid";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createContext, createMemo, useContext, type Accessor, type ParentProps } from "solid-js";
-import { changeFeed, ChangeFeedState } from "../api/change-feed.ts";
-import { useApiClient } from "../api/context.tsx";
-import { useSession } from "../session/provider.tsx";
+import { changeFeed, ChangeFeedState } from "./api.ts";
+import { useApiClient, useSession } from "../provider.tsx";
 
 export interface ChangeFeedScope {
   readonly state: Accessor<ChangeFeedState>;

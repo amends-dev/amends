@@ -42,6 +42,7 @@ export {
   type AgentSummary,
   type AgentsAction,
   type AgentsError,
+  type AgentsFailure,
   type EnvironmentFit,
   type ModelConnectionOption,
 } from "./wording.tsx";

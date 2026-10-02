@@ -3,20 +3,20 @@ import { cleanup, render } from "@solidjs/testing-library";
 import {
   AppearanceProvider,
   useAppearance,
-  type AppearancePreference,
   type AppearanceScope,
   type AppearanceSource,
-  type PalettePreference,
   type SystemAppearance,
 } from "../src/index.ts";
+import type { ColorPalette } from "@amends/ui/foundations/theme";
+import type { Appearance } from "@amends/ui/screens/workspace-navigation";
 afterEach(cleanup);
 it("follows system appearance only in system mode, responds to external changes, and disposes subscriptions", () => {
-  let preference: AppearancePreference = "system";
+  let preference: Appearance = "system";
   let system: SystemAppearance = "light";
-  let palette: PalettePreference = "linen";
+  let palette: ColorPalette = "linen";
   let changed = () => {};
   const unsubscribe = vi.fn();
-  const write = vi.fn((value: AppearancePreference) => {
+  const write = vi.fn((value: Appearance) => {
     preference = value;
   });
   const source: AppearanceSource = {

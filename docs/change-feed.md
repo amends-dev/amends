@@ -16,7 +16,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
    collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
    follows it by its own stream (see the [turn guide](turns.md)).
 3. Each `Committed` message maps its events to the keys they affect
-   (`apps/client/src/api/change-feed.ts`) and invalidates each once, so every affected read
+   (`apps/client/src/live/api.ts`) and invalidates each once, so every affected read
    refreshes once. A member's rename refreshes the members and the directory. Group creation,
    renames, and membership changes also refresh the public groups, and a public group's creation
    reaches the whole workspace. Thread activity

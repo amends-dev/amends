@@ -40,7 +40,7 @@ import {
   type Thread,
   type ThreadTimeline,
 } from "../src/index.ts";
-import { affectedKeys, signalKeys } from "../src/api/change-feed.ts";
+import { affectedKeys, signalKeys } from "../src/live/api.ts";
 
 afterEach(cleanup);
 const json = (body: unknown) =>

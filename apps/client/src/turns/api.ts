@@ -1,10 +1,81 @@
 import { ApiErrors, Turn, Workspace } from "@amends/api-http";
+import type { TurnProblem } from "@amends/ui/screens/turns";
 import { Cause, Effect, Exit, Option, Queue, Schema, Stream } from "effect";
 import { Atom } from "effect/unstable/reactivity";
+import { isUnauthorized, type Api, type ApiClient } from "../api/client.ts";
+import { command } from "../api/failures.ts";
+import { itemKeys, workspaceKey } from "../api/keys.ts";
+import { retryDelay } from "../live/api.ts";
 import { watchWake } from "../live/wake.ts";
-import { retryDelay } from "./change-feed.ts";
-import { isUnauthorized, type ApiClient } from "./client.ts";
 import { drafted, type Drafts } from "./drafts.ts";
+
+export type { Turn };
+
+/**
+ * The workspace's active turns in threads the reader may open, for marks where agents are at work.
+ * Undefined for an invalid workspace ID.
+ */
+export const activeTurnsRead = (client: ApiClient, workspaceId: string) => {
+  const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
+  if (Option.isNone(workspace)) return undefined;
+  return client.query("turns", "listActive", {
+    params: { workspaceId: workspace.value },
+    query: { limit: 100 },
+    reactivityKeys: [workspaceKey(workspaceId, "active-turns")],
+  });
+};
+
+/**
+ * A turn as the reader sees it, following its facts: where it stands and what they may do with it.
+ * Its log is followed apart, by `turnLogFeed`. Undefined for invalid IDs.
+ */
+export const turnRead = (client: ApiClient, workspaceId: string, turnId: string) => {
+  const workspace = Schema.decodeOption(Workspace.Id)(workspaceId);
+  const turn = Schema.decodeOption(Turn.Id)(turnId);
+  if (Option.isNone(workspace) || Option.isNone(turn)) return undefined;
+  return client.query("turns", "get", {
+    params: { workspaceId: workspace.value, turnId: turn.value },
+    reactivityKeys: itemKeys(workspaceId, "turns", turnId),
+  });
+};
+
+/** A stop or retry of one turn. */
+export interface TurnCommand {
+  readonly kind: "stop" | "retry";
+  readonly turnId: string;
+}
+/** Stop or retry a turn, answering with the turn it acted on, or for a retry, the new turn. */
+export const controlTurn = (workspace: string) => (api: Api, input: TurnCommand) =>
+  Effect.gen(function* () {
+    const params = {
+      workspaceId: yield* command(Workspace.Id)(workspace),
+      turnId: yield* command(Turn.Id)(input.turnId),
+    };
+    return input.kind === "stop"
+      ? yield* api.turns.cancel({ params })
+      : yield* api.turns.retry({ params });
+  });
+
+const refusals = {
+  active: "still-running",
+  completed: "replied",
+  superseded: "superseded",
+  departed: "departed",
+} as const satisfies Record<Turn.NotRetryableReason, TurnProblem>;
+
+/**
+ * What a turn command was refused for, if the host refused it: the turn already finished, so there
+ * is nothing to stop, or it cannot run again because it is still active, it replied, a later turn
+ * followed it, or its agent no longer takes part in the thread.
+ */
+export const turnRefusal = (cause: Cause.Cause<unknown>): TurnProblem | undefined => {
+  for (const reason of cause.reasons) {
+    if (!Cause.isFailReason(reason)) continue;
+    if (Schema.is(ApiErrors.TurnNotActive)(reason.error)) return "finished";
+    if (Schema.is(ApiErrors.TurnNotRetryable)(reason.error)) return refusals[reason.error.reason];
+  }
+  return undefined;
+};
 
 /**
  * A turn's log as following it holds it: its items, the response being written, whether the turn

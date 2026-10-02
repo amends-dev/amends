@@ -1,43 +1,22 @@
+import type { ConversationStatus } from "@amends/ui/screens/group";
+import type { InboxItem } from "@amends/ui/screens/inbox";
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import { markSeenRequest, type InboxFilter, type NotificationInbox } from "../api/conversations.ts";
+import { markSeen, type InboxFilter, type NotificationInbox } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useRequest } from "../request/use-request.ts";
-import { useSession } from "../session/provider.tsx";
+import { useMutation } from "../api/mutation.ts";
 import { useInbox, useInboxPending } from "./reads.ts";
 import { useMarkAllSeen } from "./seen.ts";
 import { toDate } from "./time.ts";
-import {
-  usePeople,
-  useWorkspaceGroups,
-  type Author,
-  type ConversationStatus,
-  type MentionedMember,
-} from "./views.ts";
+import { usePeople, useWorkspaceGroups } from "./views.ts";
 
-/** Why a notification came: the reader was mentioned, someone replied, or a thread started. */
-export type NotificationReason = "mention" | "reply" | "thread";
-
-/** One notification as the inbox lists it. */
-export interface InboxEntry {
-  readonly id: string;
-  readonly at: Date;
-  /** Still pending for the reader. */
-  readonly unread: boolean;
-  /** Why it came, while the reader can read its source; otherwise the thread is unavailable. */
-  readonly reason: NotificationReason | undefined;
-  readonly author: Author | undefined;
-  /** The group it came from: a team by name, or a direct group by its other people. */
-  readonly place: { readonly name: string; readonly direct: boolean } | undefined;
-  /** What was said, as markdown whose mentions link to members by id. */
-  readonly text: string | undefined;
-  readonly mentions: ReadonlyArray<MentionedMember>;
-  /** Where it points, at the timeline position that notified the reader. */
+/** One notification as the inbox lists it, with where it points, for the page that links it. */
+export type InboxEntry = Omit<InboxItem, "href"> & {
+  /** Its thread, at the timeline position that notified the reader. */
   readonly thread:
     | { readonly groupId: string; readonly threadId: string; readonly sequence: number }
     | undefined;
-}
+};
 
 type Item = NotificationInbox.Item;
 const order = (left: Item, right: Item) =>
@@ -59,7 +38,6 @@ export function useInboxView(
     readonly failed?: (change: "seen" | "all-seen", failure: WorkspaceFailure) => void;
   } = {},
 ) {
-  const session = useSession();
   const people = usePeople(workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
   const all = useInbox(workspaceId, "all");
@@ -71,23 +49,22 @@ export function useInboxView(
   // Notifications the reader opened here, unread no more even before the inbox refreshes.
   const [opened, setOpened] = createSignal<ReadonlySet<string>>(new Set());
   const [seenError, setSeenError] = createSignal<WorkspaceFailure>();
+  // Opened notifications waiting their turn to be marked seen, one request at a time.
   const queue: string[] = [];
-  const seen = useRequest(
-    markSeenRequest(useApiClient(), workspaceId),
-    (exit, notificationId) => {
-      if (Exit.isFailure(exit)) {
-        const failure = workspaceFailure(exit.cause);
-        const unseen = new Set(opened());
-        unseen.delete(notificationId);
-        setOpened(unseen);
-        setSeenError(failure);
-        events.failed?.("seen", failure);
-      }
-      const next = queue.shift();
-      if (next !== undefined) seen.run(next);
-    },
-    { when: () => session.session !== undefined },
-  );
+  const seen = useMutation(markSeen(workspaceId));
+  async function markOpenedSeen() {
+    for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+      const exit = await seen.run(next);
+      if (exit === undefined) return;
+      if (Exit.isSuccess(exit)) continue;
+      const failure = workspaceFailure(exit.cause);
+      const unseen = new Set(opened());
+      unseen.delete(next);
+      setOpened(unseen);
+      setSeenError(failure);
+      events.failed?.("seen", failure);
+    }
+  }
   // The last version of every notification read, so a retained one survives leaving Unread.
   const known = new Map<string, Item>();
   const read = () => (filter() === "pending" ? pending : all);
@@ -150,7 +127,8 @@ export function useInboxView(
       if (!entry?.unread) return;
       setOpened(new Set([...opened(), notificationId]));
       setSeenError(undefined);
-      if (!seen.run(notificationId)) queue.push(notificationId);
+      queue.push(notificationId);
+      if (!seen.pending()) void markOpenedSeen();
     },
     seenError,
     /** Mark everything seen through the newest notification listed; later arrivals stay unread. */

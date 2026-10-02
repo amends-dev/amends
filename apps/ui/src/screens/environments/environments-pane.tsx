@@ -16,8 +16,7 @@ import {
   providerName,
   runtimeLine,
   type EnvironmentSummary,
-  type EnvironmentsAction,
-  type EnvironmentsError,
+  type EnvironmentsFailure,
 } from "./wording.tsx";
 import * as s from "./environments.css.ts";
 
@@ -150,10 +149,7 @@ export interface EnvironmentListProps {
   /** Starts adding an environment, for a reader who may. */
   readonly onAdd?: () => void;
   /** A read or change that failed, outside any dialog. */
-  readonly failure?: {
-    readonly action: EnvironmentsAction | "refresh";
-    readonly error: EnvironmentsError;
-  };
+  readonly failure?: Pick<EnvironmentsFailure, "action" | "error">;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
 }

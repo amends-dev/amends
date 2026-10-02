@@ -36,7 +36,7 @@ function mount(credential: Session | undefined, fetch: typeof globalThis.fetch) 
         <output aria-label="State">{directory.state()._tag}</output>
         <output aria-label="Workspace">{workspace()?.workspace.name ?? "none"}</output>
         <button onClick={directory.retry}>Retry</button>
-        <button onClick={() => scope.replace(undefined)}>Clear</button>
+        <button onClick={scope.signOut}>Clear</button>
       </>
     );
   }

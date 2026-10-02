@@ -1,4 +1,4 @@
-import type { SettingsSection } from "../api/settings.ts";
+import type { SettingsTab } from "@amends/ui/screens/settings";
 export type WorkspacePage =
   | "home"
   | "inbox"
@@ -9,7 +9,7 @@ export type WorkspacePage =
   | "connections"
   | "settings";
 export const paths = {
-  settingsSection: (id: string, section: SettingsSection) =>
+  settingsSection: (id: string, section: SettingsTab) =>
     `/workspaces/${encodeURIComponent(id)}/settings/${section}`,
   signIn: "/sign-in",
   workspaces: "/workspaces",

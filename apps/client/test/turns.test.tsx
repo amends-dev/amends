@@ -2,8 +2,8 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/unstable/http";
-import { affectedKeys } from "../src/api/change-feed.ts";
-import { drafted, writing, type Drafts } from "../src/api/drafts.ts";
+import { affectedKeys } from "../src/live/api.ts";
+import { drafted, writing, type Drafts } from "../src/turns/drafts.ts";
 import {
   ClientProvider,
   DirectoryProvider,
@@ -13,7 +13,7 @@ import {
   useTurnLog,
   ChangeFeedProvider,
   type SessionStore,
-  type ThreadTurnEntry,
+  type ThreadEntry,
   type TurnControls,
 } from "../src/index.ts";
 
@@ -219,14 +219,16 @@ function fixture(options: { readonly atlasLeft?: boolean } = {}) {
     </ClientProvider>
   ));
   const turns = () =>
-    views.thread.entries().filter((entry): entry is ThreadTurnEntry => entry.kind === "turn");
+    views.thread
+      .entries()
+      .filter((entry): entry is Extract<ThreadEntry, { kind: "turn" }> => entry.kind === "turn");
   const turn = (id: string) => turns().find((entry) => entry.id === id);
   return { views, turns, turn, answers, writes };
 }
 
 it("shows each agent's turn where it took on the work, until it replies", async () => {
   const f = fixture();
-  await waitFor(() => expect(f.turn("atlas-1")?.agent.id).toBe("atlas"));
+  await waitFor(() => expect(f.turn("atlas-1")?.agentId).toBe("atlas"));
   await waitFor(() => expect(f.turn("atlas-1")?.agent.name).toBe("Atlas"));
   // Scout's first turn replied, so its reply stands for it.
   expect(
@@ -238,7 +240,8 @@ it("shows each agent's turn where it took on the work, until it replies", async 
     {
       id: "atlas-1",
       at: new Date(at(3)),
-      agent: { id: "atlas", memberId: "member-atlas", name: "Atlas" },
+      agentId: "atlas",
+      agent: { name: "Atlas" },
       state: "failed",
       failure: "Anthropic needs its API key.",
       stoppable: false,
@@ -252,7 +255,7 @@ it("shows each agent's turn where it took on the work, until it replies", async 
 
 it("offers no retry for an agent that stopped taking part after its turn", async () => {
   const f = fixture({ atlasLeft: true });
-  await waitFor(() => expect(f.turn("atlas-1")?.agent.id).toBe("atlas"));
+  await waitFor(() => expect(f.turn("atlas-1")?.agentId).toBe("atlas"));
   expect(f.turn("atlas-1")).toMatchObject({ state: "failed", retryable: false });
 });
 
@@ -260,7 +263,7 @@ it("stops a turn, and retries one again when the first answer is lost", async ()
   const f = fixture();
   await waitFor(() => expect(f.turn("atlas-1")?.retryable).toBe(true));
 
-  expect(f.views.controls.stop("scout-2")).toBe(true);
+  f.views.controls.stop("scout-2");
   expect(f.views.controls.acting()).toEqual({ kind: "stop", turnId: "scout-2" });
   await waitFor(() => expect(f.views.controls.acting()).toBeUndefined());
   // The command answers once the timeline shows the turn stopping.
@@ -272,11 +275,11 @@ it("stops a turn, and retries one again when the first answer is lost", async ()
 
   // A retry lost in transit asks again; a turn is retried once, so asking twice creates one turn.
   f.answers.push(new Response("unavailable", { status: 502 }));
-  expect(f.views.controls.retry("atlas-1")).toBe(true);
+  f.views.controls.retry("atlas-1");
   await waitFor(() =>
     expect(f.views.controls.problem()).toEqual({ turnId: "atlas-1", problem: "retry-failed" }),
   );
-  expect(f.views.controls.retry("atlas-1")).toBe(true);
+  f.views.controls.retry("atlas-1");
   await waitFor(() => expect(f.views.controls.acting()).toBeUndefined());
   const retries = f.writes.filter((write) => write.path.endsWith("/retry"));
   expect(retries).toHaveLength(2);

@@ -1,124 +1,107 @@
 # Amends client
 
-`@amends/client` supplies headless client state and operations to web and desktop.
-It owns API access, credential-scoped atom registries, session persistence/lifetime,
-directory validation, workspace lookup, and pure route-path helpers.
+`@amends/client` is the headless half of web and desktop. It talks to the host, keeps what it
+read current, and gives each screen a hook that returns what to show and the actions it offers.
+It renders nothing: web and desktop connect these hooks to [UI](../ui/README.md) screens and own
+routes, navigation, and page composition. Its hooks return the screens' own types, which it
+imports type-only from UI; UI imports nothing from client. The package lives under `apps/*`
+because its hooks use Solid and browser storage.
 
-Client and [UI](../ui/README.md) are
-independent peers. Neither depends on the other, including in tests and development tooling.
-Client contains no page markup, CSS, router integration, or Storybook. Web and desktop wire
-client hooks to UI screens and own routes, navigation, and page composition. Solid
-providers/hooks are headless state bindings.
-The package lives under `apps/*` because these bindings use Solid and browser storage;
-portable backend packages under `packages/*` remain Effect-only.
+## Layout
 
-## Public surface
+```text
+src/
+  provider.tsx    ClientProvider: the credential, and an API client and atom registry made for it
+  sign-in.ts      useSignIn
+  api/            shared plumbing: the client, failures, invalidation keys, useMutation,
+                  useChanges, refreshResult, the directory read
+  session/        the browser session store; DirectoryProvider, useDirectory, useWorkspace
+  live/           the change feed: its stream (api.ts), provider, status, and wake detection
+  workspaces/  conversations/  agents/  connections/  environments/  settings/  turns/
+                  one folder per feature: api.ts holds its reads and operations over the HTTP
+                  contract; the other files are the hooks its screens connect to
+  appearance/     AppearanceProvider, independent of the session
+  routing/        pure path helpers
+```
 
-- `ClientProvider` accepts an absolute `apiBaseUrl`, a `sessionStore`, and an optional
-  Effect HTTP transport. It supplies the typed client and a credential-scoped registry
-  to caller-owned children. It renders no DOM elements and selects no router/theme.
-- `useSession()` exposes the current credential, `replace`, `signOut`, `signedOut`, and
-  `isCurrent`. `signedOut` holds once the credential was cleared by signing out, here or in another
-  window, rather than rejected by the host, so the apps send the next person to sign-in without
-  returning to the page the previous one left.
-- `DirectoryProvider` validates a credential through `GET /me/workspaces` and exposes
-  `SignedOut`, `Loading`, `Ready { listing }`, or `Failed` through `useDirectory()`.
-  `retry` lets the consuming app decide when to repeat a failed read. Guests make no request.
-  The directory also refreshes when the page wakes, since invitations from other workspaces
-  reach no change feed.
-- `useWorkspace(() => workspaceId)` resolves an active membership from the directory.
-  The caller supplies identity; the hook does not read a router or render an access page.
-- `useApiClient()` gives named API modules access to the generated Effect client.
-- `useSignIn()` owns the email/code drafts, typed requests, pending/error state,
-  cancellation, and successful session installation. It has no presentation or
-  navigation behavior; see the [controller contract](src/sign-in/README.md).
-- `useCreateWorkspace()` owns the name draft, schema validation, idempotent creation,
-  and shared directory refresh. Its `memberName` draft, what people there will call the
-  creator, starts from `suggestedName(identity)`, which words an email address's local part;
-  a blank one sends none, and changing it starts a new creation key. Its `Ready` state follows a successful refresh;
-  `Created` preserves the result when only the refresh needs retry. Keys last for
-  the mounted intent, not across reloads. See [workspace entry](../../docs/workspace-entry.md).
-- `useWorkspacePicker()` shapes the directory for the workspace picker: active memberships
-  (`WorkspaceEntry`: name, member count, ownership), pending invitations (`InvitationEntry`,
-  with the expiry as a `Date`), `refreshFailed`, and `retry`. `accept(invitationId, name?)` joins,
-  as the trimmed name or as the identity when blank, one attempt at a time, and refreshes the
-  directory; `accepting()` reports the latest attempt's `pending`, `joined`, and
-  `AcceptInvitationError`. Once joined, accepting again only refreshes, and a later refresh that
-  drops the invitation settles a `refresh-failed` attempt. `suggestedName()` offers a first name.
-- `useWorkspaceAccess(() => workspaceId)` says why a workspace cannot open: `invited` (an
-  invitation outranks an ended membership), `removed`, or `unknown`.
-- `ChangeFeedProvider` keeps one workspace's reads current over its change feed while
-  mounted, and `useChangeFeed()` exposes `Connecting`, `Live`, `Reconnecting`, or `Ended`.
-  Commits invalidate the reads they affect; see [change feed](../../docs/change-feed.md).
-- `useWorkspaceSettings(workspaceId, section, { done })` shapes one settings tab for its screens,
-  with drafts, per-change failures, and completion; see [Settings](#settings). It is built on
-  `useSettings(workspaceId, section)`, which composes keyed settings reads with commands that
-  refresh them before reporting.
-- `useConnections(workspaceId, { done })` shapes the Connections page: installed providers, each
-  connection's setup, and its changes; see [Connections](#connections).
-- `useEnvironments(workspaceId, { done })` shapes the Environments page: installed harnesses and
-  providers, the accounts each provider runs under, and each environment's setup and changes; see
-  [Environments](#environments).
-- `useAgents(workspaceId, { selected, done })` shapes the Agents page: each agent's model access,
-  environment, role, and readiness, the model connections and roles to choose from, and each
-  environment's fit for a model; see [Agents](#agents).
-- `useAgentList`, `useEnvironmentList`, and `useConnectionList` give each destination's sidebar
-  its items by name, what keeps each from running as codes (issues, or a connection's setup and
-  what it is missing; and, for connections, what it gives), and whether the reader may add one.
-  Each shares its page's read, so both show the same items.
-- `useAgentStates(workspaceId)` gives each agent's issues and current activity by member ID, from
-  the agents read and the active turns, for the status patches on profile cards and one-to-one
-  conversations. The workspace layout mounts it, so every workspace page reads the agents.
-- `useThreadTurnControls(workspaceId, threadId)` stops and retries the agents' turns a thread's
-  timeline shows; see [Turns](#turns).
-- `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
-  conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
-  presentation to format. The view hooks shape them for screens; see [Views](#views).
-- `useChangeFeedStatus()` reports `connecting` or `reconnecting` once workspace changes have stopped
-  arriving for two seconds (`liveGrace`), and nothing while live or through brief drops. Mount it
-  inside `ChangeFeedProvider`.
-- `Session` reuses the existing session schema for validation and persistence.
-- `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
-  `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
-  `paths.group` and `paths.thread` name a group's page and a thread open beside it,
-  `paths.inboxThread` a thread open beside the inbox, `paths.agent`, `paths.environment`, and
-  `paths.connection` an item's page (and its Configuration or Sandbox tab), and
-  `paths.directDraft` a first message to people with no conversation yet; all resume after
-  sign-in.
+A feature's hooks return plain data and callbacks, typed as the screens' types: names instead of
+IDs where screens show names, and failure codes the screens word. Where a page links what a hook
+returns, the hook gives the screen's type without its hrefs and with the IDs the page links by. Each hook's doc comment states its contract; the tests in
+`test/` exercise them.
 
-Only `src/api` imports the HTTP contract and gateway session/directory schemas.
-Client cannot import UI, icons, styling, Storybook, router libraries, platform entry
-points, or backend implementations. UI cannot import client or API code. The repository
-boundary check enforces source imports and all dependency sections. The platform apps
-own the rendering boundary and may consume both public package surfaces.
+## Reads
 
-## Session lifetime
+Reads are atoms over the generated client, `client.query` or `client.runtime.atom`, shared by
+every consumer in a credential scope and live while mounted. Each registers an invalidation key
+from `api/keys.ts`: the directory, a workspace resource such as `members` or `agents`, or one
+group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, and the
+[change feed](../../docs/change-feed.md) invalidates the keys each commit affects, so whatever is
+mounted refreshes. Paged reads (group streams, timelines, the inbox) keep their pages in one atom
+and read on from its previous value, so a refresh never drops what is on screen.
 
-`ClientProvider` creates the API client once. Its session provider reads the store on
-mount. Replacing credentials remounts caller-owned descendants and disposes the previous
-atom registry, canceling requests and discarding cached data and local state. Each scope
-exposes `isCurrent` and a guarded `replace`; obsolete or disposed scopes cannot replace
-a newer session. Configuration is fixed for a provider's lifetime; remount to change hosts.
+## Writes
 
-The browser/webview store schema-decodes persisted sessions, removes malformed records,
-and keys credentials by normalized API URL. Matching local-storage changes, including a
-clear, synchronize same-origin windows. Web and desktop have separate origins/sessions.
-Blocked storage leaves the current provider usable in memory without persistence or
-cross-window synchronization.
+`useMutation(operation)` runs an operation, `(api, input) => Effect`, for the mounted owner, one at
+a time, and returns `{ pending, run, cancel }`. `run` answers with the operation's `Exit`, or with
+`undefined` when it did not start, was cancelled, or its owner unmounted, so an action reads top to
+bottom:
 
-Any request the host answers with `401` signs out the credential it carried, in the HTTP
-layer, so operations never handle it. The sign-out belongs to the credential scope that made
-the request: once that scope is replaced it does nothing, and it clears storage only while
-storage still holds the rejected credential, adopting a newer one another window stored. The
-app observes the transition and chooses its redirect. Other failures retain the credential
-and expose `Failed` plus retry. Missing or removed workspace membership resolves to
-`undefined`; the app chooses how to explain unavailable access without logging out.
+```ts
+const request = useMutation(renameSelf(workspaceId));
+async function save() {
+  setError(undefined);
+  const exit = await request.run(name());
+  if (exit === undefined) return;
+  if (Exit.isSuccess(exit)) saved();
+  else setError(workspaceFailure(exit.cause));
+}
+```
 
-Sign-out clears local state; it does not revoke a server token. The current host uses
+A hook exposes such an action as `save: () => void save()`. Unmounting interrupts the running
+operation; the server may still complete it.
+
+`useChanges({ write, reload, failed, done, outdated })` runs the changes of a page whose changes
+count as done only once their result shows: agents, connections, environments, and settings. It
+runs one change at a time, then `reload`s what the page shows. A failure stays with the change it
+belongs to. A stale one (`changed`, `denied`, or `gone`) makes changes wait for `refresh()`, as
+does a change whose result could not be read back (`refresh-failed`); the refresh that shows it
+completes it. `revision` counts refreshes, so rename drafts rebase on the name now shown.
+
+`refreshResult(atom)` refreshes a read from inside an operation and waits for the result that
+refresh produces. `workspaceFailure(cause)` classifies a failure as `changed`, `denied`, `gone`,
+`invalid`, or `failed`, from a map keyed by every failure the contract reports, so a new one fails
+to compile until it is placed. Readers' inputs decode through `command(schema)`, which reports a
+mismatch as `invalid` before any request.
+
+## Session
+
+`ClientProvider` takes an absolute `apiBaseUrl`, a `SessionStore`, and an optional HTTP transport.
+It reads the stored credential and makes an API client for it, which sends its token, and an atom
+registry. Signing in or out remounts everything under the provider with a new client and
+registry, which interrupts the old credential's requests and discards what it read. That remount
+is the only guard: no hook checks the session. `useSession()` gives the credential, `signIn`,
+`signOut`, and `signedOut`, which holds once the credential was cleared by signing out, here or in
+another window, rather than rejected, so the apps send the next person to sign-in afresh.
+
+A request the host answers with `401` signs the credential out in the API client, so operations
+never handle it. The sign-out clears storage only while storage still holds the rejected
+credential; a newer one another window stored is adopted instead. Signing out does not revoke the
+token on the server; the local host uses
 [development authentication](../../hosts/local/README.md#development-authentication).
-Token refresh, OS credential storage, and cross-device session synchronization remain
-future work. Pure path helpers restrict `returnTo` to internal workspace destinations;
-backend authorization remains authoritative.
+
+`createBrowserSessionStore(apiBaseUrl)` keeps the credential in local storage keyed by API URL,
+discards malformed records, follows other windows' changes, and falls back to memory when storage
+is blocked. `DirectoryProvider` validates the credential through `GET /me/workspaces`, keeps the
+last listing through refreshes, and refreshes when the page wakes, since invitations from other
+workspaces reach no change feed. `returnPath` limits where sign-in returns to internal workspace
+destinations.
+
+## Boundaries
+
+Only the modules in `api/` and each feature's `api.ts` import the HTTP contract and gateway
+schemas. Client imports UI's types only, as a development dependency, and no UI code, icons,
+styling, router, Storybook, platform entry points, or backend implementations; UI imports no
+client code. `bun run check:packages` enforces both across source and manifests.
 
 ## Verification
 
@@ -126,336 +109,8 @@ backend authorization remains authoritative.
 bun run --filter @amends/client typecheck
 bun run --filter @amends/client test
 bun run check
-bun run test
 ```
 
-Client tests use native test harnesses and isolated transports/stores without a UI
-package or router. They verify storage isolation/corruption/synchronization, stale
-scope completion, directory states, authorization failure, and retry.
-Sign-in tests cover shared-schema validation, typed wire payloads, rejection reasons,
-explicit retries, resend behavior, late responses, independent controller owners,
-and cancellation on unmount or credential replacement. Feed tests drive
-`ChangeFeedProvider` over a fake SSE transport: per-commit invalidation, reset,
-cursor resume, wake restarts, lost membership, rejected credentials, and closing
-on unmount or credential change. Web tests cover
-route guards, safe redirects, workspace changes, and cache/request disposal. Desktop
-tests verify its independent composition with the real hash router. UI owns component
-stories and portable interaction tests at port 6010; client has no workshop.
-
-After validation, directory refresh retains `Ready` with the last listing,
-`refreshing`, and `refreshFailed`, so consumers keep their drafts mounted. A failed
-initial read still exposes `Failed`; a rejected credential still clears the session.
-
-## Appearance
-
-AppearanceProvider is independent of session lifetime and supplies `useAppearance()`.
-The app injects an AppearanceSource with read/write, readPalette/writePalette, system, and subscribe operations;
-the provider owns preference, resolved light/dark state, and the independent palette choice
-(Neutral, Linen, Sage, or Slate). The source handles storage
-failures and platform listeners. Without a source, state stays in memory and system
-appearance resolves to light. Dispose/remount to change the source. Client owns no
-color values, styling, or platform appearance API.
-
-## Operations
-
-A controller runs its requests through two helpers. `requestAtom(client, operation)` in
-`src/api/request.ts` builds a private request atom whose answer carries the operation's exit,
-failures included, tagged with the attempt that asked. `useRequest(atom, settle)` runs it for one
-mounted owner, one operation at a time: `run` starts it, `cancel` interrupts it, and `settle`
-receives only the latest attempt's outcome while the owner is mounted and its credential scope is
-current. Controllers keep their own state and never track attempts themselves.
-
-`workspaceFailure(cause)` classifies a workspace operation's failure as `changed`, `denied`,
-`gone`, `invalid`, or `failed`. The map is keyed by every failure tag the contract reports for
-workspace, member, access, invitation, group, thread, and notification endpoints, so a new or
-renamed failure fails to compile
-until it is placed. Readers' inputs decode through `command(schema)`, which reports a mismatch as
-`Client.InvalidCommand` (`invalid`); a malformed response is `failed`. `isStale` is true for
-`changed`, `denied`, and `gone`: what the reader sees is out of date. Controllers expose these
-codes; the screens that show them own the reader-facing text.
-
-## Settings
-
-`useSettings(workspaceId, section)` owns one mounted settings scope, with typed reads,
-mutations, failure codes (`SettingsError`), and explicit refresh. The Workspace section reads
-settings and ownership; Members adds the roster and, for a reader who may read them, the
-invitations. Its `settled` option hears each change once its result is shown, including one whose
-read-back failed and succeeded on a later refresh. Only stale failures set
-`needsRefresh`, as does a completed command whose result could not be read back
-(`refresh-failed`); after a failed request or invalid input the reader can send again at once. Remount it when workspace or
-section identity changes. Its reads are keyed atoms, so the workspace change feed refreshes
-them in the background without marking the scope pending; commands refresh them, and the
-directory, before reporting `saved`. Inside operations, `refreshResult` waits for the result a
-refresh produces, because keyed reads can still show their previous settled value when the
-refresh starts. `useMemberName(workspaceId, saved)` changes what people in a workspace call the
-reader: `reset` starts from their name there or a suggestion, and `ready` holds while the draft is
-a valid, different name. The rename refreshes the members and the directory, and a
-`workspace.member.renamed` commit on the feed refreshes them for everyone else.
-Requests are credential-scoped and cancelled on disposal.
-
-`useWorkspaceSettings(workspaceId, section, { done })` is what the settings screens connect to.
-It shapes the workspace, its owner and transfer candidates, the roster (each member's workspace
-role, the roles the reader may give them, their access, and whether they may be removed), and
-invitations newest first with `pending`, `accepted`, `expired`, or `revoked`. It filters the roster
-by search and Active/Removed, and counts active members from the directory. Each change keeps
-what it was made against: `rename`, `transfer`, `role`, `invite`, `remove`, and `revoke`.
-`failure()` names the change that failed, or `refresh` for a read, with its `SettingsError`;
-`stale()` holds changes until `refresh()`, which keeps drafts and makes them against the values
-now shown. An invitation retried with the same recipient and role reuses its request key.
-`done` hears each completed change with whom it concerned and the invitation it created. See
-[workspace settings](../../docs/workspace-settings.md) for retry and draft behavior.
-
-## Connections
-
-`useConnections(workspaceId, { done })` is what the Connections screens connect to. It reads the
-implementations this host installed as `ConnectionProvider`s (settings, ways of authenticating,
-and model access) and the connections the reader may read as `ConnectionEntry`s: provider, the
-settings with their values, the endpoint, `setup` (`configured`, `needs-setup`, or `unavailable`
-when the host no longer installs its provider), what setup still needs, whether a key is saved,
-and whether the reader may manage it. Both reads share one invalidation key that `connection.*`
-commits and access changes refresh. `canCreate()` reads `connection.create`.
-
-Creating takes two steps: `create` drafts the provider, name, settings, and way of authenticating
-and saves the connection with a request key reused while the request is the same; `key` then
-saves the key, which the client keeps only until it is saved or `dismiss()` discards it. `rename`
-keeps the name it was made against, `configure` replaces the settings as a whole, and
-`key.clear` and `remove` need no draft. `failure()` reports `ConnectionsError`: a workspace
-failure, `storage-unavailable` when the host keeps no keys, `refresh-failed`, or `outdated`; stale
-failures hold changes until `refresh()`. `done` hears each completed change, with the connection
-it created and how that one authenticates, so a page can ask for its key next.
-
-## Environments
-
-`useEnvironments(workspaceId, { done })` is what the Environments screens connect to. It reads the
-harnesses and sandbox providers this host installed, the environments the reader may read as
-`EnvironmentEntry`s (harness, sandbox with its provider, placement, account, template, variables,
-commands, and retention, readiness issues, whether the reader may manage it, and who created it),
-and the connections, from which `accounts(providerId)` lists the accounts a provider runs under,
-ready ones first. Environments and their implementations share one invalidation key that
-`environment.*` commits, connection changes, and access changes refresh.
-
-`create` drafts the basics, then the sandbox settings when there is a sandbox; the draft lasts
-until it is saved or cancelled, so a page can detour to create an account and return. `placements`
-offers where the harness can run with the chosen sandbox. Sandbox settings are edited through a
-`SandboxEditor`, the same for a new environment and `configure.sandbox(id)`: account, template,
-variable rows with their issues, command rows that move, and retention, saved as the host's
-`SandboxSettings` with blank rows left out. `rename` keeps the name it was made against. A retried
-creation reuses its request key. `failure()` reports the change, its `EnvironmentsError`, and the
-`problems` the host named, such as `connection-unavailable`, keeping the draft.
-
-## Agents
-
-`useAgents(workspaceId, { selected, done })` is what the Agents screens connect to. It reads the
-agents the reader may read as `AgentEntry`s (name, role, instructions, model connection and model,
-reasoning, environment with its runtime, readiness issues as codes, whether the reader may
-configure and remove it, and who created it), the connections with model access as
-`ModelConnection`s with the models their provider suggests, the environments and their runtime,
-and the roles the reader may give from the workspace settings. Agents keep their own invalidation
-key, which `agent.*` commits, membership renames and removals, connection and environment
-changes, and access changes refresh.
-
-`create` drafts a name, a role (Member unless the reader chooses another they may give), and a
-configuration, lasting until saved or cancelled so a page can detour to create a model connection
-and return. The configuration is edited through a `ConfigurationEditor`, the same for a new agent
-and `configure.configuration(id)`: instructions, the connection (whose first suggested model fills
-an empty model), the model, reasoning, and the environment. `environments()` checks each
-environment against the draft's model access through the host's environment choices, once typing
-pauses, as `works`, `needs-setup` (still savable), or `cant-run` with its reasons; the choices for
-a saved agent follow `selected`, the agent open. A retried creation reuses its request key, and
-`rename` keeps the name it was made against. `failure()` reports the change, its `AgentsError`,
-and `problems`: a connection or environment no longer available, which also reloads the choices,
-reasons it cannot run, or an initial role only the owner gives, each keeping the draft.
-
-## Turns
-
-A thread's turns are part of its timeline: `useThreadConversation` folds each turn's activity into
-one `ThreadTurnEntry` where the agent took on the work, until the turn replies, when its replies
-stand for it (their message entries carry `turn`). An entry holds the agent by name, with its ID
-when the reader may see it, its `state` (`queued`, `working`, `stopping`, `done`, `failed`, or
-`stopped`), its failure as the host worded it, whether a request or the agent's departure stopped
-it, and whether the reader may stop or retry it now: they may when the agents read says they may
-direct the agent (`usable`); only a failed or requested-stopped turn that is its agent's latest in
-the thread retries, and not once the agent stopped taking part there. Pages read back from the
-newest, so a turn loaded with its start has every later item loaded too.
-
-`useThreadTurnControls(workspaceId, threadId)` stops and retries them: `stop(turnId)` and
-`retry(turnId)` read the thread's timeline again before answering; `acting()` names the one
-running. A turn is retried at
-most once, so asking again after a lost answer creates one turn.
-`problem()` reports why one did not go through as a `TurnCommandProblem` code the screens word
-(`stop-failed`, `retry-failed`, `finished`, `still-running`, `replied`, `superseded`, `departed`,
-`denied`, or `gone`), until another command starts or it is dismissed.
-
-`useTurnLog(workspaceId, turnId, { retried })` reads one turn and follows its log, shaping its
-activity, oldest first: accepted, started, each batch of input taken in (the first holding the request), each
-response with its text and whether it became the reply, interruptions, and how it ended; the
-interruption a failed turn ended on shows only as its failure when both say the same. `turn()`
-adds where it ran and the model access and environment it started with, by provider, model, and
-environment name. The turn is a read keyed by the turn, which its facts refresh; the log is
-followed by `turnLogFeed`, one subscription to `GET …/turns/:turnId/log/events` per turn while
-mounted, which opens with the log's items, applies each change in place, and stops once the turn
-ended and its last items arrived. A dropped subscription reconnects with the change feed's
-backoff and opens with the items as they stand. `draft()` is the response the agent is writing
-now, from its drafts: their text continues each response part at its offset, a repeat adds
-nothing, and text past a gap marks the draft broken until the completed response in the log
-replaces it; a turn that ends drops its drafts. `reconnecting()` says when the change feed or
-the log's subscription has been down for more than two seconds, and `updatedAt()` when the log
-last arrived. Its `stop` and `retry` refresh the turn too, and `retried` receives the turn a retry
-queued.
-
-`useTurnActivity(workspaceId)` reads the workspace's active turns in threads the reader may open,
-for marks where agents are at work: `inThread`, `inGroup` (working, then stopping, then queued),
-`ofAgent`, and `agentActivity`, an agent's most pressing state and the places it works, each thread
-by its group. It keeps the workspace's `active-turns` key, which turn facts and access changes
-refresh.
-
-## Views
-
-The view hooks shape conversation reads for the UI screens, which word what they show: client
-names people and groups and reports codes, and entries carry the `kind`, `id`, `at`, `author`,
-and `text` fields the screens' timeline takes.
-
-- `memberName(member)` is the name a member chose in the workspace, their identity until they
-  choose one, or "Former member". `usePeople(workspaceId)` names members and message authors,
-  and `mentionsOf(text)` names the members a message's markdown mentions by id, as they are
-  called now; entries carry the text with those `mentions` for the screens to render.
-- `useWorkspaceGroups(workspaceId)` lists the reader's groups as `GroupEntry` values: teams by
-  name, direct groups by their other people ("Only you" when alone), with pending counts, unseen
-  activity, when they were last active, whether a team is the workspace's general group, and what
-  the reader may do. `teams()` puts the general group first, then the rest by name; `directs()`
-  puts the most recently active first. `directWith(memberIds)` finds the direct group of exactly
-  those other people.
-- `useDirectMessages(workspaceId, suggestions?)` gives what Direct messages lists as
-  `DirectEntry` values: the reader's conversations, then up to six (`suggestions`) teammates,
-  people and agents, with no one-to-one conversation with the reader yet, by name.
-- `useGroupConversation(workspaceId, groupId)` gives a group's stream as `StreamEntry` values,
-  each thread's opening message with its reply count, whether replies are unread, and who is
-  typing. `useThreadConversation(workspaceId, threadId, focus?)` gives a thread's messages and
-  participation notes (`followed`, `unfollowed`, `left-group`, `removed-from-group`,
-  `removed-from-workspace`, with the reader as `self`), who is typing, and, given a timeline
-  position to show, reads back to it and reports its message as `focusId`. Both mark what they
-  show read while mounted and visible, and report `status`: `loading`, `unavailable` once a
-  refresh says the reader lost access (their entries empty until access returns), or `failed`.
-- `useInboxView(workspaceId, filter, retain, events?)` gives the inbox, all or only what is unread, as
-  `InboxEntry` values: why each came (`mention`, `reply`, or `thread`), its author, place, message
-  text and mentions, and thread, or no reason once its thread is unavailable. `open(id)` marks one seen at
-  once, as the reader opens it. Unread keeps `retain`, the notification open beside the inbox, in
-  place after it is seen. `unread` is the inbox's count, and `markAllSeen` marks everything
-  through the newest notification listed. A notification whose seen mark fails shows unread
-  again; `events.failed` hears of that failure, `"seen"`, and of `"all-seen"`. `useThreadConversation` reports `focusReason()`, why the
-  message at its focus notified the reader, for a thread opened from the inbox.
-- `useMentionCandidates(workspaceId, groupId)` lists a group's other members to mention.
-  `useGroupPeople(workspaceId, members)` lists a group's members for its settings, the reader
-  first, with who the reader may remove, and the workspace's other active members to add. In the
-  general group nobody can be removed, and `useGroupMembers` reports it `general` and not
-  `leavable`.
-  `useWorkspacePeople(workspaceId)` lists the workspace's other active members and agents.
-  `useMemberProfiles(workspaceId)` looks a member up by ID for their profile card: their name,
-  person or agent, whether they are the reader or were removed, and an agent's ID for its page.
-
-## Conversations
-
-Conversation reads live while mounted and share one read per workspace, group, or thread in a
-credential scope. `useGroups(workspaceId)` reads every page of the reader's groups;
-`useMembers(workspaceId)` finds members by ID to name authors and lists them `all` to choose from.
-`useWorkspacePermission(workspaceId, name)` says whether the reader may do something across the
-workspace, from the permissions read, which grant and ownership changes on the feed refresh. Each returns a `Read` whose
-`value` keeps the last success while it refreshes or a refresh fails, with `loading` for the
-first read and `failure` as a `WorkspaceFailure` code.
-
-`useGroupStream(workspaceId, groupId)` and `useThreadTimeline(workspaceId, threadId)` return a
-`PagedView`: items oldest first, opening at the newest page of 50, with `loadEarlier`,
-`loadingEarlier`, `earlierFailed`, and `complete`. An older page that fails reports
-`earlierFailed`, and `loadEarlier` then tries that page again. Both keep their pages in one atom and read its previous value,
-since a paging atom that restarts would drop older pages whenever a change arrives:
-
-- A timeline only grows, so a change reads what followed its newest item (`afterSequence`) and
-  appends it; `loadEarlier` reads the page before its oldest (`beforeSequence`, from the newest).
-- A stream's threads are ordered by start, but replies change their counts and unread state. A
-  change reads again from the newest down to the oldest thread shown, so nothing on screen drops
-  off; `loadEarlier` reads on to one page past it.
-
-Their keys are per item within a collection (`workspace/<id>/streams:<group>`,
-`workspace/<id>/timelines:<thread>`), so a commit refreshes only the stream and timeline it
-touches, and a reset refreshes them all through the collection key.
-
-`useNewThread(workspaceId, groupId)` and `useReply(workspaceId, threadId)` return a
-`ComposerController` for writing: a `draft` kept per group or thread in the credential scope, so
-it survives remounts and moving between threads, `ready` once it has text and nothing is sending,
-`pending`, an `error` code, and `send`. A send reuses its request key when the same text is
-retried, so a post that succeeded unseen is not repeated, and takes a new key for new text. The
-key is kept with the draft, so a send cut off by unmounting is retried with it after remounting. The
-draft clears once the message is posted. Posting invalidates the reads it changes, the group's
-stream and the groups for a new thread, the thread's timeline and the streams for a reply, so the
-message shows even while the change feed is away.
-`useDirectMessage(workspaceId, memberIds, started)` writes the first message to some people the
-same way, with a draft kept per set of people; posting it starts a thread in their direct group,
-creating the group when they have none, and `started` receives the group.
-
-The draft is markdown, as the composer writes it. `mentions` and `send` address the members its
-text links to as mentions (`ThreadMessage.mentionedIn`), so deleting a mention drops it, and a retry
-reuses its key only when both text and mentions match.
-`useGroupRoster(workspaceId, groupId)` reads a group's current members, whom its messages can
-mention, live over membership and grant changes.
-
-`useMarkThreadRead(workspaceId, threadId, through)` and `useMarkGroupRead(workspaceId, groupId,
-unreadSince)` record what the reader has seen while mounted and the page is visible
-(`usePageVisible`). Each takes an accessor that grows with newer activity: a thread's newest
-timeline position shown, or when a group's latest unread activity happened, undefined when there
-is none. Each value is sent once, one at a time; a failed mark is retried only once something
-newer is due. The server moves positions forward only and marks the notifications read seen.
-Marks refresh nothing themselves: the read-state signal each causes reaches every session of the
-reader through the change feed, this one included, and refreshes the groups, streams, and inbox
-it changed, as seeing notifications does.
-
-`useTyping(workspaceId)` returns who is typing in a thread now, from the change feed's typing
-signals, without the reader: each until the moment its signal names, or until that member's
-message is published, looking again when the soonest runs out. A reply's composer tells the
-thread's readers that the reader is typing when its draft grows, at most every 2.5 seconds; the
-server's signal lasts six.
-
-`useThreadFollow(workspaceId, groupId, threadId, events?)` and `useGroupFollow(workspaceId, groupId,
-events?)` return a `FollowController`: `following` once known, `pending`, an `error` code,
-`followable`, and `toggle`. Following a thread makes the reader take part in it, read from its
-participants, which change feed participation events refresh; unfollowing ends the reader's own
-participation by its ID. A group follows for the reader's own member, from the groups list. Both
-are `followable` only in team groups, from the groups list: everyone in a direct conversation takes
-part in all of it, and `toggle` there does nothing. A change shows at once while pending; the request refreshes the read and waits for it
-before answering, so the read then has the last word, including the participation that undoing a
-thread follow needs. `events.changed` hears of a change the read shows, and `events.failed` of
-one that failed, each with the state asked for.
-
-`useCreateGroup(workspaceId, created)` creates a team group from a `name`, the other `members`
-chosen, always adding the reader, and a `visibility`, private until set to public. A retry of the
-same group keeps its idempotency key, failures keep the input, `created` receives the new group's
-ID, and `reset` clears it.
-
-`usePublicGroups(workspaceId)` reads every page of the public groups the reader may join, with
-`members` and `joined`, live over group creation, renames, and membership changes the feed brings.
-`useJoinGroup(workspaceId, joined)` joins one at a time, naming the group in `joining`, then
-refreshes the groups, public groups, and inbox; a failure names its group in `error`.
-`paths.groups(workspaceId)` is where browsing public groups lives.
-
-`useRenameGroup(workspaceId, groupId, renamed)` renames a team group where the list says the reader
-may (`renamable`): `reset` starts from the current name, `ready` holds for a different valid name,
-and saving refreshes the groups. It renames from the name `reset` started from, so a rename made
-meanwhile fails as `changed` and refreshes the groups; saving again renames from that name.
-
-`useGroupMembers(workspaceId, groupId, { added, left })` reads the group's roster, with
-`rosterFailure` when it can no longer be read, and the reader's own admission, says whether they may add people (`manageable`), remove others (`membersRemovable`), and leave
-it (`leavable`), and adds
-several members, removes one, or leaves, one change at a time, with `changing` naming the change in
-flight. Each change refreshes the roster, stream, groups, and inbox; adding someone already added
-counts as added.
-
-`useInbox(workspaceId, filter)` is the reader's inbox newest first, `"all"` of it or only what is
-`"pending"`, as a `PagedView` of notifications with their sources: it opens at the newest 25,
-"earlier" reads 25 older ones, and a refresh reads down to the oldest shown, so new notifications
-arrive at the top. Notifications the change feed delivers to the reader, their read and seen
-signals, and group access changes refresh it. `useMarkSeen(workspaceId, notificationId)` marks one
-seen without opening it, showing `seen` once the host has recorded it; `useMarkAllSeen(workspaceId,
-events?)` marks everything still pending through the newest notification shown, telling
-`events.failed` when it fails; and `useInboxPending` reads how many
-are pending for the Inbox destination, including those from groups the reader left.
-`paths.inboxThread` takes the position that notified the reader as `?at=`. Marking a thread read refreshes the
-inbox, since it settles the reader's notifications from that thread.
+Tests mount hooks inside `ClientProvider` over fake fetch transports, with no UI or router. They
+cover sign-in, session storage and replacement, rejected credentials, the directory, the change
+feed over a fake event stream, and each feature's reads, writes, failures, and cancellation.

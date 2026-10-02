@@ -6,7 +6,7 @@ Workspace selection is the next feature.
 
 **Current composition.** This page records the original slice. Web and desktop now render
 the [UI](../apps/ui/README.md) `SignInEmail` and `SignInCode` screens, drawn from the Lunacy
-mocks, and switch between them on the [client controller](../apps/client/src/sign-in/README.md)'s
+mocks, and switch between them on the [client hook](../apps/client/src/sign-in.ts)'s
 step. The screens take its error codes and pending actions and own the wording, the delivery
 hint, and focus. The original slice's UI pieces and the features `SignIn` parts described below
 lived in packages that have since been removed; the sections that follow are historical.

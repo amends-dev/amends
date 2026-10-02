@@ -1,11 +1,4 @@
-import {
-  paths,
-  useConnections,
-  useWorkspace,
-  type ConnectionAction,
-  type ConnectionCapability,
-  type ConnectionEntry,
-} from "@amends/client";
+import { paths, useConnections, useWorkspace } from "@amends/client";
 import {
   ChooseProvider,
   ConfigureConnection,
@@ -16,6 +9,9 @@ import {
   ConnectionPane,
   ConnectionsPane,
   connectionsToast,
+  type ConnectionCapability,
+  type ConnectionSummary,
+  type ConnectionsAction,
   type ConnectionsTab,
 } from "@amends/ui/screens/connections";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
@@ -96,11 +92,11 @@ function Connections(props: { readonly workspaceId: string }) {
     ),
   );
   const add = () => setSearch({ add: search.kind ?? "connection" });
-  const failureOf = (action: ConnectionAction) => {
+  const failureOf = (action: ConnectionsAction) => {
     const failure = view.failure();
     return failure?.action === action ? failure.error : undefined;
   };
-  const pending = (action: ConnectionAction) => view.pending() === action;
+  const pending = (action: ConnectionsAction) => view.pending() === action;
   const refreshing = () => view.pending() === "refresh";
   const name = () => workspace()?.workspace.name ?? "";
   const tab = (): ConnectionsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
@@ -127,7 +123,7 @@ function Connections(props: { readonly workspaceId: string }) {
       .providers()
       .filter((provider) => wanted === undefined || provider.capability === wanted);
   };
-  const selected = (): ConnectionEntry | undefined =>
+  const selected = (): ConnectionSummary | undefined =>
     params.connectionId === undefined ? undefined : view.connection(params.connectionId);
   const listHref = (next: ConnectionsTab) => {
     const query = new URLSearchParams({

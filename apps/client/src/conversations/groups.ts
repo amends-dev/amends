@@ -1,18 +1,11 @@
+import type { GroupChangeError } from "@amends/ui/screens/group";
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import {
-  createGroupRequest,
-  isGroupName,
-  joinGroupRequest,
-  type Group,
-  type NewGroup,
-} from "../api/conversations.ts";
+import { createGroup, isGroupName, joinGroup, type Group, type NewGroup } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { newWorkspaceRequestKey } from "../api/workspaces.ts";
-import { useRequest } from "../request/use-request.ts";
+import { useMutation } from "../api/mutation.ts";
+import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 import { useWorkspace } from "../session/directory.tsx";
-import { useSession } from "../session/provider.tsx";
 
 export interface CreateGroupController {
   readonly name: Accessor<string>;
@@ -28,7 +21,7 @@ export interface CreateGroupController {
   readonly ready: Accessor<boolean>;
   readonly pending: Accessor<boolean>;
   /** Why the last attempt failed; the name and members are kept for another try. */
-  readonly error: Accessor<WorkspaceFailure | undefined>;
+  readonly error: Accessor<GroupChangeError | undefined>;
   /** Create the group with the reader in it; `created` receives its ID. */
   readonly create: () => void;
   /** Clear the name, members, and failure, as when the form closes. */
@@ -42,26 +35,35 @@ export function useCreateGroup(
   workspaceId: string,
   created: (groupId: string) => void,
 ): CreateGroupController {
-  const session = useSession();
   const membership = useWorkspace(() => workspaceId);
   const [name, setName] = createSignal(""),
     [members, setMembers] = createSignal<ReadonlyArray<string>>([]),
     [visibility, setVisibility] = createSignal<Group.Visibility>("Private"),
-    [error, setError] = createSignal<WorkspaceFailure>();
+    [error, setError] = createSignal<GroupChangeError>();
   let attempt: { readonly body: string; readonly key: NewGroup["key"] } | undefined;
-  const request = useRequest(
-    createGroupRequest(useApiClient(), workspaceId),
-    (exit) => {
-      if (Exit.isFailure(exit)) {
-        setError(workspaceFailure(exit.cause));
-        return;
-      }
-      attempt = undefined;
-      created(exit.value);
-    },
-    { when: () => session.session !== undefined },
-  );
+  const request = useMutation(createGroup(workspaceId));
   const ready = () => isGroupName(name()) && membership() !== undefined && !request.pending();
+  async function create() {
+    const self = membership()?.member.id;
+    if (!ready() || self === undefined) return;
+    const memberIds = [...new Set([self, ...members()])];
+    const body = JSON.stringify([name().trim(), memberIds, visibility()]);
+    if (attempt?.body !== body) attempt = { body, key: newWorkspaceRequestKey() };
+    setError(undefined);
+    const exit = await request.run({
+      name: name(),
+      memberIds,
+      visibility: visibility(),
+      key: attempt.key,
+    });
+    if (exit === undefined) return;
+    if (Exit.isFailure(exit)) {
+      setError(workspaceFailure(exit.cause));
+      return;
+    }
+    attempt = undefined;
+    created(exit.value);
+  }
   return {
     name,
     setName: (value) => {
@@ -81,15 +83,7 @@ export function useCreateGroup(
     ready,
     pending: request.pending,
     error,
-    create: () => {
-      const self = membership()?.member.id;
-      if (!ready() || self === undefined) return;
-      const memberIds = [...new Set([self, ...members()])];
-      const body = JSON.stringify([name().trim(), memberIds, visibility()]);
-      if (attempt?.body !== body) attempt = { body, key: newWorkspaceRequestKey() };
-      setError(undefined);
-      request.run({ name: name(), memberIds, visibility: visibility(), key: attempt.key });
-    },
+    create: () => void create(),
     reset: () => {
       request.cancel();
       attempt = undefined;
@@ -116,29 +110,18 @@ export function useJoinGroup(
   workspaceId: string,
   joined: (groupId: string) => void,
 ): JoinGroupController {
-  const session = useSession();
   const [joining, setJoining] = createSignal<string>(),
     [error, setError] = createSignal<{ groupId: string; failure: WorkspaceFailure }>();
-  const request = useRequest(
-    joinGroupRequest(useApiClient(), workspaceId),
-    (exit, groupId) => {
-      setJoining(undefined);
-      if (Exit.isFailure(exit)) {
-        setError({ groupId, failure: workspaceFailure(exit.cause) });
-        return;
-      }
-      joined(exit.value);
-    },
-    { when: () => session.session !== undefined },
-  );
-  return {
-    joining,
-    error,
-    join: (groupId) => {
-      if (request.pending()) return;
-      setError(undefined);
-      setJoining(groupId);
-      if (!request.run(groupId)) setJoining(undefined);
-    },
-  };
+  const request = useMutation(joinGroup(workspaceId));
+  async function join(groupId: string) {
+    if (request.pending()) return;
+    setError(undefined);
+    setJoining(groupId);
+    const exit = await request.run(groupId);
+    if (exit === undefined) return;
+    setJoining(undefined);
+    if (Exit.isFailure(exit)) setError({ groupId, failure: workspaceFailure(exit.cause) });
+    else joined(exit.value);
+  }
+  return { joining, error, join: (groupId) => void join(groupId) };
 }

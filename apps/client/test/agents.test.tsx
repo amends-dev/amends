@@ -3,7 +3,7 @@ import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { createSignal } from "solid-js";
 import { FetchHttpClient } from "effect/unstable/http";
-import { affectedKeys } from "../src/api/change-feed.ts";
+import { affectedKeys } from "../src/live/api.ts";
 import {
   ClientProvider,
   DirectoryProvider,
@@ -130,7 +130,8 @@ const viewOf = (agent: Stored) => ({
       : { _tag: "Ready" },
 });
 
-function fixture() {
+/** The host's agents; `active` holds the workspace's active turns. */
+function fixture(active: readonly unknown[] = []) {
   const server = {
     agents: [
       {
@@ -187,6 +188,29 @@ function fixture() {
     }
     if (path === "/workspaces/one/agents" && request.method === "GET")
       return json(server.agents.map(viewOf));
+    if (path === "/workspaces/one/active-turns") return json(active);
+    if (path === "/workspaces/one/groups")
+      return json([
+        {
+          group: {
+            id: "general",
+            workspaceId: "one",
+            kind: "Team",
+            visibility: "Public",
+            name: "general",
+            createdBy: "owner",
+            createdAt: "2026-09-28T12:00:00.000Z",
+          },
+          latestActivityAt: null,
+          readAt: null,
+          newActivity: false,
+          following: true,
+          pending: 0,
+          manageable: true,
+          membersRemovable: true,
+          renamable: true,
+        },
+      ]);
     if (!path.startsWith("/workspaces/one/agents")) return json({}, 404);
     const body = request.method === "DELETE" ? undefined : await request.json();
     writes.push({
@@ -244,6 +268,42 @@ function fixture() {
     setSelected,
   };
 }
+
+it("shows where each agent is at work, and its turns in progress", async () => {
+  const f = fixture([
+    {
+      id: "atlas-1",
+      workspaceId: "one",
+      groupId: "general",
+      threadId: "thread",
+      agentId: "atlas",
+      memberId: "member-atlas",
+      participationId: "p-member-atlas",
+      logAfter: null,
+      historyFrom: null,
+      retryOf: null,
+      status: "running",
+      inputAfterSequence: 0,
+      acceptedThroughSequence: 1,
+      incorporatedThroughSequence: 1,
+      selection: null,
+      messageIds: [],
+      failure: null,
+      cancelReason: null,
+      createdAt: "2026-09-28T12:01:00.000Z",
+      startedAt: "2026-09-28T12:02:00.000Z",
+      finishedAt: null,
+      stoppable: true,
+      retryable: false,
+    },
+  ]);
+  await waitFor(() =>
+    expect(f.view.agent("atlas")?.activity).toEqual({ state: "working", places: ["#general"] }),
+  );
+  expect(f.view.turns("atlas")).toEqual([{ id: "atlas-1", state: "working", where: "#general" }]);
+  expect(f.view.agent("helper")?.activity).toBeUndefined();
+  expect(f.view.turns("helper")).toEqual([]);
+});
 
 it("shapes agents with their model access, environment, role, and readiness", async () => {
   const f = fixture();

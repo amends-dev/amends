@@ -28,7 +28,7 @@ export interface PickerWorkspace {
 export interface PickerInvitation {
   readonly id: string;
   /** Once joined, focus moves to this workspace in the list. */
-  readonly workspaceId?: string;
+  readonly workspaceId: string;
   /** Absent when the reader may not see it yet. */
   readonly workspaceName?: string;
   readonly initials?: string;

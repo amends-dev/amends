@@ -12,8 +12,9 @@ to an application page. [Sign-in](sign-in-design.md) is the first slice.
 | `apps/ui`                  | Reusable visual components, patterns, and presentational screens.                     |
 | `apps/web`, `apps/desktop` | Route trees, page composition, navigation, configuration, and platform integration.   |
 
-Client and UI remain independent. A client view hook shapes state into what a screen shows,
-as codes rather than wording, and exposes the screen's actions; the screen takes data and
+UI never depends on client. A client view hook shapes state into what a screen shows, typed as
+the screen's own types, which it imports type-only from UI, as codes rather than wording, and
+exposes the screen's actions; the screen takes data and
 callbacks and owns its wording. Each app's page passes one to the other and owns only routing
 and which dialog is open.
 

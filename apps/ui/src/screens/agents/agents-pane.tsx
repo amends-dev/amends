@@ -18,8 +18,7 @@ import {
   modelLine,
   activityWords,
   type AgentSummary,
-  type AgentsAction,
-  type AgentsError,
+  type AgentsFailure,
 } from "./wording.tsx";
 import * as s from "./agents.css.ts";
 
@@ -156,10 +155,7 @@ export interface AgentListProps {
   /** Starts creating a model connection, for a reader who may add agents. */
   readonly onCreateConnection?: () => void;
   /** A read or change that failed, outside any dialog. */
-  readonly failure?: {
-    readonly action: AgentsAction | "refresh";
-    readonly error: AgentsError;
-  };
+  readonly failure?: Pick<AgentsFailure, "action" | "error">;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
 }

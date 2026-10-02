@@ -1,16 +1,18 @@
-export { ClientProvider, type ClientProviderProps } from "./provider.tsx";
+export {
+  ClientProvider,
+  useApiClient,
+  useSession,
+  type ClientProviderProps,
+  type SessionScope,
+} from "./provider.tsx";
 export {
   AppearanceProvider,
   useAppearance,
-  type AppearancePreference,
-  type PalettePreference,
   type AppearanceSource,
   type AppearanceScope,
   type SystemAppearance,
 } from "./appearance/provider.tsx";
-export { useApiClient } from "./api/context.tsx";
 export { Session } from "./api/contracts.ts";
-export { useSession, type SessionScope } from "./session/provider.tsx";
 export {
   DirectoryProvider,
   useDirectory,
@@ -21,110 +23,46 @@ export {
 export { paths, returnPath, signInPath, type WorkspacePage } from "./routing/paths.ts";
 export { resolveApiBaseUrl } from "./configuration.ts";
 export { createBrowserSessionStore, type SessionStore } from "./session/store.ts";
-export { useSignIn, type SignInController, type SignInState } from "./sign-in/controller.ts";
+export { useSignIn, type SignInController, type SignInState } from "./sign-in.ts";
 export {
   useCreateWorkspace,
   type CreateWorkspaceController,
   type CreateWorkspaceState,
 } from "./workspaces/create.ts";
 export {
-  useSettings,
-  type SettingsChange,
-  type SettingsController,
-  type SettingsError,
-  type SettingsOptions,
-} from "./settings/controller.ts";
-export {
   useWorkspaceSettings,
-  type MemberFilter,
-  type SettingsAccess,
-  type SettingsAction,
   type SettingsDone,
-  type SettingsFailure,
-  type SettingsInvitation,
-  type SettingsInvitationStatus,
-  type SettingsMember,
-  type SettingsPerson,
-  type SettingsRole,
   type WorkspaceSettingsView,
 } from "./settings/views.ts";
 export type { WorkspaceFailure } from "./api/failures.ts";
 export {
   useConnectionList,
   useConnections,
-  type ConnectionAction,
-  type ConnectionCapability,
-  type ConnectionEntry,
-  type ConnectionListEntry,
-  type ConnectionMethod,
-  type ConnectionProvider,
-  type ConnectionSetting,
-  type ConnectionSetup,
   type ConnectionsDone,
-  type ConnectionsError,
-  type ConnectionsFailure,
   type ConnectionsView,
 } from "./connections/views.ts";
 export {
   useEnvironmentList,
   useEnvironments,
-  type CreateStep,
-  type EnvironmentAction,
-  type EnvironmentEntry,
-  type EnvironmentIssue,
-  type EnvironmentListEntry,
   type EnvironmentsDone,
-  type EnvironmentsError,
-  type EnvironmentsFailure,
   type EnvironmentsView,
-  type HarnessChoice,
-  type Placement,
-  type SandboxAccount,
-  type SandboxEditor,
-  type SandboxProviderChoice,
 } from "./environments/views.ts";
-export type { CommandRow, Retention, SandboxDraft, VariableRow } from "./environments/draft.ts";
-export type { EnvironmentProblem, SandboxIssue } from "./api/environments.ts";
 export {
   useAgentList,
   useAgentStates,
   useAgents,
-  type AgentAction,
-  type AgentBlocker,
-  type AgentDraft,
-  type AgentEntry,
-  type AgentIssue,
-  type AgentListEntry,
-  type AgentRole,
-  type AgentState,
   type AgentsDone,
-  type AgentsError,
-  type AgentsFailure,
   type AgentsView,
   type ConfigurationEditor,
-  type EnvironmentFit,
-  type EnvironmentOption,
-  type ModelConnection,
 } from "./agents/views.ts";
-export type { AgentProblem, AgentReason } from "./api/agents.ts";
-export {
-  type SettingsData,
-  type SettingsSection,
-  type SettingsCommand,
-  invitationIntent,
-} from "./api/settings.ts";
+export { type SettingsData, type SettingsCommand, invitationIntent } from "./settings/api.ts";
 export {
   useWorkspacePicker,
   useWorkspaceAccess,
-  type AcceptAttempt,
-  type AcceptInvitationError,
-  type InvitationEntry,
-  type WorkspaceAccess,
-  type WorkspaceEntry,
   type WorkspacePickerController,
 } from "./workspaces/picker.ts";
 export { ChangeFeedProvider, useChangeFeed, type ChangeFeedScope } from "./live/change-feed.tsx";
-export type { ChangeFeedState } from "./api/change-feed.ts";
+export type { ChangeFeedState } from "./live/api.ts";
 export { useChangeFeedStatus, liveGrace } from "./live/status.ts";
 export {
   useGroups,
@@ -149,7 +87,7 @@ export type {
   NotificationInbox,
   Thread,
   ThreadTimeline,
-} from "./api/conversations.ts";
+} from "./conversations/api.ts";
 export { toDate } from "./conversations/time.ts";
 export {
   memberName,
@@ -162,22 +100,11 @@ export {
   useThreadConversation,
   useWorkspaceGroups,
   useWorkspacePeople,
-  type Author,
-  type ConversationStatus,
   type DirectEntry,
   type GroupEntry,
-  type MentionCandidate,
-  type MemberProfile,
-  type MentionedMember,
-  type ParticipationChange,
-  type RosterEntry,
-  type StreamEntry,
   type ThreadEntry,
-  type ThreadMessageEntry,
-  type ThreadNoteEntry,
-  type ThreadTurnEntry,
 } from "./conversations/views.ts";
-export { useInboxView, type InboxEntry, type NotificationReason } from "./conversations/inbox.ts";
+export { useInboxView } from "./conversations/inbox.ts";
 export {
   useNewThread,
   useDirectMessage,
@@ -207,19 +134,15 @@ export {
 export { useGroupMembers, type GroupMembersController } from "./conversations/members.ts";
 export { useRenameGroup, type RenameGroupController } from "./conversations/rename.ts";
 export { useMemberName, type MemberNameController } from "./workspaces/member-name.ts";
-export { suggestedName } from "./api/workspaces.ts";
+export { suggestedName } from "./workspaces/api.ts";
 export {
   activeState,
   useThreadTurnControls,
   useTurnActivity,
   useTurnLog,
   type ActiveTurn,
-  type TurnActivity,
   type TurnActivityView,
-  type TurnCommandProblem,
   type TurnControls,
-  type TurnDetail,
   type TurnEntry,
   type TurnLogView,
-  type TurnState,
 } from "./turns/views.ts";

@@ -1,3 +1,5 @@
+import type { ColorPalette } from "@amends/ui/foundations/theme";
+import type { Appearance } from "@amends/ui/screens/workspace-navigation";
 import {
   createContext,
   createMemo,
@@ -9,35 +11,31 @@ import {
   type ParentProps,
 } from "solid-js";
 
-export type AppearancePreference = "light" | "dark" | "system";
-export type SystemAppearance = Exclude<AppearancePreference, "system">;
-export type PalettePreference = "neutral" | "linen" | "sage" | "slate";
+export type SystemAppearance = Exclude<Appearance, "system">;
 /** Platform adapters tolerate unavailable storage and own system/window listeners. */
 export interface AppearanceSource {
-  readonly read: () => AppearancePreference;
-  readonly write: (preference: AppearancePreference) => void;
-  readonly readPalette: () => PalettePreference;
-  readonly writePalette: (palette: PalettePreference) => void;
+  readonly read: () => Appearance;
+  readonly write: (preference: Appearance) => void;
+  readonly readPalette: () => ColorPalette;
+  readonly writePalette: (palette: ColorPalette) => void;
   readonly system: () => SystemAppearance;
   readonly subscribe: (changed: () => void) => () => void;
 }
 export interface AppearanceScope {
-  readonly preference: Accessor<AppearancePreference>;
+  readonly preference: Accessor<Appearance>;
   readonly resolved: Accessor<SystemAppearance>;
-  readonly setPreference: (value: AppearancePreference) => void;
-  readonly palette: Accessor<PalettePreference>;
-  readonly setPalette: (value: PalettePreference) => void;
+  readonly setPreference: (value: Appearance) => void;
+  readonly palette: Accessor<ColorPalette>;
+  readonly setPalette: (value: ColorPalette) => void;
 }
 const Context = createContext<AppearanceScope>();
 
 /** Appearance is local to the application, independent of authenticated session lifetime. */
 export function AppearanceProvider(props: ParentProps<{ source?: AppearanceSource }>) {
   const source = props.source;
-  const [preference, setPreference] = createSignal<AppearancePreference>(
-    source?.read() ?? "system",
-  );
+  const [preference, setPreference] = createSignal<Appearance>(source?.read() ?? "system");
   const [system, setSystem] = createSignal<SystemAppearance>(source?.system() ?? "light");
-  const [palette, setPalette] = createSignal<PalettePreference>(source?.readPalette() ?? "neutral");
+  const [palette, setPalette] = createSignal<ColorPalette>(source?.readPalette() ?? "neutral");
   let alive = true;
   onCleanup(() => {
     alive = false;

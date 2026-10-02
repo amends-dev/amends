@@ -1,12 +1,12 @@
 import { useAtomValue } from "@effect/atom-solid";
-import { Exit, Option } from "effect";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { Effect, Exit, Option } from "effect";
+import { AsyncResult, type Atom } from "effect/unstable/reactivity";
 import { createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import { followRequest, groupsRead, participantsRead, type Follow } from "../api/conversations.ts";
+import { changeFollow, groupsRead, participantsRead, type Follow } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useRequest } from "../request/use-request.ts";
-import { useSession } from "../session/provider.tsx";
+import { useMutation } from "../api/mutation.ts";
+import { refreshResult } from "../api/refresh.ts";
+import { useApiClient } from "../provider.tsx";
 import { useWorkspace } from "../session/directory.tsx";
 
 export interface FollowController {
@@ -32,57 +32,53 @@ export interface FollowEvents {
   readonly failed?: (following: boolean, failure: WorkspaceFailure) => void;
 }
 /**
- * Follow state read from `known`, changed through `change`. A change shows until its request
- * answers, which is once the read has been refreshed, so the read has the last word.
+ * Follow state read from `known`, which `shows`, changed through `change`. A change shows until
+ * its request answers, which is once `shows` has been refreshed, so the read has the last word.
  */
 function useFollow(
   workspaceId: string,
   known: Accessor<boolean | undefined>,
+  shows: Atom.Atom<AsyncResult.AsyncResult<unknown, unknown>> | undefined,
   change: (following: boolean) => Follow | undefined,
   followable: Accessor<boolean>,
   events: FollowEvents,
 ): FollowController {
-  const session = useSession();
   const [expected, setExpected] = createSignal<boolean>(),
     [error, setError] = createSignal<WorkspaceFailure>();
-  const request = useRequest(
-    followRequest(useApiClient(), workspaceId),
-    (exit, follow) => {
-      setExpected(undefined);
-      const wanted = follow.kind === "follow-thread" || follow.kind === "follow-group";
-      if (Exit.isSuccess(exit)) {
-        if (known() === wanted) events.changed?.(wanted);
-        return;
-      }
-      const failure = workspaceFailure(exit.cause);
-      setError(failure);
-      events.failed?.(wanted, failure);
-    },
-    { when: () => session.session !== undefined },
+  // A refresh that fails leaves the read as it was.
+  const request = useMutation((api, follow: Follow) =>
+    changeFollow(workspaceId)(api, follow).pipe(
+      Effect.andThen(shows ? Effect.ignore(refreshResult(shows)) : Effect.void),
+    ),
   );
   const following = () => (request.pending() ? expected() : undefined) ?? known();
-  return {
-    following,
-    pending: request.pending,
-    error,
-    followable,
-    toggle: () => {
-      const current = following();
-      if (current === undefined || request.pending() || !followable()) return;
-      const follow = change(!current);
-      if (!follow) return;
-      setError(undefined);
-      setExpected(!current);
-      request.run(follow);
-    },
-  };
+  async function toggle() {
+    const current = following();
+    if (current === undefined || request.pending() || !followable()) return;
+    const follow = change(!current);
+    if (!follow) return;
+    setError(undefined);
+    setExpected(!current);
+    const exit = await request.run(follow);
+    if (exit === undefined) return;
+    setExpected(undefined);
+    if (Exit.isSuccess(exit)) {
+      if (known() === !current) events.changed?.(!current);
+      return;
+    }
+    const failure = workspaceFailure(exit.cause);
+    setError(failure);
+    events.failed?.(!current, failure);
+  }
+  return { following, pending: request.pending, error, followable, toggle: () => void toggle() };
 }
-/** The reader's entry for a group in their groups list, once read. */
+/** The reader's entry for a group in their groups list, once read, and the read itself. */
 function useGroupItem(workspaceId: string, groupId: string) {
   const read = groupsRead(useApiClient(), workspaceId);
   const groups = read ? useAtomValue(() => read) : () => AsyncResult.initial();
-  return () =>
+  const item = () =>
     Option.getOrUndefined(AsyncResult.value(groups()))?.find((entry) => entry.group.id === groupId);
+  return { item, read };
 }
 /**
  * Follow a thread of a team group, taking part in it so that its replies reach the reader, or
@@ -94,7 +90,7 @@ export function useThreadFollow(
   threadId: string,
   events: FollowEvents = {},
 ): FollowController {
-  const group = useGroupItem(workspaceId, groupId);
+  const group = useGroupItem(workspaceId, groupId).item;
   const read = participantsRead(useApiClient(), workspaceId, threadId);
   const participants = read ? useAtomValue(() => read) : () => AsyncResult.initial();
   const self = useWorkspace(() => workspaceId);
@@ -109,6 +105,7 @@ export function useThreadFollow(
   return useFollow(
     workspaceId,
     () => Option.getOrUndefined(Option.map(mine(), (summary) => summary !== undefined)),
+    read,
     (following) => {
       if (following) return { kind: "follow-thread", threadId };
       const summary = Option.getOrUndefined(mine());
@@ -124,11 +121,12 @@ export function useGroupFollow(
   groupId: string,
   events: FollowEvents = {},
 ): FollowController {
-  const item = useGroupItem(workspaceId, groupId);
+  const { item, read } = useGroupItem(workspaceId, groupId);
   const self = useWorkspace(() => workspaceId);
   return useFollow(
     workspaceId,
     () => item()?.following,
+    read,
     (following) => {
       const memberId = self()?.member.id;
       if (!memberId) return undefined;

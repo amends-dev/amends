@@ -1,10 +1,9 @@
+import type { GroupChangeError } from "@amends/ui/screens/group";
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import { isGroupName, renameGroupRequest } from "../api/conversations.ts";
-import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { useRequest } from "../request/use-request.ts";
-import { useSession } from "../session/provider.tsx";
+import { isGroupName, renameGroup } from "./api.ts";
+import { workspaceFailure } from "../api/failures.ts";
+import { useMutation } from "../api/mutation.ts";
 import { useGroups } from "./reads.ts";
 
 export interface RenameGroupController {
@@ -19,7 +18,7 @@ export interface RenameGroupController {
   readonly ready: Accessor<boolean>;
   readonly pending: Accessor<boolean>;
   /** Why the last attempt failed; the new name is kept for another try. */
-  readonly error: Accessor<WorkspaceFailure | undefined>;
+  readonly error: Accessor<GroupChangeError | undefined>;
   /**
    * Save the new name over the one the form started from; `renamed` runs once it is saved. If
    * someone renamed the group meanwhile, it fails as `changed`, and saving again replaces their
@@ -35,7 +34,6 @@ export function useRenameGroup(
   groupId: string,
   renamed: () => void,
 ): RenameGroupController {
-  const session = useSession();
   const groups = useGroups(workspaceId);
   const item = () => groups.value()?.find((entry) => entry.group.id === groupId);
   const current = () => {
@@ -43,23 +41,25 @@ export function useRenameGroup(
     return group?.kind === "Team" ? group.name : undefined;
   };
   const [name, setName] = createSignal(""),
-    [error, setError] = createSignal<WorkspaceFailure>(),
+    [error, setError] = createSignal<GroupChangeError>(),
     // The name the reader is renaming from; after a conflict, whatever the group is called then.
     [expected, setExpected] = createSignal<string>();
-  const request = useRequest(
-    renameGroupRequest(useApiClient(), workspaceId),
-    (exit) => {
-      if (Exit.isFailure(exit)) {
-        const failure = workspaceFailure(exit.cause);
-        if (failure === "changed") setExpected(undefined);
-        setError(failure);
-        return;
-      }
-      renamed();
-    },
-    { when: () => session.session !== undefined },
-  );
+  const request = useMutation(renameGroup(workspaceId));
   const ready = () => isGroupName(name()) && name().trim() !== current() && !request.pending();
+  async function save() {
+    const from = expected() ?? current();
+    if (!ready() || from === undefined) return;
+    setError(undefined);
+    const exit = await request.run({ groupId, name: name(), expectedName: from });
+    if (exit === undefined) return;
+    if (Exit.isSuccess(exit)) {
+      renamed();
+      return;
+    }
+    const failure = workspaceFailure(exit.cause);
+    if (failure === "changed") setExpected(undefined);
+    setError(failure);
+  }
   return {
     renamable: () => item()?.renamable ?? false,
     current,
@@ -71,12 +71,7 @@ export function useRenameGroup(
     ready,
     pending: request.pending,
     error,
-    save: () => {
-      const from = expected() ?? current();
-      if (!ready() || from === undefined) return;
-      setError(undefined);
-      request.run({ groupId, name: name(), expectedName: from });
-    },
+    save: () => void save(),
     reset: () => {
       setName(current() ?? "");
       setExpected(current());

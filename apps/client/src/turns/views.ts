@@ -1,34 +1,35 @@
+import type { TurnState } from "@amends/ui/components/turn-status";
+import type { AgentActivity } from "@amends/ui/screens/agents";
+import type {
+  ThreadTurnControls,
+  TurnLogActivity,
+  TurnLogTurn,
+  TurnProblem,
+} from "@amends/ui/screens/turns";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Exit, Option } from "effect";
+import { Effect, Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/unstable/reactivity";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { agentsReads } from "../api/agents.ts";
-import { timelineRead } from "../api/conversations.ts";
-import { useApiClient } from "../api/context.tsx";
-import { writing } from "../api/drafts.ts";
+import { agentsReads } from "../agents/api.ts";
+import { timelineRead } from "../conversations/api.ts";
+import { useApiClient } from "../provider.tsx";
+import { writing } from "./drafts.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import {
   activeTurnsRead,
   turnRead,
-  turnProblem,
-  turnsRequest,
+  turnRefusal,
+  controlTurn,
   type Turn,
-  type TurnProblem,
-} from "../api/turns.ts";
+  type TurnCommand,
+  turnLogFeed,
+} from "./api.ts";
 import { useMembers } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName, useWorkspaceGroups } from "../conversations/views.ts";
-import { turnLogFeed } from "../api/turn-log.ts";
 import { useLastingDown, useChangeFeedStatus } from "../live/status.ts";
-import { useRequest } from "../request/use-request.ts";
-
-export type { TurnProblem };
-
-/**
- * Where an agent's turn stands: waiting to start, working, stopping as asked, done with or
- * without a reply, failed, or stopped.
- */
-export type TurnState = "queued" | "working" | "stopping" | "done" | "failed" | "stopped";
+import { useMutation } from "../api/mutation.ts";
+import { refreshResult } from "../api/refresh.ts";
 
 /** An agent's turn on a thread, as a thread shows it. */
 export interface TurnEntry {
@@ -130,52 +131,24 @@ function useRead<A, E>(read: Atom.Atom<AsyncResult.AsyncResult<A, E>> | undefine
 
 /** Stopping and retrying one thread's turns. */
 export interface TurnControls {
-  /** Ask a turn to stop. Returns whether the request started. */
-  readonly stop: (turnId: string) => boolean;
-  /** Run a failed or stopped turn again. Returns whether the request started. */
-  readonly retry: (turnId: string) => boolean;
+  /** Ask a turn to stop, unless a stop or retry is running. */
+  readonly stop: (turnId: string) => void;
+  /** Run a failed or stopped turn again, unless a stop or retry is running. */
+  readonly retry: (turnId: string) => void;
   /** The stop or retry running now, and for which turn. */
-  readonly acting: Accessor<
-    { readonly kind: "stop" | "retry"; readonly turnId: string } | undefined
-  >;
+  readonly acting: Accessor<ThreadTurnControls["acting"]>;
   /** Why the last stop or retry did not go through, until another starts or it is dismissed. */
-  readonly problem: Accessor<
-    { readonly turnId: string; readonly problem: TurnCommandProblem } | undefined
-  >;
+  readonly problem: Accessor<ThreadTurnControls["problem"]>;
   readonly dismiss: () => void;
 }
-
-/**
- * Why a stop or retry did not go through, as a code the screens word: it failed on the way, the
- * turn already finished, it cannot run again (still running, replied, superseded, or its agent
- * left), the reader may not direct its agent, or the turn left their reach.
- */
-export type TurnCommandProblem =
-  | "stop-failed"
-  | "retry-failed"
-  | "finished"
-  | "still-running"
-  | "replied"
-  | "superseded"
-  | "departed"
-  | "denied"
-  | "gone";
-
-const refusals = {
-  active: "still-running",
-  completed: "replied",
-  superseded: "superseded",
-  departed: "departed",
-} as const satisfies Record<Turn.NotRetryableReason, TurnCommandProblem>;
 
 /** A failed command's cause as the problem it names. */
 const commandProblem = (
   command: "stop" | "retry",
   refused: TurnProblem | undefined,
   failure: WorkspaceFailure,
-): TurnCommandProblem => {
-  if (refused?.kind === "finished") return "finished";
-  if (refused?.kind === "not-retryable") return refusals[refused.reason];
+): TurnProblem => {
+  if (refused !== undefined) return refused;
   if (failure === "denied" || failure === "gone") return failure;
   return command === "stop" ? "stop-failed" : "retry-failed";
 };
@@ -195,31 +168,39 @@ function useControls(
   },
 ): TurnControls {
   const client = useApiClient();
-  const [acting, setActing] = createSignal<
-    { readonly kind: "stop" | "retry"; readonly turnId: string } | undefined
-  >();
+  const timeline = threadId === undefined ? undefined : timelineRead(client, workspaceId, threadId);
+  const [acting, setActing] = createSignal<ThreadTurnControls["acting"]>();
   const [problem, setProblem] = createSignal<ReturnType<TurnControls["problem"]>>();
-  const request = useRequest(turnsRequest(client, workspaceId, threadId), (exit, command) => {
+  // A command answers once the thread's timeline, and the turn when its log is open, show it.
+  const request = useMutation((api, command: TurnCommand) =>
+    controlTurn(workspaceId)(api, command).pipe(
+      Effect.tap(() => (timeline ? Effect.ignore(refreshResult(timeline.atom)) : Effect.void)),
+      Effect.tap(() => {
+        const turn = options.log ? turnRead(client, workspaceId, command.turnId) : undefined;
+        return turn ? Effect.ignore(refreshResult(turn)) : Effect.void;
+      }),
+    ),
+  );
+  async function act(kind: "stop" | "retry", turnId: string) {
+    if (request.pending()) return;
+    setProblem(undefined);
+    setActing({ kind, turnId });
+    const exit = await request.run({ kind, turnId });
+    if (exit === undefined) return;
     setActing(undefined);
     if (Exit.isSuccess(exit)) {
-      if (command.kind === "retry") options.retried?.(exit.value.id);
+      if (kind === "retry") options.retried?.(exit.value.id);
       return;
     }
     setProblem({
-      turnId: command.turnId,
-      problem: commandProblem(command.kind, turnProblem(exit.cause), workspaceFailure(exit.cause)),
+      turnId,
+      problem: commandProblem(kind, turnRefusal(exit.cause), workspaceFailure(exit.cause)),
     });
     options.refresh();
-  });
-  const start = (kind: "stop" | "retry", turnId: string) => {
-    if (!request.run({ kind, turnId, log: options.log })) return false;
-    setProblem(undefined);
-    setActing({ kind, turnId });
-    return true;
-  };
+  }
   return {
-    stop: (turnId) => start("stop", turnId),
-    retry: (turnId) => start("retry", turnId),
+    stop: (turnId) => void act("stop", turnId),
+    retry: (turnId) => void act("retry", turnId),
     acting,
     problem,
     dismiss: () => setProblem(undefined),
@@ -236,50 +217,12 @@ export function useThreadTurnControls(workspaceId: string, threadId: string): Tu
   return useControls(workspaceId, threadId, { log: false, refresh });
 }
 
-/** One entry of a turn's activity, oldest first, as its log shows it. */
-export type TurnActivity =
-  /** The agent took on work from the thread. */
-  | { readonly kind: "accepted"; readonly at: Date }
-  | { readonly kind: "started"; readonly at: Date }
-  /** The harness took in a batch of the thread's messages; the first holds the request. */
-  | {
-      readonly kind: "input";
-      readonly at: Date;
-      readonly messages: number;
-      readonly first: boolean;
-    }
-  /** A response wrote text; those the turn owes are posted as replies when it closes. */
-  | {
-      readonly kind: "response";
-      readonly at: Date;
-      readonly id: string;
-      readonly text: string;
-      readonly posted: boolean;
-    }
-  /** Execution stopped short and the same turn continues, when it can. */
-  | {
-      readonly kind: "interrupted";
-      readonly at: Date;
-      readonly reason: string;
-      readonly retrying: boolean;
-    }
-  | { readonly kind: "replied"; readonly at: Date; readonly messageId: string }
-  | { readonly kind: "finished"; readonly at: Date }
-  | { readonly kind: "failed"; readonly at: Date; readonly reason: string }
-  | { readonly kind: "stopped"; readonly at: Date; readonly by: "request" | "departure" };
-
-/** A turn as its log shows it: where it ran, with what model access. */
-export interface TurnDetail extends TurnEntry {
-  readonly groupName: string | undefined;
-  /** The model access it started with, by provider and model; undefined before it starts. */
-  readonly model: { readonly provider: string | undefined; readonly model: string } | undefined;
-  /** The environment it started in, by name when the reader may read it. */
-  readonly environment: string | undefined;
-}
-
 export interface TurnLogView extends TurnControls {
-  readonly turn: Accessor<TurnDetail | undefined>;
-  readonly activity: Accessor<ReadonlyArray<TurnActivity>>;
+  /** The turn, with its agent's ID for the page that fixes its setup. */
+  readonly turn: Accessor<
+    (Omit<TurnLogTurn, "agentHref"> & { readonly agentId: string }) | undefined
+  >;
+  readonly activity: Accessor<ReadonlyArray<TurnLogActivity>>;
   /**
    * The response the agent is writing now, before it completes: its text so far, and whether some
    * of it went missing on the way, so the rest shows once it completes.
@@ -333,30 +276,41 @@ export function useTurnLog(
     return current === "gone" || current === "denied";
   };
 
-  const turn = createMemo((): TurnDetail | undefined => {
+  const entry = createMemo(() => {
     const view = read.value();
-    if (view === undefined || lost()) return undefined;
-    const entry = entryOf(view);
-    const selection = view.selection;
+    return view === undefined || lost() ? undefined : entryOf(view);
+  });
+  const turn = createMemo(() => {
+    const current = entry(),
+      selection = read.value()?.selection;
+    if (current === undefined || selection === undefined) return undefined;
+    const group = groups.group(current.groupId);
     const connection = connections.value()?.find((item) => item.id === selection?.connectionId);
     const provider = implementations
       .value()
       ?.find((item) => item.id === connection?.implementationId)?.name;
     return {
-      ...entry,
-      groupName: groups.group(entry.groupId)?.name,
-      model: selection === null ? undefined : { provider, model: selection.model },
+      agentId: current.agent.id,
+      agent: { name: current.agent.name },
+      state: current.state,
+      where:
+        group?.kind === "direct" ? `Thread with ${group.name}` : `Thread in #${group?.name ?? ""}`,
+      model:
+        selection === null ? undefined : [provider, selection.model].filter(Boolean).join(" · "),
       environment:
         selection === null
           ? undefined
           : environments.value()?.find((item) => item.id === selection.environmentId)?.name,
+      stoppable: current.stoppable,
+      retryable: current.retryable,
+      replyId: current.replyId,
     };
   });
-  const activity = createMemo((): ReadonlyArray<TurnActivity> => {
+  const activity = createMemo((): ReadonlyArray<TurnLogActivity> => {
     const logged = feed()?.items;
-    const current = turn();
+    const current = entry();
     if (logged === undefined || current === undefined) return [];
-    const items: Array<TurnActivity> = [{ kind: "accepted", at: current.createdAt }];
+    const items: Array<TurnLogActivity> = [{ kind: "accepted", at: current.createdAt }];
     if (current.startedAt !== undefined) items.push({ kind: "started", at: current.startedAt });
     for (const item of logged) {
       const at = toDate(item.at);
@@ -387,9 +341,7 @@ export function useTurnLog(
     if (at !== undefined) {
       if (current.state === "done")
         items.push(
-          current.replyId === undefined
-            ? { kind: "finished", at }
-            : { kind: "replied", at, messageId: current.replyId },
+          current.replyId === undefined ? { kind: "finished", at } : { kind: "replied", at },
         );
       else if (current.state === "failed") {
         const reason = current.failure ?? "";
@@ -403,7 +355,7 @@ export function useTurnLog(
     return items;
   });
   const draft = createMemo(() => {
-    const current = turn();
+    const current = entry();
     if (current === undefined || current.state !== "working") return undefined;
     const following = feed();
     if (following === undefined) return undefined;
@@ -441,8 +393,8 @@ export function useTurnLog(
 
 /** An agent's active turn somewhere in the workspace. */
 export interface ActiveTurn extends TurnEntry {
-  readonly groupName: string | undefined;
-  readonly groupKind: "team" | "direct" | undefined;
+  /** Where it runs: its group, as "#general", or the people of a direct conversation. */
+  readonly place: string;
 }
 
 export interface TurnActivityView {
@@ -458,11 +410,7 @@ export interface TurnActivityView {
    * An agent's current activity, by its member ID: its most pressing state, and where it works,
    * each thread by its group, as "#general" for a team or the people of a direct group.
    */
-  readonly agentActivity: (
-    memberId: string,
-  ) =>
-    | { readonly state: "working" | "stopping" | "queued"; readonly places: readonly string[] }
-    | undefined;
+  readonly agentActivity: (memberId: string) => AgentActivity | undefined;
 }
 
 const urgency = { working: 0, stopping: 1, queued: 2 } as const;
@@ -476,7 +424,10 @@ export function useTurnActivity(workspaceId: string): TurnActivityView {
     (read.value() ?? []).map((turn) => {
       const entry = entryOf(turn);
       const group = groups.group(entry.groupId);
-      return { ...entry, groupName: group?.name, groupKind: group?.kind };
+      return {
+        ...entry,
+        place: group?.kind === "direct" ? group.name : `#${group?.name ?? "group"}`,
+      };
     }),
   );
   return {
@@ -496,14 +447,7 @@ export function useTurnActivity(workspaceId: string): TurnActivityView {
         .filter((state) => state in urgency)
         .toSorted((left, right) => urgency[left] - urgency[right]);
       if (state === undefined) return undefined;
-      return {
-        state,
-        places: turns.map((turn) =>
-          turn.groupKind === "direct"
-            ? (turn.groupName ?? "A conversation")
-            : `#${turn.groupName ?? "group"}`,
-        ),
-      };
+      return { state, places: turns.map((turn) => turn.place) };
     },
   };
 }

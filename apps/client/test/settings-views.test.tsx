@@ -9,8 +9,8 @@ import {
   useWorkspaceSettings,
   type SessionStore,
   type SettingsDone,
-  type SettingsSection,
 } from "../src/index.ts";
+import type { SettingsTab } from "@amends/ui/screens/settings";
 
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>
@@ -62,7 +62,7 @@ const invitation = (id: string, issued: number, state: object = { _tag: "Pending
   state,
 });
 
-function fixture(section: SettingsSection = "members") {
+function fixture(section: SettingsTab = "members") {
   const server = {
     adaAssignment: "a-ada",
     invitations: [
@@ -185,20 +185,23 @@ it("shapes the roster, its roles, and every invitation for the Members tab", asy
   await waitFor(() => expect(f.view.members()).toHaveLength(3));
   const [alice, adaRow, botRow] = f.view.members();
   // The owner's role changes only by transferring ownership.
-  expect(alice).toMatchObject({ name: "Alice", you: true, role: { name: "Owner" }, roles: [] });
+  expect(alice).toMatchObject({ name: "Alice", you: true, role: "Owner" });
+  expect(f.view.role.choices("owner")).toEqual([]);
   expect(adaRow).toMatchObject({
     name: "Ada",
     you: false,
     signIn: "ada@example.test",
-    role: { id: "builtin:member", name: "Member" },
-    roles: [
-      { id: "builtin:member", name: "Member" },
-      { id: "builtin:administrator", name: "Administrator" },
-    ],
+    role: "Member",
     access: [{ name: "Member", scope: "workspace", active: true }],
-    removable: true,
   });
-  expect(botRow).toMatchObject({ agent: true, access: undefined, roles: [] });
+  expect(f.view.role.of("ada")).toBe("builtin:member");
+  expect(f.view.role.choices("ada")).toEqual([
+    { id: "builtin:member", name: "Member" },
+    { id: "builtin:administrator", name: "Administrator" },
+  ]);
+  expect(f.view.removable("ada")).toBe(true);
+  expect(botRow).toMatchObject({ agent: true, access: undefined });
+  expect(f.view.role.choices(botRow!.id)).toEqual([]);
   await waitFor(() => expect(f.view.workspace()?.creator.name).toBe("Alice"));
   expect(f.view.memberCount()).toBe(2);
   expect(f.view.permissions()).toEqual({

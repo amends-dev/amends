@@ -1,12 +1,11 @@
+import type { ChangeNameError } from "@amends/ui/screens/account";
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import type { WorkspaceFailure } from "../api/failures.ts";
 import { workspaceFailure } from "../api/failures.ts";
-import { isMemberName, renameSelfRequest, suggestedName } from "../api/workspaces.ts";
-import { useRequest } from "../request/use-request.ts";
+import { useMutation } from "../api/mutation.ts";
+import { isMemberName, renameSelf, suggestedName } from "./api.ts";
+import { useSession } from "../provider.tsx";
 import { useWorkspace } from "../session/directory.tsx";
-import { useSession } from "../session/provider.tsx";
 
 export interface MemberNameController {
   /** What people in the workspace call the reader now, if they chose a name. */
@@ -17,7 +16,7 @@ export interface MemberNameController {
   /** The new name is valid, differs from the current one, and nothing is saving. */
   readonly ready: Accessor<boolean>;
   readonly pending: Accessor<boolean>;
-  readonly error: Accessor<WorkspaceFailure | undefined>;
+  readonly error: Accessor<ChangeNameError | undefined>;
   /** Save the new name; `saved` runs once it is. */
   readonly save: () => void;
   /** Start again from the current name, or a suggestion from the reader's identity. */
@@ -29,19 +28,17 @@ export function useMemberName(workspaceId: string, saved: () => void): MemberNam
   const membership = useWorkspace(() => workspaceId);
   const current = () => membership()?.member.name;
   const [name, setName] = createSignal(""),
-    [error, setError] = createSignal<WorkspaceFailure>();
-  const request = useRequest(
-    renameSelfRequest(useApiClient(), workspaceId),
-    (exit) => {
-      if (Exit.isFailure(exit)) {
-        setError(workspaceFailure(exit.cause));
-        return;
-      }
-      saved();
-    },
-    { when: () => session.session !== undefined },
-  );
+    [error, setError] = createSignal<ChangeNameError>();
+  const request = useMutation(renameSelf(workspaceId));
   const ready = () => isMemberName(name()) && name().trim() !== current() && !request.pending();
+  async function save() {
+    if (!ready()) return;
+    setError(undefined);
+    const exit = await request.run(name());
+    if (exit === undefined) return;
+    if (Exit.isSuccess(exit)) saved();
+    else setError(workspaceFailure(exit.cause));
+  }
   return {
     current,
     name,
@@ -52,11 +49,7 @@ export function useMemberName(workspaceId: string, saved: () => void): MemberNam
     ready,
     pending: request.pending,
     error,
-    save: () => {
-      if (!ready()) return;
-      setError(undefined);
-      request.run(name());
-    },
+    save: () => void save(),
     reset: () => {
       setName(current() ?? suggestedName(session.session?.humanId));
       setError(undefined);

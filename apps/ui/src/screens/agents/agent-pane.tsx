@@ -23,10 +23,9 @@ import {
   blocker,
   issueMessage,
   type AgentIssue,
-  type AgentProblem,
   type AgentSummary,
   type AgentsAction,
-  type AgentsError,
+  type AgentsFailure,
 } from "./wording.tsx";
 import * as s from "./agents.css.ts";
 
@@ -84,11 +83,7 @@ export interface AgentPaneProps {
   /** The change running, if any. */
   readonly pending?: AgentsAction | "refresh";
   /** A failed change made here, or a read that failed. */
-  readonly failure?: {
-    readonly action: AgentsAction | "refresh";
-    readonly error: AgentsError;
-    readonly problems: readonly AgentProblem[];
-  };
+  readonly failure?: AgentsFailure;
   readonly onRefresh?: () => void;
 }
 

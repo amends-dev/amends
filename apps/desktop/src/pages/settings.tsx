@@ -1,10 +1,4 @@
-import {
-  paths,
-  useWorkspace,
-  useWorkspaceSettings,
-  type SettingsAction,
-  type SettingsSection,
-} from "@amends/client";
+import { paths, useWorkspace, useWorkspaceSettings } from "@amends/client";
 import {
   ConfirmRemoveMember,
   ConfirmRevokeInvitation,
@@ -16,6 +10,8 @@ import {
   TransferOwnership,
   WorkspaceSettings,
   settingsToast,
+  type SettingsAction,
+  type SettingsTab,
 } from "@amends/ui/screens/settings";
 import { Navigate, useParams, useSearchParams } from "@solidjs/router";
 import { Show, createSignal } from "solid-js";
@@ -47,7 +43,7 @@ export function MembersSettingsPage() {
 type Dialog = "invite" | "history" | "transfer" | "remove" | "revoke";
 
 /** A workspace's settings: one section, with the member open beside Members by `?member=`. */
-function Settings(props: { readonly workspaceId: string; readonly tab: SettingsSection }) {
+function Settings(props: { readonly workspaceId: string; readonly tab: SettingsTab }) {
   const { workspaceId } = props;
   const [search, setSearch] = useSearchParams<{ member?: string }>();
   const workspace = useWorkspace(() => workspaceId);
@@ -147,7 +143,7 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsS
             onQueryChange={view.setQuery}
             filter={view.filter()}
             onFilterChange={view.setFilter}
-            members={view.members().map((member) => ({ ...member, role: member.role?.name }))}
+            members={view.members()}
             selectedId={selected()}
             memberHref={(id) => href(`${members}?member=${encodeURIComponent(id)}`)}
             invitations={
@@ -171,21 +167,19 @@ function Settings(props: { readonly workspaceId: string; readonly tab: SettingsS
         {(member) => (
           <MemberDetails
             workspaceName={name()}
-            member={{ ...member(), role: member().role?.name }}
+            member={member()}
             onClose={() => {
               view.role.reset();
               view.dismiss();
               setSearch({ member: undefined });
             }}
-            roles={member().roles}
+            roles={view.role.choices(member().id)}
             role={view.role.of(member().id)}
             onRoleChange={(roleId) => view.role.choose(member().id, roleId)}
             roleChanged={view.role.changed(member().id)}
             onSaveRole={() => view.role.save(member().id)}
             saving={pending("role")}
-            onRemove={
-              member().removable && member().status === "active" ? () => open("remove") : undefined
-            }
+            onRemove={view.removable(member().id) ? () => open("remove") : undefined}
             error={failureOf("role")}
             onRefresh={view.refresh}
             refreshing={refreshing()}
