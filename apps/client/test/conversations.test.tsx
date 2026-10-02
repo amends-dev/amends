@@ -40,7 +40,7 @@ import {
   type Thread,
   type ThreadTimeline,
 } from "../src/index.ts";
-import { affectedKeys, signalKeys } from "../src/live/api.ts";
+import { Signal, affectedKeys, signalKeys } from "../src/live/api.ts";
 
 afterEach(cleanup);
 const json = (body: unknown) =>
@@ -217,17 +217,69 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/turns",
   ]);
   // Reading a thread settles notifications from it.
-  expect(signalKeys("one", { _tag: "ThreadRead" })).toEqual([
-    "workspace/one/groups",
-    "workspace/one/streams",
-    "workspace/one/inbox",
-  ]);
-  expect(signalKeys("one", { _tag: "NotificationsSeen" })).toEqual([
-    "workspace/one/groups",
-    "workspace/one/inbox",
-  ]);
-  expect(signalKeys("one", { _tag: "GroupRead" })).toEqual(["workspace/one/groups"]);
-  expect(signalKeys("one", { _tag: "Typing" })).toEqual([]);
+  const signal = Schema.decodeSync(Signal.Value);
+  const recipient = { workspaceId: "one", memberId: "alice" };
+  const at = "2026-10-02T12:00:00.000Z";
+  expect(
+    signalKeys(
+      "one",
+      signal({
+        _tag: "ThreadRead",
+        ...recipient,
+        threadId: "thread-one",
+        readThrough: 1,
+      }),
+    ),
+  ).toEqual(["workspace/one/groups", "workspace/one/streams", "workspace/one/inbox"]);
+  expect(
+    signalKeys(
+      "one",
+      signal({
+        _tag: "NotificationsSeen",
+        ...recipient,
+        notificationIds: ["notification-one"],
+      }),
+    ),
+  ).toEqual(["workspace/one/groups", "workspace/one/inbox"]);
+  expect(
+    signalKeys(
+      "one",
+      signal({
+        _tag: "GroupRead",
+        ...recipient,
+        groupId: "group-one",
+        readAt: at,
+      }),
+    ),
+  ).toEqual(["workspace/one/groups"]);
+  expect(
+    signalKeys(
+      "one",
+      signal({
+        _tag: "Typing",
+        ...recipient,
+        groupId: "group-one",
+        threadId: "thread-one",
+        until: at,
+      }),
+    ),
+  ).toEqual([]);
+  expect(
+    signalKeys(
+      "one",
+      signal({
+        _tag: "TurnDraft",
+        workspaceId: "one",
+        groupId: "group-one",
+        threadId: "thread-one",
+        turnId: "turn-one",
+        responseId: "response-one",
+        part: 0,
+        offset: 0,
+        text: "Draft",
+      }),
+    ),
+  ).toEqual([]);
 });
 
 it("a stream opens at its newest threads, pages back, and a refresh keeps what is shown", async () => {

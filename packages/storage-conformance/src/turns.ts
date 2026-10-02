@@ -1138,7 +1138,7 @@ export const turns = (harness: ConformanceHarness) => {
                 );
               const joined = yield* prepare(first!.id);
               expect(joined._tag).toBe("Ready");
-              if (joined._tag !== "Ready") return;
+              if (!TurnExecution.Preparation.$is("Ready")(joined)) return;
               // Every earlier message is its history, not only the newest hundred activities.
               expect(joined.plan.history).toHaveLength(111);
               expect(joined.plan.history[0]).toMatchObject({
@@ -1173,7 +1173,7 @@ export const turns = (harness: ConformanceHarness) => {
               const [second] = yield* turnsOf(workspace.id, threadId);
               const backlog = yield* prepare(second!.id);
               expect(backlog._tag).toBe("Ready");
-              if (backlog._tag !== "Ready") return;
+              if (!TurnExecution.Preparation.$is("Ready")(backlog)) return;
               expect(backlog.plan.pending?.items).toHaveLength(120);
               expect(backlog.plan.pending?.items[0]).toMatchObject({
                 content: [{ text: "Later note 1." }],

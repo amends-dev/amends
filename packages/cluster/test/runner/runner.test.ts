@@ -172,9 +172,9 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     get: () => Effect.sync(() => state.turn),
     prepare: () =>
       Effect.sync((): TurnExecution.Preparation => {
-        if (!Turn.active(state.turn.status)) return { _tag: "Finished" };
-        if (state.turn.status === "cancelling") return { _tag: "Stopping" };
-        return { _tag: "Ready", plan: plan() };
+        if (!Turn.active(state.turn.status)) return TurnExecution.Preparation.Finished();
+        if (state.turn.status === "cancelling") return TurnExecution.Preparation.Stopping();
+        return TurnExecution.Preparation.Ready({ plan: plan() });
       }),
     start: (_, chosen) =>
       Effect.gen(function* () {
@@ -234,14 +234,14 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         state.steps.push("close");
         if (state.turn.status === "cancelling") {
           change({ status: "cancelled" });
-          return { _tag: "Stopped" } as const;
+          return TurnExecution.Closing.Stopped();
         }
         yield* require(["running"]);
         if (incorporated() < state.turn.acceptedThroughSequence || state.unaccepted)
-          return { _tag: "InputPending" } as const;
+          return TurnExecution.Closing.InputPending();
         state.replies = TurnLog.read(state.log).replies.map((reply) => reply.text);
         change({ status: "completed" });
-        return { _tag: "Closed", messageIds: [] } as const;
+        return TurnExecution.Closing.Closed({ messageIds: [] });
       }),
     fail: (_, reason) =>
       Effect.gen(function* () {

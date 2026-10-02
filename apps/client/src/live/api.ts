@@ -28,6 +28,8 @@ import {
   type WorkspaceResource,
 } from "../api/keys.ts";
 
+export { Signal };
+
 export type ChangeFeedState = Data.TaggedEnum<{
   /** Opening the first connection. */
   Connecting: {};
@@ -254,22 +256,23 @@ export const affectedKeys = (
  * unread state, and settles notifications from it, changing the inbox and pending counts; seeing
  * notifications changes the inbox and counts; reading a group, the groups.
  */
-export const signalKeys = (workspaceId: string, signal: { readonly _tag: string }) => {
-  switch (signal._tag) {
-    case "ThreadRead":
-      return [
+export const signalKeys = (workspaceId: string, signal: Signal.Value): Array<string> =>
+  Signal.Value.matchOrElse(
+    signal,
+    {
+      ThreadRead: () => [
         workspaceKey(workspaceId, "groups"),
         collectionKey(workspaceId, "streams"),
         workspaceKey(workspaceId, "inbox"),
-      ];
-    case "NotificationsSeen":
-      return [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")];
-    case "GroupRead":
-      return [workspaceKey(workspaceId, "groups")];
-    default:
-      return [];
-  }
-};
+      ],
+      NotificationsSeen: () => [
+        workspaceKey(workspaceId, "groups"),
+        workspaceKey(workspaceId, "inbox"),
+      ],
+      GroupRead: () => [workspaceKey(workspaceId, "groups")],
+    },
+    () => [],
+  );
 
 const failures = (cause: Cause.Cause<unknown>) =>
   cause.reasons.flatMap((reason) => (Cause.isFailReason(reason) ? [reason.error] : []));

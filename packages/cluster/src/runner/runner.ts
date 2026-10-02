@@ -17,6 +17,7 @@ import { Gateway } from "@amends/gateway";
 import type { GatewayErrors } from "@amends/gateway";
 import { Context, Crypto, Effect, Layer } from "effect";
 import { Attempt } from "./attempt.ts";
+import { Ending } from "./ending.ts";
 import { NextStep } from "./next-step.ts";
 import { RunnerSettings } from "./settings.ts";
 import type { Options } from "./settings.ts";
@@ -57,37 +58,39 @@ export const make = Effect.fn("TurnRunner.make")(function* (options: Options) {
       // Whether to rest before the next attempt, as after one that was interrupted; until the
       // run's first attempt, the turn's log says, by an attempt that died.
       let restBeforeAttempt: boolean | undefined;
+      const runAttempt = Effect.fnUntraced(function* (step: Attempt.Step) {
+        const ending = yield* Attempt.run(turnSteps, settings, step);
+        if (Ending.$is("Finished")(ending)) return false;
+        if (Ending.$is("Unrunnable")(ending)) {
+          yield* turnSteps.fail(ending.reason);
+          return false;
+        }
+        restBeforeAttempt = Ending.$is("Interrupted")(ending);
+        return true;
+      });
       for (;;) {
         const step = NextStep.decide(yield* turnSteps.prepare, settings, restBeforeAttempt);
-        switch (step._tag) {
-          case "Done":
-            return;
-          case "ConfirmStop":
-            return yield* turnSteps.confirmStopped;
-          case "Fail":
-            return yield* turnSteps.fail(step.reason);
-          case "GiveUp":
-            yield* Effect.logWarning("Turn given up", {
-              ...turnSteps.ids,
-              attempts: step.attempts,
-              problem: step.problem,
-            });
-            return yield* turnSteps.fail(step.reason);
-          case "Start":
-            yield* turnSteps.start(step.selection);
-            break;
-          case "Rest":
-            yield* Effect.sleep(step.delay);
-            restBeforeAttempt = false;
-            break;
-          case "Summarize":
-          case "Work": {
-            const ending = yield* Attempt.run(turnSteps, settings, step);
-            if (ending._tag === "Finished") return;
-            if (ending._tag === "Unrunnable") return yield* turnSteps.fail(ending.reason);
-            restBeforeAttempt = ending._tag === "Interrupted";
-          }
-        }
+        const continueRunning = yield* NextStep.Step.$match(step, {
+          Done: () => Effect.succeed(false),
+          ConfirmStop: () => Effect.as(turnSteps.confirmStopped, false),
+          Fail: ({ reason }) => Effect.as(turnSteps.fail(reason), false),
+          GiveUp: ({ reason, attempts, problem }) =>
+            Effect.gen(function* () {
+              yield* Effect.logWarning("Turn given up", { ...turnSteps.ids, attempts, problem });
+              yield* turnSteps.fail(reason);
+              return false;
+            }),
+          Start: ({ selection }) => Effect.as(turnSteps.start(selection), true),
+          Rest: ({ delay }) =>
+            Effect.gen(function* () {
+              yield* Effect.sleep(delay);
+              restBeforeAttempt = false;
+              return true;
+            }),
+          Summarize: runAttempt,
+          Work: runAttempt,
+        });
+        if (!continueRunning) return;
       }
     },
     Effect.provideService(Crypto.Crypto, crypto),

@@ -9,7 +9,7 @@ import { Effect } from "effect";
 import { Checkpoint } from "./checkpoint.ts";
 import type { Compaction } from "./compaction.ts";
 import { Ending } from "./ending.ts";
-import type { NextStep } from "./next-step.ts";
+import { NextStep } from "./next-step.ts";
 import { Session } from "./session.ts";
 import { durationInWords, type Settings } from "./settings.ts";
 import type { TurnSteps } from "./turn-steps.ts";
@@ -66,7 +66,7 @@ const waitUntilStopped = (turnSteps: TurnSteps.Interface, settings: Settings) =>
     for (;;) {
       yield* Effect.sleep(settings.checkInterval);
       const current = yield* turnSteps.get;
-      if (current.status !== "running") return Ending.again;
+      if (current.status !== "running") return Ending.Again();
     }
   });
 
@@ -95,14 +95,14 @@ const endAfterFailure = Effect.fnUntraced(function* (
   };
   if (failure.problem === "model-context") {
     yield* Effect.logWarning("Turn context full", logFields);
-    return Ending.again;
+    return Ending.Again();
   }
   if (!failure.retryable) {
     yield* Effect.logWarning("Turn failed", logFields);
-    return Ending.unrunnable(text);
+    return Ending.Unrunnable({ reason: text });
   }
   yield* Effect.logWarning("Turn interrupted", logFields);
-  return Ending.interrupted;
+  return Ending.Interrupted();
 });
 
 /** Run the step as the turn's next attempt, and say how it ended. */
@@ -113,11 +113,11 @@ export const run = Effect.fnUntraced(function* (
 ) {
   const names = { connection: step.plan.connection.name, model: step.plan.selection.model };
   const idleTimeoutInWords = durationInWords(settings.idleTimeout);
-  yield* turnSteps.recordAttempt(step._tag === "Summarize" ? "summary" : "session");
+  yield* turnSteps.recordAttempt(NextStep.Step.$is("Summarize")(step) ? "summary" : "session");
   type RunStep = ReturnType<typeof Checkpoint.record> | ReturnType<typeof Session.run>;
   const runStep = Effect.suspend(
     (): Effect.Effect<Effect.Success<RunStep>, Effect.Error<RunStep>, Effect.Services<RunStep>> =>
-      step._tag === "Summarize"
+      NextStep.Step.$is("Summarize")(step)
         ? Checkpoint.record(turnSteps, settings, step)
         : Session.run(turnSteps, settings, step),
   );

@@ -2,7 +2,7 @@ import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { Environment } from "@amends/core/environment";
 import { Turn } from "@amends/core/turn";
-import type { TurnExecution } from "@amends/core/turn";
+import { TurnExecution } from "@amends/core/turn";
 import type { Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { expect, it } from "@effect/vitest";
@@ -115,20 +115,24 @@ const plan = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Plan =
   overflow: { count: 0, pending: false },
   ...overrides,
 });
-const ready = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Preparation => ({
-  _tag: "Ready",
-  plan: plan(overrides),
-});
+const ready = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Preparation =>
+  TurnExecution.Preparation.Ready({ plan: plan(overrides) });
 
 it("a finished turn needs nothing, and one asked to stop is confirmed stopped", () => {
-  expect(NextStep.decide({ _tag: "Finished" }, settings(), undefined)._tag).toBe("Done");
-  expect(NextStep.decide({ _tag: "Stopping" }, settings(), undefined)._tag).toBe("ConfirmStop");
+  expect(NextStep.decide(TurnExecution.Preparation.Finished(), settings(), undefined)._tag).toBe(
+    "Done",
+  );
+  expect(NextStep.decide(TurnExecution.Preparation.Stopping(), settings(), undefined)._tag).toBe(
+    "ConfirmStop",
+  );
 });
 
 it("fails a turn prepare finds unrunnable, or one this host cannot run", () => {
   const failed = (preparation: TurnExecution.Preparation) =>
     NextStep.decide(preparation, settings(), undefined);
-  expect(failed({ _tag: "Unrunnable", reason: "The agent was removed." })).toEqual({
+  expect(
+    failed(TurnExecution.Preparation.Unrunnable({ reason: "The agent was removed." })),
+  ).toEqual({
     _tag: "Fail",
     reason: "The agent was removed.",
   });

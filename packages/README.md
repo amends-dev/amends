@@ -58,6 +58,11 @@ the variant's fields too; use them when checking unknown values. `Data.taggedEnu
 provides tag-only `$is` guards and exhaustive `$match`. `Predicate.isTagged` handles
 optional tagged values without requiring another decode.
 
+Internal workflow states use `Data.TaggedEnum` with `Data.taggedEnum` to derive
+their constructors and helpers. This includes turn preparation and closing,
+runner steps and endings, gateway admission, and internal change-feed and turn-log
+inputs. Keep schemas for the values that cross validation or persistence boundaries.
+
 ## Constructors and layers
 
 Use Effect's public library pattern across shared packages:
