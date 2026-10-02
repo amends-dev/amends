@@ -3,7 +3,7 @@ import { Api, ApiErrors, Principal } from "@amends/api-http";
 import { Gateway } from "@amends/gateway";
 import { OwnershipService, WorkspaceSettingsService } from "@amends/core/workspace";
 import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 /**
  * Register workspace creation and ownership operations over authenticated gateway entry.

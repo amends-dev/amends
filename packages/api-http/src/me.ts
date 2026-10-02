@@ -1,5 +1,5 @@
 import { WorkspaceDirectory } from "@amends/gateway/directory";
-import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
 
 /** What the authenticated identity can reach across workspaces. */

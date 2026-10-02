@@ -2,7 +2,7 @@
 
 A Bun and TypeScript monorepo with a shared Solid application for web and Tauri desktop, an HTTP API, and workspace
 services backed by PostgreSQL. The root workspace catalog pins Effect
-**4.0.0-rc.115**, and `bun.lock` records resolved dependencies.
+**4.0.0**, and `bun.lock` records resolved dependencies.
 
 From the repository root:
 
@@ -159,7 +159,7 @@ bun run lefthook run pre-commit --force
 Following [Effect's Git subtree guide](https://effect.website/blog/the-one-weird-git-trick-that-makes-coding-agents-more-effect-ive/),
 `repos/effect` contains a squashed subtree of
 [`Effect-TS/effect`](https://github.com/Effect-TS/effect) at tag
-`effect@4.0.0-rc.115`, commit `4a05d4914fa2327a42bd75fe77c22c188becf3b4`.
+`effect@4.0.0`, commit `67ba4e46a11ccda0b6761578bfd22c04ae00167d`.
 The tag matches the installed packages, so the local examples describe the APIs
 available to the application. A normal Git clone includes this source; no
 submodule initialization or upstream dependency installation is required.
@@ -171,7 +171,7 @@ application project and normal editor suggestions/search.
 
 ## Updating Effect
 
-Choose a published release candidate available for the Effect packages in use.
+Choose a published stable release available for the Effect packages in use.
 Update their exact versions in the root `package.json` under `workspaces.catalog`,
 then install to update all workspace resolutions:
 
@@ -193,6 +193,7 @@ bun run test
 Update the version and commit recorded above after upgrading. Keep package and
 subtree updates together when sharing changes. Recheck the affected APIs against
 the matching source and perform the [temporary-port startup check](hosts/local/README.md#verify).
-Journal payloads use SchemaBinary; the missing
-[golden-byte compatibility test](docs/current-status.md#payload-format-compatibility)
-means round-trip tests alone do not establish compatibility across Effect upgrades.
+Journal payloads use SchemaBinary. The [codec fixtures](packages/core/test/journal/codec.test.ts)
+check representative bytes captured on rc.115 independently of the current encoder.
+Preserve those fixtures across upgrades; [coverage remains partial](docs/current-status.md#payload-format-compatibility),
+and round-trip tests alone do not establish compatibility for other payloads.

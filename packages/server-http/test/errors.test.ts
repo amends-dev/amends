@@ -2,7 +2,7 @@ import { Api, ApiErrors, Unauthorized } from "@amends/api-http";
 import { GatewayErrors, SignIn } from "@amends/gateway";
 import { expect, it } from "@effect/vitest";
 import type { SchemaAST } from "effect";
-import { HttpApi } from "effect/unstable/httpapi";
+import { HttpApi } from "effect/http-api";
 
 /** The constructor an error schema declares, which every schema of that error shares. */
 const constructorOf = (ast: SchemaAST.AST): unknown => ast.annotations?.["~constructor"];

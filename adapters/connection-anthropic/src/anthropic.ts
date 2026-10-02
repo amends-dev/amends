@@ -2,7 +2,7 @@ import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
 import { Layer } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 
 /** Claude models through the Anthropic API, with an API key. */
 export const declaration = ConnectionImplementation.Declaration.make({

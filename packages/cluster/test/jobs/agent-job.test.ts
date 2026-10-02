@@ -11,7 +11,7 @@ import {
   RunnerStorage,
   Sharding,
   ShardingConfig,
-} from "effect/unstable/cluster";
+} from "effect/cluster";
 import { Gateway, GatewayErrors } from "@amends/gateway";
 import { AgentJob } from "../../src/jobs/agent-job.ts";
 

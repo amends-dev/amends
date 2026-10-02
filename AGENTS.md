@@ -167,7 +167,7 @@ renaming documentation. `CLAUDE.md` is a symlink to this file; keep one guidance
 
 ## Effect
 
-This project uses Effect v4 release candidates. The root `package.json` workspace
+This project uses stable Effect v4. The root `package.json` workspace
 catalog and `bun.lock` define the installed versions; keep Effect dependencies and the vendored source
 on the same release when upgrading.
 

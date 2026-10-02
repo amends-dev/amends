@@ -11,7 +11,7 @@ import type {
 } from "@amends/ui/screens/settings";
 import { useAtomValue } from "@effect/atom-solid";
 import { Cause, DateTime, Effect, Option, Predicate } from "effect";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
 import type { Member } from "../conversations/api.ts";

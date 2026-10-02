@@ -3,7 +3,7 @@ import { Workspace } from "@amends/core/workspace";
 import { HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
 import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
 import { ApiErrors } from "./errors.ts";
 

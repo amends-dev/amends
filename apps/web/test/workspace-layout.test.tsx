@@ -9,7 +9,7 @@ import {
   type DirectoryScope,
 } from "@amends/client";
 import { Layer, Schema } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { Application } from "../src/application.tsx";
 import { WorkspaceLayout } from "../src/workspace-layout.tsx";
 import { withChangeFeed } from "./change-feed.ts";

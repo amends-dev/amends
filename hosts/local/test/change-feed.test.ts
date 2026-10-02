@@ -21,8 +21,8 @@ import {
   Stream,
 } from "effect";
 import { Streams } from "@amends/server-http";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
+import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
+import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
 import { LocalHost } from "../src/host.ts";
 import { LocalServer } from "../src/server.ts";

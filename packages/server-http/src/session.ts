@@ -1,7 +1,7 @@
 import { Api } from "@amends/api-http";
 import { SignIn } from "@amends/gateway";
 import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 /**
  * Register session handlers over the host's sign-in service.

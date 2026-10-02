@@ -3,9 +3,10 @@ import { BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
-import { DateTime, Effect, Encoding, Layer, Redacted } from "effect";
-import { HttpClient, HttpClientRequest, HttpRouter } from "effect/unstable/http";
-import { HttpApiClient, HttpApiMiddleware } from "effect/unstable/httpapi";
+import { DateTime, Effect, Layer, Redacted } from "effect";
+import { Base64 } from "effect/encoding";
+import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
+import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
 import { LocalHost } from "../src/host.ts";
 import { LocalServer } from "../src/server.ts";
@@ -30,9 +31,7 @@ const server = (url: string, credentialKey: Redacted.Redacted<string> | undefine
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
   );
-const credentialKey = Redacted.make(
-  Encoding.encodeBase64(crypto.getRandomValues(new Uint8Array(32))),
-);
+const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const asAlice = yield* client(alice);

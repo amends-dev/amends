@@ -7,8 +7,8 @@ import { SessionTokens, Gateway, type GatewayErrors } from "@amends/gateway";
 import { expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
 import type { Scope } from "effect";
-import { HttpClientRequest, HttpServer } from "effect/unstable/http";
-import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
+import { HttpClientRequest, HttpServer } from "effect/http";
+import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
 import { BearerAuthentication, ChangeFeedHandlers } from "../src/index.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });

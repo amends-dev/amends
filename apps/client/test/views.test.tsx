@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { createSignal } from "solid-js";
 import {
   ClientProvider,

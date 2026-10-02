@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/te
 import { HashRouter } from "@solidjs/router";
 import { Session, type SessionStore } from "@amends/client";
 import { Layer, Schema } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
 import { committed, notificationsSeen, withChangeFeed, type Sidebar } from "./change-feed.ts";

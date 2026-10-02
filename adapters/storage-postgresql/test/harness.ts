@@ -1,7 +1,8 @@
 import type { Harness } from "@amends/storage-conformance";
 import { BunCrypto } from "@effect/platform-bun";
-import { Effect, Encoding, Layer, Redacted } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { Effect, Layer, Redacted } from "effect";
+import { Base64 } from "effect/encoding";
+import { SqlClient } from "effect/sql";
 import { layer } from "../src/index.ts";
 import { database, inDatabase, setup } from "./support.ts";
 
@@ -32,7 +33,7 @@ const projections = [
 const { available, withDatabase } = setup();
 
 /** A fixed credential key for tests, 32 bytes as base64. */
-const credentialKey = Redacted.make(Encoding.encodeBase64(new Uint8Array(32).fill(7)));
+const credentialKey = Redacted.make(Base64.encode(new Uint8Array(32).fill(7)));
 
 /** A database for each test on the run's server; each connection is another host's pool. */
 export const harness: Harness = {

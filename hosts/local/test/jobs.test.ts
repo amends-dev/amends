@@ -7,7 +7,7 @@ import { BunCrypto } from "@effect/platform-bun";
 import { PostgresStorage } from "@amends/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, Context, Duration, Effect, Exit, Layer, Redacted } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { SqlClient } from "effect/sql";
 import { LocalHost } from "../src/host.ts";
 import { setup } from "./database.ts";
 

@@ -1,5 +1,5 @@
 import { useAtomValue } from "@effect/atom-solid";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { createContext, createMemo, useContext, type Accessor, type ParentProps } from "solid-js";
 import { changeFeed, ChangeFeedState } from "./api.ts";
 import { useApiClient, useSession } from "../provider.tsx";

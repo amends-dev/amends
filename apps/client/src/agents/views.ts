@@ -11,7 +11,7 @@ import type {
 } from "@amends/ui/screens/agents";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Cause, Effect, Option, Predicate } from "effect";
-import { Atom, AsyncResult } from "effect/unstable/reactivity";
+import { Atom, AsyncResult } from "effect/reactivity";
 import {
   createEffect,
   createMemo,

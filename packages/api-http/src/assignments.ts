@@ -1,7 +1,7 @@
 import { Assignment, Permission } from "@amends/core/authorization";
 import { Member, Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
 import { ApiErrors } from "./errors.ts";
 

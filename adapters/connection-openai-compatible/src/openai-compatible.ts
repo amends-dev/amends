@@ -2,7 +2,7 @@ import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai-compat";
 import { Layer } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 
 /**
  * Models from any API implementing OpenAI's chat completions: OpenAI itself, OpenRouter, Groq, or a

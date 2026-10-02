@@ -3,7 +3,7 @@ import { Api, ApiErrors, Principal } from "@amends/api-http";
 import { InvitationService } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 /**
  * Register invitation handlers, capturing the gateway and reading the principal per request.

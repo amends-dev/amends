@@ -1,5 +1,5 @@
 import type { Layer, Redacted } from "effect";
-import type { LanguageModel, Model } from "effect/unstable/ai";
+import type { LanguageModel, Model } from "effect/ai";
 import type { ConnectionImplementation } from "./implementation.ts";
 
 /** What a connection supplies to reach its model provider: its settings and its credential. */

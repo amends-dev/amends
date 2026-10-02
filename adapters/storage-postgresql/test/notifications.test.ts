@@ -5,7 +5,7 @@ import { Notification, type NotificationStore } from "@amends/core/notification"
 import { Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { SqlClient } from "effect/sql";
 import { harness } from "./harness.ts";
 import { boundTo, inDatabase, initialized, setup, workspaceId } from "./support.ts";
 

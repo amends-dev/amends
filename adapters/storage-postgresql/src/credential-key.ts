@@ -3,7 +3,8 @@
  * nonce per secret, and the row's identity as additional data, so a sealed value opens only as the
  * credential it was stored as.
  */
-import { Context, Data, Effect, Encoding, Layer, Redacted, Result } from "effect";
+import { Context, Data, Effect, Layer, Redacted, Result } from "effect";
+import { Base64 } from "effect/encoding";
 import type { Option } from "effect";
 
 /** The key is malformed, or a secret failed to seal or open. */
@@ -31,7 +32,7 @@ const asFailure = (cause: unknown) =>
     : new Failure({ message: cause instanceof Error ? cause.message : String(cause), cause });
 const bytes = (base64: string) =>
   Result.getOrThrowWith(
-    Encoding.decodeBase64(base64),
+    Base64.decode(base64),
     () => new Failure({ message: "The credential key must be base64" }),
   );
 
@@ -60,7 +61,7 @@ export const make = (key: Redacted.Redacted<string>): Effect.Effect<Interface, F
               cryptoKey,
               encoder.encode(secret),
             );
-            return `${version}:${Encoding.encodeBase64(nonce)}:${Encoding.encodeBase64(new Uint8Array(sealed))}`;
+            return `${version}:${Base64.encode(nonce)}:${Base64.encode(new Uint8Array(sealed))}`;
           },
           catch: asFailure,
         }),

@@ -25,7 +25,7 @@ import {
 } from "@amends/core/thread";
 import { Request } from "@amends/core/request";
 import { Schema } from "effect";
-import { HttpApiSchema } from "effect/unstable/httpapi";
+import { HttpApiSchema } from "effect/http-api";
 
 /** The principal is an agent where only a human may act. */
 export class HumanRequired extends Schema.TaggedError<HumanRequired>()(

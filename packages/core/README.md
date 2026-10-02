@@ -827,7 +827,7 @@ Follow Effect's public library pattern: construction and service provision are
 separate APIs that share one implementation. The matching upstream examples are
 [`PgClient`](../../repos/effect/packages/sql/pg/src/PgClient.ts),
 [`MssqlClient`](../../repos/effect/packages/sql/mssql/src/MssqlClient.ts), and
-[`KeyValueStore`](../../repos/effect/packages/effect/src/unstable/persistence/KeyValueStore.ts).
+[`KeyValueStore`](../../repos/effect/packages/effect/src/persistence/KeyValueStore.ts).
 
 | API                                                    | Meaning                                                                          |
 | ------------------------------------------------------ | -------------------------------------------------------------------------------- |

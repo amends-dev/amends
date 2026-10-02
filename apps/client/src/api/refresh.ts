@@ -1,5 +1,5 @@
 import { Effect, Exit } from "effect";
-import { AsyncResult, AtomRegistry, type Atom } from "effect/unstable/reactivity";
+import { AsyncResult, AtomRegistry, type Atom } from "effect/reactivity";
 
 /**
  * Refresh a read from inside an operation and wait for the result that refresh produces. Reads

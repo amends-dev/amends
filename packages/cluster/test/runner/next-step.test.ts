@@ -7,7 +7,7 @@ import type { Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { expect, it } from "@effect/vitest";
 import { Duration, Effect, Layer, Schema } from "effect";
-import { LanguageModel, Model } from "effect/unstable/ai";
+import { LanguageModel, Model } from "effect/ai";
 import { NextStep } from "../../src/runner/next-step.ts";
 import { RunnerSettings } from "../../src/runner/settings.ts";
 

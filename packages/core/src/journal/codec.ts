@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect";
-import { SchemaBinary } from "effect/unstable/encoding";
+import { SchemaBinary } from "effect/encoding";
 import type { Fact } from "./fact.ts";
 import type { Store } from "./store.ts";
 

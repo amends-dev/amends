@@ -1,7 +1,7 @@
 import type { Harness } from "@amends/sandbox-conformance";
 import { BunServices } from "@effect/platform-bun";
 import { Effect } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { DaytonaSandbox } from "../src/index.ts";
 
 /**

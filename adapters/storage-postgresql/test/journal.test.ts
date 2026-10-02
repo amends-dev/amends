@@ -2,7 +2,7 @@ import { Entry, Store } from "@amends/core/journal";
 import { Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { SqlClient } from "effect/sql";
 import { harness } from "./harness.ts";
 import { database, inDatabase, setup, views, workspaceId } from "./support.ts";
 

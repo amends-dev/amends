@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { AiError } from "effect/unstable/ai";
+import { AiError } from "effect/ai";
 import { HarnessErrors } from "@amends/harness";
 
 const refused = (description: string) =>

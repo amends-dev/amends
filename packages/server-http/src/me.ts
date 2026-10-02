@@ -1,7 +1,7 @@
 import { Api, Principal } from "@amends/api-http";
 import { WorkspaceDirectory } from "@amends/gateway";
 import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 /**
  * Register directory handlers over the host service, reading the principal per request.

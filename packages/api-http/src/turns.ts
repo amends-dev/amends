@@ -2,7 +2,7 @@ import { Thread } from "@amends/core/thread";
 import { Turn } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
 import { ApiErrors } from "./errors.ts";
 import { limit } from "./paging.ts";

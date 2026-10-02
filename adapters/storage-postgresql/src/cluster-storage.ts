@@ -5,8 +5,8 @@
  */
 import { AgentJob } from "@amends/cluster";
 import { Clock, DateTime, Effect, Option, Schema } from "effect";
-import { Snowflake } from "effect/unstable/cluster";
-import { SqlClient } from "effect/unstable/sql";
+import { Snowflake } from "effect/cluster";
+import { SqlClient } from "effect/sql";
 import { PostgresDatabase } from "./database.ts";
 
 /** Another live process runs jobs at this runner address. */

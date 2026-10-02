@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
 import { createSignal } from "solid-js";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { affectedKeys } from "../src/live/api.ts";
 import {
   ClientProvider,

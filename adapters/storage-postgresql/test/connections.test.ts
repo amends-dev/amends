@@ -1,14 +1,15 @@
 import { Connection, ConnectionCredentialStore } from "@amends/core/connection";
 import { Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Encoding, Option, Redacted } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { Effect, Option, Redacted } from "effect";
+import { Base64 } from "effect/encoding";
+import { SqlClient } from "effect/sql";
 import { harness } from "./harness.ts";
 import { inDatabase, setup, views, workspaceId } from "./support.ts";
 
 Suites.connections(harness);
 
-const credentialKey = Redacted.make(Encoding.encodeBase64(new Uint8Array(32).fill(9)));
+const credentialKey = Redacted.make(Base64.encode(new Uint8Array(32).fill(9)));
 const credential = {
   id: Connection.CredentialId.make("credential-one"),
   connectionId: Connection.Id.make("connection-one"),

@@ -3,7 +3,7 @@
  * so a job on one runner of the cluster removes the handled ones once they are old enough.
  */
 import { Cron, DateTime, Duration, Effect } from "effect";
-import { ClusterCron } from "effect/unstable/cluster";
+import { ClusterCron } from "effect/cluster";
 
 /** The name of the job that prunes handled requests. */
 export const jobName = "amends/prune-handled-requests";

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Stream } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
-import type { AiError, Response } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
+import type { AiError, Response } from "effect/ai";
 import { Environment, EnvironmentErrors } from "@amends/environment";
 import { HarnessEvent, Transcript } from "@amends/harness";
 import { type HarnessTool } from "@amends/harness";

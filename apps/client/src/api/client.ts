@@ -1,8 +1,8 @@
 import { Api as Contract, Authentication, Unauthorized } from "@amends/api-http";
 import { Cause, Effect, Layer, Schema } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
-import { HttpApiMiddleware } from "effect/unstable/httpapi";
-import { AtomHttpApi } from "effect/unstable/reactivity";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
+import { HttpApiMiddleware } from "effect/http-api";
+import { AtomHttpApi } from "effect/reactivity";
 import type { SignIn } from "./contracts.ts";
 
 export interface ApiClientOptions {

@@ -1,4 +1,4 @@
-import { HttpApi, OpenApi } from "effect/unstable/httpapi";
+import { HttpApi, OpenApi } from "effect/http-api";
 import { InvitationsGroup } from "./invitations.ts";
 import { AssignmentsGroup } from "./assignments.ts";
 import { MeGroup } from "./me.ts";

@@ -11,7 +11,7 @@ import {
   RunnerStorage,
   Sharding,
   ShardingConfig,
-} from "effect/unstable/cluster";
+} from "effect/cluster";
 import { TurnJob } from "../../src/jobs/turn-job.ts";
 import { TurnRunner } from "../../src/runner/runner.ts";
 

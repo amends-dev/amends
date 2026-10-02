@@ -1,6 +1,6 @@
 import type { Sandbox } from "@amends/sandbox";
 import type { Effect, Layer, Scope } from "effect";
-import type { HttpClient } from "effect/unstable/http";
+import type { HttpClient } from "effect/http";
 
 /** What a sandbox provider adapter supplies to run the conformance suites against itself. */
 export interface Harness {

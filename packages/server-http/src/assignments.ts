@@ -2,7 +2,7 @@ import { Api, Principal } from "@amends/api-http";
 import { AssignmentService } from "@amends/core/authorization";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 /** @category layers */
 export const layer = HttpApiBuilder.group(

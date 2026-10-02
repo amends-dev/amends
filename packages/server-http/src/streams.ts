@@ -18,7 +18,7 @@ import {
   Predicate,
 } from "effect";
 
-import { HttpBody, HttpEffect, HttpServerResponse } from "effect/unstable/http";
+import { HttpBody, HttpEffect, HttpServerResponse } from "effect/http";
 import { Draining } from "./draining.ts";
 
 const heartbeat = Stream.tick("5 seconds").pipe(

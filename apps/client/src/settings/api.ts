@@ -10,7 +10,7 @@ import {
   Identity,
 } from "@amends/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom } from "effect/unstable/reactivity";
+import { AsyncResult, Atom } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";
 import { directoryQuery } from "../api/directory.ts";
 import { command } from "../api/failures.ts";

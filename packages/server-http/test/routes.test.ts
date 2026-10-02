@@ -33,8 +33,8 @@ import {
 import { SessionTokens, Gateway, GatewayErrors, SignIn, WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import type { Scope } from "effect";
-import { HttpClientRequest, HttpServer } from "effect/unstable/http";
-import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
+import { HttpClientRequest, HttpServer } from "effect/http";
+import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
 import { Routes } from "../src/index.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });

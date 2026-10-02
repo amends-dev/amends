@@ -14,7 +14,7 @@ import {
   ApiErrors,
 } from "@amends/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
-import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
+import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";
 import { command } from "../api/failures.ts";
 import { collectionKey, itemKey, itemKeys, workspaceKey } from "../api/keys.ts";

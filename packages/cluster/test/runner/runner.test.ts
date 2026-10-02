@@ -24,8 +24,8 @@ import {
 } from "effect";
 import { type Cause } from "effect";
 import { TestClock } from "effect/testing";
-import { AiError, LanguageModel, Model } from "effect/unstable/ai";
-import type { Prompt, Response } from "effect/unstable/ai";
+import { AiError, LanguageModel, Model } from "effect/ai";
+import type { Prompt, Response } from "effect/ai";
 
 type Script = Stream.Stream<Response.StreamPartEncoded, AiError.AiError>;
 

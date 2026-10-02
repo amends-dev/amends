@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { Prompt } from "effect/unstable/ai";
+import { Prompt } from "effect/ai";
 import { Transcript } from "@amends/harness";
 
 /** The key under which this harness records its native data: Effect AI's provider metadata. */

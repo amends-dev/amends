@@ -6,7 +6,7 @@
 import { TurnLog } from "@amends/core/turn";
 import { HarnessErrors, Transcript } from "@amends/harness";
 import { Duration, Effect, Result, Schema } from "effect";
-import { AiError, LanguageModel, Prompt } from "effect/unstable/ai";
+import { AiError, LanguageModel, Prompt } from "effect/ai";
 
 /**
  * The summary could not be written, and whether trying again may help: `problem` is what readers

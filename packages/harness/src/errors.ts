@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AiError } from "effect/unstable/ai";
+import { AiError } from "effect/ai";
 import { Transcript } from "./transcript.ts";
 
 /** A session was asked to act before its history was prepared. */

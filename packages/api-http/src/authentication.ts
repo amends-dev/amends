@@ -1,6 +1,6 @@
 import { Identity } from "@amends/core/identity";
 import { Context, Schema } from "effect";
-import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi";
+import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
 
 /**
  * The authenticated human or agent, supplied by middleware for each request.

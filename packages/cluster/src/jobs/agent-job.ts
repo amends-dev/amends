@@ -11,8 +11,8 @@ import { AgentJobs, AgentWork } from "@amends/core/turn";
 import { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Cause, Crypto, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
-import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
-import { Rpc } from "effect/unstable/rpc";
+import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/cluster";
+import { Rpc } from "effect/rpc";
 import { JobRetry } from "./retry.ts";
 
 /**

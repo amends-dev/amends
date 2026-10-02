@@ -1,14 +1,14 @@
 import type { Sandbox } from "@amends/sandbox";
-import { Effect, Encoding, Result, Stream } from "effect";
+import { Effect, Result, Stream } from "effect";
+import { Hex } from "effect/encoding";
 import type { Harness } from "./harness.ts";
 
 /** UTF-8 bytes, without a platform's text encoder. */
-export const bytes = (text: string): Uint8Array =>
-  Result.getOrThrow(Encoding.decodeHex(Encoding.encodeHex(text)));
+export const bytes = (text: string): Uint8Array => Result.getOrThrow(Hex.decode(Hex.encode(text)));
 
 /** Text from UTF-8 bytes. */
 export const text = (data: Uint8Array): string =>
-  Result.getOrThrow(Encoding.decodeHexString(Encoding.encodeHex(data)));
+  Result.getOrThrow(Hex.decodeString(Hex.encode(data)));
 
 /** A sandbox for the test's scope, with the harness's options, destroyed when the test ends. */
 export const acquire = (

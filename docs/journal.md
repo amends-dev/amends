@@ -486,10 +486,11 @@ own writes; consumers requiring committed history read outside write transaction
 The shared binary codec preserves schema transformations and service requirements.
 Its output buffers have independent ownership. Fact schema versions and the binary
 format are persistence contracts that must remain readable when dependencies change.
-The implementation uses `SchemaBinary.toCodec`. Current tests exercise round trips
-and storage behavior but do not pin literal golden bytes; encoding and decoding with
-the same upgraded codec cannot prove old payload compatibility. Add fixed fixtures
-before claiming that an Effect upgrade preserves the persisted format.
+The implementation uses `SchemaBinary.toCodec`. The [codec tests](../packages/core/test/journal/codec.test.ts)
+pin workspace initialization, message, and turn-checkpoint bytes captured with Effect
+4.0.0-rc.115. They decode those fixtures independently of the current encoder and require
+encoding to produce identical bytes. Other payload variants still need fixed fixtures;
+encoding and decoding with the same upgraded codec alone cannot prove old payload compatibility.
 
 In the planned turn domain, turn logs provide durable history for continuation and final-response
 derivation. Rebuilding domain projections from the journal does not recreate those

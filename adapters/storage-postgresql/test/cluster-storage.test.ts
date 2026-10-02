@@ -5,8 +5,8 @@ import { Gateway, GatewayErrors } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";
-import { RunnerAddress, SingleRunner } from "effect/unstable/cluster";
-import { SqlClient } from "effect/unstable/sql";
+import { RunnerAddress, SingleRunner } from "effect/cluster";
+import { SqlClient } from "effect/sql";
 import { PostgresClusterStorage } from "../src/index.ts";
 import { database, setup } from "./support.ts";
 

@@ -7,7 +7,7 @@ import {
 } from "@amends/core/thread";
 import { Gateway } from "@amends/gateway";
 import { Effect } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 
 /**
  * Register thread handlers, capturing the gateway and reading the principal per request.

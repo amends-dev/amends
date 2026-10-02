@@ -12,8 +12,8 @@ import {
   Stream,
   Option,
 } from "effect";
-import { Sse } from "effect/unstable/encoding";
-import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
+import { Sse } from "effect/encoding";
+import { Atom, AtomRegistry, Reactivity } from "effect/reactivity";
 import { watchWake } from "./wake.ts";
 import { isUnauthorized, type ApiClient } from "../api/client.ts";
 import { posted, typing, typistsAtom } from "../conversations/typing.ts";

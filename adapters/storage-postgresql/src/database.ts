@@ -2,7 +2,7 @@ import { PgClient } from "@effect/sql-pg";
 import * as PgDrizzle from "drizzle-orm/effect-postgres";
 import { migrate } from "drizzle-orm/effect-postgres/migrator";
 import { Context, Effect, Layer } from "effect";
-import { SqlClient, SqlError } from "effect/unstable/sql";
+import { SqlClient, SqlError } from "effect/sql";
 import { fileURLToPath } from "node:url";
 import { PostgresNotices } from "./notices.ts";
 import { PostgresReads } from "./reads.ts";

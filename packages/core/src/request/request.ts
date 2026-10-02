@@ -1,4 +1,5 @@
-import { Crypto, Effect, Encoding, Result, Schema } from "effect";
+import { Crypto, Effect, Result, Schema } from "effect";
+import { Hex } from "effect/encoding";
 
 /**
  * A key the client chooses once for one logical request, such as a UUID, and repeats on every
@@ -17,7 +18,7 @@ export interface Options {
 }
 
 /** A string's UTF-8 bytes; hex encoding reads strings as UTF-8, and valid hex always decodes. */
-const utf8 = (text: string) => Result.getOrThrow(Encoding.decodeHex(Encoding.encodeHex(text)));
+const utf8 = (text: string) => Result.getOrThrow(Hex.decode(Hex.encode(text)));
 
 /**
  * The ID a keyed request gives the record it creates, derived from parts naming the operation,
@@ -29,7 +30,7 @@ export const derivedId = Effect.fnUntraced(function* (parts: ReadonlyArray<strin
   const bytes = (yield* crypto.digest("SHA-256", utf8(JSON.stringify(parts)))).slice(0, 16);
   bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x80;
   bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
-  const hex = Encoding.encodeHex(bytes);
+  const hex = Hex.encode(bytes);
   return [
     hex.slice(0, 8),
     hex.slice(8, 12),

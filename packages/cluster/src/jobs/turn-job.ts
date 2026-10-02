@@ -9,8 +9,8 @@ import { Store } from "@amends/core/journal";
 import { Turn, TurnJobs } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { Cause, DateTime, Effect, Exit, Layer, Option, PrimaryKey, Schema } from "effect";
-import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/unstable/cluster";
-import { Rpc } from "effect/unstable/rpc";
+import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/cluster";
+import { Rpc } from "effect/rpc";
 import { TurnRunner } from "../runner/runner.ts";
 import { JobRetry } from "./retry.ts";
 

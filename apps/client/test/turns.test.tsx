@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { affectedKeys } from "../src/live/api.ts";
 import { drafted, writing, type Drafts } from "../src/turns/drafts.ts";
 import {
@@ -333,7 +333,7 @@ function eventStream(request: Request) {
     response: new Response(body, { headers: { "content-type": "text/event-stream" } }),
     send: (message: unknown) => write("message", message),
     unavailable: () => {
-      write("effect/httpapi/stream/failure", [
+      write("effect/http-api/stream/failure", [
         { _tag: "Fail", error: { _tag: "Turn.LogUnavailable" } },
       ]);
       controller.close();

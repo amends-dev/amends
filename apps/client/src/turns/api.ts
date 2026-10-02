@@ -1,7 +1,7 @@
 import { ApiErrors, Turn, Workspace } from "@amends/api-http";
 import type { TurnProblem } from "@amends/ui/screens/turns";
 import { Cause, Effect, Exit, Option, Queue, Schema, Stream } from "effect";
-import { Atom } from "effect/unstable/reactivity";
+import { Atom } from "effect/reactivity";
 import { isUnauthorized, type Api, type ApiClient } from "../api/client.ts";
 import { command } from "../api/failures.ts";
 import { itemKeys, workspaceKey } from "../api/keys.ts";

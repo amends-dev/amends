@@ -12,8 +12,8 @@ import {
   Stream,
 } from "effect";
 import type { JsonSchema } from "effect";
-import { LanguageModel, Model, Tool } from "effect/unstable/ai";
-import type { Response, Toolkit } from "effect/unstable/ai";
+import { LanguageModel, Model, Tool } from "effect/ai";
+import type { Response, Toolkit } from "effect/ai";
 import {
   Harness,
   HarnessErrors,

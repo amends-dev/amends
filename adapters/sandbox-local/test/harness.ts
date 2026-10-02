@@ -1,7 +1,7 @@
 import type { Harness } from "@amends/sandbox-conformance";
 import { BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, Random } from "effect";
-import { FetchHttpClient } from "effect/unstable/http";
+import { FetchHttpClient } from "effect/http";
 import { LocalSandbox } from "../src/index.ts";
 
 /** A provider over a temporary directory for each test, removed when the test ends. */

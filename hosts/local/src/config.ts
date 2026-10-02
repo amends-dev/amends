@@ -1,4 +1,5 @@
-import { Config, Duration, Effect, Encoding, Option, Result, Schema } from "effect";
+import { Config, Duration, Effect, Option, Result, Schema } from "effect";
+import { Base64 } from "effect/encoding";
 import type { Redacted } from "effect";
 
 export interface Options {
@@ -83,7 +84,7 @@ const credentialKey = Config.schema(
     Schema.String.check(
       Schema.makeFilter(
         (value) =>
-          Result.match(Encoding.decodeBase64(value), {
+          Result.match(Base64.decode(value), {
             onFailure: () => false,
             onSuccess: (bytes) => bytes.length === 32,
           }) || "Expected 32 bytes encoded as base64, such as from `openssl rand -base64 32`",

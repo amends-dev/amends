@@ -8,7 +8,7 @@ import type {
 } from "@amends/ui/screens/turns";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Effect, Exit, Option } from "effect";
-import { AsyncResult, type Atom } from "effect/unstable/reactivity";
+import { AsyncResult, type Atom } from "effect/reactivity";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { agentsReads } from "../agents/api.ts";
 import { timelineRead } from "../conversations/api.ts";

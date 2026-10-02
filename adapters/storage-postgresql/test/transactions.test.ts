@@ -16,7 +16,7 @@ import {
   Option,
   Redacted,
 } from "effect";
-import { SqlClient, SqlError } from "effect/unstable/sql";
+import { SqlClient, SqlError } from "effect/sql";
 import { Binding } from "../src/binding.ts";
 import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { harness } from "./harness.ts";

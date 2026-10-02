@@ -2,7 +2,7 @@ import { Agent } from "@amends/core/agent";
 import { Connection } from "@amends/core/connection";
 import { Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
 import { ApiErrors } from "./errors.ts";
 

@@ -1,7 +1,7 @@
 import type { Schema } from "effect";
 import { EffectDrizzleQueryError } from "drizzle-orm/effect-core";
 import { Cause, Option } from "effect";
-import { SqlError } from "effect/unstable/sql";
+import { SqlError } from "effect/sql";
 
 /** The client's classification of a failed statement, whether Drizzle or the client raised it. */
 export const sqlError = (error: unknown): SqlError.SqlError | undefined => {

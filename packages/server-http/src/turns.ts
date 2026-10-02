@@ -4,7 +4,7 @@ import { Turn, TurnService } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Effect, Layer } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 import { Streams } from "./streams.ts";
 
 /**

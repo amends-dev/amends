@@ -427,11 +427,13 @@ clients that reconnect repeatedly.
 ## Payload-format compatibility
 
 [Codec.makeForSchema](../packages/core/src/journal/codec.ts) persists payloads through
-`SchemaBinary.toCodec` and copies output buffers. Existing tests cover round trips,
-structured headers, and idempotency. They do not freeze representative payloads as
-literal expected bytes and decode those fixtures independently of the current encoder.
-There is no golden-bytes test for the persisted SchemaBinary format.
+`SchemaBinary.toCodec` and copies output buffers. The [codec tests](../packages/core/test/journal/codec.test.ts)
+freeze representative workspace, message, and turn-checkpoint bytes captured with Effect
+4.0.0-rc.115, checking both decoding and identical encoding on 4.0.0. They cover dates,
+Unicode, tagged unions, nullable fields, arrays, and optional provider metadata, but not
+every fact or log variant. Existing storage tests also cover round trips, structured
+headers, and idempotency.
 
-Add fixed fixtures before claiming byte compatibility across Effect or schema
-changes. Keep dependency and vendored-source versions aligned, and follow the
+Extend the fixed fixtures before claiming byte compatibility for other payloads across
+Effect or schema changes. Keep dependency and vendored-source versions aligned, and follow the
 [journal compatibility guidance](journal.md#reading-and-replay).

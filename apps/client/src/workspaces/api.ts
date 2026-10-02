@@ -1,6 +1,6 @@
 import { ApiErrors, Invitation, Member, Workspace } from "@amends/api-http";
 import { Cause, Effect, Schema } from "effect";
-import { Reactivity } from "effect/unstable/reactivity";
+import { Reactivity } from "effect/reactivity";
 import type { Api } from "../api/client.ts";
 import { WorkspaceDirectory } from "../api/contracts.ts";
 import { command } from "../api/failures.ts";

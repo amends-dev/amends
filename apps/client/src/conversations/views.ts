@@ -12,7 +12,7 @@ import type {
 } from "@amends/ui/screens/timeline";
 import { useAtomValue } from "@effect/atom-solid";
 import { Option, Predicate } from "effect";
-import { AsyncResult } from "effect/unstable/reactivity";
+import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { agentsReads } from "../agents/api.ts";
 import { useApiClient } from "../provider.tsx";

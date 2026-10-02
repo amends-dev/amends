@@ -1,6 +1,6 @@
 import { Api } from "@amends/api-http";
 import { Layer } from "effect";
-import { HttpApiBuilder, HttpApiScalar } from "effect/unstable/httpapi";
+import { HttpApiBuilder, HttpApiScalar } from "effect/http-api";
 import { BearerAuthentication } from "./authentication.ts";
 import { InvitationsHandlers } from "./invitations.ts";
 import { AssignmentsHandlers } from "./assignments.ts";

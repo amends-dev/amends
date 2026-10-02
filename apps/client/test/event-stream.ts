@@ -21,7 +21,7 @@ export function eventStream(request: Request) {
     response: new Response(body, { headers: { "content-type": "text/event-stream" } }),
     send: (message: unknown) => write("message", message),
     unavailable: () => {
-      write("effect/httpapi/stream/failure", [
+      write("effect/http-api/stream/failure", [
         { _tag: "Fail", error: { _tag: "ChangeFeed.Unavailable" } },
       ]);
       controller.close();

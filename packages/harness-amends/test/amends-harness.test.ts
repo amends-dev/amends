@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Ref, Schema, Stream } from "effect";
 import type { Scope } from "effect";
-import { AiError, LanguageModel, Prompt } from "effect/unstable/ai";
-import type { Response } from "effect/unstable/ai";
+import { AiError, LanguageModel, Prompt } from "effect/ai";
+import type { Response } from "effect/ai";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
 import { type Harness, type HarnessTool } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";

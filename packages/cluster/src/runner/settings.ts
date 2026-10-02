@@ -2,7 +2,7 @@
 import type { ModelInference } from "@amends/connection/model-inference";
 import type { Harness } from "@amends/harness";
 import { Duration } from "effect";
-import type { LanguageModel, Model } from "effect/unstable/ai";
+import type { LanguageModel, Model } from "effect/ai";
 
 /** The model access an in-process harness takes: Effect AI's, from a connection's implementation. */
 export type ModelAccess = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName;

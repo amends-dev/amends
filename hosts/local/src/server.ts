@@ -1,7 +1,7 @@
 import { Draining, Routes } from "@amends/server-http";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Layer } from "effect";
-import { HttpRouter } from "effect/unstable/http";
+import { HttpRouter } from "effect/http";
 import type { LocalHost } from "./host.ts";
 import { DevelopmentAuthentication } from "./authentication/authentication.ts";
 

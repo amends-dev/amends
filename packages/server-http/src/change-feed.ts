@@ -2,7 +2,7 @@ import { Api, Principal } from "@amends/api-http";
 import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
 import { Gateway } from "@amends/gateway";
 import { Effect, Layer } from "effect";
-import { HttpApiBuilder } from "effect/unstable/httpapi";
+import { HttpApiBuilder } from "effect/http-api";
 import { Streams } from "./streams.ts";
 
 /**

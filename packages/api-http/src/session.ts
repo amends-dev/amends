@@ -1,6 +1,6 @@
 import { SignIn } from "@amends/gateway/sign-in";
 import { Schema } from "effect";
-import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/unstable/httpapi";
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 
 /** Email sign-in: request a code, then exchange it for a session. No credential is needed yet. */
 export class SessionGroup extends HttpApiGroup.make("session")

@@ -1,7 +1,7 @@
 import { ConnectionImplementation } from "@amends/connection";
 import { expect, it } from "@effect/vitest";
 import { Effect, Redacted, Schema } from "effect";
-import { LanguageModel, Model } from "effect/unstable/ai";
+import { LanguageModel, Model } from "effect/ai";
 import { AnthropicConnection } from "../src/index.ts";
 
 interface Recorded {

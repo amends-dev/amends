@@ -1,7 +1,7 @@
 import { ConnectionImplementation } from "@amends/connection";
 import { expect, it } from "@effect/vitest";
 import { Effect, Redacted, Schema } from "effect";
-import { LanguageModel } from "effect/unstable/ai";
+import { LanguageModel } from "effect/ai";
 import { OpenAiCompatibleConnection } from "../src/index.ts";
 
 interface Recorded {

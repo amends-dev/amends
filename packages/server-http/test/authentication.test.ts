@@ -3,8 +3,8 @@ import { Api, Authentication } from "@amends/api-http";
 import { Identity } from "@amends/core/identity";
 import { SessionTokens, WorkspaceDirectory } from "@amends/gateway";
 import { Effect, Layer, Redacted, Ref } from "effect";
-import { HttpClientRequest, HttpServer } from "effect/unstable/http";
-import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
+import { HttpClientRequest, HttpServer } from "effect/http";
+import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";
 import { BearerAuthentication, MeHandlers } from "../src/index.ts";
 
 it.effect.each(["make", "layer"] as const)(

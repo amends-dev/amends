@@ -18,7 +18,7 @@ import {
   Option,
   Schema,
 } from "effect";
-import type { SqlError } from "effect/unstable/sql";
+import type { SqlError } from "effect/sql";
 import { PostgresDatabase } from "./database.ts";
 import { PostgresNotices } from "./notices.ts";
 import { isContention } from "./errors.ts";

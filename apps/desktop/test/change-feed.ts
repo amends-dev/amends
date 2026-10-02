@@ -127,7 +127,7 @@ export function withChangeFeed(
       request,
       send: (message) => write("message", message),
       unavailable: () => {
-        write("effect/httpapi/stream/failure", [
+        write("effect/http-api/stream/failure", [
           { _tag: "Fail", error: { _tag: "ChangeFeed.Unavailable" } },
         ]);
         try {

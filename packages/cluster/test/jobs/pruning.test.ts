@@ -8,7 +8,7 @@ import {
   RunnerStorage,
   Sharding,
   ShardingConfig,
-} from "effect/unstable/cluster";
+} from "effect/cluster";
 import { JobPruning } from "../../src/jobs/pruning.ts";
 
 /** Cluster in memory, reading for due messages every second of the test clock. */

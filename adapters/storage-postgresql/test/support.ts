@@ -25,7 +25,7 @@ import { AgentJobs, TurnJobs } from "@amends/core/turn";
 import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { SqlClient } from "effect/sql";
 import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { temporary } from "./postgres.ts";
 

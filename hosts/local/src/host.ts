@@ -18,8 +18,8 @@ import {
   type Runners,
   type Sharding,
   SingleRunner,
-} from "effect/unstable/cluster";
-import type { SqlClient } from "effect/unstable/sql";
+} from "effect/cluster";
+import type { SqlClient } from "effect/sql";
 
 /** Gateway and directory owned by one host lifetime. */
 export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;

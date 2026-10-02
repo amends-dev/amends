@@ -2,7 +2,7 @@ import { Codec, Journal, Log, Publication, Subject } from "@amends/core/journal"
 import { Changed, Changed2, Other, Suites } from "@amends/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
-import { SqlClient } from "effect/unstable/sql";
+import { SqlClient } from "effect/sql";
 import { harness } from "./harness.ts";
 import { boundTo, core, inDatabase, setup, testProvenance, workspaceId } from "./support.ts";
 
