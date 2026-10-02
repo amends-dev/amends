@@ -1,4 +1,4 @@
-# Live updates
+# Change feed
 
 Workspace pages stay current through the workspace [change feed](../packages/api-http/README.md)
 (`GET /workspaces/:id/changes`, server-sent events). Nothing polls. Client owns the connection
@@ -6,7 +6,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
 
 ## Flow
 
-1. A workspace route mounts `WorkspaceFeedProvider` from `@amends/client` around its layout.
+1. A workspace route mounts `ChangeFeedProvider` from `@amends/client` around its layout.
    The provider opens one stream per workspace per credential scope, shared by every consumer,
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
@@ -16,7 +16,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
    collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
    follows it by its own stream (see the [turn guide](turns.md)).
 3. Each `Committed` message maps its events to the keys they affect
-   (`apps/client/src/api/changes.ts`) and invalidates each once, so every affected read
+   (`apps/client/src/api/change-feed.ts`) and invalidates each once, so every affected read
    refreshes once. A member's rename refreshes the members and the directory. Group creation,
    renames, and membership changes also refresh the public groups, and a public group's creation
    reaches the whole workspace. Thread activity
@@ -46,8 +46,12 @@ and cache invalidation; apps mount it once per workspace view; features show its
 4. `Ready` with `reset` invalidates every key for the workspace and the directory. A first
    connection always resets, because reads loaded before it may have missed commits.
 
-A write still refreshes the reads it changed before reporting success, so its result appears
-at once; the feed then delivers the same commit and refreshes those reads again.
+A write that commits still refreshes the reads it changed before reporting success, so its result
+appears at once; the feed then delivers the same commit and refreshes those reads again. Read
+marks and marking notifications seen write private state rather than a commit, and refresh nothing
+themselves: the signal the server publishes for them reaches every session of the reader, the one
+that wrote included, and refreshes what it changed, once. While the feed is down, what they change
+catches up when it reconnects, with the rest of the view.
 
 ## Connection
 
@@ -60,7 +64,7 @@ at once; the feed then delivers the same commit and refreshes those reads again.
   without delivering anything, and the client cannot see the server's heartbeats.
 - `401` signs out. `403`/`404` end the feed and refresh the directory; the route guard then
   shows that the workspace is unavailable. Removal arrives as a commit, then the stream ends.
-- Client's `useLiveStatus()` stays silent while live and for two seconds after a drop, then
+- Client's `useChangeFeedStatus()` stays silent while live and for two seconds after a drop, then
   reports `connecting` or `reconnecting`; the apps pass it to UI's `LiveStatus`, a live region
   that says "Connecting…" or "Reconnecting…" at the bottom of the screen.
 
@@ -78,8 +82,8 @@ it against the values then shown. Background refreshes never mark settings pendi
   feed. The directory refreshes when the page wakes instead; an identity-level feed would be
   a backend addition.
 - Read-state signals refresh the groups and streams, since they change unread state and pending
-  counts; reading a thread and seeing notifications also refresh the inbox, since both settle
-  notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
+  counts; reading a thread and seeing notifications also refresh the inbox and its count, since
+  both settle notifications. Typing signals keep a per-workspace list of who is typing in each thread until the
   moment each names, or until that member's message is published, and never show the reader. They
   are not replayed, so a reconnect starts with nobody typing. The notifications a commit carries
   refresh the inbox by refetching it rather than being added to it from the message.

@@ -55,14 +55,15 @@ import {
   boundTo,
   failingLate,
   journalLog,
+  listOldestFirst,
   otherWorkspaceId,
   placed,
   publishedMessage,
   runHost,
   Support,
   testProvenance,
-  workspaceId,
   threadInternals,
+  workspaceId,
 } from "./support.ts";
 
 import type { Harness } from "./harness.ts";
@@ -98,7 +99,7 @@ export const threadReplies = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
-      bound.notifications.listByRecipient(Notification.ofMember(id, identityFor(id)), {
+      listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
         limit: 100,
       });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
@@ -273,7 +274,8 @@ export const threadReplies = (harness: Harness) => {
               expect(yield* notifications(bound, agentId)).toHaveLength(2);
               expect(yield* notifications(bound, otherId)).toEqual([]);
               expect(
-                yield* bound.notifications.listByRecipient(
+                yield* listOldestFirst(
+                  bound.notifications,
                   Notification.ofMember(owner.memberId, owner.identity),
                   { limit: 100 },
                 ),
@@ -1151,7 +1153,7 @@ export const threadReplies = (harness: Harness) => {
                 const recipient = Notification.ofMember(memberId, identity);
                 return {
                   // In timeline order, whatever order the inbox lists them in.
-                  all: (yield* bound.notifications.listByRecipient(recipient, { limit: 10 }))
+                  all: (yield* listOldestFirst(bound.notifications, recipient, { limit: 10 }))
                     .toSorted((a, b) => (a.thread?.sequence ?? 0) - (b.thread?.sequence ?? 0))
                     .map((n) => [n.thread?.sequence, n.state._tag]),
                   pending: (yield* bound.notifications.listPendingByRecipient(recipient, {

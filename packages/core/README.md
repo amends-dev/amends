@@ -20,7 +20,7 @@ The current domains contain these features:
 | `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
 | `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
-| `notification`  | Notification records, inbox/source reads, acknowledgment, activity-driven generation, and departure settlement.  |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.        |
 | `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
 | `agent`         | Agents' configuration: instructions, model access, and environment, over an agent's workspace membership.        |
 | `turn`          | Agents' attempts on threads: accepting work, each attempt's log, execution steps, and cancellation.              |
@@ -39,22 +39,20 @@ management.
 contract, `NotificationService`, and the projection that generates notifications. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient (one Triage
 recipient per workspace, `{ _tag: "Triage" }`), and is `Pending`, `Discarded` when its agent
-participation ends or its person leaves the source's group, `Acknowledged` once a human saw it, or `Informational` from the start when
+participation ends or its person leaves the source's group, `Seen` once a human saw it, `Accepted` once an agent took it into a turn, or `Informational` from the start when
 its activity asks an agent for no work, as another agent's message does. Each activity recipient
 records `requestsWork`. A human or agent recipient names the
 membership notified as well as the identity (`Notification.ofMember`), so an inbox belongs to one
 membership: someone who rejoins under a new member ID starts with an empty one.
-`NotificationService` serves the acting member's own inbox (`get`, `list`, `listPending`, and
-`inbox`, newest first with each source they can still read), `resolveSource`, and human
-`acknowledge`; contact and triage inboxes are read only through the
-store. `NotificationProjection`
+`NotificationService` serves the acting member's own `inbox`, newest first with each source they
+can still read, its `countPending`, and a person's `markSeen` and `markSeenThrough`; contact and
+triage inboxes are read only through the store. `NotificationProjection`
 generates notifications from each recorded thread activity's recipients, and settles pending agent
 input when a participation ends, from the activity and its own notifications alone. A human's `Seen` is private state the store keeps outside the
-journal. `resolveSource` and `inbox` read a notification's recorded activity as its timeline
-shows it, under the recipient's current access. Notifications never create turns, accept their input, or execute work. See
+journal, and its stored state says `Seen`. `inbox` reads a notification's recorded activity as its
+timeline shows it, under the recipient's current access. Notifications never create turns, accept their input, or execute work. See
 [reading the inbox](../../docs/thread-workflows.md#reading-the-inbox),
-[resolving a notification source](../../docs/thread-workflows.md#resolving-a-notification-source),
-and [acknowledging a notification](../../docs/thread-workflows.md#acknowledging-a-notification).
+and [marking a notification seen](../../docs/thread-workflows.md#marking-a-notification-seen).
 
 Membership demonstrates the feature layout:
 
@@ -267,8 +265,8 @@ log.
 
 Agents handle their own notifications as people do theirs. `AgentWork.acceptWork`, which the
 agent's [job](#jobs) runs, acts as the agent: its pending work notifications on a thread join the
-active turn there, or start a new one, and the same commit settles them as `Acknowledged` with
-outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, while the
+active turn there, or start a new one, and the same commit settles them as `Accepted` with the
+turn's ID. Work waits while a turn there is still stopping, while the
 active turn belongs to a participation that ended, so an agent that left and came back is not
 handed work by the turn being stopped as departed, and while the agent cannot open the thread.
 A new turn's input starts where the agent's latest turn in the same participation stopped taking
@@ -669,26 +667,28 @@ message schemas. Frontend query dependencies belong in the client.
 ## Signals
 
 `@amends/core/signal` holds what is happening now and is never stored: `Signal.Value` is `Typing`,
-`ThreadRead`, `GroupCaughtUp`, `NotificationsSeen`, or `TurnDraft`.
-`Signal.reachOf` gives each its audience, as a fact declares one: typing and a turn's drafts reach
-the thread's group with `thread.read` for the thread, and
-the three read-state signals reach only the member whose private state changed, so their other
-sessions stay current without the journal. `Signal.inChangeFeed` leaves a turn's drafts out of the
-change feed: they reach only readers following the turn's log.
+`ThreadRead`, `GroupRead`, `NotificationsSeen`, or `TurnDraft`.
+`Signal.changeFeedReachOf` gives each its audience on the change feed, as a fact declares one:
+typing reaches the thread's group with `thread.read` for the thread, and the three read-state
+signals reach only the member whose private state changed, so their other sessions stay current
+without the journal. A turn's drafts reach nobody there: only readers following the turn's log,
+which checks their access itself.
 
-`Signals.Service` is the workspace's delivery, a required host binding: `publish` offers a signal
-to the subscribers present at that moment, in every process over the same storage, and
-`subscribe` returns those published from then until its scope closes. Delivery is best effort.
+`SignalHub.Service` is the workspace's delivery, which storage binds with the stores: `publish`
+offers a signal to the subscribers present at that moment, in every process over the same storage,
+and `subscribe` returns those published from then until its scope closes. Delivery is best effort.
 Publishing never fails the operation that publishes, and a subscriber that falls behind, or whose
 process loses its connection to the others, misses signals rather than delaying anyone.
+`SignalHub.makeLocal` is one process's hub for every workspace, which storage adapters bind to each
+workspace and relay between processes where several share their storage.
 
-`SignalService.typing(threadId)` tells the thread's readers that the acting member is
-composing there until `until`, six seconds later (`SignalService.typingFor`). It requires
-current group access and `thread.publish`, as posting does, and returns `ThreadNotFound` for
-missing and inaccessible threads alike. Repeats from the same member in the same thread within two
-seconds are dropped by the process that receives them, so a client may call it on each keystroke;
-clients hide their own member's typing. `ReadStateService` and
-`NotificationService.acknowledge` publish the read-state signals after their writes.
+`ThreadMessageService.typing(threadId)` tells the thread's readers that the acting member is
+composing there for the next six seconds. It requires current group access and `thread.publish`,
+as publishing does, and returns `NotFound` for missing and inaccessible threads alike. Repeats from
+the same member in the same thread within two seconds are dropped by the process that receives
+them, so a client may call it on each keystroke; clients hide their own member's typing.
+`ReadStateService` and `NotificationService.markSeen` and `markSeenThrough` publish the read-state
+signals after their writes; the reader's sessions, the one that wrote included, refresh from them.
 
 ## Jobs
 
@@ -900,10 +900,9 @@ meaning rather than using it as a synonym for a constructor.
 | Invitation operations     | `InvitationService.make()`            | `InvitationService.Service`             |
 | Ownership operations      | `OwnershipService.make()`             | `OwnershipService.Service`              |
 | Change feed               | `ChangeFeedService.make()`            | `ChangeFeedService.Service`             |
-| Typing signals            | `SignalService.make()`                | `SignalService.Service`                 |
 
 The store modules and `Checkpoint` declare contracts implemented by adapters.
-`Signals.Service` is a host contract too, bound to one workspace like the stores.
+`SignalHub.Service` is a storage contract too, bound to one workspace like the stores.
 `Actor.Service`, `Publication.Service`, and `Store.Transaction` identify invocation
 context supplied by trusted ingress, application operations, and storage. These contracts have no default implementation or
 pass-through `make`/`layer` wrappers in core. Private transaction tags coordinate

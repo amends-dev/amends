@@ -1,7 +1,7 @@
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { useApiClient } from "../api/context.tsx";
-import { seenRequest, type InboxFilter, type NotificationInbox } from "../api/conversations.ts";
+import { markSeenRequest, type InboxFilter, type NotificationInbox } from "../api/conversations.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useRequest } from "../request/use-request.ts";
 import { useSession } from "../session/provider.tsx";
@@ -73,7 +73,7 @@ export function useInboxView(
   const [seenError, setSeenError] = createSignal<WorkspaceFailure>();
   const queue: string[] = [];
   const seen = useRequest(
-    seenRequest(useApiClient(), workspaceId),
+    markSeenRequest(useApiClient(), workspaceId),
     (exit, notificationId) => {
       if (Exit.isFailure(exit)) {
         const failure = workspaceFailure(exit.cause);

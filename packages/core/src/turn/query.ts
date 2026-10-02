@@ -1,6 +1,6 @@
 import { Clock, Context, Duration, Effect, Layer, Schedule, Stream } from "effect";
 import type { Signal } from "../signal/signal.ts";
-import { Signals } from "../signal/signals.ts";
+import { SignalHub } from "../signal/hub.ts";
 import type { TurnId } from "./id.ts";
 
 /** A part of a response a turn is writing, as its drafts told it from the start. */
@@ -43,7 +43,7 @@ interface Held {
  * @category constructors
  */
 export const make = Effect.gen(function* () {
-  const signals = yield* Signals.Service;
+  const signalHub = yield* SignalHub.Service;
   const turns = new Map<string, { readonly parts: Map<string, Held>; at: number }>();
   const holdDraft = (
     signal: Extract<Signal.Value, { readonly _tag: "TurnDraft" }>,
@@ -66,7 +66,7 @@ export const make = Effect.gen(function* () {
     else if (signal.offset + signal.text.length > held.text.length)
       held.text += signal.text.slice(held.text.length - signal.offset);
   };
-  const live = yield* signals.subscribe;
+  const live = yield* signalHub.subscribe;
   yield* live.pipe(
     Stream.runForEach((signal) =>
       signal._tag === "TurnDraft"

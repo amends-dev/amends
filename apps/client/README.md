@@ -25,7 +25,7 @@ portable backend packages under `packages/*` remain Effect-only.
   `SignedOut`, `Loading`, `Ready { listing }`, or `Failed` through `useDirectory()`.
   `retry` lets the consuming app decide when to repeat a failed read. Guests make no request.
   The directory also refreshes when the page wakes, since invitations from other workspaces
-  reach no workspace feed.
+  reach no change feed.
 - `useWorkspace(() => workspaceId)` resolves an active membership from the directory.
   The caller supplies identity; the hook does not read a router or render an access page.
 - `useApiClient()` gives named API modules access to the generated Effect client.
@@ -47,9 +47,9 @@ portable backend packages under `packages/*` remain Effect-only.
   drops the invitation settles a `refresh-failed` attempt. `suggestedName()` offers a first name.
 - `useWorkspaceAccess(() => workspaceId)` says why a workspace cannot open: `invited` (an
   invitation outranks an ended membership), `removed`, or `unknown`.
-- `WorkspaceFeedProvider` keeps one workspace's reads current over its change feed while
-  mounted, and `useWorkspaceFeed()` exposes `Connecting`, `Live`, `Reconnecting`, or `Ended`.
-  Commits invalidate the reads they affect; see [live updates](../../docs/live-updates.md).
+- `ChangeFeedProvider` keeps one workspace's reads current over its change feed while
+  mounted, and `useChangeFeed()` exposes `Connecting`, `Live`, `Reconnecting`, or `Ended`.
+  Commits invalidate the reads they affect; see [change feed](../../docs/change-feed.md).
 - `useWorkspaceSettings(workspaceId, section, { done })` shapes one settings tab for its screens,
   with drafts, per-change failures, and completion; see [Settings](#settings). It is built on
   `useSettings(workspaceId, section)`, which composes keyed settings reads with commands that
@@ -74,9 +74,9 @@ portable backend packages under `packages/*` remain Effect-only.
 - `useGroups`, `useMembers`, `useGroupStream`, `useThreadTimeline`, and `useInbox` are live
   conversation reads; see [Conversations](#conversations). `toDate` turns a decoded instant into a `Date` for
   presentation to format. The view hooks shape them for screens; see [Views](#views).
-- `useLiveStatus()` reports `connecting` or `reconnecting` once workspace changes have stopped
+- `useChangeFeedStatus()` reports `connecting` or `reconnecting` once workspace changes have stopped
   arriving for two seconds (`liveGrace`), and nothing while live or through brief drops. Mount it
-  inside `WorkspaceFeedProvider`.
+  inside `ChangeFeedProvider`.
 - `Session` reuses the existing session schema for validation and persistence.
 - `createBrowserSessionStore`, `resolveApiBaseUrl`, `paths`, `returnPath`, and
   `signInPath` provide the storage, configuration, and pure path helpers used by both apps.
@@ -135,7 +135,7 @@ scope completion, directory states, authorization failure, and retry.
 Sign-in tests cover shared-schema validation, typed wire payloads, rejection reasons,
 explicit retries, resend behavior, late responses, independent controller owners,
 and cancellation on unmount or credential replacement. Feed tests drive
-`WorkspaceFeedProvider` over a fake SSE transport: per-commit invalidation, reset,
+`ChangeFeedProvider` over a fake SSE transport: per-commit invalidation, reset,
 cursor resume, wake restarts, lost membership, rejected credentials, and closing
 on unmount or credential change. Web tests cover
 route guards, safe redirects, workspace changes, and cache/request disposal. Desktop
@@ -294,11 +294,11 @@ adds where it ran and the model access and environment it started with, by provi
 environment name. The turn is a read keyed by the turn, which its facts refresh; the log is
 followed by `turnLogFeed`, one subscription to `GET …/turns/:turnId/log/events` per turn while
 mounted, which opens with the log's items, applies each change in place, and stops once the turn
-ended and its last items arrived. A dropped subscription reconnects with the workspace feed's
+ended and its last items arrived. A dropped subscription reconnects with the change feed's
 backoff and opens with the items as they stand. `draft()` is the response the agent is writing
 now, from its drafts: their text continues each response part at its offset, a repeat adds
 nothing, and text past a gap marks the draft broken until the completed response in the log
-replaces it; a turn that ends drops its drafts. `reconnecting()` says when the workspace feed or
+replaces it; a turn that ends drops its drafts. `reconnecting()` says when the change feed or
 the log's subscription has been down for more than two seconds, and `updatedAt()` when the log
 last arrived. Its `stop` and `retry` refresh the turn too, and `retried` receives the turn a retry
 queued.
@@ -403,11 +403,10 @@ unreadSince)` record what the reader has seen while mounted and the page is visi
 (`usePageVisible`). Each takes an accessor that grows with newer activity: a thread's newest
 timeline position shown, or when a group's latest unread activity happened, undefined when there
 is none. Each value is sent once, one at a time; a failed mark is retried only once something
-newer is due. Marks invalidate the groups and streams themselves, so they show even while the
-change feed is away, and the server moves positions forward only and acknowledges the
-notifications read. Each mark, and seeing one notification, expects the reader's own signal it
-causes for ten seconds: when that signal comes back through the feed, before or after the answer,
-it refreshes nothing more, while a signal from another session's different mark still does.
+newer is due. The server moves positions forward only and marks the notifications read seen.
+Marks refresh nothing themselves: the read-state signal each causes reaches every session of the
+reader through the change feed, this one included, and refreshes the groups, streams, and inbox
+it changed, as seeing notifications does.
 
 `useTyping(workspaceId)` returns who is typing in a thread now, from the change feed's typing
 signals, without the reader: each until the moment its signal names, or until that member's

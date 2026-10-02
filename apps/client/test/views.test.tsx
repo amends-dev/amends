@@ -51,7 +51,7 @@ const listing = {
 const listItem = (group: Record<string, unknown>, extra: Record<string, unknown> = {}) => ({
   group,
   latestActivityAt: null,
-  caughtUpAt: null,
+  readAt: null,
   newActivity: false,
   following: false,
   pending: 0,

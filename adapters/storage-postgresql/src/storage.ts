@@ -13,6 +13,7 @@ import { Groups } from "./groups.ts";
 import { GroupMemberships } from "./group-memberships.ts";
 import { GroupFollows } from "./group-follows.ts";
 import { ReadStates } from "./read-states.ts";
+import { PostgresSignalHub } from "./signal-hub.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
@@ -36,7 +37,7 @@ export interface Options extends Binding.Options {
 }
 
 /**
- * Provide every store core requires over the same workspace binding.
+ * Provide every store core requires, and the signal hub, over the same workspace binding.
  * Adding a store adds a line here.
  *
  * @category layers
@@ -63,6 +64,7 @@ const layerStores = Layer.mergeAll(
   Environments.layer,
   Agents.layer,
   TurnRecords.layer,
+  PostgresSignalHub.layer,
 );
 
 /**

@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js";
-import { useWorkspaceFeed } from "./workspace-feed.tsx";
+import { useChangeFeed } from "./change-feed.tsx";
 
 /** How long changes may stop arriving before the reader is told, covering a host restart. */
 export const liveGrace = 2_000;
@@ -25,10 +25,10 @@ export function useLastingDown(down: Accessor<boolean>): Accessor<boolean> {
 /**
  * Whether workspace changes have stopped arriving, so what the reader sees may be out of date:
  * `connecting` before the first, `reconnecting` after a drop, and undefined while live and through
- * brief reconnections. Mount inside WorkspaceFeedProvider.
+ * brief reconnections. Mount inside ChangeFeedProvider.
  */
-export function useLiveStatus(): Accessor<"connecting" | "reconnecting" | undefined> {
-  const feed = useWorkspaceFeed();
+export function useChangeFeedStatus(): Accessor<"connecting" | "reconnecting" | undefined> {
+  const feed = useChangeFeed();
   const shown = useLastingDown(() => {
     const state = feed.state()._tag;
     return state === "Connecting" || state === "Reconnecting";

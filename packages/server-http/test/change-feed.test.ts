@@ -9,7 +9,7 @@ import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/unstable/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
-import { BearerAuthentication, ChangesHandlers } from "../src/index.ts";
+import { BearerAuthentication, ChangeFeedHandlers } from "../src/index.ts";
 
 const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
 const workspaceId = Workspace.Id.make("workspace-one");
@@ -52,10 +52,10 @@ const credentials = Layer.succeed(
   SessionTokens.Service,
   SessionTokens.Service.of({ resolve: () => Effect.succeed(alice) }),
 );
-const client = HttpApiTest.groups(Api, ["changes"]).pipe(
+const client = HttpApiTest.groups(Api, ["changeFeed"]).pipe(
   Effect.provide(
     Layer.mergeAll(
-      ChangesHandlers.layer.pipe(
+      ChangeFeedHandlers.layer.pipe(
         Layer.provideMerge(BearerAuthentication.layer),
         Layer.provide(Layer.mergeAll(gateway, credentials)),
       ),
@@ -75,7 +75,7 @@ it.effect(
       const messages: Array<ChangeFeed.Message> = [];
       const exit = yield* Effect.gen(function* () {
         const api = yield* client;
-        const stream = yield* api.changes.watch({ params: { workspaceId }, query: {} });
+        const stream = yield* api.changeFeed.watch({ params: { workspaceId }, query: {} });
         return yield* Stream.runForEach(stream, (message) =>
           Effect.sync(() => messages.push(message)),
         );

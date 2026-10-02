@@ -52,7 +52,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
         position.readThrough,
       );
     }),
-    getGroupsCaughtUp: Effect.fn("ReadStates.getGroupsCaughtUp")(
+    getGroupReads: Effect.fn("ReadStates.getGroupReads")(
       function* (memberInput, groupInput) {
         const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
         const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
@@ -61,25 +61,25 @@ export const make = Effect.fn("ReadStates.make")(function* () {
           const at = times.get(keyOf(memberId, groupId));
           return at === undefined
             ? []
-            : [{ workspaceId, memberId, groupId, caughtUpAt: DateTime.makeUnsafe(at) }];
+            : [{ workspaceId, memberId, groupId, readAt: DateTime.makeUnsafe(at) }];
         });
       },
-      Effect.mapError(storeFailure(ReadStateStore, "getGroupsCaughtUp")),
+      Effect.mapError(storeFailure(ReadStateStore, "getGroupReads")),
     ),
     advanceGroup: Effect.fn("ReadStates.advanceGroup")(function* (input) {
-      const caughtUp = yield* Schema.decodeEffect(Schema.toType(ReadState.GroupCaughtUp))(
-        input,
-      ).pipe(Effect.mapError(storeConflict(ReadStateStore, "advanceGroup")));
-      if (caughtUp.workspaceId !== workspaceId)
+      const groupRead = yield* Schema.decodeEffect(Schema.toType(ReadState.GroupRead))(input).pipe(
+        Effect.mapError(storeConflict(ReadStateStore, "advanceGroup")),
+      );
+      if (groupRead.workspaceId !== workspaceId)
         return yield* new ReadStateStore.Conflict({
           operation: "advanceGroup",
-          message: "Caught-up time belongs to another workspace",
+          message: "Group read time belongs to another workspace",
         });
       const space = yield* join.pipe(Effect.mapError(storeFailure(ReadStateStore, "advanceGroup")));
       advance(
         space.groupTimes,
-        keyOf(caughtUp.memberId, caughtUp.groupId),
-        DateTime.toEpochMillis(caughtUp.caughtUpAt),
+        keyOf(groupRead.memberId, groupRead.groupId),
+        DateTime.toEpochMillis(groupRead.readAt),
       );
     }),
   });

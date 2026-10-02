@@ -42,7 +42,7 @@ export function DirectoryProvider(props: ParentProps) {
   const read = session.session
     ? { result: useAtomValue(query), retry: useAtomRefresh(query) }
     : undefined;
-  // Workspace feeds refresh the directory for their own changes, but invitations from other
+  // Change feeds refresh the directory for their own changes, but invitations from other
   // workspaces reach no feed this identity holds. Refresh when the page returns instead.
   onMount(() => {
     if (read)

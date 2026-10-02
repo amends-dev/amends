@@ -12,7 +12,7 @@ import { groupReadTimes, threadReadPositions } from "./schema.ts";
 const decodePositions = Schema.decodeUnknownEffect(Schema.Array(ReadState.ThreadPosition));
 const decodeGroups = Schema.decodeUnknownEffect(
   Schema.Array(
-    Schema.Struct({ ...ReadState.GroupCaughtUp.fields, caughtUpAt: Schema.DateTimeUtcFromDate }),
+    Schema.Struct({ ...ReadState.GroupRead.fields, readAt: Schema.DateTimeUtcFromDate }),
   ),
 );
 
@@ -72,7 +72,7 @@ export const make = Effect.fn("ReadStates.make")(function* () {
           }),
       ).pipe(Effect.mapError(storeError(ReadStateStore, "advanceThread")));
     }),
-    getGroupsCaughtUp: Effect.fn("ReadStates.getGroupsCaughtUp")(
+    getGroupReads: Effect.fn("ReadStates.getGroupReads")(
       function* (memberInput, groupInput) {
         const memberId = yield* Schema.decodeEffect(Member.Id)(memberInput);
         const groupIds = yield* Schema.decodeEffect(Schema.Array(Group.Id))(groupInput);
@@ -90,25 +90,25 @@ export const make = Effect.fn("ReadStates.make")(function* () {
             ),
         ).pipe(Effect.flatMap(decodeGroups));
       },
-      Effect.mapError(storeFailure(ReadStateStore, "getGroupsCaughtUp")),
+      Effect.mapError(storeFailure(ReadStateStore, "getGroupReads")),
     ),
     advanceGroup: Effect.fn("ReadStates.advanceGroup")(function* (input) {
-      const caughtUp = yield* Schema.decodeEffect(Schema.toType(ReadState.GroupCaughtUp))(
-        input,
-      ).pipe(Effect.mapError(storeConflict(ReadStateStore, "advanceGroup")));
-      if (caughtUp.workspaceId !== workspaceId)
+      const groupRead = yield* Schema.decodeEffect(Schema.toType(ReadState.GroupRead))(input).pipe(
+        Effect.mapError(storeConflict(ReadStateStore, "advanceGroup")),
+      );
+      if (groupRead.workspaceId !== workspaceId)
         return yield* new ReadStateStore.Conflict({
           operation: "advanceGroup",
-          message: "Caught-up time belongs to another workspace",
+          message: "Group read time belongs to another workspace",
         });
       yield* guard(
         db
           .insert(groupReadTimes)
-          .values({ ...caughtUp, caughtUpAt: DateTime.toDate(caughtUp.caughtUpAt) })
+          .values({ ...groupRead, readAt: DateTime.toDate(groupRead.readAt) })
           .onConflictDoUpdate({
             target: [groupReadTimes.workspaceId, groupReadTimes.memberId, groupReadTimes.groupId],
             set: {
-              caughtUpAt: sql`greatest(${groupReadTimes.caughtUpAt}, excluded.caught_up_at)`,
+              readAt: sql`greatest(${groupReadTimes.readAt}, excluded.read_at)`,
             },
           }),
       ).pipe(Effect.mapError(storeError(ReadStateStore, "advanceGroup")));

@@ -2,8 +2,8 @@
 
 Conversations in groups: starting them, replying, following, reading, and the notifications and
 read state around them. The operations are `ThreadService`, `ThreadMessageService`,
-`ThreadParticipationService`, `NotificationService`, `ReadStateService`, and
-`SignalService` in a workspace context, such as `Gateway.asMember`. The gateway preserves the
+`ThreadParticipationService`, `NotificationService`, and `ReadStateService` in a workspace
+context, such as `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
 failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
@@ -255,58 +255,56 @@ reading until it holds `limit` of them or the thread has no more; an empty page 
 `NotificationService.inbox({ limit, before?, pendingOnly? })` lists the acting human or agent's
 notifications newest first, by recorded time then ID in descending binary order, all of them or
 only those still pending. `before` is the last listed `{ recordedAt, id }`, an exclusive boundary.
-Each item carries its notification and, as `source`, the timeline item that resolving it returns;
-where resolving would return `SourceUnavailable`, the item has no `source`. It requires active
-membership only, lists nobody else's notifications, and changes nothing. `list` and `listPending`
-keep the oldest-first order, for work queues. `countPending` counts what is still pending for the
-acting identity, from any source, including threads they can no longer read.
+Each item carries its notification and, as `source`, the timeline item it points to while the
+reader may still read it (see [notification sources](#notification-sources)). It requires active
+membership only, lists nobody else's notifications, and changes nothing. `countPending` counts what
+is still pending for the acting identity, from any source, including threads they can no longer
+read.
 
 ## Seeing everything at once
 
-`NotificationService.acknowledgeThrough({ recordedAt, id })` records `Seen` for every
+`NotificationService.markSeenThrough({ recordedAt, id })` records `Seen` for every
 notification still pending for the acting human up to and including that position in inbox
 order, typically the newest one they are shown, so a notification that arrives meanwhile stays
-pending. It marks them in batches of 100, each written as `acknowledge` writes one and heard by
+pending. It marks them in batches of 100, each written as `markSeen` writes one and heard by
 the person's other sessions as one `NotificationsSeen` signal, and returns how many it marked;
 nothing left to mark returns zero. Batches are not one transaction: a failure keeps what earlier
 batches marked, and a retry continues. A batch that a departure settles part of meanwhile is read
 again without those, up to twice. Agents receive `HumanRecipientRequired`.
 
-## Resolving a notification source
+## Notification sources
 
-`NotificationService.resolveSource(notificationId)` returns the source's `Thread.TimelineItem`
-for the acting human or agent. It first checks active workspace membership and that the caller owns
-the notification: missing IDs and other recipients' notifications both return
-`NotificationService.NotFound`, before any source lookup. It then checks current group access
-and `thread.read` on the source thread, as timeline reads do, and returns the activity with its
-message or participation summary.
+An inbox item's `source` is the `Thread.TimelineItem` its notification points to: the activity with
+its message or participation summary, read under current group access and `thread.read` on the
+source thread, as timeline reads do. The inbox lists only the reader's own notifications, so no
+other recipient's source is ever read.
 
 Owning a notification does not grant access to its source. Missing or unsupported sources, and
-sources outside current access, return `NotificationService.SourceUnavailable`. Unfollowing
-keeps group access, so earlier sources stay readable with `thread.read`; leaving the group or
-losing the grant blocks resolution, and readmission restores it without reviving the old
-participation. Pending and discarded agent notifications both resolve. Resolving changes nothing.
+sources outside current access, leave the item without one. Unfollowing keeps group access, so
+earlier sources stay readable with `thread.read`; leaving the group or losing the grant hides the
+source, and readmission shows it again without reviving the old participation. Pending and
+discarded agent notifications both show their source.
 
-## Acknowledging a notification
+## Marking a notification seen
 
-`NotificationService.acknowledge(notificationId)` records that the acting human saw their
+`NotificationService.markSeen(notificationId)` records that the acting human saw their
 notification and returns the updated `Notification.Record`. It requires active workspace
 membership and ownership, but no action grant or thread access: a person can clear an old
 notification after leaving its group or losing `thread.read`. It does not resolve the source,
 rejoin participation, or mark the conversation read.
 
-The state becomes `{ _tag: "Acknowledged", outcome: { _tag: "Seen" }, acknowledgedAt }`. The
-notification stays in inbox history and leaves pending results and counts. Repeating it returns
-the first time stored, including when two devices acknowledge at once. Missing and other
+The state becomes `{ _tag: "Seen", seenAt }`. The notification stays in inbox history and leaves
+pending results and counts. Repeating it returns the first time stored, including when two devices
+mark it at once. Missing and other
 recipients' IDs return `NotificationService.NotFound`; an agent's notification returns
 `HumanRecipientRequired`, and a discarded one `AlreadyHandled`, including one that leaving its
-group settles while it is being acknowledged.
+group settles while it is being marked.
 
 `Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
 workspace's write order, and survives rebuilding projections. It creates no activity or
 notifications. The person's other connected sessions hear of it as a `NotificationsSeen`
 [signal](../packages/core/README.md#signals). Handing work to an agent's turn or a channel will be
-recorded by those workflows, not by acknowledgment.
+recorded by those workflows, not by marking it seen.
 
 ## Marking conversations read
 
@@ -318,13 +316,13 @@ latest activity returns `BeyondTimeline`. The position only moves forward. The r
 notifications from the thread up to that position become `Seen`. Reading a timeline does not mark
 it read; clients call this for what they have shown.
 
-`markGroupRead({ groupId })` records that the acting person caught up with a group now. It needs
-current group membership and `group.read`, and returns `GroupNotFound` otherwise; the caught-up
-time also only moves forward.
+`markGroupRead({ groupId })` records that the acting person read a group now. It needs current
+group membership and `group.read`, and returns `GroupNotFound` otherwise; the read time also only
+moves forward.
 
-Positions and caught-up times are private state, like `Seen`: outside the journal, never waiting
+Positions and read times are private state, like `Seen`: outside the journal, never waiting
 for the workspace's conversation writes, and kept when projections are rebuilt. The person's other
-sessions hear of each change as a `ThreadRead` or `GroupCaughtUp`
+sessions hear of each change as a `ThreadRead` or `GroupRead`
 [signal](../packages/core/README.md#signals). Starting a thread or replying reads it through the
 author's message in the same commit. [Thread lists](#reading-conversations) and
 [group lists](group-workflows.md#reading-groups) report unread state from these records; only
@@ -332,10 +330,10 @@ messages count as new activity, not quiet participation changes.
 
 ## Typing
 
-`SignalService.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
+`ThreadMessageService.typing(threadId)`, and `POST /workspaces/:workspaceId/threads/:threadId/typing`
 over HTTP, tells the thread's readers that the acting member is composing there. It needs the same
-current group access and `thread.publish` as posting, and returns `ThreadNotFound` for missing and
-inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's
+current group access and `thread.publish` as publishing, and returns `ThreadMessageService.NotFound`
+for missing and inaccessible threads. The `Typing` [signal](../packages/core/README.md#signals) reaches the group's
 members with `thread.read` for the thread, on every host, and lasts six seconds unless repeated;
 repeats within two seconds are dropped. It is never stored.
 

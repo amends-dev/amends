@@ -18,6 +18,7 @@ import { DateTime, Effect, Option } from "effect";
 import {
   type Bound,
   boundTo,
+  listOldestFirst,
   otherWorkspaceId,
   runHost,
   Support,
@@ -69,7 +70,7 @@ export const groupFollows = (harness: Harness) => {
           .sort(),
       );
     const inbox = (bound: Bound, memberId: Member.Id) =>
-      bound.notifications.listByRecipient(Notification.ofMember(memberId, identityOf(memberId)), {
+      listOldestFirst(bound.notifications, Notification.ofMember(memberId, identityOf(memberId)), {
         limit: 100,
       });
     /**

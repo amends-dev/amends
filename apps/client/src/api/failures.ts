@@ -133,7 +133,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ThreadParticipationService.ThreadNotFound": "gone",
   "ThreadParticipationService.NotFound": "gone",
   "NotificationService.NotFound": "gone",
-  "NotificationService.SourceUnavailable": "gone",
   "Client.InvalidCommand": "invalid",
   "GroupMembershipService.FixedMembership": "invalid",
   "GroupMembershipService.GeneralMembership": "invalid",

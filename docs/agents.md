@@ -69,4 +69,4 @@ response reuses its request key. When the host refuses a connection or an enviro
 available, the message sits beside that field, the choices reload, and the draft stays; an
 Administrator role refused to someone other than the owner is worded at the role field. The change
 feed refreshes agents on each `agent.*` commit and on membership, connection, environment, and
-access changes; see [live updates](live-updates.md).
+access changes; see [change feed](change-feed.md).

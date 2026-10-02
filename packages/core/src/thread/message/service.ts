@@ -1,4 +1,4 @@
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { AgentPermissions } from "../../agent/permissions.ts";
@@ -16,6 +16,9 @@ import { Request } from "../../request/request.ts";
 import { ThreadMessageStore } from "./store.ts";
 import { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
 import { Notification } from "../../notification/notification.ts";
+import { Signal } from "../../signal/signal.ts";
+import { SignalHub } from "../../signal/hub.ts";
+import type { Thread } from "../thread.ts";
 export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./errors.ts";
 
 export type Error =
@@ -27,6 +30,10 @@ export type Error =
   | ParticipantUnavailable
   | HumanAuthorRequired
   | ThreadMessageStore.Failure;
+export type TypingError =
+  | Authorization.Error
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | NotFound;
 export interface Interface {
   /**
    * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
@@ -36,10 +43,22 @@ export interface Interface {
     input: ThreadMessage.PublishInput,
     options?: Request.Options,
   ) => Effect.Effect<ThreadMessage.Record, Error, Actor.Service>;
+  /**
+   * Tell the thread's readers that the acting member is composing a message there, for the next
+   * few seconds. Requires current group access and `thread.publish`, as publishing does. Repeats
+   * from the same member in the same thread within a moment are dropped, so a client may send it
+   * whenever the member types.
+   */
+  readonly typing: (threadId: Thread.Id) => Effect.Effect<void, TypingError, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/message/service/Service",
 ) {}
+/** How long readers show a typing indicator without a repeat. */
+const typingFor = Duration.seconds(6);
+/** Typing repeats closer than this are dropped. */
+const typingEvery = Duration.seconds(2);
+
 export const make = Effect.fn("ThreadMessageService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
@@ -48,6 +67,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   const threadMessageStore = yield* ThreadMessageStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
+  const signalHub = yield* SignalHub.Service;
   const { workspaceId } = yield* Store.Service;
   /**
    * The ID a reply gives its message. Without a key it is new each time. A keyed reply derives it
@@ -59,26 +79,31 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]),
     );
   });
+  /** The thread, once the actor may read it and publish there. */
+  const requirePublishable = Effect.fnUntraced(function* (threadId: Thread.Id) {
+    const thread = yield* threadQuery
+      .requireAccess(threadId)
+      .pipe(
+        Effect.catchTag("ThreadQuery.NotFound", (error) =>
+          Effect.fail(new NotFound({ threadId: error.threadId })),
+        ),
+      );
+    yield* authorization.require([
+      Requirement.make(ThreadMessagePermissions.Publish, {
+        _tag: "Thread",
+        workspaceId,
+        threadId: thread.id,
+      }),
+    ]);
+    return thread;
+  });
   /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
   const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessage.Id) =>
     key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId);
   const publish = Effect.fn("ThreadMessageService.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
-      const thread = yield* threadQuery
-        .requireAccess(request.threadId)
-        .pipe(
-          Effect.catchTag("ThreadQuery.NotFound", (error) =>
-            Effect.fail(new NotFound({ threadId: error.threadId })),
-          ),
-        );
-      yield* authorization.require([
-        Requirement.make(ThreadMessagePermissions.Publish, {
-          _tag: "Thread",
-          workspaceId,
-          threadId: thread.id,
-        }),
-      ]);
+      const thread = yield* requirePublishable(request.threadId);
       const actor = yield* Actor.Service;
       if (actor.identity._tag !== "Human")
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
@@ -155,7 +180,32 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  return Service.of({ publish });
+  /** When each member last said they were typing in each thread, in this process. */
+  const lastTyping = new Map<string, number>();
+  const typing = Effect.fn("ThreadMessageService.typing")(function* (threadId: Thread.Id) {
+    const thread = yield* requirePublishable(threadId);
+    const actor = yield* Actor.Service;
+    const now = yield* DateTime.now;
+    const at = DateTime.toEpochMillis(now);
+    const key = JSON.stringify([actor.memberId, thread.id]);
+    const last = lastTyping.get(key);
+    if (last !== undefined && at - last < Duration.toMillis(typingEvery)) return;
+    // Forget old entries so the map follows only recent typists.
+    if (lastTyping.size > 1024)
+      for (const [entry, time] of lastTyping)
+        if (at - time >= Duration.toMillis(typingFor)) lastTyping.delete(entry);
+    lastTyping.set(key, at);
+    yield* signalHub.publish(
+      Signal.Value.cases.Typing.make({
+        workspaceId,
+        groupId: thread.groupId,
+        threadId: thread.id,
+        memberId: actor.memberId,
+        until: DateTime.add(now, { milliseconds: Duration.toMillis(typingFor) }),
+      }),
+    );
+  });
+  return Service.of({ publish, typing });
 });
 export const layer = Layer.effect(Service, make());
 export * as ThreadMessageService from "./service.ts";

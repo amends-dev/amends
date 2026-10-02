@@ -21,7 +21,7 @@ export { invitationPolicy } from "./invitation-policy.ts";
 export { invitationReplay } from "./invitation-replay.ts";
 export { invitations } from "./invitations.ts";
 export { journal } from "./journal.ts";
-export { notificationAcknowledgment } from "./notification-acknowledgment.ts";
+export { notificationSeen } from "./notification-seen.ts";
 export { notificationSources } from "./notification-sources.ts";
 export { notifications } from "./notifications.ts";
 export { ownership } from "./ownership.ts";

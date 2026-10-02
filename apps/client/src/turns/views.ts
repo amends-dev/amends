@@ -19,7 +19,7 @@ import { useMembers } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName, useWorkspaceGroups } from "../conversations/views.ts";
 import { turnLogFeed } from "../api/turn-log.ts";
-import { useLastingDown, useLiveStatus } from "../live/status.ts";
+import { useLastingDown, useChangeFeedStatus } from "../live/status.ts";
 import { useRequest } from "../request/use-request.ts";
 
 export type { TurnProblem };
@@ -319,7 +319,7 @@ export function useTurnLog(
   const connections = useRead(setup?.connections);
   const implementations = useRead(setup?.connectionImplementations);
   const environments = useRead(setup?.environments);
-  const live = useLiveStatus();
+  const live = useChangeFeedStatus();
   const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
   const failure = (): WorkspaceFailure | undefined => {
     const connection = feed()?.connection;

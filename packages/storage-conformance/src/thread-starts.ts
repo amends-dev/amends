@@ -22,11 +22,12 @@ import { DateTime, Effect, Layer, Option, Context } from "effect";
 import {
   type Bound,
   boundTo,
+  listOldestFirst,
   runHost,
   Support,
   testProvenance,
-  workspaceId,
   threadInternals,
+  workspaceId,
 } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -58,7 +59,7 @@ export const threadStarts = (harness: Harness) => {
         records.map((record) => ThreadParticipation.referenceOf(record.participant)),
       );
     const inbox = (bound: Bound, recipient: Notification.Recipient) =>
-      bound.notifications.listByRecipient(recipient, { limit: 100 });
+      listOldestFirst(bound.notifications, recipient, { limit: 100 });
     const prepare = Effect.fnUntraced(function* () {
       const bound = yield* boundTo(workspaceId);
       const workspace = yield* initialized(bound);

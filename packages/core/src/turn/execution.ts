@@ -17,7 +17,7 @@ import { ThreadActivityStore } from "../thread/activity/store.ts";
 import { ThreadMessageActivity } from "../thread/message/activity.ts";
 import { ThreadMessageStore } from "../thread/message/store.ts";
 import { MemberStore } from "../workspace/member/store.ts";
-import { Signals } from "../signal/signals.ts";
+import { SignalHub } from "../signal/hub.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Identity } from "../identity/identity.ts";
 import { Actor } from "../identity/actor.ts";
@@ -283,7 +283,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const threadActivityStore = yield* ThreadActivityStore.Service;
   const threadMessageStore = yield* ThreadMessageStore.Service;
   const memberStore = yield* MemberStore.Service;
-  const signals = yield* Signals.Service;
+  const signalHub = yield* SignalHub.Service;
   const turnCommand = yield* TurnCommand.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -745,7 +745,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   ) {
     const turn = yield* requireTurn(turnId);
     if (turn.status !== "running" || piece.text === "" || piece.responseId === "") return;
-    yield* signals.publish({
+    yield* signalHub.publish({
       _tag: "TurnDraft",
       workspaceId,
       groupId: turn.groupId,

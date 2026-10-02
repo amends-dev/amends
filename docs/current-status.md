@@ -108,7 +108,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 ## HTTP coverage
 
 HTTP exposes sign-in, workspace creation and the directory, members, invitations, assignments, ownership,
-the notification inbox, its sources and acknowledgment, groups, threads, replies, following, read
+the notification inbox, its sources and marking them seen, groups, threads, replies, following, read
 state, the change feed, and typing. No operation reaches a group from outside it, so there is no
 workspace-wide oversight of private groups or direct groups by design.
 
@@ -211,7 +211,7 @@ Unread keeps the open notification in place after it is seen, until another open
 closes, and shows "You're all caught up" only once nothing unread and nothing open remains.
 "Mark all seen" marks everything through the newest one listed so that later arrivals stay
 unread. There is no way to mark one seen without opening it. The inbox reads each listed
-notification's source as resolving one does, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
+notification's source under current access, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
 placeholder until tasks exist.
 
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
@@ -291,7 +291,7 @@ Recipient decline, direct/scoped grant editing, richer directory metadata, remem
 navigation, and work/activity pages remain unimplemented. The app-owned
 [workspace shell](workspace-shell.md) now provides persistent navigation, nested
 page boundaries, and an account popup with appearance and sign-out controls.
-[Live updates](live-updates.md) keep workspace views current over the change feed. Invitations
+The [change feed](change-feed.md) keeps workspace views current. Invitations
 from other workspaces appear only when the page wakes or reloads, since no identity-level feed
 exists.
 Only local sign-out exists; server revocation,

@@ -16,7 +16,7 @@ import { ChangeFeed } from "./change-feed.ts";
 import type { ChangeFeedEvents } from "./events.ts";
 import { ChangeFeedSource } from "./source.ts";
 import { Signal } from "../signal/signal.ts";
-import { Signals } from "../signal/signals.ts";
+import { SignalHub } from "../signal/hub.ts";
 
 export interface Interface {
   /**
@@ -74,7 +74,7 @@ const changesAccessOf = (actor: Actor.Value) => (prepared: ChangeFeedEvents.Prep
 /** Capture the shared source and the reader's policy; authenticate the actor per subscription. @category constructors */
 export const make = Effect.fn("ChangeFeedService.make")(function* () {
   const changeFeedSource = yield* ChangeFeedSource.Service;
-  const signals = yield* Signals.Service;
+  const signalHub = yield* SignalHub.Service;
   const authorization = yield* Authorization.Service;
   const grantResolver = yield* GrantResolver.Service;
   const groupMembershipStore = yield* GroupMembershipStore.Service;
@@ -100,7 +100,7 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
     const options = yield* Schema.decodeEffect(ChangeFeed.WatchOptions)(input);
     const actor = yield* Actor.Service;
     // Register for signals and commits before Ready, so neither misses what follows it.
-    const live = yield* signals.subscribe;
+    const live = yield* signalHub.subscribe;
     const subscription = yield* changeFeedSource.subscribe(
       Option.map(Option.fromUndefinedOr(options.after), ChangeFeed.positionOf),
     );
@@ -150,9 +150,10 @@ export const make = Effect.fn("ChangeFeedService.make")(function* () {
     );
     // Signals follow the reader's current access, reloaded by the commits above.
     const happening = live.pipe(
-      Stream.filter(
-        (signal) => Signal.inChangeFeed(signal) && reaches(access, Signal.reachOf(signal)),
-      ),
+      Stream.filter((signal) => {
+        const reach = Signal.changeFeedReachOf(signal);
+        return reach !== undefined && reaches(access, reach);
+      }),
       Stream.map((signal) => ChangeFeed.Message.cases.Signal.make({ workspaceId, signal })),
     );
     return Stream.make(ready).pipe(

@@ -16,10 +16,5 @@ export class NotFound extends Schema.TaggedError<NotFound>()("NotificationServic
   workspaceId: WorkspaceId.Id,
   notificationId: Notification.Id,
 }) {}
-/** The caller owns the notification, but its supported source cannot currently be read. */
-export class SourceUnavailable extends Schema.TaggedError<SourceUnavailable>()(
-  "NotificationService.SourceUnavailable",
-  { notificationId: Notification.Id },
-) {}
 
 export * as NotificationErrors from "./errors.ts";

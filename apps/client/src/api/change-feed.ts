@@ -4,7 +4,6 @@ import { Sse } from "effect/unstable/encoding";
 import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
 import { watchWake } from "../live/wake.ts";
 import { isUnauthorized, type ApiClient } from "./client.ts";
-import { consume, echoesAtom, echoOf } from "./echoes.ts";
 import { posted, typing, typistsAtom } from "./typing.ts";
 import {
   collectionKey,
@@ -17,7 +16,7 @@ import {
   type WorkspaceResource,
 } from "./keys.ts";
 
-export type WorkspaceFeedState = Data.TaggedEnum<{
+export type ChangeFeedState = Data.TaggedEnum<{
   /** Opening the first connection. */
   Connecting: {};
   /** Changes arrive as they commit. */
@@ -27,7 +26,7 @@ export type WorkspaceFeedState = Data.TaggedEnum<{
   /** Credentials were rejected, or the workspace is no longer available to this member. */
   Ended: { readonly reason: "unauthorized" | "unavailable" };
 }>;
-export const WorkspaceFeedState = Data.taggedEnum<WorkspaceFeedState>();
+export const ChangeFeedState = Data.taggedEnum<ChangeFeedState>();
 
 type Affected = WorkspaceResource | typeof directoryKey;
 /**
@@ -241,7 +240,7 @@ export const affectedKeys = (
 /**
  * The reads a signal to the reader's own sessions changes. Reading a thread changes its stream's
  * unread state, and settles notifications from it, changing the inbox and pending counts; seeing
- * notifications changes the inbox and counts; catching up, the groups.
+ * notifications changes the inbox and counts; reading a group, the groups.
  */
 export const signalKeys = (workspaceId: string, signal: { readonly _tag: string }) => {
   switch (signal._tag) {
@@ -253,7 +252,7 @@ export const signalKeys = (workspaceId: string, signal: { readonly _tag: string 
       ];
     case "NotificationsSeen":
       return [workspaceKey(workspaceId, "groups"), workspaceKey(workspaceId, "inbox")];
-    case "GroupCaughtUp":
+    case "GroupRead":
       return [workspaceKey(workspaceId, "groups")];
     default:
       return [];
@@ -297,7 +296,7 @@ export const retryDelay = Effect.fnUntraced(function* (
 const run = Effect.fnUntraced(function* (
   client: ApiClient,
   workspaceId: string,
-  states: Queue.Queue<WorkspaceFeedState, Cause.Done>,
+  states: Queue.Queue<ChangeFeedState, Cause.Done>,
 ) {
   const api = yield* client;
   const reactivity = yield* Reactivity.Reactivity;
@@ -310,7 +309,7 @@ const run = Effect.fnUntraced(function* (
   ];
   const id = Schema.decodeOption(Workspace.Id)(workspaceId);
   if (id._tag === "None") {
-    Queue.offerUnsafe(states, WorkspaceFeedState.Ended({ reason: "unavailable" }));
+    Queue.offerUnsafe(states, ChangeFeedState.Ended({ reason: "unavailable" }));
     return;
   }
   const wake = yield* Queue.sliding<void>(1);
@@ -318,7 +317,7 @@ const run = Effect.fnUntraced(function* (
     Effect.sync(() => watchWake(window, () => Queue.offerUnsafe(wake, undefined))),
     (stop) => Effect.sync(stop),
   );
-  type Message = Stream.Success<Effect.Success<ReturnType<typeof api.changes.watch>>>;
+  type Message = Stream.Success<Effect.Success<ReturnType<typeof api.changeFeed.watch>>>;
   let cursor: Extract<Message, { _tag: "Committed" }>["cursor"] | undefined;
   let attempt = 0;
   let connected = false;
@@ -330,7 +329,7 @@ const run = Effect.fnUntraced(function* (
           connected = true;
           liveSince = now;
           if (message.cursor !== null) cursor = message.cursor;
-          Queue.offerUnsafe(states, WorkspaceFeedState.Live());
+          Queue.offerUnsafe(states, ChangeFeedState.Live());
           return message.reset ? reactivity.invalidate(everything) : Effect.void;
         });
       case "Committed": {
@@ -353,14 +352,6 @@ const run = Effect.fnUntraced(function* (
         const signal = message.signal;
         if (signal._tag === "Typing")
           registry.update(typists, (current) => typing(current, signal, Date.now()));
-        // The reader's own request already refreshed what its signal changes.
-        const echo = echoOf(signal);
-        if (echo !== undefined) {
-          const echoes = echoesAtom(workspaceId);
-          const { expected, next } = consume(registry.get(echoes), echo, Date.now());
-          registry.set(echoes, next);
-          if (expected) return Effect.void;
-        }
         const keys = signalKeys(workspaceId, signal);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
       }
@@ -370,11 +361,11 @@ const run = Effect.fnUntraced(function* (
     Queue.offerUnsafe(
       states,
       connected || attempt > 0
-        ? WorkspaceFeedState.Reconnecting({ attempt: Math.max(attempt, 1) })
-        : WorkspaceFeedState.Connecting(),
+        ? ChangeFeedState.Reconnecting({ attempt: Math.max(attempt, 1) })
+        : ChangeFeedState.Connecting(),
     );
     yield* Queue.clear(wake);
-    const connection = api.changes
+    const connection = api.changeFeed
       .watch({
         params: { workspaceId: id.value },
         query: cursor === undefined ? {} : { after: cursor },
@@ -391,12 +382,12 @@ const run = Effect.fnUntraced(function* (
     }
     const cause = Exit.isFailure(outcome) ? outcome.cause : Cause.empty;
     if (isUnauthorized(cause)) {
-      Queue.offerUnsafe(states, WorkspaceFeedState.Ended({ reason: "unauthorized" }));
+      Queue.offerUnsafe(states, ChangeFeedState.Ended({ reason: "unauthorized" }));
       return;
     }
     if (unavailable(cause)) {
       yield* reactivity.invalidate([directoryKey]);
-      Queue.offerUnsafe(states, WorkspaceFeedState.Ended({ reason: "unavailable" }));
+      Queue.offerUnsafe(states, ChangeFeedState.Ended({ reason: "unavailable" }));
       return;
     }
     // A connection that stayed up starts over; one that fails as soon as it opens, such as on
@@ -404,7 +395,7 @@ const run = Effect.fnUntraced(function* (
     const now = yield* Clock.currentTimeMillis;
     attempt = liveSince !== undefined && now - liveSince >= healthy ? 1 : attempt + 1;
     liveSince = undefined;
-    Queue.offerUnsafe(states, WorkspaceFeedState.Reconnecting({ attempt }));
+    Queue.offerUnsafe(states, ChangeFeedState.Reconnecting({ attempt }));
     yield* Effect.raceFirst(
       Effect.flatMap(retryDelay(attempt, cause), Effect.sleep),
       Queue.take(wake),
@@ -416,7 +407,7 @@ const makeFamily = (client: ApiClient) =>
   Atom.family((workspaceId: string) =>
     client.runtime.atom(
       Stream.callback(
-        (states: Queue.Queue<WorkspaceFeedState, Cause.Done>) => run(client, workspaceId, states),
+        (states: Queue.Queue<ChangeFeedState, Cause.Done>) => run(client, workspaceId, states),
         {
           bufferSize: 1,
           strategy: "sliding",
@@ -426,7 +417,7 @@ const makeFamily = (client: ApiClient) =>
   );
 const families = new WeakMap<ApiClient, ReturnType<typeof makeFamily>>();
 /** One shared stream per workspace in a credential scope, open while any consumer is mounted. */
-export const workspaceFeed = (client: ApiClient, workspaceId: string) => {
+export const changeFeed = (client: ApiClient, workspaceId: string) => {
   let family = families.get(client);
   if (!family) {
     family = makeFamily(client);

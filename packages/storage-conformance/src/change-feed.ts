@@ -281,7 +281,9 @@ export const changeFeed = (harness: Harness) => {
             const inbox = yield* as(
               mentioned,
               Effect.flatMap(NotificationService.Service, (notificationService) =>
-                notificationService.list({ limit: 10 }),
+                Effect.map(notificationService.inbox({ limit: 10 }), (items) =>
+                  items.map((item) => item.notification),
+                ),
               ),
             );
             expect(inbox).toHaveLength(1);

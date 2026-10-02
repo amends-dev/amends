@@ -123,13 +123,9 @@ export {
   type WorkspaceEntry,
   type WorkspacePickerController,
 } from "./workspaces/picker.ts";
-export {
-  WorkspaceFeedProvider,
-  useWorkspaceFeed,
-  type WorkspaceFeedScope,
-} from "./live/workspace-feed.tsx";
-export type { WorkspaceFeedState } from "./api/changes.ts";
-export { useLiveStatus, liveGrace } from "./live/status.ts";
+export { ChangeFeedProvider, useChangeFeed, type ChangeFeedScope } from "./live/change-feed.tsx";
+export type { ChangeFeedState } from "./api/change-feed.ts";
+export { useChangeFeedStatus, liveGrace } from "./live/status.ts";
 export {
   useGroups,
   useGroupRoster,

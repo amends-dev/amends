@@ -1,6 +1,6 @@
 # PostgreSQL storage
 
-Workspace storage, the workspace directory, and the signal hub over PostgreSQL. Statements are
+Workspace storage, with each workspace's signal hub, and the workspace directory over PostgreSQL. Statements are
 written with Drizzle and run through `@effect/sql-pg`, so they share the Effect
 client's transaction service; the journal opens each commit on a reserved
 connection and every Drizzle statement inside it lands on that connection.
@@ -133,8 +133,8 @@ identity, the transaction boundary, and the guard each statement runs under. `st
 `layerWorkspace(workspaceId, options)` to compose the store layers over a binding for the requested
 workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing
 SQL client in `make` and acquires the pool in `layer`; `directory.ts` reads across workspaces, and
-`schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener,
-`signals.ts` the signal hub over it, `turns.ts` the queue in which a process's writers to
+`schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener, which
+`signal-hub.ts` binds to each workspace as its signal hub, `turns.ts` the queue in which a process's writers to
 one workspace or log wait for each other, and `cluster-storage.ts` the upkeep of Effect
 Cluster's tables. Bindings and raw tables are internal to the adapter's public package
 surface.
@@ -161,16 +161,18 @@ remain generation responsibilities. The notification projection generates openin
 and discards pending agent input when its participation ends, and a person's pending notifications
 from a group they leave, with one update through `pending_notifications_by_group`, which the plan
 test checks. Adding the `access-lost` reason replaced the development baseline.
-The row's `state` holds what the journal settles: `Pending`, `Discarded`, or `Informational`. A human's `Seen` lives
-in `notification_seen`, keyed by workspace and notification with the first `seen_at`, which is not
-a projection table: it has no foreign key to `notifications`, so truncating and rebuilding them keeps
-it. The row keeps a copy in `seen_at`, which `notification_seen_state` allows only on a pending
-human notification: reads show it as `Acknowledged`, and the pending indexes leave seen rows out, so
-pending reads and counts never visit a reader's seen history however long it grows. An insert
-restores the copy from `notification_seen` in the same statement, so a rebuild keeps what was seen.
-`markSeen` checks every notification in one query, then in one statement sets the rows' `seen_at`
-and records `notification_seen`, keeping existing times, in the caller's transaction or on its own;
-updating the rows first makes concurrent calls take turns on their locks and agree on the first time.
+The row's `state` is the notification's: `Pending`, `Seen`, `Accepted`, `Discarded`, or
+`Informational`, and `notification_state` checks each holds its own columns and no other's. A
+human's `Seen` is private state outside the journal, so it is also kept in `notification_seen`,
+keyed by workspace and notification with the first `seen_at`, which is not a projection table: it
+has no foreign key to `notifications`, so truncating and rebuilding them keeps it. An insert of a
+pending human notification restores `Seen` and its `seen_at` from `notification_seen` in the same
+statement, so a rebuild keeps what was seen. The pending indexes cover only `Pending` rows, so
+pending reads and counts never visit a reader's seen history however long it grows.
+`markSeen` checks every notification in one query, then in one statement sets the pending rows to
+`Seen` and records `notification_seen`, in the caller's transaction or on its own; updating the
+rows first makes concurrent calls take turns on their locks, and the later one finds the row
+already `Seen`, so both agree on the first time.
 A departure that settles a row between the check and the update leaves it unseen; core reads the
 notification again and reports it handled.
 `pending_agent_notifications_by_participation` finds the pending agent input a departure settles.
@@ -303,17 +305,18 @@ serialize every notifying commit on the server. A notice lost to a failure betwe
 waiters to their poll. Each pool's listener, started by the first waiting reader or signal subscriber and
 stopped 30 seconds after the last, holds one pooled connection on `LISTEN` and wakes that log's
 waiters in the process.
-A waiter takes its wakeup signal before checking the log, so an append between the check and the
+A waiter takes its wakeup before checking the log, so an append between the check and the
 wait still wakes it; the log is the truth and the notification only says when to look again.
 When its connection fails, the listener listens again after a second and then wakes every waiter
 to re-check what it missed. Waiters also re-check every `pollInterval` (five seconds by default)
 without a notification. `LISTEN` needs a session connection, so behind a transaction-pooling proxy
 the adapter falls back to that interval.
 
-`PostgresSignals` relays [signals](../../packages/core/README.md#signals) on the same channel:
-`publish` sends the JSON-encoded signal with its workspace through `pg_notify` outside any
-transaction, and the listener in every pool, including the sender's, offers it to that
-workspace's subscribers. Each subscriber has a queue of 256 that drops the oldest when it falls
+Each workspace's signal hub, bound with its stores, relays
+[signals](../../packages/core/README.md#signals) on the same channel: `publish` sends the
+JSON-encoded signal with its workspace through `pg_notify` outside any transaction, and the
+listener in every pool, including the sender's, decodes it once and offers it to that workspace's
+subscribers in the pool's `SignalHub.makeLocal`. Each subscriber misses the oldest once 256
 behind; a signal this version cannot decode is skipped. Nothing is stored. Signals sent while a
 listener reconnects are lost, a failed publish is logged rather than failing its operation, and a
 payload over PostgreSQL's 8000-byte notification limit is not delivered; current signals are far
@@ -363,7 +366,7 @@ Gateway.layer().pipe(
 );
 ```
 
-The root `layer(options)` provides the storage, directory, and signal hub contracts, with the
+The root `layer(options)` provides the storage and directory contracts, with the
 [lock and timeout options](#locks-and-timeouts); `PostgresDatabase.layer` takes the Effect
 client's pool configuration, such as `maxConnections` (ten by default). The local host also
 supplies cryptography and composes this over the database at `AMENDS_DATABASE_URL`, with

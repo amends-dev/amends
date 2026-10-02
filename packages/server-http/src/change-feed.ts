@@ -1,6 +1,5 @@
 import { Api, Principal } from "@amends/api-http";
 import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
-import { SignalService } from "@amends/core/signal";
 import { Gateway } from "@amends/gateway";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/unstable/httpapi";
@@ -15,7 +14,7 @@ import { Streams } from "./streams.ts";
  */
 export const layer = HttpApiBuilder.group(
   Api,
-  "changes",
+  "changeFeed",
   Effect.fn(function* (handlers) {
     const gateway = yield* Gateway.Service;
     const streams = yield* Streams.Service;
@@ -37,18 +36,8 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ).pipe(Streams.withHeartbeats),
-      typing: ({ params }) =>
-        Effect.flatMap(Principal, (principal) =>
-          gateway.asMember(
-            params.workspaceId,
-            principal,
-            Effect.flatMap(SignalService.Service, (signalService) =>
-              signalService.typing(params.threadId),
-            ),
-          ),
-        ),
     });
   }),
 ).pipe(Layer.provide(Streams.layer));
 
-export * as ChangesHandlers from "./changes.ts";
+export * as ChangeFeedHandlers from "./change-feed.ts";

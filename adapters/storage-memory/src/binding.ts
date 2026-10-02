@@ -212,7 +212,7 @@ export const make = Effect.fn("Binding.make")(function* (workspaceId: Workspace.
             workspace: exclusive,
           });
           if ((state.space.commits.get(state.commit.id)?.entryCount ?? 0) > 0)
-            MemoryDatabase.signalAppend(database);
+            MemoryDatabase.wakeAppendReaders(database);
         }
         for (const logId of state.held)
           yield* MemoryDatabase.logLock(database, workspaceId, logId).release(1);

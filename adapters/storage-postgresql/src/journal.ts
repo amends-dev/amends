@@ -570,9 +570,9 @@ export const make = Effect.fn("Journal.make")(function* () {
         Effect.gen(function* () {
           yield* database.notices.listening;
           while (true) {
-            const signal = database.notices.next(workspaceId, logId);
+            const nextAppend = database.notices.nextAppend(workspaceId, logId);
             if (yield* appended) return;
-            yield* Deferred.await(signal).pipe(Effect.timeoutOption(pollInterval));
+            yield* Deferred.await(nextAppend).pipe(Effect.timeoutOption(pollInterval));
           }
         }),
       );

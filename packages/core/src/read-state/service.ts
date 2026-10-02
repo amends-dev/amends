@@ -12,7 +12,7 @@ import { ThreadPermissions } from "../thread/permissions.ts";
 import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
 import { Signal } from "../signal/signal.ts";
-import { Signals } from "../signal/signals.ts";
+import { SignalHub } from "../signal/hub.ts";
 import { ReadStateCommand } from "./command.ts";
 import { BeyondTimeline, GroupNotFound, HumanRequired, ThreadNotFound } from "./errors.ts";
 import { Notification } from "../notification/notification.ts";
@@ -36,13 +36,13 @@ export interface Interface {
   /**
    * Record that the acting person has read a thread through a timeline position, under the
    * thread's current access and `thread.read`. The position only moves forward. Their pending
-   * notifications from that thread up to the position are acknowledged as seen in the same
+   * notifications from that thread up to the position are marked seen in the same
    * commit; with none, only the position is written, outside the workspace's write order.
    */
   readonly markThreadRead: (
     input: ReadState.MarkThreadReadInput,
   ) => Effect.Effect<void, Error, Actor.Service>;
-  /** Record that the acting person caught up with a group now, under membership and `group.read`. */
+  /** Record that the acting person read a group now, under membership and `group.read`. */
   readonly markGroupRead: (
     input: ReadState.MarkGroupReadInput,
   ) => Effect.Effect<void, Error, Actor.Service>;
@@ -59,7 +59,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
   const threadActivityStore = yield* ThreadActivityStore.Service;
   const readStateCommand = yield* ReadStateCommand.Service;
   const readStateStore = yield* ReadStateStore.Service;
-  const signals = yield* Signals.Service;
+  const signalHub = yield* SignalHub.Service;
   const { workspaceId } = yield* Store.Service;
 
   /** The acting person as a reader; agents keep no read state. */
@@ -105,7 +105,7 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
     // Reading settles the inbox up to the position. Both are private state, written outside the
     // workspace's write order; the reader's other sessions hear of it as a signal.
     yield* readStateCommand.markThreadRead(reader, thread, position.readThrough);
-    yield* signals.publish(
+    yield* signalHub.publish(
       Signal.Value.cases.ThreadRead.make({
         workspaceId,
         memberId: reader.memberId,
@@ -134,19 +134,19 @@ export const make = Effect.fn("ReadStateService.make")(function* () {
         groupId: request.groupId,
       }),
     ]);
-    const caughtUpAt = yield* DateTime.now;
+    const readAt = yield* DateTime.now;
     yield* readStateStore.advanceGroup({
       workspaceId,
       memberId: reader.memberId,
       groupId: request.groupId,
-      caughtUpAt,
+      readAt,
     });
-    yield* signals.publish(
-      Signal.Value.cases.GroupCaughtUp.make({
+    yield* signalHub.publish(
+      Signal.Value.cases.GroupRead.make({
         workspaceId,
         memberId: reader.memberId,
         groupId: request.groupId,
-        caughtUpAt,
+        readAt,
       }),
     );
   });

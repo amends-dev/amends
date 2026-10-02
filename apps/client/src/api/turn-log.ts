@@ -2,7 +2,7 @@ import { ApiErrors, Turn, Workspace } from "@amends/api-http";
 import { Cause, Effect, Exit, Option, Queue, Schema, Stream } from "effect";
 import { Atom } from "effect/unstable/reactivity";
 import { watchWake } from "../live/wake.ts";
-import { retryDelay } from "./changes.ts";
+import { retryDelay } from "./change-feed.ts";
 import { isUnauthorized, type ApiClient } from "./client.ts";
 import { drafted, type Drafts } from "./drafts.ts";
 

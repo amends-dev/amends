@@ -32,14 +32,12 @@ export interface Interface {
   readonly advanceThread: (
     position: ReadState.ThreadPosition,
   ) => Effect.Effect<void, Failure | Conflict>;
-  /** One member's caught-up times for several groups; groups never caught up are omitted. */
-  readonly getGroupsCaughtUp: (
+  /** One member's read times for several groups; groups never read are omitted. */
+  readonly getGroupReads: (
     memberId: MemberId.Id,
     groupIds: ReadonlyArray<GroupId.Id>,
-  ) => Effect.Effect<ReadonlyArray<ReadState.GroupCaughtUp>, Failure>;
-  readonly advanceGroup: (
-    caughtUp: ReadState.GroupCaughtUp,
-  ) => Effect.Effect<void, Failure | Conflict>;
+  ) => Effect.Effect<ReadonlyArray<ReadState.GroupRead>, Failure>;
+  readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, Failure | Conflict>;
 }
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/read-state/store/Service",

@@ -28,6 +28,7 @@ import {
   type Bound,
   boundTo,
   journalLog,
+  listOldestFirst,
   otherWorkspaceId,
   placed,
   runHost,
@@ -39,13 +40,13 @@ import {
 import type { Harness } from "./harness.ts";
 
 /**
- * Acknowledging notifications: a human's Seen is private state outside the journal. Ownership,
+ * Marking notifications seen: a human's Seen is private state outside the journal. Ownership,
  * repeats, transactions, concurrency, and survival through rebuilds.
  */
 
-export const notificationAcknowledgment = (harness: Harness) => {
+export const notificationSeen = (harness: Harness) => {
   const { core, initialized, runGateway } = Support.make(harness);
-  describe.skipIf(!harness.available)(`${harness.name}: notification acknowledgment`, () => {
+  describe.skipIf(!harness.available)(`${harness.name}: marking notifications seen`, () => {
     const human: Actor.Value = {
       workspaceId,
       memberId: Member.Id.make("human"),
@@ -69,23 +70,31 @@ export const notificationAcknowledgment = (harness: Harness) => {
         Effect.provideService(Publication.Service, testProvenance()),
         Effect.provide(core(bound)),
       );
-    const ack = (id: Notification.Id) =>
+    const markSeen = (id: Notification.Id) =>
       Effect.flatMap(NotificationService.Service, (notificationService) =>
-        notificationService.acknowledge(id),
+        notificationService.markSeen(id),
       );
-    const resolve = (id: Notification.Id) =>
+    /** What the actor's inbox shows a notification pointing to, or undefined without a source. */
+    const sourceOf = (id: Notification.Id) =>
       Effect.flatMap(NotificationService.Service, (notificationService) =>
-        notificationService.resolveSource(id),
+        Effect.map(
+          notificationService.inbox({ limit: 50 }),
+          (items) => items.find((item) => item.notification.id === id)?.source,
+        ),
       );
     /** A member's inbox, as their membership. */
     const notes = (bound: Bound, member: Actor.Value) =>
-      bound.notifications.listByRecipient(Notification.ofMember(member.memberId, member.identity), {
-        limit: 100,
-      });
+      listOldestFirst(
+        bound.notifications,
+        Notification.ofMember(member.memberId, member.identity),
+        {
+          limit: 100,
+        },
+      );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const seenAt = DateTime.makeUnsafe("2026-09-21T12:00:00.123Z");
-    const seenState = (acknowledgedAt: DateTime.Utc): Notification.State =>
-      Notification.State.cases.Acknowledged.make({ outcome: { _tag: "Seen" }, acknowledgedAt });
+    const seenState = (seenAt: DateTime.Utc): Notification.State =>
+      Notification.State.cases.Seen.make({ seenAt });
     const changed = <A extends object>(record: A, changes: Partial<A>): A =>
       Object.assign({}, record, changes);
     const prepare = Effect.fnUntraced(function* () {
@@ -186,7 +195,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     });
 
     it.effect(
-      "human acknowledgment records Seen privately with a stable time, and writes nothing to the journal",
+      "marking seen records Seen privately with a stable time, and writes nothing to the journal",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -195,7 +204,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
               const p = yield* prepare();
               const before = yield* snapshot(p);
               const now = yield* DateTime.now;
-              const result = yield* run(p.bound, human, ack(p.humanNote.id));
+              const result = yield* run(p.bound, human, markSeen(p.humanNote.id));
               expect(result).toEqual(changed(p.humanNote, { state: seenState(now) }));
               expect(yield* p.bound.notifications.get(result.id)).toEqual(Option.some(result));
               expect(
@@ -209,11 +218,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
               expect(after).toEqual(Object.assign({}, before, { human: [result] }));
               // Seen again later keeps the first time.
               yield* TestClock.adjust("1 second");
-              expect(yield* run(p.bound, human, ack(result.id))).toEqual(result);
+              expect(yield* run(p.bound, human, markSeen(result.id))).toEqual(result);
               expect(yield* snapshot(p)).toEqual(after);
-              const ownerResult = yield* run(p.bound, p.owner, ack(p.ownerNote.id));
-              expect(ownerResult.state._tag).toBe("Acknowledged");
-              expect(yield* run(p.bound, p.owner, resolve(p.ownerNote.id))).toEqual({
+              const ownerResult = yield* run(p.bound, p.owner, markSeen(p.ownerNote.id));
+              expect(ownerResult.state._tag).toBe("Seen");
+              expect(yield* run(p.bound, p.owner, sourceOf(p.ownerNote.id))).toEqual({
                 message: p.first.message,
                 activity: p.first.activity,
               });
@@ -262,19 +271,19 @@ export const notificationAcknowledgment = (harness: Harness) => {
               // Through the older one: the newer, which the reader had not seen, stays pending.
               expect(
                 yield* asHuman((s) =>
-                  s.acknowledgeThrough({ recordedAt: older.recordedAt, id: older.id }),
+                  s.markSeenThrough({ recordedAt: older.recordedAt, id: older.id }),
                 ),
               ).toBe(1);
               expect(yield* pending()).toEqual([newer]);
               expect(yield* asHuman((s) => s.countPending)).toBe(1);
               const through = { recordedAt: newer.recordedAt, id: newer.id };
-              expect(yield* asHuman((s) => s.acknowledgeThrough(through))).toBe(1);
+              expect(yield* asHuman((s) => s.markSeenThrough(through))).toBe(1);
               expect(yield* asHuman((s) => s.countPending)).toBe(0);
               // Nothing left to see marks nothing.
-              expect(yield* asHuman((s) => s.acknowledgeThrough(through))).toBe(0);
+              expect(yield* asHuman((s) => s.markSeenThrough(through))).toBe(0);
               // Agents accept work rather than seeing it, and everyone counts only their own.
               expect(
-                yield* Effect.flip(service(agent)((s) => s.acknowledgeThrough(through))),
+                yield* Effect.flip(service(agent)((s) => s.markSeenThrough(through))),
               ).toMatchObject({ _tag: "NotificationService.HumanRecipientRequired" });
               expect(yield* service(p.owner)((s) => s.countPending)).toBe(2);
               expect(
@@ -288,7 +297,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "acknowledgment requires active ownership, has no role bypass, and cannot accept agent work",
+      "marking seen requires active ownership, has no role bypass, and cannot accept agent work",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -308,7 +317,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   "Authorization.InvalidActor",
                 ],
               ] as const)
-                expect(yield* Effect.flip(run(p.bound, actor, ack(id)))).toMatchObject({
+                expect(yield* Effect.flip(run(p.bound, actor, markSeen(id)))).toMatchObject({
                   _tag: tag,
                 });
               expect(yield* snapshot(p)).toEqual(before);
@@ -326,7 +335,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                     ),
                   );
                   expect(
-                    yield* Effect.flip(notificationService.acknowledge(p.humanNote.id)),
+                    yield* Effect.flip(notificationService.markSeen(p.humanNote.id)),
                   ).toMatchObject({
                     _tag: "Authorization.InvalidActor",
                   });
@@ -354,27 +363,17 @@ export const notificationAcknowledgment = (harness: Harness) => {
             Effect.gen(function* () {
               const p = yield* prepare();
               // Still in the group, the reader has lost the source through their grants.
-              expect(
-                yield* Effect.flip(run(p.bound, human, resolve(p.humanNote.id))),
-              ).toMatchObject({
-                _tag: "NotificationService.SourceUnavailable",
-              });
+              expect(yield* run(p.bound, human, sourceOf(p.humanNote.id))).toBeUndefined();
               const before = yield* snapshot(p);
               const bound = {
                 ...p.bound,
                 context: Context.add(p.bound.context, Store.Service, {
                   ...p.bound.store,
-                  getEntry: () => Effect.die("Acknowledgment must not resolve the source"),
+                  getEntry: () => Effect.die("Marking seen must not read the source"),
                 }),
               };
-              expect((yield* run(bound, human, ack(p.humanNote.id))).state._tag).toBe(
-                "Acknowledged",
-              );
-              expect(
-                yield* Effect.flip(run(p.bound, human, resolve(p.humanNote.id))),
-              ).toMatchObject({
-                _tag: "NotificationService.SourceUnavailable",
-              });
+              expect((yield* run(bound, human, markSeen(p.humanNote.id))).state._tag).toBe("Seen");
+              expect(yield* run(p.bound, human, sourceOf(p.humanNote.id))).toBeUndefined();
               expect((yield* snapshot(p)).participation).toEqual(before.participation);
               // Leaving afterwards keeps what they saw as seen; only the pending is settled.
               const admission = Option.getOrThrow(
@@ -391,14 +390,14 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 ),
               );
               expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
-                value: { state: { _tag: "Acknowledged" } },
+                value: { state: { _tag: "Seen" } },
               });
               const missing = changed(p.humanNote, {
                 id: Notification.Id.make("missing-source"),
                 source: { logId: Log.Id.make("other-log"), entryId: p.humanNote.source.entryId },
               });
               yield* p.bound.store.transaction(p.bound.notifications.insert(missing));
-              expect((yield* run(bound, human, ack(missing.id))).state._tag).toBe("Acknowledged");
+              expect((yield* run(bound, human, markSeen(missing.id))).state._tag).toBe("Seen");
             }),
           ),
         ),
@@ -420,13 +419,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
             });
             expect(
               Exit.isFailure(
-                yield* Effect.exit(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
+                yield* Effect.exit(run({ ...p.bound, context }, human, markSeen(p.humanNote.id))),
               ),
             ).toBe(true);
             expect(yield* snapshot(p)).toEqual(before);
-            expect((yield* run(p.bound, human, ack(p.humanNote.id))).state._tag).toBe(
-              "Acknowledged",
-            );
+            expect((yield* run(p.bound, human, markSeen(p.humanNote.id))).state._tag).toBe("Seen");
           }),
         ),
       ),
@@ -478,7 +475,9 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 );
               // The human leaves Team after the notification was read as pending, before Seen.
               const racing = racingSeen(p.bound, leave(admission.id));
-              expect(yield* Effect.flip(run(racing, human, ack(p.humanNote.id)))).toMatchObject({
+              expect(
+                yield* Effect.flip(run(racing, human, markSeen(p.humanNote.id))),
+              ).toMatchObject({
                 _tag: "NotificationService.AlreadyHandled",
               });
               expect(yield* p.bound.notifications.get(p.humanNote.id)).toMatchObject({
@@ -518,7 +517,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   racingSeen(p.bound, leave(rejoined.id)),
                   human,
                   Effect.flatMap(NotificationService.Service, (notificationService) =>
-                    notificationService.acknowledgeThrough({
+                    notificationService.markSeenThrough({
                       recordedAt: through.recordedAt,
                       id: through.id,
                     }),
@@ -526,7 +525,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 ),
               ).toBe(1);
               expect(yield* p.bound.notifications.get(other.id)).toMatchObject({
-                value: { state: { _tag: "Acknowledged" } },
+                value: { state: { _tag: "Seen" } },
               });
               expect(
                 yield* p.bound.notifications.listPendingByRecipient(
@@ -618,7 +617,9 @@ export const notificationAcknowledgment = (harness: Harness) => {
                       expect(yield* p.bound.notifications.get(staged.id)).toEqual(
                         Option.some(changed(staged, { state: seenState(seenAt) })),
                       );
-                      yield* ack(p.humanNote.id).pipe(Effect.provideService(Actor.Service, human));
+                      yield* markSeen(p.humanNote.id).pipe(
+                        Effect.provideService(Actor.Service, human),
+                      );
                       return yield* Effect.fail("rollback");
                     }),
                   ),
@@ -627,15 +628,15 @@ export const notificationAcknowledgment = (harness: Harness) => {
               expect(yield* Effect.flip(operation)).toBe("rollback");
               expect(yield* snapshot(p)).toEqual(before);
               expect(yield* p.bound.notifications.get(staged.id)).toEqual(Option.none());
-              expect(yield* run(p.bound, human, ack(p.humanNote.id))).toMatchObject({
-                state: { _tag: "Acknowledged" },
+              expect(yield* run(p.bound, human, markSeen(p.humanNote.id))).toMatchObject({
+                state: { _tag: "Seen" },
               });
             }),
           ),
         ),
     );
 
-    it.effect("staged member removal prevents acknowledgment within the same outer commit", () =>
+    it.effect("staged member removal prevents marking seen within the same outer commit", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
@@ -651,7 +652,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                     yield* Effect.flatMap(MemberService.Service, (memberService) =>
                       memberService.remove(human.memberId),
                     );
-                    return yield* ack(p.humanNote.id).pipe(
+                    return yield* markSeen(p.humanNote.id).pipe(
                       Effect.provideService(Actor.Service, human),
                     );
                   }),
@@ -677,7 +678,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 storage,
                 Effect.gen(function* () {
                   const p = yield* prepare();
-                  const result = yield* run(p.bound, human, ack(p.humanNote.id));
+                  const result = yield* run(p.bound, human, markSeen(p.humanNote.id));
                   const participant = (yield* p.bound.participations.listByThread(
                     p.first.thread.id,
                   )).find((p) => ThreadParticipation.memberOf(p.participant) === agent.memberId);
@@ -785,9 +786,11 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 yield* Effect.flip(foreign.notifications.markSeen([p.humanNote.id], seenAt)),
               ).toMatchObject({ _tag: "NotificationStore.Conflict" });
               expect(yield* snapshot(p)).toEqual(before);
-              expect(yield* Effect.flip(run(p.bound, human, ack(discarded.id)))).toMatchObject({
-                _tag: "NotificationService.AlreadyHandled",
-              });
+              expect(yield* Effect.flip(run(p.bound, human, markSeen(discarded.id)))).toMatchObject(
+                {
+                  _tag: "NotificationService.AlreadyHandled",
+                },
+              );
               const invalid = { at: seenAt };
               Reflect.set(invalid, "at", "not-a-date");
               expect(
@@ -831,7 +834,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "concurrent acknowledgments from two hosts both succeed with the one stored time",
+      "marking seen concurrently from two hosts succeeds for both with the one stored time",
       () =>
         harness.withStorage((storage) =>
           Effect.gen(function* () {
@@ -850,7 +853,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                     yield* Deferred.succeed(signal, undefined);
                     yield* Deferred.await(gate);
                     yield* TestClock.adjust(`${index + 1} seconds`);
-                    return yield* run(bound, human, ack(saved.humanNote.id));
+                    return yield* run(bound, human, markSeen(saved.humanNote.id));
                   }),
                 ),
               ).pipe(Effect.forkChild),
@@ -866,7 +869,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                   const stored = Option.getOrThrow(
                     yield* bound.notifications.get(saved.humanNote.id),
                   );
-                  expect(stored.state._tag).toBe("Acknowledged");
+                  expect(stored.state._tag).toBe("Seen");
                   for (const result of results) expect(result).toEqual(stored);
                   // Seeing takes no journal commit.
                   expect(yield* history(bound)).toEqual(journal);
@@ -878,7 +881,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "acknowledging another recipient's notification reads as missing and writes nothing",
+      "marking another recipient's notification seen reads as missing and writes nothing",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -891,7 +894,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 get: () => Effect.succeedSome(changed(p.agentNote, { id: p.humanNote.id })),
               });
               expect(
-                yield* Effect.flip(run({ ...p.bound, context }, human, ack(p.humanNote.id))),
+                yield* Effect.flip(run({ ...p.bound, context }, human, markSeen(p.humanNote.id))),
               ).toMatchObject({ _tag: "NotificationService.NotFound" });
               expect(yield* snapshot(p)).toEqual(before);
             }),
@@ -900,7 +903,7 @@ export const notificationAcknowledgment = (harness: Harness) => {
     );
 
     it.effect(
-      "gateway exposes acknowledgment outcomes and invalid-input errors without exposing internal services",
+      "gateway exposes marking-seen outcomes and invalid-input errors without exposing internal services",
       () =>
         harness.withStorage((storage) =>
           Effect.gen(function* () {
@@ -912,27 +915,27 @@ export const notificationAcknowledgment = (harness: Harness) => {
                 const result = yield* gateway.asMember(
                   workspaceId,
                   human.identity,
-                  ack(p.humanNote.id),
+                  markSeen(p.humanNote.id),
                 );
-                expect(result.state._tag).toBe("Acknowledged");
+                expect(result.state._tag).toBe("Seen");
                 expect(
-                  yield* gateway.asMember(workspaceId, human.identity, ack(p.humanNote.id)),
+                  yield* gateway.asMember(workspaceId, human.identity, markSeen(p.humanNote.id)),
                 ).toEqual(result);
                 expect(
                   yield* Effect.flip(
-                    gateway.asMember(workspaceId, p.owner.identity, ack(p.humanNote.id)),
+                    gateway.asMember(workspaceId, p.owner.identity, markSeen(p.humanNote.id)),
                   ),
                 ).toMatchObject({ _tag: "NotificationService.NotFound" });
                 expect(
                   yield* Effect.flip(
-                    gateway.asMember(workspaceId, agent.identity, ack(p.agentNote.id)),
+                    gateway.asMember(workspaceId, agent.identity, markSeen(p.agentNote.id)),
                   ),
                 ).toMatchObject({ _tag: "NotificationService.HumanRecipientRequired" });
                 const invalid = { id: p.humanNote.id };
                 Reflect.set(invalid, "id", "");
                 expect(
                   yield* Effect.flip(
-                    gateway.asMember(workspaceId, human.identity, ack(invalid.id)),
+                    gateway.asMember(workspaceId, human.identity, markSeen(invalid.id)),
                   ),
                 ).toMatchObject({ _tag: "Gateway.InvalidInput" });
               }),

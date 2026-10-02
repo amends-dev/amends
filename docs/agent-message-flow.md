@@ -172,7 +172,7 @@ accepted now. Usually it finds nothing.
 ## 7. What readers see
 
 Every fact published in a commit reaches the workspace change feed, which the client maps to
-the reads it invalidates ([live updates](live-updates.md)); the thread's timeline shows
+the reads it invalidates ([change feed](change-feed.md)); the thread's timeline shows
 `turn.created`, `turn.started`, the reply, and `turn.ended`, and the Agents page shows activity
 ([turns](turns.md)). Streaming text and typing are signals, not journal facts. A turn's log is
 followed over its own stream.

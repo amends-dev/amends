@@ -129,6 +129,16 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
+      typing: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.typing(params.threadId),
+            ),
+          ),
+        ),
       markRead: ({ params, payload }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

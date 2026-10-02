@@ -9,7 +9,7 @@ import { MembersHandlers } from "./members.ts";
 import { NotificationsHandlers } from "./notifications.ts";
 import { SessionHandlers } from "./session.ts";
 import { WorkspacesHandlers } from "./workspaces.ts";
-import { ChangesHandlers } from "./changes.ts";
+import { ChangeFeedHandlers } from "./change-feed.ts";
 import { ConnectionsHandlers } from "./connections.ts";
 import { AgentsHandlers } from "./agents.ts";
 import { EnvironmentsHandlers } from "./environments.ts";
@@ -36,7 +36,7 @@ export const layerHandlers = Layer.mergeAll(
   EnvironmentsHandlers.layer,
   AgentsHandlers.layer,
   TurnsHandlers.layer,
-  ChangesHandlers.layer,
+  ChangeFeedHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 
 /**

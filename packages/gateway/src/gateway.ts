@@ -15,7 +15,6 @@ import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Cause } from "effect";
 import type { Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
-import type { WorkspaceSignals } from "./signals.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
@@ -138,12 +137,7 @@ export const make = Effect.fn("Gateway.make")(function* (
 ): Effect.fn.Return<
   Interface,
   never,
-  | WorkspaceStorage.Service
-  | WorkspaceSignals.Service
-  | AgentJobs.Service
-  | TurnJobs.Service
-  | Crypto.Crypto
-  | Scope.Scope
+  WorkspaceStorage.Service | AgentJobs.Service | TurnJobs.Service | Crypto.Crypto | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options);
   /**

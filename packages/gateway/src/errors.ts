@@ -25,7 +25,6 @@ import { ConnectionService } from "@amends/core/connection";
 import { AgentService } from "@amends/core/agent";
 import { Turn, TurnService } from "@amends/core/turn";
 import { EnvironmentService } from "@amends/core/environment";
-import { SignalService } from "@amends/core/signal";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -89,10 +88,8 @@ export const PublicError = Schema.Union([
   MemberService.OwnerProtected,
   MemberService.AlreadyRemoved,
   NotificationService.NotFound,
-  NotificationService.SourceUnavailable,
   NotificationService.HumanRecipientRequired,
   NotificationService.AlreadyHandled,
-  SignalService.ThreadNotFound,
   ThreadService.GroupNotFound,
   ThreadService.NotFound,
   ThreadService.ParticipantUnavailable,

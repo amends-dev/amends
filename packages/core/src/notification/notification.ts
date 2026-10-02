@@ -51,36 +51,21 @@ export const ofMember = <const I extends Identity.MemberReference>(
 ) => Object.assign({}, identity, { memberId });
 
 /**
- * How a recipient handled a notification: a person saw it, or an agent accepted it into a turn,
- * which owns the work from then on. Extend with delivery handoff when channels exist.
+ * Where a notification stands. Pending waits for its recipient: a person sees it, or an agent
+ * accepts it into a turn, which owns the work from then on. Seen is private to the person, kept
+ * outside the journal; the journal settles everything else.
  */
-export const AcknowledgmentOutcome = Schema.TaggedUnion({
-  Seen: {},
-  Accepted: { turnId: TurnId.Id },
-});
-export type AcknowledgmentOutcome = typeof AcknowledgmentOutcome.Type;
-
-export const Acknowledgment = Schema.Struct({
-  outcome: AcknowledgmentOutcome,
-  acknowledgedAt: Schema.DateTimeUtcFromString,
-});
-export interface Acknowledgment extends Schema.Schema.Type<typeof Acknowledgment> {}
-
-/** The outcome determines which recipient contract can record an acknowledgment. */
-export const acceptsAcknowledgment = (recipient: Recipient, outcome: AcknowledgmentOutcome) =>
-  AcknowledgmentOutcome.match(outcome, {
-    Seen: () => recipient._tag === "Human",
-    Accepted: () => recipient._tag === "Agent",
-  });
-
 export const State = Schema.TaggedUnion({
   Pending: {},
+  /** Its human recipient saw it. */
+  Seen: { seenAt: Schema.DateTimeUtcFromString },
+  /** Its agent recipient accepted it into a turn. */
+  Accepted: { turnId: TurnId.Id, acceptedAt: Schema.DateTimeUtcFromString },
   /**
    * Settled without handling: an agent's input when its participation ends, or a person's pending
    * notifications from a group they no longer belong to, whose threads they cannot open.
    */
   Discarded: { reason: Schema.Literals(["participation-ended", "access-lost"]) },
-  Acknowledged: Acknowledgment.fields,
   /**
    * The source told this recipient something without asking anything of it, as another agent's
    * message tells an agent: settled when created, so it never waits for handling.
@@ -88,6 +73,11 @@ export const State = Schema.TaggedUnion({
   Informational: {},
 });
 export type State = typeof State.Type;
+
+/** Only people see their notifications, and only agents accept theirs. */
+export const fitsRecipient = (recipient: Recipient, state: State) =>
+  (state._tag !== "Seen" || recipient._tag === "Human") &&
+  (state._tag !== "Accepted" || recipient._tag === "Agent");
 
 /**
  * One recipient's notification of a recorded source. Generation chooses
@@ -108,9 +98,7 @@ export const Record = Schema.Struct({
 }).check(
   Schema.makeFilter(
     (record) =>
-      record.state._tag !== "Acknowledged" ||
-      acceptsAcknowledgment(record.recipient, record.state.outcome) ||
-      "Acknowledgment outcome does not match the recipient",
+      fitsRecipient(record.recipient, record.state) || "State does not match the recipient",
   ),
 );
 export interface Record extends Schema.Schema.Type<typeof Record> {}

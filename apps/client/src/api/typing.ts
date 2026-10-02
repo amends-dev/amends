@@ -44,7 +44,7 @@ export const typingRequest = (client: ApiClient, workspace: string) =>
   requestAtom(client, (threadId: string) =>
     Effect.gen(function* () {
       const api = yield* client;
-      yield* api.changes.typing({
+      yield* api.threads.typing({
         params: {
           workspaceId: yield* command(Workspace.Id)(workspace),
           threadId: yield* command(Thread.Id)(threadId),

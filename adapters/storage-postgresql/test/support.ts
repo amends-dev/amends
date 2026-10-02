@@ -26,8 +26,7 @@ import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/unstable/sql";
-import { PostgresDatabase, PostgresSignals, PostgresStorage } from "../src/index.ts";
-import { Signals } from "@amends/core/signal";
+import { PostgresDatabase, PostgresStorage } from "../src/index.ts";
 import { temporary } from "./postgres.ts";
 
 export const setup = () => {
@@ -47,9 +46,7 @@ export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
-  context: Context.Context<
-    WorkspaceStorage.Bindings | Signals.Service | AgentJobs.Service | TurnJobs.Service
-  >,
+  context: Context.Context<WorkspaceStorage.Bindings | AgentJobs.Service | TurnJobs.Service>,
 ) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
@@ -75,13 +72,11 @@ export type Bound = ReturnType<typeof bind>;
 export const views = (options: PostgresStorage.Options = {}) =>
   Effect.gen(function* () {
     const service = yield* PostgresStorage.make(options);
-    const hub = yield* PostgresSignals.make();
     return {
       forWorkspace: (workspaceId: Workspace.Id) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>
           bind(
             context.pipe(
-              Context.add(Signals.Service, hub.forWorkspace(workspaceId)),
               Context.add(AgentJobs.Service, AgentJobs.noRunner),
               Context.add(TurnJobs.Service, TurnJobs.noRunner),
             ),

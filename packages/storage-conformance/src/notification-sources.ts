@@ -36,13 +36,14 @@ import { TestClock } from "effect/testing";
 import {
   type Bound,
   boundTo,
+  listOldestFirst,
   otherWorkspaceId,
   placed,
   runHost,
   Support,
   testProvenance,
-  workspaceId,
   threadInternals,
+  workspaceId,
 } from "./support.ts";
 import type { Harness } from "./harness.ts";
 
@@ -77,7 +78,7 @@ export const notificationSources = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
-      bound.notifications.listByRecipient(Notification.ofMember(id, identityFor(id)), {
+      listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
         limit: 100,
       });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
@@ -157,14 +158,22 @@ export const notificationSources = (harness: Harness) => {
 
     const changed = <A extends object>(record: A, changes: Partial<A>): A =>
       Object.assign({}, record, changes);
-    const resolve = (id: Notification.Id) =>
+    /** The actor's inbox entry for a notification, if their inbox holds it. */
+    const entryOf = (id: Notification.Id) =>
       Effect.flatMap(NotificationService.Service, (notificationService) =>
-        notificationService.resolveSource(id),
+        Effect.map(notificationService.inbox({ limit: 50 }), (items) =>
+          items.find((item) => item.notification.id === id),
+        ),
+      );
+    /** What the actor's inbox shows their notification pointing to; undefined when it shows none. */
+    const sourceOf = (id: Notification.Id) =>
+      Effect.flatMap(entryOf(id), (entry) =>
+        entry === undefined
+          ? Effect.die(`${id} is not in the inbox`)
+          : Effect.succeed(entry.source),
       );
     const inboxGet = (id: Notification.Id) =>
-      Effect.flatMap(NotificationService.Service, (notificationService) =>
-        notificationService.get(id),
-      );
+      Effect.map(entryOf(id), (entry) => entry?.notification);
     const noteFor = Effect.fnUntraced(function* (bound: Bound, id: Member.Id) {
       const note = (yield* notifications(bound, id))[0];
       if (!note) return yield* Effect.die("Missing notification");
@@ -174,7 +183,7 @@ export const notificationSources = (harness: Harness) => {
       ...bound,
       context: Context.add(bound.context, NotificationStore.Service, {
         ...bound.notifications,
-        get: () => Effect.succeedSome(note),
+        listLatestByRecipient: () => Effect.succeed([note]),
       }),
     });
     const snapshot = Effect.fnUntraced(function* (bound: Bound, threadId: Thread.Id) {
@@ -224,7 +233,8 @@ export const notificationSources = (harness: Harness) => {
               };
               for (const actor of [human, agent]) {
                 const note = yield* noteFor(bound, actor.memberId);
-                const result = yield* run(readOnly, actor, resolve(note.id));
+                const result = yield* run(readOnly, actor, sourceOf(note.id));
+                if (result === undefined) return yield* Effect.die("Expected a source");
                 expect(result).toEqual({ activity: first.activity, message: first.message });
                 expect(Object.keys(result).sort()).toEqual(["activity", "message"]);
                 expect(result).toEqual(
@@ -245,7 +255,7 @@ export const notificationSources = (harness: Harness) => {
     );
 
     it.effect(
-      "notification ownership and active identity are checked before touching source storage",
+      "the inbox holds only its reader's notifications, and checks their identity before reading sources",
       () =>
         harness.withStorage((storage) =>
           runHost(
@@ -260,20 +270,12 @@ export const notificationSources = (harness: Harness) => {
                   getEntry: () => Effect.die("Source must not be read"),
                 }),
               };
+              // Another recipient's notification never reaches the inbox.
               for (const actor of [owner, agent])
-                expect(
-                  yield* Effect.flip(run(protectedBound, actor, resolve(note.id))),
-                ).toMatchObject({
-                  _tag: "NotificationService.NotFound",
-                });
+                expect(yield* run(bound, actor, entryOf(note.id))).toBeUndefined();
               expect(
                 yield* Effect.flip(
-                  run(protectedBound, human, resolve(Notification.Id.make("missing"))),
-                ),
-              ).toMatchObject({ _tag: "NotificationService.NotFound" });
-              expect(
-                yield* Effect.flip(
-                  run(protectedBound, { ...human, identity: owner.identity }, resolve(note.id)),
+                  run(protectedBound, { ...human, identity: owner.identity }, entryOf(note.id)),
                 ),
               ).toMatchObject({ _tag: "Authorization.InvalidActor" });
               yield* run(
@@ -284,7 +286,7 @@ export const notificationSources = (harness: Harness) => {
                 ),
               );
               expect(
-                yield* Effect.flip(run(protectedBound, human, resolve(note.id))),
+                yield* Effect.flip(run(protectedBound, human, entryOf(note.id))),
               ).toMatchObject({
                 _tag: "Authorization.InvalidActor",
               });
@@ -303,9 +305,7 @@ export const notificationSources = (harness: Harness) => {
               const { bound, owner, group, first, human } = yield* prepare();
               const note = yield* noteFor(bound, humanId);
               expect(yield* run(bound, human, inboxGet(note.id))).toEqual(note);
-              expect(yield* Effect.flip(run(bound, human, resolve(note.id)))).toEqual(
-                new NotificationService.SourceUnavailable({ notificationId: note.id }),
-              );
+              expect(yield* run(bound, human, sourceOf(note.id))).toBeUndefined();
               const assignment = yield* grant(
                 bound,
                 humanId,
@@ -328,7 +328,14 @@ export const notificationSources = (harness: Harness) => {
                   }),
                 ),
               );
-              expect(yield* asActor(service.resolveSource(note.id), human)).toEqual({
+              expect(
+                yield* asActor(
+                  sourceOf(note.id).pipe(
+                    Effect.provideService(NotificationService.Service, service),
+                  ),
+                  human,
+                ),
+              ).toEqual({
                 activity: first.activity,
                 message: first.message,
               });
@@ -343,10 +350,13 @@ export const notificationSources = (harness: Harness) => {
                 ),
               );
               expect(
-                yield* Effect.flip(asActor(service.resolveSource(note.id), human)),
-              ).toMatchObject({
-                _tag: "NotificationService.SourceUnavailable",
-              });
+                yield* asActor(
+                  sourceOf(note.id).pipe(
+                    Effect.provideService(NotificationService.Service, service),
+                  ),
+                  human,
+                ),
+              ).toBeUndefined();
               yield* grant(bound, humanId, ThreadPermissions.Read);
               yield* run(
                 bound,
@@ -364,10 +374,13 @@ export const notificationSources = (harness: Harness) => {
               });
               expect(yield* run(bound, human, inboxGet(note.id))).toEqual(settled);
               expect(
-                yield* Effect.flip(asActor(service.resolveSource(note.id), human)),
-              ).toMatchObject({
-                _tag: "NotificationService.SourceUnavailable",
-              });
+                yield* asActor(
+                  sourceOf(note.id).pipe(
+                    Effect.provideService(NotificationService.Service, service),
+                  ),
+                  human,
+                ),
+              ).toBeUndefined();
               yield* run(
                 bound,
                 owner,
@@ -375,7 +388,14 @@ export const notificationSources = (harness: Harness) => {
                   groupMembershipService.add({ groupId: group.id, memberId: humanId }),
                 ),
               );
-              expect(yield* asActor(service.resolveSource(note.id), human)).toEqual({
+              expect(
+                yield* asActor(
+                  sourceOf(note.id).pipe(
+                    Effect.provideService(NotificationService.Service, service),
+                  ),
+                  human,
+                ),
+              ).toEqual({
                 activity: first.activity,
                 message: first.message,
               });
@@ -433,7 +453,7 @@ export const notificationSources = (harness: Harness) => {
                 bound,
                 human,
                 Effect.flatMap(NotificationService.Service, (notificationService) =>
-                  notificationService.acknowledge(older.id),
+                  notificationService.markSeen(older.id),
                 ),
               );
               expect((yield* inbox({ limit: 10 })).map((item) => item.notification)).toEqual([
@@ -507,7 +527,7 @@ export const notificationSources = (harness: Harness) => {
                 ),
               );
               const before = yield* snapshot(bound, first.thread.id);
-              expect(yield* run(bound, agent, resolve(note.id))).toEqual({
+              expect(yield* run(bound, agent, sourceOf(note.id))).toEqual({
                 activity: first.activity,
                 message: first.message,
               });
@@ -541,10 +561,8 @@ export const notificationSources = (harness: Harness) => {
                 { logId: nonActivity.logId, entryId: nonActivity.id },
               ])
                 expect(
-                  yield* Effect.flip(
-                    run(withNote(bound, changed(note, { source })), human, resolve(note.id)),
-                  ),
-                ).toMatchObject({ _tag: "NotificationService.SourceUnavailable" });
+                  yield* run(withNote(bound, changed(note, { source })), human, sourceOf(note.id)),
+                ).toBeUndefined();
               const entry = Option.getOrThrow(
                 yield* bound.store.getEntry(note.source.logId, note.source.entryId),
               );
@@ -555,9 +573,7 @@ export const notificationSources = (harness: Harness) => {
                 getEntry: () =>
                   Effect.succeedSome(changed(entry, { fact: changed(header, { version: 999 }) })),
               });
-              expect(
-                yield* Effect.flip(run({ ...bound, context }, human, resolve(note.id))),
-              ).toMatchObject({ _tag: "NotificationService.SourceUnavailable" });
+              expect(yield* run({ ...bound, context }, human, sourceOf(note.id))).toBeUndefined();
               expect(yield* bound.store.getEntry(Log.Id.make("another-log"), entry.id)).toEqual(
                 Option.none(),
               );
@@ -569,7 +585,7 @@ export const notificationSources = (harness: Harness) => {
                   yield* bound.store.getEntry(note.source.logId, note.source.entryId),
                 ).payload,
               ).not.toEqual(entry.payload);
-              expect(yield* run(bound, human, resolve(note.id))).toEqual({
+              expect(yield* run(bound, human, sourceOf(note.id))).toEqual({
                 activity: first.activity,
                 message: first.message,
               });
@@ -591,15 +607,15 @@ export const notificationSources = (harness: Harness) => {
               getMany: () => Effect.die("Message must not be read without permission"),
             });
             expect(
-              yield* Effect.flip(run({ ...bound, context: guarded }, human, resolve(note.id))),
-            ).toMatchObject({ _tag: "NotificationService.SourceUnavailable" });
+              yield* run({ ...bound, context: guarded }, human, sourceOf(note.id)),
+            ).toBeUndefined();
             const failure = new Store.Failure({ operation: "getEntry", cause: "injected" });
             const failing = Context.add(bound.context, Store.Service, {
               ...bound.store,
               getEntry: () => Effect.fail(failure),
             });
             expect(
-              yield* Effect.flip(run({ ...bound, context: failing }, human, resolve(note.id))),
+              yield* Effect.flip(run({ ...bound, context: failing }, human, sourceOf(note.id))),
             ).toBe(failure);
           }),
         ),
@@ -693,7 +709,8 @@ export const notificationSources = (harness: Harness) => {
                   threadService.readTimeline(first.thread.id, { limit: 10 }),
                 ),
               );
-              const notes = yield* bound.notifications.listByRecipient(
+              const notes = yield* listOldestFirst(
+                bound.notifications,
                 Notification.ofMember(owner.memberId, owner.identity),
                 {
                   limit: 100,
@@ -702,11 +719,12 @@ export const notificationSources = (harness: Harness) => {
               for (const event of events) {
                 const note = notes.find((n) => n.source.entryId === event.id);
                 if (!note) return yield* Effect.die("Missing source notification");
-                const result = yield* run(bound, owner, resolve(note.id));
+                const result = yield* run(bound, owner, sourceOf(note.id));
                 expect(result).toEqual(
                   timeline.find((item) => item.activity.id === event.payload.activity.id),
                 );
-                if (!("participant" in result)) return yield* Effect.die("Wrong source subject");
+                if (result === undefined || !("participant" in result))
+                  return yield* Effect.die("Wrong source subject");
                 expect(Object.keys(result.participant).sort()).toEqual([
                   "id",
                   "joinedAt",
@@ -744,19 +762,18 @@ export const notificationSources = (harness: Harness) => {
                       (n) => n.id !== note.id,
                     );
                     if (!latest) return yield* Effect.die("Missing staged notification");
-                    expect(yield* asActor(resolve(latest.id), human)).toEqual(result);
+                    expect(yield* asActor(sourceOf(latest.id), human)).toEqual(result);
                     yield* journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: assignment.payload.assignmentId,
                       memberId: assignment.payload.memberId,
                     });
-                    return yield* asActor(resolve(latest.id), human);
+                    expect(yield* asActor(sourceOf(latest.id), human)).toBeUndefined();
+                    return yield* Effect.fail("rolled back" as const);
                   }).pipe(Publication.withActor),
                 ),
               );
-              expect(yield* Effect.flip(run(bound, owner, operation))).toMatchObject({
-                _tag: "NotificationService.SourceUnavailable",
-              });
+              expect(yield* Effect.flip(run(bound, owner, operation))).toBe("rolled back");
               expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
               const admission = Option.getOrThrow(
                 yield* bound.groupMemberships.findActive(group.id, humanId),
@@ -773,13 +790,12 @@ export const notificationSources = (harness: Harness) => {
                       ),
                       human,
                     );
-                    return yield* asActor(resolve(note.id), human);
+                    expect(yield* asActor(sourceOf(note.id), human)).toBeUndefined();
+                    return yield* Effect.fail("rolled back" as const);
                   }),
                 ),
               );
-              expect(yield* Effect.flip(run(bound, owner, leave))).toMatchObject({
-                _tag: "NotificationService.SourceUnavailable",
-              });
+              expect(yield* Effect.flip(run(bound, owner, leave))).toBe("rolled back");
               expect(yield* snapshot(bound, first.thread.id)).toEqual(before);
             }),
           ),
@@ -787,7 +803,7 @@ export const notificationSources = (harness: Harness) => {
     );
 
     it.effect(
-      "source references resolve after reopening and gateway exposes source-unavailable without leaking content",
+      "sources resolve after reopening, and the gateway shows a missing source as none",
       () =>
         harness.withStorage((storage) =>
           Effect.gen(function* () {
@@ -809,7 +825,7 @@ export const notificationSources = (harness: Harness) => {
                   yield* gateway.asMember(
                     workspaceId,
                     saved.human.identity,
-                    resolve(saved.note.id),
+                    sourceOf(saved.note.id),
                   ),
                 ).toEqual({ activity: saved.first.activity, message: saved.first.message });
                 const bound = yield* boundTo(workspaceId);
@@ -819,26 +835,12 @@ export const notificationSources = (harness: Harness) => {
                 });
                 yield* bound.store.transaction(bound.notifications.insert(unavailable));
                 expect(
-                  yield* Effect.flip(
-                    gateway.asMember(workspaceId, saved.human.identity, resolve(unavailable.id)),
+                  yield* gateway.asMember(
+                    workspaceId,
+                    saved.human.identity,
+                    sourceOf(unavailable.id),
                   ),
-                ).toMatchObject({ _tag: "NotificationService.SourceUnavailable" });
-                expect(
-                  yield* Effect.flip(
-                    gateway.asMember(
-                      workspaceId,
-                      saved.human.identity,
-                      resolve(Notification.Id.make("missing")),
-                    ),
-                  ),
-                ).toMatchObject({ _tag: "NotificationService.NotFound" });
-                const invalid = { id: saved.note.id };
-                Reflect.set(invalid, "id", "");
-                expect(
-                  yield* Effect.flip(
-                    gateway.asMember(workspaceId, saved.human.identity, resolve(invalid.id)),
-                  ),
-                ).toMatchObject({ _tag: "Gateway.InvalidInput" });
+                ).toBeUndefined();
               }),
             );
           }),

@@ -86,29 +86,24 @@ starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotenc
 same key returns the first attempt's result, whatever the retry's body. Clients generating the
 typed client pass it in `headers`.
 
-- `notifications`: `GET /workspaces/:workspaceId/notifications` lists the inbox of the
-  authenticated human or agent's membership. `GET …/:notificationId` reads one notification. Active
-  membership is required, and a missing record or another recipient's notification
-  returns the same 404. The caller cannot select a different recipient.
-  `GET …/inbox` lists the same inbox newest first, each notification with its `source` timeline
-  item where the caller can still read it; it takes `limit` from 1 to 50, `pendingOnly`, and
-  `before`, the last item's `{ recordedAt, id }` as URL-encoded JSON. `GET …/count` returns
+- `notifications`: `GET /workspaces/:workspaceId/notifications/inbox` lists the inbox of the
+  authenticated human or agent's membership newest first, each notification with its `source`
+  timeline item where the caller can still read it; it takes `limit` from 1 to 50, `pendingOnly`,
+  and `before`, the last item's `{ recordedAt, id }` as URL-encoded JSON. Active membership is
+  required, and the caller cannot select a different recipient. `GET …/count` returns
   `{ pending }`, how many notifications are still pending for the caller, and
-  `POST …/acknowledge` with `{ through: { recordedAt, id } }` marks a person's pending
-  notifications seen up to that one, returning `{ acknowledged }`.
-  `GET …/:notificationId/source` returns the timeline item the notification points to, under the
-  caller's current access to it (404 `NotificationService.SourceUnavailable` without it).
-  `POST …/:notificationId/acknowledge` records that the person saw it and returns the
-  notification; acknowledging again returns the first acknowledgment, an agent's notification
-  is a 403, and one an agent's work already settled is a 409.
-- `changes`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream of the
+  `POST …/seen` with `{ through: { recordedAt, id } }` marks a person's pending notifications
+  seen up to that one, returning `{ marked }`. `POST …/:notificationId/seen` records that the
+  person saw it and returns the notification; marking it again returns the first time, a missing
+  record or another recipient's notification is the same 404, an agent's notification is a 403,
+  and one already settled otherwise is a 409.
+- `changeFeed`: `GET /workspaces/:workspaceId/changes` opens a live SSE stream of the
   commits and signals the caller may see, resumable from a cursor. Authentication and active
-  membership are checked on entry. `POST /workspaces/:workspaceId/threads/:threadId/typing`
-  tells the thread's readers that the caller is typing there, answering 204.
+  membership are checked on entry.
 
 ### Live changes
 
-`ChangesGroup.watch` reuses core's `ChangeFeed.Message` through `StreamSse`.
+`ChangeFeedGroup.watch` reuses core's `ChangeFeed.Message` through `StreamSse`.
 The generated client returns a typed Effect stream. Raw clients send the bearer
 credential, for example:
 
@@ -147,8 +142,9 @@ then the stream ends; reconnecting returns 403.
 
 Between commits, `_tag: "Signal"` messages carry `workspaceId` and a `signal` happening now:
 `Typing` (`groupId`, `threadId`, `memberId`, and `until`, a UTC ISO string) reaches the thread's
-readers, and `ThreadRead`, `GroupCaughtUp`, and `NotificationsSeen` reach only the caller's own
-sessions after one of them records read state or acknowledges a notification. A response an
+readers, and `ThreadRead`, `GroupRead`, and `NotificationsSeen` reach only the caller's own
+sessions, the one that wrote included, after one of them records read state or marks a
+notification seen. A response an
 agent's turn is writing reaches only those following its log (see [Turns](#turns)). Signals have no
 cursor, are never replayed, and may be missed; after reconnecting, refresh read state with the rest
 of the view. Show a typing indicator until `until` unless another `Typing` extends it, and hide the
@@ -206,7 +202,7 @@ describe the rules behind each operation.
 | `DELETE …/groups/:groupId/members/:membershipId`     | End that admission under management permission; returns it.                                                                                                       |
 | `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                       |
 | `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                               |
-| `POST …/groups/:groupId/read`                        | Record that the caller caught up with the group now; 204.                                                                                                         |
+| `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                   |
 | `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                       |
 | `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                    |
 | `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread and its opening message.                                                                            |
@@ -215,6 +211,7 @@ describe the rules behind each operation.
 | `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                              |
 | `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                   |
 | `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                            |
+| `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                       |
 | `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                      |
 | `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                      |
 | `POST …/threads/:threadId/read`                      | Move the caller's position forward to `{ throughSequence }`; 204.                                                                                                 |
@@ -239,7 +236,7 @@ people write messages and keep read positions: an agent principal gets 403. A re
 the thread's latest activity is a 409 `ReadStateService.BeyondTimeline` carrying the latest
 sequence. A direct group's members are fixed and it has nothing to follow, so adding, removing, and
 following there are 409s; unfollowing an ended participation or removing an ended admission is
-also a 409. Positions, caught-up times, and acknowledgments reach the caller's other sessions as
+also a 409. Positions, read times, and what they saw reach the caller's sessions as
 signals on the change feed, and the conversation's facts reach the group's readers as commits.
 
 ### Connections

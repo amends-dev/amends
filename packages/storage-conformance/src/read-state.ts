@@ -277,32 +277,32 @@ export const readState = (harness: Harness) => {
         ),
     );
 
-    it.effect("marking a group read records a caught-up time that only moves forward", () =>
+    it.effect("marking a group read records a read time that only moves forward", () =>
       harness.withStorage((storage) =>
         runHost(
           storage,
           Effect.gen(function* () {
             const { bound, team } = yield* prepare();
             const human = actorFor(humanId);
-            const caughtUp = Effect.map(
-              bound.readStates.getGroupsCaughtUp(humanId, [team.id]),
-              (times) => times.map((time) => time.caughtUpAt),
+            const readTimes = Effect.map(
+              bound.readStates.getGroupReads(humanId, [team.id]),
+              (times) => times.map((time) => time.readAt),
             );
             yield* TestClock.adjust("1 minute");
             yield* run(bound, human, markGroupRead(team.id));
             const first = yield* DateTime.now;
-            expect(yield* caughtUp).toEqual([first]);
+            expect(yield* readTimes).toEqual([first]);
             yield* TestClock.adjust("1 minute");
             yield* run(bound, human, markGroupRead(team.id));
             const second = yield* DateTime.now;
-            expect(yield* caughtUp).toEqual([second]);
+            expect(yield* readTimes).toEqual([second]);
             yield* bound.readStates.advanceGroup({
               workspaceId,
               memberId: humanId,
               groupId: team.id,
-              caughtUpAt: first,
+              readAt: first,
             });
-            expect(yield* caughtUp).toEqual([second]);
+            expect(yield* readTimes).toEqual([second]);
             expect(
               yield* Effect.flip(run(bound, actorFor(agentId), markGroupRead(team.id))),
             ).toEqual(new ReadStateService.HumanRequired({ memberId: agentId }));
@@ -667,7 +667,7 @@ export const readState = (harness: Harness) => {
               // Unread activity that addressed nobody leaves nothing pending.
               expect(itemOf(listed, team.id)).toMatchObject({
                 latestActivityAt: posted,
-                caughtUpAt: null,
+                readAt: null,
                 newActivity: true,
                 following: false,
                 pending: 0,
@@ -686,7 +686,7 @@ export const readState = (harness: Harness) => {
                 ),
               );
               expect(itemOf(yield* mine(human), team.id)).toMatchObject({
-                caughtUpAt: yield* DateTime.now,
+                readAt: yield* DateTime.now,
                 newActivity: false,
                 following: true,
               });

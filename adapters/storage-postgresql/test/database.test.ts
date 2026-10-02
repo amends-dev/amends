@@ -193,7 +193,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const thread = threads[0]!.thread;
           const [admission] = yield* bound.groupMemberships.listActiveByMember(memberIds[0]!);
           // Mentioned members are notified; authors are not.
-          const inbox = yield* bound.notifications.listByRecipient(
+          const inbox = yield* bound.notifications.listLatestByRecipient(
             Notification.ofMember(memberIds[0]!, {
               _tag: "Human",
               id: Identity.HumanId.make(memberIds[0]!),

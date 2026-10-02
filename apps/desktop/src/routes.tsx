@@ -8,7 +8,7 @@ import {
   useDirectory,
   useSession,
   useWorkspace,
-  WorkspaceFeedProvider,
+  ChangeFeedProvider,
 } from "@amends/client";
 import { CheckingSessionScreen, HostUnavailableScreen } from "@amends/ui/screens/standalone";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
@@ -89,9 +89,9 @@ function WorkspaceRoute(props: ParentProps) {
       when={workspace() !== undefined}
       fallback={<WorkspaceUnavailablePage workspaceId={params.workspaceId} />}
     >
-      <WorkspaceFeedProvider workspaceId={params.workspaceId}>
+      <ChangeFeedProvider workspaceId={params.workspaceId}>
         <WorkspaceLayout>{props.children}</WorkspaceLayout>
-      </WorkspaceFeedProvider>
+      </ChangeFeedProvider>
     </Show>
   );
 }

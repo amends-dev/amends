@@ -12,43 +12,31 @@ const wire = {
   recordedAt: "2026-09-19T12:00:00.000Z",
   state: { _tag: "Pending" },
 } as const;
-it.effect(
-  "Seen acknowledgments preserve their outcome and timestamp through the notification codec",
-  () =>
-    Effect.gen(function* () {
-      const encoded = {
-        ...wire,
-        state: {
-          _tag: "Acknowledged",
-          outcome: { _tag: "Seen" },
-          acknowledgedAt: "2026-09-21T12:00:00.123Z",
-        },
-      };
-      const record = yield* Schema.decodeUnknownEffect(Notification.Record)(encoded);
-      const codec = Codec.makeForSchema(Notification.Record);
-      expect(
-        yield* Schema.encodeEffect(Notification.Record)(
-          yield* codec.decode(yield* codec.encode(record)),
-        ),
-      ).toEqual(encoded);
-      const decode = Schema.decodeUnknownOption(Notification.Record);
-      for (const invalid of [
-        ...["Agent", "Contact", "Triage"].map((kind) => ({
-          ...encoded,
-          recipient: { _tag: kind, id: "recipient", memberId: "member-one" },
-        })),
-        { ...encoded, state: { ...encoded.state, acknowledgedAt: "invalid" } },
-        {
-          ...encoded,
-          state: { ...encoded.state, outcome: { _tag: "TurnAccepted", turnId: "unverified" } },
-        },
-        {
-          ...encoded,
-          state: { _tag: "Acknowledged", acknowledgedAt: encoded.state.acknowledgedAt },
-        },
-      ])
-        expect(Option.isNone(decode(invalid))).toBe(true);
-    }),
+it.effect("a Seen notification keeps its time through the codec, and only a person's can be", () =>
+  Effect.gen(function* () {
+    const encoded = {
+      ...wire,
+      state: { _tag: "Seen", seenAt: "2026-09-21T12:00:00.123Z" },
+    };
+    const record = yield* Schema.decodeUnknownEffect(Notification.Record)(encoded);
+    const codec = Codec.makeForSchema(Notification.Record);
+    expect(
+      yield* Schema.encodeEffect(Notification.Record)(
+        yield* codec.decode(yield* codec.encode(record)),
+      ),
+    ).toEqual(encoded);
+    const decode = Schema.decodeUnknownOption(Notification.Record);
+    for (const invalid of [
+      ...["Agent", "Contact", "Triage"].map((kind) => ({
+        ...encoded,
+        recipient: { _tag: kind, id: "recipient", memberId: "member-one" },
+      })),
+      { ...encoded, state: { _tag: "Seen", seenAt: "invalid" } },
+      { ...encoded, state: { _tag: "Seen" } },
+      { ...encoded, state: { _tag: "Accepted", turnId: "turn", acceptedAt: encoded.state.seenAt } },
+    ])
+      expect(Option.isNone(decode(invalid))).toBe(true);
+  }),
 );
 it.effect.each(["Human", "Agent", "Contact"] as const)(
   "a %s notification preserves its source, recipient kind, and recorded time through codecs",
@@ -89,7 +77,7 @@ it("notification decoding rejects malformed references and unsupported recipient
     { ...wire, source: { ...wire.source, entryId: "" } },
     { ...wire, recipient: { _tag: "Human", id: "" } },
     { ...wire, recipient: { _tag: "Unknown", id: "recipient-one" } },
-    { ...wire, state: { _tag: "Acknowledged" } },
+    { ...wire, state: { _tag: "Unknown" } },
     { ...wire, recordedAt: "not-a-date" },
   ]) {
     expect(Option.isNone(decode(invalid))).toBe(true);

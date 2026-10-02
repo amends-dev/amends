@@ -3,7 +3,7 @@ import {
   useAppearance,
   useCreateGroup,
   useInboxPending,
-  useLiveStatus,
+  useChangeFeedStatus,
   useMemberName,
   useMemberProfiles,
   useMentionCandidates,
@@ -100,7 +100,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const pending = useInboxPending(workspaceId);
   const activity = useTurnActivity(workspaceId);
   const creator = useWorkspacePermission(workspaceId, "group.create");
-  const live = useLiveStatus();
+  const live = useChangeFeedStatus();
   const conversation = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/*rest");
   const opened = useMatch(() => "/workspaces/:workspaceId/groups/:groupId/threads/:threadId");
   const fromInbox = useMatch(

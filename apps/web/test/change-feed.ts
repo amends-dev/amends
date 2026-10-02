@@ -36,6 +36,17 @@ export const committed = (
   notifications: [],
 });
 
+/** The reader's sessions hear that they saw these notifications, as the server tells them. */
+export const notificationsSeen = (
+  workspaceId: string,
+  memberId: string,
+  notificationIds: ReadonlyArray<string>,
+) => ({
+  _tag: "Signal",
+  workspaceId,
+  signal: { _tag: "NotificationsSeen", workspaceId, memberId, notificationIds },
+});
+
 /**
  * The workspace sidebar's reads: the reader's groups, the members naming them, what the reader
  * may do there, and how many notifications are pending for them.

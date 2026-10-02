@@ -17,14 +17,14 @@ export const ThreadPosition = Schema.Struct({
 });
 export interface ThreadPosition extends Schema.Schema.Type<typeof ThreadPosition> {}
 
-/** When a human member last caught up with a group's threads. Private to that member. */
-export const GroupCaughtUp = Schema.Struct({
+/** When a human member last read a group's threads. Private to that member. */
+export const GroupRead = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   memberId: MemberId.Id,
   groupId: GroupId.Id,
-  caughtUpAt: Schema.DateTimeUtcFromString,
+  readAt: Schema.DateTimeUtcFromString,
 });
-export interface GroupCaughtUp extends Schema.Schema.Type<typeof GroupCaughtUp> {}
+export interface GroupRead extends Schema.Schema.Type<typeof GroupRead> {}
 
 export const MarkThreadReadInput = Schema.Struct({
   threadId: ThreadId.Id,

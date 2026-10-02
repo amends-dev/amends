@@ -52,4 +52,4 @@ lost response reuses its request key, so it is not created twice. A key typed in
 stays in the client only until it saves or the dialog closes. A host without
 `AMENDS_CREDENTIAL_KEY` keeps connections but refuses keys, which the key dialog reports as
 credential storage being unavailable. The change feed refreshes the connections for every reader
-on each `connection.*` commit and on access changes; see [live updates](live-updates.md).
+on each `connection.*` commit and on access changes; see [change feed](change-feed.md).

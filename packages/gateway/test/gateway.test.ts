@@ -10,6 +10,7 @@ import {
 } from "@amends/core/thread";
 import { expect, it } from "@effect/vitest";
 import { ReadStateStore } from "@amends/core/read-state";
+import { SignalHub } from "@amends/core/signal";
 import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
 import { Actor, Identity } from "@amends/core/identity";
 import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
@@ -41,7 +42,6 @@ import {
 import { TestClock } from "effect/testing";
 import { GatewayErrors } from "../src/errors.ts";
 import { Gateway } from "../src/gateway.ts";
-import { WorkspaceSignals } from "../src/signals.ts";
 import { WorkspaceStorage } from "../src/storage.ts";
 import { WorkspaceRuntime } from "../src/workspace-runtime.ts";
 
@@ -85,240 +85,241 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       getAppend: unexpected,
       append: unexpected,
     }),
-  ).pipe(
-    Context.add(
-      Checkpoint.Service,
-      Checkpoint.Service.of({
-        get: () => Effect.succeedNone,
-        set: unexpected,
-        listLive: options.listLive ?? (() => Effect.succeed([])),
-        setLive: () => Effect.void,
-      }),
-    ),
-    Context.add(
-      WorkspaceStore.Service,
-      WorkspaceStore.Service.of({
-        // Booting checks the built-in roles of an initialized workspace; these boot none.
-        get: Effect.succeedNone,
-        insert: unexpected,
-        rename: () => Effect.die("Unexpected workspace rename"),
-        transferOwnership: unexpected,
-      }),
-    ),
-    Context.add(
-      MemberStore.Service,
-      MemberStore.Service.of({
+  )
+    .pipe(
+      Context.add(
+        Checkpoint.Service,
+        Checkpoint.Service.of({
+          get: () => Effect.succeedNone,
+          set: unexpected,
+          listLive: options.listLive ?? (() => Effect.succeed([])),
+          setLive: () => Effect.void,
+        }),
+      ),
+      Context.add(
+        WorkspaceStore.Service,
+        WorkspaceStore.Service.of({
+          // Booting checks the built-in roles of an initialized workspace; these boot none.
+          get: Effect.succeedNone,
+          insert: unexpected,
+          rename: () => Effect.die("Unexpected workspace rename"),
+          transferOwnership: unexpected,
+        }),
+      ),
+      Context.add(
+        MemberStore.Service,
+        MemberStore.Service.of({
+          get: unexpected,
+          getMany: unexpected,
+          findActive:
+            options.findActive ??
+            ((identity) =>
+              Effect.succeedSome({
+                id: memberId,
+                workspaceId: boundWorkspaceId,
+                identity,
+                status: "active",
+              })),
+          list: unexpected(),
+          insert: unexpected,
+          markRemoved: unexpected,
+          rename: unexpected,
+        }),
+      ),
+      Context.add(
+        InvitationStore.Service,
+        InvitationStore.Service.of({
+          get: unexpected,
+          list: unexpected(),
+          listPendingByRecipient: unexpected,
+          insert: unexpected,
+          settle: unexpected,
+        }),
+      ),
+      Context.add(
+        NotificationStore.Service,
+        NotificationStore.Service.of({
+          discardPendingForParticipation: unexpected,
+          discardPendingForGroup: unexpected,
+          markSeen: unexpected,
+          accept: unexpected,
+          get: unexpected,
+          listPendingByRecipient: unexpected,
+          listLatestByRecipient: unexpected,
+          listLatestPendingByRecipient: unexpected,
+          listPendingByThread: unexpected,
+          countPendingByRecipient: unexpected,
+          countPendingByGroup: unexpected,
+          insert: unexpected,
+          insertMany: unexpected,
+        }),
+      ),
+      Context.add(ThreadStore.Service, {
         get: unexpected,
-        getMany: unexpected,
-        findActive:
-          options.findActive ??
-          ((identity) =>
-            Effect.succeedSome({
-              id: memberId,
-              workspaceId: boundWorkspaceId,
-              identity,
-              status: "active",
-            })),
-        list: unexpected(),
+        listByGroup: unexpected,
+        listByLatest: unexpected,
+        listByStart: unexpected,
         insert: unexpected,
-        markRemoved: unexpected,
-        rename: unexpected,
-      }),
-    ),
-    Context.add(
-      InvitationStore.Service,
-      InvitationStore.Service.of({
-        get: unexpected,
-        list: unexpected(),
-        listPendingByRecipient: unexpected,
-        insert: unexpected,
-        settle: unexpected,
-      }),
-    ),
-    Context.add(
-      NotificationStore.Service,
-      NotificationStore.Service.of({
-        discardPendingForParticipation: unexpected,
-        discardPendingForGroup: unexpected,
-        markSeen: unexpected,
-        accept: unexpected,
-        get: unexpected,
-        listByRecipient: unexpected,
-        listPendingByRecipient: unexpected,
-        listLatestByRecipient: unexpected,
-        listLatestPendingByRecipient: unexpected,
-        listPendingByThread: unexpected,
-        countPendingByRecipient: unexpected,
-        countPendingByGroup: unexpected,
-        insert: unexpected,
-        insertMany: unexpected,
-      }),
-    ),
-    Context.add(ThreadStore.Service, {
-      get: unexpected,
-      listByGroup: unexpected,
-      listByLatest: unexpected,
-      listByStart: unexpected,
-      insert: unexpected,
-      getLatest: unexpected,
-      recordLatest: unexpected,
-    }),
-    Context.add(ThreadParticipationStore.Service, {
-      get: unexpected,
-      getMany: unexpected,
-      listByThread: unexpected,
-      pageActiveByThread: unexpected,
-      findActive: unexpected,
-      endByAdmission: unexpected,
-      insert: unexpected,
-      end: unexpected,
-    }),
-    Context.add(ThreadMessageStore.Service, {
-      get: unexpected,
-      getMany: unexpected,
-      insert: unexpected,
-    }),
-    Context.add(ThreadActivityStore.Service, {
-      latest: unexpected,
-      get: unexpected,
-      listByThread: unexpected,
-      getFirst: unexpected,
-      countByKind: unexpected,
-      readPage: unexpected,
-      insert: unexpected,
-    }),
-    Context.add(
-      GroupStore.Service,
-      GroupStore.Service.of({
-        get: unexpected,
-        getMany: unexpected,
-        findDirect: unexpected,
-        pagePublic: unexpected,
-        insert: unexpected,
-        rename: unexpected,
         getLatest: unexpected,
         recordLatest: unexpected,
       }),
-    ),
-    Context.add(
-      GroupMembershipStore.Service,
-      GroupMembershipStore.Service.of({
+      Context.add(ThreadParticipationStore.Service, {
         get: unexpected,
         getMany: unexpected,
+        listByThread: unexpected,
+        pageActiveByThread: unexpected,
         findActive: unexpected,
-        listByGroup: unexpected,
-        findActiveMany: unexpected,
-        summarize: unexpected,
-        pageActiveByGroup: unexpected,
-        pageActiveByMember: unexpected,
-        listActiveByMember: unexpected,
-        insert: unexpected,
-        markRemoved: unexpected,
-      }),
-    ),
-    Context.add(
-      ReadStateStore.Service,
-      ReadStateStore.Service.of({
-        getThreadPositions: unexpected,
-        advanceThread: unexpected,
-        getGroupsCaughtUp: unexpected,
-        advanceGroup: unexpected,
-      }),
-    ),
-    Context.add(
-      GroupFollowStore.Service,
-      GroupFollowStore.Service.of({
-        get: unexpected,
-        findActive: unexpected,
-        findActiveMany: unexpected,
-        listActiveByGroup: unexpected,
+        endByAdmission: unexpected,
         insert: unexpected,
         end: unexpected,
       }),
-    ),
-    Context.add(
-      ConnectionStore.Service,
-      ConnectionStore.Service.of({
+      Context.add(ThreadMessageStore.Service, {
         get: unexpected,
-        list: unexpected(),
+        getMany: unexpected,
         insert: unexpected,
-        update: unexpected,
       }),
-    ),
-    Context.add(
-      EnvironmentStore.Service,
-      EnvironmentStore.Service.of({
+      Context.add(ThreadActivityStore.Service, {
+        latest: unexpected,
         get: unexpected,
-        list: unexpected(),
-        insert: unexpected,
-        update: unexpected,
-      }),
-    ),
-    Context.add(
-      AgentStore.Service,
-      AgentStore.Service.of({
-        get: unexpected,
-        list: unexpected(),
-        insert: unexpected,
-        update: unexpected,
-      }),
-    ),
-    Context.add(
-      TurnStore.Service,
-      TurnStore.Service.of({
-        get: unexpected,
-        findActive: unexpected,
-        findLatest: unexpected,
-        listActive: unexpected,
-        listActiveByMember: unexpected,
         listByThread: unexpected,
+        getFirst: unexpected,
+        countByKind: unexpected,
+        readPage: unexpected,
         insert: unexpected,
-        update: unexpected,
       }),
-    ),
-    Context.add(
-      ConnectionCredentialStore.Service,
-      ConnectionCredentialStore.Service.of({
-        put: unexpected,
-        get: unexpected,
-        remove: unexpected,
-      }),
-    ),
-    Context.add(
-      RoleStore.Service,
-      RoleStore.Service.of({
-        get: unexpected,
-        insert: unexpected,
-        rename: unexpected,
-        setPermissions: unexpected,
-        builtinRevision: unexpected(),
-        recordBuiltinRevision: unexpected,
-      }),
-    ),
-    Context.add(
-      AssignmentStore.Service,
-      AssignmentStore.Service.of({
-        get: unexpected,
-        listActiveByMember: unexpected,
-        listActiveByRole: unexpected,
-        insert: unexpected,
-        markRevoked: unexpected,
-      }),
-    ),
-  );
+      Context.add(
+        GroupStore.Service,
+        GroupStore.Service.of({
+          get: unexpected,
+          getMany: unexpected,
+          findDirect: unexpected,
+          pagePublic: unexpected,
+          insert: unexpected,
+          rename: unexpected,
+          getLatest: unexpected,
+          recordLatest: unexpected,
+        }),
+      ),
+      Context.add(
+        GroupMembershipStore.Service,
+        GroupMembershipStore.Service.of({
+          get: unexpected,
+          getMany: unexpected,
+          findActive: unexpected,
+          listByGroup: unexpected,
+          findActiveMany: unexpected,
+          summarize: unexpected,
+          pageActiveByGroup: unexpected,
+          pageActiveByMember: unexpected,
+          listActiveByMember: unexpected,
+          insert: unexpected,
+          markRemoved: unexpected,
+        }),
+      ),
+      Context.add(
+        ReadStateStore.Service,
+        ReadStateStore.Service.of({
+          getThreadPositions: unexpected,
+          advanceThread: unexpected,
+          getGroupReads: unexpected,
+          advanceGroup: unexpected,
+        }),
+      ),
+      Context.add(
+        GroupFollowStore.Service,
+        GroupFollowStore.Service.of({
+          get: unexpected,
+          findActive: unexpected,
+          findActiveMany: unexpected,
+          listActiveByGroup: unexpected,
+          insert: unexpected,
+          end: unexpected,
+        }),
+      ),
+      Context.add(
+        ConnectionStore.Service,
+        ConnectionStore.Service.of({
+          get: unexpected,
+          list: unexpected(),
+          insert: unexpected,
+          update: unexpected,
+        }),
+      ),
+      Context.add(
+        EnvironmentStore.Service,
+        EnvironmentStore.Service.of({
+          get: unexpected,
+          list: unexpected(),
+          insert: unexpected,
+          update: unexpected,
+        }),
+      ),
+      Context.add(
+        AgentStore.Service,
+        AgentStore.Service.of({
+          get: unexpected,
+          list: unexpected(),
+          insert: unexpected,
+          update: unexpected,
+        }),
+      ),
+      Context.add(
+        TurnStore.Service,
+        TurnStore.Service.of({
+          get: unexpected,
+          findActive: unexpected,
+          findLatest: unexpected,
+          listActive: unexpected,
+          listActiveByMember: unexpected,
+          listByThread: unexpected,
+          insert: unexpected,
+          update: unexpected,
+        }),
+      ),
+      Context.add(
+        ConnectionCredentialStore.Service,
+        ConnectionCredentialStore.Service.of({
+          put: unexpected,
+          get: unexpected,
+          remove: unexpected,
+        }),
+      ),
+      Context.add(
+        RoleStore.Service,
+        RoleStore.Service.of({
+          get: unexpected,
+          insert: unexpected,
+          rename: unexpected,
+          setPermissions: unexpected,
+          builtinRevision: unexpected(),
+          recordBuiltinRevision: unexpected,
+        }),
+      ),
+      Context.add(
+        AssignmentStore.Service,
+        AssignmentStore.Service.of({
+          get: unexpected,
+          listActiveByMember: unexpected,
+          listActiveByRole: unexpected,
+          insert: unexpected,
+          markRevoked: unexpected,
+        }),
+      ),
+    )
+    .pipe(
+      // Signals no test here observes: published into nothing, and no subscriber ever hears one.
+      Context.add(
+        SignalHub.Service,
+        SignalHub.Service.of({
+          publish: () => Effect.void,
+          subscribe: Effect.succeed(Stream.never),
+        }),
+      ),
+    );
 };
-/** Signals no test here observes: published into nothing, and no subscriber ever hears one. */
-const quiet = WorkspaceSignals.Service.of({
-  forWorkspace: (workspaceId) => ({
-    workspaceId,
-    publish: () => Effect.void,
-    subscribe: Effect.succeed(Stream.never),
-  }),
-});
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
-    Layer.succeed(WorkspaceSignals.Service, quiet),
     AgentJobs.layerNoRunner,
     TurnJobs.layerNoRunner,
     Layer.succeed(

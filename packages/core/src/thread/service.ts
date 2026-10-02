@@ -103,7 +103,7 @@ export interface Interface {
     input: Thread.StartDirectInput,
     options?: Request.Options,
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
-  /** Current group audience plus thread.read. Reading creates no participation or acknowledgment. */
+  /** Current group audience plus thread.read. Reading creates no participation and marks nothing seen. */
   readonly get: (threadId: Thread.Id) => Effect.Effect<Thread.Record, ReadError, Actor.Service>;
   /**
    * One page of a group's threads the actor can read, newest latest activity first, each with the

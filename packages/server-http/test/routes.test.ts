@@ -144,6 +144,7 @@ const conversations = Layer.mergeAll(
       publish: record("thread.publish", () =>
         Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
       ),
+      typing: record("thread.typing", () => Effect.void),
     }),
   ),
   Layer.succeed(
@@ -174,21 +175,13 @@ const operations = Layer.mergeAll(
   Layer.succeed(
     NotificationService.Service,
     NotificationService.Service.of({
-      resolveSource: record("notification.resolveSource", (notificationId) =>
-        Effect.fail(new NotificationService.SourceUnavailable({ notificationId })),
-      ),
-      acknowledge: record("notification.acknowledge", (notificationId) =>
-        Effect.fail(new NotificationService.AlreadyHandled({ notificationId })),
-      ),
-      get: record("notification.get", (notificationId) =>
+      markSeen: record("notification.markSeen", (notificationId) =>
         notificationId === notification.id
-          ? Effect.succeed(notification)
+          ? Effect.fail(new NotificationService.AlreadyHandled({ notificationId }))
           : Effect.fail(new NotificationService.NotFound({ workspaceId, notificationId })),
       ),
-      list: record("notification.list", () => Effect.succeed([notification])),
-      listPending: record("notification.listPending", () => Effect.succeed([notification])),
       inbox: record("notification.inbox", () => Effect.succeed([{ notification }])),
-      acknowledgeThrough: record("notification.acknowledgeThrough", () => Effect.succeed(2)),
+      markSeenThrough: record("notification.markSeenThrough", () => Effect.succeed(2)),
       countPending: Effect.succeed(3),
     }),
   ),
@@ -334,39 +327,6 @@ const makeClient = HttpApiTest.groups(Api, [
   "groups",
   "threads",
 ]);
-it.effect("notification queries decode cursors and select the requested application read", () =>
-  Effect.gen(function* () {
-    calls.length = 0;
-    const after = { recordedAt: notification.recordedAt, id: Notification.Id.make("a + & é") };
-    const pages = yield* run("alice", (client) =>
-      Effect.gen(function* () {
-        const first = yield* client.notifications.list({
-          params: { workspaceId },
-          query: { limit: 1 },
-        });
-        const next = yield* client.notifications.list({
-          params: { workspaceId },
-          query: { limit: 2, after, pendingOnly: true },
-        });
-        yield* client.notifications.list({
-          params: { workspaceId },
-          query: { limit: 3, pendingOnly: false },
-        });
-        return [first, next];
-      }),
-    );
-    expect(pages).toEqual([[notification], [notification]]);
-    expect(calls).toEqual([
-      { operation: "asMember", arguments: [workspaceId, alice] },
-      { operation: "notification.list", arguments: [{ limit: 1 }] },
-      { operation: "asMember", arguments: [workspaceId, alice] },
-      { operation: "notification.listPending", arguments: [{ limit: 2, after }] },
-      { operation: "asMember", arguments: [workspaceId, alice] },
-      { operation: "notification.list", arguments: [{ limit: 3 }] },
-    ]);
-  }),
-);
-
 it.effect("the inbox route decodes its cursor and passes the page to the application", () =>
   Effect.gen(function* () {
     calls.length = 0;
@@ -395,17 +355,11 @@ it.effect("the inbox route decodes its cursor and passes the page to the applica
   }),
 );
 
-it.effect("individual notification reads encode records and expose a typed 404", () =>
+it.effect("marking a missing notification seen exposes a typed 404", () =>
   Effect.gen(function* () {
-    const found = yield* run("alice", (client) =>
-      client.notifications.get({
-        params: { workspaceId, notificationId: notification.id },
-      }),
-    );
-    expect(found).toEqual(notification);
     const missing = yield* run("alice", (client) =>
       client.notifications
-        .get({
+        .markSeen({
           params: { workspaceId, notificationId: Notification.Id.make("missing") },
         })
         .pipe(Effect.flip),
@@ -718,11 +672,7 @@ it.effect(
             payload: { throughSequence: 4 },
             responseMode: "response-only",
           }),
-          client.notifications.source({
-            params: { workspaceId, notificationId: notification.id },
-            responseMode: "response-only",
-          }),
-          client.notifications.acknowledge({
+          client.notifications.markSeen({
             params: { workspaceId, notificationId: notification.id },
             responseMode: "response-only",
           }),
@@ -730,7 +680,7 @@ it.effect(
       );
       expect(statuses).toEqual([
         201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 200,
-        200, 403, 404, 409, 409, 404, 409,
+        200, 403, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
@@ -777,8 +727,7 @@ it.effect(
         { operation: "thread.follow", arguments: [threadId] },
         { operation: "thread.unfollow", arguments: [{ threadId, participationId }] },
         { operation: "thread.markRead", arguments: [{ threadId, throughSequence: 4 }] },
-        { operation: "notification.resolveSource", arguments: [notification.id] },
-        { operation: "notification.acknowledge", arguments: [notification.id] },
+        { operation: "notification.markSeen", arguments: [notification.id] },
       ]);
     }),
 );

@@ -58,14 +58,15 @@ import {
   boundTo,
   failingLate,
   journalLog,
+  listOldestFirst,
   otherWorkspaceId,
   placed,
   placedIn,
   runHost,
   Support,
   testProvenance,
-  workspaceId,
   threadInternals,
+  workspaceId,
 } from "./support.ts";
 
 import type { Harness } from "./harness.ts";
@@ -101,7 +102,7 @@ export const threadParticipation = (harness: Harness) => {
       );
     const history = (bound: Bound) => bound.store.read(Log.Id.make("journal"), { limit: 100 });
     const notifications = (bound: Bound, id: Member.Id) =>
-      bound.notifications.listByRecipient(Notification.ofMember(id, identityFor(id)), {
+      listOldestFirst(bound.notifications, Notification.ofMember(id, identityFor(id)), {
         limit: 100,
       });
     const create = (memberIds: ReadonlyArray<Member.Id>) =>
@@ -1170,7 +1171,8 @@ export const threadParticipation = (harness: Harness) => {
                   ),
                 ),
               );
-              const selected = yield* bound.notifications.listByRecipient(
+              const selected = yield* listOldestFirst(
+                bound.notifications,
                 Notification.ofMember(owner.memberId, owner.identity),
                 {
                   limit: 100,
@@ -1199,7 +1201,8 @@ export const threadParticipation = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) => journal.replay),
               );
               expect(
-                yield* bound.notifications.listByRecipient(
+                yield* listOldestFirst(
+                  bound.notifications,
                   Notification.ofMember(owner.memberId, owner.identity),
                   { limit: 100 },
                 ),
@@ -1693,7 +1696,7 @@ export const threadParticipation = (harness: Harness) => {
                 { _tag: "Triage" },
               ] satisfies ReadonlyArray<Notification.Recipient>)
                 expect(
-                  (yield* bound.notifications.listByRecipient(recipient, { limit: 10 })).map(
+                  (yield* listOldestFirst(bound.notifications, recipient, { limit: 10 })).map(
                     (note) => [note.participationId, note.state._tag],
                   ),
                 ).toEqual([[recipient._tag === "Triage" ? triage.id : contact.id, "Pending"]]);
