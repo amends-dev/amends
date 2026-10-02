@@ -18,7 +18,7 @@ import {
   type ConnectionSettingField,
   type ConnectionSummary,
   type ConnectionsAction,
-  type ConnectionsError,
+  type ConnectionsFailure,
   type SettingIssue,
 } from "./wording.tsx";
 import * as s from "./connections.css.ts";
@@ -60,10 +60,7 @@ export interface ConnectionPaneProps {
   /** The change running, if any. */
   readonly pending?: ConnectionsAction | "refresh";
   /** A failed change made here, or a read that failed. */
-  readonly failure?: {
-    readonly action: ConnectionsAction | "refresh";
-    readonly error: ConnectionsError;
-  };
+  readonly failure?: ConnectionsFailure;
   readonly onRefresh?: () => void;
 }
 

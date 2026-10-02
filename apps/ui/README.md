@@ -271,8 +271,8 @@ group the reader has not joined opens as a preview: Back, a Public badge, and a 
 in place of the composer; its threads open without a composer too.
 `SignInEmail` and `SignInCode` are sign-in's two steps: an email address, optionally with other
 providers under "or", then the six-digit code with Change email and Send again; a wrong code
-stays in the cells for editing. They take client's error codes (`SignInEmailError`,
-`SignInCodeError`) and pending actions and own the wording: a problem with the code marks the
+stays in the cells for editing. They name the error codes client returns (`SignInEmailError`,
+`SignInCodeError`), take them with pending actions, and own the wording: a problem with the code marks the
 field, while a failed request shows as a `Field.Alert` under it. Each step focuses its field
 when it appears, and a new code is announced and refocuses the cleared field. `WorkspacePicker`
 lists the reader's workspaces and invitations with Open and Accept invite, falling back to
@@ -323,8 +323,8 @@ Revoke and View history; on phones the roster lists each role under the name, an
 invitations become one card that opens the history. `MemberDetails` opens a member in the side
 panel with their role (`Select`, and Save role), access, and Remove member. `InviteMember`,
 `InvitationHistory`, `TransferOwnership`, `ConfirmRemoveMember`, and `ConfirmRevokeInvitation`
-are its modals. They take client's settings codes (`SettingsError`, by `SettingsAction`) and own
-the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
+are its modals. They name the settings codes client returns (`SettingsError`, by `SettingsAction`) and
+own the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
 completed change. `ConnectionsPane` is Connections from the Lunacy "Connections" frames, with All
 and Needs setup tabs, Add connection, quiet placeholder rows while loading, and a failed state
 with Retry. `ConnectionList` searches the connections and lists each with its provider, endpoint,
@@ -333,7 +333,7 @@ empty state that offers adding one; each row opens the connection's page. `Conne
 page in one column: a notice with what setup still needs when it cannot be used, the name and the provider's settings as
 separate saves, its key, which is only ever replaced or removed, its details, and removal. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
 setup, adding, and replacing), `ConfirmRemoveConnection`, and `ConfirmRemoveKey` are its modals;
-they take client's codes (`ConnectionsError`) and own the wording, and `connectionsToast` words the
+they name the codes client returns (`ConnectionsError`) and own the wording, and `connectionsToast` words the
 toasts. `ConfigureConnection` and `ConnectionKey` take `returnTo` for creating a connection on
 the way to another form, such as a sandbox account while adding an environment. **Screens / Connections** walks adding a connection and its key, a host without key
 storage, an unavailable provider, a read-only member, search, and a stale rename.

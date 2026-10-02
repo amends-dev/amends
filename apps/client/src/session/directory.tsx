@@ -11,10 +11,9 @@ import {
   type ParentProps,
 } from "solid-js";
 import type { WorkspaceDirectory } from "../api/contracts.ts";
-import { useApiClient } from "../api/context.tsx";
+import { useApiClient, useSession } from "../provider.tsx";
 import { directoryQuery } from "../api/directory.ts";
 import { watchWake } from "../live/wake.ts";
-import { useSession } from "./provider.tsx";
 
 export type DirectoryState = Data.TaggedEnum<{
   SignedOut: {};

@@ -7,7 +7,7 @@ import {
   DirectoryProvider,
   Session,
   useSession,
-  useSettings,
+  useWorkspaceSettings,
   type SessionScope,
   type SessionStore,
 } from "../src/index.ts";
@@ -30,7 +30,7 @@ function mount(fetch: typeof globalThis.fetch, stored: { value: Session | undefi
   let scope!: SessionScope;
   function Consumer() {
     scope = useSession();
-    useSettings("one", "workspace");
+    useWorkspaceSettings("one", "workspace");
     return null;
   }
   render(() => (

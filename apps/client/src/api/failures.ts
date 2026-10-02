@@ -7,7 +7,7 @@ import type { ApiClient } from "./client.ts";
  */
 export type WorkspaceFailure = "changed" | "denied" | "gone" | "invalid" | "failed";
 /** Whether a failure means the values on screen are out of date, so edits wait for a refresh. */
-export const isStale = (failure: WorkspaceFailure) =>
+export const isStale = (failure: string) =>
   failure === "changed" || failure === "denied" || failure === "gone";
 
 /** A command the reader composed that fails the contract's schema before any request. */

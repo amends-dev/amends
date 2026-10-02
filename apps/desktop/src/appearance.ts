@@ -1,16 +1,18 @@
-import type { AppearancePreference, AppearanceSource, PalettePreference } from "@amends/client";
+import type { AppearanceSource } from "@amends/client";
+import type { ColorPalette } from "@amends/ui/foundations/theme";
+import type { Appearance } from "@amends/ui/screens/workspace-navigation";
 const key = "amends.appearance";
 const paletteKey = "amends.palette";
-const parsePalette = (value: string | null): PalettePreference =>
+const parsePalette = (value: string | null): ColorPalette =>
   value === "linen" || value === "sage" || value === "slate" ? value : "neutral";
-const preference = (value: string | null): AppearancePreference =>
+const preference = (value: string | null): Appearance =>
   value === "light" || value === "dark" ? value : "system";
 
 /** One platform source per application. Blocked storage keeps the in-memory choice. */
 export function createAppearanceSource(target: Window = window): AppearanceSource {
   const media = target.matchMedia("(prefers-color-scheme: dark)");
-  let fallback: AppearancePreference = "system";
-  let paletteFallback: PalettePreference = "neutral";
+  let fallback: Appearance = "system";
+  let paletteFallback: ColorPalette = "neutral";
   return {
     read: () => {
       try {

@@ -102,7 +102,7 @@ function mount(
   };
 }
 
-it("starts without requests and stays inert when a credential is already present", () => {
+it("starts at the email step without requests, and ignores code actions there", () => {
   const http = network(),
     fixture = mount(http.fetch);
   expect(fixture.controller.state()).toEqual({
@@ -114,13 +114,6 @@ it("starts without requests and stays inert when a credential is already present
   fixture.controller.verifyCode("001234");
   fixture.controller.resendCode();
   expect(http.fetch).not.toHaveBeenCalled();
-  fixture.changeSession(session("existing"));
-  expect(fixture.controller.state()).toEqual({ _tag: "SessionPresent" });
-  fixture.controller.setEmail("a@example.com");
-  fixture.controller.requestCode("a@example.com");
-  fixture.controller.changeEmail();
-  expect(http.fetch).not.toHaveBeenCalled();
-  expect(fixture.store.read()?.token).toBe("existing");
 });
 it.each(["", "alice", "alice@local", " alice@example.com", "alice@example.com "])(
   "validates email %s against the shared schema before HTTP",
@@ -170,7 +163,8 @@ it("uses the typed API, preserves leading zeros, and installs a decoded session 
     expect(fixture.store.read()).toEqual({ token: "credential", humanId: "human" }),
   );
   expect(fixture.writes).toHaveBeenCalledOnce();
-  expect(fixture.controller.state()).toEqual({ _tag: "SessionPresent" });
+  // The credential remounted the app: a new flow starts, and the old one is disposed.
+  expect(fixture.controller).not.toBe(guest);
   guest.requestCode("old@example.com");
   guest.verifyCode("998877");
   guest.resendCode();
@@ -439,7 +433,7 @@ it("cancels requests on credential replacement and cannot overwrite a newer sess
   await waitFor(() => expect(http.calls).toHaveLength(2));
   fixture.changeSession(session("new-session"));
   await waitFor(() => expect(http.at(1).request.signal.aborted).toBe(true));
-  expect(fixture.controller.state()).toEqual({ _tag: "SessionPresent" });
+  expect(fixture.controller).not.toBe(old);
   http.at(1).resolve(json({ token: "stale", identity: "old" }));
   old.changeEmail();
   old.requestCode("ignored@example.com");

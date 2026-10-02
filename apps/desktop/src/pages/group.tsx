@@ -55,7 +55,7 @@ function Group(props: {
   const entries = () =>
     conversation.entries().map((entry) => {
       const working = activity.inThread(entry.id);
-      return working.length === 0
+      return working.length === 0 || entry.thread === undefined
         ? entry
         : {
             ...entry,

@@ -1,5 +1,16 @@
+import type {
+  AgentBlocker,
+  AgentEnvironmentOption,
+  AgentIssue,
+  AgentRoleOption,
+  AgentsAction,
+  AgentsFailure,
+  AgentSummary,
+  AgentTurnSummary,
+  ModelConnectionOption,
+} from "@amends/ui/screens/agents";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Exit, Option } from "effect";
+import { Cause, Effect, Option } from "effect";
 import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import {
   createEffect,
@@ -14,124 +25,25 @@ import {
   agentProblems,
   issueCode,
   agentsReads,
-  agentsRequest,
+  changeAgent,
   newAgentRequestKey,
+  reloadAgents,
   type Agent,
   type AgentCommand,
   type AgentConfiguration,
-  type AgentIssue,
-  type AgentProblem,
   type AgentsReads,
-} from "../api/agents.ts";
-import { useApiClient } from "../api/context.tsx";
-import { isStale, workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
+} from "./api.ts";
+import { useApiClient } from "../provider.tsx";
+import { useChanges } from "../api/changes.ts";
+import { workspaceFailure } from "../api/failures.ts";
 import { toDate } from "../conversations/time.ts";
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
 import { memberName } from "../conversations/views.ts";
-import type { EnvironmentIssue } from "../environments/views.ts";
-
-export type { AgentIssue };
-import { useRequest } from "../request/use-request.ts";
 import { useTurnActivity } from "../turns/views.ts";
 
-/** The reasons an environment cannot run a model access at all; the others are setup. */
-export type AgentBlocker = Extract<
-  AgentIssue,
-  "no-model-inference" | "interface-unsupported" | "reasoning-unsupported"
->;
-
-/** An agent, as the list and its details show it. */
-export interface AgentEntry {
-  readonly id: string;
-  readonly memberId: string;
-  readonly name: string;
-  /** The role its membership holds, by name, when the reader may read its access. */
-  readonly role: string | undefined;
-  readonly instructions: string;
-  /** Its model connection, by name when the reader may still read it. */
-  readonly connection: { readonly id: string; readonly name: string | undefined };
-  readonly model: string;
-  readonly reasoning: string | undefined;
-  /** The environment it starts in, by name and runtime when the reader may still read it. */
-  readonly environment: {
-    readonly id: string;
-    readonly name: string | undefined;
-    readonly runtime: string | undefined;
-  };
-  /** What keeps it from running now; empty when it is ready. */
-  readonly issues: readonly AgentIssue[];
-  /** The reader may rename it and change its configuration. */
-  readonly configurable: boolean;
-  /** The reader may remove it. */
-  readonly removable: boolean;
-  /** Who added it, by name. */
-  readonly createdBy: string | undefined;
-  readonly createdAt: Date;
-}
-
-/** A connection that provides model access, as the connection field offers it. */
-export interface ModelConnection {
-  readonly id: string;
-  readonly name: string;
-  /** Its key is saved, so an agent using it can be ready. */
-  readonly ready: boolean;
-  /** The models its provider suggests. */
-  readonly models: ReadonlyArray<{ readonly id: string; readonly name: string }>;
-}
-
-/**
- * Whether an environment can run the chosen model access: it works; it needs setup first, which
- * does not stop saving; or it cannot run it, for these reasons.
- */
-export type EnvironmentFit =
-  | { readonly kind: "works" }
-  | {
-      readonly kind: "needs-setup";
-      /** What the environment itself lacks. */
-      readonly issues: readonly EnvironmentIssue[];
-      /** The model connection still needs its key. */
-      readonly connection: boolean;
-    }
-  | { readonly kind: "cant-run"; readonly reasons: readonly AgentBlocker[] };
-
-/** An environment the reader may start an agent in, with how it fits the chosen model access. */
-export interface EnvironmentOption {
-  readonly id: string;
-  readonly name: string;
-  /** "Amends · Daytona", or "Amends · No sandbox". */
-  readonly runtime: string;
-  /** Its harness, by name. */
-  readonly harness: string;
-  /** Its sandbox provider, by name, when it has one. */
-  readonly provider: string | undefined;
-  /** The reasoning levels its harness takes; none for Amends. */
-  readonly reasoningLevels: readonly string[];
-  /** Undefined while the fit is checked. */
-  readonly fit: EnvironmentFit | undefined;
-}
-
-/** A role an agent can start with, among those the reader may give. */
-export interface AgentRole {
-  readonly id: string;
-  readonly name: string;
-}
-
-/** A change the reader can make to agents. */
-export type AgentAction = Exclude<AgentCommand, { kind: "refresh" }>["kind"];
-/**
- * Why a change or read failed: a workspace failure; `refresh-failed` when a change completed but
- * its result could not be read back; or `outdated` when a live refresh failed. `problems` names
- * what the host refused, such as a connection that is no longer available.
- */
-export type AgentsError = WorkspaceFailure | "refresh-failed" | "outdated";
-export interface AgentsFailure {
-  readonly action: AgentAction | "refresh";
-  readonly error: AgentsError;
-  readonly problems: readonly AgentProblem[];
-}
 /** A change that completed and whose result is shown. */
 export interface AgentsDone {
-  readonly action: AgentAction;
+  readonly action: AgentsAction;
   /** The agent it concerned, by name. */
   readonly subject?: string;
   /** The agent it created. */
@@ -158,9 +70,9 @@ export interface ConfigurationEditor {
   readonly setReasoning: (reasoning: string | undefined) => void;
   readonly setEnvironment: (environmentId: string) => void;
   /** The environments the reader may use, with how each fits the chosen model access. */
-  readonly environments: () => readonly EnvironmentOption[];
+  readonly environments: () => readonly AgentEnvironmentOption[];
   /** The chosen environment, once the reader may use it. */
-  readonly environment: () => EnvironmentOption | undefined;
+  readonly environment: () => AgentEnvironmentOption | undefined;
   /** The draft names everything it needs, and nothing that cannot run. */
   readonly complete: () => boolean;
 }
@@ -184,13 +96,9 @@ const sameConfiguration = (left: AgentConfiguration, right: AgentConfiguration) 
   left.model.reasoning === right.model.reasoning &&
   left.environmentId === right.environmentId;
 
-/** An agent as the Agents sidebar lists it. */
-export interface AgentListEntry {
-  readonly id: string;
+/** An agent as the Agents sidebar lists it, with the member it acts as. */
+export interface AgentListEntry extends Pick<AgentSummary, "id" | "name" | "issues" | "activity"> {
   readonly memberId: string;
-  readonly name: string;
-  /** What keeps it from running now; empty when it is ready. */
-  readonly issues: readonly AgentIssue[];
 }
 
 /**
@@ -201,6 +109,7 @@ export function useAgentList(workspaceId: string) {
   const reads = agentsReads(useApiClient(), workspaceId);
   const read = reads ? useAtomValue(() => reads.agents) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
+  const activity = useTurnActivity(workspaceId);
   const agents = createMemo((): readonly AgentListEntry[] | undefined =>
     read === undefined
       ? undefined
@@ -209,6 +118,7 @@ export function useAgentList(workspaceId: string) {
           memberId: view.memberId,
           name: view.name,
           issues: view.readiness._tag === "Incomplete" ? view.readiness.issues.map(issueCode) : [],
+          activity: activity.agentActivity(view.memberId),
         })),
   );
   return {
@@ -219,17 +129,6 @@ export function useAgentList(workspaceId: string) {
   };
 }
 
-/** An agent's state, as its status marks show it: its setup, and where it is at work. */
-export interface AgentState {
-  /** What keeps it from running now; empty when it is ready. */
-  readonly issues: readonly AgentIssue[];
-  /** Its most pressing turn state, and each thread it works on; unset while it is idle. */
-  readonly activity?: {
-    readonly state: "queued" | "working" | "stopping";
-    readonly places: readonly string[];
-  };
-}
-
 /**
  * Each agent's state by its member ID, live while mounted: its setup from the agents read it
  * shares with the Agents pages, and where it is at work from the active turns. Undefined for a
@@ -237,16 +136,11 @@ export interface AgentState {
  */
 export function useAgentStates(workspaceId: string) {
   const list = useAgentList(workspaceId);
-  const activity = useTurnActivity(workspaceId);
   const byMember = createMemo(
     () => new Map(list.agents().map((agent) => [agent.memberId, agent] as const)),
   );
-  return (memberId: string): AgentState | undefined => {
-    const agent = byMember().get(memberId);
-    if (agent === undefined) return undefined;
-    const now = activity.agentActivity(memberId);
-    return now === undefined ? { issues: agent.issues } : { issues: agent.issues, activity: now };
-  };
+  return (memberId: string): Pick<AgentSummary, "issues" | "activity"> | undefined =>
+    byMember().get(memberId);
 }
 
 /**
@@ -267,9 +161,10 @@ export function useAgents(
   const reads = agentsReads(client, workspaceId);
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
   const members = useMembers(workspaceId);
+  const activity = useTurnActivity(workspaceId);
   const read = reads ? connect(reads) : undefined;
 
-  const connections = createMemo((): readonly ModelConnection[] => {
+  const connections = createMemo((): readonly ModelConnectionOption[] => {
     const implementations = read?.connectionImplementations() ?? [];
     return (read?.connections() ?? []).flatMap((connection) => {
       const inference = connection.installed ? connection.capabilities.modelInference : undefined;
@@ -319,11 +214,10 @@ export function useAgents(
     );
   });
 
-  const entryOf = (view: Agent.View): AgentEntry => {
+  const entryOf = (view: Agent.View): AgentSummary => {
     const environment = environments().get(view.environmentId);
     return {
       id: view.id,
-      memberId: view.memberId,
       name: view.name,
       role: view.role?.name,
       instructions: view.instructions,
@@ -345,52 +239,24 @@ export function useAgents(
       removable: view.removable,
       createdBy: memberName(members.member(view.createdBy)),
       createdAt: toDate(view.createdAt),
+      activity: activity.agentActivity(view.memberId),
     };
   };
   const all = createMemo(() => (read?.agents() ?? []).map(entryOf));
   const loaded = () => read?.agents() !== undefined;
   const find = (agentId: string) => all().find((entry) => entry.id === agentId);
 
-  const roles = createMemo((): readonly AgentRole[] =>
+  const roles = createMemo((): readonly AgentRoleOption[] =>
     (read?.settings()?.roles ?? []).flatMap((choice) =>
       choice.assignable ? [{ id: choice.role.id, name: choice.role.name }] : [],
     ),
   );
 
-  // The change running or last run, with the agent it concerned, until it settles.
-  const [attempt, setAttempt] = createSignal<{
-    readonly action: AgentAction | "refresh";
-    readonly subject?: string;
-  }>();
-  const [error, setError] = createSignal<{
-    readonly error: AgentsError;
-    readonly problems: readonly AgentProblem[];
-  }>();
-  const [needsRefresh, setNeedsRefresh] = createSignal(false);
-  const [revision, setRevision] = createSignal(0);
-  let unconfirmed: { readonly command: AgentCommand; readonly created?: string } | undefined;
-
-  const finish = (command: AgentCommand, created: string | undefined) => {
-    const current = attempt();
-    setAttempt(undefined);
-    if (command.kind === "refresh") return;
-    if (command.kind === "create") {
-      intent = undefined;
-      setCreating(undefined);
-    }
-    if (command.kind === "rename") forget(setNames, command.agentId);
-    if (command.kind === "configure") forget(setConfigs, command.agentId);
-    options.done?.({ action: command.kind, subject: current?.subject, created });
-  };
-  const request = useRequest(agentsRequest(client, workspaceId), (exit, command) => {
-    if (Exit.isFailure(exit)) {
-      const problems = agentProblems(exit.cause);
-      // An initial role the reader may not give is refused at its field; the rest stays current.
-      const failure = problems.some((problem) => problem.kind === "role-denied")
-        ? "invalid"
-        : workspaceFailure(exit.cause);
-      setError({ error: failure, problems });
-      if (isStale(failure)) setNeedsRefresh(true);
+  const changes = useChanges({
+    write: changeAgent(workspaceId),
+    reload: reads ? reloadAgents(reads) : Effect.void,
+    failed: (cause) => {
+      const problems = agentProblems(cause);
       // A connection or environment that left the reader's reach: reload what can be chosen.
       if (
         problems.some(
@@ -399,33 +265,24 @@ export function useAgents(
         )
       )
         read?.reloadChoices();
-      return;
-    }
-    const { refreshed, created } = exit.value;
-    if (Exit.isFailure(refreshed)) {
-      if (command.kind !== "refresh") {
-        unconfirmed = { command, created };
-        setError({ error: "refresh-failed", problems: [] });
-        setNeedsRefresh(true);
-      } else setError({ error: workspaceFailure(refreshed.cause), problems: [] });
-      return;
-    }
-    setNeedsRefresh(false);
-    if (command.kind === "refresh") setRevision((value) => value + 1);
-    const done = command.kind === "refresh" ? unconfirmed : { command, created };
-    unconfirmed = undefined;
-    if (done) finish(done.command, done.created);
-    else setAttempt(undefined);
+      // An initial role the reader may not give is refused at its field; the rest stays current.
+      const error = problems.some((problem) => problem.kind === "role-denied")
+        ? "invalid"
+        : workspaceFailure(cause);
+      return { error, problems };
+    },
+    done: (change: AgentCommand, created, subject: string | undefined) => {
+      if (change.kind === "create") {
+        intent = undefined;
+        setCreating(undefined);
+      }
+      if (change.kind === "rename") forget(setNames, change.agentId);
+      if (change.kind === "configure") forget(setConfigs, change.agentId);
+      options.done?.({ action: change.kind, subject, created });
+    },
+    outdated: () => loaded() && read?.failure() !== undefined,
   });
-  const [running, setRunning] = createSignal<AgentAction | "refresh">();
-  const send = (command: AgentCommand, subject?: string) => {
-    if (request.pending() || (needsRefresh() && command.kind !== "refresh")) return;
-    setError(undefined);
-    if (command.kind !== "refresh" || !needsRefresh() || !attempt())
-      setAttempt({ action: command.kind, subject });
-    setRunning(command.kind);
-    request.run(command);
-  };
+  const send = changes.send;
 
   /**
    * The environment choices for a draft's model access. The model is checked once typing pauses,
@@ -469,13 +326,13 @@ export function useAgents(
     change: (update: (draft: AgentDraft) => AgentDraft) => void,
     fits: () => ReadonlyArray<Agent.EnvironmentChoice> | undefined,
   ): ConfigurationEditor => {
-    const options = createMemo((): readonly EnvironmentOption[] => {
+    const options = createMemo((): readonly AgentEnvironmentOption[] => {
       const checked = fits();
       const known = environments();
       if (checked === undefined)
         return [...known.values()].map((environment) => ({ ...environment, fit: undefined }));
       const pendingConnection = !(connectionOf(draft().connectionId)?.ready ?? true);
-      return checked.flatMap((choice): readonly EnvironmentOption[] => {
+      return checked.flatMap((choice): readonly AgentEnvironmentOption[] => {
         const environment = known.get(choice.environmentId);
         if (!environment) return [];
         const compatibility = choice.compatibility;
@@ -631,7 +488,7 @@ export function useAgents(
   // After an explicit refresh, rename drafts stay and are made against the name now shown.
   createEffect(
     on(
-      revision,
+      changes.revision,
       () =>
         setNames((previous) =>
           Object.fromEntries(
@@ -657,6 +514,19 @@ export function useAgents(
     /** Every agent the reader may read, by name. */
     agents: all,
     agent: find,
+    /** An agent's turns in progress, by where each runs. */
+    turns: (agentId: string): readonly AgentTurnSummary[] => {
+      const memberId = read?.agents()?.find((view) => view.id === agentId)?.memberId;
+      return memberId === undefined
+        ? []
+        : activity
+            .ofAgent(memberId)
+            .flatMap((turn) =>
+              turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
+                ? [{ id: turn.id, state: turn.state, where: turn.place }]
+                : [],
+            );
+    },
     /** The connections agents can use for model access, ready ones first. */
     connections: () =>
       connections().toSorted((left, right) => Number(right.ready) - Number(left.ready)),
@@ -667,37 +537,24 @@ export function useAgents(
     /** The reader may add agents. */
     canCreate: () => canCreate() === true,
     /** The change running, or `refresh`. */
-    pending: () => (request.pending() ? running() : undefined),
-    failure: (): AgentsFailure | undefined => {
-      const current = error();
-      const readFailure = loaded() ? read?.failure() : undefined;
-      if (current === undefined)
-        return readFailure === undefined
-          ? undefined
-          : { action: "refresh", error: "outdated", problems: [] };
-      const action = attempt()?.action;
-      if (action) return { action, ...current };
-      return needsRefresh() ? { action: "refresh", ...current } : undefined;
-    },
+    pending: changes.pending,
+    failure: (): AgentsFailure | undefined => changes.failure(),
     /** What the reader sees is out of date: changes wait for a refresh. */
-    stale: needsRefresh,
+    stale: changes.stale,
     /** Reload, on behalf of the change that found the values out of date, if any. */
     refresh: () => {
       if (!loaded()) read?.retry();
-      else send({ kind: "refresh" });
+      else changes.refresh();
     },
     /** Set aside the last change's failure, as a dialog closes. */
-    dismiss: () => {
-      if (!request.pending()) setAttempt(undefined);
-    },
+    dismiss: changes.dismiss,
     create: {
       /**
        * Start an agent: Member, the first ready model connection and its first suggested model,
        * and the first environment.
        */
       begin: () => {
-        setAttempt(undefined);
-        setError(undefined);
+        changes.dismiss();
         intent = undefined;
         const connection = connections().find((candidate) => candidate.ready) ?? connections()[0];
         setCreating({
@@ -749,7 +606,9 @@ export function useAgents(
       /** The name differs from the one saved and can be saved now. */
       changed: (agentId: string) => {
         const name = names()[agentId]?.name.trim();
-        return !needsRefresh() && name !== undefined && name !== "" && name !== find(agentId)?.name;
+        return (
+          !changes.stale() && name !== undefined && name !== "" && name !== find(agentId)?.name
+        );
       },
       save: (agentId: string) => {
         const edit = names()[agentId];
@@ -767,7 +626,7 @@ export function useAgents(
       changed: (agentId: string) => {
         const edit = configs()[agentId];
         const saved = savedDraft(agentId);
-        if (!edit || !saved || needsRefresh()) return false;
+        if (!edit || !saved || changes.stale()) return false;
         const next = configurationOf(edit);
         const current = configurationOf(saved);
         return (

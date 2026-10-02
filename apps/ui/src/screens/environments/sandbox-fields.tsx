@@ -21,16 +21,19 @@ import {
 import * as s from "./environments.css.ts";
 
 /** A variable row being edited; its ID keeps the row across edits. */
-export interface VariableRowView {
+export interface VariableRow {
   readonly id: string;
   readonly key: string;
   readonly value: string;
 }
-/** A setup command row being edited. */
-export interface CommandRowView {
+/** A setup command row being edited, run in list order. */
+export interface CommandRow {
   readonly id: string;
   readonly command: string;
 }
+
+/** Why a variable row would be refused: a key that is not a name, or one set above it. */
+export type VariableIssue = "invalid" | "duplicate";
 
 /** The most variables and setup commands an environment holds. */
 const limit = 50;
@@ -45,7 +48,7 @@ export interface SandboxFieldsProps {
   readonly onCreateAccount?: () => void;
   readonly template: string;
   readonly onTemplateChange: (template: string) => void;
-  readonly variables: readonly VariableRowView[];
+  readonly variables: readonly VariableRow[];
   readonly onAddVariable: () => void;
   readonly onVariableChange: (
     id: string,
@@ -53,8 +56,8 @@ export interface SandboxFieldsProps {
   ) => void;
   readonly onRemoveVariable: (id: string) => void;
   /** Why a variable row would be refused. */
-  readonly variableIssue?: (id: string) => "invalid" | "duplicate" | undefined;
-  readonly commands: readonly CommandRowView[];
+  readonly variableIssue?: (id: string) => VariableIssue | undefined;
+  readonly commands: readonly CommandRow[];
   readonly onAddCommand: () => void;
   readonly onCommandChange: (id: string, command: string) => void;
   readonly onMoveCommand: (id: string, by: -1 | 1) => void;

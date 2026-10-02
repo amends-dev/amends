@@ -1,19 +1,10 @@
-import type { Environment } from "../api/environments.ts";
-
-/** What releasing a sandbox does: stop it and keep its files, or destroy it. */
-export type Retention = "stop" | "destroy";
-
-/** An environment variable as a row being edited; the ID keeps its row across edits. */
-export interface VariableRow {
-  readonly id: string;
-  readonly key: string;
-  readonly value: string;
-}
-/** A setup command as a row being edited, run in list order. */
-export interface CommandRow {
-  readonly id: string;
-  readonly command: string;
-}
+import type {
+  CommandRow,
+  Retention,
+  VariableIssue,
+  VariableRow,
+} from "@amends/ui/screens/environments";
+import type { Environment } from "./api.ts";
 
 /** Sandbox settings as a form edits them, before they are checked and saved. */
 export interface SandboxDraft {
@@ -26,9 +17,6 @@ export interface SandboxDraft {
 
 /** The most variables and setup commands an environment holds. */
 export const limit = 50;
-
-/** Why a variable row would be refused: a key that is not a name, or one set above it. */
-export type VariableIssue = "invalid" | "duplicate";
 
 let rows = 0;
 const rowId = () => `row-${++rows}`;

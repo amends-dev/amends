@@ -9,12 +9,12 @@ import {
   Session,
   useGroups,
   useMarkThreadRead,
-  useSettings,
+  useWorkspaceSettings,
   useTyping,
   useChangeFeed,
   ChangeFeedProvider,
   type SessionStore,
-  type SettingsController,
+  type WorkspaceSettingsView,
   type ChangeFeedScope,
 } from "../src/index.ts";
 import { eventStream } from "./event-stream.ts";
@@ -136,10 +136,12 @@ function fixture(
     },
   };
   const [shown, setShown] = createSignal(true);
-  let feed!: ChangeFeedScope, settings!: SettingsController, typing!: ReturnType<typeof useTyping>;
+  let feed!: ChangeFeedScope,
+    settings!: WorkspaceSettingsView,
+    typing!: ReturnType<typeof useTyping>;
   function Consumer() {
     feed = useChangeFeed();
-    settings = useSettings("one", "workspace");
+    settings = useWorkspaceSettings("one", "workspace");
     typing = useTyping("one");
     options.mount?.();
     return null;
@@ -196,7 +198,7 @@ it("refreshes the reads each commit affects, and every read after a reset", asyn
   const first = await f.connected(0);
   expect(new URL(first.request.url).searchParams.has("after")).toBe(false);
   expect(first.request.headers.get("authorization")).toBe("Bearer alice");
-  await waitFor(() => expect(f.settings.data()?.settings.workspace.name).toBe("Studio"));
+  await waitFor(() => expect(f.settings.workspace()?.name).toBe("Studio"));
   expect(f.feed.state()._tag).toBe("Connecting");
   const before = { settings: f.count("/settings"), directory: f.count("/me/workspaces") };
   // A subscription without a cursor resets: reads loaded before it may have missed commits.
@@ -217,12 +219,12 @@ it("refreshes the reads each commit affects, and every read after a reset", asyn
       event("workspace.renamed", { workspaceId: "one", previousName: "Studio", name: "Atelier" }),
     ),
   );
-  await waitFor(() => expect(f.settings.data()?.settings.workspace.name).toBe("Atelier"));
+  await waitFor(() => expect(f.settings.workspace()?.name).toBe("Atelier"));
   expect(f.count("/ownership")).toBe(before.settings + 2);
   await waitFor(() => expect(f.count("/me/workspaces")).toBe(before.directory + 2));
   // Live refreshes never report the settings as pending or lock their commands.
-  expect(f.settings.pending()).toBe(false);
-  expect(f.settings.needsRefresh()).toBe(false);
+  expect(f.settings.pending()).toBeUndefined();
+  expect(f.settings.stale()).toBe(false);
 });
 
 it("resumes after the last commit when the stream drops, without refreshing on resume", async () => {

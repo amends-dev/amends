@@ -9,10 +9,10 @@ import {
   Session,
   useWorkspaceAccess,
   useWorkspacePicker,
-  type WorkspaceAccess,
   type WorkspacePickerController,
   type SessionStore,
 } from "../src/index.ts";
+import type { WorkspaceAccess } from "@amends/ui/screens/standalone";
 
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>

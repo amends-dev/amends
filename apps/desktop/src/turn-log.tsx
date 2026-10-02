@@ -1,4 +1,4 @@
-import { paths, useTurnLog, useWorkspaceGroups } from "@amends/client";
+import { paths, useTurnLog } from "@amends/client";
 import { TurnLogPane } from "@amends/ui/screens/turns";
 
 const href = (path: string) => `#${path}`;
@@ -16,21 +16,11 @@ export function TurnLog(props: {
   readonly onOpenReply?: () => void;
 }) {
   const log = useTurnLog(props.workspaceId, props.turnId, { retried: props.onRetried });
-  const groups = useWorkspaceGroups(props.workspaceId);
   const turn = () => {
     const current = log.turn();
-    if (current === undefined) return undefined;
-    const group = groups.group(current.groupId);
-    return {
-      ...current,
-      where:
-        group?.kind === "direct"
-          ? `Thread with ${group.name}`
-          : `Thread in #${current.groupName ?? group?.name ?? ""}`,
-      model:
-        current.model && [current.model.provider, current.model.model].filter(Boolean).join(" · "),
-      agentHref: href(paths.agent(props.workspaceId, current.agent.id)),
-    };
+    return (
+      current && { ...current, agentHref: href(paths.agent(props.workspaceId, current.agentId)) }
+    );
   };
   const status = () => {
     if (log.loading()) return "loading" as const;

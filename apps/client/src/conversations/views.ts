@@ -1,9 +1,21 @@
+import type { MentionCandidate } from "@amends/ui/components/composer";
+import type { MessageAuthor } from "@amends/ui/components/message";
+import type { Profile } from "@amends/ui/components/profile-card";
+import type { RichTextMention } from "@amends/ui/components/rich-text";
+import type { TurnState } from "@amends/ui/components/turn-status";
+import type { ConversationStatus, GroupVisibility, SettingsMember } from "@amends/ui/screens/group";
+import type {
+  ParticipationChange,
+  TimelineMessage,
+  TimelineNote,
+  TimelineTurn,
+} from "@amends/ui/screens/timeline";
 import { useAtomValue } from "@effect/atom-solid";
 import { Option } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
-import { agentsReads } from "../api/agents.ts";
-import { useApiClient } from "../api/context.tsx";
+import { agentsReads } from "../agents/api.ts";
+import { useApiClient } from "../provider.tsx";
 import {
   Group,
   type GroupMembership,
@@ -11,10 +23,9 @@ import {
   type Thread,
   ThreadMessage,
   type ThreadTimeline,
-} from "../api/conversations.ts";
+} from "./api.ts";
 import type { WorkspaceFailure } from "../api/failures.ts";
 import { useWorkspace } from "../session/directory.tsx";
-import type { TurnState } from "../turns/views.ts";
 import { useMarkGroupRead, useMarkThreadRead } from "./read.ts";
 import {
   useGroupRoster,
@@ -32,22 +43,6 @@ import { useTyping } from "./typing.ts";
  */
 export const memberName = (member: Member.Record | undefined) =>
   member === undefined ? "Former member" : (member.name ?? member.identity.id);
-
-/** Someone who wrote a message, as a timeline shows them. */
-export interface Author {
-  /** Their member ID; absent for a contact outside the workspace. */
-  readonly id?: string;
-  readonly name: string;
-  readonly agent: boolean;
-}
-/** A member a message mentions, by the name the reader knows them by now. */
-export interface MentionedMember {
-  readonly id: string;
-  readonly name: string;
-}
-
-/** Why a conversation shows no entries: still loading, closed to the reader, or failed. */
-export type ConversationStatus = "loading" | "unavailable" | "failed";
 
 /**
  * Whether a live read lost its access: a refresh answered that what it reads is gone or denied,
@@ -90,7 +85,7 @@ export function usePeople(workspaceId: string) {
   const members = useMembers(workspaceId);
   const self = useWorkspace(() => workspaceId);
   const selfId = () => self()?.member.id as string | undefined;
-  const authorOf = (author: Thread.Record["createdBy"]): Author => {
+  const authorOf = (author: Thread.Record["createdBy"]): MessageAuthor => {
     if (author._tag === "Contact") return { name: "Contact", agent: false };
     const member = members.member(author.memberId);
     return {
@@ -103,7 +98,7 @@ export function usePeople(workspaceId: string) {
    * The members a message's text mentions, named as they are now. Someone no longer in the
    * workspace is left out, and shows by the name the text recorded.
    */
-  const mentionsOf = (text: string): MentionedMember[] =>
+  const mentionsOf = (text: string): RichTextMention[] =>
     ThreadMessage.mentionedIn(text).flatMap((id) => {
       const member = members.member(id);
       return member === undefined ? [] : [{ id, name: memberName(member) }];
@@ -124,7 +119,7 @@ export interface GroupEntry {
   readonly kind: "team" | "direct";
   /** A team's name, or a direct group's other people. */
   readonly name: string;
-  readonly visibility?: "public" | "private";
+  readonly visibility?: GroupVisibility;
   /** The workspace's general group, which everyone belongs to and people never leave. */
   readonly general: boolean;
   /** When any of its threads last had activity. */
@@ -206,24 +201,6 @@ export function useWorkspaceGroups(workspaceId: string) {
   };
 }
 
-/** A thread as its group's stream shows it: the message that opened it and its replies. */
-export interface StreamEntry {
-  readonly kind: "message";
-  /** The thread's ID. */
-  readonly id: string;
-  readonly author: Author;
-  readonly at: Date;
-  /** Markdown, whose mentions link to members by id. */
-  readonly text: string;
-  readonly mentions: ReadonlyArray<MentionedMember>;
-  readonly thread: {
-    readonly replies: number;
-    readonly unread: boolean;
-    /** The names of people typing a reply now. */
-    readonly typing: ReadonlyArray<string>;
-  };
-}
-
 /**
  * A group's stream: each thread's opening message, oldest shown first and live while mounted, with
  * its replies, whether they are unread, and who is typing. While mounted and visible it catches
@@ -241,7 +218,7 @@ export function useGroupConversation(workspaceId: string, groupId: string) {
       ? toDate(item.latestActivityAt).getTime()
       : undefined;
   });
-  const entryOf = (opening: Thread.Opening): StreamEntry => ({
+  const entryOf = (opening: Thread.Opening): TimelineMessage => ({
     kind: "message",
     id: opening.thread.id,
     author: people.authorOf(opening.message.author),
@@ -267,61 +244,11 @@ export function useGroupConversation(workspaceId: string, groupId: string) {
   };
 }
 
-/** A thread's message as its timeline shows it. */
-export interface ThreadMessageEntry {
-  readonly kind: "message";
-  readonly id: string;
-  readonly author: Author;
-  readonly at: Date;
-  /** Markdown, whose mentions link to members by id. */
-  readonly text: string;
-  readonly mentions: ReadonlyArray<MentionedMember>;
-  /** For an agent's reply, the turn that posted it, whose log tells how it came about. */
-  readonly turn?: { readonly id: string };
-}
-/** How someone's part in a thread changed. Joining by writing or a mention shows in the message. */
-export type ParticipationChange =
-  | "followed"
-  | "unfollowed"
-  | "left-group"
-  | "removed-from-group"
-  | "removed-from-workspace";
-/** Someone following a thread or ending their part in it. */
-export interface ThreadNoteEntry {
-  readonly kind: "note";
-  readonly id: string;
-  readonly at: Date;
-  readonly change: ParticipationChange;
-  readonly who: string;
-  /** It happened to the reader. */
-  readonly self: boolean;
-}
-/**
- * An agent's turn where it took on the work, as it went since: waiting, working, or how it ended.
- * A turn that replied shows as its replies instead.
- */
-export interface ThreadTurnEntry {
-  readonly kind: "turn";
-  /** The turn's ID. */
-  readonly id: string;
-  /** When the agent took on the work. */
-  readonly at: Date;
-  /** The agent, with its ID when the reader may see it. */
-  readonly agent: { readonly id?: string; readonly memberId: string; readonly name: string };
-  readonly state: TurnState;
-  /** Why it failed, as the host worded it. */
-  readonly failure?: string;
-  /** Why it stopped or is stopping: someone asked, or its agent stopped taking part. */
-  readonly stoppedBy?: "request" | "departure";
-  /** The reader may ask it to stop now. */
-  readonly stoppable: boolean;
-  /**
-   * The reader may run it again now: it failed or was stopped on request, it is its agent's latest
-   * turn in the thread, and the agent still takes part.
-   */
-  readonly retryable: boolean;
-}
-export type ThreadEntry = ThreadMessageEntry | ThreadNoteEntry | ThreadTurnEntry;
+/** A thread's timeline entry; a turn carries its agent's ID, for the page that fixes its setup. */
+export type ThreadEntry =
+  | TimelineMessage
+  | TimelineNote
+  | (Omit<TimelineTurn, "agentHref"> & { readonly agentId?: string });
 
 type Published = Extract<ThreadTimeline.Item, { readonly message: unknown }>;
 type Participation = Extract<ThreadTimeline.Item, { readonly participant: unknown }>;
@@ -407,7 +334,7 @@ export function useThreadConversation(
   const agents = useAgentAccess(workspaceId);
   const lost = useLostAccess(timeline);
   useMarkThreadRead(workspaceId, threadId, () => timeline.value()?.at(-1)?.activity.sequence);
-  const noteOf = (item: Participation): ThreadNoteEntry => {
+  const noteOf = (item: Participation): TimelineNote => {
     const participant = item.participant.participant;
     const self = participant._tag === "Member" && participant.memberId === people.selfId();
     return {
@@ -429,7 +356,7 @@ export function useThreadConversation(
   };
   const entries = createMemo((): ReadonlyArray<ThreadEntry> => {
     if (lost()) return [];
-    const shown: Array<ThreadMessageEntry | ThreadNoteEntry | TurnSoFar> = [];
+    const shown: Array<TimelineMessage | TimelineNote | TurnSoFar> = [];
     const turns = new Map<string, TurnSoFar>();
     /** Each agent's latest turn, and the last time it stopped taking part. */
     const latest = new Map<string, string>();
@@ -480,11 +407,8 @@ export function useThreadConversation(
           kind: "turn",
           id: turn.id,
           at: turn.at,
-          agent: {
-            ...(agent === undefined ? {} : { id: agent.id }),
-            memberId: turn.memberId,
-            name: people.name(turn.memberId),
-          },
+          agent: { name: people.name(turn.memberId) },
+          ...(agent === undefined ? {} : { agentId: agent.id }),
           state: turn.state,
           ...(turn.failure === undefined ? {} : { failure: turn.failure }),
           ...(turn.stoppedBy === undefined ? {} : { stoppedBy: turn.stoppedBy }),
@@ -539,12 +463,6 @@ export function useThreadConversation(
   };
 }
 
-/** Someone a message can mention, as a composer suggests them after `@`. */
-export interface MentionCandidate {
-  readonly id: string;
-  readonly name: string;
-  readonly agent: boolean;
-}
 /** A group's other members, whom its messages can mention, live while mounted. */
 export function useMentionCandidates(
   workspaceId: string,
@@ -567,18 +485,6 @@ export function useMentionCandidates(
   );
 }
 
-/** A group's member, as its settings list them. */
-export interface RosterEntry {
-  /** The membership's ID, which removing takes. */
-  readonly id: string;
-  readonly memberId: string;
-  readonly name: string;
-  readonly agent: boolean;
-  /** The reader. */
-  readonly you: boolean;
-  /** The reader may remove them. */
-  readonly removable: boolean;
-}
 /**
  * A group's members for its settings, the reader first, then by name; and the workspace's other
  * active members, who can be added. `members` is a `useGroupMembers` controller for the group.
@@ -593,14 +499,13 @@ export function useGroupPeople(
   },
 ) {
   const people = usePeople(workspaceId);
-  const roster = createMemo((): ReadonlyArray<RosterEntry> =>
+  const roster = createMemo((): ReadonlyArray<SettingsMember> =>
     (members.roster() ?? [])
       .map((admission) => {
         const member = people.member(admission.memberId);
         const you = admission.memberId === people.selfId();
         return {
           id: admission.id,
-          memberId: admission.memberId,
           name: memberName(member),
           agent: member?.identity._tag === "Agent",
           you,
@@ -612,7 +517,7 @@ export function useGroupPeople(
       ),
   );
   const candidates = createMemo((): ReadonlyArray<MentionCandidate> => {
-    const inGroup = new Set(roster().map((entry) => entry.memberId));
+    const inGroup = new Set((members.roster() ?? []).map((admission) => admission.memberId));
     return (people.all() ?? [])
       .filter((member) => member.status === "active" && !inGroup.has(member.id))
       .map((member) => ({
@@ -624,26 +529,15 @@ export function useGroupPeople(
   return { roster, candidates };
 }
 
-/** A workspace member as their profile card shows them. */
-export interface MemberProfile {
-  readonly id: string;
-  readonly name: string;
-  readonly kind: "person" | "agent";
-  /** The reader themself. */
-  readonly you: boolean;
-  /** Removed from the workspace; they keep their name. */
-  readonly former: boolean;
-  /** An agent's own ID, where its page is. */
-  readonly agentId?: string;
-}
-
 /**
  * Members as their profile cards show them, by member ID and never by name, live while mounted.
  * Undefined for someone the reader's workspace does not know.
  */
 export function useMemberProfiles(workspaceId: string) {
   const people = usePeople(workspaceId);
-  return (memberId: string): MemberProfile | undefined => {
+  return (
+    memberId: string,
+  ): (Omit<Profile, "status"> & { readonly agentId?: string }) | undefined => {
     const member = people.member(memberId);
     if (member === undefined) return undefined;
     return {

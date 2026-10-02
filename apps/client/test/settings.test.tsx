@@ -7,8 +7,8 @@ import {
   ClientProvider,
   DirectoryProvider,
   Session,
-  useSettings,
-  type SettingsController,
+  useWorkspaceSettings,
+  type WorkspaceSettingsView,
   type SessionStore,
 } from "../src/index.ts";
 afterEach(cleanup);
@@ -25,7 +25,7 @@ for (const replacement of [false, true])
   it(`cancels pending settings when ${replacement ? "credentials change" : "the feature unmounts"}`, async () => {
     const [shown, setShown] = createSignal(true);
     let session = Schema.decodeSync(Session)({ token: "alice", identity: "alice" }),
-      controller!: SettingsController;
+      view!: WorkspaceSettingsView;
     const listeners = new Set<() => void>();
     const store: SessionStore = {
       read: () => session,
@@ -63,7 +63,7 @@ for (const replacement of [false, true])
       return Promise.resolve(json({ memberships: [], invitations: [] }));
     });
     function Consumer() {
-      controller = useSettings("one", "workspace");
+      view = useWorkspaceSettings("one", "workspace");
       return null;
     }
     render(() => (
@@ -81,10 +81,12 @@ for (const replacement of [false, true])
         </DirectoryProvider>
       </ClientProvider>
     ));
-    await waitFor(() => expect(controller.data()?.settings.workspace.name).toBe("Studio"));
-    const previous = controller;
-    controller.send({ kind: "rename", name: "Updated", expectedName: "Studio" });
-    controller.send({ kind: "rename", name: "Duplicate", expectedName: "Studio" });
+    await waitFor(() => expect(view.workspace()?.name).toBe("Studio"));
+    const previous = view;
+    view.rename.setName("Updated");
+    view.rename.save();
+    view.rename.setName("Duplicate");
+    view.rename.save();
     await waitFor(() => expect(mutation).toBeDefined());
     expect(await mutation!.clone().json()).toEqual({ name: "Updated", expectedName: "Studio" });
     expect(
@@ -96,8 +98,9 @@ for (const replacement of [false, true])
     } else setShown(false);
     await waitFor(() => expect(mutation!.signal.aborted).toBe(true));
     held.resolve(json({ ...workspace, name: "Updated" }));
-    previous.send({ kind: "rename", name: "After cleanup", expectedName: "Studio" });
-    expect(previous.data()?.settings.workspace.name).toBe("Studio");
+    previous.rename.setName("After cleanup");
+    previous.rename.save();
+    expect(previous.workspace()?.name).toBe("Studio");
     expect(
       fetch.mock.calls.filter(([input, init]) => new Request(input, init).method === "PUT"),
     ).toHaveLength(1);
@@ -133,9 +136,9 @@ it("retries at once after a failed request or invalid input, and waits for a ref
       );
     return Promise.resolve(json({ memberships: [], invitations: [] }));
   });
-  let controller!: SettingsController;
+  let view!: WorkspaceSettingsView;
   function Consumer() {
-    controller = useSettings("one", "workspace");
+    view = useWorkspaceSettings("one", "workspace");
     return null;
   }
   render(() => (
@@ -151,24 +154,27 @@ it("retries at once after a failed request or invalid input, and waits for a ref
       </DirectoryProvider>
     </ClientProvider>
   ));
-  await waitFor(() => expect(controller.data()?.settings.workspace.name).toBe("Studio"));
+  await waitFor(() => expect(view.workspace()?.name).toBe("Studio"));
   // A host failure leaves the values current: the same edit can be sent again at once.
-  controller.send({ kind: "rename", name: "Atelier", expectedName: "Studio" });
-  await waitFor(() => expect(controller.error()).toBe("failed"));
-  expect(controller.needsRefresh()).toBe(false);
+  view.rename.setName("Atelier");
+  view.rename.save();
+  await waitFor(() => expect(view.failure()).toEqual({ action: "rename", error: "failed" }));
+  expect(view.stale()).toBe(false);
   // Invalid input fails before any request and does not lock either.
-  controller.send({ kind: "remove", memberId: "" });
-  await waitFor(() => expect(controller.error()).toBe("invalid"));
-  expect(controller.needsRefresh()).toBe(false);
+  view.remove("");
+  await waitFor(() => expect(view.failure()).toEqual({ action: "remove", error: "invalid" }));
+  expect(view.stale()).toBe(false);
   expect(puts).toHaveLength(1);
   // A conflict means the values are out of date: edits wait for an explicit refresh.
-  controller.send({ kind: "rename", name: "Atelier", expectedName: "Studio" });
-  await waitFor(() => expect(controller.error()).toBe("changed"));
-  expect(controller.needsRefresh()).toBe(true);
-  controller.send({ kind: "rename", name: "Again", expectedName: "Studio" });
+  view.rename.save();
+  await waitFor(() => expect(view.failure()).toEqual({ action: "rename", error: "changed" }));
+  expect(view.stale()).toBe(true);
+  view.rename.setName("Again");
+  view.rename.save();
   expect(puts).toHaveLength(2);
-  controller.refresh();
-  await waitFor(() => expect(controller.needsRefresh()).toBe(false));
-  expect(controller.error()).toBeUndefined();
-  expect(controller.revision()).toBe(1);
+  view.refresh();
+  await waitFor(() => expect(view.stale()).toBe(false));
+  expect(view.failure()).toBeUndefined();
+  // The draft survives the refresh, made against the name now shown.
+  expect(view.rename.name()).toBe("Again");
 });

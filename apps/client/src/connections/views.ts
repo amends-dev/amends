@@ -1,101 +1,39 @@
+import type {
+  ConnectionCapability,
+  ConnectionMethod,
+  ConnectionProviderOption,
+  ConnectionSettingField,
+  ConnectionSetup,
+  ConnectionSummary,
+  ConnectionsAction,
+  ConnectionsFailure,
+  SettingIssue,
+} from "@amends/ui/screens/connections";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Exit, Option } from "effect";
+import { Cause, Effect, Option } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
+import { useApiClient } from "../provider.tsx";
 import {
+  changeConnection,
   connectionsReads,
-  connectionsRequest,
   credentialsUnavailable,
   newConnectionRequestKey,
   type Connection,
   type ConnectionCommand,
   type ConnectionImplementation,
   type ConnectionsReads,
-} from "../api/connections.ts";
-import { isStale, workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
+  reloadConnections,
+} from "./api.ts";
+import { useChanges } from "../api/changes.ts";
+import { workspaceFailure } from "../api/failures.ts";
 import { toDate } from "../conversations/time.ts";
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
 import { memberName } from "../conversations/views.ts";
-import { useRequest } from "../request/use-request.ts";
 
-/**
- * Whether a connection can be used: `configured` when it has what its provider needs,
- * `needs-setup` when it lacks required settings or its key, and `unavailable` when this host no
- * longer installs its provider. Configured never means a request to the provider succeeded.
- */
-export type ConnectionSetup = "configured" | "needs-setup" | "unavailable";
-/** How a connection authenticates, chosen when it is created. */
-export type ConnectionMethod = "api-key" | "none";
-
-/** What a provider's connections give access to: model providers, or sandboxes for environments. */
-export type ConnectionCapability = "model-access" | "sandboxes";
-
-/** A setting a provider takes, as its implementation declares it. */
-export interface ConnectionSetting {
-  readonly key: string;
-  readonly label: string;
-  readonly kind: "text" | "url" | "integer";
-  readonly required: boolean;
-  readonly description?: string;
-  readonly placeholder?: string;
-}
-
-/** A provider this host installed, which a new connection goes through. */
-export interface ConnectionProvider {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  /** What its connections give access to. */
-  readonly capability: ConnectionCapability | undefined;
-  /** The sandbox provider whose account its connections are, if they are one. */
-  readonly sandboxProvider: string | undefined;
-  /** The ways its connections may authenticate, in the order it prefers them. */
-  readonly methods: readonly ConnectionMethod[];
-  readonly settings: readonly ConnectionSetting[];
-}
-
-/** A connection, as the list and its details show it. Its key never reaches the client. */
-export interface ConnectionEntry {
-  readonly id: string;
-  readonly name: string;
-  readonly providerId: string;
-  /** Undefined when this host no longer installs the provider. */
-  readonly provider: ConnectionProvider | undefined;
-  /** Its settings with their values; the saved keys alone when the provider is unavailable. */
-  readonly settings: ReadonlyArray<ConnectionSetting & { readonly value: string }>;
-  /** Its first URL setting's value; undefined when it uses the provider's default. */
-  readonly endpoint: string | undefined;
-  readonly setup: ConnectionSetup;
-  /** What setup still needs: required settings by label, and whether its key is missing. */
-  readonly missing: { readonly settings: readonly string[]; readonly key: boolean };
-  readonly method: ConnectionMethod;
-  readonly keySaved: boolean;
-  /** The reader may rename it, change its settings and key, and remove it. */
-  readonly manageable: boolean;
-  readonly createdBy: string;
-  readonly createdAt: Date;
-}
-
-/** A change the reader can make to connections. */
-export type ConnectionAction = Exclude<ConnectionCommand, { kind: "refresh" }>["kind"];
-/**
- * Why a change or read failed: a workspace failure; `storage-unavailable` when the host keeps no
- * credentials; `refresh-failed` when a change completed but its result could not be read back;
- * or `outdated` when a live refresh failed.
- */
-export type ConnectionsError =
-  | WorkspaceFailure
-  | "storage-unavailable"
-  | "refresh-failed"
-  | "outdated";
-export interface ConnectionsFailure {
-  readonly action: ConnectionAction | "refresh";
-  readonly error: ConnectionsError;
-}
 /** A change that completed and whose result is shown. */
 export interface ConnectionsDone {
-  readonly action: ConnectionAction;
+  readonly action: ConnectionsAction;
   /** The connection it concerned, by name. */
   readonly subject?: string;
   /** The connection it created. */
@@ -110,7 +48,7 @@ const isWholeNumber = /^[1-9]\d{0,14}$/;
  * A value the setting would refuse: a URL that is not http or https, or a count that is not a
  * whole number above zero.
  */
-const settingIssue = (setting: ConnectionSetting, value: string): "url" | "integer" | undefined => {
+const settingIssue = (setting: ConnectionSettingField, value: string): SettingIssue | undefined => {
   const trimmed = value.trim();
   if (trimmed === "") return undefined;
   if (setting.kind === "url" && !isUrl.test(trimmed)) return "url";
@@ -120,7 +58,9 @@ const settingIssue = (setting: ConnectionSetting, value: string): "url" | "integ
 
 const methodOf = (authentication: ConnectionImplementation.Authentication): ConnectionMethod =>
   authentication._tag === "ApiKey" ? "api-key" : "none";
-const providerOf = (declaration: ConnectionImplementation.Declaration): ConnectionProvider => ({
+const providerOf = (
+  declaration: ConnectionImplementation.Declaration,
+): ConnectionProviderOption => ({
   id: declaration.id,
   name: declaration.name,
   description: declaration.description,
@@ -130,7 +70,6 @@ const providerOf = (declaration: ConnectionImplementation.Declaration): Connecti
       : declaration.capabilities.sandbox !== undefined
         ? "sandboxes"
         : undefined,
-  sandboxProvider: declaration.capabilities.sandbox?.provider,
   methods: declaration.authentication.map(methodOf),
   settings: declaration.settings.map((setting) => ({
     key: setting.key,
@@ -155,7 +94,7 @@ export interface ConnectionListEntry {
    * `needs-setup` when it lacks required settings or its key, and `unavailable` when this server
    * no longer installs its provider.
    */
-  readonly setup: "configured" | "needs-setup" | "unavailable";
+  readonly setup: ConnectionSetup;
   /** What setup still needs: required settings by key, and whether its key is missing. */
   readonly missing: { readonly settings: readonly string[]; readonly key: boolean };
 }
@@ -228,7 +167,9 @@ export function useConnections(
   const read = reads ? connect(reads) : undefined;
 
   const providers = createMemo(() => (read?.implementations() ?? []).map(providerOf));
-  const entryOf = (view: Connection.View): ConnectionEntry => {
+  const providerOfEntry = (entry: ConnectionSummary) =>
+    providers().find((provider) => provider.id === entry.providerId);
+  const entryOf = (view: Connection.View): ConnectionSummary => {
     const provider = providers().find((candidate) => candidate.id === view.implementationId);
     const settings = provider
       ? provider.settings.map((setting) => ({
@@ -281,70 +222,35 @@ export function useConnections(
   const all = createMemo(() => (read?.connections() ?? []).map(entryOf));
   const loaded = () => read?.connections() !== undefined && read.implementations() !== undefined;
 
-  // The change running or last run, with the connection it concerned, until it settles.
-  const [attempt, setAttempt] = createSignal<{
-    readonly action: ConnectionAction | "refresh";
-    readonly subject?: string;
-    readonly method?: ConnectionMethod;
-  }>();
-  const [error, setError] = createSignal<ConnectionsError>();
-  const [needsRefresh, setNeedsRefresh] = createSignal(false);
-  const [revision, setRevision] = createSignal(0);
-  let unconfirmed: { readonly command: ConnectionCommand; readonly created?: string } | undefined;
-
-  const finish = (command: ConnectionCommand, created: string | undefined) => {
-    const current = attempt();
-    setAttempt(undefined);
-    if (command.kind === "refresh") return;
-    if (command.kind === "create") {
-      intent = undefined;
-      setDraft(undefined);
-    }
-    if (command.kind === "rename") forget(setNames, command.connectionId);
-    if (command.kind === "configure") forget(setConfigs, command.connectionId);
-    if (command.kind === "set-key") setSecret("");
-    options.done?.({
-      action: command.kind,
-      subject: current?.subject,
+  const changes = useChanges({
+    write: changeConnection(workspaceId),
+    reload: reads ? reloadConnections(reads) : Effect.void,
+    failed: (cause) => ({
+      error: credentialsUnavailable(cause) ? "storage-unavailable" : workspaceFailure(cause),
+      problems: [],
+    }),
+    done: (
+      change: ConnectionCommand,
       created,
-      method: current?.method,
-    });
-  };
-  const request = useRequest(connectionsRequest(client, workspaceId), (exit, command) => {
-    if (Exit.isFailure(exit)) {
-      const failure = workspaceFailure(exit.cause);
-      setError(credentialsUnavailable(exit.cause) ? "storage-unavailable" : failure);
-      if (isStale(failure)) setNeedsRefresh(true);
-      return;
-    }
-    const { refreshed, created } = exit.value;
-    if (Exit.isFailure(refreshed)) {
-      if (command.kind !== "refresh") {
-        unconfirmed = { command, created };
-        setError("refresh-failed");
-        setNeedsRefresh(true);
-      } else setError(workspaceFailure(refreshed.cause));
-      return;
-    }
-    setNeedsRefresh(false);
-    if (command.kind === "refresh") setRevision((value) => value + 1);
-    const done = command.kind === "refresh" ? unconfirmed : { command, created };
-    unconfirmed = undefined;
-    if (done) finish(done.command, done.created);
-    else setAttempt(undefined);
+      details: { readonly subject?: string; readonly method?: ConnectionMethod } | undefined,
+    ) => {
+      if (change.kind === "create") {
+        intent = undefined;
+        setDraft(undefined);
+      }
+      if (change.kind === "rename") forget(setNames, change.connectionId);
+      if (change.kind === "configure") forget(setConfigs, change.connectionId);
+      if (change.kind === "set-key") setSecret("");
+      options.done?.({
+        action: change.kind,
+        subject: details?.subject,
+        created,
+        method: details?.method,
+      });
+    },
+    outdated: () => loaded() && read?.failure() !== undefined,
   });
-  const [running, setRunning] = createSignal<ConnectionAction | "refresh">();
-  const send = (
-    command: ConnectionCommand,
-    details: { readonly subject?: string; readonly method?: ConnectionMethod } = {},
-  ) => {
-    if (request.pending() || (needsRefresh() && command.kind !== "refresh")) return;
-    setError(undefined);
-    if (command.kind !== "refresh" || !needsRefresh() || !attempt())
-      setAttempt({ action: command.kind, ...details });
-    setRunning(command.kind);
-    request.run(command);
-  };
+  const send = changes.send;
   const find = (connectionId: string) => all().find((entry) => entry.id === connectionId);
 
   // A new connection: its provider, name, settings, and way of authenticating. Retrying the same
@@ -383,7 +289,7 @@ export function useConnections(
   // After an explicit refresh, rename drafts stay and are made against the name now shown.
   createEffect(
     on(
-      revision,
+      changes.revision,
       () =>
         setNames((previous) =>
           Object.fromEntries(
@@ -397,7 +303,7 @@ export function useConnections(
     ),
   );
 
-  const valuesOf = (entry: ConnectionEntry) =>
+  const valuesOf = (entry: ConnectionSummary) =>
     configs()[entry.id] ??
     Object.fromEntries(entry.settings.map((setting) => [setting.key, setting.value]));
   const cleaned = (settings: Readonly<Record<string, string>>) =>
@@ -406,7 +312,10 @@ export function useConnections(
         .map(([key, value]) => [key, value.trim()] as const)
         .filter(([, value]) => value !== ""),
     );
-  const complete = (provider: ConnectionProvider, settings: Readonly<Record<string, string>>) =>
+  const complete = (
+    provider: ConnectionProviderOption,
+    settings: Readonly<Record<string, string>>,
+  ) =>
     provider.settings.every((setting) => {
       const value = settings[setting.key] ?? "";
       return (!setting.required || value.trim() !== "") && !settingIssue(setting, value);
@@ -423,33 +332,33 @@ export function useConnections(
     },
     /** The providers this host installed. */
     providers,
+    /** The provider whose connections are accounts for a sandbox provider, by ID. */
+    accountProvider: (sandboxProvider: string) =>
+      read
+        ?.implementations()
+        ?.find((declaration) => declaration.capabilities.sandbox?.provider === sandboxProvider)?.id,
     /** Every connection the reader may read, by name. */
     connections: all,
     connection: find,
     /** The reader may add connections. */
     canCreate: () => canCreate() === true,
     /** The change running, or `refresh`. */
-    pending: () => (request.pending() ? running() : undefined),
+    pending: changes.pending,
     failure: (): ConnectionsFailure | undefined => {
-      const current = error();
-      const readFailure = loaded() ? read?.failure() : undefined;
-      if (current === undefined)
-        return readFailure === undefined ? undefined : { action: "refresh", error: "outdated" };
-      const action = attempt()?.action;
-      if (action) return { action, error: current };
-      return needsRefresh() ? { action: "refresh", error: current } : undefined;
+      const failure = changes.failure();
+      return failure && { action: failure.action, error: failure.error };
     },
     /** What the reader sees is out of date: changes wait for a refresh. */
-    stale: needsRefresh,
+    stale: changes.stale,
     /** Reload, on behalf of the change that found the values out of date, if any. */
     refresh: () => {
       if (!loaded()) read?.retry();
-      else send({ kind: "refresh" });
+      else changes.refresh();
     },
     /** Set aside the last change's failure and the key being entered, as a dialog closes. */
     dismiss: () => {
-      if (request.pending()) return;
-      setAttempt(undefined);
+      if (changes.pending()) return;
+      changes.dismiss();
       setSecret("");
     },
     create: {
@@ -457,8 +366,7 @@ export function useConnections(
       begin: (providerId: string) => {
         const provider = providers().find((candidate) => candidate.id === providerId);
         if (!provider) return;
-        setAttempt(undefined);
-        setError(undefined);
+        changes.dismiss();
         setDraft({
           providerId,
           name: provider.name,
@@ -529,7 +437,7 @@ export function useConnections(
       changed: (connectionId: string) => {
         const name = names()[connectionId]?.name.trim();
         return (
-          !needsRefresh() && name !== undefined && name !== "" && name !== find(connectionId)?.name
+          !changes.stale() && name !== undefined && name !== "" && name !== find(connectionId)?.name
         );
       },
       save: (connectionId: string) => {
@@ -567,14 +475,13 @@ export function useConnections(
       /** The settings differ from those saved, and can be saved now. */
       changed: (connectionId: string) => {
         const entry = find(connectionId),
+          provider = entry && providerOfEntry(entry),
           edit = configs()[connectionId];
-        if (!entry?.provider || !edit || needsRefresh()) return false;
+        if (!entry || !provider || !edit || changes.stale()) return false;
         const saved = cleaned(
           Object.fromEntries(entry.settings.map((setting) => [setting.key, setting.value])),
         );
-        return (
-          JSON.stringify(cleaned(edit)) !== JSON.stringify(saved) && complete(entry.provider, edit)
-        );
+        return JSON.stringify(cleaned(edit)) !== JSON.stringify(saved) && complete(provider, edit);
       },
       save: (connectionId: string) => {
         const entry = find(connectionId),

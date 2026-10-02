@@ -6,15 +6,15 @@
   components, the six layout patterns, and presentational screens for every page, verified in
   its standalone Storybook workshop.
 - [client](client/README.md) owns headless sessions, API/query state, the view hooks screens
-  are connected through, and pure route helpers. It has no dependency on UI, styling, router
-  libraries, or Storybook.
+  are connected through, and pure route helpers. It imports only UI's screen types, and nothing
+  of styling, router libraries, or Storybook.
 - [web](web/README.md) composes client and UI with browser routing on port 4321.
 - [desktop](desktop/README.md) composes client and UI in Tauri 2 with hash routing and a
   Solid/Vite webview on development port 1420.
 
 The earlier UI implementations and the `design-system` and `features` workspaces were removed;
 `ui` was built as `ui-v2` and took the name when it replaced them. Both apps compose the
-independent client and UI packages. They own route
+client and UI packages. They own route
 trees and page composition, while client owns session/API state and the hooks that shape
 it for each screen. Workspace pages use the persistent Shell/Navigation layout and the
 account menu. Appearance state is headless, with platform persistence and system

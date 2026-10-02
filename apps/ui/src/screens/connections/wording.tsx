@@ -100,6 +100,11 @@ export type ConnectionsError =
   | "storage-unavailable"
   | "refresh-failed"
   | "outdated";
+/** A change's failure, or a refresh's, with the action it belongs to. */
+export interface ConnectionsFailure {
+  readonly action: ConnectionsAction | "refresh";
+  readonly error: ConnectionsError;
+}
 
 export const capabilityLabels = {
   "model-access": "Model access",

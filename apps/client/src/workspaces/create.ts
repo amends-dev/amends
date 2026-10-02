@@ -1,29 +1,27 @@
+import type { CreateWorkspaceError } from "@amends/ui/screens/workspaces";
 import { Data, Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
+import { directoryQuery } from "../api/directory.ts";
+import { useMutation } from "../api/mutation.ts";
+import { refreshResult } from "../api/refresh.ts";
 import {
-  createWorkspaceRequest,
+  createWorkspace,
   isMemberName,
   isWorkspaceName,
   suggestedName,
   newWorkspaceRequestKey,
   workspaceRejection,
   type CreatedWorkspace,
-} from "../api/workspaces.ts";
-import { useRequest } from "../request/use-request.ts";
-import { useSession } from "../session/provider.tsx";
+  type NewWorkspace,
+} from "./api.ts";
+import { useApiClient, useSession } from "../provider.tsx";
 export type CreateWorkspaceState = Data.TaggedEnum<{
   Form: {
     readonly name: string;
     /** What people there will call the creator, suggested from their identity. */
     readonly memberName: string;
     readonly pending: boolean;
-    readonly error:
-      | "invalid-name"
-      | "invalid-member-name"
-      | "denied"
-      | "request-failed"
-      | undefined;
+    readonly error: CreateWorkspaceError | undefined;
   };
   Created: {
     readonly workspace: CreatedWorkspace;
@@ -41,9 +39,13 @@ export interface CreateWorkspaceController {
   readonly retryRefresh: () => void;
 }
 
-/** A mounted creation intent. Retries of the same name retain its idempotency key. */
+/**
+ * A mounted creation intent: create the workspace, then reload the directory so that its pages
+ * open. Retries of the same name keep its idempotency key.
+ */
 export function useCreateWorkspace(): CreateWorkspaceController {
   const session = useSession();
+  const client = useApiClient();
   const [state, setState] = createSignal<CreateWorkspaceState>(
     State.Form({
       name: "",
@@ -52,70 +54,60 @@ export function useCreateWorkspace(): CreateWorkspaceController {
       error: undefined,
     }),
   );
-  let intent:
-    | { name: string; memberName: string; key: ReturnType<typeof newWorkspaceRequestKey> }
-    | undefined;
-  const request = useRequest(
-    createWorkspaceRequest(useApiClient()),
-    (exit, input) => {
-      const snapshot = state();
-      if (Exit.isFailure(exit)) {
-        if (snapshot._tag === "Form")
-          setState(
-            State.Form({ ...snapshot, pending: false, error: workspaceRejection(exit.cause) }),
-          );
-        else if (snapshot._tag === "Created")
-          setState(State.Created({ ...snapshot, pending: false, refreshFailed: true }));
-        return;
-      }
-      if (input.kind === "create" && snapshot._tag === "Form" && exit.value) {
-        setState(State.Created({ workspace: exit.value, pending: false, refreshFailed: false }));
-        refresh();
-      } else if (input.kind === "refresh" && snapshot._tag === "Created")
-        setState(State.Ready({ workspace: snapshot.workspace }));
-    },
-    { when: () => session.session !== undefined },
-  );
-  function refresh() {
+  let intent: NewWorkspace | undefined;
+  const create = useMutation(createWorkspace);
+  const reload = useMutation(() => refreshResult(directoryQuery(client)));
+  async function submit(draft?: string) {
     const value = state();
-    if (value._tag !== "Created" || value.pending || request.pending()) return;
+    if (value._tag !== "Form" || value.pending) return;
+    const name = (draft ?? value.name).trim();
+    if (!isWorkspaceName(name)) {
+      setState(State.Form({ ...value, name: draft ?? value.name, error: "invalid-name" }));
+      return;
+    }
+    // A name is optional; without one, people see the creator's identity.
+    const memberName = value.memberName.trim();
+    if (memberName !== "" && !isMemberName(memberName)) {
+      setState(State.Form({ ...value, name, error: "invalid-member-name" }));
+      return;
+    }
+    if (intent?.name !== name || (intent.memberName ?? "") !== memberName)
+      intent = { name, memberName, key: newWorkspaceRequestKey() };
+    const submitting = State.Form({ ...value, name, memberName, pending: true, error: undefined });
+    setState(submitting);
+    const exit = await create.run(intent);
+    if (exit === undefined) return;
+    if (Exit.isFailure(exit)) {
+      setState(
+        State.Form({ ...submitting, pending: false, error: workspaceRejection(exit.cause) }),
+      );
+      return;
+    }
+    setState(State.Created({ workspace: exit.value, pending: false, refreshFailed: false }));
+    await reloadDirectory();
+  }
+  async function reloadDirectory() {
+    const value = state();
+    if (value._tag !== "Created" || value.pending) return;
     setState(State.Created({ ...value, pending: true, refreshFailed: false }));
-    if (!request.run({ kind: "refresh" })) setState(value);
+    const exit = await reload.run();
+    if (exit === undefined) return;
+    if (Exit.isSuccess(exit)) setState(State.Ready({ workspace: value.workspace }));
+    else setState(State.Created({ ...value, pending: false, refreshFailed: true }));
   }
   return {
     state,
     setName: (name) => {
       const value = state();
-      if (value._tag === "Form" && !value.pending && session.isCurrent())
+      if (value._tag === "Form" && !value.pending)
         setState(State.Form({ ...value, name, pending: false, error: undefined }));
     },
     setMemberName: (memberName) => {
       const value = state();
-      if (value._tag === "Form" && !value.pending && session.isCurrent())
+      if (value._tag === "Form" && !value.pending)
         setState(State.Form({ ...value, memberName, pending: false, error: undefined }));
     },
-    submit: (name) => {
-      const value = state();
-      if (value._tag !== "Form" || value.pending || request.pending() || !session.isCurrent())
-        return;
-      const submitted = (name ?? value.name).trim();
-      if (!isWorkspaceName(submitted)) {
-        setState(State.Form({ ...value, name: name ?? value.name, error: "invalid-name" }));
-        return;
-      }
-      // A name is optional; without one, people see the creator's identity.
-      const memberName = value.memberName.trim();
-      if (memberName !== "" && !isMemberName(memberName)) {
-        setState(State.Form({ ...value, name: submitted, error: "invalid-member-name" }));
-        return;
-      }
-      if (intent?.name !== submitted || intent.memberName !== memberName)
-        intent = { name: submitted, memberName, key: newWorkspaceRequestKey() };
-      setState(
-        State.Form({ ...value, name: submitted, memberName, pending: true, error: undefined }),
-      );
-      if (!request.run({ kind: "create", ...intent })) setState(value);
-    },
-    retryRefresh: refresh,
+    submit: (name) => void submit(name),
+    retryRefresh: () => void reloadDirectory(),
   };
 }

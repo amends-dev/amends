@@ -1,8 +1,6 @@
 import { createEffect, createSignal, onCleanup, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import { readRequest, type ReadMark } from "../api/conversations.ts";
-import { useRequest } from "../request/use-request.ts";
-import { useSession } from "../session/provider.tsx";
+import { markRead, type ReadMark } from "./api.ts";
+import { useMutation } from "../api/mutation.ts";
 
 /** Whether the page is showing, so that what it shows can count as read. */
 export function usePageVisible(): Accessor<boolean> {
@@ -22,18 +20,15 @@ function useReadMarks(
   due: Accessor<number | undefined>,
   mark: (value: number) => ReadMark,
 ) {
-  const session = useSession();
   const visible = usePageVisible();
   let attempted: number | undefined;
-  const request = useRequest(readRequest(useApiClient(), workspaceId), () => {}, {
-    when: () => session.session !== undefined,
-  });
+  const request = useMutation(markRead(workspaceId));
   createEffect(() => {
     const value = due();
     if (value === undefined || !visible() || request.pending()) return;
     if (attempted !== undefined && value <= attempted) return;
     attempted = value;
-    request.run(mark(value));
+    void request.run(mark(value));
   });
 }
 /**

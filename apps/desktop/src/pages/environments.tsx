@@ -1,11 +1,4 @@
-import {
-  paths,
-  useConnections,
-  useEnvironments,
-  useWorkspace,
-  type EnvironmentAction,
-  type EnvironmentEntry,
-} from "@amends/client";
+import { paths, useConnections, useEnvironments, useWorkspace } from "@amends/client";
 import { ConfigureConnection, ConnectionKey } from "@amends/ui/screens/connections";
 import {
   AddEnvironment,
@@ -14,7 +7,9 @@ import {
   EnvironmentList,
   EnvironmentsPane,
   environmentsToast,
+  type EnvironmentSummary,
   type EnvironmentTab,
+  type EnvironmentsAction,
   type EnvironmentsTab,
 } from "@amends/ui/screens/environments";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
@@ -97,12 +92,10 @@ function Environments(props: { readonly workspaceId: string }) {
     const provider = environmentId
       ? view.environment(environmentId)?.sandbox?.providerId
       : view.create.providerId();
-    const implementation = connections
-      .providers()
-      .find((candidate) => candidate.sandboxProvider === provider);
-    if (!implementation) return;
+    const account = provider && connections.accountProvider(provider);
+    if (!account) return;
     view.dismiss();
-    connections.create.begin(implementation.id);
+    connections.create.begin(account);
     setDetour(environmentId === undefined ? {} : { environmentId });
     setDialog("create-account");
   };
@@ -134,11 +127,11 @@ function Environments(props: { readonly workspaceId: string }) {
       },
     ),
   );
-  const failureOf = (action: EnvironmentAction) => {
+  const failureOf = (action: EnvironmentsAction) => {
     const failure = view.failure();
     return failure?.action === action ? failure : undefined;
   };
-  const pending = (action: EnvironmentAction) => view.pending() === action;
+  const pending = (action: EnvironmentsAction) => view.pending() === action;
   const refreshing = () => view.pending() === "refresh";
   const name = () => workspace()?.workspace.name ?? "";
   const tab = (): EnvironmentsTab => (search.tab === "needs-setup" ? "needs-setup" : "all");
@@ -152,7 +145,7 @@ function Environments(props: { readonly workspaceId: string }) {
           (words === "" || environment.name.toLocaleLowerCase().includes(words)),
       );
   });
-  const selected = (): EnvironmentEntry | undefined =>
+  const selected = (): EnvironmentSummary | undefined =>
     params.environmentId === undefined ? undefined : view.environment(params.environmentId);
   const add = () => setSearch({ add: "environment" });
   /** The draft's name, or the environment's, for the account detour to name where it returns. */

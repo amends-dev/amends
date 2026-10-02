@@ -101,6 +101,7 @@
         "effect": "catalog:",
       },
       "devDependencies": {
+        "@amends/ui": "workspace:*",
         "@solidjs/testing-library": "^0.8.9",
         "happy-dom": "^20.10.6",
         "solid-js": "^1.9.12",

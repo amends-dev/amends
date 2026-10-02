@@ -4,8 +4,6 @@ import {
   useConnections,
   useTurnActivity,
   useWorkspace,
-  type AgentAction,
-  type AgentEntry,
   type ConfigurationEditor,
 } from "@amends/client";
 import {
@@ -15,7 +13,9 @@ import {
   AgentsPane,
   ConfirmRemoveAgent,
   agentsToast,
+  type AgentSummary,
   type AgentTab,
+  type AgentsAction,
   type AgentsTab,
 } from "@amends/ui/screens/agents";
 import { ChooseProvider, ConfigureConnection, ConnectionKey } from "@amends/ui/screens/connections";
@@ -136,7 +136,7 @@ function Agents(props: { readonly workspaceId: string }) {
     ),
   );
   const add = () => setSearch({ add: "agent" });
-  const failureOf = (action: AgentAction) => {
+  const failureOf = (action: AgentsAction) => {
     const failure = view.failure();
     return failure?.action === action ? failure : undefined;
   };
@@ -152,30 +152,10 @@ function Agents(props: { readonly workspaceId: string }) {
         (agent) =>
           (tab() === "all" || agent.issues.length > 0) &&
           (words === "" || agent.name.toLocaleLowerCase().includes(words)),
-      )
-      .map((agent) => ({ ...agent, activity: activity.agentActivity(agent.memberId) }));
+      );
   });
-  const selected = (): AgentEntry | undefined =>
+  const selected = (): AgentSummary | undefined =>
     params.agentId === undefined ? undefined : view.agent(params.agentId);
-  /** The open agent's turns in progress, by where each runs. */
-  const turns = () => {
-    const agent = selected();
-    if (agent === undefined) return [];
-    return activity.ofAgent(agent.memberId).flatMap((turn) =>
-      turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
-        ? [
-            {
-              id: turn.id,
-              state: turn.state,
-              where:
-                turn.groupKind === "direct"
-                  ? (turn.groupName ?? "A conversation")
-                  : `#${turn.groupName ?? "group"}`,
-            },
-          ]
-        : [],
-    );
-  };
   const openThread = (turnId: string) => {
     const turn = activity.all().find((candidate) => candidate.id === turnId);
     if (turn) navigate(paths.thread(workspaceId, turn.groupId, turn.threadId));
@@ -287,7 +267,7 @@ function Agents(props: { readonly workspaceId: string }) {
               const agent = selected();
               if (agent) navigate(paths.environment(workspaceId, agent.environment.id));
             }}
-            turns={turns()}
+            turns={view.turns(agentId)}
             onOpenTurn={(turnId) => setSearch({ log: turnId })}
             onRemove={() => open("remove")}
             pending={view.pending()}

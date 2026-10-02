@@ -1,19 +1,18 @@
+import type { SendError } from "@amends/ui/screens/group";
 import { useAtomSet, useAtomValue } from "@effect/atom-solid";
 import { Exit } from "effect";
 import { Atom } from "effect/unstable/reactivity";
 import { createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
 import {
   ThreadMessage,
   isMessageText,
   newPostKey,
-  postRequest,
+  postMessage,
+  sendTyping,
   type Post,
-} from "../api/conversations.ts";
-import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { typingRequest } from "../api/typing.ts";
-import { useRequest } from "../request/use-request.ts";
-import { useSession } from "../session/provider.tsx";
+} from "./api.ts";
+import { workspaceFailure } from "../api/failures.ts";
+import { useMutation } from "../api/mutation.ts";
 
 interface Draft {
   /** Markdown, whose mentions link to members. */
@@ -42,7 +41,7 @@ export interface ComposerController {
   readonly ready: Accessor<boolean>;
   readonly pending: Accessor<boolean>;
   /** Why the last send failed; the draft is kept for another try. */
-  readonly error: Accessor<WorkspaceFailure | undefined>;
+  readonly error: Accessor<SendError | undefined>;
   /** Send the draft with its mentions; it clears once the message is posted. */
   readonly send: () => void;
 }
@@ -61,41 +60,48 @@ function compose(
   target: Target,
   posted?: (groupId: string) => void,
 ): ComposerController {
-  const session = useSession();
   const draftAtom = draftOf(`${workspaceId}\u0000${targetKey(target)}\u0000${target.kind}`);
   const draft = useAtomValue(() => draftAtom),
     write = useAtomSet(() => draftAtom);
-  const [error, setError] = createSignal<WorkspaceFailure>();
+  const [error, setError] = createSignal<SendError>();
   const mentions = () => ThreadMessage.mentionedIn(draft().text);
-  const request = useRequest(
-    postRequest(useApiClient(), workspaceId),
-    (exit, post) => {
-      if (Exit.isFailure(exit)) {
-        setError(workspaceFailure(exit.cause));
-        return;
-      }
-      if (draft().text === post.text) write(empty);
-      else write({ text: draft().text });
-      if (exit.value.groupId !== undefined) posted?.(exit.value.groupId);
-    },
-    { when: () => session.session !== undefined },
-  );
+  const request = useMutation(postMessage(workspaceId));
   const ready = () => isMessageText(draft().text) && !request.pending();
   // Replying tells the thread's readers the reader is typing, at most every so often.
-  const typing =
-    target.kind === "reply"
-      ? useRequest(typingRequest(useApiClient(), workspaceId), () => {}, {
-          when: () => session.session !== undefined,
-        })
-      : undefined;
+  const typing = target.kind === "reply" ? useMutation(sendTyping(workspaceId)) : undefined;
   let typedAt = 0;
   const typed = (previous: string, text: string) => {
     if (!typing || target.kind !== "reply" || text.length <= previous.length) return;
     const now = Date.now();
     if (now - typedAt < typingInterval || !isMessageText(text)) return;
     typedAt = now;
-    typing.run(target.threadId);
+    void typing.run(target.threadId);
   };
+  async function send() {
+    if (!ready()) return;
+    const text = draft().text,
+      addressed = mentions();
+    const body = JSON.stringify([text, addressed]);
+    // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.
+    const attempt = draft().attempt?.body === body ? draft().attempt! : { body, key: newPostKey() };
+    write({ ...draft(), attempt });
+    setError(undefined);
+    const exit = await request.run({
+      ...target,
+      text,
+      mentions: addressed,
+      key: attempt.key,
+    } as Post);
+    if (exit === undefined) return;
+    if (Exit.isFailure(exit)) {
+      setError(workspaceFailure(exit.cause));
+      return;
+    }
+    // What was typed while it was sending stays as the next draft.
+    if (draft().text === text) write(empty);
+    else write({ text: draft().text });
+    if (exit.value.groupId !== undefined) posted?.(exit.value.groupId);
+  }
   return {
     draft: () => draft().text,
     setDraft: (text) => {
@@ -108,18 +114,7 @@ function compose(
     ready,
     pending: request.pending,
     error,
-    send: () => {
-      if (!ready()) return;
-      const text = draft().text,
-        addressed = mentions();
-      const body = JSON.stringify([text, addressed]);
-      // A retry of the same message keeps its key, so a post that succeeded unseen is not repeated.
-      const attempt =
-        draft().attempt?.body === body ? draft().attempt! : { body, key: newPostKey() };
-      write({ ...draft(), attempt });
-      setError(undefined);
-      request.run({ ...target, text, mentions: addressed, key: attempt.key } as Post);
-    },
+    send: () => void send(),
   };
 }
 /** Start a thread in a group from a kept draft. */

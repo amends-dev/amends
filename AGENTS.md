@@ -87,8 +87,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   components, the six layout patterns, and presentational screens, with a standalone Storybook
   workshop. Introduce and verify one piece at a time. It is UI-only and must not depend on
   client state, routing, or API contracts. `client` owns headless session lifetime, typed API
-  access, query state, the view hooks screens connect through, and pure route helpers. Client
-  and UI must not depend on each other in any dependency section or source import. `web` and
+  access, query state, the view hooks screens connect through, and pure route helpers. UI never
+  depends on client. Client takes UI as a development dependency only to type what its hooks
+  return as the screens' own types, through type-only imports, and imports no UI code. `web` and
   `desktop` consume these libraries and own route trees, page composition, API URL, and
   persistence configuration; each page connects client hooks to UI screens. `desktop` owns the
   Tauri shell; platform APIs stay in the entry apps.

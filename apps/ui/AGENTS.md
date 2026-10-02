@@ -9,7 +9,9 @@ Read [README.md](README.md) before changing this package.
   or pattern before adding one; screens compose patterns rather than restyling them.
 - This package is presentation only. Do not depend on `@amends/client`, routing, Effect, or
   platform APIs. Screens take data as props and report
-  actions through callbacks; web and desktop connect them to client hooks.
+  actions through callbacks; web and desktop connect them to client hooks. Screens' data types
+  are the vocabulary client's hooks return, imported type-only, so name them for what the screen
+  shows.
 - Components read colors, shadows, type, and spacing from the foundations, never raw values.
   Corners are square.
 - Give every piece Storybook coverage with representative data, in both modes. Portable story

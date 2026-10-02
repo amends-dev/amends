@@ -1,51 +1,29 @@
+import type {
+  AcceptInvitationError,
+  PickerAccept,
+  PickerInvitation,
+  PickerWorkspace,
+} from "@amends/ui/screens/workspaces";
+import type { WorkspaceAccess } from "@amends/ui/screens/standalone";
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
-import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
-import { acceptInvitationRequest } from "../api/settings.ts";
-import { suggestedName } from "../api/workspaces.ts";
+import { directoryQuery } from "../api/directory.ts";
+import { workspaceFailure } from "../api/failures.ts";
+import { useMutation } from "../api/mutation.ts";
+import { refreshResult } from "../api/refresh.ts";
+import { acceptInvitation, suggestedName } from "./api.ts";
 import { toDate } from "../conversations/time.ts";
-import { useRequest } from "../request/use-request.ts";
+import { useApiClient, useSession } from "../provider.tsx";
 import { useDirectory } from "../session/directory.tsx";
-import { useSession } from "../session/provider.tsx";
-
-/** Why accepting failed, or `refresh-failed` when it joined but the directory did not reload. */
-export type AcceptInvitationError = WorkspaceFailure | "refresh-failed";
-
-/** An active membership, as the picker lists it. */
-export interface WorkspaceEntry {
-  readonly id: string;
-  readonly name: string;
-  /** Active members, the reader included. */
-  readonly memberCount: number;
-  readonly owner: boolean;
-}
-
-/** A pending invitation for the signed-in identity. */
-export interface InvitationEntry {
-  readonly id: string;
-  readonly workspaceId: string;
-  /** Absent when the workspace's name is not shared with invitees. */
-  readonly workspaceName: string | undefined;
-  readonly expiresAt: Date;
-}
-
-/** The latest attempt to accept an invitation. */
-export interface AcceptAttempt {
-  readonly invitationId: string;
-  readonly pending: boolean;
-  readonly error: AcceptInvitationError | undefined;
-  /** The reader is a member now; accepting again only reloads the directory. */
-  readonly joined: boolean;
-}
 
 export interface WorkspacePickerController {
-  readonly workspaces: Accessor<readonly WorkspaceEntry[]>;
-  readonly invitations: Accessor<readonly InvitationEntry[]>;
+  /** Active memberships; the app gives each its link. */
+  readonly workspaces: Accessor<readonly Omit<PickerWorkspace, "href">[]>;
+  readonly invitations: Accessor<readonly PickerInvitation[]>;
   /** The last reload failed; the lists show what loaded before. */
   readonly refreshFailed: Accessor<boolean>;
   readonly retry: () => void;
-  readonly accepting: Accessor<AcceptAttempt | undefined>;
+  readonly accepting: Accessor<PickerAccept | undefined>;
   /** Join as `name`, or as the identity when it is blank. One attempt runs at a time. */
   readonly accept: (invitationId: string, name?: string) => void;
   /** A first name to offer when joining, from the identity. */
@@ -63,7 +41,7 @@ export function useWorkspacePicker(): WorkspacePickerController {
   const workspaces = createMemo(() =>
     (ready()?.listing.memberships ?? [])
       .filter((entry) => entry.member.status === "active")
-      .map((entry): WorkspaceEntry => ({
+      .map((entry): Omit<PickerWorkspace, "href"> => ({
         id: entry.workspace.id,
         name: entry.workspace.name,
         memberCount: entry.activeMemberCount,
@@ -71,38 +49,41 @@ export function useWorkspacePicker(): WorkspacePickerController {
       })),
   );
   const invitations = createMemo(() =>
-    (ready()?.listing.invitations ?? []).map((invitation): InvitationEntry => ({
+    (ready()?.listing.invitations ?? []).map((invitation): PickerInvitation => ({
       id: invitation.details.id,
       workspaceId: invitation.details.workspaceId,
       workspaceName: invitation.workspaceName,
       expiresAt: toDate(invitation.details.expiresAt),
     })),
   );
-  const [attempt, setAttempt] = createSignal<AcceptAttempt>();
+  const [attempt, setAttempt] = createSignal<PickerAccept>();
   // Joined invitations whose reload failed; accepting them again only reloads.
   const joined = new Set<string>();
-  const request = useRequest(
-    acceptInvitationRequest(useApiClient()),
-    (exit, input) => {
-      if (Exit.isFailure(exit)) {
-        setAttempt({
-          invitationId: input.invitationId,
-          pending: false,
-          error: workspaceFailure(exit.cause),
-          joined: input.refreshOnly,
-        });
-        return;
-      }
-      joined.add(input.invitationId);
-      setAttempt({
-        invitationId: input.invitationId,
-        pending: false,
-        error: Exit.isFailure(exit.value.refreshed) ? "refresh-failed" : undefined,
-        joined: true,
+  const join = useMutation(acceptInvitation);
+  const client = useApiClient();
+  const reload = useMutation(() => refreshResult(directoryQuery(client)));
+  /** Join, unless already joined, then reload the directory so the workspace shows. */
+  async function accept(invitationId: string, name?: string) {
+    const invitation = invitations().find((entry) => entry.id === invitationId);
+    if (!invitation || attempt()?.pending) return;
+    const settle = (error: AcceptInvitationError | undefined, member: boolean) =>
+      setAttempt({ invitationId, pending: false, error, joined: member });
+    setAttempt({ invitationId, pending: true, error: undefined, joined: joined.has(invitationId) });
+    if (!joined.has(invitationId)) {
+      const trimmed = name?.trim();
+      const exit = await join.run({
+        workspaceId: invitation.workspaceId,
+        invitationId,
+        ...(trimmed ? { name: trimmed } : {}),
       });
-    },
-    { when: () => session.session !== undefined },
-  );
+      if (exit === undefined) return;
+      if (Exit.isFailure(exit)) return settle(workspaceFailure(exit.cause), false);
+      joined.add(invitationId);
+    }
+    const reloaded = await reload.run();
+    if (reloaded === undefined) return;
+    settle(Exit.isFailure(reloaded) ? "refresh-failed" : undefined, true);
+  }
   const accepting = createMemo(() => {
     const current = attempt();
     // A later reload that drops the invitation settles a failed one.
@@ -119,30 +100,10 @@ export function useWorkspacePicker(): WorkspacePickerController {
     refreshFailed: () => ready()?.refreshFailed ?? false,
     retry: directory.retry,
     accepting,
-    accept: (invitationId, name) => {
-      const invitation = invitations().find((entry) => entry.id === invitationId);
-      if (!invitation || request.pending()) return;
-      const previous = attempt(),
-        refreshOnly = joined.has(invitationId),
-        trimmed = name?.trim();
-      setAttempt({ invitationId, pending: true, error: undefined, joined: refreshOnly });
-      const started = request.run({
-        workspaceId: invitation.workspaceId,
-        invitationId,
-        ...(trimmed ? { name: trimmed } : {}),
-        refreshOnly,
-      });
-      if (!started) setAttempt(previous);
-    },
+    accept: (invitationId, name) => void accept(invitationId, name),
     suggestedName: () => suggestedName(session.session?.humanId),
   };
 }
-
-/** Why the signed-in identity cannot open a workspace. */
-export type WorkspaceAccess =
-  | { readonly reason: "invited"; readonly workspaceName: string | undefined }
-  | { readonly reason: "removed"; readonly workspaceName: string }
-  | { readonly reason: "unknown" };
 
 /**
  * For a workspace without an active membership: an invitation not yet accepted, a membership that

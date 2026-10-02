@@ -270,14 +270,15 @@ maps query state to pages, errors, and navigation. Web uses browser routing and
 an API proxy; Tauri uses hash routing and connects to the existing local host. Its content
 security policy allows connections only to `http://127.0.0.1:8787`, so the desktop app cannot
 reach a host at any other address until that is configurable.
-Client and UI have no dependency on each other in source, tests, or manifests.
+UI has no dependency on client. Client depends on UI only for the screens' types, as a
+development dependency with type-only imports.
 Stored credentials are scoped by API URL and validated before protected content mounts.
 Changing credentials disposes the previous registry and requests. Session rejection,
 host failures, missing workspace access, and unknown routes have separate states.
 
-The headless [sign-in controller](../apps/client/src/sign-in/README.md) owns email/code
+The headless [sign-in hook](../apps/client/src/sign-in.ts) owns email/code
 drafts, shared-schema validation, typed HTTP requests, explicit retry/resend, and
-session installation. Each mounted controller owns its requests; changing email,
+signing in. Each mounted hook owns its requests; changing email,
 unmounting, and credential replacement cancel old work and ignore late responses.
 Web and desktop wire it to the UI sign-in screens, which map its codes to wording.
 

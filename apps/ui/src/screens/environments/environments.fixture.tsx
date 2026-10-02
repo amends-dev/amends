@@ -15,7 +15,7 @@ import {
   EnvironmentList,
   EnvironmentsPane,
   environmentsToast,
-  type CommandRowView,
+  type CommandRow,
   type EnvironmentTab,
   type EnvironmentIssue,
   type EnvironmentProblem,
@@ -25,7 +25,7 @@ import {
   type Retention,
   type SandboxAccountOption,
   type SandboxProviderOption,
-  type VariableRowView,
+  type VariableRow,
 } from "./index.ts";
 
 const harnesses: readonly HarnessOption[] = [
@@ -59,8 +59,8 @@ export const sampleProviders: readonly SandboxProviderOption[] = [
 interface SandboxDraft {
   readonly accountId: string | undefined;
   readonly template: string;
-  readonly variables: readonly VariableRowView[];
-  readonly commands: readonly CommandRowView[];
+  readonly variables: readonly VariableRow[];
+  readonly commands: readonly CommandRow[];
   readonly retention: Retention;
 }
 interface Sample {
@@ -72,12 +72,12 @@ interface Sample {
 }
 
 let rowId = 0;
-const variable = (key: string, value: string): VariableRowView => ({
+const variable = (key: string, value: string): VariableRow => ({
   id: `v${++rowId}`,
   key,
   value,
 });
-const command = (text: string): CommandRowView => ({ id: `c${++rowId}`, command: text });
+const command = (text: string): CommandRow => ({ id: `c${++rowId}`, command: text });
 const sandbox = (accountId: string | undefined, template = ""): SandboxDraft => ({
   accountId,
   template,

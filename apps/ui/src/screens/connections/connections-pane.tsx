@@ -15,8 +15,7 @@ import {
   connectionStatus,
   methodLabels,
   type ConnectionSummary,
-  type ConnectionsAction,
-  type ConnectionsError,
+  type ConnectionsFailure,
 } from "./wording.tsx";
 import * as s from "./connections.css.ts";
 
@@ -154,10 +153,7 @@ export interface ConnectionListProps {
   /** Starts adding a connection, for a reader who may. */
   readonly onAdd?: () => void;
   /** A read or change that failed, outside any dialog. */
-  readonly failure?: {
-    readonly action: ConnectionsAction | "refresh";
-    readonly error: ConnectionsError;
-  };
+  readonly failure?: ConnectionsFailure;
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
 }

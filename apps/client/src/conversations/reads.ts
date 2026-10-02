@@ -2,7 +2,7 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-solid";
 import { Option } from "effect";
 import { AsyncResult, type Atom } from "effect/unstable/reactivity";
 import { createMemo, type Accessor } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
+import { useApiClient } from "../provider.tsx";
 import {
   groupsRead,
   inboxRead,
@@ -21,7 +21,7 @@ import {
   type PagedRead,
   type Thread,
   type ThreadTimeline,
-} from "../api/conversations.ts";
+} from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 
 /** A live read: its latest value, kept while it refreshes or a refresh fails. */

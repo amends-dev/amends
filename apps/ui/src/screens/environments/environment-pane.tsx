@@ -26,7 +26,7 @@ import {
   type EnvironmentProblem,
   type EnvironmentSummary,
   type EnvironmentsAction,
-  type EnvironmentsError,
+  type EnvironmentsFailure,
 } from "./wording.tsx";
 import * as s from "./environments.css.ts";
 
@@ -69,11 +69,7 @@ export interface EnvironmentPaneProps {
   /** The change running, if any. */
   readonly pending?: EnvironmentsAction | "refresh";
   /** A failed change made here, or a read that failed. */
-  readonly failure?: {
-    readonly action: EnvironmentsAction | "refresh";
-    readonly error: EnvironmentsError;
-    readonly problems: readonly EnvironmentProblem[];
-  };
+  readonly failure?: EnvironmentsFailure;
   readonly onRefresh?: () => void;
 }
 

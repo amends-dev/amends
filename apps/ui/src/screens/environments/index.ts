@@ -19,10 +19,11 @@ export {
 export {
   SandboxFields,
   SandboxSummary,
-  type CommandRowView,
+  type CommandRow,
   type SandboxFieldsProps,
   type SandboxSummaryProps,
-  type VariableRowView,
+  type VariableIssue,
+  type VariableRow,
 } from "./sandbox-fields.tsx";
 export {
   environmentStatus,
@@ -35,6 +36,7 @@ export {
   type EnvironmentSummary,
   type EnvironmentsAction,
   type EnvironmentsError,
+  type EnvironmentsFailure,
   type HarnessOption,
   type Placement,
   type Retention,

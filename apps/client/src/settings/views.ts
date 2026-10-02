@@ -1,19 +1,34 @@
-import { DateTime } from "effect";
+import type {
+  InvitationStatus,
+  MemberDetail,
+  MemberFilter,
+  SettingsAction,
+  SettingsFailure,
+  SettingsInvitation,
+  SettingsPerson,
+  SettingsRole,
+  SettingsTab,
+} from "@amends/ui/screens/settings";
+import { useAtomValue } from "@effect/atom-solid";
+import { Cause, DateTime, Effect, Option } from "effect";
+import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
-import type { Member } from "../api/conversations.ts";
+import { useChanges } from "../api/changes.ts";
+import type { Member } from "../conversations/api.ts";
+import { workspaceFailure } from "../api/failures.ts";
 import {
+  changeSettings,
   invitationIntent,
+  reloadSettings,
+  settingsReads,
   type SettingsCommand,
   type SettingsData,
-  type SettingsSection,
-} from "../api/settings.ts";
+  type SettingsReads,
+} from "./api.ts";
 import { memberName, usePeople } from "../conversations/views.ts";
 import { toDate } from "../conversations/time.ts";
+import { useApiClient } from "../provider.tsx";
 import { useWorkspace } from "../session/directory.tsx";
-import { useSettings, type SettingsChange, type SettingsError } from "./controller.ts";
-
-/** A change the reader can make in settings. */
-export type SettingsAction = SettingsChange["kind"];
 
 /** A change that completed and whose result is shown. */
 export interface SettingsDone {
@@ -24,68 +39,16 @@ export interface SettingsDone {
   readonly created?: string;
 }
 
-/**
- * Why the reader's last change, or a read, failed. `refresh` covers reads: a live refresh that
- * failed, or values found out of date after the change that found them was set aside.
- */
-export interface SettingsFailure {
-  readonly action: SettingsAction | "refresh";
-  readonly error: SettingsError;
-}
-
-/** Someone in the workspace, as settings shows them. */
-export interface SettingsPerson {
-  readonly id: string;
-  readonly name: string;
-  readonly agent: boolean;
-  /** The reader. */
-  readonly you: boolean;
-}
-
-export interface SettingsRole {
-  readonly id: string;
-  readonly name: string;
-}
-
-/** Access a member holds: a role or one permission, across the workspace or on one target. */
-export interface SettingsAccess {
-  readonly id: string;
-  /** The role's name, or the permission's. */
-  readonly name: string;
-  readonly scope: "workspace" | "target";
-  readonly active: boolean;
-}
-
-/** A workspace member, as the roster and their details show them. */
-export interface SettingsMember extends SettingsPerson {
-  /** What they sign in as, such as an email address. */
-  readonly signIn: string;
-  readonly status: "active" | "removed";
-  /** Their workspace role, when the reader may read their access and they hold one. */
-  readonly role: SettingsRole | undefined;
+/** A member as settings shows them, with what the reader may change about them. */
+interface Row {
+  readonly detail: MemberDetail;
+  /** Their workspace role's id, when the reader may read their access and they hold one. */
+  readonly roleId: string | undefined;
   /** The roles the reader may give them; empty when the reader may not change their role. */
   readonly roles: readonly SettingsRole[];
-  /** What they may do, when the reader may read it. */
-  readonly access: readonly SettingsAccess[] | undefined;
+  /** The reader may remove them now. */
   readonly removable: boolean;
 }
-
-export type SettingsInvitationStatus = "pending" | "accepted" | "expired" | "revoked";
-
-export interface SettingsInvitation {
-  readonly id: string;
-  /** The sign-in email it was issued to. */
-  readonly recipient: string;
-  /** The role it gives, by name. */
-  readonly role: string;
-  readonly status: SettingsInvitationStatus;
-  readonly issuedAt: Date;
-  readonly expiresAt: Date;
-  readonly revocable: boolean;
-}
-
-/** Which members the roster lists. */
-export type MemberFilter = "active" | "removed";
 
 type Entry = SettingsData["members"][number];
 const workspaceRoles = (entry: Entry) =>
@@ -98,7 +61,7 @@ const workspaceRoles = (entry: Entry) =>
 const statusOf = (
   invitation: SettingsData["invitations"][number],
   now: number,
-): SettingsInvitationStatus => {
+): InvitationStatus => {
   if (invitation.state._tag === "Accepted") return "accepted";
   if (invitation.state._tag === "Revoked") return "revoked";
   return DateTime.toEpochMillis(invitation.details.expiresAt) <= now ? "expired" : "pending";
@@ -112,22 +75,20 @@ const statusOf = (
  */
 export function useWorkspaceSettings(
   workspaceId: string,
-  section: SettingsSection,
+  section: SettingsTab,
   options: { readonly done?: (done: SettingsDone) => void } = {},
 ) {
   const membership = useWorkspace(() => workspaceId);
   const people = usePeople(workspaceId);
   const selfId = () => membership()?.member.id as string | undefined;
-  // The change running or last run, with whom it concerned, until it settles or is set aside.
-  const [attempt, setAttempt] = createSignal<{
-    readonly action: SettingsAction | "refresh";
-    readonly subject?: string;
-  }>();
-  const [running, setRunning] = createSignal<SettingsAction | "refresh">();
-  const settings = useSettings(workspaceId, section, {
-    settled: (change, created) => {
-      const subject = attempt()?.subject;
-      setAttempt(undefined);
+  const client = useApiClient();
+  const reads = settingsReads(client, workspaceId);
+  const read = reads ? connect(reads, section) : undefined;
+  const data = () => read?.data();
+  const changes = useChanges({
+    write: changeSettings(workspaceId),
+    reload: reads ? reloadSettings(client, reads, section) : Effect.void,
+    done: (change: SettingsCommand, created, subject: string | undefined) => {
       if (change.kind === "rename") setName(undefined);
       if (change.kind === "role") setRole(undefined);
       if (change.kind === "transfer") setTransfer(undefined);
@@ -137,14 +98,9 @@ export function useWorkspaceSettings(
       }
       options.done?.({ action: change.kind, subject, created });
     },
+    outdated: () => data() !== undefined && read?.failure() !== undefined,
   });
-  const data = settings.data;
-  const send = (command: SettingsCommand, subject?: string) => {
-    if (settings.pending() || (settings.needsRefresh() && command.kind !== "refresh")) return;
-    setAttempt({ action: command.kind, subject });
-    setRunning(command.kind);
-    settings.send(command);
-  };
+  const send = changes.send;
 
   const person = (member: Member.Record): SettingsPerson => ({
     id: member.id,
@@ -152,19 +108,16 @@ export function useWorkspaceSettings(
     agent: member.identity._tag === "Agent",
     you: member.id === selfId(),
   });
-  const memberOf = (entry: Entry): SettingsMember => {
+  const rowOf = (entry: Entry): Row => {
     const access = entry.access;
     // A closed membership holds no access, whatever its assignments still record.
     const current = entry.member.status === "active" ? access : null;
     const assigned = workspaceRoles(entry)[0];
     const roleId = assigned?.source._tag === "Role" ? assigned.source.roleId : undefined;
-    const role =
+    const roleName =
       roleId === undefined
         ? undefined
-        : {
-            id: roleId,
-            name: access?.roles.find((choice) => choice.role.id === roleId)?.role.name ?? roleId,
-          };
+        : (access?.roles.find((choice) => choice.role.id === roleId)?.role.name ?? roleId);
     const assignable =
       access?.roles
         .filter((choice) => choice.assignable)
@@ -173,27 +126,30 @@ export function useWorkspaceSettings(
     const editable =
       access?.canManage === true &&
       entry.member.status === "active" &&
-      (role === undefined || assignable.some((choice) => choice.id === role.id));
+      (roleId === undefined || assignable.some((choice) => choice.id === roleId));
     return {
-      ...person(entry.member),
-      signIn: entry.member.identity.id,
-      status: entry.member.status,
-      role,
+      detail: {
+        ...person(entry.member),
+        signIn: entry.member.identity.id,
+        status: entry.member.status,
+        role: roleName,
+        access: current?.assignments.map(({ id, source, status }) => {
+          const scope = source._tag === "Role" ? source.scope : source.grant.scope;
+          return {
+            id,
+            name:
+              source._tag === "Role"
+                ? (current.roles.find((choice) => choice.role.id === source.roleId)?.role.name ??
+                  source.roleId)
+                : source.grant.permission,
+            scope: scope._tag === "Workspace" ? ("workspace" as const) : ("target" as const),
+            active: status === "active",
+          };
+        }),
+      },
+      roleId,
       roles: editable ? assignable : [],
-      access: current?.assignments.map(({ id, source, status }): SettingsAccess => {
-        const scope = source._tag === "Role" ? source.scope : source.grant.scope;
-        return {
-          id,
-          name:
-            source._tag === "Role"
-              ? (current.roles.find((choice) => choice.role.id === source.roleId)?.role.name ??
-                source.roleId)
-              : source.grant.permission,
-          scope: scope._tag === "Workspace" ? "workspace" : "target",
-          active: status === "active",
-        };
-      }),
-      removable: entry.canRemove,
+      removable: entry.canRemove && entry.member.status === "active",
     };
   };
   const byName = (left: SettingsPerson, right: SettingsPerson) =>
@@ -201,20 +157,26 @@ export function useWorkspaceSettings(
   // The reader first, then everyone by name.
   const roster = createMemo(() =>
     (data()?.members ?? [])
-      .map(memberOf)
-      .toSorted((left, right) => Number(right.you) - Number(left.you) || byName(left, right)),
+      .map(rowOf)
+      .toSorted(
+        (left, right) =>
+          Number(right.detail.you) - Number(left.detail.you) || byName(left.detail, right.detail),
+      ),
   );
+  const rowOfMember = (memberId: string) => roster().find((row) => row.detail.id === memberId);
   const [query, setQuery] = createSignal("");
   const [filter, setFilter] = createSignal<MemberFilter>("active");
   const members = createMemo(() => {
     const words = query().trim().toLowerCase();
-    return roster().filter(
-      (member) =>
-        member.status === filter() &&
-        (words === "" ||
-          member.name.toLowerCase().includes(words) ||
-          member.signIn.toLowerCase().includes(words)),
-    );
+    return roster()
+      .map((row) => row.detail)
+      .filter(
+        (member) =>
+          member.status === filter() &&
+          (words === "" ||
+            member.name.toLowerCase().includes(words) ||
+            member.signIn.toLowerCase().includes(words)),
+      );
   });
   const invitations = createMemo(() => {
     const now = Date.now();
@@ -271,7 +233,7 @@ export function useWorkspaceSettings(
   // After an explicit refresh, drafts stay and are made against what the reader now reviews.
   createEffect(
     on(
-      settings.revision,
+      changes.revision,
       () => {
         const draft = name();
         if (draft) setName({ ...draft, expected: storedName() });
@@ -289,8 +251,10 @@ export function useWorkspaceSettings(
     /** Why nothing shows yet; undefined once the settings have loaded. */
     status: (): "loading" | "failed" | "unavailable" | undefined => {
       if (data() !== undefined) return undefined;
-      const error = settings.error();
-      if (settings.pending() || error === undefined) return "loading";
+      if (!read) return "unavailable";
+      const failure = read.failure();
+      if (failure === undefined) return "loading";
+      const error = workspaceFailure(failure);
       return error === "denied" || error === "gone" ? "unavailable" : "failed";
     },
     workspace: createMemo(() => {
@@ -315,7 +279,7 @@ export function useWorkspaceSettings(
     /** Active members, as the workspace directory counts them. */
     memberCount: () =>
       membership()?.activeMemberCount ??
-      roster().filter((member) => member.status === "active").length,
+      roster().filter((row) => row.detail.status === "active").length,
     permissions: () => ({
       rename: data()?.settings.canRename ?? false,
       invite: data()?.settings.canInvite ?? false,
@@ -331,7 +295,9 @@ export function useWorkspaceSettings(
     /** The roster after the search and filter. */
     members,
     /** A member by id, whatever the search and filter. */
-    member: (memberId: string) => roster().find((member) => member.id === memberId),
+    member: (memberId: string) => rowOfMember(memberId)?.detail,
+    /** The reader may remove the member now. */
+    removable: (memberId: string) => rowOfMember(memberId)?.removable ?? false,
     query,
     setQuery,
     filter,
@@ -339,29 +305,17 @@ export function useWorkspaceSettings(
     /** Every invitation the reader may read, newest first. */
     invitations,
     /** The change running, or `refresh`. */
-    pending: () => (settings.pending() && data() !== undefined ? running() : undefined),
+    pending: () => (data() !== undefined ? changes.pending() : undefined),
     failure: (): SettingsFailure | undefined => {
-      const error = settings.error();
-      if (error === undefined || data() === undefined) return undefined;
-      const current = attempt();
-      if (current) return { action: current.action, error };
-      return error === "outdated" || settings.needsRefresh()
-        ? { action: "refresh", error }
-        : undefined;
+      const failure = data() !== undefined ? changes.failure() : undefined;
+      return failure && { action: failure.action, error: failure.error };
     },
     /** What the reader sees is out of date: changes wait for a refresh. */
-    stale: settings.needsRefresh,
+    stale: changes.stale,
     /** Reload, on behalf of the change that found the values out of date, if any. */
-    refresh: () => {
-      if (settings.pending()) return;
-      if (!settings.needsRefresh() || !attempt()) setAttempt({ action: "refresh" });
-      setRunning("refresh");
-      settings.refresh();
-    },
+    refresh: changes.refresh,
     /** Set aside the last change's failure, such as when its dialog closes. */
-    dismiss: () => {
-      if (!settings.pending()) setAttempt(undefined);
-    },
+    dismiss: changes.dismiss,
     rename: {
       name: () => name()?.name ?? storedName(),
       setName: (value: string) =>
@@ -369,9 +323,7 @@ export function useWorkspaceSettings(
       /** The name differs from the one saved and can be saved now. */
       changed: () => {
         const draft = name()?.name.trim();
-        return (
-          !settings.needsRefresh() && draft !== undefined && draft !== "" && draft !== storedName()
-        );
+        return !changes.stale() && draft !== undefined && draft !== "" && draft !== storedName();
       },
       save: () => {
         const draft = name();
@@ -382,7 +334,7 @@ export function useWorkspaceSettings(
       /** Start choosing a new owner against the current ownership. */
       begin: () => {
         const ownership = data()?.ownership;
-        setAttempt(undefined);
+        changes.dismiss();
         if (ownership) setTransfer({ memberId: undefined, expected: ownership.ownerAssignmentId });
       },
       chosen: () => transfer()?.memberId,
@@ -407,12 +359,12 @@ export function useWorkspaceSettings(
       },
     },
     role: {
+      /** The roles the reader may give the member; empty when they may not change their role. */
+      choices: (memberId: string) => rowOfMember(memberId)?.roles ?? [],
       /** The member's chosen role, or their current one. */
       of: (memberId: string) => {
         const edit = role();
-        return edit?.memberId === memberId
-          ? edit.roleId
-          : roster().find((member) => member.id === memberId)?.role?.id;
+        return edit?.memberId === memberId ? edit.roleId : rowOfMember(memberId)?.roleId;
       },
       choose: (memberId: string, roleId: string) => {
         const edit = role();
@@ -426,9 +378,9 @@ export function useWorkspaceSettings(
       changed: (memberId: string) => {
         const edit = role();
         return (
-          !settings.needsRefresh() &&
+          !changes.stale() &&
           edit?.memberId === memberId &&
-          edit.roleId !== roster().find((member) => member.id === memberId)?.role?.id
+          edit.roleId !== rowOfMember(memberId)?.roleId
         );
       },
       save: (memberId: string) => {
@@ -436,18 +388,18 @@ export function useWorkspaceSettings(
         if (edit?.memberId !== memberId) return;
         send(
           { kind: "role", memberId, roleId: edit.roleId, expectedAssignmentIds: edit.expected },
-          roster().find((member) => member.id === memberId)?.name,
+          rowOfMember(memberId)?.detail.name,
         );
       },
       /** Drop the choice, such as when the member's details close. */
       reset: () => setRole(undefined),
     },
     remove: (memberId: string) =>
-      send({ kind: "remove", memberId }, roster().find((member) => member.id === memberId)?.name),
+      send({ kind: "remove", memberId }, rowOfMember(memberId)?.detail.name),
     invite: {
       /** Start a new invitation for the first role the reader may give. */
       begin: () => {
-        setAttempt(undefined);
+        changes.dismiss();
         setInvite({ recipient: "", roleId: inviteRoles()[0]?.id });
       },
       recipient: () => invite().recipient,
@@ -474,3 +426,48 @@ export function useWorkspaceSettings(
 }
 
 export type WorkspaceSettingsView = ReturnType<typeof useWorkspaceSettings>;
+
+const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | undefined =>
+  AsyncResult.isFailure(read) && !read.waiting ? read.cause : undefined;
+/** A section's reads, live while mounted, and the last complete view of them. */
+function connect(reads: SettingsReads, section: SettingsTab) {
+  const settings = useAtomValue(() => reads.settings),
+    ownership = useAtomValue(() => reads.ownership),
+    members = useAtomValue(() => reads.members(section === "members"));
+  const canReadInvitations = createMemo(() =>
+    Option.match(AsyncResult.value(settings()), {
+      onNone: () => false,
+      onSome: (view) => view.canReadInvitations,
+    }),
+  );
+  const invitations = useAtomValue(() =>
+    reads.invitations(section === "members" && canReadInvitations()),
+  );
+  return {
+    // Keep the last complete view while reads refresh, so live updates never blank the page.
+    data: createMemo<SettingsData | undefined>((previous) => {
+      const view = AsyncResult.value(settings()),
+        owner = AsyncResult.value(ownership()),
+        people = AsyncResult.value(members()),
+        invites = AsyncResult.value(invitations());
+      if (
+        Option.isNone(view) ||
+        Option.isNone(owner) ||
+        Option.isNone(people) ||
+        Option.isNone(invites)
+      )
+        return previous;
+      return {
+        settings: view.value,
+        ownership: owner.value,
+        members: people.value,
+        invitations: invites.value,
+      };
+    }),
+    /** Why the latest read failed, once it settles. */
+    failure: createMemo(
+      () =>
+        settled(settings()) ?? settled(ownership()) ?? settled(members()) ?? settled(invitations()),
+    ),
+  };
+}

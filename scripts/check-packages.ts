@@ -68,9 +68,13 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
         errors.push(
           `${path}: UI must remain presentation-only; ${section}.${name} belongs in client or a platform app.`,
         );
+      // Client names what it returns by the screens' types, so it takes UI to type-check only.
+      const screenTypes = name === "@amends/ui" && section === "devDependencies";
       if (
         path === "apps/client/package.json" &&
-        ((name.startsWith("@amends/") && !["@amends/api-http", "@amends/gateway"].includes(name)) ||
+        ((name.startsWith("@amends/") &&
+          !["@amends/api-http", "@amends/gateway"].includes(name) &&
+          !screenTypes) ||
           name.startsWith("@tauri-apps/") ||
           name === "@solidjs/router" ||
           name.startsWith("@vanilla-extract/") ||
@@ -79,7 +83,7 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
           name.startsWith("storybook-"))
       )
         errors.push(
-          `${path}: client must remain headless and independent of UI, routing presentation, and platform/backend implementations (${section}.${name}).`,
+          `${path}: client must remain headless and take UI only as a development dependency for its types, independent of routing presentation and platform/backend implementations (${section}.${name}).`,
         );
     }
   }
@@ -94,7 +98,7 @@ for await (const path of new Bun.Glob(
   );
 }
 
-// UI owns presentation; client/api owns shared client contract imports.
+// UI owns presentation; client's API modules own its contract imports.
 for await (const path of new Bun.Glob(
   "apps/{icons,ui,client,web,desktop}/{src,test,.storybook}/**/*.{ts,tsx}",
 ).scan({
@@ -115,6 +119,7 @@ for await (const path of new Bun.Glob(
   );
   // Bun's JSX scanner includes synthetic React require calls, even with JSX auto-import
   // disabled. Exclude those, then recover literal require calls from the actual source.
+  const runtime = new Set(imports.map((dependency) => dependency.path));
   const dependencies = new Set(
     imports
       .filter(
@@ -158,8 +163,12 @@ for await (const path of new Bun.Glob(
     const uiImport = dependency === "@amends/ui" || dependency.startsWith("@amends/ui/");
     const clientImport =
       dependency === "@amends/client" || dependency.startsWith("@amends/client/");
+    // Shared API plumbing and each feature's api.ts reach the HTTP contract.
+    // Client may name the screens' types, never import UI code.
+    const screenTypeImport = uiImport && !runtime.has(dependency);
     const contractImport =
-      path.startsWith("apps/client/src/api/") &&
+      (path.startsWith("apps/client/src/api/") ||
+        /^apps\/client\/src\/[^/]+\/api\.ts$/.test(path)) &&
       ["@amends/api-http", "@amends/gateway/sign-in", "@amends/gateway/directory"].includes(
         dependency,
       );
@@ -183,7 +192,10 @@ for await (const path of new Bun.Glob(
       );
     if (
       path.startsWith("apps/client/") &&
-      ((dependency.startsWith("@amends/") && !clientImport && !contractImport) ||
+      ((dependency.startsWith("@amends/") &&
+        !clientImport &&
+        !contractImport &&
+        !screenTypeImport) ||
         dependency.startsWith("@tauri-apps/") ||
         dependency === "@solidjs/router" ||
         dependency.startsWith("@solidjs/router/") ||
@@ -201,7 +213,7 @@ for await (const path of new Bun.Glob(
         target.startsWith(resolve(root, "hosts") + "/"))
     )
       errors.push(
-        `${path}: client must remain headless; UI, styles, route rendering, and platform/backend implementations belong outside client (${dependency}).`,
+        `${path}: client must remain headless; it may import UI types only, and styles, route rendering, and platform/backend implementations belong outside client (${dependency}).`,
       );
   }
 }

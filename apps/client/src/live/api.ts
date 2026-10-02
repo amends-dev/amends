@@ -2,9 +2,9 @@ import { ApiErrors, Workspace } from "@amends/api-http";
 import { Cause, Clock, Data, Duration, Effect, Exit, Queue, Random, Schema, Stream } from "effect";
 import { Sse } from "effect/unstable/encoding";
 import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
-import { watchWake } from "../live/wake.ts";
-import { isUnauthorized, type ApiClient } from "./client.ts";
-import { posted, typing, typistsAtom } from "./typing.ts";
+import { watchWake } from "./wake.ts";
+import { isUnauthorized, type ApiClient } from "../api/client.ts";
+import { posted, typing, typistsAtom } from "../conversations/typing.ts";
 import {
   collectionKey,
   directoryKey,
@@ -14,7 +14,7 @@ import {
   workspaceResources,
   type WorkspaceCollection,
   type WorkspaceResource,
-} from "./keys.ts";
+} from "../api/keys.ts";
 
 export type ChangeFeedState = Data.TaggedEnum<{
   /** Opening the first connection. */

@@ -22,10 +22,9 @@ import {
   useWorkspaceGroups,
   useWorkspacePeople,
   useWorkspacePermission,
-  type ConnectionCapability,
-  type MentionCandidate,
   type WorkspacePage,
 } from "@amends/client";
+import type { MentionCandidate } from "@amends/ui/components/composer";
 import type { PickerPerson } from "@amends/ui/components/member-picker";
 import { LiveStatus } from "@amends/ui/components/live-status";
 import { Profiles } from "@amends/ui/components/profile-card";
@@ -33,7 +32,7 @@ import { Toast } from "@amends/ui/components/toast";
 import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
 import { agentStatus } from "@amends/ui/screens/agents";
-import { connectionStatus } from "@amends/ui/screens/connections";
+import { connectionStatus, type ConnectionCapability } from "@amends/ui/screens/connections";
 import { environmentStatus } from "@amends/ui/screens/environments";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
@@ -565,7 +564,6 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
   const navigate = useNavigate();
   const [, setSearch] = useSearchParams<{ add?: string }>();
   const list = useAgentList(props.workspaceId);
-  const activity = useTurnActivity(props.workspaceId);
   const open = useMatch(() => "/workspaces/:workspaceId/agents/:agentId/*rest");
   const base = paths.workspacePage(props.workspaceId, "agents");
   return (
@@ -590,8 +588,8 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
               initials: agent.name.trim().charAt(0).toUpperCase(),
               tone: "lilac" as const,
             },
-            activity: activity.agentActivity(agent.memberId)?.state,
-            status: agentStatus(agent.issues, activity.agentActivity(agent.memberId)),
+            activity: agent.activity?.state,
+            status: agentStatus(agent.issues, agent.activity),
           })),
           loading: list.loading(),
           empty: "No agents yet",
@@ -736,8 +734,8 @@ function ThreadPanel(props: {
     thread
       .entries()
       .map((entry) =>
-        entry.kind === "turn" && entry.agent.id !== undefined
-          ? { ...entry, agentHref: href(paths.agent(props.workspaceId, entry.agent.id)) }
+        entry.kind === "turn" && entry.agentId !== undefined
+          ? { ...entry, agentHref: href(paths.agent(props.workspaceId, entry.agentId)) }
           : entry,
       );
   return (

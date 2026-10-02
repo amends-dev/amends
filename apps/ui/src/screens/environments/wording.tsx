@@ -87,6 +87,12 @@ export type EnvironmentsError =
   | "failed"
   | "refresh-failed"
   | "outdated";
+/** A change's failure, or a refresh's, with the action it belongs to and what the server refused. */
+export interface EnvironmentsFailure {
+  readonly action: EnvironmentsAction | "refresh";
+  readonly error: EnvironmentsError;
+  readonly problems: readonly EnvironmentProblem[];
+}
 /** What the server refused, beyond a workspace failure. */
 export type EnvironmentProblem =
   | "unknown-harness"

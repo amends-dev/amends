@@ -1,120 +1,46 @@
+import type {
+  AddEnvironmentProps,
+  EnvironmentIssue,
+  EnvironmentsAction,
+  EnvironmentsFailure,
+  EnvironmentSummary,
+  HarnessOption,
+  Placement,
+  Retention,
+  SandboxAccountOption,
+  SandboxProviderOption,
+  VariableIssue,
+} from "@amends/ui/screens/environments";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Exit, Option } from "effect";
+import { Cause, Effect, Option } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
-import { useApiClient } from "../api/context.tsx";
+import { useApiClient } from "../provider.tsx";
 import {
+  changeEnvironment,
   environmentProblems,
   environmentsReads,
-  environmentsRequest,
   newEnvironmentRequestKey,
+  reloadEnvironments,
   type Environment,
   type EnvironmentCommand,
-  type EnvironmentProblem,
   type EnvironmentsReads,
-} from "../api/environments.ts";
-import { isStale, workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
+} from "./api.ts";
+import { useChanges } from "../api/changes.ts";
+import { workspaceFailure } from "../api/failures.ts";
 import { toDate } from "../conversations/time.ts";
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
 import { memberName } from "../conversations/views.ts";
-import { useRequest } from "../request/use-request.ts";
-import { SandboxDrafts, type Retention, type SandboxDraft } from "./draft.ts";
+import { SandboxDrafts, type SandboxDraft } from "./draft.ts";
 
-/** Where a harness's loop runs: in amends, or as a program inside the sandbox. */
-export type Placement = "in-process" | "in-sandbox";
-/**
- * What keeps an environment from running now: its harness or sandbox provider is no longer
- * installed, its account connection is gone, or that account still needs its key.
- */
-export type EnvironmentIssue =
-  | "harness-unavailable"
-  | "sandbox-unavailable"
-  | "connection-unavailable"
-  | "connection-incomplete";
-
-/** A harness this host installed. */
-export interface HarnessChoice {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  /** Where its loop can run. */
-  readonly placements: readonly Placement[];
-}
-/** A sandbox provider this host installed. */
-export interface SandboxProviderChoice {
-  readonly id: string;
-  readonly name: string;
-  readonly description: string;
-  /** Its sandboxes run under an account connection. */
-  readonly account: boolean;
-  /** How it describes the starting point it takes, if it takes one. */
-  readonly template:
-    | { readonly label: string; readonly description?: string; readonly placeholder?: string }
-    | undefined;
-}
-/** A connection a sandbox can run under: an account at one provider. */
-export interface SandboxAccount {
-  readonly id: string;
-  readonly name: string;
-  readonly providerId: string;
-  /** Its key is saved, so the environment can be ready. */
-  readonly ready: boolean;
-}
-
-/** An environment, as the list and its details show it. */
-export interface EnvironmentEntry {
-  readonly id: string;
-  readonly name: string;
-  readonly harnessId: string;
-  /** Undefined when this host no longer installs the harness. */
-  readonly harness: HarnessChoice | undefined;
-  readonly sandbox:
-    | {
-        readonly providerId: string;
-        /** Undefined when this host no longer installs the provider. */
-        readonly provider: SandboxProviderChoice | undefined;
-        readonly placement: Placement;
-        /** Its account connection, if it runs under one; its name when the reader may read it. */
-        readonly account: { readonly id: string; readonly name: string | undefined } | undefined;
-        readonly template: string | undefined;
-        readonly variables: ReadonlyArray<{ readonly key: string; readonly value: string }>;
-        readonly commands: readonly string[];
-        readonly retention: Retention;
-      }
-    | undefined;
-  /** What keeps it from running now; empty when it is ready. */
-  readonly issues: readonly EnvironmentIssue[];
-  /** The reader may rename it, change its sandbox settings, and remove it. */
-  readonly manageable: boolean;
-  /** Who added it, by name; undefined for the one the workspace started with. */
-  readonly createdBy: string | undefined;
-  readonly createdAt: Date;
-}
-
-/** A change the reader can make to environments. */
-export type EnvironmentAction = Exclude<EnvironmentCommand, { kind: "refresh" }>["kind"];
-/**
- * Why a change or read failed: a workspace failure; `refresh-failed` when a change completed but
- * its result could not be read back; or `outdated` when a live refresh failed. `problems` names
- * what the host refused, such as a sandbox account that is no longer available.
- */
-export type EnvironmentsError = WorkspaceFailure | "refresh-failed" | "outdated";
-export interface EnvironmentsFailure {
-  readonly action: EnvironmentAction | "refresh";
-  readonly error: EnvironmentsError;
-  readonly problems: readonly EnvironmentProblem[];
-}
 /** A change that completed and whose result is shown. */
 export interface EnvironmentsDone {
-  readonly action: EnvironmentAction;
+  readonly action: EnvironmentsAction;
   /** The environment it concerned, by name. */
   readonly subject?: string;
   /** The environment it created. */
   readonly created?: string;
 }
-
-/** The step of adding an environment: its basics, then its sandbox settings if it has one. */
-export type CreateStep = "basics" | "sandbox";
 
 const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | undefined =>
   AsyncResult.isFailure(read) && !read.waiting ? read.cause : undefined;
@@ -134,7 +60,7 @@ export interface SandboxEditor {
   ) => void;
   readonly removeVariable: (id: string) => void;
   /** Why a variable row would be refused. */
-  readonly variableIssue: (id: string) => "invalid" | "duplicate" | undefined;
+  readonly variableIssue: (id: string) => VariableIssue | undefined;
   readonly addCommand: () => void;
   readonly setCommand: (id: string, command: string) => void;
   readonly moveCommand: (id: string, by: -1 | 1) => void;
@@ -212,7 +138,7 @@ export function useEnvironments(
   const members = useMembers(workspaceId);
   const read = reads ? connect(reads) : undefined;
 
-  const harnesses = createMemo((): readonly HarnessChoice[] =>
+  const harnesses = createMemo((): readonly HarnessOption[] =>
     (read?.implementations()?.harnesses ?? []).map((harness) => ({
       id: harness.id,
       name: harness.name,
@@ -220,7 +146,7 @@ export function useEnvironments(
       placements: harness.placement,
     })),
   );
-  const providers = createMemo((): readonly SandboxProviderChoice[] =>
+  const providers = createMemo((): readonly SandboxProviderOption[] =>
     (read?.implementations()?.sandboxes ?? []).map((provider) => ({
       id: provider.id,
       name: provider.name,
@@ -240,24 +166,26 @@ export function useEnvironments(
             },
     })),
   );
-  const accounts = createMemo((): readonly SandboxAccount[] =>
-    (read?.connections() ?? []).flatMap((connection) => {
-      const provider = connection.capabilities.sandbox?.provider;
-      return provider === undefined || !connection.installed
-        ? []
-        : [
-            {
-              id: connection.id,
-              name: connection.name,
-              providerId: provider,
-              ready: connection.readiness.sandbox?._tag === "Ready",
-            },
-          ];
-    }),
+  // Accounts sandboxes can run under, with the sandbox provider each is an account at.
+  const accounts = createMemo(
+    (): ReadonlyArray<SandboxAccountOption & { readonly providerId: string }> =>
+      (read?.connections() ?? []).flatMap((connection) => {
+        const provider = connection.capabilities.sandbox?.provider;
+        return provider === undefined || !connection.installed
+          ? []
+          : [
+              {
+                id: connection.id,
+                name: connection.name,
+                providerId: provider,
+                ready: connection.readiness.sandbox?._tag === "Ready",
+              },
+            ];
+      }),
   );
   const providerOf = (id: string) => providers().find((provider) => provider.id === id);
 
-  const entryOf = (view: Environment.View): EnvironmentEntry => {
+  const entryOf = (view: Environment.View): EnvironmentSummary => {
     const sandbox = view.sandbox;
     const account =
       sandbox?.connectionId === null || sandbox === null
@@ -296,63 +224,22 @@ export function useEnvironments(
   const loaded = () => read?.environments() !== undefined && read.implementations() !== undefined;
   const find = (environmentId: string) => all().find((entry) => entry.id === environmentId);
 
-  // The change running or last run, with the environment it concerned, until it settles.
-  const [attempt, setAttempt] = createSignal<{
-    readonly action: EnvironmentAction | "refresh";
-    readonly subject?: string;
-  }>();
-  const [error, setError] = createSignal<{
-    readonly error: EnvironmentsError;
-    readonly problems: readonly EnvironmentProblem[];
-  }>();
-  const [needsRefresh, setNeedsRefresh] = createSignal(false);
-  const [revision, setRevision] = createSignal(0);
-  let unconfirmed: { readonly command: EnvironmentCommand; readonly created?: string } | undefined;
-
-  const finish = (command: EnvironmentCommand, created: string | undefined) => {
-    const current = attempt();
-    setAttempt(undefined);
-    if (command.kind === "refresh") return;
-    if (command.kind === "create") {
-      intent = undefined;
-      setDraft(undefined);
-    }
-    if (command.kind === "rename") forget(setNames, command.environmentId);
-    if (command.kind === "configure") forget(setConfigs, command.environmentId);
-    options.done?.({ action: command.kind, subject: current?.subject, created });
-  };
-  const request = useRequest(environmentsRequest(client, workspaceId), (exit, command) => {
-    if (Exit.isFailure(exit)) {
-      const failure = workspaceFailure(exit.cause);
-      setError({ error: failure, problems: environmentProblems(exit.cause) });
-      if (isStale(failure)) setNeedsRefresh(true);
-      return;
-    }
-    const { refreshed, created } = exit.value;
-    if (Exit.isFailure(refreshed)) {
-      if (command.kind !== "refresh") {
-        unconfirmed = { command, created };
-        setError({ error: "refresh-failed", problems: [] });
-        setNeedsRefresh(true);
-      } else setError({ error: workspaceFailure(refreshed.cause), problems: [] });
-      return;
-    }
-    setNeedsRefresh(false);
-    if (command.kind === "refresh") setRevision((value) => value + 1);
-    const done = command.kind === "refresh" ? unconfirmed : { command, created };
-    unconfirmed = undefined;
-    if (done) finish(done.command, done.created);
-    else setAttempt(undefined);
+  const changes = useChanges({
+    write: changeEnvironment(workspaceId),
+    reload: reads ? reloadEnvironments(reads) : Effect.void,
+    failed: (cause) => ({ error: workspaceFailure(cause), problems: environmentProblems(cause) }),
+    done: (change: EnvironmentCommand, created, subject: string | undefined) => {
+      if (change.kind === "create") {
+        intent = undefined;
+        setDraft(undefined);
+      }
+      if (change.kind === "rename") forget(setNames, change.environmentId);
+      if (change.kind === "configure") forget(setConfigs, change.environmentId);
+      options.done?.({ action: change.kind, subject, created });
+    },
+    outdated: () => loaded() && read?.failure() !== undefined,
   });
-  const [running, setRunning] = createSignal<EnvironmentAction | "refresh">();
-  const send = (command: EnvironmentCommand, subject?: string) => {
-    if (request.pending() || (needsRefresh() && command.kind !== "refresh")) return;
-    setError(undefined);
-    if (command.kind !== "refresh" || !needsRefresh() || !attempt())
-      setAttempt({ action: command.kind, subject });
-    setRunning(command.kind);
-    request.run(command);
-  };
+  const send = changes.send;
 
   // A new environment: its basics, then its sandbox settings. Retrying the same request reuses
   // its key, so an attempt whose response was lost is not created twice.
@@ -361,7 +248,7 @@ export function useEnvironments(
     readonly harnessId: string | undefined;
     readonly providerId: string | undefined;
     readonly placement: Placement | undefined;
-    readonly step: CreateStep;
+    readonly step: AddEnvironmentProps["step"];
     readonly sandbox: SandboxDraft;
   }>();
   let intent:
@@ -373,7 +260,7 @@ export function useEnvironments(
     return id === undefined ? undefined : providerOf(id);
   };
   /** Where the harness can run with the chosen sandbox: only in process without one. */
-  const placementsFor = (harness: HarnessChoice | undefined, providerId: string | undefined) =>
+  const placementsFor = (harness: HarnessOption | undefined, providerId: string | undefined) =>
     (harness?.placements ?? []).filter(
       (placement) => providerId !== undefined || placement === "in-process",
     );
@@ -399,7 +286,7 @@ export function useEnvironments(
     set((previous) =>
       Object.fromEntries(Object.entries(previous).filter(([id]) => id !== environmentId)),
     );
-  const savedDraft = (entry: EnvironmentEntry): SandboxDraft | undefined => {
+  const savedDraft = (entry: EnvironmentSummary): SandboxDraft | undefined => {
     const view = read?.environments()?.find((environment) => environment.id === entry.id);
     return view?.sandbox ? SandboxDrafts.fromSandbox(view.sandbox) : undefined;
   };
@@ -409,7 +296,7 @@ export function useEnvironments(
     const entry = find(environmentId);
     return (entry && savedDraft(entry)) ?? SandboxDrafts.empty();
   };
-  const shape = (provider: SandboxProviderChoice | undefined) => ({
+  const shape = (provider: SandboxProviderOption | undefined) => ({
     account: provider?.account ?? false,
     template: provider?.template !== undefined,
   });
@@ -417,7 +304,7 @@ export function useEnvironments(
   // After an explicit refresh, rename drafts stay and are made against the name now shown.
   createEffect(
     on(
-      revision,
+      changes.revision,
       () =>
         setNames((previous) =>
           Object.fromEntries(
@@ -453,34 +340,21 @@ export function useEnvironments(
     /** The reader may add environments. */
     canCreate: () => canCreate() === true,
     /** The change running, or `refresh`. */
-    pending: () => (request.pending() ? running() : undefined),
-    failure: (): EnvironmentsFailure | undefined => {
-      const current = error();
-      const readFailure = loaded() ? read?.failure() : undefined;
-      if (current === undefined)
-        return readFailure === undefined
-          ? undefined
-          : { action: "refresh", error: "outdated", problems: [] };
-      const action = attempt()?.action;
-      if (action) return { action, ...current };
-      return needsRefresh() ? { action: "refresh", ...current } : undefined;
-    },
+    pending: changes.pending,
+    failure: (): EnvironmentsFailure | undefined => changes.failure(),
     /** What the reader sees is out of date: changes wait for a refresh. */
-    stale: needsRefresh,
+    stale: changes.stale,
     /** Reload, on behalf of the change that found the values out of date, if any. */
     refresh: () => {
       if (!loaded()) read?.retry();
-      else send({ kind: "refresh" });
+      else changes.refresh();
     },
     /** Set aside the last change's failure, as a dialog closes. */
-    dismiss: () => {
-      if (!request.pending()) setAttempt(undefined);
-    },
+    dismiss: changes.dismiss,
     create: {
       /** Start an environment: no sandbox, and the first installed harness. */
       begin: () => {
-        setAttempt(undefined);
-        setError(undefined);
+        changes.dismiss();
         intent = undefined;
         setDraft({
           name: "",
@@ -577,7 +451,10 @@ export function useEnvironments(
       changed: (environmentId: string) => {
         const name = names()[environmentId]?.name.trim();
         return (
-          !needsRefresh() && name !== undefined && name !== "" && name !== find(environmentId)?.name
+          !changes.stale() &&
+          name !== undefined &&
+          name !== "" &&
+          name !== find(environmentId)?.name
         );
       },
       save: (environmentId: string) => {
@@ -609,7 +486,7 @@ export function useEnvironments(
       changed: (environmentId: string) => {
         const entry = find(environmentId);
         const edit = configs()[environmentId];
-        if (!entry?.sandbox?.provider || !edit || needsRefresh()) return false;
+        if (!entry?.sandbox?.provider || !edit || changes.stale()) return false;
         const saved = savedDraft(entry);
         const provider = shape(entry.sandbox.provider);
         return (
