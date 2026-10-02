@@ -162,17 +162,15 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     const records = yield* pendingOnly
       ? notificationStore.listLatestPendingByRecipient(target, request)
       : notificationStore.listLatestByRecipient(target, request);
-    return yield* Effect.forEach(
-      records,
-      (notification) =>
-        Effect.map(
-          findSource(notification),
-          Option.match({
-            onNone: (): NotificationInbox.Item => ({ notification }),
-            onSome: (item): NotificationInbox.Item => ({ notification, source: item }),
-          }),
-        ),
-      { concurrency: 4 },
+    // One at a time: inside a caller's commit, the store takes one step at a time.
+    return yield* Effect.forEach(records, (notification) =>
+      Effect.map(
+        findSource(notification),
+        Option.match({
+          onNone: (): NotificationInbox.Item => ({ notification }),
+          onSome: (item): NotificationInbox.Item => ({ notification, source: item }),
+        }),
+      ),
     );
   });
   const markSeen = Effect.fn("NotificationService.markSeen")(function* (
