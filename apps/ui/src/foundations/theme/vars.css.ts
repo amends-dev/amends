@@ -1,5 +1,6 @@
 import { createGlobalThemeContract, createTheme } from "@vanilla-extract/css";
-import { colorModes, light, type ColorMode } from "../color/tokens.ts";
+import { light, type ColorMode } from "../color/tokens.ts";
+import { colorPalettes, type ColorPalette } from "../color/palettes.ts";
 import { elevation } from "../elevation/tokens.ts";
 
 // Global names, so the variables read plainly in developer tools.
@@ -8,7 +9,12 @@ export const vars = createGlobalThemeContract(
   (_value, path) => `amends-${path.join("-")}`,
 );
 
-export const modeThemes: Readonly<Record<ColorMode, string>> = {
-  light: createTheme(vars, { color: colorModes.light, shadow: elevation.light }),
-  dark: createTheme(vars, { color: colorModes.dark, shadow: elevation.dark }),
-};
+export const paletteThemes = Object.fromEntries(
+  Object.entries(colorPalettes).map(([palette, colors]) => [
+    palette,
+    {
+      light: createTheme(vars, { color: colors.light, shadow: elevation.light }),
+      dark: createTheme(vars, { color: colors.dark, shadow: elevation.dark }),
+    },
+  ]),
+) as Readonly<Record<ColorPalette, Record<ColorMode, string>>>;

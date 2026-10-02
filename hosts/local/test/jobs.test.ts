@@ -1,8 +1,8 @@
-import { BackgroundJobs, BackgroundProcess } from "@amends/core/background";
 import { Commit, Store } from "@amends/core/journal";
-import { Workspace } from "@amends/core/workspace";
-import { BackgroundJob } from "@amends/cluster";
-import { Gateway } from "@amends/gateway";
+import { AgentJobs, AgentWork } from "@amends/core/turn";
+import { Member, Workspace } from "@amends/core/workspace";
+import { AgentJob } from "@amends/cluster";
+import { Gateway, type GatewayErrors } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { PostgresStorage } from "@amends/storage-postgresql";
 import { describe, expect, it } from "@effect/vitest";
@@ -13,9 +13,26 @@ import { setup } from "./database.ts";
 
 const { available, withDatabase } = setup();
 const workspaceId = Workspace.Id.make("workspace-one");
-const process = BackgroundProcess.Name.make("test.work");
+const agent = Member.Id.make("agent-member");
 
-describe.skipIf(!available)("background work on the local host", () => {
+/** A gateway that only does agents' work, telling `ran` whose work it did, and where. */
+const agentWorkOnly = (ran: (workspaceId: Workspace.Id, memberId: Member.Id) => void) => {
+  const unexpected = () => Effect.die("Only agents' work is expected");
+  return Gateway.Service.of({
+    createWorkspace: unexpected,
+    asMember: unexpected,
+    inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
+      const record = (memberId: Member.Id) => Effect.sync(() => ran(id, memberId));
+      return Effect.provideService(
+        program as Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, AgentWork.Service>,
+        AgentWork.Service,
+        AgentWork.Service.of({ acceptWork: record, stopDepartedTurns: record }),
+      );
+    },
+  });
+};
+
+describe.skipIf(!available)("jobs on the local host", () => {
   // The host's database and cluster share one client, so Cluster stores a request on the connection
   // of the commit that asks for it.
   it.live(
@@ -23,22 +40,10 @@ describe.skipIf(!available)("background work on the local host", () => {
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
-          const runs: Array<string> = [];
-          const unexpected = () => Effect.die("Only background runs are expected");
-          const gateway = Gateway.Service.of({
-            createWorkspace: unexpected,
-            inWorkspace: unexpected,
-            asMember: unexpected,
-            asMemberScoped: unexpected,
-            executeTurns: unexpected,
-            runBackgroundProcess: (_, name) =>
-              Effect.sync(() => {
-                runs.push(name);
-                return BackgroundProcess.idle;
-              }),
-          });
+          const runs: Array<Member.Id> = [];
+          const gateway = agentWorkOnly((_, memberId) => runs.push(memberId));
           const context = yield* Layer.build(
-            BackgroundJob.layer.pipe(
+            AgentJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
               ),
@@ -47,12 +52,12 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
-          const backgroundJobs = Context.get(context, BackgroundJobs.Service);
+          const agentJobs = Context.get(context, AgentJobs.Service);
           const stored = Effect.flatMap(
             SqlClient.SqlClient,
             (sql) => sql<{ readonly count: number }>`
             SELECT count(*)::int AS count FROM cluster_messages
-            WHERE entity_type = 'amends/BackgroundJob'`,
+            WHERE entity_type = 'amends/AgentJob'`,
           ).pipe(
             Effect.map(([row]) => row?.count ?? 0),
             Effect.orDie,
@@ -60,18 +65,18 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const rolledBack = yield* Effect.exit(
             store.transaction(
-              backgroundJobs
-                .request({ workspaceId, process })
+              agentJobs
+                .requestAcceptWork({ workspaceId, memberId: agent })
                 .pipe(Effect.andThen(Effect.fail("abandon"))),
             ),
           );
           expect(Exit.isFailure(rolledBack)).toBe(true);
           expect(yield* stored).toBe(0);
-          yield* store.transaction(backgroundJobs.request({ workspaceId, process }));
+          yield* store.transaction(agentJobs.requestAcceptWork({ workspaceId, memberId: agent }));
           expect(yield* stored).toBe(1);
           // The committed request reaches the worker; the rolled-back one never existed.
           yield* Effect.sleep("3 seconds");
-          expect(runs).toEqual([process]);
+          expect(runs).toEqual([agent]);
         }).pipe(Effect.scoped),
       ),
     30_000,
@@ -85,21 +90,11 @@ describe.skipIf(!available)("background work on the local host", () => {
       withDatabase((url) =>
         Effect.gen(function* () {
           let runs = 0;
-          const unexpected = () => Effect.die("Only background runs are expected");
-          const gateway = Gateway.Service.of({
-            createWorkspace: unexpected,
-            inWorkspace: unexpected,
-            asMember: unexpected,
-            asMemberScoped: unexpected,
-            executeTurns: unexpected,
-            runBackgroundProcess: () =>
-              Effect.sync(() => {
-                runs += 1;
-                return BackgroundProcess.idle;
-              }),
+          const gateway = agentWorkOnly(() => {
+            runs += 1;
           });
           const context = yield* Layer.build(
-            BackgroundJob.layer.pipe(
+            AgentJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
               ),
@@ -110,13 +105,13 @@ describe.skipIf(!available)("background work on the local host", () => {
           );
           const storage = yield* PostgresStorage.make().pipe(Effect.provide(context));
           const store = Context.get(yield* storage.forWorkspace(workspaceId), Store.Service);
-          const backgroundJobs = Context.get(context, BackgroundJobs.Service);
+          const agentJobs = Context.get(context, AgentJobs.Service);
           // A commit goes on after it makes a request, as a real one does with its later facts
           // and staged writes, so Cluster's own look comes before the request is there to find.
           for (let commit = 1; commit <= 5; commit++) {
             yield* store.transaction(
-              backgroundJobs
-                .request({ workspaceId, process })
+              agentJobs
+                .requestAcceptWork({ workspaceId, memberId: agent })
                 .pipe(Effect.andThen(Effect.sleep("100 millis"))),
             );
             const committedAt = yield* Clock.currentTimeMillis;
@@ -158,25 +153,13 @@ describe.skipIf(!available)("background work on the local host", () => {
       withDatabase((url) =>
         Effect.gen(function* () {
           const runs: Array<{ readonly runner: string; readonly key: string }> = [];
-          const unexpected = () => Effect.die("Only background runs are expected");
           const runner = (name: string, port: number) =>
-            BackgroundJob.layer.pipe(
+            AgentJob.layer.pipe(
               Layer.provide(
                 Layer.mergeAll(
                   Layer.succeed(
                     Gateway.Service,
-                    Gateway.Service.of({
-                      createWorkspace: unexpected,
-                      inWorkspace: unexpected,
-                      asMember: unexpected,
-                      asMemberScoped: unexpected,
-                      executeTurns: unexpected,
-                      runBackgroundProcess: (id) =>
-                        Effect.sync(() => {
-                          runs.push({ runner: name, key: id });
-                          return BackgroundProcess.idle;
-                        }),
-                    }),
+                    agentWorkOnly((id) => runs.push({ runner: name, key: id })),
                   ),
                   BunCrypto.layer,
                 ),
@@ -191,7 +174,7 @@ describe.skipIf(!available)("background work on the local host", () => {
             );
           const first = yield* Layer.build(runner("first", 34471));
           yield* Layer.build(runner("second", 34472));
-          const backgroundJobs = Context.get(first, BackgroundJobs.Service);
+          const agentJobs = Context.get(first, AgentJobs.Service);
           const workspaces = Array.from({ length: 20 }, (_, index) =>
             Workspace.Id.make(`workspace-${index}`),
           );
@@ -199,7 +182,7 @@ describe.skipIf(!available)("background work on the local host", () => {
             Effect.forEach(
               workspaces,
               (id) =>
-                backgroundJobs.request({ workspaceId: id, process }).pipe(
+                agentJobs.requestAcceptWork({ workspaceId: id, memberId: agent }).pipe(
                   Effect.provideService(Store.Transaction, {
                     id: Commit.Id.make(`${name}:${id}`),
                     append: () => Effect.die("Unexpected append"),

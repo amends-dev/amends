@@ -139,6 +139,7 @@ it.effect("participation domain facts publish without touching notifications", (
           groupId: Group.Id.make("group"),
           threadId: Thread.Id.make("thread"),
           participationId: ThreadParticipation.Id.make("participation"),
+          memberId: Member.Id.make("member"),
           reason: "unfollowed",
         });
         expect(yield* fixture.checkpoints.get(key)).toEqual(Option.none());

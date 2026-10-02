@@ -35,12 +35,9 @@ const failing = Layer.succeed(
 const gateway = Layer.succeed(
   Gateway.Service,
   Gateway.Service.of({
-    asMember: () => Effect.die("unused"),
     inWorkspace: () => Effect.die("unused"),
     createWorkspace: () => Effect.die("unused"),
-    runBackgroundProcess: () => Effect.die("unused"),
-    executeTurns: () => Effect.die("unused"),
-    asMemberScoped: <A, E>(
+    asMember: <A, E>(
       _id: Workspace.Id,
       _identity: Identity.MemberReference,
       program: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope>,

@@ -3,6 +3,7 @@ import { Schema } from "effect";
 import { Subject } from "../../journal/subject.ts";
 import { Group } from "../../group/group.ts";
 import { GroupId } from "../../group/id.ts";
+import { MemberId } from "../../workspace/member/id.ts";
 import { ThreadParticipation } from "./participation.ts";
 /** Participation with its thread's group, whose members may see who takes part. */
 export const Added = Fact.make("thread.participation.added", {
@@ -20,6 +21,8 @@ export const Ended = Fact.make("thread.participation.ended", {
   payload: Schema.Struct({
     ...ThreadParticipation.Departure.fields,
     groupId: GroupId.Id,
+    /** The member who took part, whose work may stop with it. */
+    memberId: MemberId.Id,
     reason: ThreadParticipation.EndReason,
   }),
 });

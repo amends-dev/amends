@@ -28,7 +28,7 @@ it.effect("handled requests are pruned every hour, once they are a week old", ()
           calls.push({ types, before: DateTime.toEpochMillis(before) });
           return 0;
         }),
-      entityTypes: ["amends/BackgroundJob", "amends/TurnJob"],
+      entityTypes: ["amends/AgentJob", "amends/TurnJob"],
     }).pipe(Layer.provideMerge(cluster));
     yield* TestClock.adjust("3 hours").pipe(Effect.provide(pruning), Effect.scoped);
     const week = Duration.toMillis(Duration.days(7));
@@ -36,11 +36,7 @@ it.effect("handled requests are pruned every hour, once they are a week old", ()
     // The entity types it was given, and the job's own past runs.
     expect(calls).toEqual(
       [1, 2, 3].map((hours) => ({
-        types: [
-          "amends/BackgroundJob",
-          "amends/TurnJob",
-          "ClusterCron/amends/prune-handled-requests",
-        ],
+        types: ["amends/AgentJob", "amends/TurnJob", "ClusterCron/amends/prune-handled-requests"],
         before: hours * hour - week,
       })),
     );

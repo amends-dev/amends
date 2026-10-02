@@ -5,7 +5,7 @@ import { Log } from "@amends/core/journal";
 import { Turn, TurnErrors, TurnExecution, TurnLog } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { TurnRunner } from "@amends/cluster";
-import { Gateway } from "@amends/gateway";
+import { Gateway, type GatewayErrors } from "@amends/gateway";
 import type { Harness, HarnessEvent, Transcript } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { describe, expect, it } from "@effect/vitest";
@@ -336,12 +336,14 @@ const runnerOver = (
       Gateway.Service,
       Gateway.Service.of({
         createWorkspace: unexpected,
-        inWorkspace: unexpected,
         asMember: unexpected,
-        asMemberScoped: unexpected,
-        runBackgroundProcess: unexpected,
-        executeTurns: (_, program) =>
-          Effect.provideService(program, TurnExecution.Service, turnExecution),
+        // Turn execution, without the gateway's mapping of failures to public ones.
+        inWorkspace: <A, E>(_: Workspace.Id, program: Effect.Effect<A, E, unknown>) =>
+          Effect.provideService(
+            program as Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, TurnExecution.Service>,
+            TurnExecution.Service,
+            turnExecution,
+          ),
       }),
     ),
     Effect.provideService(

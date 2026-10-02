@@ -28,6 +28,7 @@ import {
   future,
   placedIn,
   request,
+  runAgentJobs,
   Support,
   testImplementation,
 } from "./support.ts";
@@ -43,14 +44,9 @@ const turnsOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
     alice,
     Effect.flatMap(TurnService.Service, (turnService) => turnService.listByThread(threadId, 10)),
   );
+/** Run turn execution in the workspace, as a turn's job does each step. */
 const execute = <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, TurnExecution.Service>) =>
-  Effect.flatMap(Gateway.Service, (gateway) => gateway.executeTurns(id, program));
-const accept = (id: Workspace.Id) =>
-  Effect.flatMap(Gateway.Service, (gateway) => gateway.runBackgroundProcess(id, "turn.accept"));
-const stopDeparted = (id: Workspace.Id) =>
-  Effect.flatMap(Gateway.Service, (gateway) =>
-    gateway.runBackgroundProcess(id, "turn.stop-departed"),
-  );
+  Effect.flatMap(Gateway.Service, (gateway) => Effect.scoped(gateway.inWorkspace(id, program)));
 const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
   as(
     id,
@@ -66,7 +62,7 @@ const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
 const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberReference = alice) =>
   Effect.gen(function* () {
     const gateway = yield* Gateway.Service;
-    const stream = yield* gateway.asMemberScoped(
+    const stream = yield* gateway.asMember(
       id,
       reader,
       Effect.flatMap(TurnService.Service, (turnService) => turnService.watchLog(turnId)),
@@ -254,7 +250,7 @@ export const turns = (harness: ConformanceHarness) => {
               });
               expect(asked?.thread?.sequence).toBe(started.activity.sequence);
 
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [turn] = yield* turnsOf(workspace.id, threadId);
               expect(turn).toMatchObject({
                 agentId: agent.id,
@@ -277,7 +273,7 @@ export const turns = (harness: ConformanceHarness) => {
               );
               // More work on the same thread joins the active turn.
               const more = yield* reply(workspace.id, threadId, "Include the risks too.");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const after = yield* turnsOf(workspace.id, threadId);
               expect(after).toHaveLength(1);
               expect(after[0]).toMatchObject({
@@ -287,9 +283,6 @@ export const turns = (harness: ConformanceHarness) => {
               expect(
                 yield* bound.notifications.listPendingByRecipient(recipient, { limit: 10 }),
               ).toEqual([]);
-              // Running again with nothing waiting changes nothing.
-              expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
-              expect(yield* turnsOf(workspace.id, threadId)).toHaveLength(1);
             }),
           ),
         ),
@@ -308,7 +301,7 @@ export const turns = (harness: ConformanceHarness) => {
                 agent.memberId,
               ]);
               const threadId = started.thread.id;
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [queued] = yield* turnsOf(workspace.id, threadId);
               const turnId = queued!.id;
               const readTurns = <A, E>(
@@ -369,7 +362,7 @@ export const turns = (harness: ConformanceHarness) => {
                   ),
                 ),
               ).toEqual({ _tag: "InputPending" });
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const second = batch("b2", "Include the risks too.");
               const closing = yield* execute(
                 workspace.id,
@@ -470,7 +463,7 @@ export const turns = (harness: ConformanceHarness) => {
                   { limit: 10 },
                 ),
               ).toEqual([]);
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               expect(yield* turnsOf(workspace.id, threadId)).toHaveLength(1);
             }),
           ),
@@ -491,7 +484,7 @@ export const turns = (harness: ConformanceHarness) => {
                   agent.memberId,
                 ]);
                 const threadId = started.thread.id;
-                yield* accept(workspace.id);
+                yield* runAgentJobs(workspace.id);
                 const [queued] = yield* turnsOf(workspace.id, threadId);
                 const turnId = queued!.id;
                 const run = <A, E>(
@@ -565,7 +558,7 @@ export const turns = (harness: ConformanceHarness) => {
               const started = yield* start(workspace.id, "Scout, draft the notes.", [
                 agent.memberId,
               ]);
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [queued] = yield* turnsOf(workspace.id, started.thread.id);
               const next = yield* followLog(workspace.id, queued!.id);
               expect(brief(yield* next)).toBe("opened ");
@@ -603,7 +596,7 @@ export const turns = (harness: ConformanceHarness) => {
                   alice,
                   Effect.flatMap(TurnService.Service, (turnService) => turnService.cancel(turnId)),
                 );
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
               // A queued turn stops at once: nothing runs it yet.
               expect(yield* cancel(first!.id)).toMatchObject({
@@ -611,7 +604,7 @@ export const turns = (harness: ConformanceHarness) => {
                 cancelReason: "requested",
               });
               const again = yield* reply(workspace.id, threadId, "Please try again.");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [second] = yield* turnsOf(workspace.id, threadId);
               expect(second).toMatchObject({
                 status: "queued",
@@ -650,7 +643,7 @@ export const turns = (harness: ConformanceHarness) => {
               // A running turn stops once execution confirms it; meanwhile new work waits.
               expect(yield* cancel(second!.id)).toMatchObject({ status: "cancelling" });
               yield* reply(workspace.id, threadId, "Actually, just the summary.");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               expect((yield* turnsOf(workspace.id, threadId)).map(({ status }) => status)).toEqual([
                 "cancelling",
                 "cancelled",
@@ -661,7 +654,7 @@ export const turns = (harness: ConformanceHarness) => {
                   turnExecution.confirmStopped(second!.id),
                 ),
               );
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [third] = yield* turnsOf(workspace.id, threadId);
               expect(third?.id).not.toBe(second!.id);
               expect(third?.status).toBe("queued");
@@ -724,7 +717,7 @@ export const turns = (harness: ConformanceHarness) => {
                 );
               const flags = (views: ReadonlyArray<Turn.View>) =>
                 views.map(({ status, stoppable, retryable }) => ({ status, stoppable, retryable }));
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [queued] = yield* turnsOf(workspace.id, threadId);
               expect(flags([queued!])).toEqual([
                 { status: "queued", stoppable: true, retryable: false },
@@ -869,7 +862,7 @@ export const turns = (harness: ConformanceHarness) => {
                 text: "Check the calendar.",
                 native: { amends: { anthropic: { signature: "sig" } } },
               };
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
               // The agent's log for the thread is empty, with no checkpoint yet.
               expect(first).toMatchObject({ logAfter: null, historyFrom: null, retryOf: null });
@@ -903,7 +896,7 @@ export const turns = (harness: ConformanceHarness) => {
                 ),
               );
               const more = yield* reply(workspace.id, threadId, "And the rollback plan?");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [second] = yield* turnsOf(workspace.id, threadId);
               expect(second).toMatchObject({
                 historyFrom: null,
@@ -970,7 +963,7 @@ export const turns = (harness: ConformanceHarness) => {
                 ),
               );
               const last = yield* reply(workspace.id, threadId, "Never mind, just the date.");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [third] = yield* turnsOf(workspace.id, threadId);
               expect(third).toMatchObject({ retryOf: null });
               expect(third!.logAfter!).toBeGreaterThan(second!.logAfter!);
@@ -1037,7 +1030,7 @@ export const turns = (harness: ConformanceHarness) => {
                 ),
               );
               yield* reply(workspace.id, threadId, "Thanks.");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [fourth] = yield* turnsOf(workspace.id, threadId);
               expect(fourth).toMatchObject({ historyFrom: recorded });
               expect(yield* prepare(fourth!.id)).toMatchObject({
@@ -1068,7 +1061,7 @@ export const turns = (harness: ConformanceHarness) => {
                 agent.memberId,
               ]);
               const threadId = started.thread.id;
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
               yield* execute(
                 workspace.id,
@@ -1087,8 +1080,8 @@ export const turns = (harness: ConformanceHarness) => {
                 (text) => reply(workspace.id, threadId, text),
                 { discard: true },
               );
-              // None can be accepted yet, so the run does not ask to run again at once.
-              expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
+              // None can be accepted yet.
+              yield* runAgentJobs(workspace.id);
               expect((yield* turnsOf(workspace.id, threadId)).map(({ status }) => status)).toEqual([
                 "cancelling",
               ]);
@@ -1098,7 +1091,7 @@ export const turns = (harness: ConformanceHarness) => {
                   turnExecution.confirmStopped(first!.id),
                 ),
               );
-              expect(yield* accept(workspace.id)).toEqual({ _tag: "Idle" });
+              yield* runAgentJobs(workspace.id);
               const [next] = yield* turnsOf(workspace.id, threadId);
               expect(next).toMatchObject({ status: "queued", retryOf: null });
             }),
@@ -1136,7 +1129,7 @@ export const turns = (harness: ConformanceHarness) => {
                   }),
                 ),
               ).pipe(Effect.flatMap((message) => withPlace(workspace.id, { message })));
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [first] = yield* turnsOf(workspace.id, threadId);
               const prepare = (turnId: Turn.Id) =>
                 execute(
@@ -1178,7 +1171,7 @@ export const turns = (harness: ConformanceHarness) => {
                 ),
               );
               yield* talk(120, "Later note");
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [second] = yield* turnsOf(workspace.id, threadId);
               const backlog = yield* prepare(second!.id);
               expect(backlog._tag).toBe("Ready");
@@ -1206,7 +1199,7 @@ export const turns = (harness: ConformanceHarness) => {
             const { workspace, agent, identity } = yield* workspaceWithAgent;
             const started = yield* start(workspace.id, "Scout, look into this.", [agent.memberId]);
             const threadId = started.thread.id;
-            yield* accept(workspace.id);
+            yield* runAgentJobs(workspace.id);
             const participants = yield* as(
               workspace.id,
               identity,
@@ -1226,10 +1219,8 @@ export const turns = (harness: ConformanceHarness) => {
                 threadParticipationService.unfollow({ threadId, participationId: mine!.id }),
               ),
             );
-            // Taking work in does not look for departures; the process that stops them does.
-            yield* accept(workspace.id);
-            expect((yield* turnsOf(workspace.id, threadId))[0]?.status).toBe("queued");
-            expect(yield* stopDeparted(workspace.id)).toEqual({ _tag: "Idle" });
+            // Unfollowing asks for the agent's turns there to stop.
+            yield* runAgentJobs(workspace.id);
             const [stopped] = yield* turnsOf(workspace.id, threadId);
             expect(stopped).toMatchObject({
               status: "cancelled",
@@ -1271,7 +1262,7 @@ export const turns = (harness: ConformanceHarness) => {
                 agent.memberId,
               ]);
               const threadId = started.thread.id;
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [departed] = yield* turnsOf(workspace.id, threadId);
               const participants = yield* as(
                 workspace.id,
@@ -1313,8 +1304,9 @@ export const turns = (harness: ConformanceHarness) => {
                 limit: 10,
               });
               expect(request?.participationId).not.toBe(departed!.participationId);
-              // The departed turn takes none of it: it waits until that turn has stopped.
-              yield* accept(workspace.id);
+              // Accepted before its departed turn is stopped, none of it goes to that turn: it
+              // waits until that turn has stopped.
+              yield* runAgentJobs(workspace.id, { only: "acceptWork" });
               expect(yield* turnsOf(workspace.id, threadId)).toMatchObject([
                 {
                   id: departed!.id,
@@ -1325,8 +1317,8 @@ export const turns = (harness: ConformanceHarness) => {
               expect(
                 yield* bound.notifications.listPendingByRecipient(recipient, { limit: 10 }),
               ).toEqual([request]);
-              yield* stopDeparted(workspace.id);
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [next, stopped] = yield* turnsOf(workspace.id, threadId);
               expect(stopped).toMatchObject({
                 id: departed!.id,
@@ -1359,7 +1351,7 @@ export const turns = (harness: ConformanceHarness) => {
                 agent.memberId,
               ]);
               const threadId = started.thread.id;
-              yield* accept(workspace.id);
+              yield* runAgentJobs(workspace.id);
               const [queued] = yield* turnsOf(workspace.id, threadId);
               const turnId = queued!.id;
               const reads: ReadonlyArray<
@@ -1435,7 +1427,7 @@ export const turns = (harness: ConformanceHarness) => {
                     }),
                   ),
                 );
-                yield* accept(workspace.id);
+                yield* runAgentJobs(workspace.id);
                 const [queued] = yield* turnsOf(workspace.id, started.thread.id);
                 const turnId = queued!.id;
                 const draft = (text: string, offset: number) =>

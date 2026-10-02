@@ -6,10 +6,19 @@ import { Subject } from "../journal/subject.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadMessageId } from "../thread/message/id.ts";
 import { WorkspaceId } from "../workspace/id.ts";
+import { MemberId } from "../workspace/member/id.ts";
 import { Turn } from "./turn.ts";
 
-/** Every fact names the turn's thread and group; the group's members may learn of it. */
-const Where = { workspaceId: WorkspaceId.Id, groupId: GroupId.Id, threadId: ThreadId.Id };
+/**
+ * Every fact names the turn's thread and group, which the group's members may learn of, and its
+ * agent's membership, whose work it changes.
+ */
+const Where = {
+  workspaceId: WorkspaceId.Id,
+  groupId: GroupId.Id,
+  threadId: ThreadId.Id,
+  memberId: MemberId.Id,
+};
 const audience = (payload: { readonly groupId: GroupId.Id }) => [Group.audienceOf(payload.groupId)];
 const subject = (payload: { readonly turnId: Turn.Id }) => Subject.make("turn", payload.turnId);
 

@@ -1,10 +1,5 @@
 import * as Core from "@amends/core";
 import { Authorization } from "@amends/core/authorization";
-import {
-  type BackgroundJobs,
-  type BackgroundProcess,
-  BackgroundRuns,
-} from "@amends/core/background";
 import { Actor, Identity } from "@amends/core/identity";
 import { Checkpoint, Projection, Store } from "@amends/core/journal";
 import {
@@ -15,7 +10,7 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
-import type { TurnExecution, TurnJobs } from "@amends/core/turn";
+import type { AgentJobs, TurnJobs } from "@amends/core/turn";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { Cause } from "effect";
 import type { Scope } from "effect";
@@ -25,12 +20,6 @@ import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
 
 export interface Interface {
-  /** Keep the workspace lease and operation resources in the caller's scope, including response streams. */
-  readonly asMemberScoped: <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
-    workspaceId: Workspace.Id,
-    identity: Identity.MemberReference,
-    program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
   /**
    * Allocate a workspace ID and run core initialization for its creator. The
    * caller has authenticated the creator and checked their entitlement.
@@ -44,48 +33,32 @@ export interface Interface {
     GatewayErrors.Conflict | GatewayErrors.Uncertain | GatewayErrors.InvalidInput
   >;
   /**
-   * Run core operations in a workspace without an actor: invitation acceptance,
-   * where the recipient is not yet a member. Programs may require only core's
-   * services, never its stores or journal. A workspace that was never
-   * created returns WorkspaceNotFound without being prepared.
+   * Run core operations as the identity's active membership, keeping the workspace prepared for
+   * the caller's scope, so a stream the program returns keeps it too. Membership is resolved
+   * before the workspace is prepared, so a non-member or an unknown workspace returns NotMember
+   * without loading it. Core rechecks membership and permissions per operation; writes do so
+   * inside their transaction.
    */
-  readonly inWorkspace: <A, E, R extends Core.Operations>(
-    workspaceId: Workspace.Id,
-    program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.WorkspaceNotFound>;
-  /**
-   * Run core operations as the identity's active membership. Membership is resolved before the
-   * workspace is prepared, so a non-member or an unknown workspace returns NotMember without
-   * loading it. Core rechecks membership and permissions per operation; writes do so inside
-   * their transaction.
-   */
-  readonly asMember: <A, E, R extends Core.Operations | Actor.Service>(
+  readonly asMember: <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
     workspaceId: Workspace.Id,
     identity: Identity.MemberReference,
     program: Effect.Effect<A, E, R>,
-  ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember>;
+  ) => Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
   /**
-   * Run one of a workspace's background processes once, for the host process that runs its
-   * background jobs when a job's request arrives, and report what it left outstanding. It has no actor:
-   * the process acts as itself. A workspace that was never created returns WorkspaceNotFound
-   * without being prepared.
+   * Run a program in a workspace without an actor, keeping the workspace prepared for the caller's
+   * scope: invitation acceptance, where the recipient is not yet a member, and a host's jobs, which
+   * call the services core gives them. Programs may require only core's operations and those
+   * services, never its stores or journal. A workspace that was never created returns
+   * WorkspaceNotFound without being prepared.
    */
-  readonly runBackgroundProcess: (
+  readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
     workspaceId: Workspace.Id,
-    process: string,
+    program: Effect.Effect<A, E, R>,
   ) => Effect.Effect<
-    BackgroundProcess.Outcome,
-    BackgroundRuns.Unknown | BackgroundRuns.Failure | GatewayErrors.WorkspaceNotFound
+    A,
+    GatewayErrors.PublicErrorOf<E> | GatewayErrors.WorkspaceNotFound,
+    Scope.Scope
   >;
-  /**
-   * Run turn execution in a workspace, for the host process that runs the work agents accepted.
-   * It is trusted and has no actor: each step acts as its turn's agent. Its failures are core's
-   * own. A workspace that was never created returns WorkspaceNotFound without being prepared.
-   */
-  readonly executeTurns: <A, E>(
-    workspaceId: Workspace.Id,
-    program: Effect.Effect<A, E, TurnExecution.Service>,
-  ) => Effect.Effect<A, E | GatewayErrors.WorkspaceNotFound>;
 }
 
 /** Workspace bootstrap and entry; core's services are the operations. */
@@ -97,14 +70,12 @@ const isUncertain = Schema.is(Store.CommitUncertain);
 const isMismatch = Schema.is(Authorization.WorkspaceMismatch);
 const isBehind = Schema.is(Projection.Behind);
 const isUnregistered = Schema.is(Projection.Unregistered);
-const isRunFailure = Schema.is(BackgroundRuns.Failure);
 
 /**
  * Another host changed which projection versions are live, so this prepared runtime's commits no
- * longer match them, whether an operation failed with it or a background process did.
+ * longer match them.
  */
-const isStaleError = (error: unknown): boolean =>
-  isBehind(error) || isUnregistered(error) || (isRunFailure(error) && isStaleError(error.cause));
+const isStaleError = (error: unknown): boolean => isBehind(error) || isUnregistered(error);
 const isStaleCause = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
     (reason) =>
@@ -169,7 +140,7 @@ export const make = Effect.fn("Gateway.make")(function* (
   never,
   | WorkspaceStorage.Service
   | WorkspaceSignals.Service
-  | BackgroundJobs.Service
+  | AgentJobs.Service
   | TurnJobs.Service
   | Crypto.Crypto
   | Scope.Scope
@@ -325,68 +296,41 @@ export const make = Effect.fn("Gateway.make")(function* (
     },
   );
 
+  const asMember: Interface["asMember"] = Effect.fn("Gateway.asMember")(function* <
+    A,
+    E,
+    R extends Core.Operations | Actor.Service | Scope.Scope,
+  >(
+    workspaceId: Workspace.Id,
+    identity: Identity.MemberReference,
+    program: Effect.Effect<A, E, R>,
+  ) {
+    const operation: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope> = program;
+    const admission = yield* checkAdmission(workspaceId, identity);
+    if (admission._tag === "Refused") return yield* new GatewayErrors.NotMember({ workspaceId });
+    const admittedMember =
+      admission._tag === "Member" ? Option.some(admission.member) : Option.none<Member.Record>();
+    return yield* runInWorkspace(
+      workspaceId,
+      withActor(workspaceId, identity, operation, admittedMember),
+    );
+  });
+
   const inWorkspace: Interface["inWorkspace"] = Effect.fn("Gateway.inWorkspace")(function* <
     A,
     E,
-    R extends Core.Operations,
+    R extends Core.Operations | Core.JobServices | Scope.Scope,
   >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, R>) {
-    const operation: Effect.Effect<A, E, Core.Operations> = program;
+    const operation: Effect.Effect<A, E, Core.Operations | Core.JobServices | Scope.Scope> =
+      program;
     yield* requireCreated(workspaceId);
-    return yield* Effect.scoped(
-      runInWorkspace(
-        workspaceId,
-        toPublicErrors(workspaceId, reloadWhenStale(workspaceId, operation)),
-      ),
+    return yield* runInWorkspace(
+      workspaceId,
+      toPublicErrors(workspaceId, reloadWhenStale(workspaceId, operation)),
     );
   });
 
-  const asMemberScoped: Interface["asMemberScoped"] = Effect.fn("Gateway.asMemberScoped")(
-    function* <A, E, R extends Core.Operations | Actor.Service | Scope.Scope>(
-      workspaceId: Workspace.Id,
-      identity: Identity.MemberReference,
-      program: Effect.Effect<A, E, R>,
-    ) {
-      const operation: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope> = program;
-      const admission = yield* checkAdmission(workspaceId, identity);
-      if (admission._tag === "Refused") return yield* new GatewayErrors.NotMember({ workspaceId });
-      const admittedMember =
-        admission._tag === "Member" ? Option.some(admission.member) : Option.none<Member.Record>();
-      return yield* runInWorkspace(
-        workspaceId,
-        withActor(workspaceId, identity, operation, admittedMember),
-      );
-    },
-  );
-
-  const asMember: Interface["asMember"] = (workspaceId, identity, program) =>
-    Effect.scoped(asMemberScoped(workspaceId, identity, program));
-
-  const runBackgroundProcess: Interface["runBackgroundProcess"] = Effect.fn(
-    "Gateway.runBackgroundProcess",
-  )(function* (workspaceId: Workspace.Id, process: string) {
-    yield* requireCreated(workspaceId);
-    const run = Effect.flatMap(BackgroundRuns.Service, (backgroundRuns) =>
-      backgroundRuns.run(process),
-    );
-    return yield* Effect.scoped(runInWorkspace(workspaceId, reloadWhenStale(workspaceId, run)));
-  });
-
-  const executeTurns: Interface["executeTurns"] = Effect.fn("Gateway.executeTurns")(function* <
-    A,
-    E,
-  >(workspaceId: Workspace.Id, program: Effect.Effect<A, E, TurnExecution.Service>) {
-    yield* requireCreated(workspaceId);
-    return yield* Effect.scoped(runInWorkspace(workspaceId, reloadWhenStale(workspaceId, program)));
-  });
-
-  return Service.of({
-    createWorkspace,
-    inWorkspace,
-    asMember,
-    asMemberScoped,
-    runBackgroundProcess,
-    executeTurns,
-  });
+  return Service.of({ createWorkspace, asMember, inWorkspace });
 });
 
 /**

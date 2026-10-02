@@ -3,6 +3,8 @@ export { TurnActivity } from "./activity.ts";
 export { TurnService } from "./service.ts";
 export { TurnCommand } from "./command.ts";
 export { TurnJobs } from "./jobs.ts";
+export { AgentJobs } from "./agent-jobs.ts";
+export { AgentWork } from "./agent-work.ts";
 export { TurnErrors } from "./errors.ts";
 export { TurnExecution } from "./execution.ts";
 export { TurnFacts } from "./facts.ts";

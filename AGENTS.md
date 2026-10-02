@@ -53,9 +53,10 @@ currently run through TypeScript. Check compatibility before changing this setup
   `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
   `environment` composes a harness with an optional sandbox into a running environment.
-  `cluster` runs jobs, the work outside requests, on Effect Cluster: a background job for each
-  workspace's background process and a turn job for each agent's turn, entities whose requests a
-  commit stores, with their retries and pruning. Its turn runner prepares each turn from core, spawns its environment with the
+  `cluster` runs jobs, the work outside requests, on Effect Cluster: an agent job for each agent,
+  which accepts its work and stops its departed turns, and a turn job for each turn, entities whose
+  requests a commit stores, with their retries and pruning. Jobs enter workspaces through the
+  gateway like any other caller. Its turn runner prepares each turn from core, spawns its environment with the
   agent's model access, records what the harness reports, and closes it; hosts pass in the
   harnesses and model code they install.
   `connection` is the contract connection implementations fulfil: the declaration a host

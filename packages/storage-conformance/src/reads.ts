@@ -44,7 +44,7 @@ export const reads = (harness: Harness) => {
                 .pipe(Effect.forkChild);
               yield* Deferred.await(entered);
               yield* Effect.gen(function* () {
-                yield* gateway.asMemberScoped(
+                yield* gateway.asMember(
                   workspace.id,
                   alice,
                   Effect.gen(function* () {

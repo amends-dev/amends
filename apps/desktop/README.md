@@ -109,7 +109,8 @@ and `src/pages/environments.tsx` the [Environments page](../../docs/environments
 `src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from `useAgents`, detouring
 through them to create a model connection. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members sections, which the Settings sidebar lists, and their modals. `src/appearance.ts` supplies
-local preference persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved mode through the UI Theme.
+local mode and palette persistence and system appearance; Application wraps the session
+with AppearanceProvider and applies the resolved mode and chosen palette through the UI Theme.
+The account menu offers Neutral, Linen, Sage, and Slate independently of Light, Dark, or System.
 `src/routes.tsx` mounts `WorkspaceFeedProvider` around the workspace layout, so workspace pages
 stay current over the change feed; the layout shows `LiveStatus` from `useLiveStatus()`. The content security policy's `connect-src` already covers the stream, which uses the same API origin. See [live updates](../../docs/live-updates.md).

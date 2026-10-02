@@ -665,6 +665,7 @@ export const notificationSources = (harness: Harness) => {
                                 groupId: first.thread.groupId,
                                 threadId: first.thread.id,
                                 participationId: participant.id,
+                                memberId: memberParticipant(participant).memberId,
                                 reason: "unfollowed",
                               })
                               .pipe(Publication.withOccurredAt(occurredAt)),

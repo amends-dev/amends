@@ -28,7 +28,7 @@ export function Application(props: ApplicationProps) {
 function ThemedApplication(props: ApplicationProps) {
   const appearance = useAppearance();
   return (
-    <Theme mode={appearance.resolved()}>
+    <Theme mode={appearance.resolved()} palette={appearance.palette()}>
       <ErrorBoundary
         fallback={<CrashedScreen homeHref="#/" onReload={() => window.location.reload()} />}
       >

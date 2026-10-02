@@ -18,9 +18,11 @@ type Argument<K extends keyof TurnExecution.Interface> = TurnExecution.Interface
 
 /** @category constructors */
 export const make = (gateway: Gateway.Interface, workspaceId: Workspace.Id, turnId: Turn.Id) => {
+  // Each step holds the workspace only while it runs, so a step after another host changed it
+  // uses the workspace prepared again.
   const executeTurnStep = <A, E>(
     call: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>,
-  ) => gateway.executeTurns(workspaceId, Effect.flatMap(TurnExecution.Service, call));
+  ) => Effect.scoped(gateway.inWorkspace(workspaceId, Effect.flatMap(TurnExecution.Service, call)));
   return {
     /** The turn, as log fields. */
     ids: { workspaceId, turnId },

@@ -23,7 +23,7 @@ combine the path's group or thread ID with the body into the operation's input a
 `Idempotency-Key` header as its request key; core authorizes, validates, and chooses who takes
 part. Management reads of groups the caller does not belong to are not exposed.
 
-`ChangesHandlers.watch` enters through `Gateway.asMemberScoped` and calls
+`ChangesHandlers.watch` enters through `Gateway.asMember` and calls
 `ChangeFeedService.watch`. Effect's HTTP server transfers the request scope
 to the response stream, keeping the workspace services and subscription alive until
 completion or disconnect. The `after` query resumes from a cursor. HTTP owns SSE

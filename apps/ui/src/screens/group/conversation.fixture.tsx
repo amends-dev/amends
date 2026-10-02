@@ -5,6 +5,7 @@ import type { MentionCandidate } from "../../components/composer/index.ts";
 import { Profiles } from "../../components/profile-card/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { people, profile } from "../sample.ts";
+import type { ColorPalette } from "../../foundations/color/palettes.ts";
 import type { TimelineEntry } from "../timeline/index.ts";
 import {
   HomeSidebar,
@@ -110,6 +111,7 @@ export function Conversation(props: ConversationProps) {
   const [open, setOpen] = createSignal(props.open ?? false);
   const [following, setFollowing] = createSignal(true);
   const [appearance, setAppearance] = createSignal<Appearance>("system");
+  const [palette, setPalette] = createSignal<ColorPalette>("neutral");
   const [entries, setEntries] = createSignal(openings);
   const { onSearch: _search, ...base } = navigation({
     groups: [{ id: "general", name: "general" }],
@@ -133,6 +135,8 @@ export function Conversation(props: ConversationProps) {
                   identity: "jordan@mercier.example",
                   appearance: appearance(),
                   onAppearanceChange: setAppearance,
+                  palette: palette(),
+                  onPaletteChange: setPalette,
                   onOpenSettings: () => {},
                   onChangeName: () => {},
                   onSignOut: () => {},

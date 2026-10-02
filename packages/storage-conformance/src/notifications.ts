@@ -14,7 +14,7 @@ import { acceptInvitation, createWorkspace, invite, removeMember } from "./opera
 import {
   boundTo,
   future,
-  layerManualBackgroundJobs,
+  layerRecordedAgentJobs,
   otherWorkspaceId,
   runHost,
   Support,
@@ -662,7 +662,7 @@ export const notifications = (harness: Harness) => {
               const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 });
               const gateway = yield* Gateway.make().pipe(
                 Effect.provide(
-                  Layer.mergeAll(harness.crypto, layerManualBackgroundJobs, TurnJobs.layerNoRunner),
+                  Layer.mergeAll(harness.crypto, layerRecordedAgentJobs, TurnJobs.layerNoRunner),
                 ),
               );
               yield* gateway.asMember(

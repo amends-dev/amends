@@ -1,5 +1,8 @@
-import type { AppearancePreference, AppearanceSource } from "@amends/client";
+import type { AppearancePreference, AppearanceSource, PalettePreference } from "@amends/client";
 const key = "amends.appearance";
+const paletteKey = "amends.palette";
+const parsePalette = (value: string | null): PalettePreference =>
+  value === "linen" || value === "sage" || value === "slate" ? value : "neutral";
 const preference = (value: string | null): AppearancePreference =>
   value === "light" || value === "dark" ? value : "system";
 
@@ -7,6 +10,7 @@ const preference = (value: string | null): AppearancePreference =>
 export function createAppearanceSource(target: Window = window): AppearanceSource {
   const media = target.matchMedia("(prefers-color-scheme: dark)");
   let fallback: AppearancePreference = "system";
+  let paletteFallback: PalettePreference = "neutral";
   return {
     read: () => {
       try {
@@ -24,10 +28,26 @@ export function createAppearanceSource(target: Window = window): AppearanceSourc
         /* Appearance still works in memory. */
       }
     },
+    readPalette: () => {
+      try {
+        paletteFallback = parsePalette(target.localStorage.getItem(paletteKey));
+      } catch {
+        /* Retain the local palette. */
+      }
+      return paletteFallback;
+    },
+    writePalette: (value) => {
+      paletteFallback = value;
+      try {
+        target.localStorage.setItem(paletteKey, value);
+      } catch {
+        /* Palette selection still works in memory. */
+      }
+    },
     system: () => (media.matches ? "dark" : "light"),
     subscribe: (changed) => {
       const storage = (event: StorageEvent) => {
-        if (event.key !== null && event.key !== key) return;
+        if (event.key !== null && event.key !== key && event.key !== paletteKey) return;
         try {
           if (event.storageArea !== target.localStorage) return;
         } catch {

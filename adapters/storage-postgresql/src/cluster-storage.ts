@@ -3,19 +3,19 @@
  * default `cluster` prefix. Cluster never removes a message or its reply, so the host prunes
  * the ones it has handled.
  */
-import { BackgroundJob } from "@amends/cluster";
+import { AgentJob } from "@amends/cluster";
 import { Clock, DateTime, Effect, Option, Schema } from "effect";
 import { Snowflake } from "effect/unstable/cluster";
 import { SqlClient } from "effect/unstable/sql";
 import { PostgresDatabase } from "./database.ts";
 
-/** Another live process runs background work at this runner address. */
+/** Another live process runs jobs at this runner address. */
 export class AddressTaken extends Schema.TaggedError<AddressTaken>()(
   "PostgresClusterStorage.AddressTaken",
   { address: Schema.String },
 ) {
   override get message() {
-    return `Another process is running background work at ${this.address}; give each process its own runner address`;
+    return `Another process is running jobs at ${this.address}; give each process its own runner address`;
   }
 }
 
@@ -76,78 +76,65 @@ export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(fun
   );
 });
 
-/** One background process's job requests across every workspace. */
-export interface ProcessStatus {
-  readonly process: string;
+/** One kind of agent job request, such as `AcceptWork`, across every workspace. */
+export interface RequestStatus {
+  readonly request: string;
   /** Requests due now that no runner has handled yet. */
   readonly due: number;
-  /** Requests set for later: a process's next run, or a retry after a failed one. */
+  /** Requests set for later: a retry after a failed run. */
   readonly scheduled: number;
   /** Of the requests not yet handled, those that follow a failed run. */
   readonly retrying: number;
   /** When the longest-waiting due request became due. */
   readonly oldestDue: Option.Option<DateTime.Utc>;
-  /** Requests the worker gave up on, among those not yet pruned. */
-  readonly dropped: number;
 }
 /** A request waiting to run again after failed runs. */
 export interface Retry {
-  readonly process: string;
+  readonly request: string;
   readonly workspaceId: string;
-  readonly attempt: number;
-  readonly at: DateTime.Utc;
-}
-/** A request the worker gave up on. */
-export interface Drop {
-  readonly process: string;
-  readonly workspaceId: string;
-  readonly reason: BackgroundJob.Dropped["reason"];
+  readonly memberId: string;
   readonly attempt: number;
   readonly at: DateTime.Utc;
 }
 export interface Status {
-  readonly processes: ReadonlyArray<ProcessStatus>;
-  /** The most recent retries and drops, newest first. */
+  readonly requests: ReadonlyArray<RequestStatus>;
+  /** The most recent retries, newest first. */
   readonly retries: ReadonlyArray<Retry>;
-  readonly drops: ReadonlyArray<Drop>;
 }
 
-const RunFields = Schema.Struct({
+const RequestFields = Schema.Struct({
   workspaceId: Schema.String,
-  process: Schema.String,
+  memberId: Schema.String,
   attempt: Schema.Int,
   at: Schema.Finite,
-});
-const DropReply = Schema.TaggedStruct("Failure", {
-  cause: Schema.Tuple([Schema.TaggedStruct("Fail", { error: BackgroundJob.Dropped })]),
 });
 const fromJson = <S extends Schema.Top>(schema: S) =>
   Schema.decodeUnknownEffect(Schema.fromJsonString(schema));
 
 /**
- * What background work waits, retries, and was dropped, from the background jobs' requests Cluster keeps: per
- * process, and the latest `limit` (twenty by default) retries and drops. Empty before any host
- * has run background work over this database. It only reads, over any client of the database,
- * such as `PostgresDatabase.layerClient`, which leaves the schema as it is.
+ * What agent jobs wait for and retry, from the requests Cluster keeps: per kind of request, and the
+ * latest `limit` (twenty by default) retries. Empty before any host has run agent jobs over this
+ * database. It only reads, over any client of the database, such as
+ * `PostgresDatabase.layerClient`, which leaves the schema as it is.
  */
-export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStatus")(function* (
+export const agentJobStatus = Effect.fn("PostgresClusterStorage.agentJobStatus")(function* (
   options: { readonly limit?: number | undefined } = {},
 ) {
   const sql = yield* SqlClient.SqlClient;
   const limit = options.limit ?? 20;
   const [tables] = yield* sql<{ readonly present: boolean }>`
     SELECT to_regclass('cluster_messages') IS NOT NULL AS present`;
-  if (tables?.present !== true) return { processes: [], retries: [], drops: [] } satisfies Status;
-  const entityType = BackgroundJob.entity.type;
+  if (tables?.present !== true) return { requests: [], retries: [] } satisfies Status;
+  const entityType = AgentJob.entity.type;
   const now = yield* Clock.currentTimeMillis;
   const waiting = yield* sql<{
-    readonly process: string;
+    readonly request: string;
     readonly due: number;
     readonly scheduled: number;
     readonly retrying: number;
     readonly oldest: string | null;
   }>`
-    SELECT payload::jsonb->>'process' AS process,
+    SELECT tag AS request,
       count(*) FILTER (WHERE deliver_at IS NULL OR deliver_at <= ${now})::int AS due,
       count(*) FILTER (WHERE deliver_at > ${now})::int AS scheduled,
       count(*) FILTER (WHERE (payload::jsonb->>'attempt')::int > 0)::int AS retrying,
@@ -155,71 +142,33 @@ export const backgroundStatus = Effect.fn("PostgresClusterStorage.backgroundStat
         AS oldest
     FROM cluster_messages
     WHERE entity_type = ${entityType} AND kind = 0 AND NOT processed
-    GROUP BY 1`;
-  const dropped = yield* sql<{ readonly process: string; readonly dropped: number }>`
-    SELECT m.payload::jsonb->>'process' AS process, count(*)::int AS dropped
-    FROM cluster_replies r JOIN cluster_messages m ON m.id = r.request_id
-    WHERE m.entity_type = ${entityType} AND r.kind = 0 AND r.payload LIKE ${`%${BackgroundJob.droppedTag}%`}
-    GROUP BY 1`;
-  const retried = yield* sql<{ readonly payload: string }>`
-    SELECT payload FROM cluster_messages
+    GROUP BY 1
+    ORDER BY 1`;
+  const retried = yield* sql<{ readonly request: string; readonly payload: string }>`
+    SELECT tag AS request, payload FROM cluster_messages
     WHERE entity_type = ${entityType} AND kind = 0 AND NOT processed
       AND (payload::jsonb->>'attempt')::int > 0
     ORDER BY id DESC LIMIT ${limit}`;
-  const lost = yield* sql<{ readonly payload: string; readonly reply: string }>`
-    SELECT m.payload, r.payload AS reply
-    FROM cluster_replies r JOIN cluster_messages m ON m.id = r.request_id
-    WHERE m.entity_type = ${entityType} AND r.kind = 0 AND r.payload LIKE ${`%${BackgroundJob.droppedTag}%`}
-    ORDER BY m.id DESC LIMIT ${limit}`;
-  const processes = new Map<string, ProcessStatus>();
-  const status = (process: string) =>
-    processes.get(process) ?? {
-      process,
-      due: 0,
-      scheduled: 0,
-      retrying: 0,
-      oldestDue: Option.none(),
-      dropped: 0,
-    };
-  for (const row of waiting)
-    processes.set(
-      row.process,
-      Object.assign({}, status(row.process), {
-        due: row.due,
-        scheduled: row.scheduled,
-        retrying: row.retrying,
-        oldestDue: Option.map(Option.fromNullOr(row.oldest), (millis) =>
-          DateTime.makeUnsafe(Number(millis)),
-        ),
-      }),
-    );
-  for (const row of dropped)
-    processes.set(row.process, Object.assign({}, status(row.process), { dropped: row.dropped }));
   const retries = yield* Effect.forEach(retried, (row) =>
-    Effect.map(fromJson(RunFields)(row.payload), (run) => ({
-      process: run.process,
-      workspaceId: run.workspaceId,
-      attempt: run.attempt,
-      at: DateTime.makeUnsafe(run.at),
+    Effect.map(fromJson(RequestFields)(row.payload), (fields) => ({
+      request: row.request,
+      workspaceId: fields.workspaceId,
+      memberId: fields.memberId,
+      attempt: fields.attempt,
+      at: DateTime.makeUnsafe(fields.at),
     })),
   );
-  const drops = yield* Effect.forEach(lost, (row) =>
-    Effect.gen(function* () {
-      const run = yield* fromJson(RunFields)(row.payload);
-      const [{ error }] = (yield* fromJson(DropReply)(row.reply)).cause;
-      return {
-        process: run.process,
-        workspaceId: run.workspaceId,
-        reason: error.reason,
-        attempt: error.attempt,
-        at: DateTime.makeUnsafe(run.at),
-      };
-    }),
-  );
   return {
-    processes: [...processes.values()].toSorted((a, b) => a.process.localeCompare(b.process)),
+    requests: waiting.map((row) => ({
+      request: row.request,
+      due: row.due,
+      scheduled: row.scheduled,
+      retrying: row.retrying,
+      oldestDue: Option.map(Option.fromNullOr(row.oldest), (millis) =>
+        DateTime.makeUnsafe(Number(millis)),
+      ),
+    })),
     retries,
-    drops,
   } satisfies Status;
 });
 

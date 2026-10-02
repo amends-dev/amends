@@ -1,6 +1,6 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
-import { BackgroundJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
+import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
@@ -28,13 +28,13 @@ export interface Options {
   /** The most connections to open to the database, twenty by default. */
   readonly poolSize?: number | undefined;
   /**
-   * This process's address among the processes running background work over the database,
+   * This process's address among the processes running jobs over the database,
    * `localhost:34431` by default. The host refuses to start while another process holds it.
    */
   readonly runnerAddress?: { readonly host: string; readonly port: number } | undefined;
   /**
    * How those processes reach each other: through the database alone, by default, or also over
-   * sockets at their runner addresses, which delivers a wake to another process at once rather
+   * sockets at their runner addresses, which delivers a request to another process at once rather
    * than at its next read. Cluster's socket messages are not authenticated, so the addresses must
    * be reachable only on a private network.
    */
@@ -44,7 +44,7 @@ export interface Options {
    * 35 seconds by default. Every process over one database uses the same.
    */
   readonly runnerTakeover?: Duration.Input | undefined;
-  /** How often a runner reads for due wakes, every two seconds by default. */
+  /** How often a runner reads for due job requests, every two seconds by default. */
   readonly pollInterval?: Duration.Input | undefined;
   /**
    * The key that seals connections' credentials at rest, 32 bytes as base64. Without one, the
@@ -74,8 +74,8 @@ export const turnRunnerOptions: TurnRunner.Options = {
 };
 
 /**
- * The database, and the cluster that runs background work over the same pool: one SQL client, so
- * a wake a commit asks for is stored in that commit's transaction. The process first claims its
+ * The database, and the cluster that runs jobs over the same pool: one SQL client, so a job a
+ * commit requests is stored in that commit's transaction. The process first claims its
  * runner address, so it fails to start while another process runs at it. Cluster keeps its own
  * tables beside the adapter's and holds one of the pool's connections for its shard locks, and the
  * claim another.
@@ -106,25 +106,25 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 
 /**
  * The gateway and the workspace directory over one PostgreSQL database, through the
- * storage adapter, with the workspaces' background work and agents' turns running in this
- * process, and handled wakes and turn requests pruned after seven days. The HTTP server resolves
+ * storage adapter, with agents' jobs and turns' jobs running in this process, and handled job
+ * requests pruned after seven days. The HTTP server resolves
  * bearer tokens before entering the gateway.
  *
  * @category layers
  */
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer =>
   Layer.mergeAll(
-    BackgroundJob.layerWorker,
+    AgentJob.layerWorker,
     JobPruning.layer({
       prune: PostgresClusterStorage.prune,
-      entityTypes: [BackgroundJob.entity.type, TurnJob.entity.type],
+      entityTypes: [AgentJob.entity.type, TurnJob.entity.type],
     }),
     TurnJob.layerWorker.pipe(Layer.provide(TurnRunner.layer(turnRunnerOptions))),
   ).pipe(
     Layer.provideMerge(
       Gateway.layer(installed).pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
-        Layer.provide(BackgroundJob.layerRequests),
+        Layer.provide(AgentJob.layerRequests),
         Layer.provide(TurnJob.layerRequests),
       ),
     ),

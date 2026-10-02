@@ -31,13 +31,13 @@ import {
 import {
   type Invitation,
   InvitationStore,
+  type Member,
   MemberFacts,
   MemberStore,
   Workspace,
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { BackgroundJobs } from "@amends/core/background";
 import {
   ConnectionCatalog,
   ConnectionCredentialStore,
@@ -45,7 +45,7 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { AgentStore } from "@amends/core/agent";
-import { TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
+import { AgentJobs, AgentWork, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
@@ -139,22 +139,67 @@ export const installed = {
   sandboxes: testSandboxes,
 };
 
+/** The agent work each workspace's commits asked for and no suite has run yet, in order. */
+const requestedAgentWork = new Map<
+  Workspace.Id,
+  Array<{ readonly work: keyof AgentWork.Interface; readonly memberId: Member.Id }>
+>();
+const keepOnceCommitted = (work: keyof AgentWork.Interface) => (request: AgentJobs.Request) =>
+  Effect.flatMap(Store.Transaction, (storeTransaction) =>
+    storeTransaction.afterCommit(
+      Effect.sync(() => {
+        const requested = requestedAgentWork.get(request.workspaceId) ?? [];
+        requested.push({ work, memberId: request.memberId });
+        requestedAgentWork.set(request.workspaceId, requested);
+      }),
+    ),
+  );
+
 /**
- * Background jobs the suites run themselves: each request is accepted and nothing runs, so a suite
- * runs the background process it expects, as a host's runner would.
+ * Agent jobs the suites run themselves: a commit's requests are kept once it commits, and
+ * `runAgentJobs` does the work they asked for, as a host's agent jobs would.
  */
-export const manualBackgroundJobs = BackgroundJobs.Service.of({ request: () => Effect.void });
-export const layerManualBackgroundJobs = Layer.succeed(
-  BackgroundJobs.Service,
-  manualBackgroundJobs,
-);
+export const recordedAgentJobs = AgentJobs.Service.of({
+  requestAcceptWork: keepOnceCommitted("acceptWork"),
+  requestStopDepartedTurns: keepOnceCommitted("stopDepartedTurns"),
+});
+export const layerRecordedAgentJobs = Layer.succeed(AgentJobs.Service, recordedAgentJobs);
+
+/**
+ * Do the agent work the workspace's commits asked for since the last run, in order and once each,
+ * through the gateway in context, as a host's agent jobs would; with `only`, just that work, as when
+ * the other's job is still to run. Work those runs ask for waits for the next.
+ */
+export const runAgentJobs = Effect.fnUntraced(function* (
+  id: Workspace.Id,
+  options: { readonly only?: keyof AgentWork.Interface } = {},
+) {
+  const gateway = yield* Gateway.Service;
+  const requested = requestedAgentWork.get(id) ?? [];
+  const due = requested.filter(({ work }) => options.only === undefined || work === options.only);
+  requestedAgentWork.set(
+    id,
+    requested.filter((request) => !due.includes(request)),
+  );
+  const seen = new Set<string>();
+  for (const { work, memberId } of due) {
+    if (seen.has(`${work}:${memberId}`)) continue;
+    seen.add(`${work}:${memberId}`);
+    yield* Effect.scoped(
+      gateway.inWorkspace(
+        id,
+        Effect.flatMap(AgentWork.Service, (agentWork) => agentWork[work](memberId)),
+      ),
+    );
+  }
+});
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
   context: Context.Context<
     | WorkspaceStorage.Bindings
     | Signals.Service
-    | BackgroundJobs.Service
+    | AgentJobs.Service
     | TurnJobs.Service
     | ConnectionCatalog.Service
     | EnvironmentCatalog.Service
@@ -186,9 +231,9 @@ export const bind = (
 export type Bound = ReturnType<typeof bind>;
 
 /**
- * A workspace's stores with its signals from the host, and background and turn jobs the suites
- * run themselves: a commit's request is accepted and nothing runs, so a suite runs the process
- * or the turn it expects, as a host's runner would.
+ * A workspace's stores with its signals from the host, and agent and turn jobs the suites run
+ * themselves: a suite does the agent work its commits asked for, and runs the turn it expects, as
+ * a host's jobs would.
  */
 const withHostServices = (
   context: Context.Context<WorkspaceStorage.Bindings>,
@@ -198,7 +243,7 @@ const withHostServices = (
   bind(
     context.pipe(
       Context.add(Signals.Service, workspaceSignals.forWorkspace(id)),
-      Context.add(BackgroundJobs.Service, manualBackgroundJobs),
+      Context.add(AgentJobs.Service, recordedAgentJobs),
       Context.add(TurnJobs.Service, TurnJobs.noRunner),
       Context.add(ConnectionCatalog.Service, catalog),
       Context.add(EnvironmentCatalog.Service, environmentCatalog),
@@ -254,7 +299,7 @@ export const make = (harness: Harness) => {
         Layer.mergeAll(
           Layer.succeedContext(host),
           harness.crypto,
-          layerManualBackgroundJobs,
+          layerRecordedAgentJobs,
           TurnJobs.layerNoRunner,
         ),
       ),

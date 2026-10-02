@@ -21,6 +21,7 @@ import { Keyed } from "../../internal/keyed.tsx";
 import type { IconComponent } from "../../internal/props.ts";
 import type { TaskState } from "../../components/task-status/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";
+import { paletteOptions, type ColorPalette } from "../../foundations/color/palettes.ts";
 import { Rail } from "../../patterns/rail/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Sidebar } from "../../patterns/sidebar/index.ts";
@@ -80,6 +81,8 @@ export interface AccountMenu {
   readonly identity: string;
   readonly appearance: Appearance;
   readonly onAppearanceChange: (appearance: Appearance) => void;
+  readonly palette?: ColorPalette;
+  readonly onPaletteChange?: (palette: ColorPalette) => void;
   readonly onOpenSettings: () => void;
   readonly onChangeName: () => void;
   readonly onSignOut: () => void;
@@ -181,6 +184,24 @@ export function WorkspaceNavigation(props: WorkspaceNavigationProps) {
                     <Menu.RadioItem value="light">Light</Menu.RadioItem>
                     <Menu.RadioItem value="dark">Dark</Menu.RadioItem>
                   </Menu.RadioGroup>
+                  <Show when={menu().onPaletteChange}>
+                    {(changePalette) => (
+                      <>
+                        <Menu.Separator />
+                        <Menu.RadioGroup
+                          label="Color palette"
+                          value={menu().palette ?? "neutral"}
+                          onChange={(value) => changePalette()(value as ColorPalette)}
+                        >
+                          <For each={paletteOptions}>
+                            {(option) => (
+                              <Menu.RadioItem value={option.value}>{option.label}</Menu.RadioItem>
+                            )}
+                          </For>
+                        </Menu.RadioGroup>
+                      </>
+                    )}
+                  </Show>
                   <Menu.Separator />
                   <Menu.Item onSelect={() => props.onSwitchWorkspace()}>Switch workspace</Menu.Item>
                   <Menu.Item onSelect={() => menu().onOpenSettings()}>Workspace settings</Menu.Item>

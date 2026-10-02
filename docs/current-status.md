@@ -81,15 +81,15 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
   turn to override, and no profile photos. Agents run only when their work arrives in a thread, and a removed agent's membership
   cannot be reactivated, as a person's cannot.
-- Core can define [background processes](../packages/core/README.md#background-work), and the
-  local host runs them as background jobs on an Effect Cluster runner; `turn.accept` and
-  `turn.stop-departed` are the ones registered. Turns run on the same runner, each as its own
-  turn job. Several host
+- Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish, and the
+  local host runs them on an Effect Cluster runner: an agent job per agent, which accepts its
+  work and stops its departed turns, and a turn job per turn. Several host
   processes over one database share the work; one that stops answering keeps its workspaces for
   the takeover time, 35 seconds by default. Cluster's socket transport, which delivers job requests
-  between processes at once, is not authenticated and belongs on a private network. Background job
-  requests are not coalesced: a burst of commits that each ask for a run runs the process once
-  per commit.
+  between processes at once, is not authenticated and belongs on a private network. Agent job
+  requests are not coalesced: a burst of commits that each ask an agent for work runs its
+  acceptance once per commit, and a person's leaving a group or thread runs an agent job that
+  finds no turns to stop, since the facts do not say whether the member is an agent.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping
@@ -257,10 +257,11 @@ dark status values follow its rules without frames of their own, and the older f
 
 ## Shared client foundation
 
-UI's `Theme` supplies the chosen mode's variables and body typography, and its Shell and
+UI's `Theme` supplies the chosen mode and palette's variables and body typography, and its Shell and
 Centered patterns lay out pages inside and outside a workspace. Web and desktop compose those
 parts without local styles. Appearance preferences
-are persisted per app origin; System follows operating-system appearance.
+are persisted per app origin; System follows operating-system appearance. The account menu offers
+the original Neutral palette and experimental Linen, Sage, and Slate palettes, each in both modes.
 
 [Web](../apps/web/README.md) and [desktop](../apps/desktop/README.md) independently
 compose headless session/API state from [client](../apps/client/README.md) and

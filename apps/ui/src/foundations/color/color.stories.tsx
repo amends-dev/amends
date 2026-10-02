@@ -1,6 +1,7 @@
 import { For } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
-import { avatarTones, dark, light } from "./tokens.ts";
+import { avatarTones, light } from "./tokens.ts";
+import { colorPalettes, type ColorPalette } from "./palettes.ts";
 import { vars } from "../theme/vars.css.ts";
 import * as s from "../foundations.stories.css.ts";
 
@@ -24,15 +25,17 @@ const groups: ReadonlyArray<{ group: Group; title: string; note: string }> = [
   {
     group: "action",
     title: "Actions",
-    note: "The primary action and the current-item indicator are the darkest shade.",
+    note: "The primary action and the current-item indicator carry the palette’s accent.",
   },
 ];
 
-function Swatch(props: { group: Group; role: string }) {
+function Swatch(props: { group: Group; role: string; palette: ColorPalette }) {
   const color = () =>
     (vars.color[props.group] as Record<string, string>)[props.role] ?? "transparent";
   const values = () =>
-    [light, dark].map((mode) => (mode[props.group] as Record<string, string>)[props.role]);
+    Object.values(colorPalettes[props.palette]).map(
+      (mode) => (mode[props.group] as Record<string, string>)[props.role],
+    );
   return (
     <li class={s.swatch}>
       {props.group === "text" ? (
@@ -65,93 +68,98 @@ const statusRoles = ["mark", "text", "surface", "border"] as const;
 
 const meta = { title: "Foundations/Color" } satisfies Meta;
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj;
 
 export const Roles = {
-  render: () => (
-    <div class={s.page}>
-      <For each={groups}>
-        {(entry) => (
-          <section class={s.section}>
-            <h2 class={s.heading}>{entry.title}</h2>
-            <p class={s.note}>{entry.note}</p>
-            <ul class={s.grid}>
-              <For each={Object.keys(light[entry.group])}>
-                {(role) => <Swatch group={entry.group} role={role} />}
-              </For>
-            </ul>
-          </section>
-        )}
-      </For>
-      <section class={s.section}>
-        <h2 class={s.heading}>Status</h2>
-        <p class={s.note}>
-          Marks are the only saturated color. Text, surfaces, and borders make a notice in the tone.
-          Offline has no tone: its mark is a ring in text.muted.
-        </p>
-        <ul class={s.grid}>
-          <For each={statusTones}>
-            {(tone) => (
-              <For each={statusRoles}>
-                {(role) => (
-                  <li class={s.swatch}>
-                    <span
-                      class={s.chip}
-                      style={
-                        role === "text"
-                          ? { color: vars.color.status[tone].text }
-                          : { "background-color": vars.color.status[tone][role] }
-                      }
-                      aria-hidden="true"
-                    >
-                      {role === "text" ? "Aa" : ""}
-                    </span>
-                    <span>
-                      <span class={s.name}>
-                        status.{tone}.{role}
+  render: (_args, context) => {
+    const palette = (): ColorPalette => context.globals["palette"] ?? "neutral";
+    const colors = () => colorPalettes[palette()];
+    return (
+      <div class={s.page}>
+        <For each={groups}>
+          {(entry) => (
+            <section class={s.section}>
+              <h2 class={s.heading}>{entry.title}</h2>
+              <p class={s.note}>{entry.note}</p>
+              <ul class={s.grid}>
+                <For each={Object.keys(light[entry.group])}>
+                  {(role) => <Swatch group={entry.group} role={role} palette={palette()} />}
+                </For>
+              </ul>
+            </section>
+          )}
+        </For>
+        <section class={s.section}>
+          <h2 class={s.heading}>Status</h2>
+          <p class={s.note}>
+            Status marks identify state. Text, surfaces, and borders make a notice in the tone.
+            Offline has no tone: its mark is a ring in text.muted.
+          </p>
+          <ul class={s.grid}>
+            <For each={statusTones}>
+              {(tone) => (
+                <For each={statusRoles}>
+                  {(role) => (
+                    <li class={s.swatch}>
+                      <span
+                        class={s.chip}
+                        style={
+                          role === "text"
+                            ? { color: vars.color.status[tone].text }
+                            : { "background-color": vars.color.status[tone][role] }
+                        }
+                        aria-hidden="true"
+                      >
+                        {role === "text" ? "Aa" : ""}
                       </span>
-                      <span class={s.value}>
-                        {light.status[tone][role]} / {dark.status[tone][role]}
+                      <span>
+                        <span class={s.name}>
+                          status.{tone}.{role}
+                        </span>
+                        <span class={s.value}>
+                          {colors().light.status[tone][role]} / {colors().dark.status[tone][role]}
+                        </span>
                       </span>
-                    </span>
-                  </li>
-                )}
-              </For>
-            )}
-          </For>
-        </ul>
-      </section>
-      <section class={s.section}>
-        <h2 class={s.heading}>Avatar tones</h2>
-        <p class={s.note}>
-          Square initials; a person keeps one tone. Ink marks the current reader.
-        </p>
-        <ul class={s.grid}>
-          <For each={avatarTones}>
-            {(tone) => (
-              <li class={s.swatch}>
-                <span
-                  class={s.chip}
-                  style={{
-                    "background-color": vars.color.avatar[tone].background,
-                    color: vars.color.avatar[tone].foreground,
-                    border: "none",
-                  }}
-                  aria-hidden="true"
-                >
-                  AM
-                </span>
-                <span>
-                  <span class={s.name}>avatar.{tone}</span>
-                  <span class={s.value}>
-                    {light.avatar[tone].background} / {dark.avatar[tone].background}
+                    </li>
+                  )}
+                </For>
+              )}
+            </For>
+          </ul>
+        </section>
+        <section class={s.section}>
+          <h2 class={s.heading}>Avatar tones</h2>
+          <p class={s.note}>
+            Square initials; a person keeps one tone. Ink marks the current reader.
+          </p>
+          <ul class={s.grid}>
+            <For each={avatarTones}>
+              {(tone) => (
+                <li class={s.swatch}>
+                  <span
+                    class={s.chip}
+                    style={{
+                      "background-color": vars.color.avatar[tone].background,
+                      color: vars.color.avatar[tone].foreground,
+                      border: "none",
+                    }}
+                    aria-hidden="true"
+                  >
+                    AM
                   </span>
-                </span>
-              </li>
-            )}
-          </For>
-        </ul>
-      </section>
-    </div>
-  ),
+                  <span>
+                    <span class={s.name}>avatar.{tone}</span>
+                    <span class={s.value}>
+                      {colors().light.avatar[tone].background} /{" "}
+                      {colors().dark.avatar[tone].background}
+                    </span>
+                  </span>
+                </li>
+              )}
+            </For>
+          </ul>
+        </section>
+      </div>
+    );
+  },
 } satisfies Story;

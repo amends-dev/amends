@@ -3,6 +3,7 @@ export {
   AppearanceProvider,
   useAppearance,
   type AppearancePreference,
+  type PalettePreference,
   type AppearanceSource,
   type AppearanceScope,
   type SystemAppearance,

@@ -1,7 +1,6 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
-import { BackgroundJobs } from "@amends/core/background";
-import { TurnJobs, TurnStore } from "@amends/core/turn";
+import { AgentJobs, TurnJobs, TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
@@ -320,7 +319,7 @@ const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
     Layer.succeed(WorkspaceSignals.Service, quiet),
-    BackgroundJobs.layerUnavailable,
+    AgentJobs.layerNoRunner,
     TurnJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,
@@ -328,7 +327,7 @@ const host = (storage: WorkspaceStorage.Interface) =>
     ),
   );
 const run = <A, E>(
-  program: (gateway: Gateway.Interface) => Effect.Effect<A, E>,
+  program: (gateway: Gateway.Interface) => Effect.Effect<A, E, Scope.Scope>,
   options: BindingOptions = {},
 ) =>
   Effect.flatMap(Gateway.make(), program).pipe(
@@ -355,7 +354,10 @@ it.effect.each(["inWorkspace", "asMember"] as const)(
           program: Effect.Effect<A, E>,
         ): Effect.Effect<
           A,
-          GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember | GatewayErrors.WorkspaceNotFound
+          | GatewayErrors.PublicErrorOf<E>
+          | GatewayErrors.NotMember
+          | GatewayErrors.WorkspaceNotFound,
+          Scope.Scope
         > =>
           entry === "inWorkspace"
             ? gateway.inWorkspace(workspaceId, program)
@@ -726,16 +728,17 @@ const counted = Effect.fnUntraced(function* (options: Gateway.Options) {
 it.effect("an idle workspace is released after its time-to-live and boots again from storage", () =>
   Effect.gen(function* () {
     const { gateway, boots } = yield* counted({ idleTimeToLive: "1 minute" });
-    yield* gateway.inWorkspace(workspaceId, Effect.void);
+    // Each request's lease closes with its scope, as an HTTP response's does once it is sent.
+    yield* Effect.scoped(gateway.inWorkspace(workspaceId, Effect.void));
     expect(boots.reads).toBe(1);
     // Each request restarts the idle time from its release.
     yield* TestClock.adjust("59 seconds");
-    yield* gateway.asMember(workspaceId, alice, Effect.void);
+    yield* Effect.scoped(gateway.asMember(workspaceId, alice, Effect.void));
     yield* TestClock.adjust("59 seconds");
-    yield* gateway.inWorkspace(workspaceId, Effect.void);
+    yield* Effect.scoped(gateway.inWorkspace(workspaceId, Effect.void));
     expect(boots.reads).toBe(1);
     yield* TestClock.adjust("1 minute");
-    yield* gateway.asMember(workspaceId, alice, Effect.void);
+    yield* Effect.scoped(gateway.asMember(workspaceId, alice, Effect.void));
     expect(boots.reads).toBe(2);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );
@@ -745,16 +748,16 @@ it.effect("an open lease keeps its workspace prepared past the time-to-live", ()
     const { gateway, boots } = yield* counted({ idleTimeToLive: "1 minute" });
     // A response stream holds its lease the same way until the client disconnects.
     const stream = yield* Scope.make();
-    yield* gateway.asMemberScoped(workspaceId, alice, Effect.void).pipe(Scope.provide(stream));
+    yield* gateway.asMember(workspaceId, alice, Effect.void).pipe(Scope.provide(stream));
     yield* TestClock.adjust("10 minutes");
-    yield* gateway.inWorkspace(workspaceId, Effect.void);
+    yield* Effect.scoped(gateway.inWorkspace(workspaceId, Effect.void));
     expect(boots.reads).toBe(1);
     yield* Scope.close(stream, Exit.void);
     yield* TestClock.adjust("59 seconds");
-    yield* gateway.inWorkspace(workspaceId, Effect.void);
+    yield* Effect.scoped(gateway.inWorkspace(workspaceId, Effect.void));
     expect(boots.reads).toBe(1);
     yield* TestClock.adjust("1 minute");
-    yield* gateway.inWorkspace(workspaceId, Effect.void);
+    yield* Effect.scoped(gateway.inWorkspace(workspaceId, Effect.void));
     expect(boots.reads).toBe(2);
   }).pipe(Effect.scoped, Effect.provide(host({ forWorkspace: unexpected }))),
 );

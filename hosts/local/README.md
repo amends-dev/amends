@@ -43,7 +43,7 @@ amends's own [harness](../../packages/harness-amends/README.md); and the
 `LocalHost.installed` declares them.
 
 The pool size is the most connections the host opens. Four are the host's own: one listens for
-notifications, two run background work, and one holds the runner address. A busy workspace's
+notifications, two run jobs, and one holds the runner address. A busy workspace's
 writers wait for each other in memory rather than each holding a connection, and its reads use at
 most three at once; see [locks and timeouts](../../adapters/storage-postgresql/README.md#locks-and-timeouts).
 
@@ -61,10 +61,10 @@ once a stream opens. The minimum of five leaves two for requests, so one long co
 stall every read; with three the host stops answering once a change stream opens. Database URLs stay
 redacted in configuration errors.
 
-## Background work
+## Jobs
 
-The host runs its workspaces' [background jobs](../../packages/cluster/README.md#background-jobs)
-in its own process, on an Effect Cluster runner over the same database pool as its storage, so a
+The host runs [agent jobs](../../packages/cluster/README.md#agent-jobs) and turn jobs in its own
+process, on an Effect Cluster runner over the same database pool as its storage, so a
 job request a commit makes is stored in that commit's transaction. Cluster keeps its own tables
 beside the adapter's (`cluster_messages`, `cluster_replies`, `cluster_runners`,
 `cluster_migrations`), creating them at startup; reads for due requests every two seconds; and holds
@@ -72,7 +72,7 @@ one of the pool's connections for its shard locks. Every hour, one runner prunes
 days ago.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
-share out the workspaces' background work, and when one stops answering, the others take its
+share out the jobs, and when one stops answering, the others take its
 workspaces after `AMENDS_RUNNER_TAKEOVER`, which every process over the database sets alike. A
 process claims its address as it starts, holding one more pooled connection, and refuses to
 start while another process holds it: two processes at one address would share Cluster's machine
@@ -81,12 +81,12 @@ process, so a host restarted after a crash takes its address back at once, and i
 jobs run again. Restart a host by stopping the old process before starting the new one; requests
 sent meanwhile wait in the database.
 
-`bun run --filter @amends/host-local status` reports the background work of the database at
-`AMENDS_DATABASE_URL`: per process, the background job requests due, scheduled, retrying, and dropped, then the
-latest retries and drops with their workspaces. For output to process further, run
+`bun run --filter @amends/host-local status` reports the agent jobs of the database at
+`AMENDS_DATABASE_URL`: per kind of request, those due, scheduled, and retrying, then the latest
+retries with their agents and workspaces. For output to process further, run
 `bun hosts/local/src/status.ts --json` from the repository root, which prefixes no lines.
 It only reads: it applies no migrations, so it is safe against a database another version of the
-host serves. Failures and drops are also logged as they happen.
+host serves. Failures are also logged as they happen.
 
 With `AMENDS_RUNNER_TRANSPORT=storage`, the default, processes coordinate through the database
 alone, so a request for a job another process runs arrives at that process's next read,

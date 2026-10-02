@@ -32,6 +32,7 @@ import {
 } from "@amends/core/workspace";
 import { SessionTokens, Gateway, GatewayErrors, SignIn, WorkspaceDirectory } from "@amends/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
+import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/unstable/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/unstable/httpapi";
 import { Routes } from "../src/index.ts";
@@ -239,21 +240,22 @@ const operations = Layer.mergeAll(
 const gateway = Layer.succeed(
   Gateway.Service,
   Gateway.Service.of({
-    asMemberScoped: () => Effect.die("unused"),
-    runBackgroundProcess: () => Effect.die("unused"),
-    executeTurns: () => Effect.die("unused"),
     createWorkspace: record("createWorkspace", () => Effect.succeed(workspace)),
-    inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, Core.Operations>) => {
+    inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
       calls.push({ operation: "inWorkspace", arguments: [id] });
-      return Effect.provide(program, operations) as Effect.Effect<
-        A,
-        GatewayErrors.PublicErrorOf<E>
-      >;
+      return Effect.provide(
+        program as Effect.Effect<
+          A,
+          GatewayErrors.PublicErrorOf<E>,
+          Layer.Success<typeof operations>
+        >,
+        operations,
+      );
     },
     asMember: <A, E>(
       id: Workspace.Id,
       identity: Identity.MemberReference,
-      program: Effect.Effect<A, E, Core.Operations | Actor.Service>,
+      program: Effect.Effect<A, E, Core.Operations | Actor.Service | Scope.Scope>,
     ) => {
       calls.push({ operation: "asMember", arguments: [id, identity] });
       if (identity.id !== alice.id)
@@ -261,7 +263,7 @@ const gateway = Layer.succeed(
       return Effect.provide(
         Effect.provideService(program, Actor.Service, actor),
         operations,
-      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember>;
+      ) as Effect.Effect<A, GatewayErrors.PublicErrorOf<E> | GatewayErrors.NotMember, Scope.Scope>;
     },
   }),
 );
