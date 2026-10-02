@@ -47,7 +47,7 @@ export const make = (
     results = [];
   };
   for (const item of transcript) {
-    if (item._tag === "ToolResult") {
+    if (Transcript.Item.isAnyOf(["ToolResult"])(item)) {
       results.push(
         Prompt.toolResultPart({
           id: item.callId,
@@ -60,7 +60,7 @@ export const make = (
       continue;
     }
     flushResults();
-    if (item._tag === "Input") {
+    if (Transcript.Item.isAnyOf(["Input"])(item)) {
       const [first = "", ...rest] = text(item.content);
       messages.push(
         Prompt.userMessage({
@@ -76,20 +76,20 @@ export const make = (
       Prompt.assistantMessage({
         content: item.parts.map((part) => {
           const options = optionsOf(part.native);
-          switch (part._tag) {
-            case "Text":
-              return Prompt.textPart({ text: part.text, options });
-            case "Reasoning":
-              return Prompt.reasoningPart({ text: part.text, options });
-            case "ToolCall":
-              return Prompt.toolCallPart({
+          return Transcript.ResponsePart.match<
+            Prompt.TextPart | Prompt.ReasoningPart | Prompt.ToolCallPart
+          >(part, {
+            Text: (part) => Prompt.textPart({ text: part.text, options }),
+            Reasoning: (part) => Prompt.reasoningPart({ text: part.text, options }),
+            ToolCall: (part) =>
+              Prompt.toolCallPart({
                 id: part.id,
                 name: part.name,
                 params: part.params,
                 providerExecuted: false,
                 options,
-              });
-          }
+              }),
+          });
         }),
       }),
     );

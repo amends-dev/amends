@@ -1,7 +1,7 @@
 import type { ConnectionImplementation } from "@amends/connection";
 import type { HarnessImplementation } from "@amends/harness";
 import type { SandboxImplementation } from "@amends/sandbox";
-import { Option, Schema } from "effect";
+import { Option, Schema, Predicate } from "effect";
 import { Connection } from "../connection/connection.ts";
 import { Environment } from "./environment.ts";
 
@@ -38,7 +38,11 @@ export const readiness = (
         declaration.value.capabilities.sandbox?.provider !== provider.value.id
       )
         issues.push("connection-unavailable");
-      else if (Connection.readiness(connection.value, declaration.value)._tag === "Incomplete")
+      else if (
+        Connection.Readiness.isAnyOf(["Incomplete"])(
+          Connection.readiness(connection.value, declaration.value),
+        )
+      )
         issues.push("connection-incomplete");
     }
   }
@@ -84,17 +88,17 @@ export const check = (
   selection: Selection,
 ): Compatibility => {
   const reasons: Array<Reason> = [];
-  if (environment.readiness._tag === "Incomplete")
+  if (Environment.Readiness.isAnyOf(["Incomplete"])(environment.readiness))
     reasons.push({ _tag: "EnvironmentNotReady", issues: environment.readiness.issues });
   const inference = selection.connection.installed
     ? selection.connection.capabilities.modelInference
     : undefined;
   if (inference === undefined) reasons.push({ _tag: "NoModelInference" });
   else {
-    if (selection.connection.readiness.modelInference?._tag !== "Ready")
+    if (!Predicate.isTagged(selection.connection.readiness.modelInference, "Ready"))
       reasons.push({ _tag: "ConnectionNotReady" });
     if (
-      harness?.models._tag === "Interfaces" &&
+      Predicate.isTagged(harness?.models, "Interfaces") &&
       !harness.models.interfaces.includes(inference.interface)
     )
       reasons.push({ _tag: "InterfaceUnsupported", interface: inference.interface });

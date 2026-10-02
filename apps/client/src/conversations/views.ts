@@ -11,7 +11,7 @@ import type {
   TimelineTurn,
 } from "@amends/ui/screens/timeline";
 import { useAtomValue } from "@effect/atom-solid";
-import { Option } from "effect";
+import { Option, Predicate } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { agentsReads } from "../agents/api.ts";
@@ -23,6 +23,8 @@ import {
   type Thread,
   ThreadMessage,
   type ThreadTimeline,
+  ThreadParticipation,
+  Identity,
 } from "./api.ts";
 import type { WorkspaceFailure } from "../api/failures.ts";
 import { useWorkspace } from "../session/directory.tsx";
@@ -86,12 +88,12 @@ export function usePeople(workspaceId: string) {
   const self = useWorkspace(() => workspaceId);
   const selfId = () => self()?.member.id as string | undefined;
   const authorOf = (author: Thread.Record["createdBy"]): MessageAuthor => {
-    if (author._tag === "Contact") return { name: "Contact", agent: false };
+    if (ThreadMessage.Author.isAnyOf(["Contact"])(author)) return { name: "Contact", agent: false };
     const member = members.member(author.memberId);
     return {
       id: author.memberId,
       name: memberName(member),
-      agent: member?.identity._tag === "Agent",
+      agent: Predicate.isTagged(member?.identity, "Agent"),
     };
   };
   /**
@@ -336,7 +338,9 @@ export function useThreadConversation(
   useMarkThreadRead(workspaceId, threadId, () => timeline.value()?.at(-1)?.activity.sequence);
   const noteOf = (item: Participation): TimelineNote => {
     const participant = item.participant.participant;
-    const self = participant._tag === "Member" && participant.memberId === people.selfId();
+    const self =
+      ThreadParticipation.Reference.isAnyOf(["Member"])(participant) &&
+      participant.memberId === people.selfId();
     return {
       kind: "note",
       id: item.activity.id,
@@ -345,12 +349,11 @@ export function useThreadConversation(
         item.activity.kind === "participation.followed"
           ? "followed"
           : changes[item.activity.details.reason],
-      who:
-        participant._tag === "Member"
-          ? people.name(participant.memberId)
-          : participant._tag === "Contact"
-            ? "A contact"
-            : "Triage",
+      who: ThreadParticipation.Reference.isAnyOf(["Member"])(participant)
+        ? people.name(participant.memberId)
+        : ThreadParticipation.Reference.isAnyOf(["Contact"])(participant)
+          ? "A contact"
+          : "Triage",
       self,
     };
   };
@@ -374,7 +377,10 @@ export function useThreadConversation(
         });
       else if (isParticipation(item)) {
         const participant = item.participant.participant;
-        if (item.activity.kind !== "participation.followed" && participant._tag === "Member")
+        if (
+          item.activity.kind !== "participation.followed" &&
+          ThreadParticipation.Reference.isAnyOf(["Member"])(participant)
+        )
           departed.set(participant.memberId, item.activity.sequence);
         shown.push(noteOf(item));
       } else if (item.activity.kind === "turn.created") {
@@ -478,7 +484,7 @@ export function useMentionCandidates(
         {
           id: admission.memberId,
           name: memberName(member),
-          agent: member?.identity._tag === "Agent",
+          agent: Predicate.isTagged(member?.identity, "Agent"),
         },
       ];
     }),
@@ -507,7 +513,7 @@ export function useGroupPeople(
         return {
           id: admission.id,
           name: memberName(member),
-          agent: member?.identity._tag === "Agent",
+          agent: Predicate.isTagged(member?.identity, "Agent"),
           you,
           removable: !you && members.membersRemovable() && !members.general?.(),
         };
@@ -523,7 +529,7 @@ export function useGroupPeople(
       .map((member) => ({
         id: member.id,
         name: memberName(member),
-        agent: member.identity._tag === "Agent",
+        agent: Identity.MemberReference.isAnyOf(["Agent"])(member.identity),
       }));
   });
   return { roster, candidates };
@@ -543,10 +549,12 @@ export function useMemberProfiles(workspaceId: string) {
     return {
       id: member.id,
       name: memberName(member),
-      kind: member.identity._tag === "Agent" ? "agent" : "person",
+      kind: Identity.MemberReference.isAnyOf(["Agent"])(member.identity) ? "agent" : "person",
       you: member.id === people.selfId(),
       former: member.status === "removed",
-      ...(member.identity._tag === "Agent" ? { agentId: member.identity.id } : {}),
+      ...(Identity.MemberReference.isAnyOf(["Agent"])(member.identity)
+        ? { agentId: member.identity.id }
+        : {}),
     };
   };
 }
@@ -560,7 +568,7 @@ export function useWorkspacePeople(workspaceId: string): Accessor<ReadonlyArray<
       .map((member) => ({
         id: member.id,
         name: memberName(member),
-        agent: member.identity._tag === "Agent",
+        agent: Identity.MemberReference.isAnyOf(["Agent"])(member.identity),
       })),
   );
 }

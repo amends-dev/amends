@@ -2,7 +2,13 @@ import { useAtomValue } from "@effect/atom-solid";
 import { Effect, Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/unstable/reactivity";
 import { createSignal, type Accessor } from "solid-js";
-import { changeFollow, groupsRead, participantsRead, type Follow } from "./api.ts";
+import {
+  changeFollow,
+  groupsRead,
+  participantsRead,
+  type Follow,
+  ThreadParticipation,
+} from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useMutation } from "../api/mutation.ts";
 import { refreshResult } from "../api/refresh.ts";
@@ -98,7 +104,7 @@ export function useThreadFollow(
     Option.map(AsyncResult.value(participants()), (all) =>
       all.find(
         (summary) =>
-          summary.participant._tag === "Member" &&
+          ThreadParticipation.Reference.isAnyOf(["Member"])(summary.participant) &&
           summary.participant.memberId === self()?.member.id,
       ),
     );

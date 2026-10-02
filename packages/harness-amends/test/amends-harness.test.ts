@@ -4,7 +4,7 @@ import type { Scope } from "effect";
 import { AiError, LanguageModel, Prompt } from "effect/unstable/ai";
 import type { Response } from "effect/unstable/ai";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
-import type { Harness, HarnessTool } from "@amends/harness";
+import { type Harness, type HarnessTool } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 
 type Script = Stream.Stream<Response.StreamPartEncoded, AiError.AiError>;
@@ -67,10 +67,7 @@ const start = (
     .pipe(Effect.provideService(LanguageModel.LanguageModel, model));
 
 const untilIdle = (session: Harness.Session) =>
-  session.events.pipe(
-    Stream.takeUntil((event) => event._tag === "Idle"),
-    Stream.runCollect,
-  );
+  session.events.pipe(Stream.takeUntil(HarnessEvent.Event.isAnyOf(["Idle"])), Stream.runCollect);
 
 /** Events as a log stores and reads them back: encoded, as JSON, and decoded again. */
 const stored = (events: ReadonlyArray<HarnessEvent.Event>) =>
@@ -167,7 +164,7 @@ describe("AmendsHarness", () => {
       yield* session.prepare([]);
       yield* session.submit(batch("b1", "x".repeat(200)));
       const events = yield* session.events.pipe(
-        Stream.takeUntil((event) => event._tag === "ContextFull"),
+        Stream.takeUntil(HarnessEvent.Event.isAnyOf(["ContextFull"])),
         Stream.runCollect,
       );
 
@@ -191,7 +188,7 @@ describe("AmendsHarness", () => {
       yield* session.prepare([]);
       yield* session.submit(batch("b1", "When is high tide?"));
       const events = yield* session.events.pipe(
-        Stream.takeUntil((event) => event._tag === "ContextFull"),
+        Stream.takeUntil(HarnessEvent.Event.isAnyOf(["ContextFull"])),
         Stream.runCollect,
       );
 
@@ -255,7 +252,9 @@ describe("AmendsHarness", () => {
       const events = yield* untilIdle(session);
 
       expect(
-        events.flatMap((event) => (event._tag === "BlockCompleted" ? [event.block] : [])),
+        events.flatMap((event) =>
+          HarnessEvent.Event.isAnyOf(["BlockCompleted"])(event) ? [event.block] : [],
+        ),
       ).toEqual([
         { _tag: "Reasoning", text: "Seventeen times 23." },
         { _tag: "Text", text: "391" },
@@ -360,7 +359,7 @@ describe("AmendsHarness", () => {
           yield* source.prepare([]);
           yield* source.submit(batch("b1", "Move to the sandbox and build."));
           const events = yield* source.events.pipe(
-            Stream.takeUntil((event) => event._tag === "ResponseFinished"),
+            Stream.takeUntil(HarnessEvent.Event.isAnyOf(["ResponseFinished"])),
             Stream.runCollect,
           );
           yield* Deferred.await(started);
@@ -439,7 +438,7 @@ describe("AmendsHarness", () => {
         { _tag: "Response", parts: [{ _tag: "Text", text: "Both done." }] },
       ]);
       expect(prompts).toHaveLength(2);
-      expect(events.filter((event) => event._tag === "Idle")).toHaveLength(1);
+      expect(events.filter(HarnessEvent.Event.isAnyOf(["Idle"]))).toHaveLength(1);
     }),
   );
 

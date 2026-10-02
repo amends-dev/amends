@@ -1,4 +1,9 @@
-import { paths, useCreateWorkspace, useWorkspacePicker } from "@amends/client";
+import {
+  paths,
+  useCreateWorkspace,
+  useWorkspacePicker,
+  CreateWorkspaceState,
+} from "@amends/client";
 import { CreateWorkspace, WorkspacePicker } from "@amends/ui/screens/workspaces";
 import { useMatch, useNavigate } from "@solidjs/router";
 import { createEffect, Show } from "solid-js";
@@ -44,15 +49,16 @@ function CreateWorkspaceDialog() {
   const navigate = useNavigate();
   createEffect(() => {
     const state = creation.state();
-    if (state._tag === "Ready") navigate(paths.workspace(state.workspace.id), { replace: true });
+    if (CreateWorkspaceState.$is("Ready")(state))
+      navigate(paths.workspace(state.workspace.id), { replace: true });
   });
   const form = () => {
     const state = creation.state();
-    return state._tag === "Form" ? state : undefined;
+    return CreateWorkspaceState.$is("Form")(state) ? state : undefined;
   };
   const created = () => {
     const state = creation.state();
-    return state._tag === "Created"
+    return CreateWorkspaceState.$is("Created")(state)
       ? { name: state.workspace.name, pending: state.pending, refreshFailed: state.refreshFailed }
       : undefined;
   };

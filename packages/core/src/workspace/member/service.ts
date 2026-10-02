@@ -1,3 +1,4 @@
+import { Identity } from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
@@ -170,7 +171,7 @@ export const make = Effect.fn("MemberService.make")(function* (): Effect.fn.Retu
             removed.provenance.occurredAt,
           );
       }).pipe(Publication.withCause(removed, removed.provenance.occurredAt));
-      if (member.identity._tag === "Human") {
+      if (Identity.MemberReference.isAnyOf(["Human"])(member.identity)) {
         const recipientId = member.identity.id;
         const actor = yield* Actor.Service;
         const revokedAt = yield* DateTime.now;

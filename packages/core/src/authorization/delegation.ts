@@ -72,7 +72,8 @@ export const recipientDenial = (
     return new OwnerProtected({ workspaceId: recipient.workspaceId });
   if (!recipientNeedsAssignments(recipient)) return undefined;
   return assignments.some(
-    ({ source }) => source._tag !== "Role" || source.roleId !== BuiltinRoles.MemberId,
+    ({ source }) =>
+      !Assignment.Source.isAnyOf(["Role"])(source) || source.roleId !== BuiltinRoles.MemberId,
   )
     ? new Denied({ reason: "protected-member" })
     : undefined;

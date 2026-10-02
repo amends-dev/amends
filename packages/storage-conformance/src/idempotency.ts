@@ -1,7 +1,7 @@
 import { Role, RoleFacts } from "@amends/core/authorization";
 import { Journal, Log, Publication, Store } from "@amends/core/journal";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, Schema } from "effect";
+import { Effect, Option, Schema, Result } from "effect";
 import type { Harness } from "./harness.ts";
 import { forWorkspace, otherWorkspaceId, Support, testProvenance, workspaceId } from "./support.ts";
 
@@ -208,11 +208,10 @@ export const idempotency = (harness: Harness) => {
             ],
             { concurrency: "unbounded" },
           );
-          const successes = attempts.filter((result) => result._tag === "Success");
+          const successes = attempts.filter((result) => Result.isSuccess(result));
           expect(successes.length).toBeGreaterThan(0);
           for (const result of attempts)
-            if (result._tag === "Failure")
-              expect(result.failure._tag).toBe("JournalStore.Conflict");
+            if (Result.isFailure(result)) expect(result.failure._tag).toBe("JournalStore.Conflict");
           const first = yield* a.store.transaction(append);
           const second = yield* b.store.transaction(append);
           expect(second).toEqual(first);

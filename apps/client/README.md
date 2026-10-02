@@ -103,6 +103,11 @@ schemas. Client imports UI's types only, as a development dependency, and no UI 
 styling, router, Storybook, platform entry points, or backend implementations; UI imports no
 client code. `bun run check:packages` enforces both across source and manifests.
 
+Feature API modules also expose the existing schema helpers their views use to branch
+on decoded values. The client exports `DirectoryState`, `SignInState`, and
+`CreateWorkspaceState` as constructor bundles alongside their types, so app pages
+can use their `$is` guards without comparing `_tag` directly.
+
 ## Verification
 
 ```sh

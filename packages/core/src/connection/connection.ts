@@ -183,7 +183,8 @@ export const readiness = (
 ): Readiness => {
   const settings = missingSettings(declaration, record.settings);
   const credential =
-    record.authentication._tag === "ApiKey" && record.authentication.credentialId === null;
+    Authentication.isAnyOf(["ApiKey"])(record.authentication) &&
+    record.authentication.credentialId === null;
   return settings.length === 0 && !credential
     ? { _tag: "Ready" }
     : { _tag: "Incomplete", settings, credential };
@@ -199,10 +200,9 @@ export const view = (
   name: record.name,
   implementationId: record.implementationId,
   settings: record.settings,
-  authentication:
-    record.authentication._tag === "ApiKey"
-      ? { _tag: "ApiKey", configured: record.authentication.credentialId !== null }
-      : { _tag: "None" },
+  authentication: Authentication.isAnyOf(["ApiKey"])(record.authentication)
+    ? { _tag: "ApiKey", configured: record.authentication.credentialId !== null }
+    : { _tag: "None" },
   createdBy: record.createdBy,
   createdAt: record.createdAt,
   installed: declaration !== undefined,

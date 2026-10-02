@@ -6,6 +6,8 @@ import {
   Ownership,
   Workspace,
   WorkspaceSettings,
+  Scope,
+  Identity,
 } from "@amends/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/unstable/reactivity";
@@ -15,6 +17,8 @@ import { command } from "../api/failures.ts";
 import { refreshResult } from "../api/refresh.ts";
 import { workspaceKey } from "../api/keys.ts";
 import { newWorkspaceRequestKey } from "../workspaces/api.ts";
+
+export { Assignment, Scope, Invitation, Identity };
 
 /** The Workspace tab reads settings and ownership; Members adds the roster and invitations. */
 export interface SettingsData {

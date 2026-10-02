@@ -25,7 +25,7 @@ export type DirectoryState = Data.TaggedEnum<{
   };
   Failed: {};
 }>;
-const DirectoryState = Data.taggedEnum<DirectoryState>();
+export const DirectoryState = Data.taggedEnum<DirectoryState>();
 export interface DirectoryScope {
   readonly state: Accessor<DirectoryState>;
   readonly retry: () => void;
@@ -61,7 +61,7 @@ export function DirectoryProvider(props: ParentProps) {
         refreshFailed: false,
       });
     // A refresh must not unmount validated pages or discard their local drafts.
-    if (previous?._tag === "Ready")
+    if (DirectoryState.$is("Ready")(previous))
       return DirectoryState.Ready({
         ...previous,
         refreshing: current.waiting,
@@ -88,7 +88,7 @@ export function useWorkspace(
   const directory = useDirectory();
   return createMemo(() => {
     const state = directory.state();
-    return state._tag === "Ready"
+    return DirectoryState.$is("Ready")(state)
       ? state.listing.memberships.find(
           (entry) => entry.workspace.id === workspaceId() && entry.member.status === "active",
         )

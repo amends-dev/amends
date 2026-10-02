@@ -1,5 +1,17 @@
-import { ApiErrors, Workspace } from "@amends/api-http";
-import { Cause, Clock, Data, Duration, Effect, Exit, Queue, Random, Schema, Stream } from "effect";
+import { ApiErrors, Workspace, Signal, ChangeFeed } from "@amends/api-http";
+import {
+  Cause,
+  Clock,
+  Data,
+  Duration,
+  Effect,
+  Exit,
+  Queue,
+  Random,
+  Schema,
+  Stream,
+  Option,
+} from "effect";
 import { Sse } from "effect/unstable/encoding";
 import { Atom, AtomRegistry, Reactivity } from "effect/unstable/reactivity";
 import { watchWake } from "./wake.ts";
@@ -308,7 +320,7 @@ const run = Effect.fnUntraced(function* (
     ...workspaceCollections.map((collection) => collectionKey(workspaceId, collection)),
   ];
   const id = Schema.decodeOption(Workspace.Id)(workspaceId);
-  if (id._tag === "None") {
+  if (Option.isNone(id)) {
     Queue.offerUnsafe(states, ChangeFeedState.Ended({ reason: "unavailable" }));
     return;
   }
@@ -322,9 +334,9 @@ const run = Effect.fnUntraced(function* (
   let attempt = 0;
   let connected = false;
   let liveSince: number | undefined;
-  const receive = (message: Message): Effect.Effect<void> => {
-    switch (message._tag) {
-      case "Ready":
+  const receive = (message: Message): Effect.Effect<void> =>
+    ChangeFeed.Message.match(message, {
+      Ready: (message) => {
         return Effect.flatMap(Clock.currentTimeMillis, (now) => {
           connected = true;
           liveSince = now;
@@ -332,7 +344,8 @@ const run = Effect.fnUntraced(function* (
           Queue.offerUnsafe(states, ChangeFeedState.Live());
           return message.reset ? reactivity.invalidate(everything) : Effect.void;
         });
-      case "Committed": {
+      },
+      Committed: (message) => {
         cursor = message.cursor;
         // A member whose message arrived is no longer typing it.
         for (const event of message.events)
@@ -347,16 +360,15 @@ const run = Effect.fnUntraced(function* (
         // A notification for the reader changes their inbox and pending counts.
         const keys = affectedKeys(workspaceId, message.events, message.notifications.length > 0);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
-      }
-      case "Signal": {
+      },
+      Signal: (message) => {
         const signal = message.signal;
-        if (signal._tag === "Typing")
+        if (Signal.Value.isAnyOf(["Typing"])(signal))
           registry.update(typists, (current) => typing(current, signal, Date.now()));
         const keys = signalKeys(workspaceId, signal);
         return keys.length > 0 ? reactivity.invalidate(keys) : Effect.void;
-      }
-    }
-  };
+      },
+    });
   while (true) {
     Queue.offerUnsafe(
       states,

@@ -1,3 +1,4 @@
+import { Assignment } from "./assignment/assignment.ts";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import type { Member } from "../workspace/member/member.ts";
 
@@ -60,7 +61,7 @@ export const make = Effect.fn("GrantResolver.make")(function* (): Effect.fn.Retu
     const grants: Array<Grant.Value> = [];
     for (const assignment of yield* assignmentStore.listActiveByMember(memberId)) {
       const source = assignment.source;
-      if (source._tag === "Direct") {
+      if (Assignment.Source.isAnyOf(["Direct"])(source)) {
         grants.push(...(yield* resolveGrant(source.grant.permission, source.grant.scope)));
       } else {
         const role = yield* roleStore.get(source.roleId);

@@ -311,7 +311,7 @@ const registry: ReadonlyArray<Registered> = [
       readThreadRequirement(activity.threadId, workspaceId),
     notifications: (event) =>
       event.payload.recipients.flatMap((selected) =>
-        selected.recipient._tag === "Human" || selected.recipient._tag === "Agent"
+        Notification.Recipient.isAnyOf(["Human", "Agent"])(selected.recipient)
           ? [
               {
                 scope: Member.audienceOf(selected.recipient.memberId),

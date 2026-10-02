@@ -147,7 +147,7 @@ it.effect("derived occurrences survive uncertain commits and remain available af
         expect(yield* fixture.counter.get).toBe(0);
         yield* fixture.loseNextAcknowledgment;
         const failure = yield* Effect.flip(journal.publish(Received, input));
-        if (failure._tag !== "JournalStore.CommitUncertain")
+        if (!Schema.is(Store.CommitUncertain)(failure))
           return yield* Effect.die("Expected uncertain commit");
         const retry = yield* journal.publish(Received, input);
         expect(retry.commitId).toBe(failure.commitId);

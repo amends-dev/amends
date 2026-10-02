@@ -10,7 +10,7 @@ import type {
   ModelConnectionOption,
 } from "@amends/ui/screens/agents";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Effect, Option } from "effect";
+import { Cause, Effect, Option, Predicate } from "effect";
 import { Atom, AsyncResult } from "effect/unstable/reactivity";
 import {
   createEffect,
@@ -28,10 +28,11 @@ import {
   changeAgent,
   newAgentRequestKey,
   reloadAgents,
-  type Agent,
+  Agent,
   type AgentCommand,
   type AgentConfiguration,
   type AgentsReads,
+  EnvironmentCompatibility,
 } from "./api.ts";
 import { useApiClient } from "../provider.tsx";
 import { useChanges } from "../api/changes.ts";
@@ -117,7 +118,9 @@ export function useAgentList(workspaceId: string) {
           id: view.id,
           memberId: view.memberId,
           name: view.name,
-          issues: view.readiness._tag === "Incomplete" ? view.readiness.issues.map(issueCode) : [],
+          issues: Agent.Readiness.isAnyOf(["Incomplete"])(view.readiness)
+            ? view.readiness.issues.map(issueCode)
+            : [],
           activity: activity.agentActivity(view.memberId),
         })),
   );
@@ -176,7 +179,7 @@ export function useAgents(
         {
           id: connection.id,
           name: connection.name,
-          ready: connection.readiness.modelInference?._tag === "Ready",
+          ready: Predicate.isTagged(connection.readiness.modelInference, "Ready"),
           models,
         },
       ];
@@ -234,7 +237,9 @@ export function useAgents(
         name: environment?.name,
         runtime: environment?.runtime,
       },
-      issues: view.readiness._tag === "Incomplete" ? view.readiness.issues.map(issueCode) : [],
+      issues: Agent.Readiness.isAnyOf(["Incomplete"])(view.readiness)
+        ? view.readiness.issues.map(issueCode)
+        : [],
       configurable: view.configurable,
       removable: view.removable,
       createdBy: memberName(members.member(view.createdBy)),
@@ -336,16 +341,22 @@ export function useAgents(
         const environment = known.get(choice.environmentId);
         if (!environment) return [];
         const compatibility = choice.compatibility;
-        if (compatibility._tag === "Compatible")
+        if (EnvironmentCompatibility.Compatibility.isAnyOf(["Compatible"])(compatibility))
           return [{ ...environment, fit: { kind: "works" } }];
         const blockers = compatibility.reasons
-          .map((reason) => (reason._tag === "EnvironmentNotReady" ? undefined : issueCode(reason)))
+          .map((reason) =>
+            EnvironmentCompatibility.Reason.isAnyOf(["EnvironmentNotReady"])(reason)
+              ? undefined
+              : issueCode(reason),
+          )
           .filter((issue): issue is AgentIssue => issue !== undefined)
           .filter(blocker);
         if (blockers.length > 0)
           return [{ ...environment, fit: { kind: "cant-run", reasons: blockers } }];
         const issues = compatibility.reasons.flatMap((reason) =>
-          reason._tag === "EnvironmentNotReady" ? reason.issues : [],
+          EnvironmentCompatibility.Reason.isAnyOf(["EnvironmentNotReady"])(reason)
+            ? reason.issues
+            : [],
         );
         return [
           {
@@ -355,7 +366,9 @@ export function useAgents(
               issues,
               connection:
                 pendingConnection ||
-                compatibility.reasons.some((reason) => reason._tag === "ConnectionNotReady"),
+                compatibility.reasons.some(
+                  EnvironmentCompatibility.Reason.isAnyOf(["ConnectionNotReady"]),
+                ),
             },
           },
         ];

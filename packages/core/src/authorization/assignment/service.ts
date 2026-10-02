@@ -1,3 +1,4 @@
+import { Scope } from "../scope.ts";
 import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Actor } from "../../identity/actor.ts";
@@ -151,7 +152,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
     });
   });
   const isWorkspaceRole = (record: Assignment.Record) =>
-    record.source._tag === "Role" && record.source.scope._tag === "Workspace";
+    Assignment.Source.isAnyOf(["Role"])(record.source) &&
+    Scope.Value.isAnyOf(["Workspace"])(record.source.scope);
   const assign = Effect.fn("AssignmentService.assign")(
     function* (input: Assignment.AssignInput) {
       const request = yield* Schema.decodeEffect(Assignment.AssignInput)(input);
@@ -160,7 +162,7 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       const existing = (yield* delegation.assignmentsFor(request.memberId)).find(
         (record) =>
           isWorkspaceRole(record) &&
-          record.source._tag === "Role" &&
+          Assignment.Source.isAnyOf(["Role"])(record.source) &&
           record.source.roleId === request.roleId,
       );
       if (existing !== undefined) return existing;
@@ -178,7 +180,8 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       if (Option.isNone(found)) return yield* new NotFound({ assignmentId: id });
       const record = found.value;
       if (record.memberId !== memberId) return yield* new NotFound({ assignmentId: id });
-      if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
+      if (Assignment.Source.isAnyOf(["Role"])(record.source))
+        yield* delegation.requireGrant(record.source.roleId);
       if (record.status === "revoked") return record;
       return yield* assignmentCommand.revokeAssignment(record);
     },
@@ -198,10 +201,12 @@ export const make = Effect.fn("AssignmentService.make")(function* (): Effect.fn.
       )
         return yield* new Changed({ memberId: request.memberId });
       for (const record of current) {
-        if (record.source._tag === "Role") yield* delegation.requireGrant(record.source.roleId);
+        if (Assignment.Source.isAnyOf(["Role"])(record.source))
+          yield* delegation.requireGrant(record.source.roleId);
       }
       const same = current.find(
-        ({ source }) => source._tag === "Role" && source.roleId === request.roleId,
+        ({ source }) =>
+          Assignment.Source.isAnyOf(["Role"])(source) && source.roleId === request.roleId,
       );
       if (current.length === 1 && same !== undefined) return same;
       for (const record of current) yield* assignmentCommand.revokeAssignment(record);

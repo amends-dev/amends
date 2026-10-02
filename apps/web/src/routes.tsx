@@ -9,6 +9,7 @@ import {
   useSession,
   useWorkspace,
   ChangeFeedProvider,
+  DirectoryState,
 } from "@amends/client";
 import { CheckingSessionScreen, HostUnavailableScreen } from "@amends/ui/screens/standalone";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
@@ -55,8 +56,8 @@ function ValidatedSession(props: ParentProps) {
   const account = useStandaloneAccount();
   return (
     <Switch>
-      <Match when={directory.state()._tag === "Ready"}>{props.children}</Match>
-      <Match when={directory.state()._tag === "Failed"}>
+      <Match when={DirectoryState.$is("Ready")(directory.state())}>{props.children}</Match>
+      <Match when={DirectoryState.$is("Failed")(directory.state())}>
         <HostUnavailableScreen homeHref="/" account={account()} onRetry={directory.retry} />
       </Match>
       <Match when={true}>

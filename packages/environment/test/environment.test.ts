@@ -4,7 +4,7 @@ import { LanguageModel } from "effect/unstable/ai";
 import type { AiError, Response } from "effect/unstable/ai";
 import { Environment, EnvironmentErrors } from "@amends/environment";
 import { HarnessEvent, Transcript } from "@amends/harness";
-import type { HarnessTool } from "@amends/harness";
+import { type HarnessTool } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { SandboxErrors } from "@amends/sandbox";
 import type { Sandbox } from "@amends/sandbox";
@@ -130,12 +130,16 @@ const withSandbox = (
 
 const untilIdle = (running: Environment.Running) =>
   running.events.pipe(
-    Stream.takeUntil((event) => event._tag === "Harness" && event.event._tag === "Idle"),
+    Stream.takeUntil(
+      (event) =>
+        Environment.Event.isAnyOf(["Harness"])(event) &&
+        HarnessEvent.Event.isAnyOf(["Idle"])(event.event),
+    ),
     Stream.runCollect,
   );
 
 const harnessEvents = (events: ReadonlyArray<Environment.Event>) =>
-  events.flatMap((event) => (event._tag === "Harness" ? [event.event] : []));
+  events.flatMap((event) => (Environment.Event.isAnyOf(["Harness"])(event) ? [event.event] : []));
 
 describe("Environment.spawn", () => {
   it.effect("runs in process: ready first, then history, input, and release", () =>

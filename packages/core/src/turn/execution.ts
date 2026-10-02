@@ -1,9 +1,10 @@
-import type { Environment as EnvironmentRuntime } from "@amends/environment";
-import type { HarnessErrors, HarnessEvent } from "@amends/harness";
+import { Connection } from "../connection/connection.ts";
+import { Environment as EnvironmentRuntime } from "@amends/environment";
+import { type HarnessErrors, HarnessEvent } from "@amends/harness";
 import { Transcript } from "@amends/harness";
-import type { Redacted } from "effect";
+import { type Redacted, Predicate } from "effect";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { type PlatformError } from "effect";
 import { AgentStore } from "../agent/store.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { ConnectionCredentialStore } from "../connection/credential-store.ts";
@@ -378,7 +379,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const memberIds = [
       ...new Set(
         list.flatMap(({ message }) =>
-          message.author._tag === "Member" ? [message.author.memberId] : [],
+          ThreadMessage.Author.isAnyOf(["Member"])(message.author) ? [message.author.memberId] : [],
         ),
       ),
     ];
@@ -386,7 +387,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       (yield* memberStore.getMany(memberIds)).map((member) => [member.id as string, member.name]),
     );
     return (author: ThreadMessage.Author): Transcript.Author =>
-      author._tag === "Member"
+      ThreadMessage.Author.isAnyOf(["Member"])(author)
         ? { id: author.memberId, name: named.get(author.memberId) ?? "A member" }
         : { id: author.contactId, name: "A contact" };
   });
@@ -435,7 +436,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const earlier = yield* readMessagesBetween(turn, { through: turn.inputAfterSequence });
     const author = yield* nameAuthors(earlier);
     return earlier.flatMap(({ message }): ReadonlyArray<Transcript.Item> =>
-      message.author._tag === "Member" && message.author.memberId === turn.memberId
+      ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
+      message.author.memberId === turn.memberId
         ? TurnLog.splitIntoPieces(message.text, pieceSize).map((text, index) => ({
             _tag: "Response",
             id: `message:${message.id}${index === 0 ? "" : `/${index}`}` as Transcript.ResponseId,
@@ -463,7 +465,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       return unrunnableBecause("The agent's model connection is no longer available.");
     const authentication = connection.value.authentication;
     let credential: Redacted.Redacted<string> | undefined;
-    if (authentication._tag === "ApiKey") {
+    if (Connection.Authentication.isAnyOf(["ApiKey"])(authentication)) {
       if (authentication.credentialId === null)
         return unrunnableBecause(`${connection.value.name} needs its API key.`);
       const stored = yield* connectionCredentialStore
@@ -489,7 +491,10 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       through: turn.acceptedThroughSequence,
     })).filter(
       ({ message }) =>
-        !(message.author._tag === "Member" && message.author.memberId === turn.memberId),
+        !(
+          ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
+          message.author.memberId === turn.memberId
+        ),
     );
     const author = yield* nameAuthors(messages);
     const waiting = messages.flatMap(({ sequence, message }) =>
@@ -625,7 +630,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   ) {
     const found = yield* openAgentLog(turn).getAppend(submissionKeyOf(batchId));
     const entry = Option.getOrUndefined(found)?.[0]?.payload;
-    return entry?._tag === "Submitted" ? entry : undefined;
+    return Predicate.isTagged(entry, "Submitted") ? entry : undefined;
   });
 
   const recordSubmission = Effect.fn("TurnExecution.recordSubmission")(function* (
@@ -675,7 +680,11 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         yield* requireStatus(turn, ["running", "cancelling"]);
         // Input the harness took in is a batch execution submitted, exactly as recorded.
         for (const event of events) {
-          if (event._tag !== "Harness" || event.event._tag !== "InputIncorporated") continue;
+          if (
+            !EnvironmentRuntime.Event.isAnyOf(["Harness"])(event) ||
+            !HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event.event)
+          )
+            continue;
           const recorded = yield* findSubmittedBatch(turn, event.event.batch.id);
           if (recorded === undefined)
             return yield* new InvalidResponse({
@@ -689,7 +698,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         if (events.length > 0)
           yield* openAgentLog(turn).appendAll(
             events.map((event): TurnLog.Entry =>
-              event._tag === "Harness"
+              EnvironmentRuntime.Event.isAnyOf(["Harness"])(event)
                 ? { _tag: "Harness", turnId: turn.id, event: event.event }
                 : { _tag: "Environment", turnId: turn.id, event: event.event },
             ),

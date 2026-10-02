@@ -12,6 +12,7 @@ import {
   ThreadMessageService,
   ThreadParticipationService,
   type ThreadTimeline,
+  ThreadParticipation,
 } from "@amends/core/thread";
 import { Turn, TurnService, TurnExecution, TurnLog } from "@amends/core/turn";
 import type { Member, Workspace } from "@amends/core/workspace";
@@ -79,22 +80,19 @@ const followLog = (id: Workspace.Id, turnId: Turn.Id, reader: Identity.MemberRef
 /** A log message in brief: its kind, and the items or text it carries. */
 const brief = (message: Turn.LogMessage | "done" | "unavailable") => {
   if (message === "done" || message === "unavailable") return message;
-  switch (message._tag) {
-    case "Opened":
-      return `opened ${message.items.map((item) => item._tag).join(",")}`;
-    case "Changed":
-      return `changed ${message.changes
+  return Turn.LogMessage.match(message, {
+    Opened: (message) => `opened ${message.items.map((item) => item._tag).join(",")}`,
+    Changed: (message) =>
+      `changed ${message.changes
         .map(({ index, item }) =>
-          item._tag === "Responded"
+          Turn.LogItem.isAnyOf(["Responded"])(item)
             ? `${index}:${item.text}${item.reply ? " (reply)" : ""}`
             : `${index}:${item._tag}`,
         )
-        .join(",")}`;
-    case "Drafted":
-      return `drafted ${message.text}`;
-    case "Ended":
-      return "ended";
-  }
+        .join(",")}`,
+    Drafted: (message) => `drafted ${message.text}`,
+    Ended: () => "ended",
+  });
 };
 
 /** A timeline item in brief: a message's text, or a turn's change. */
@@ -420,9 +418,9 @@ export const turns = (harness: ConformanceHarness) => {
               expect(shown.turn).toMatchObject({ id: turnId, status: "completed" });
               expect(
                 shown.items.map((item) =>
-                  item._tag === "Responded"
+                  Turn.LogItem.isAnyOf(["Responded"])(item)
                     ? `${item._tag}: ${item.text}${item.reply ? " (reply)" : ""}`
-                    : item._tag === "InputTaken"
+                    : Turn.LogItem.isAnyOf(["InputTaken"])(item)
                       ? `${item._tag}: ${item.messages}`
                       : item._tag,
                 ),
@@ -439,9 +437,13 @@ export const turns = (harness: ConformanceHarness) => {
                   turnExecution.readEntries(turnId),
                 ),
               );
-              expect(entries.filter(({ entry }) => entry._tag === "Submitted")).toHaveLength(2);
+              expect(
+                entries.filter(({ entry }) => TurnLog.Entry.isAnyOf(["Submitted"])(entry)),
+              ).toHaveLength(2);
               // The log says how the turn began and ended, as its facts do.
-              expect(entries.find(({ entry }) => entry._tag === "Started")?.entry).toMatchObject({
+              expect(
+                entries.find(({ entry }) => TurnLog.Entry.isAnyOf(["Started"])(entry))?.entry,
+              ).toMatchObject({
                 selection,
                 instructions: "Help the team.",
               });
@@ -1205,7 +1207,7 @@ export const turns = (harness: ConformanceHarness) => {
             );
             const mine = participants.find(
               (participant) =>
-                participant.participant._tag === "Member" &&
+                ThreadParticipation.Reference.isAnyOf(["Member"])(participant.participant) &&
                 participant.participant.memberId === agent.memberId,
             );
             yield* as(
@@ -1269,7 +1271,7 @@ export const turns = (harness: ConformanceHarness) => {
               );
               const mine = participants.find(
                 (participant) =>
-                  participant.participant._tag === "Member" &&
+                  ThreadParticipation.Reference.isAnyOf(["Member"])(participant.participant) &&
                   participant.participant.memberId === agent.memberId,
               );
               yield* as(

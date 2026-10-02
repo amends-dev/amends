@@ -261,7 +261,7 @@ it.effect("uncertain commit outcomes preserve identity and are not automatically
         const { journal } = yield* setup;
         yield* fixture.loseNextAcknowledgment;
         const failure = yield* Effect.flip(journal.publish(Changed, { amount: 1 }));
-        if (failure._tag !== "JournalStore.CommitUncertain")
+        if (!Schema.is(Store.CommitUncertain)(failure))
           throw new Error("Expected uncertain outcome");
         expect(Option.isSome(yield* journal.log.get(failure.commitId))).toBe(true);
         expect(yield* (yield* Counter).get).toBe(1);

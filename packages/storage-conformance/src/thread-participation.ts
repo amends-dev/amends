@@ -78,7 +78,8 @@ export const threadParticipation = (harness: Harness) => {
   describe.skipIf(!harness.available)(`${harness.name}: thread participation`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
-      if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+      if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
+        throw new Error("Expected a member participant");
       return record.participant;
     };
 
@@ -421,7 +422,7 @@ export const threadParticipation = (harness: Harness) => {
               expect(
                 (yield* notifications(bound, agentId))
                   .filter((n) => n.participationId === initial.id)
-                  .every((n) => n.state._tag === "Discarded"),
+                  .every((n) => Notification.State.isAnyOf(["Discarded"])(n.state)),
               ).toBe(true);
               const pending = yield* bound.notifications.listPendingByRecipient(
                 Notification.ofMember(agent.memberId, agent.identity),
@@ -1673,7 +1674,9 @@ export const threadParticipation = (harness: Harness) => {
                 ),
               );
               expect(
-                participants.map((p) => p.participant).filter((p) => p._tag !== "Member"),
+                participants
+                  .map((p) => p.participant)
+                  .filter((p) => !ThreadParticipation.Reference.isAnyOf(["Member"])(p)),
               ).toEqual(
                 [{ _tag: "Contact", contactId }, { _tag: "Triage" }].sort((left, right) =>
                   left._tag < right._tag ? -1 : 1,

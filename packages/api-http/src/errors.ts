@@ -82,8 +82,9 @@ export const InvitationUnavailable = InvitationService.Unavailable.pipe(HttpApiS
 export const InvitationInvalidExpiry = InvitationService.InvalidExpiry.pipe(
   HttpApiSchema.status(400),
 );
+export const DelegationDenied = Delegation.Denied.pipe(HttpApiSchema.status(403));
 export const delegation = [
-  Delegation.Denied.pipe(HttpApiSchema.status(403)),
+  DelegationDenied,
   Delegation.OwnerProtected.pipe(HttpApiSchema.status(409)),
   Delegation.UnsupportedRole.pipe(HttpApiSchema.status(400)),
   Delegation.RoleNotFound.pipe(HttpApiSchema.status(404)),

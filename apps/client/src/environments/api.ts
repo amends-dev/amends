@@ -14,7 +14,7 @@ import { workspaceKey } from "../api/keys.ts";
 import { refreshResult } from "../api/refresh.ts";
 import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 
-export type { Connection, Environment, HarnessImplementation, SandboxImplementation };
+export { type Connection, Environment, type HarnessImplementation, type SandboxImplementation };
 
 const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
   const params = { workspaceId };

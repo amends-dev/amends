@@ -7,7 +7,18 @@
 import type { TurnExecution } from "@amends/core/turn";
 import { Environment } from "@amends/environment";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
-import { Clock, Crypto, Duration, Effect, Layer, Pull, Result, Schema, Stream } from "effect";
+import {
+  Clock,
+  Crypto,
+  Duration,
+  Effect,
+  Layer,
+  Pull,
+  Result,
+  Schema,
+  Stream,
+  Predicate,
+} from "effect";
 import { ContextBudget } from "./context-budget.ts";
 import { Drafts } from "./drafts.ts";
 import { Ending } from "./ending.ts";
@@ -153,8 +164,8 @@ const submitInput = Effect.fnUntraced(function* (
  * deltas, which only show readers a block while it streams.
  */
 const withoutDeltas = (event: Environment.Event): ReadonlyArray<Environment.Event> =>
-  event._tag === "Harness" &&
-  (event.event._tag === "TextDelta" || event.event._tag === "ReasoningDelta")
+  Environment.Event.isAnyOf(["Harness"])(event) &&
+  HarnessEvent.Event.isAnyOf(["TextDelta", "ReasoningDelta"])(event.event)
     ? []
     : [event];
 
@@ -201,19 +212,31 @@ const makeEventRecorder = Effect.fnUntraced(function* (
             }),
           );
       for (const item of chunk) {
-        if (item._tag !== "Harness") continue;
+        if (!Environment.Event.isAnyOf(["Harness"])(item)) continue;
         const event = item.event;
-        if (event._tag === "ToolCallStarted") runningToolCalls.add(event.callId);
-        else if (event._tag === "ToolCallCompleted") runningToolCalls.delete(event.result.callId);
+        if (HarnessEvent.Event.isAnyOf(["ToolCallStarted"])(event))
+          runningToolCalls.add(event.callId);
+        else if (HarnessEvent.Event.isAnyOf(["ToolCallCompleted"])(event))
+          runningToolCalls.delete(event.result.callId);
         drafts.applyEvent(event);
       }
       yield* drafts.showWhenDue;
       const events = chunk.flatMap(withoutDeltas);
       if (events.length > 0) yield* turnSteps.recordEvents(events);
-      if (events.some((item) => item._tag === "Harness" && item.event._tag === "ContextFull"))
+      if (
+        events.some(
+          (item) =>
+            Environment.Event.isAnyOf(["Harness"])(item) &&
+            HarnessEvent.Event.isAnyOf(["ContextFull"])(item.event),
+        )
+      )
         return "full" as const;
       const lastEvent = events.at(-1);
-      if (lastEvent?._tag === "Harness" && lastEvent.event._tag === "Idle") return "idle" as const;
+      if (
+        Predicate.isTagged(lastEvent, "Harness") &&
+        HarnessEvent.Event.isAnyOf(["Idle"])(lastEvent.event)
+      )
+        return "idle" as const;
     }
   });
   return { recordUntilIdle };

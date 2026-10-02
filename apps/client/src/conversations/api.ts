@@ -1,3 +1,4 @@
+export { Identity };
 import {
   Group,
   GroupMembership,
@@ -9,6 +10,8 @@ import {
   ThreadParticipation,
   ThreadTimeline,
   Workspace,
+  Identity,
+  ApiErrors,
 } from "@amends/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/unstable/reactivity";
@@ -458,7 +461,7 @@ export const renameGroup = (workspace: string) => (api: Api, rename: GroupRename
       })
       .pipe(
         Effect.tapError((error) =>
-          error._tag === "GroupService.Changed"
+          Schema.is(ApiErrors.GroupChanged)(error)
             ? Reactivity.invalidate([workspaceKey(workspace, "groups")])
             : Effect.void,
         ),

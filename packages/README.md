@@ -50,6 +50,14 @@ plan an explicit migration. Test both encoding and decoding. Public models used
 by HTTP carry stable schema identifiers for generated documentation. Keep
 transport status annotations in the HTTP contract package.
 
+Use Effect's variant helpers for types that already provide them: `Option.isNone`,
+`Result.isFailure`, and the corresponding guards for other built-in types. For
+decoded `Schema.TaggedUnion` values, use `.isAnyOf([...tags])` for tag-only checks
+and `.match` or `.matchOrElse` for dispatch. Schema `.guards` and `Schema.is` validate
+the variant's fields too; use them when checking unknown values. `Data.taggedEnum`
+provides tag-only `$is` guards and exhaustive `$match`. `Predicate.isTagged` handles
+optional tagged values without requiring another decode.
+
 ## Constructors and layers
 
 Use Effect's public library pattern across shared packages:

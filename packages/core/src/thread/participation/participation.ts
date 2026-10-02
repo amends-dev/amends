@@ -32,9 +32,9 @@ export const recipientOf = (participant: Participant): Notification.Recipient =>
   });
 /** Active participation is unique per member, contact, or the thread's triage participant. */
 export const keyOf = (participant: Participant | Reference): string =>
-  participant._tag === "Member"
+  Reference.isAnyOf(["Member"])(participant)
     ? `Member:${participant.memberId}`
-    : participant._tag === "Contact"
+    : Reference.isAnyOf(["Contact"])(participant)
       ? `Contact:${participant.contactId}`
       : "Triage";
 
@@ -72,7 +72,7 @@ export const Reference = Schema.TaggedUnion({
 export type Reference = typeof Reference.Type;
 /** The member behind a participant or its reference, when it is one. */
 export const memberOf = (participant: Participant | Reference): MemberId.Id | undefined =>
-  participant._tag === "Member" ? participant.memberId : undefined;
+  Reference.isAnyOf(["Member"])(participant) ? participant.memberId : undefined;
 export const referenceOf = (participant: Participant): Reference =>
   Participant.match(participant, {
     Member: ({ memberId }): Reference => ({ _tag: "Member", memberId }),

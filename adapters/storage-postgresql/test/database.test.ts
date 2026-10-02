@@ -6,7 +6,7 @@ import { Fact, Journal, Publication, Subject } from "@amends/core/journal";
 import { ThreadService } from "@amends/core/thread";
 import { Notification } from "@amends/core/notification";
 import { Member, MemberFacts } from "@amends/core/workspace";
-import { Array, DateTime, Effect, Option, Redacted, Schema } from "effect";
+import { Array, DateTime, Effect, Option, Redacted, Schema, Exit } from "effect";
 import { SqlClient } from "effect/unstable/sql";
 import { PostgresDatabase } from "../src/index.ts";
 import {
@@ -78,7 +78,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             ).pipe(Effect.provide(database(url)), Effect.exit),
           { concurrency: "unbounded" },
         );
-        expect(opened.filter((exit) => exit._tag === "Failure")).toEqual([]);
+        expect(opened.filter((exit) => Exit.isFailure(exit))).toEqual([]);
         const applied = yield* inDatabase(
           url,
           Effect.flatMap(

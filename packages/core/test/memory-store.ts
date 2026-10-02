@@ -1,9 +1,10 @@
+import { Identity } from "@amends/core/identity";
 import { Array, Context, DateTime, Deferred, Effect, Option, Ref, Schema, Semaphore } from "effect";
 import { Assignment } from "../src/authorization/assignment/assignment.ts";
 import { AssignmentStore } from "../src/authorization/assignment/store.ts";
 import { Role } from "../src/authorization/role/role.ts";
 import { RoleStore } from "../src/authorization/role/store.ts";
-import type { Scope } from "../src/authorization/scope.ts";
+import { Scope } from "../src/authorization/scope.ts";
 import { Commit } from "../src/journal/commit.ts";
 import { Checkpoint } from "../src/journal/checkpoint.ts";
 import { Entry } from "../src/journal/entry.ts";
@@ -99,19 +100,20 @@ const cloneRole = (role: Role.Record): Role.Record => ({
   permissions: [...role.permissions],
 });
 const cloneScope = (scope: Scope.Value): Scope.Value =>
-  scope._tag === "Workspace" ? { ...scope } : { ...scope, target: { ...scope.target } };
+  Scope.Value.isAnyOf(["Workspace"])(scope)
+    ? { ...scope }
+    : { ...scope, target: { ...scope.target } };
 const cloneAssignment = (assignment: Assignment.Record): Assignment.Record => ({
   id: assignment.id,
   workspaceId: assignment.workspaceId,
   memberId: assignment.memberId,
   status: assignment.status,
-  source:
-    assignment.source._tag === "Role"
-      ? { ...assignment.source, scope: cloneScope(assignment.source.scope) }
-      : {
-          ...assignment.source,
-          grant: { ...assignment.source.grant, scope: cloneScope(assignment.source.grant.scope) },
-        },
+  source: Assignment.Source.isAnyOf(["Role"])(assignment.source)
+    ? { ...assignment.source, scope: cloneScope(assignment.source.scope) }
+    : {
+        ...assignment.source,
+        grant: { ...assignment.source.grant, scope: cloneScope(assignment.source.grant.scope) },
+      },
 });
 const cloneCursor = (cursor: Checkpoint.Cursor): Checkpoint.Cursor => ({
   position: cursor.position,
@@ -516,7 +518,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
             (member) =>
               member.workspaceId === workspaceId &&
               member.status === "active" &&
-              member.identity._tag === identity._tag &&
+              Identity.MemberReference.isAnyOf([identity._tag])(member.identity) &&
               member.identity.id === identity.id,
           ),
           cloneMember,
@@ -546,7 +548,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
             (member) =>
               member.workspaceId === workspaceId &&
               member.status === "active" &&
-              member.identity._tag === record.identity._tag &&
+              Identity.MemberReference.isAnyOf([record.identity._tag])(member.identity) &&
               member.identity.id === record.identity.id,
           )
         ) {
@@ -726,7 +728,7 @@ export const make = Effect.fn("JournalTest.memoryStore")(function* (
             (record) =>
               record.workspaceId === workspaceId &&
               record.status === "active" &&
-              record.source._tag === "Role" &&
+              Assignment.Source.isAnyOf(["Role"])(record.source) &&
               record.source.roleId === roleId,
           )
           .map(cloneAssignment);

@@ -1,7 +1,7 @@
-import type { Identity } from "@amends/core/identity";
+import { Identity } from "@amends/core/identity";
 import { Store } from "@amends/core/journal";
 import { Member, MemberStore } from "@amends/core/workspace";
-import { Array, Effect, Layer, Schema } from "effect";
+import { Array, Effect, Layer, Schema, Option } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
 import { compareBinary, Rows } from "./rows.ts";
@@ -11,7 +11,7 @@ const rows = Rows.make(Schema.fromJsonString(Member.Record));
 
 const isActive = (member: Member.Record, identity: Identity.MemberReference) =>
   member.status === "active" &&
-  member.identity._tag === identity._tag &&
+  Identity.MemberReference.isAnyOf([identity._tag])(member.identity) &&
   member.identity.id === identity.id;
 
 /**
@@ -80,7 +80,7 @@ export const make = Effect.fn("Members.make")(function* () {
       const current = yield* rows
         .get(space.records.members, id)
         .pipe(Effect.mapError(storeFailure(MemberStore, "rename")));
-      if (current._tag === "None" || current.value.status !== "active")
+      if (Option.isNone(current) || current.value.status !== "active")
         return yield* new MemberStore.Conflict({
           operation: "rename",
           message: "Expected an active membership",
@@ -96,7 +96,7 @@ export const make = Effect.fn("Members.make")(function* () {
       const current = yield* rows
         .get(space.records.members, id)
         .pipe(Effect.mapError(storeFailure(MemberStore, "markRemoved")));
-      if (current._tag === "None" || current.value.status !== "active")
+      if (Option.isNone(current) || current.value.status !== "active")
         return yield* new MemberStore.Conflict({
           operation: "markRemoved",
           message: "Expected an active membership",

@@ -30,7 +30,7 @@ export type CreateWorkspaceState = Data.TaggedEnum<{
   };
   Ready: { readonly workspace: CreatedWorkspace };
 }>;
-const State = Data.taggedEnum<CreateWorkspaceState>();
+export const CreateWorkspaceState = Data.taggedEnum<CreateWorkspaceState>();
 export interface CreateWorkspaceController {
   readonly state: Accessor<CreateWorkspaceState>;
   readonly setName: (name: string) => void;
@@ -47,7 +47,7 @@ export function useCreateWorkspace(): CreateWorkspaceController {
   const session = useSession();
   const client = useApiClient();
   const [state, setState] = createSignal<CreateWorkspaceState>(
-    State.Form({
+    CreateWorkspaceState.Form({
       name: "",
       memberName: suggestedName(session.session?.humanId),
       pending: false,
@@ -59,53 +59,69 @@ export function useCreateWorkspace(): CreateWorkspaceController {
   const reload = useMutation(() => refreshResult(directoryQuery(client)));
   async function submit(draft?: string) {
     const value = state();
-    if (value._tag !== "Form" || value.pending) return;
+    if (!CreateWorkspaceState.$is("Form")(value) || value.pending) return;
     const name = (draft ?? value.name).trim();
     if (!isWorkspaceName(name)) {
-      setState(State.Form({ ...value, name: draft ?? value.name, error: "invalid-name" }));
+      setState(
+        CreateWorkspaceState.Form({ ...value, name: draft ?? value.name, error: "invalid-name" }),
+      );
       return;
     }
     // A name is optional; without one, people see the creator's identity.
     const memberName = value.memberName.trim();
     if (memberName !== "" && !isMemberName(memberName)) {
-      setState(State.Form({ ...value, name, error: "invalid-member-name" }));
+      setState(CreateWorkspaceState.Form({ ...value, name, error: "invalid-member-name" }));
       return;
     }
     if (intent?.name !== name || (intent.memberName ?? "") !== memberName)
       intent = { name, memberName, key: newWorkspaceRequestKey() };
-    const submitting = State.Form({ ...value, name, memberName, pending: true, error: undefined });
+    const submitting = CreateWorkspaceState.Form({
+      ...value,
+      name,
+      memberName,
+      pending: true,
+      error: undefined,
+    });
     setState(submitting);
     const exit = await create.run(intent);
     if (exit === undefined) return;
     if (Exit.isFailure(exit)) {
       setState(
-        State.Form({ ...submitting, pending: false, error: workspaceRejection(exit.cause) }),
+        CreateWorkspaceState.Form({
+          ...submitting,
+          pending: false,
+          error: workspaceRejection(exit.cause),
+        }),
       );
       return;
     }
-    setState(State.Created({ workspace: exit.value, pending: false, refreshFailed: false }));
+    setState(
+      CreateWorkspaceState.Created({ workspace: exit.value, pending: false, refreshFailed: false }),
+    );
     await reloadDirectory();
   }
   async function reloadDirectory() {
     const value = state();
-    if (value._tag !== "Created" || value.pending) return;
-    setState(State.Created({ ...value, pending: true, refreshFailed: false }));
+    if (!CreateWorkspaceState.$is("Created")(value) || value.pending) return;
+    setState(CreateWorkspaceState.Created({ ...value, pending: true, refreshFailed: false }));
     const exit = await reload.run();
     if (exit === undefined) return;
-    if (Exit.isSuccess(exit)) setState(State.Ready({ workspace: value.workspace }));
-    else setState(State.Created({ ...value, pending: false, refreshFailed: true }));
+    if (Exit.isSuccess(exit)) setState(CreateWorkspaceState.Ready({ workspace: value.workspace }));
+    else setState(CreateWorkspaceState.Created({ ...value, pending: false, refreshFailed: true }));
   }
   return {
     state,
     setName: (name) => {
       const value = state();
-      if (value._tag === "Form" && !value.pending)
-        setState(State.Form({ ...value, name, pending: false, error: undefined }));
+      if (CreateWorkspaceState.$is("Form")(value) && !value.pending)
+        setState(CreateWorkspaceState.Form({ ...value, name, pending: false, error: undefined }));
     },
     setMemberName: (memberName) => {
       const value = state();
-      if (value._tag === "Form" && !value.pending)
-        setState(State.Form({ ...value, memberName, pending: false, error: undefined }));
+      if (CreateWorkspaceState.$is("Form")(value) && !value.pending)
+        setState(
+          CreateWorkspaceState.Form({ ...value, memberName, pending: false, error: undefined }),
+        );
     },
     submit: (name) => void submit(name),
     retryRefresh: () => void reloadDirectory(),

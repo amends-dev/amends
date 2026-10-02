@@ -11,7 +11,7 @@ import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
-import type { Signal } from "../signal/signal.ts";
+import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
 import { ThreadQuery } from "../thread/query.ts";
 import { ThreadId } from "../thread/id.ts";
@@ -278,7 +278,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
             return;
           }
           reader.add({ entry: entry.payload, at: entry.recordedAt, position: batch.position });
-          if (entry.payload._tag === "Ended") over = true;
+          if (TurnLog.Entry.isAnyOf(["Ended"])(entry.payload)) over = true;
         }
         after = batch.position;
         if (over) return;
@@ -333,7 +333,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     const draftedInputs = live.pipe(
       Stream.filter(
         (signal): signal is Extract<Signal.Value, { readonly _tag: "TurnDraft" }> =>
-          signal._tag === "TurnDraft" && signal.turnId === turn.id,
+          Signal.Value.isAnyOf(["TurnDraft"])(signal) && signal.turnId === turn.id,
       ),
       Stream.map((signal): Input => ({
         _tag: "Drafted",
@@ -386,7 +386,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
         }).pipe(
           Stream.mapEffect(messagesFor),
           Stream.flattenIterable,
-          Stream.takeUntil((message) => message._tag === "Ended"),
+          Stream.takeUntil(Turn.LogMessage.isAnyOf(["Ended"])),
         ),
       ),
     );

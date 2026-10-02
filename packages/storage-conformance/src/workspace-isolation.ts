@@ -1,5 +1,5 @@
 import { Agent } from "@amends/core/agent";
-import { BuiltinRoles, Role } from "@amends/core/authorization";
+import { BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
 import { Connection } from "@amends/core/connection";
 import { Environment } from "@amends/core/environment";
 import { Group } from "@amends/core/group";
@@ -78,12 +78,11 @@ export const workspaceIsolation = (harness: Harness) => {
                 write: bound.assignments.insert(
                   Object.assign({}, assignment, elsewhere, {
                     id: assignment.id.replace(/^/, "foreign-") as typeof assignment.id,
-                    source:
-                      assignment.source._tag === "Role"
-                        ? Object.assign({}, assignment.source, {
-                            scope: { _tag: "Workspace" as const, workspaceId: otherWorkspaceId },
-                          })
-                        : assignment.source,
+                    source: Assignment.Source.isAnyOf(["Role"])(assignment.source)
+                      ? Object.assign({}, assignment.source, {
+                          scope: { _tag: "Workspace" as const, workspaceId: otherWorkspaceId },
+                        })
+                      : assignment.source,
                   }),
                 ),
                 kept: (on) =>

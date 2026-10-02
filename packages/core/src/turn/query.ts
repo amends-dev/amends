@@ -1,5 +1,5 @@
 import { Clock, Context, Duration, Effect, Layer, Schedule, Stream } from "effect";
-import type { Signal } from "../signal/signal.ts";
+import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
 import type { TurnId } from "./id.ts";
 
@@ -69,7 +69,7 @@ export const make = Effect.gen(function* () {
   const live = yield* signalHub.subscribe;
   yield* live.pipe(
     Stream.runForEach((signal) =>
-      signal._tag === "TurnDraft"
+      Signal.Value.isAnyOf(["TurnDraft"])(signal)
         ? Effect.map(Clock.currentTimeMillis, (now) => holdDraft(signal, now))
         : Effect.void,
     ),

@@ -37,7 +37,8 @@ export const make = Effect.fn("Invitations.make")(function* () {
         records
           .filter(
             (record) =>
-              record.details.recipientId === recipientId && record.state._tag === "Pending",
+              record.details.recipientId === recipientId &&
+              Invitation.State.isAnyOf(["Pending"])(record.state),
           )
           .toSorted((left, right) => compareBinary(left.details.id, right.details.id)),
       ),
@@ -47,7 +48,10 @@ export const make = Effect.fn("Invitations.make")(function* () {
       const record = yield* validateRecord(input).pipe(
         Effect.mapError(storeConflict(InvitationStore, "insert")),
       );
-      if (record.details.workspaceId !== workspaceId || record.state._tag !== "Pending")
+      if (
+        record.details.workspaceId !== workspaceId ||
+        !Invitation.State.isAnyOf(["Pending"])(record.state)
+      )
         return yield* new InvitationStore.Conflict({
           operation: "insert",
           message: "Expected a pending invitation in this workspace",
@@ -72,7 +76,7 @@ export const make = Effect.fn("Invitations.make")(function* () {
       const current = yield* rows
         .get(space.records.invitations, id)
         .pipe(Effect.mapError(storeFailure(InvitationStore, "settle")));
-      if (Option.isNone(current) || current.value.state._tag !== "Pending")
+      if (Option.isNone(current) || !Invitation.State.isAnyOf(["Pending"])(current.value.state))
         return yield* new InvitationStore.Conflict({
           operation: "settle",
           message: "Expected a pending invitation",

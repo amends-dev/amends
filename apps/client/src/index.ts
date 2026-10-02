@@ -17,17 +17,17 @@ export {
   DirectoryProvider,
   useDirectory,
   useWorkspace,
-  type DirectoryState,
+  DirectoryState,
   type DirectoryScope,
 } from "./session/directory.tsx";
 export { paths, returnPath, signInPath, type WorkspacePage } from "./routing/paths.ts";
 export { resolveApiBaseUrl } from "./configuration.ts";
 export { createBrowserSessionStore, type SessionStore } from "./session/store.ts";
-export { useSignIn, type SignInController, type SignInState } from "./sign-in.ts";
+export { useSignIn, type SignInController, SignInState } from "./sign-in.ts";
 export {
   useCreateWorkspace,
   type CreateWorkspaceController,
-  type CreateWorkspaceState,
+  CreateWorkspaceState,
 } from "./workspaces/create.ts";
 export {
   useWorkspaceSettings,

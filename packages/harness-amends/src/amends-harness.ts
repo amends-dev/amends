@@ -9,7 +9,7 @@ import {
   Transcript,
   type HarnessImplementation,
 } from "@amends/harness";
-import type { HarnessEvent } from "@amends/harness";
+import { type HarnessEvent } from "@amends/harness";
 import { AmendsPrompt } from "./prompt.ts";
 
 /** Amends's own harness: an agent loop run in process through Effect AI. */
@@ -202,7 +202,7 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     let modelId = modelName;
 
     const blockOf = (part: Streamed | Transcript.ToolCall): Transcript.ResponsePart =>
-      part._tag === "ToolCall"
+      Transcript.ResponsePart.isAnyOf(["ToolCall"])(part)
         ? part
         : { _tag: part._tag, text: part.text, ...withNative(part.metadata) };
     /** Report the block at `index` as completed, once. */
@@ -216,7 +216,10 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     const completeAll = (only?: Streamed["_tag"]) =>
       Effect.forEach(
         parts.flatMap((part, index) =>
-          completed.has(index) || (only !== undefined && part._tag !== only) ? [] : [index],
+          completed.has(index) ||
+          (only !== undefined && !Transcript.ResponsePart.isAnyOf([only])(part))
+            ? []
+            : [index],
         ),
         complete,
         { discard: true },
@@ -351,7 +354,9 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     yield* lock.withPermit(
       Effect.gen(function* () {
         const latest = yield* Ref.get(state);
-        const calls = response.parts.flatMap((part) => (part._tag === "ToolCall" ? [part.id] : []));
+        const calls = response.parts.flatMap((part) =>
+          Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) ? [part.id] : [],
+        );
         yield* Ref.set(state, {
           ...latest,
           transcript: [...latest.transcript, response],
@@ -429,7 +434,9 @@ const start = Effect.fnUntraced(function* (options: Harness.StartOptions) {
     if (yield* lock.withPermit(overLimit)) return false;
     const response = yield* respond;
     yield* Effect.forEach(
-      response.parts.flatMap((part) => (part._tag === "ToolCall" ? [part] : [])),
+      response.parts.flatMap((part) =>
+        Transcript.ResponsePart.isAnyOf(["ToolCall"])(part) ? [part] : [],
+      ),
       execute,
       { concurrency: "unbounded", discard: true },
     );

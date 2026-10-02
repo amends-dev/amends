@@ -104,36 +104,35 @@ export const summarize = (items: ReadonlyArray<Item>): Result.Result<Summary, st
   const seen = new Set<string>();
   let open = new Map<string, ToolCall>();
   for (const [index, item] of items.entries()) {
-    switch (item._tag) {
-      case "Input":
-        if (open.size > 0) return Result.fail(`Input ${index} interrupts unanswered tool calls.`);
-        break;
-      case "Response":
-        if (open.size > 0)
-          return Result.fail(`Response ${index} interrupts unanswered tool calls.`);
+    const problem = Item.match<string | undefined>(item, {
+      Input: () => (open.size > 0 ? `Input ${index} interrupts unanswered tool calls.` : undefined),
+      Response: (item) => {
+        if (open.size > 0) return `Response ${index} interrupts unanswered tool calls.`;
         open = new Map();
         for (const part of item.parts) {
-          if (part._tag !== "ToolCall") continue;
-          if (seen.has(part.id)) return Result.fail(`Tool call ${part.id} appears twice.`);
+          if (!ResponsePart.isAnyOf(["ToolCall"])(part)) continue;
+          if (seen.has(part.id)) return `Tool call ${part.id} appears twice.`;
           seen.add(part.id);
           open.set(part.id, part);
         }
-        break;
-      case "ToolResult": {
+        return undefined;
+      },
+      ToolResult: (item) => {
         const call = open.get(item.callId);
         if (call === undefined)
-          return Result.fail(`Tool result ${index} answers no pending call ${item.callId}.`);
+          return `Tool result ${index} answers no pending call ${item.callId}.`;
         if (call.name !== item.name)
-          return Result.fail(`Tool result ${index} names ${item.name}, not ${call.name}.`);
+          return `Tool result ${index} names ${item.name}, not ${call.name}.`;
         open.delete(item.callId);
-        break;
-      }
-    }
+        return undefined;
+      },
+    });
+    if (problem !== undefined) return Result.fail(problem);
   }
   const last = items.at(-1);
   return Result.succeed({
     pending: [...open.values()],
-    awaitsResponse: open.size === 0 && last !== undefined && last._tag !== "Response",
+    awaitsResponse: open.size === 0 && last !== undefined && !Item.isAnyOf(["Response"])(last),
   });
 };
 
@@ -169,20 +168,21 @@ export const sentResult = (result: ToolResult): unknown => {
 export const characters = (items: ReadonlyArray<Item>): number => {
   let total = 0;
   for (const item of items)
-    switch (item._tag) {
-      case "Input":
+    Item.match(item, {
+      Input: (item) => {
         for (const part of item.content) total += part.text.length;
-        break;
-      case "ToolResult": {
+      },
+      ToolResult: (item) => {
         const sent = sentResult(item);
         total += typeof sent === "string" ? sent.length : JSON.stringify(sent).length;
-        break;
-      }
-      case "Response":
+      },
+      Response: (item) => {
         for (const part of item.parts)
-          total += part._tag === "ToolCall" ? JSON.stringify(part.params).length : part.text.length;
-        break;
-    }
+          total += ResponsePart.isAnyOf(["ToolCall"])(part)
+            ? JSON.stringify(part.params).length
+            : part.text.length;
+      },
+    });
   return total;
 };
 
@@ -211,7 +211,9 @@ export const estimate = (
   const index =
     measured === undefined
       ? -1
-      : items.findLastIndex((item) => item._tag === "Response" && item.id === measured.responseId);
+      : items.findLastIndex(
+          (item) => Item.isAnyOf(["Response"])(item) && item.id === measured.responseId,
+        );
   const unmeasured =
     characters(items.slice(index + 1)) + (index === -1 ? (options.instructions?.length ?? 0) : 0);
   return (index === -1 ? 0 : measured!.tokens) + Math.ceil(unmeasured / charactersPerToken);

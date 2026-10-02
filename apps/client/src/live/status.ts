@@ -1,3 +1,4 @@
+import { ChangeFeedState } from "./api.ts";
 import { createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js";
 import { useChangeFeed } from "./change-feed.tsx";
 
@@ -35,6 +36,6 @@ export function useChangeFeedStatus(): Accessor<"connecting" | "reconnecting" | 
   });
   return () => {
     if (!shown()) return undefined;
-    return feed.state()._tag === "Connecting" ? "connecting" : "reconnecting";
+    return ChangeFeedState.$is("Connecting")(feed.state()) ? "connecting" : "reconnecting";
   };
 }

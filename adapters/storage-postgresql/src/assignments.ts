@@ -75,9 +75,13 @@ export const make = Effect.fn("Assignments.make")(function* () {
           memberId: record.memberId,
           status: record.status,
           sourceKind: source._tag,
-          roleId: source._tag === "Role" ? source.roleId : null,
-          permission: source._tag === "Direct" ? source.grant.permission : null,
-          ...ScopeColumns.encode(source._tag === "Role" ? source.scope : source.grant.scope),
+          roleId: Assignment.Source.isAnyOf(["Role"])(source) ? source.roleId : null,
+          permission: Assignment.Source.isAnyOf(["Direct"])(source)
+            ? source.grant.permission
+            : null,
+          ...ScopeColumns.encode(
+            Assignment.Source.isAnyOf(["Role"])(source) ? source.scope : source.grant.scope,
+          ),
         }),
         true,
       ).pipe(Effect.mapError(storeError(AssignmentStore, "insert")));

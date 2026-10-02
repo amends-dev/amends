@@ -132,7 +132,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
   const findSource = Effect.fnUntraced(function* (notification: Notification.Record) {
     if (
       notification.source.logId !== journal.log.id ||
-      (notification.recipient._tag !== "Human" && notification.recipient._tag !== "Agent")
+      !Notification.Recipient.isAnyOf(["Human", "Agent"])(notification.recipient)
     )
       return Option.none<Thread.TimelineItem>();
     const found = yield* journal.log
@@ -177,9 +177,10 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     notificationId: Notification.Id,
   ) {
     const notification = yield* requireOwn(notificationId);
-    if (notification.recipient._tag !== "Human") return yield* new HumanRecipientRequired({});
-    if (notification.state._tag === "Seen") return notification;
-    if (notification.state._tag !== "Pending")
+    if (!Notification.Recipient.isAnyOf(["Human"])(notification.recipient))
+      return yield* new HumanRecipientRequired({});
+    if (Notification.State.isAnyOf(["Seen"])(notification.state)) return notification;
+    if (!Notification.State.isAnyOf(["Pending"])(notification.state))
       return yield* new AlreadyHandled({ notificationId: notification.id });
     // Leaving its group may settle it first, and the store then refuses it or records nothing:
     // what it reads as afterwards decides.
@@ -188,9 +189,9 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       .pipe(Effect.catchTag("NotificationStore.Conflict", () => Effect.void));
     // Another device may have seen it first; the stored time is the one that holds.
     const seen = yield* requireOwn(notification.id);
-    if (seen.state._tag === "Discarded")
+    if (Notification.State.isAnyOf(["Discarded"])(seen.state))
       return yield* new AlreadyHandled({ notificationId: notification.id });
-    if (seen.state._tag !== "Seen")
+    if (!Notification.State.isAnyOf(["Seen"])(seen.state))
       return yield* Effect.die("A seen notification still reads as unseen");
     // The recipient's other sessions hear of it as a signal.
     yield* signalHub.publish(
@@ -206,7 +207,8 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
     input: NotificationStore.Cursor,
   ) {
     const target = yield* requireRecipient();
-    if (target._tag !== "Human") return yield* new HumanRecipientRequired({});
+    if (!Notification.Recipient.isAnyOf(["Human"])(target))
+      return yield* new HumanRecipientRequired({});
     const through = yield* decodeCursor(input);
     const memberId = (yield* Actor.Service).memberId;
     /** One page marked: what it listed and how many of them were due. */
@@ -234,7 +236,7 @@ export const make = Effect.fn("NotificationService.make")(function* (): Effect.f
       const { page, due } = yield* markPageSeen(after).pipe(
         Effect.retry({
           times: 2,
-          while: (error) => error._tag === "NotificationStore.Conflict",
+          while: Schema.is(NotificationStore.Conflict),
         }),
       );
       marked += due;

@@ -1,3 +1,4 @@
+import { Identity } from "../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { AgentPermissions } from "../agent/permissions.ts";
@@ -201,7 +202,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     for (const memberId of named) {
       const member = eligible.get(memberId)?.member;
       if (member === undefined) return yield* new ParticipantUnavailable({ memberId });
-      if (member.identity._tag === "Agent")
+      if (Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
         yield* authorization.require([
           Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
         ]);
@@ -246,7 +247,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       const request = yield* Schema.decodeEffect(Thread.StartDirectInput)(input);
       yield* authorization.require([]);
       const actor = yield* Actor.Service;
-      if (actor.identity._tag !== "Human")
+      if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const author = Notification.ofMember(actor.memberId, actor.identity);
       const memberIds = Group.directMembers([actor.memberId, ...request.memberIds]);
@@ -298,7 +299,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         }),
       ]);
       const actor = yield* Actor.Service;
-      if (actor.identity._tag !== "Human")
+      if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
         return yield* new HumanAuthorRequired({ memberId: actor.memberId });
       const author = Notification.ofMember(actor.memberId, actor.identity);
       const ids = yield* deriveStartIds("thread.start", options.requestKey);

@@ -28,7 +28,9 @@ const toRow = (record: Connection.Record): typeof connections.$inferInsert => ({
   implementationId: record.implementationId,
   settings: record.settings,
   authentication: record.authentication._tag,
-  credentialId: record.authentication._tag === "ApiKey" ? record.authentication.credentialId : null,
+  credentialId: Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication)
+    ? record.authentication.credentialId
+    : null,
   status: record.status,
   createdBy: record.createdBy,
   createdAt: DateTime.toDate(record.createdAt),

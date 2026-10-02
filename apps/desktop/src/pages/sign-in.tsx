@@ -1,4 +1,4 @@
-import { paths, useSignIn } from "@amends/client";
+import { paths, useSignIn, SignInState } from "@amends/client";
 import { SignInCode, SignInEmail } from "@amends/ui/screens/sign-in";
 import { Match, Switch } from "solid-js";
 
@@ -7,7 +7,7 @@ export function SignInPage() {
   const flow = useSignIn();
   const step = <Tag extends "Email" | "Code">(tag: Tag) => {
     const state = flow.state();
-    return state._tag === tag ? (state as Extract<typeof state, { _tag: Tag }>) : undefined;
+    return SignInState.$is(tag)(state) ? state : undefined;
   };
   return (
     <Switch>

@@ -254,63 +254,64 @@ export const reader = (): Reader => {
   };
 
   const add = ({ entry, at, position }: Recorded) => {
-    switch (entry._tag) {
-      case "Started":
+    Entry.match(entry, {
+      Started: (entry) => {
         started = { selection: entry.selection, instructions: entry.instructions };
-        break;
-      case "Attempt":
+      },
+      Attempt: () => {
         attempts += 1;
         accounted = false;
-        break;
-      case "Ended":
+      },
+      Ended: (entry) => {
         ended = entry;
-        break;
-      case "Submitted":
+      },
+      Submitted: (entry) => {
         covers.set(entry.batchId, entry.throughSequence);
-        break;
-      case "Interrupted":
+      },
+      Interrupted: (entry) => {
         interruption = { reason: entry.reason, problem: entry.problem };
         accounted = true;
         if (entry.problem === "model-context") recordOverflow();
         items.push({ _tag: "Interrupted", at, reason: entry.reason, retryable: entry.retryable });
-        break;
-      case "Requested":
+      },
+      Requested: (entry) => {
         requested.push(entry.input);
-        break;
-      case "Checkpoint":
+      },
+      Checkpoint: (entry) => {
         checkpoint = position;
         resetAttempts();
         overflow = { ...overflow, pending: false };
         // Input a summary took in counts as taken in, after any answer given before it.
-        if (entry.through === null) break;
+        if (entry.through === null) return;
         through = Math.max(through ?? entry.through, entry.through);
         if (answer !== undefined) replies.push(answer);
         answer = undefined;
-        break;
-      case "Environment":
-      case "History":
-        break;
-      case "Harness": {
+      },
+      Environment: () => undefined,
+      History: () => undefined,
+      Harness: (entry) => {
         const event = entry.event;
         events.push(event);
-        if (event._tag === "InputIncorporated") {
+        if (HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event)) {
           takenIn = true;
           const covered = covers.get(event.batch.id);
           if (covered !== undefined) through = Math.max(through ?? covered, covered);
           if (answer !== undefined) replies.push(answer);
           answer = undefined;
           items.push({ _tag: "InputTaken", at, messages: event.batch.items.length });
-        } else if (event._tag === "BlockCompleted") {
+        } else if (HarnessEvent.Event.isAnyOf(["BlockCompleted"])(event)) {
           const response = responses.get(event.responseId) ?? {
             blocks: new Map(),
             item: undefined,
           };
           responses.set(event.responseId, response);
           response.blocks.set(event.part, event.block);
-          if (event.block._tag !== "Text") break;
-          const texts = sortParts(response.blocks).filter(([, part]) => part._tag === "Text");
+          if (!Transcript.ResponsePart.isAnyOf(["Text"])(event.block)) return;
+          const texts = sortParts(response.blocks).filter(([, part]) =>
+            Transcript.ResponsePart.isAnyOf(["Text"])(part),
+          );
           const text = HarnessEvent.textOf(texts.map(([, part]) => part));
-          if (!hasText(text)) break;
+          if (!hasText(text)) return;
           const updated = {
             _tag: "Responded" as const,
             at,
@@ -322,7 +323,7 @@ export const reader = (): Reader => {
           if (response.item === undefined) items.push(updated);
           else items[items.indexOf(response.item)] = updated;
           response.item = updated;
-        } else if (event._tag === "ResponseFinished") {
+        } else if (HarnessEvent.Event.isAnyOf(["ResponseFinished"])(event)) {
           resetAttempts();
           overflow = { count: 0, pending: false };
           const parts = sortParts(responses.get(event.responseId)?.blocks ?? new Map()).map(
@@ -330,14 +331,13 @@ export const reader = (): Reader => {
           );
           const text = HarnessEvent.textOf(parts);
           answer =
-            parts.some((part) => part._tag === "ToolCall") || !hasText(text)
+            parts.some(Transcript.ResponsePart.isAnyOf(["ToolCall"])) || !hasText(text)
               ? undefined
               : { responseId: event.responseId, text };
-        } else if (event._tag === "ToolCallCompleted") resetAttempts();
-        else if (event._tag === "ContextFull") recordOverflow();
-        break;
-      }
-    }
+        } else if (HarnessEvent.Event.isAnyOf(["ToolCallCompleted"])(event)) resetAttempts();
+        else if (HarnessEvent.Event.isAnyOf(["ContextFull"])(event)) recordOverflow();
+      },
+    });
   };
 
   const currentReading = (): Reading => {
@@ -353,7 +353,9 @@ export const reader = (): Reader => {
       // A turn's requests go with the first batch it submits.
       requested: takenIn ? [] : [...requested],
       items: items.map((item) =>
-        item._tag === "Responded" && owed.has(item.responseId) ? { ...item, reply: true } : item,
+        Turn.LogItem.isAnyOf(["Responded"])(item) && owed.has(item.responseId)
+          ? { ...item, reply: true }
+          : item,
       ),
       started,
       ended,
@@ -415,8 +417,11 @@ const endingNoteFor = (ended: Ended | undefined): ReadonlyArray<Transcript.Input
 
 /** A response without its reasoning, which serves only the turn that produced it. */
 export const withoutReasoning = (item: Transcript.Item): Transcript.Item =>
-  item._tag === "Response"
-    ? { ...item, parts: item.parts.filter((part) => part._tag !== "Reasoning") }
+  Transcript.Item.isAnyOf(["Response"])(item)
+    ? {
+        ...item,
+        parts: item.parts.filter((part) => !Transcript.ResponsePart.isAnyOf(["Reasoning"])(part)),
+      }
     : item;
 
 /** What a turn continues from, read from its agent's log for the thread. */
@@ -468,8 +473,11 @@ export const buildContext = (records: ReadonlyArray<Recorded>, turnId: Turn.Id):
   let measured: Transcript.Measured | undefined;
   for (const record of records) {
     const entry = record.entry;
-    if (entry._tag === "Checkpoint") measured = undefined;
-    else if (entry._tag === "Harness" && entry.event._tag === "ResponseFinished") {
+    if (Entry.isAnyOf(["Checkpoint"])(entry)) measured = undefined;
+    else if (
+      Entry.isAnyOf(["Harness"])(entry) &&
+      HarnessEvent.Event.isAnyOf(["ResponseFinished"])(entry.event)
+    ) {
       const usage = entry.event.usage;
       if (usage?.inputTokens !== undefined)
         measured = {
@@ -482,33 +490,37 @@ export const buildContext = (records: ReadonlyArray<Recorded>, turnId: Turn.Id):
       own.add(record);
       entries.push(record);
     }
-    if (entry._tag === "Started") {
+    if (Entry.isAnyOf(["Started"])(entry)) {
       startedTurns.add(entry.turnId);
       begun = true;
     }
-    switch (entry._tag) {
-      case "Checkpoint":
-        items = historyFromCheckpoint(entry);
-        segment = undefined;
-        current = [];
-        begun = true;
-        break;
-      case "History":
-        foldSegment();
-        items = [...items, ...entry.items];
-        begun = true;
-        break;
-      default:
+    Entry.matchOrElse(
+      entry,
+      {
+        Checkpoint: (entry) => {
+          items = historyFromCheckpoint(entry);
+          segment = undefined;
+          current = [];
+          begun = true;
+        },
+        History: (entry) => {
+          foldSegment();
+          items = [...items, ...entry.items];
+          begun = true;
+        },
+      },
+      (entry) => {
         if (mine) {
-          if (entry._tag !== "Harness") break;
+          if (!Entry.isAnyOf(["Harness"])(entry)) return;
           foldSegment();
           current.push(entry.event);
-          break;
+          return;
         }
         if (segment !== undefined && segment.turnId !== entry.turnId) foldSegment();
         segment ??= { turnId: entry.turnId, reader: reader() };
         segment.reader.add(record);
-    }
+      },
+    );
   }
   foldSegment();
   return {
@@ -560,7 +572,7 @@ export interface Limits {
 }
 
 const isSummary = (item: Transcript.Item) =>
-  item._tag === "Input" && item.author.id === checkpointAuthor.id;
+  Transcript.Item.isAnyOf(["Input"])(item) && item.author.id === checkpointAuthor.id;
 
 /**
  * Whether a transcript and the input waiting for it outgrow the budget, and if so what a
@@ -588,7 +600,7 @@ export const proposeCompaction = (
     tails[index] = Math.ceil(characters / Transcript.charactersPerToken);
   }
   const isCutPoint = (index: number) => {
-    if (all[index]!._tag === "ToolResult") return false;
+    if (Transcript.Item.isAnyOf(["ToolResult"])(all[index]!)) return false;
     const piece = index - transcript.length;
     return piece <= 0 || waiting[piece]!.sequence !== waiting[piece - 1]!.sequence;
   };
@@ -609,7 +621,7 @@ export const proposeCompaction = (
       ? []
       : transcript
           .slice(current, Math.min(cut, transcript.length))
-          .filter((item) => item._tag === "Input");
+          .filter(Transcript.Item.isAnyOf(["Input"]));
   const pinned =
     Transcript.estimate(inputs) + Transcript.estimate(tail) <= limits.keep ? inputs : [];
   return {

@@ -76,8 +76,8 @@ export type State = typeof State.Type;
 
 /** Only people see their notifications, and only agents accept theirs. */
 export const fitsRecipient = (recipient: Recipient, state: State) =>
-  (state._tag !== "Seen" || recipient._tag === "Human") &&
-  (state._tag !== "Accepted" || recipient._tag === "Agent");
+  (!State.isAnyOf(["Seen"])(state) || Recipient.isAnyOf(["Human"])(recipient)) &&
+  (!State.isAnyOf(["Accepted"])(state) || Recipient.isAnyOf(["Agent"])(recipient));
 
 /**
  * One recipient's notification of a recorded source. Generation chooses
@@ -131,7 +131,7 @@ export const fromActivity = (
   recipient: selected.recipient,
   recordedAt: entry.recordedAt,
   state:
-    selected.recipient._tag === "Agent" && !selected.requestsWork
+    Recipient.isAnyOf(["Agent"])(selected.recipient) && !selected.requestsWork
       ? { _tag: "Informational" }
       : { _tag: "Pending" },
 });

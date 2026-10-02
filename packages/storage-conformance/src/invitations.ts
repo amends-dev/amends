@@ -4,7 +4,7 @@ import { Actor } from "@amends/core/identity";
 import { Journal, Log } from "@amends/core/journal";
 import { Invitation, InvitationService, Member } from "@amends/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import { DateTime, Effect, Option } from "effect";
+import { DateTime, Effect, Option, Result } from "effect";
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -287,8 +287,8 @@ export const invitations = (harness: Harness) => {
                   ),
                 { concurrency: "unbounded" },
               );
-              expect(results.filter((value) => value._tag === "Success")).toHaveLength(1);
-              const failure = results.find((value) => value._tag === "Failure");
+              expect(results.filter((value) => Result.isSuccess(value))).toHaveLength(1);
+              const failure = results.find((value) => Result.isFailure(value));
               expect(failure).toMatchObject({
                 _tag: "Failure",
                 failure: { _tag: "InvitationService.AlreadyMember" },

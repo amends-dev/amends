@@ -69,7 +69,8 @@ export const threads = (harness: Harness) => {
   describe.skipIf(!harness.available)(`${harness.name}: threads`, () => {
     /** Narrow a stored participation to its member participant for assertions. */
     const memberParticipant = (record: ThreadParticipation.Record) => {
-      if (record.participant._tag !== "Member") throw new Error("Expected a member participant");
+      if (!ThreadParticipation.Participant.isAnyOf(["Member"])(record.participant))
+        throw new Error("Expected a member participant");
       return record.participant;
     };
     const humanId = Member.Id.make("human");
@@ -487,9 +488,13 @@ export const threads = (harness: Harness) => {
                 insertMany: (records) =>
                   Effect.andThen(
                     bound.notifications.insertMany(
-                      records.filter((record) => record.recipient._tag !== "Human"),
+                      records.filter(
+                        (record) => !Notification.Recipient.isAnyOf(["Human"])(record.recipient),
+                      ),
                     ),
-                    records.some((record) => record.recipient._tag === "Human")
+                    records.some((record) =>
+                      Notification.Recipient.isAnyOf(["Human"])(record.recipient),
+                    )
                       ? Effect.fail(failure)
                       : Effect.void,
                   ),
@@ -579,8 +584,8 @@ export const threads = (harness: Harness) => {
                 ),
               );
               expect(
-                (yield* notifications(bound, agentId, agentIdentity)).every(
-                  (row) => row.state._tag === "Discarded",
+                (yield* notifications(bound, agentId, agentIdentity)).every((row) =>
+                  Notification.State.isAnyOf(["Discarded"])(row.state),
                 ),
               ).toBe(true);
               expect(
@@ -589,8 +594,8 @@ export const threads = (harness: Harness) => {
                 )?.status,
               ).toBe("ended");
               expect(
-                (yield* notifications(bound, humanId, humanIdentity)).every(
-                  (row) => row.state._tag === "Pending",
+                (yield* notifications(bound, humanId, humanIdentity)).every((row) =>
+                  Notification.State.isAnyOf(["Pending"])(row.state),
                 ),
               ).toBe(true);
             }),

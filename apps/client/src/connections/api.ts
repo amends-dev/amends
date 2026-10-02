@@ -6,7 +6,7 @@ import { workspaceKey } from "../api/keys.ts";
 import { refreshResult } from "../api/refresh.ts";
 import { newWorkspaceRequestKey } from "../workspaces/api.ts";
 
-export type { Connection, ConnectionImplementation };
+export { Connection, ConnectionImplementation };
 
 const reads = (client: ApiClient, workspaceId: Workspace.Id) => {
   const params = { workspaceId };

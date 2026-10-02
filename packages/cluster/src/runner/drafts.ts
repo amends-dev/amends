@@ -4,7 +4,7 @@
  * characters, at the offset it continues. A completed block replaces its draft in the log, and a
  * draft that fails to show is not retried.
  */
-import type { HarnessEvent } from "@amends/harness";
+import { HarnessEvent } from "@amends/harness";
 import { Clock, Effect } from "effect";
 import type { TurnSteps } from "./turn-steps.ts";
 
@@ -43,7 +43,7 @@ export const make = (turnSteps: TurnSteps.Interface) => {
   return {
     /** Keep the text a harness event adds to a block, or drop a block's draft once it completes. */
     applyEvent: (event: HarnessEvent.Event) => {
-      if (event._tag === "TextDelta") {
+      if (HarnessEvent.Event.isAnyOf(["TextDelta"])(event)) {
         const key = draftKey(event.responseId, event.part);
         const draft = drafts.get(key) ?? {
           responseId: event.responseId,
@@ -53,7 +53,7 @@ export const make = (turnSteps: TurnSteps.Interface) => {
         };
         draft.pending += event.delta;
         drafts.set(key, draft);
-      } else if (event._tag === "BlockCompleted")
+      } else if (HarnessEvent.Event.isAnyOf(["BlockCompleted"])(event))
         drafts.delete(draftKey(event.responseId, event.part));
     },
     /** Show readers what was written since the last draft, once the interval has passed. */

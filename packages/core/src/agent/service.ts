@@ -1,6 +1,7 @@
+import { Scope } from "../authorization/scope.ts";
 import type { HarnessImplementation } from "@amends/harness";
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
-import type { PlatformError } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer, Option, Schema, Predicate } from "effect";
+import { type PlatformError } from "effect";
 import { Assignment } from "../authorization/assignment/assignment.ts";
 
 import { AssignmentPermissions } from "../authorization/assignment/permissions.ts";
@@ -136,7 +137,7 @@ interface Access {
  * Saving waits for neither; each shows on the agent until resolved.
  */
 const isAwaitingSetup = (reason: EnvironmentCompatibility.Reason) =>
-  reason._tag === "EnvironmentNotReady" || reason._tag === "ConnectionNotReady";
+  EnvironmentCompatibility.Reason.isAnyOf(["EnvironmentNotReady", "ConnectionNotReady"])(reason);
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("AgentService.make")(function* () {
@@ -244,7 +245,8 @@ export const make = Effect.fn("AgentService.make")(function* () {
     if (Option.isNone(connection)) issues.push({ _tag: "ConnectionUnavailable" });
     if (Option.isSome(environment) && Option.isSome(connection)) {
       const checked = yield* checkCompatibility(environment.value, connection.value, record.model);
-      if (checked._tag === "Incompatible") issues.push(...checked.reasons);
+      if (EnvironmentCompatibility.Compatibility.isAnyOf(["Incompatible"])(checked))
+        issues.push(...checked.reasons);
     }
     const [first, ...rest] = issues;
     return first === undefined
@@ -283,9 +285,10 @@ export const make = Effect.fn("AgentService.make")(function* () {
   ) {
     const source = assigned.find(
       (assignment) =>
-        assignment.source._tag === "Role" && assignment.source.scope._tag === "Workspace",
+        Assignment.Source.isAnyOf(["Role"])(assignment.source) &&
+        Scope.Value.isAnyOf(["Workspace"])(assignment.source.scope),
     )?.source;
-    if (source?._tag !== "Role") return null;
+    if (!Predicate.isTagged(source, "Role")) return null;
     const found = yield* roleStore.get(source.roleId);
     return Option.isSome(found) ? { id: found.value.id, name: found.value.name } : null;
   });
@@ -379,7 +382,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
   const checkConfiguration = Effect.fnUntraced(function* (configuration: Agent.Configuration) {
     const { connection, environment } = yield* requireUsableResources(configuration);
     const checked = yield* checkCompatibility(environment, connection, configuration.model);
-    if (checked._tag === "Compatible") return;
+    if (EnvironmentCompatibility.Compatibility.isAnyOf(["Compatible"])(checked)) return;
     const [first, ...rest] = checked.reasons.filter((reason) => !isAwaitingSetup(reason));
     if (first !== undefined) return yield* new Incompatible({ reasons: [first, ...rest] });
   });

@@ -1,3 +1,4 @@
+import { ThreadParticipation } from "@amends/core/thread";
 import { Api, Authentication, Group, type ThreadTimeline } from "@amends/api-http";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
@@ -297,7 +298,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         // Bob stops following the thread; he still reads it through the group.
         const own = participants.find(
           (participant) =>
-            participant.participant._tag === "Member" && participant.participant.memberId === bobId,
+            ThreadParticipation.Reference.isAnyOf(["Member"])(participant.participant) &&
+            participant.participant.memberId === bobId,
         )!;
         yield* asBob.threads.unfollow({
           params: { workspaceId, threadId },
@@ -448,7 +450,8 @@ describe.skipIf(!available)("PostgreSQL", () => {
         });
         const own = participants.find(
           (participant) =>
-            participant.participant._tag === "Member" && participant.participant.memberId === bobId,
+            ThreadParticipation.Reference.isAnyOf(["Member"])(participant.participant) &&
+            participant.participant.memberId === bobId,
         )!;
         expect(
           yield* asBob.threads

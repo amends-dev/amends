@@ -149,9 +149,9 @@ export const make = Effect.fn("ThreadParticipations.make")(function* () {
         // Each participant as the active-participation index keys it: its kind and ID.
         const kinds = references.map((reference) => reference._tag);
         const keys = references.map((reference) =>
-          reference._tag === "Member"
+          ThreadParticipation.Reference.isAnyOf(["Member"])(reference)
             ? reference.memberId
-            : reference._tag === "Contact"
+            : ThreadParticipation.Reference.isAnyOf(["Contact"])(reference)
               ? reference.contactId
               : "",
         );

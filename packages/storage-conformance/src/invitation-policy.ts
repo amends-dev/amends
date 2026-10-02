@@ -1,4 +1,4 @@
-import { AssignmentFacts, BuiltinRoles, Role } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
 import { Journal, Log, Publication } from "@amends/core/journal";
 import { Member, MemberFacts } from "@amends/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
@@ -148,7 +148,9 @@ export const invitationPolicy = (harness: Harness) => {
                 const assignment = (yield* bound.assignments.listActiveByMember(
                   workspace.ownerMemberId,
                 )).find(
-                  ({ source }) => source._tag === "Role" && source.roleId === BuiltinRoles.OwnerId,
+                  ({ source }) =>
+                    Assignment.Source.isAnyOf(["Role"])(source) &&
+                    source.roleId === BuiltinRoles.OwnerId,
                 );
                 if (assignment === undefined) throw new Error("Missing Owner assignment");
                 yield* Effect.flatMap(Journal.Service, (journal) =>

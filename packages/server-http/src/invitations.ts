@@ -1,3 +1,4 @@
+import { Identity } from "@amends/core/identity";
 import { Api, ApiErrors, Principal } from "@amends/api-http";
 import { InvitationService } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
@@ -39,7 +40,8 @@ export const layer = HttpApiBuilder.group(
       accept: ({ params, payload }) =>
         Effect.gen(function* () {
           const principal = yield* Principal;
-          if (principal._tag !== "Human") return yield* new ApiErrors.HumanRequired();
+          if (!Identity.MemberReference.isAnyOf(["Human"])(principal))
+            return yield* new ApiErrors.HumanRequired();
           return yield* gateway.inWorkspace(
             params.workspaceId,
             Effect.flatMap(InvitationService.Service, (invitationService) =>

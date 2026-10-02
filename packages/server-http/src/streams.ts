@@ -6,8 +6,18 @@
 import { ApiErrors } from "@amends/api-http";
 import type { Identity } from "@amends/core/identity";
 import type { Workspace } from "@amends/core/workspace";
-import { Cause, Context, Deferred, Effect, Layer, Option, Stream } from "effect";
-import type { Scope } from "effect";
+import {
+  Cause,
+  Context,
+  Deferred,
+  Effect,
+  Layer,
+  Option,
+  Stream,
+  type Scope,
+  Predicate,
+} from "effect";
+
 import { HttpBody, HttpEffect, HttpServerResponse } from "effect/unstable/http";
 import { Draining } from "./draining.ts";
 
@@ -18,7 +28,7 @@ const heartbeat = Stream.tick("5 seconds").pipe(
 
 /** Transport comments keep idle connections open without becoming domain messages. */
 const prepareResponse: HttpEffect.PreResponseHandler = (_request, response) => {
-  if (response.body._tag !== "Stream") return Effect.succeed(response);
+  if (!Predicate.isTagged(response.body, "Stream")) return Effect.succeed(response);
   return Effect.succeed(
     response.pipe(
       HttpServerResponse.setHeader("cache-control", "no-store"),

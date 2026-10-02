@@ -10,7 +10,7 @@ import type {
   SettingsTab,
 } from "@amends/ui/screens/settings";
 import { useAtomValue } from "@effect/atom-solid";
-import { Cause, DateTime, Effect, Option } from "effect";
+import { Cause, DateTime, Effect, Option, Predicate } from "effect";
 import { AsyncResult } from "effect/unstable/reactivity";
 import { createEffect, createMemo, createSignal, on } from "solid-js";
 import { useChanges } from "../api/changes.ts";
@@ -24,6 +24,10 @@ import {
   type SettingsCommand,
   type SettingsData,
   type SettingsReads,
+  Assignment,
+  Scope,
+  Invitation,
+  Identity,
 } from "./api.ts";
 import { memberName, usePeople } from "../conversations/views.ts";
 import { toDate } from "../conversations/time.ts";
@@ -55,15 +59,15 @@ const workspaceRoles = (entry: Entry) =>
   entry.access?.assignments.filter(
     (assignment) =>
       assignment.status === "active" &&
-      assignment.source._tag === "Role" &&
-      assignment.source.scope._tag === "Workspace",
+      Assignment.Source.isAnyOf(["Role"])(assignment.source) &&
+      Scope.Value.isAnyOf(["Workspace"])(assignment.source.scope),
   ) ?? [];
 const statusOf = (
   invitation: SettingsData["invitations"][number],
   now: number,
 ): InvitationStatus => {
-  if (invitation.state._tag === "Accepted") return "accepted";
-  if (invitation.state._tag === "Revoked") return "revoked";
+  if (Invitation.State.isAnyOf(["Accepted"])(invitation.state)) return "accepted";
+  if (Invitation.State.isAnyOf(["Revoked"])(invitation.state)) return "revoked";
   return DateTime.toEpochMillis(invitation.details.expiresAt) <= now ? "expired" : "pending";
 };
 
@@ -105,7 +109,7 @@ export function useWorkspaceSettings(
   const person = (member: Member.Record): SettingsPerson => ({
     id: member.id,
     name: memberName(member),
-    agent: member.identity._tag === "Agent",
+    agent: Identity.MemberReference.isAnyOf(["Agent"])(member.identity),
     you: member.id === selfId(),
   });
   const rowOf = (entry: Entry): Row => {
@@ -113,7 +117,9 @@ export function useWorkspaceSettings(
     // A closed membership holds no access, whatever its assignments still record.
     const current = entry.member.status === "active" ? access : null;
     const assigned = workspaceRoles(entry)[0];
-    const roleId = assigned?.source._tag === "Role" ? assigned.source.roleId : undefined;
+    const roleId = Predicate.isTagged(assigned?.source, "Role")
+      ? assigned.source.roleId
+      : undefined;
     const roleName =
       roleId === undefined
         ? undefined
@@ -134,15 +140,18 @@ export function useWorkspaceSettings(
         status: entry.member.status,
         role: roleName,
         access: current?.assignments.map(({ id, source, status }) => {
-          const scope = source._tag === "Role" ? source.scope : source.grant.scope;
+          const scope = Assignment.Source.isAnyOf(["Role"])(source)
+            ? source.scope
+            : source.grant.scope;
           return {
             id,
-            name:
-              source._tag === "Role"
-                ? (current.roles.find((choice) => choice.role.id === source.roleId)?.role.name ??
-                  source.roleId)
-                : source.grant.permission,
-            scope: scope._tag === "Workspace" ? ("workspace" as const) : ("target" as const),
+            name: Assignment.Source.isAnyOf(["Role"])(source)
+              ? (current.roles.find((choice) => choice.role.id === source.roleId)?.role.name ??
+                source.roleId)
+              : source.grant.permission,
+            scope: Scope.Value.isAnyOf(["Workspace"])(scope)
+              ? ("workspace" as const)
+              : ("target" as const),
             active: status === "active",
           };
         }),

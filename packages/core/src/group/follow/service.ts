@@ -1,3 +1,4 @@
+import { Identity } from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { AgentPermissions } from "../../agent/permissions.ts";
@@ -102,7 +103,7 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     const member = found.value;
     if (member.status !== "active")
       return yield* new MemberUnavailable({ memberId: request.memberId });
-    if (member.identity._tag !== "Agent")
+    if (!Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
       return yield* new AgentRequired({ memberId: request.memberId });
     // Directing an agent's attention is using it, in either direction.
     yield* authorization.require([

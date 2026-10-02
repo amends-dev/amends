@@ -1,6 +1,7 @@
+import { Performer } from "@amends/core/identity";
 import { Event, Store } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
-import { DateTime, Effect, Schema } from "effect";
+import { DateTime, Effect, Schema, Predicate } from "effect";
 import { logEntries } from "./schema.ts";
 
 export const columns = {
@@ -147,12 +148,16 @@ export const toColumns = (entry: Store.Content) => {
     factName: entry.fact?.name ?? null,
     factVersion: entry.fact?.version ?? null,
     performerKind: performer?._tag ?? null,
-    performerMemberId: performer?._tag === "Member" ? performer.memberId : null,
+    performerMemberId: Predicate.isTagged(performer, "Member") ? performer.memberId : null,
     performerIdentityKind:
-      performer !== undefined && performer._tag !== "System" ? performer.identity._tag : null,
+      performer !== undefined && !Performer.Reference.isAnyOf(["System"])(performer)
+        ? performer.identity._tag
+        : null,
     performerIdentityId:
-      performer !== undefined && performer._tag !== "System" ? performer.identity.id : null,
-    performerSystemId: performer?._tag === "System" ? performer.id : null,
+      performer !== undefined && !Performer.Reference.isAnyOf(["System"])(performer)
+        ? performer.identity.id
+        : null,
+    performerSystemId: Predicate.isTagged(performer, "System") ? performer.id : null,
     causeLogId: provenance?.causedBy?.logId ?? null,
     causeCommitId: provenance?.causedBy?.commitId ?? null,
     causeEntryId: provenance?.causedBy?.id ?? null,

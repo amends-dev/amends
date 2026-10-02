@@ -11,9 +11,8 @@ import {
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
 import type { AgentJobs, TurnJobs } from "@amends/core/turn";
-import { Context, Crypto, Effect, Layer, Option, Schema } from "effect";
-import type { Cause } from "effect";
-import type { Scope } from "effect";
+import { Context, Crypto, Effect, Layer, Option, Schema, Cause } from "effect";
+import { type Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
 import { WorkspaceStorage } from "./storage.ts";
 import { WorkspaceRuntime } from "./workspace-runtime.ts";
@@ -78,8 +77,8 @@ const isStaleError = (error: unknown): boolean => isBehind(error) || isUnregiste
 const isStaleCause = (cause: Cause.Cause<unknown>) =>
   cause.reasons.some(
     (reason) =>
-      (reason._tag === "Fail" && isStaleError(reason.error)) ||
-      (reason._tag === "Die" && isStaleError(reason.defect)),
+      (Cause.isFailReason(reason) && isStaleError(reason.error)) ||
+      (Cause.isDieReason(reason) && isStaleError(reason.defect)),
   );
 
 /**

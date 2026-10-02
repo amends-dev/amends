@@ -16,6 +16,9 @@ export { TurnsGroup } from "./turns.ts";
 export { WorkspacesGroup } from "./workspaces.ts";
 
 // Shared wire schemas for typed clients; implementations stay in core.
+export { Identity } from "@amends/core/identity";
+export { ChangeFeed } from "@amends/core/change-feed";
+export { Signal } from "@amends/core/signal";
 export {
   Workspace,
   WorkspaceSettings,
@@ -23,7 +26,7 @@ export {
   Member,
   Invitation,
 } from "@amends/core/workspace";
-export { Assignment } from "@amends/core/authorization";
+export { Assignment, Scope } from "@amends/core/authorization";
 export { Group, GroupMembership } from "@amends/core/group";
 export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends/core/thread";
 export { Notification, NotificationInbox } from "@amends/core/notification";

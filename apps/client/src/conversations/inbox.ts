@@ -2,7 +2,7 @@ import type { ConversationStatus } from "@amends/ui/screens/group";
 import type { InboxItem } from "@amends/ui/screens/inbox";
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { markSeen, type InboxFilter, type NotificationInbox } from "./api.ts";
+import { markSeen, type InboxFilter, type NotificationInbox, Notification } from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useMutation } from "../api/mutation.ts";
 import { useInbox, useInboxPending } from "./reads.ts";
@@ -93,7 +93,9 @@ export function useInboxView(
     return {
       id: notification.id,
       at: toDate(notification.recordedAt),
-      unread: notification.state._tag === "Pending" && !opened().has(notification.id),
+      unread:
+        Notification.State.isAnyOf(["Pending"])(notification.state) &&
+        !opened().has(notification.id),
       reason:
         readable === undefined
           ? undefined

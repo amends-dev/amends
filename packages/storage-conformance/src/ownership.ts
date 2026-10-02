@@ -20,7 +20,7 @@ import {
 
 import { describe, expect, it } from "@effect/vitest";
 
-import { Effect, Option } from "effect";
+import { Effect, Option, Result } from "effect";
 
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
@@ -263,8 +263,8 @@ export const ownership = (harness: Harness) => {
                   }).pipe(Effect.result),
                 { concurrency: "unbounded" },
               );
-              expect(results.filter(({ _tag }) => _tag === "Success")).toHaveLength(1);
-              expect(results.filter(({ _tag }) => _tag === "Failure")).toHaveLength(1);
+              expect(results.filter(Result.isSuccess)).toHaveLength(1);
+              expect(results.filter(Result.isFailure)).toHaveLength(1);
               const owners = yield* bound.assignments.listActiveByRole(BuiltinRoles.OwnerId);
               expect(owners).toHaveLength(1);
               const owner = owners[0];
