@@ -5,7 +5,7 @@ with a trusted actor, and its services are the operations. The
 gateway does the two things core cannot do for itself: bootstrap a workspace,
 and bind a workspace's storage and resolve an authenticated identity into the
 actor so those services can run. HTTP, RPC, and MCP all enter the same way and then
-call core directly, so nothing is declared twice.
+call core directly, so nothing is declared twice; so do a host's jobs, without an actor.
 
 ## Organization and models
 
@@ -30,7 +30,7 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-`WorkspaceSignals.Service`, core's `BackgroundJobs.Service` and `TurnJobs.Service`, and
+`WorkspaceSignals.Service`, core's `AgentJobs.Service` and `TurnJobs.Service`, and
 `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
@@ -62,35 +62,27 @@ implementation.
   into `Actor.Service`, binds the workspace, and runs the program. Membership is resolved
   before the workspace is prepared, so a non-member or an unknown workspace returns
   `NotMember` without loading it.
-  Programs may require only core's `Operations` and the actor. Stores,
+  Programs may require only core's `Operations`, the actor, and `Scope`. Stores,
   the journal, and authorization are not reachable, so protocol code cannot
   bypass the checks core performs inside each operation.
-- `inWorkspace(workspaceId, program)` is the same without an actor, for
-  invitation acceptance where the recipient is not yet a member. A workspace that was never
-  created returns `WorkspaceNotFound` without being prepared.
-- `asMemberScoped(workspaceId, identity, program)` uses the caller's scope for
-  the runtime lease and operation resources. Streaming ingress uses it to keep
-  subscriptions alive until disconnect. Programs may additionally require `Scope`.
-  `asMember` wraps this operation in a short scope for ordinary request/response work.
-- `runBackgroundProcess(workspaceId, process)` runs one of the workspace's
-  [background processes](../core/README.md#background-work) once, with no actor, and returns
-  what it left outstanding. It is for the host process that runs background jobs, when a job's
-  request arrives; `BackgroundRuns.Unknown` reports a process this host does not register, and a
+- `inWorkspace(workspaceId, program)` is the same without an actor: for invitation acceptance,
+  where the recipient is not yet a member, and for a host's [jobs](../core/README.md#jobs).
+  Programs may require core's `Operations` and `JobServices`, which jobs call, and `Scope`. A
   workspace that was never created returns `WorkspaceNotFound` without being prepared.
-- `executeTurns(workspaceId, program)` runs [turn execution](../core/README.md#turns) for the
-  host process that runs agents' accepted work. It is trusted and has no actor: each step acts as
-  its turn's agent, and failures are core's own. A workspace that was never created returns
-  `WorkspaceNotFound`.
+
+Both keep the workspace prepared for the caller's scope, as an Effect resource is: an HTTP
+response's scope, which a stream holds until the client disconnects, or one the caller closes
+with `Effect.scoped`. A job's turn runner takes a scope for each step, so a step after another
+host changed the workspace uses it prepared again. Both apply one error policy, described under
+[public outcomes](#public-outcomes).
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`),
 `WorkspaceSignals.Service`, whose `forWorkspace` returns that workspace's `Signals.Service`,
-core's `BackgroundJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
+core's `AgentJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
 each naming its workspace, and `Crypto.Crypto`. The gateway passes the job services to each
-workspace's core as they are. A host that runs no background jobs provides
-`BackgroundJobs.layerUnavailable`, whose requests fail the commit that makes them rather than accept
-work nothing would do; one that runs no turns provides `TurnJobs.layerNoRunner`: agents still
-accept their work, which waits queued.
+workspace's core as they are. A host that runs no jobs provides each one's `layerNoRunner`:
+requests are accepted and nothing runs, so work waits in agents' inboxes, or queued.
 Identities must come from a trusted ingress, never from client input.
 
 ### Workspace boot and readiness
@@ -135,7 +127,7 @@ Workspace creation remains core's atomic initialization operation. A new workspa
 has no history to replay. After boot, commits persist events and projection records
 together; `Projection.Behind` rejects writes while a registered projection is not
 live, and `Projection.Unregistered` while one this host does not run is, as when another host
-with a different projection set booted. Either one, from an operation or a background run, stops
+with a different projection set booted. Either one, from an operation or a job, stops
 sharing the prepared runtime: the next request prepares the workspace again and replays it, and
 the failed request, which committed nothing, returns `Gateway.Conflict` to retry. Deliberate
 rebuilds run replay explicitly with fresh targets or a domain-managed migration,
@@ -154,8 +146,8 @@ host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
-[`@amends/cluster`](../cluster/README.md) implements core's `BackgroundJobs` and `TurnJobs` on
-Effect Cluster, with the workers that run what they store.
+[`@amends/cluster`](../cluster/README.md) implements core's `AgentJobs` and `TurnJobs` on
+Effect Cluster, with the workers that run what they store through `inWorkspace`.
 
 `WorkspaceSignals.Service` delivers [ephemeral signals](../core/README.md#signals), such as typing,
 between every process over the same storage. It is separate from `WorkspaceStorage` because
@@ -168,12 +160,12 @@ signals.
 
 Programs fail only with outcomes a caller can act on. Domain errors from core
 pass through unchanged. The gateway adds `NotMember` when the identity has no
-active membership, `WorkspaceNotFound` when invitation acceptance names a workspace that was
+active membership, `WorkspaceNotFound` when `inWorkspace` names a workspace that was
 never created, `Conflict` for retryable storage contention, `Uncertain`
 when a commit's outcome is unknown, and `InvalidInput` when core rejects
 caller-supplied values such as invitation grants. Every other failure, and any
 failure while binding storage or building core, becomes a defect that keeps its
-cause for host logging. `GatewayErrors.PublicError` is the schema of these
+cause for host logging. Jobs get the same outcomes, and run again later after any failure. `GatewayErrors.PublicError` is the schema of these
 outcomes, and `GatewayErrors.PublicErrorOf<E>` computes a program's public error
 type from core's. A domain error core adds reaches callers only once it is listed there;
 otherwise it becomes a defect, which HTTP answers with 500. A server-http test checks that every

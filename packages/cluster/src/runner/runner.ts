@@ -28,8 +28,7 @@ export type { ContextPolicy, ModelAccess, Options } from "./settings.ts";
 
 /** A step through the gateway failed; the turn stays as its last commit left it. */
 export type Failure =
-  | TurnExecution.PrepareError
-  | TurnExecution.CloseError
+  | GatewayErrors.PublicErrorOf<TurnExecution.PrepareError | TurnExecution.CloseError>
   | GatewayErrors.WorkspaceNotFound;
 
 export interface Interface {

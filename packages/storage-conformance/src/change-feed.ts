@@ -100,7 +100,7 @@ export const changeFeed = (harness: Harness) => {
           const next = yield* on(
             first,
             Effect.flatMap(Gateway.Service, (gateway) =>
-              listen(gateway.asMemberScoped(workspace.id, alice, watch())),
+              listen(gateway.asMember(workspace.id, alice, watch())),
             ),
           );
           const ready = yield* next;
@@ -139,7 +139,7 @@ export const changeFeed = (harness: Harness) => {
           const cursor = yield* Effect.scoped(
             Effect.gen(function* () {
               const gateway = yield* Gateway.Service;
-              const next = yield* listen(gateway.asMemberScoped(workspace.id, alice, watch()));
+              const next = yield* listen(gateway.asMember(workspace.id, alice, watch()));
               yield* next;
               yield* gateway.asMember(workspace.id, alice, issue(bob.id));
               return committed(yield* next).cursor;
@@ -153,7 +153,7 @@ export const changeFeed = (harness: Harness) => {
           yield* Effect.gen(function* () {
             const gateway = yield* Gateway.Service;
             const next = yield* listen(
-              gateway.asMemberScoped(workspace.id, alice, watch({ after: cursor })),
+              gateway.asMember(workspace.id, alice, watch({ after: cursor })),
             );
             expect(yield* next).toEqual({
               _tag: "Ready",

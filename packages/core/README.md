@@ -28,7 +28,6 @@ The current domains contain these features:
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
 | `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
 | `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
-| `background`    | Processes the domains run outside requests, the background jobs commits request, and the runs hosts perform.     |
 | `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.            |
 
 Permission, grant, requirement, scope, and target remain focused modules within
@@ -122,7 +121,7 @@ turn's runner or harness reports.
 
 A host binds the journal store to one workspace, and that binding is the only place a service
 learns which workspace it serves: services that need the workspace ID read it from `Store.Service`.
-Projection stores and signals are bound the same way and carry no ID of their own. Background and turn
+Projection stores and signals are bound the same way and carry no ID of their own. Agent and turn
 job requests name their workspace, taken from the fact that asks for them, since the host runs
 every workspace's jobs.
 
@@ -266,8 +265,8 @@ execution starts, the replies it published, and why it failed or was asked to st
 works, its row changes only with its status and the input it accepts; its progress lives in the
 log.
 
-Agents handle their own notifications as people do theirs. `TurnCommand.acceptWork`, the
-`turn.accept` background process, acts as each agent: its pending work notifications on a thread join the
+Agents handle their own notifications as people do theirs. `AgentWork.acceptWork`, which the
+agent's [job](#jobs) runs, acts as the agent: its pending work notifications on a thread join the
 active turn there, or start a new one, and the same commit settles them as `Acknowledged` with
 outcome `Accepted` and the turn's ID. Work waits while a turn there is still stopping, while the
 active turn belongs to a participation that ended, so an agent that left and came back is not
@@ -276,13 +275,11 @@ A new turn's input starts where the agent's latest turn in the same participatio
 input in, as that turn's entries say, so what a cancelled or
 failed turn accepted but never took in is the next turn's to handle; its entries follow what the
 agent's log holds when it is created, and its history starts from that log's latest checkpoint:
-the latest turn's own, or the one that turn started from. It wakes on activity that requests an agent's
-work and on turns ending. Each run reads every active agent's pending work a page at a time,
-passing over work that must wait, and accepts work for at most a hundred threads before asking to
-run again; a run that finds only waiting work ends idle, so it never runs again at once without
-progress. A second process, `turn.stop-departed`, stops the turns of agents whose participation
-ended: a queued one at once, a running one by asking. It wakes on participation and group
-departures and checks each agent's own active turns, including agents no longer members.
+the latest turn's own, or the one that turn started from. Each run reads the agent's pending work
+a page at a time and passes over work that must wait; the end of the turn it waits for asks for
+another run. `AgentWork.stopDepartedTurns` stops a member's turns in threads it no longer takes
+part in: a queued one at once, a running one by asking. It checks the member's own active turns,
+so an agent that left the workspace has its turns stopped too.
 
 Each agent has one log for each participation in a thread, apart from the journal, `TurnLog`,
 and every entry names the turn that wrote it: its `Started` with the selection and the agent's
@@ -371,7 +368,7 @@ reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits 
 the turn. The host supplies
 `TurnJobs`, and `TurnJobs.layerNoRunner` accepts requests and runs nothing; [cluster](../cluster/README.md) runs harnesses
 and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
-from a person's message through its background job, acceptance, and turn job to the reply.
+from a person's message through the agent's job, acceptance, and the turn's job to the reply.
 
 `TurnService` lets a reader who may read a thread `get` and `listByThread` its turns, as
 `Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
@@ -693,35 +690,29 @@ seconds are dropped by the process that receives them, so a client may call it o
 clients hide their own member's typing. `ReadStateService` and
 `NotificationService.acknowledge` publish the read-state signals after their writes.
 
-## Background work
+## Jobs
 
-`@amends/core/background` holds work the domains do outside any request, within one workspace.
-A domain defines a process beside its facts with `BackgroundProcess.make(name, { wakesOn, run })`
-and registers it in `Core.processes`, as the turn domain registers `turn.accept`.
+A job is work a commit asks for that runs outside any request. Core declares which facts request
+which job, as journal [reactions](../../docs/journal.md#reactions), in the commit that publishes the
+fact: the request is stored with the commit and discarded if it rolls back, a request that cannot
+be stored fails the commit, and neither replay nor a retried publication that returns its
+original event asks again. Each request names the workspace of the fact that asked for it, and an
+agent's job names the agent by its membership.
 
-- `name` is dotted and owned by the domain, such as `notification.settle`.
-- `run` finds what is outstanding from stored records, so a run after a restart is an ordinary
-  run, handles a bounded batch in commits of its own, and returns an outcome: `Idle` when nothing
-  remains, `Continue` when more is outstanding now, or `At` with when it is next due. A run can be
-  interrupted and repeated, so each commit rechecks what it acts on and is safe to redo.
-- `wakesOn` lists the facts whose publication asks for it to run, built with
-  `BackgroundProcess.on(fact, when?)`, which can accept only some payloads.
+- A **turn job** (`TurnJobs`) runs a turn, step by step through `TurnExecution`. Creating or
+  retrying a turn requests it.
+- An **agent job** (`AgentJobs`) does an agent's work through `AgentWork`. Activity that asks the
+  agent for work, and the end of one of its turns, request `acceptWork`; the end of its
+  participation in a thread, and its leaving or removal from a group, request
+  `stopDepartedTurns`. Those departure facts name a member who may be a person, whose job finds no
+  turns to stop.
 
-A commit that publishes such a fact requests the process's background job through `BackgroundJobs.Service`,
-once per process per commit, in that same commit: the request is stored with the commit and
-discarded if it rolls back, and a request that cannot be stored fails the commit. This is a
-journal [reaction](../../docs/journal.md#reactions), so neither replay nor a retried publication
-that returns its original event asks again. Each request names the workspace of the fact that
-asked for it. `BackgroundJobs.Service` is a required host service, shared by every workspace, which
-delivers each request to whatever runs background jobs; `BackgroundJobs.layerUnavailable` refuses
-them, for a host that runs none.
-
-`BackgroundRuns.Service` is how that process runs one: `run(name)` runs a registered process once,
-attributed to it as a `System` performer named after it, and returns its outcome. An unregistered
-name fails with `BackgroundRuns.Unknown`, a process's own failure with `BackgroundRuns.Failure`,
-and two processes sharing a name stop the workspace's core from starting. It is part of `Core.layer`
-but not of `Core.Operations`, since no actor runs it. The gateway runs it for hosts through
-[`runBackgroundProcess`](../cluster/README.md#background-jobs).
+`TurnJobs.Service` and `AgentJobs.Service` are host services, shared by every workspace, which
+deliver each request to whatever runs those jobs; `layerNoRunner` accepts requests and runs
+nothing. What jobs call, `TurnExecution` and `AgentWork`, is part of `Core.layer` as
+`Core.JobServices`, apart from `Core.Operations`, since no actor calls it: it acts as the agent
+or the product. A host's jobs reach it through the gateway's `inWorkspace`, as
+[cluster](../cluster/README.md) does.
 
 ## Module dependencies and exports
 

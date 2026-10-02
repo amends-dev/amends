@@ -319,6 +319,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     workspaceId,
     groupId: turn.groupId,
     threadId: turn.threadId,
+    memberId: turn.memberId,
     turnId: turn.id,
   });
   const requireStatus = (turn: Turn.Record, statuses: ReadonlyArray<Turn.Status>) =>

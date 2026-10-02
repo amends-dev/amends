@@ -333,7 +333,7 @@ including errors that could be classified as definite rollback. See the
 
 ## Effect Cluster's tables
 
-A host that runs background work on Effect Cluster over this database keeps Cluster's tables
+A host that runs jobs on Effect Cluster over this database keeps Cluster's tables
 beside the adapter's; Cluster creates them itself, with its default `cluster` prefix, and never
 removes a message or its reply. `PostgresClusterStorage.prune(entityTypes, before, options?)`
 removes the handled messages of those entity types stored before a time, with their replies, and
@@ -341,17 +341,17 @@ returns how many went. A message's ID carries when Cluster stored it; messages n
 stay, however old, and so do other entity types'. Each statement removes at most `batch`
 messages, a thousand by default.
 
-`PostgresClusterStorage.backgroundStatus(options?)` reports the workspaces' background work from
-those tables: per background process, the job requests due, scheduled, and retrying, when the
-longest-waiting due request became due, and how many requests were dropped; then the latest retries and drops, with their
-workspaces. It reports nothing before any host has run background work over the database. It
-needs only a SQL client, such as `PostgresDatabase.layerClient`, so reading it changes no schema.
+`PostgresClusterStorage.agentJobStatus(options?)` reports agent jobs from those tables: per kind
+of request, such as `AcceptWork`, the requests due, scheduled, and retrying, and when the
+longest-waiting due request became due; then the latest retries, with their agents and
+workspaces. It reports nothing before any host has run agent jobs over the database. It needs
+only a SQL client, such as `PostgresDatabase.layerClient`, so reading it changes no schema.
 
 `PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
 processes over the database never run Cluster at one address: it fails with `AddressTaken`
 while another process holds it. The claim is a session-level advisory lock on a connection it
 keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
-dies. `cluster-storage.test.ts` checks pruning and the status over real background job requests, and the claim
+dies. `cluster-storage.test.ts` checks pruning and the status over real agent job requests, and the claim
 across pools.
 
 ## Composition

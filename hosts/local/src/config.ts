@@ -7,10 +7,10 @@ export interface Options {
   readonly databaseUrl: Redacted.Redacted<string>;
   /** The most connections the host opens to it; one listens for notifications while needed. */
   readonly poolSize: number;
-  /** This process's address among those running background work over the database. */
+  /** This process's address among those running jobs over the database. */
   readonly runnerAddress: { readonly host: string; readonly port: number };
   /**
-   * How processes running background work reach each other: through the database alone, or also
+   * How processes running jobs reach each other: through the database alone, or also
    * directly over sockets at their runner addresses.
    */
   readonly runnerTransport: "storage" | "socket";

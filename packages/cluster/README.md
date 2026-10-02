@@ -1,20 +1,21 @@
 # Cluster
 
 `@amends/cluster` runs **jobs**: work outside any request that a commit asks for and Effect Cluster
-delivers, runs, and retries. There are two kinds. A **background job** runs one of a workspace's
-[background processes](../core/README.md#background-work), such as `turn.accept`; a **turn job**
-runs one [turn](../core/README.md#turns) an agent accepted, through `TurnRunner`, which runs the
-turn with the agent's model access in a spawned [environment](../environment/README.md). A host
-composes them over its [gateway](../gateway/README.md), as the
-[local host](../../hosts/local/README.md#turns) does.
+delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). There are two kinds. An
+**agent job** accepts the work asked of one agent into turns, and stops its turns where it no
+longer takes part; a **turn job** runs one [turn](../core/README.md#turns) an agent accepted,
+through `TurnRunner`, which runs the turn with the agent's model access in a spawned
+[environment](../environment/README.md). Both enter the workspace through the
+[gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an actor does. A host
+composes them over its gateway, as the [local host](../../hosts/local/README.md#turns) does.
 
-| Module                   | What it holds                                                                                            |
-| ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `jobs/background-job.ts` | `BackgroundJob`: the `amends/BackgroundJob` entity, its `Run` requests, and their worker.                |
-| `jobs/turn-job.ts`       | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Abandon` requests, and their worker.              |
-| `jobs/retry.ts`          | `JobRetry.delay`, the delay before both kinds' retries.                                                  |
-| `jobs/pruning.ts`        | `JobPruning`, the hourly job that removes handled requests.                                              |
-| `runner/`                | `TurnRunner`, which runs one turn, and the modules it is made of; see [running a turn](#running-a-turn). |
+| Module              | What it holds                                                                                                  |
+| ------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `jobs/agent-job.ts` | `AgentJob`: the `amends/AgentJob` entity, its `AcceptWork` and `StopDepartedTurns` requests, and their worker. |
+| `jobs/turn-job.ts`  | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Abandon` requests, and their worker.                    |
+| `jobs/retry.ts`     | `JobRetry.delay`, the delay before both kinds' retries.                                                        |
+| `jobs/pruning.ts`   | `JobPruning`, the hourly job that removes handled requests.                                                    |
+| `runner/`           | `TurnRunner`, which runs one turn, and the modules it is made of; see [running a turn](#running-a-turn).       |
 
 The package depends on Effect, core, the gateway, and the harness, environment, and connection
 contracts. It knows no harness or model provider: the host passes in the ones it installs.
@@ -27,7 +28,7 @@ owns the entity handles it when it arrives. Cluster keeps an entity on one runne
 job handles one request at a time, and redelivers a request whose handling was cut short, so work
 resumes after a restart. Each kind has the same three layers:
 
-- `layerRequests` provides core's service for the kind (`BackgroundJobs` or `TurnJobs`), through
+- `layerRequests` provides core's service for the kind (`AgentJobs` or `TurnJobs`), through
   which core requests jobs in a commit, each request naming its workspace. Sent inside the commit, a request is stored in the commit's transaction when
   Cluster's message storage uses the same SQL client as the workspace's storage; the host
   composing them owns that. Cluster saves such a persisted request and only notifies its runner
@@ -44,23 +45,20 @@ resumes after a restart. Each kind has the same three layers:
 A failed request asks for another after `JobRetry.delay`, which doubles from two seconds up to five
 minutes.
 
-### Background jobs
+### Agent jobs
 
-A background job is one workspace's background process: an entity, `amends/BackgroundJob`, keyed
-by workspace and process, whose `Run` requests say when the process should run.
-`BackgroundJob.layerRequests` provides core's `BackgroundJobs.Service`; a commit's request is
-keyed by its commit ID, so a commit that asks twice asks once.
+An agent job is one agent: an entity, `amends/AgentJob`, keyed by workspace and the agent's
+membership, whose requests ask it to accept the agent's work (`AcceptWork`) or to stop its turns
+where it no longer takes part (`StopDepartedTurns`). Different agents' jobs run side by side; one
+agent's requests take turns. `AgentJob.layerRequests` provides core's `AgentJobs.Service`; a
+commit's request is keyed by its commit ID, so a commit that asks twice for the same work asks
+once.
 
-When a `Run` arrives, the worker calls `runBackgroundProcess`, then asks for the next run: at once
-after `Continue`, at the due time after `At`, and after a failure once the retry delay has passed.
-Runs that ask for the same later time share one request, keyed by that time; a time the request or
-the clock has already reached takes a fresh key, since its request may have run and a repeated key
-would be dropped. Requests are not coalesced: each commit's request runs the process once, and a
-run that finds nothing outstanding returns at once. A process this host does not register is
-dropped after `maxUnknownRuns` (ten) failed runs, and a workspace that was never created at once.
-The worker fails a request it drops with `BackgroundJob.Dropped`, naming the reason and the retries
-before it, so Cluster keeps the drop as the request's reply, where operators find it until handled
-requests are pruned. A request it could not act on stays undelivered, so Cluster runs it again.
+When a request arrives, the worker does its work through `AgentWork`, the request's own method of
+it, in a scope of its own. A failed request asks for another after the retry delay, under a fresh
+`retry:` key. A request whose workspace was never created is dropped and logged. Requests are not
+coalesced: each commit's request does its work once, and work that finds nothing to do returns at
+once.
 
 ### Turn jobs
 
@@ -84,7 +82,7 @@ a turn again in the same `Run` after an interruption worth retrying.
 ### Pruning
 
 `JobPruning.layer({ prune, entityTypes, keep? })` removes the handled requests of the entity types
-it is given, such as `BackgroundJob.entity.type` and `TurnJob.entity.type`, with the pruning job's
+it is given, such as `AgentJob.entity.type` and `TurnJob.entity.type`, with the pruning job's
 own past runs, once they are older than `keep` (seven days by default), every hour on one runner,
 through `ClusterCron`. Cluster removes neither, and only the host's storage knows how, so the host
 supplies `prune`. By then a request's key no longer needs to stop a repeat, since nothing asks
@@ -113,7 +111,8 @@ until the turn ends. The pieces, each in its own module:
 | `drafts.ts`                        | Text still being written, shown to readers as drafts.                                                                                         |
 | `settings.ts`, `context-budget.ts` | The runner's options and defaults; how much of its model's context a turn may use.                                                            |
 
-Each step goes through `gateway.executeTurns` as its own commit, attributed to the turn's agent:
+Each step goes through `gateway.inWorkspace` as its own commit, attributed to the turn's agent,
+holding the workspace only while it runs:
 
 1. `prepare` the turn. A finished turn is left as it is, one asked to stop is confirmed
    stopped (`confirmStopped`), and one whose agent, connection, key, or environment is gone is failed with the

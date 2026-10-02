@@ -1,7 +1,6 @@
-import { BackgroundJobs, BackgroundProcess, BackgroundRuns } from "@amends/core/background";
-import { Commit, Store } from "@amends/core/journal";
-import { Workspace } from "@amends/core/workspace";
-import { BackgroundJob } from "@amends/cluster";
+import { AgentWork, TurnStore } from "@amends/core/turn";
+import { Member, Workspace } from "@amends/core/workspace";
+import { AgentJob } from "@amends/cluster";
 import { Gateway, GatewayErrors } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
@@ -13,45 +12,65 @@ import { database, setup } from "./support.ts";
 
 const { available, withDatabase } = setup();
 const workspaceId = Workspace.Id.make("workspace-one");
-const process = BackgroundProcess.Name.make("test.work");
+const agent = Member.Id.make("agent-member");
 
-/** Cluster over the test database, with a worker whose runs all leave nothing outstanding. */
-const cluster = (url: string) => {
-  const unexpected = () => Effect.die("Only background runs are expected");
-  const gateway = Gateway.Service.of({
+/**
+ * A gateway that only does agents' work: in a workspace named `missing`, which was never created;
+ * in one named `failing`, failing; elsewhere, doing nothing.
+ */
+const agentWorkOnly = () => {
+  const unexpected = () => Effect.die("Only agents' work is expected");
+  return Gateway.Service.of({
     createWorkspace: unexpected,
-    inWorkspace: unexpected,
     asMember: unexpected,
-    asMemberScoped: unexpected,
-    executeTurns: unexpected,
-    runBackgroundProcess: () => Effect.succeed(BackgroundProcess.idle),
+    inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
+      if (id === "missing")
+        return Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId: id }));
+      const work = () =>
+        id === "failing"
+          ? Effect.fail(new TurnStore.Failure({ operation: "get", cause: "Not yet" }))
+          : Effect.void;
+      return Effect.provideService(
+        program as Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, AgentWork.Service>,
+        AgentWork.Service,
+        AgentWork.Service.of({ acceptWork: work, stopDepartedTurns: work }),
+      );
+    },
   });
-  return BackgroundJob.layer.pipe(
-    Layer.provide(Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer)),
+};
+
+/** Agent jobs over the test database, reading for due requests as often as `pollInterval`. */
+const cluster = (url: string, pollInterval: Duration.Input = "1 second") =>
+  AgentJob.layer.pipe(
+    Layer.provide(Layer.mergeAll(Layer.succeed(Gateway.Service, agentWorkOnly()), BunCrypto.layer)),
     Layer.provideMerge(
       SingleRunner.layer({
         shardingConfig: {
           runnerAddress: Option.some(RunnerAddress.make("localhost", 34431)),
-          entityMessagePollInterval: Duration.seconds(1),
+          entityMessagePollInterval: Duration.fromInputUnsafe(pollInterval),
         },
       }).pipe(Layer.provide(BunCrypto.layer)),
     ),
     Layer.provideMerge(database(url)),
   );
-};
 
-const requestIn = (id: Workspace.Id, commit: string, at?: DateTime.Utc) =>
-  Effect.flatMap(BackgroundJobs.Service, (backgroundJobs) =>
-    backgroundJobs.request({ workspaceId: id, process, at }),
-  ).pipe(
-    Effect.provideService(Store.Transaction, {
-      id: Commit.Id.make(commit),
-      append: () => Effect.die("Unexpected append"),
-      afterCommit: (effect) => effect,
-    }),
-  );
+/** Store a request for the agent to accept its work, due at `at` or now, under `key`. */
+const requestIn = (id: Workspace.Id, key: string, at?: DateTime.Utc) =>
+  Effect.gen(function* () {
+    const agentJobClient = yield* AgentJob.entity.client;
+    yield* agentJobClient(AgentJob.entityId(id, agent)).AcceptWork(
+      new AgentJob.AcceptWork({
+        workspaceId: id,
+        memberId: agent,
+        key,
+        at: at ?? (yield* DateTime.now),
+        attempt: 0,
+      }),
+      { discard: true },
+    );
+  });
 
-const request = (commit: string, at?: DateTime.Utc) => requestIn(workspaceId, commit, at);
+const request = (key: string, at?: DateTime.Utc) => requestIn(workspaceId, key, at);
 
 const count = (query: string) =>
   Effect.flatMap(SqlClient.SqlClient, (sql) => sql.unsafe<{ readonly count: number }>(query)).pipe(
@@ -84,7 +103,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 UPDATE cluster_messages SET entity_type = 'other/Entity'
                 WHERE id = (SELECT min(id) FROM cluster_messages WHERE processed)`,
             ).pipe(Effect.orDie);
-            const types = [BackgroundJob.entity.type];
+            const types = [AgentJob.entity.type];
             const now = yield* DateTime.now;
             expect(
               yield* PostgresClusterStorage.prune(types, DateTime.subtract(now, { hours: 1 })),
@@ -134,46 +153,17 @@ describe.skipIf(!available)("PostgreSQL", () => {
   );
 
   it.live(
-    "background status counts what waits, retries, and was dropped, per process",
+    "the agent job status counts what waits and retries, per kind of request",
     () =>
       withDatabase((url) =>
         Effect.gen(function* () {
           const empty = yield* Layer.build(database(url));
-          // Before any host ran background work, there is nothing to report.
+          // Before any host ran agent jobs, there is nothing to report.
           expect(
-            yield* PostgresClusterStorage.backgroundStatus().pipe(Effect.provide(empty)),
-          ).toEqual({ processes: [], retries: [], drops: [] });
-          const unexpected = () => Effect.die("Only background runs are expected");
-          const gateway = Gateway.Service.of({
-            createWorkspace: unexpected,
-            inWorkspace: unexpected,
-            asMember: unexpected,
-            asMemberScoped: unexpected,
-            executeTurns: unexpected,
-            runBackgroundProcess: (id) =>
-              id === "missing"
-                ? Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId: id }))
-                : id === "failing"
-                  ? Effect.fail(new BackgroundRuns.Failure({ process, cause: "Not yet" }))
-                  : Effect.succeed(BackgroundProcess.idle),
-          });
+            yield* PostgresClusterStorage.agentJobStatus().pipe(Effect.provide(empty)),
+          ).toEqual({ requests: [], retries: [] });
           // Reading rarely, so the retry a failed run schedules stays waiting through the test.
-          const context = yield* Layer.build(
-            BackgroundJob.layer.pipe(
-              Layer.provide(
-                Layer.mergeAll(Layer.succeed(Gateway.Service, gateway), BunCrypto.layer),
-              ),
-              Layer.provideMerge(
-                SingleRunner.layer({
-                  shardingConfig: {
-                    runnerAddress: Option.some(RunnerAddress.make("localhost", 34431)),
-                    entityMessagePollInterval: Duration.seconds(30),
-                  },
-                }).pipe(Layer.provide(BunCrypto.layer)),
-              ),
-              Layer.provideMerge(database(url)),
-            ),
-          );
+          const context = yield* Layer.build(cluster(url, "30 seconds"));
           const now = yield* DateTime.now;
           yield* Effect.gen(function* () {
             for (const id of ["missing", "failing", "fine"])
@@ -185,24 +175,23 @@ describe.skipIf(!available)("PostgreSQL", () => {
             );
             const deadline = (yield* Clock.currentTimeMillis) + 10_000;
             while (
-              (yield* PostgresClusterStorage.backgroundStatus()).retries.length === 0 &&
+              (yield* PostgresClusterStorage.agentJobStatus()).retries.length === 0 &&
               (yield* Clock.currentTimeMillis) < deadline
             )
               yield* Effect.sleep("100 millis");
-            const status = yield* PostgresClusterStorage.backgroundStatus();
-            expect(status.processes).toEqual([
+            const status = yield* PostgresClusterStorage.agentJobStatus();
+            // The later request and the failed one's retry wait; the others were handled.
+            expect(status.requests).toEqual([
               {
-                process,
+                request: "AcceptWork",
                 due: 0,
                 scheduled: 2,
                 retrying: 1,
                 oldestDue: Option.none(),
-                dropped: 1,
               },
             ]);
-            expect(status.retries).toMatchObject([{ process, workspaceId: "failing", attempt: 1 }]);
-            expect(status.drops).toMatchObject([
-              { process, workspaceId: "missing", reason: "workspace-not-found", attempt: 0 },
+            expect(status.retries).toMatchObject([
+              { request: "AcceptWork", workspaceId: "failing", memberId: agent, attempt: 1 },
             ]);
           }).pipe(Effect.provide(context));
         }).pipe(Effect.scoped),

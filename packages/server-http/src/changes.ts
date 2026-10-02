@@ -25,7 +25,7 @@ export const layer = HttpApiBuilder.group(
         Effect.flatMap(Principal, (principal) =>
           streams.hold(params.workspaceId, principal).pipe(
             Effect.andThen(
-              gateway.asMemberScoped(
+              gateway.asMember(
                 params.workspaceId,
                 principal,
                 Effect.flatMap(ChangeFeedService.Service, (changeFeedService) =>

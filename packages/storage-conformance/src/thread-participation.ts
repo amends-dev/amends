@@ -1149,6 +1149,7 @@ export const threadParticipation = (harness: Harness) => {
                                 groupId: first.thread.groupId,
                                 threadId: first.thread.id,
                                 participationId: participant.id,
+                                memberId: memberParticipant(participant).memberId,
                                 reason: "unfollowed",
                               })
                               .pipe(Publication.withOccurredAt(occurredAt)),
@@ -1406,6 +1407,7 @@ export const threadParticipation = (harness: Harness) => {
                                 groupId: group.id,
                                 threadId: first.thread.id,
                                 participationId: participant.id,
+                                memberId: memberParticipant(participant).memberId,
                                 reason: "group-left",
                               })
                               .pipe(Publication.withCause(removed, occurredAt));
@@ -1515,6 +1517,7 @@ export const threadParticipation = (harness: Harness) => {
                                 groupId: first.thread.groupId,
                                 threadId: first.thread.id,
                                 participationId: participant.id,
+                                memberId: memberParticipant(participant).memberId,
                                 reason: "unfollowed",
                               })
                               .pipe(Publication.withOccurredAt(occurredAt));

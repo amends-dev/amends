@@ -17,7 +17,8 @@ import { TurnRunner } from "../../src/runner/runner.ts";
 
 const workspaceId = Workspace.Id.make("workspace-one");
 const turnId = Turn.Id.make("turn-one");
-const down = new TurnStore.Failure({ operation: "get", cause: "The database is down" });
+// Through the gateway, a failure no caller can act on, such as storage's, is a defect.
+const down = Effect.die(new TurnStore.Failure({ operation: "get", cause: "The database is down" }));
 
 /** Cluster in memory, reading for due requests every second of the test clock. */
 const cluster = Sharding.layer.pipe(

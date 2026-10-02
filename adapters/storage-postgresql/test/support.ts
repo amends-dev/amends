@@ -19,10 +19,9 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { BackgroundJobs } from "@amends/core/background";
 import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
-import { TurnJobs } from "@amends/core/turn";
+import { AgentJobs, TurnJobs } from "@amends/core/turn";
 import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
@@ -30,12 +29,6 @@ import { SqlClient } from "effect/unstable/sql";
 import { PostgresDatabase, PostgresSignals, PostgresStorage } from "../src/index.ts";
 import { Signals } from "@amends/core/signal";
 import { temporary } from "./postgres.ts";
-
-/**
- * Background jobs the suites run themselves: each request is accepted and nothing runs, so a suite
- * runs the background process it expects, as a host's runner would.
- */
-const manualBackgroundJobs = BackgroundJobs.Service.of({ request: () => Effect.void });
 
 export const setup = () => {
   const url = inject("amendsPostgresUrl");
@@ -55,7 +48,7 @@ export const journalLog = Log.Id.make("journal");
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
   context: Context.Context<
-    WorkspaceStorage.Bindings | Signals.Service | BackgroundJobs.Service | TurnJobs.Service
+    WorkspaceStorage.Bindings | Signals.Service | AgentJobs.Service | TurnJobs.Service
   >,
 ) => ({
   context,
@@ -89,7 +82,7 @@ export const views = (options: PostgresStorage.Options = {}) =>
           bind(
             context.pipe(
               Context.add(Signals.Service, hub.forWorkspace(workspaceId)),
-              Context.add(BackgroundJobs.Service, manualBackgroundJobs),
+              Context.add(AgentJobs.Service, AgentJobs.noRunner),
               Context.add(TurnJobs.Service, TurnJobs.noRunner),
             ),
           ),

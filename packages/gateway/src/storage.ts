@@ -1,8 +1,7 @@
 import type * as Core from "@amends/core";
-import type { BackgroundJobs } from "@amends/core/background";
 import type { ConnectionCatalog } from "@amends/core/connection";
 import type { EnvironmentCatalog } from "@amends/core/environment";
-import type { TurnJobs } from "@amends/core/turn";
+import type { AgentJobs, TurnJobs } from "@amends/core/turn";
 import type { Signals } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
 import { Context } from "effect";
@@ -10,13 +9,13 @@ import type { Crypto, Effect } from "effect";
 
 /**
  * Storage-only dependencies; the gateway supplies cryptography, the workspace's signals, its
- * background and turn jobs, and the host's connection and environment catalogs.
+ * agent and turn jobs, and the host's connection and environment catalogs.
  */
 export type Bindings = Exclude<
   Core.HostServices,
   | Crypto.Crypto
   | Signals.Service
-  | BackgroundJobs.Service
+  | AgentJobs.Service
   | ConnectionCatalog.Service
   | EnvironmentCatalog.Service
   | TurnJobs.Service

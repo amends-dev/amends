@@ -4,6 +4,8 @@ import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
+import { AgentJobs } from "./turn/agent-jobs.ts";
+import { AgentWork } from "./turn/agent-work.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
@@ -13,8 +15,6 @@ import { EnvironmentService } from "./environment/service.ts";
 import { EnvironmentPermissions } from "./environment/permissions.ts";
 import { EnvironmentProjection } from "./environment/projection.ts";
 import { EnvironmentQuery } from "./environment/query.ts";
-import { BackgroundRuns } from "./background/runs.ts";
-import { BackgroundJobs } from "./background/jobs.ts";
 import { ThreadService } from "./thread/service.ts";
 import { ThreadCommand } from "./thread/command.ts";
 import { GroupCommand } from "./group/command.ts";
@@ -157,18 +157,14 @@ const activityResolvers = [
 export const journalLog = Log.Id.make("journal");
 
 /**
- * Work the domains do outside requests, in each workspace. A process runs from what is stored, and
- * a commit that publishes a fact it wakes on asks for it to run in that same commit. A domain that
- * adds background work registers its process here.
+ * The domain journal and its log, over host storage. A commit that publishes a fact that changes
+ * an agent's work, or creates or retries a turn, requests that job in the same commit.
  */
-export const processes = [TurnCommand.acceptWorkProcess, TurnCommand.stopDepartedProcess] as const;
-
-/** The domain journal and its log, over host storage; its commits ask for background work. */
 const journal = Journal.layer({
   logId: journalLog,
   projections,
-  reactions: [...BackgroundJobs.reactions(processes), ...TurnJobs.reactions] as ReadonlyArray<
-    Reaction.Definition<BackgroundJobs.Service | TurnJobs.Service>
+  reactions: [...AgentJobs.reactions, ...TurnJobs.reactions] as ReadonlyArray<
+    Reaction.Definition<AgentJobs.Service | TurnJobs.Service>
   >,
 }).pipe(Layer.provideMerge(Log.layer));
 
@@ -241,28 +237,28 @@ const operations = Layer.mergeAll(
 );
 
 /**
- * What runs outside requests: the domains' background processes, and turn execution, which a
- * host's runner drives for the turns agents accepted. Neither is an operation an actor calls.
+ * What jobs call, outside requests: an agent's work, accepting what is asked of it and stopping its
+ * turns where it left, and turn execution, which a turn's job drives. Neither is an operation an
+ * actor calls.
  */
-const background = Layer.mergeAll(
-  BackgroundRuns.layer(processes).pipe(Layer.provide(turnCommand)),
-  TurnExecution.layer,
-).pipe(Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)));
+const jobServices = Layer.mergeAll(AgentWork.layer, TurnExecution.layer).pipe(
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
+);
 
 /**
- * Complete core for one workspace: application operations, background runs, and turn execution over the
- * journal, authorization, and the permission catalog.
+ * Complete core for one workspace: application operations and what jobs call, over the journal,
+ * authorization, and the permission catalog.
  *
  * @category layers
  */
-export const layer = Layer.mergeAll(operations, background).pipe(
+export const layer = Layer.mergeAll(operations, jobServices).pipe(
   Layer.provideMerge(Layer.mergeAll(journal, authorization)),
   Layer.provideMerge(PermissionCatalog.layer(permissions)),
 );
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
- * store, cryptography, the workspace's signals, and its background and turn jobs. Adding a required store changes this type
+ * store, cryptography, the workspace's signals, and its agent and turn jobs. Adding a required store changes this type
  * and makes incomplete host compositions fail type checking.
  *
  * @category models
@@ -277,3 +273,11 @@ export type HostServices = Layer.Services<typeof layer>;
  * @category models
  */
 export type Operations = Layer.Success<typeof operations>;
+
+/**
+ * The services a host's jobs call. They act as the agent or the product and check no actor's
+ * permissions, so only jobs a host trusts run them, never a protocol's handlers for an actor.
+ *
+ * @category models
+ */
+export type JobServices = Layer.Success<typeof jobServices>;

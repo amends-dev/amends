@@ -1,6 +1,7 @@
 import { ConnectionPermissions } from "@amends/core/connection";
 import { EnvironmentPermissions } from "@amends/core/environment";
 import { AgentPermissions } from "@amends/core/agent";
+import { AgentWork } from "@amends/core/turn";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
 import type { Identity } from "@amends/core/identity";
@@ -372,7 +373,7 @@ export const gateway = (harness: Harness) => {
     );
 
     it.effect(
-      "a background run reports a process no one registered, and a workspace never created",
+      "a job enters a workspace without an actor, and a workspace never created is refused",
       () =>
         harness.withStorage((storage) =>
           runGateway(
@@ -380,12 +381,14 @@ export const gateway = (harness: Harness) => {
             Effect.gen(function* () {
               const gateway = yield* Gateway.Service;
               const workspace = yield* Operations.createWorkspace(alice.id);
-              expect(
-                yield* Effect.flip(gateway.runBackgroundProcess(workspace.id, "test.unregistered")),
-              ).toMatchObject({ _tag: "BackgroundRuns.Unknown", process: "test.unregistered" });
+              // A member that is no agent has no work to accept.
+              const acceptWork = Effect.flatMap(AgentWork.Service, (agentWork) =>
+                agentWork.acceptWork(workspace.ownerMemberId),
+              );
+              yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork));
               const missing = Workspace.Id.make("never-created");
               expect(
-                yield* Effect.flip(gateway.runBackgroundProcess(missing, "test.unregistered")),
+                yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork))),
               ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: missing }));
               expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toMatchObject({
                 memberships: [{ workspace }],

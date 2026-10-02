@@ -43,7 +43,7 @@ and code validation happen during operations. Construction issues no token or co
 
 `LocalHost` and `LocalServer` are composition modules, so they expose layers without
 additional `make` wrappers. `LocalHost.layer` composes the gateway, directory,
-PostgreSQL adapter, cryptography, and background work on an Effect Cluster runner over the
+PostgreSQL adapter, cryptography, and jobs on an Effect Cluster runner over the
 adapter's pool. The gateway owns prepared workspace runtimes in its host
 scope. Each runtime boots lazily, replays, and stays prepared while in use and for an idle
 period afterwards; requests resolve identity and open operation scopes over the prepared

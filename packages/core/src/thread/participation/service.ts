@@ -134,6 +134,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
                 threadId: thread.id,
                 participationId: participant.id,
                 groupId: thread.groupId,
+                memberId: own.memberId,
                 reason,
               })
               .pipe(Publication.withOccurredAt(occurredAt)),

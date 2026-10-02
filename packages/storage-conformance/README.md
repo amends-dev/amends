@@ -77,8 +77,8 @@ registration.
 | `readState`                  | Thread and group lists with unread state, read state that only moves forward, and settling the inbox on reading.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 `Support` holds the fixtures the suites share: identities, bound stores by name, a fixed
-clock, and cores, hosts, and gateways over a harness's storage. Their background jobs are
-`manualBackgroundJobs`: a commit's request is accepted and nothing runs, so a suite runs the process it
-expects through the gateway, as a host's runner would. Their turn jobs are
+clock, and cores, hosts, and gateways over a harness's storage. Their agent jobs are
+`recordedAgentJobs`: a commit's requests are kept once it commits, and `runAgentJobs` does the
+work they asked for through the gateway, as a host's agent jobs would. Their turn jobs are
 `TurnJobs.noRunner`, so a suite drives turn execution itself. `Operations` runs single application
 operations through a gateway, the way a protocol handler does.
