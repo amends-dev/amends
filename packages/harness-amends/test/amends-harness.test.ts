@@ -116,6 +116,137 @@ describe("AmendsHarness", () => {
     }),
   );
 
+  it.effect("keeps text and reasoning separate when their start events are missing", () =>
+    Effect.gen(function* () {
+      const { model } = yield* scripted([
+        parts(
+          { type: "reasoning-delta", id: "shared", delta: "Think " },
+          { type: "text-delta", id: "shared", delta: "Hello " },
+          { type: "reasoning-delta", id: "shared", delta: "again." },
+          { type: "text-delta", id: "shared", delta: "world." },
+          { type: "reasoning-end", id: "shared" },
+          { type: "text-end", id: "shared" },
+          finish("stop"),
+        ),
+      ]);
+      const session = yield* start(model, { sessionId: "s1" });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "Hi"));
+      const events = yield* untilIdle(session);
+
+      expect(
+        events
+          .filter(HarnessEvent.Event.isAnyOf(["TextDelta", "ReasoningDelta"]))
+          .map(({ part, delta }) => ({ part, delta })),
+      ).toEqual([
+        { part: 0, delta: "Think " },
+        { part: 1, delta: "Hello " },
+        { part: 0, delta: "again." },
+        { part: 1, delta: "world." },
+      ]);
+      expect(HarnessEvent.transcript(stored(events))).toEqual([
+        input("Hi"),
+        {
+          _tag: "Response",
+          id: "s1/1",
+          parts: [
+            { _tag: "Reasoning", text: "Think again." },
+            { _tag: "Text", text: "Hello world." },
+          ],
+        },
+      ]);
+    }),
+  );
+
+  it.effect("merges provider metadata from a block's start, deltas, and end", () =>
+    Effect.gen(function* () {
+      const { model } = yield* scripted([
+        parts(
+          {
+            type: "reasoning-start",
+            id: "r",
+            metadata: {
+              provider: { started: true, signature: "initial" },
+              other: { preserved: true },
+            },
+          },
+          {
+            type: "reasoning-delta",
+            id: "r",
+            delta: "Think.",
+            metadata: {
+              provider: { delta: true },
+            },
+          },
+          {
+            type: "reasoning-end",
+            id: "r",
+            metadata: {
+              provider: { signature: "final" },
+            },
+          },
+          ...text("t", "Hello"),
+          finish("stop"),
+        ),
+      ]);
+      const session = yield* start(model, { sessionId: "s1" });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "Hi"));
+      const events = yield* untilIdle(session);
+
+      expect(HarnessEvent.transcript(stored(events))).toEqual([
+        input("Hi"),
+        {
+          _tag: "Response",
+          id: "s1/1",
+          parts: [
+            {
+              _tag: "Reasoning",
+              text: "Think.",
+              native: {
+                amends: {
+                  provider: { started: true, delta: true, signature: "final" },
+                  other: { preserved: true },
+                },
+              },
+            },
+            { _tag: "Text", text: "Hello" },
+          ],
+        },
+      ]);
+    }),
+  );
+
+  it.effect("completes every block once when end events are missing or repeated", () =>
+    Effect.gen(function* () {
+      const { model } = yield* scripted([
+        parts(
+          ...text("ended", "First"),
+          { type: "text-end", id: "ended" },
+          { type: "reasoning-start", id: "r" },
+          { type: "reasoning-delta", id: "r", delta: "Think." },
+          { type: "text-start", id: "open" },
+          { type: "text-delta", id: "open", delta: "Last" },
+          finish("stop"),
+        ),
+      ]);
+      const session = yield* start(model, { sessionId: "s1" });
+      yield* session.prepare([]);
+      yield* session.submit(batch("b1", "Hi"));
+      const events = yield* untilIdle(session);
+
+      expect(
+        events
+          .filter(HarnessEvent.Event.isAnyOf(["BlockCompleted"]))
+          .map(({ part, block }) => ({ part, block })),
+      ).toEqual([
+        { part: 0, block: { _tag: "Text", text: "First" } },
+        { part: 1, block: { _tag: "Reasoning", text: "Think." } },
+        { part: 2, block: { _tag: "Text", text: "Last" } },
+      ]);
+    }),
+  );
+
   it.effect("runs the tools a response calls and answers with their results", () =>
     Effect.gen(function* () {
       const { model, prompts } = yield* scripted([
@@ -274,7 +405,12 @@ describe("AmendsHarness", () => {
           finish("tool-calls"),
         ),
         Stream.concat(
-          parts({ type: "text-start", id: "t1" }, { type: "text-delta", id: "t1", delta: "Hi" }),
+          parts(
+            { type: "reasoning-start", id: "r2" },
+            { type: "reasoning-delta", id: "r2", delta: "Unfinished reasoning." },
+            { type: "text-start", id: "t1" },
+            { type: "text-delta", id: "t1", delta: "Hi" },
+          ),
           Stream.fail(
             AiError.make({
               module: "Test",
@@ -299,10 +435,10 @@ describe("AmendsHarness", () => {
       );
       expect(failure).toBeInstanceOf(HarnessErrors.ExecutionFailed);
       expect(failure).toMatchObject({ retryable: true });
-      // The text written before the failure is reported as a block of the unfinished response.
+      // Partial text is reported; unfinished reasoning without a signature is omitted.
       expect(recorded.slice(-2)).toMatchObject([
         { _tag: "TextDelta", responseId: "s1/2" },
-        { _tag: "BlockCompleted", responseId: "s1/2", part: 0, block: { text: "Hi" } },
+        { _tag: "BlockCompleted", responseId: "s1/2", part: 1, block: { text: "Hi" } },
       ]);
 
       // Execution going on asks for a fresh response; the work ending keeps what was written.

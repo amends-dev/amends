@@ -34,6 +34,13 @@ The loop runs calls itself rather than letting Effect AI resolve them, so it rec
 and can leave a call unanswered: a call still running when the session's scope closes has no
 result, and the next session receives it through `resolve`. Transfer and recovery rely on this.
 
+Text and reasoning use Effect tagged variants around mutable buffers. The streaming lookup
+keeps each buffer with its response-part index, so deltas update it without casting an entry
+from the array that also holds completed tool calls. A delta or end without a start opens its
+buffer, and metadata accumulates across chunks. On a successful response, every block is
+reported once, including blocks whose end event never arrives. Completion copies the buffer
+into the shared transcript format.
+
 ## Translation
 
 Each request is built from the transcript alone: the instructions as a system message, each input
