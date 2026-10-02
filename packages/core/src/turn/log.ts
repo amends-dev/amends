@@ -14,8 +14,8 @@ const Of = { turnId: TurnId.Id };
  * One entry of an agent's log for a thread, naming the turn that wrote it. Together the entries
  * are everything the agent did there: each turn's start and end, the input execution submitted,
  * with the timeline position it covers; each attempt to run it; what the harness reported, block
- * by block, whichever harness ran it and wherever; the running environment it worked in;
- * interruptions; input asked of a turn directly, such as a retry; the thread's history before the
+ * by block, whichever harness ran it and wherever; the running environment it worked in and the
+ * harness sessions it started there; interruptions; input asked of a turn directly, such as a retry; the thread's history before the
  * first turn; and checkpoints that replace what came before.
  */
 export const Entry = Schema.TaggedUnion({
@@ -26,6 +26,11 @@ export const Entry = Schema.TaggedUnion({
   Started: { ...Of, selection: Turn.Selection, instructions: Schema.String },
   /** Execution began a harness session for the turn, or a summary for its checkpoint. */
   Attempt: { ...Of, kind: Schema.Literals(["session", "summary"]) },
+  /**
+   * Execution started a harness session with this ID, recorded before it starts. The harness
+   * events after it are that session's, until another session, a summary, or a checkpoint.
+   */
+  Session: { ...Of, sessionId: Schema.NonEmptyString },
   /** Input submitted as one batch, covering the thread's relevant input through a position. */
   Submitted: {
     ...Of,
@@ -154,6 +159,15 @@ export interface Overflow {
   readonly pending: boolean;
 }
 
+/**
+ * The harness session the turn last started, and how many of its events the log recorded: those a
+ * session still running continues after.
+ */
+export interface LatestSession {
+  readonly sessionId: string;
+  readonly recorded: number;
+}
+
 /** Why execution last stopped short without the turn getting further. */
 export interface Interruption {
   readonly reason: string;
@@ -184,6 +198,8 @@ export interface Reading {
   readonly replies: ReadonlyArray<Reply>;
   /** Input asked of the turn itself that no batch it submitted has taken in yet. */
   readonly requested: ReadonlyArray<Transcript.Input>;
+  /** Where the newest of those sits in the log, which tells batches holding them apart. */
+  readonly requestedAt: Log.Position | undefined;
   /** The entries the thread's readers see, oldest first. */
   readonly items: ReadonlyArray<Turn.LogItem>;
   /** What the turn started with, once execution took it. */
@@ -194,6 +210,8 @@ export interface Reading {
   readonly ended: Ended | undefined;
   /** The running environment the turn's latest attempt worked in, to acquire again. */
   readonly environment: Environment.Reference | undefined;
+  /** The harness session the turn last started, until a summary or checkpoint ended it. */
+  readonly session: LatestSession | undefined;
   /** Where the latest checkpoint the turn recorded sits in the log. */
   readonly checkpoint: Log.Position | undefined;
   /**
@@ -221,6 +239,8 @@ export interface Reader {
 
 const hasText = (text: string) => /\S/u.test(text);
 
+const sameInput = Schema.toEquivalence(Transcript.Input);
+
 /** A reader of one turn's entries, empty to begin with. */
 export const reader = (): Reader => {
   const events: Array<HarnessEvent.Event> = [];
@@ -236,12 +256,12 @@ export const reader = (): Reader => {
     }
   >();
   const replies: Array<Reply> = [];
-  const requested: Array<Transcript.Input> = [];
-  let takenIn = false;
+  let requested: Array<{ readonly input: Transcript.Input; readonly position: Log.Position }> = [];
   let answer: Reply | undefined;
   let started: Reading["started"];
   let ended: Ended | undefined;
   let environment: Environment.Reference | undefined;
+  let session: { sessionId: string; recorded: number } | undefined;
   let checkpoint: Log.Position | undefined;
   let attempts = 0;
   let interruption: Interruption | undefined;
@@ -264,9 +284,13 @@ export const reader = (): Reader => {
       Started: (entry) => {
         started = { selection: entry.selection, instructions: entry.instructions };
       },
-      Attempt: () => {
+      Attempt: (entry) => {
         attempts += 1;
         accounted = false;
+        if (entry.kind === "summary") session = undefined;
+      },
+      Session: (entry) => {
+        session = { sessionId: entry.sessionId, recorded: 0 };
       },
       Ended: (entry) => {
         ended = entry;
@@ -281,10 +305,11 @@ export const reader = (): Reader => {
         items.push({ _tag: "Interrupted", at, reason: entry.reason, retryable: entry.retryable });
       },
       Requested: (entry) => {
-        requested.push(entry.input);
+        requested.push({ input: entry.input, position });
       },
       Checkpoint: (entry) => {
         checkpoint = position;
+        session = undefined;
         resetAttempts();
         overflow = { ...overflow, pending: false };
         // Input a summary took in counts as taken in, after any answer given before it.
@@ -300,8 +325,12 @@ export const reader = (): Reader => {
       Harness: (entry) => {
         const event = entry.event;
         events.push(event);
+        if (session !== undefined) session.recorded += 1;
         if (HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event)) {
-          takenIn = true;
+          // What was asked of the turn goes in with a batch; what the batch held is taken in.
+          requested = requested.filter(
+            ({ input }) => !event.batch.items.some((item) => sameInput(item, input)),
+          );
           const covered = covers.get(event.batch.id);
           if (covered !== undefined) through = Math.max(through ?? covered, covered);
           if (answer !== undefined) replies.push(answer);
@@ -358,8 +387,8 @@ export const reader = (): Reader => {
       transcript: (history) => HarnessEvent.transcript(recorded, history, { unfinished: "omit" }),
       view: (history) => HarnessEvent.transcript(recorded, history, { unfinished: "keep" }),
       replies: owedReplies,
-      // A turn's requests go with the first batch it submits.
-      requested: takenIn ? [] : [...requested],
+      requested: requested.map(({ input }) => input),
+      requestedAt: requested.at(-1)?.position,
       items: items.map((item) =>
         Turn.LogItem.isAnyOf(["Responded"])(item) && owed.has(item.responseId)
           ? { ...item, reply: true }
@@ -368,6 +397,7 @@ export const reader = (): Reader => {
       started,
       ended,
       environment,
+      session: session === undefined ? undefined : { ...session },
       checkpoint,
       attempts,
       interruption,
@@ -393,6 +423,36 @@ export const checkpointAuthor: Transcript.Author = {
 
 /** Who tells the agent how an earlier turn of its own ended short. */
 export const noteAuthor: Transcript.Author = { id: "amends", name: "Amends" };
+
+/**
+ * What the agent is told when the sandbox it worked in is gone and a new one took its place, so it
+ * does not assume files from earlier in the conversation.
+ */
+export const lostFilesNote: Transcript.Input = {
+  _tag: "Input",
+  author: noteAuthor,
+  content: [
+    {
+      _tag: "Text",
+      text: "Your sandbox was replaced with a new one, so files from earlier in this conversation are gone.",
+    },
+  ],
+};
+
+/**
+ * Whether the running environment just acquired lost the files of the one the turn worked in
+ * before: that one had a sandbox, and a new sandbox, with nothing of it, took its place.
+ */
+export const lostFiles = (
+  previous: Environment.Reference | undefined,
+  acquired: {
+    readonly reference: Environment.Reference;
+    readonly filesystem: Environment.Filesystem;
+  },
+): boolean =>
+  previous?.sandboxId !== undefined &&
+  acquired.reference.sandboxId !== previous.sandboxId &&
+  acquired.filesystem._tag === "Fresh";
 
 /** What a checkpoint puts in place of the history before it. */
 export const historyFromCheckpoint = (checkpoint: {

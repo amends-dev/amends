@@ -26,6 +26,12 @@ export class UnsupportedPlatform extends Schema.TaggedError<UnsupportedPlatform>
   { platform: Schema.String },
 ) {}
 
+/** The harness server could not be started in the sandbox, or does not answer there. */
+export class HarnessServerFailed extends Schema.TaggedError<HarnessServerFailed>()(
+  "Environment.HarnessServerFailed",
+  { reason: Schema.String },
+) {}
+
 /** The running environment to reacquire belongs to another definition. */
 export class ForeignReference extends Schema.TaggedError<ForeignReference>()(
   "Environment.ForeignReference",

@@ -284,7 +284,7 @@ and every entry names the turn that wrote it: its `Started` with the selection a
 instructions it keeps, each `Attempt` at a harness session or a summary, the input execution
 `Submitted` as a batch with the position it covers, each `Harness` event (a response block by
 block, its finish, tool starts and results), each running `Environment` a run acquired, with where
-its files came from,
+its files came from, each harness `Session` started, by the ID it was given before it started,
 `Interrupted` stops with their reason and problem, input `Requested` of a turn itself such as a
 retry, the thread's `History` before the first turn, `Checkpoint`s that replace what came before
 them, and its `Ended` with the outcome, the replies, and why it failed or was stopped
@@ -293,7 +293,8 @@ Only one turn writes there at a time, so a turn's entries sit together after its
 by `TurnLog.readTurnEntries`. `TurnLog.reader` is the one reading of a turn's entries, taking them as they
 come, and `TurnLog.read` reads them at once: its harness events, how far input is taken in, its
 transcript and the view it leaves, the replies it owes, input asked of it, the items its readers
-see, what it started with, how it ended, the running environment it last acquired, its latest
+see, what it started with, how it ended, the running environment it last acquired, the session it
+last started with the number of harness events recorded since, its latest
 checkpoint's position, and its attempts since it
 last got further (a response finished, a tool call completed, or a checkpoint), with the latest
 interruption and whether the last attempt died without recording one, and how often its context
@@ -307,7 +308,10 @@ host's runner drives, each step its own commit attributed to the turn's agent: `
 turn with its selection and the agent's instructions now, which for a participation's first turn
 records the thread's history in the log first, record each attempt (`recordAttempt`), a checkpoint (`recordCheckpoint`), submitted
 batches (`recordSubmission`), whose first record stands and is what execution hands the harness, the
-running environment a run acquired (`recordEnvironment`), and what the harness reports
+running environment a run acquired (`recordEnvironment`), which, when it is a new sandbox in place
+of one a run before acquired, asks the turn to tell the agent its earlier files are gone, the
+session a run starts
+(`recordSession`), and what the harness reports
 (`recordEvents`), where input the harness says it took in must be a batch as recorded, and `close` it. Closing requires
 all accepted input taken in and no work still waiting for the agent on the thread, both checked in
 the closing commit; otherwise it reports `InputPending`. It then publishes every answer the turn
@@ -322,8 +326,9 @@ thread's timeline, and appends `Ended` to its agent's log. `prepare` assembles w
 the stores: the agent's instructions and the model access and environment the turn started with
 or, before it starts, the agent's current ones, the running environment to acquire again (`reacquire`), the connection's settings and key, the history and
 transcript read from the log, input asked of the turn and the thread's accepted input not yet taken
-in, all of it however long the backlog, the turn's own entries, and its attempts since it last got
-further. Before the first turn of a participation starts, its history is every thread message
+in, all of it however long the backlog, as one batch named for what it covers, so a run that hands
+it over again names it the same, the session a run left to attach to, the turn's own entries, and
+its attempts since it last got further. Before the first turn of a participation starts, its history is every thread message
 before its input (the agent's own as responses), which starting records in the log in entries of a
 bounded size. A message longer than 40,000 characters is given in pieces. `prepare` also gives the
 waiting input piece by piece with where each came from, the size of the input asked of the turn,

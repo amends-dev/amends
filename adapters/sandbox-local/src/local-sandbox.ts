@@ -20,7 +20,8 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 export const name = "local";
 
 /**
- * Commands run as this host's user in a directory of their own. Nothing isolates them: they can
+ * Commands run as this host's user in a directory of their own, with a temporary directory of their
+ * own as `TMPDIR`. Nothing isolates them: they can
  * reach the host's files, processes, and network, so this provider is for development and tests.
  */
 export const capabilities: Sandbox.Capabilities = {
@@ -94,6 +95,8 @@ export const make = Effect.fnUntraced(function* (options: Options) {
   const newId = crypto.randomUUIDv4.pipe(Effect.map((id) => Sandbox.Id.make(id)));
   const directoryOf = (id: Sandbox.Id) => path.join(sandboxes, id);
   const metadataOf = (id: Sandbox.Id) => path.join(sandboxes, `${id}.json`);
+  /** The sandbox's temporary directory, apart from its working directory, removed with it. */
+  const temporaryOf = (id: Sandbox.Id) => path.join(sandboxes, `${id}.tmp`);
 
   const processScope = (id: Sandbox.Id) =>
     Effect.suspend(() => {
@@ -114,12 +117,14 @@ export const make = Effect.fnUntraced(function* (options: Options) {
     const { env } = yield* fs
       .readFileString(metadataOf(id))
       .pipe(Effect.flatMap(Schema.decodeEffect(MetadataJson)), Effect.orDie);
+    yield* fs.makeDirectory(temporaryOf(id), { recursive: true });
+    const temporary = yield* fs.realPath(temporaryOf(id));
     const resolve = (target: string | undefined) =>
       target === undefined ? workdir : path.resolve(workdir, target);
     const commandOf = (command: Sandbox.Command, stdin: "pipe" | "ignore") =>
       ChildProcess.make(command.argv[0], command.argv.slice(1), {
         cwd: resolve(command.cwd),
-        env: { ...env, ...command.env },
+        env: { TMPDIR: temporary, ...env, ...command.env },
         extendEnv: true,
         stdin,
       });
@@ -203,6 +208,7 @@ export const make = Effect.fnUntraced(function* (options: Options) {
       stop: stopProcesses(id),
       destroy: stopProcesses(id).pipe(
         Effect.andThen(fs.remove(directoryOf(id), { recursive: true, force: true })),
+        Effect.andThen(fs.remove(temporaryOf(id), { recursive: true, force: true })),
         Effect.andThen(fs.remove(metadataOf(id), { force: true })),
         Effect.mapError(failure),
       ),

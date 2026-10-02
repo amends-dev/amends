@@ -1,6 +1,6 @@
 # Harnesses in sandboxes
 
-Status: agreed on 2026-10-02; milestones 1 and 2 are built. This plans how agents' turns run inside a sandbox, such as
+Status: agreed on 2026-10-02; milestones 1 to 3 are built. This plans how agents' turns run inside a sandbox, such as
 amends's own harness or opencode on Daytona, so that adding another harness or sandbox provider
 means adding one adapter. The [core model](core-model.md) states the ownership this follows.
 
@@ -53,9 +53,12 @@ against what it wrote, failing with `Unsupported` when they differ.
 
 ### Lifetimes
 
-A harness session lasts one attempt. The running environment lasts the turn's run and is released,
-applying its retention, when the turn ends. The turn's log records the running environment it
-acquired, so a later attempt or run reacquires the same sandbox rather than starting another.
+A harness session lasts one attempt, recorded in the turn's log before it starts. A run cut short
+leaves its session at work in the harness server, and the next run attaches to it, collecting what
+it reported meanwhile, rather than starting another. The running environment lasts the turn's run
+and is released, applying its retention, when the turn ends. The turn's log records the running
+environment it acquired, so a later attempt or run reacquires the same sandbox rather than starting
+another.
 
 ## Acceptance
 
@@ -84,8 +87,11 @@ compaction, so a conversation longer than its model's window is not yet covered 
 - The model connection's key reaches the sandbox itself, in the session's start request. A model
   proxy on the host, which gives the sandbox a base URL and a token for the turn instead, is the
   next goal.
-- The host uploads its own build of the harness server when it spawns an environment, unless the
-  sandbox already has that version, so the harness server and the host always agree.
+- The host uploads its own build of the harness server when it starts one, unless the sandbox
+  already has that version. A server already running in the sandbox is kept while it speaks the
+  host's protocol version, whichever build started it: two builds of the same code differ, and the
+  session it holds matters more. Releasing the sandbox stops it, so the next turn runs the host's
+  own build.
 
 ## Milestones
 
@@ -99,6 +105,13 @@ compaction, so a conversation longer than its model's window is not yet covered 
    than an environment variable, since a Daytona process's environment is on its command line.
 3. Recovery: the harness server listens on a port with a token for the turn; reconnecting and
    resuming events; rebuilding into a fresh sandbox; releasing sandboxes that crashed runs left.
+   Built: the harness server runs in the background over HTTP, found through a state file for each
+   sandbox, and keeps what its session reported. A run cut short leaves the session at work; the
+   next run attaches with the number of events the log recorded and collects the rest. Batch IDs
+   derived from the log let the server give a batch submitted again once. A sandbox found gone is
+   replaced by a new one, and the agent's input says its files are gone. A run that ends a turn
+   without spawning, or abandons it, releases the sandbox an earlier run left. The local host's
+   end-to-end tests kill a host partway, and destroy a sandbox partway.
 4. Daytona with a real model.
 5. The opencode adapter, which proves the goal: only the adapter, its registration, and the stored
    environment change.

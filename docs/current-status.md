@@ -61,11 +61,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   models, but the compatibility check accepts any model name, and nothing checks one with its
   provider.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, and the local host
-  installs only the local one. A harness server in a sandbox talks over its process's standard
-  input and output, one process per session, so a session does not survive its host; reconnecting,
-  a port with a token for the turn, and Daytona are the next milestones of
-  [harnesses in sandboxes](sandbox-harnesses.md). A sandbox left by a run that crashed is not
-  released, and the model connection's key reaches the sandbox in the session's start request. An environment's retention
+  installs only the local one; Daytona and opencode are the next milestones of
+  [harnesses in sandboxes](sandbox-harnesses.md). A harness server in a sandbox listens on a port
+  with a token of its own, and a session a dead host left goes on there for the next run to attach
+  to; a local sandbox's processes end when its host stops cleanly, so there the next run starts the
+  session again. A session no run comes back to keeps its server running until its sandbox stops.
+  The model connection's key reaches the sandbox in the session's start request. An environment's retention
   can only stop or destroy its sandbox, so no harness context survives a release. Environments
   do not yet supply the MCP endpoint or a turn's credentials. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
   is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes

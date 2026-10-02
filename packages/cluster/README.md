@@ -138,16 +138,23 @@ holding the workspace only while it runs:
    `idleTimeout` interrupts the run like a harness failure, so it is retried and then fails the
    turn; nothing is left out instead.
 5. For the run's first session, spawn the turn's environment, acquiring the one its log last
-   recorded, and record what was acquired (`recordEnvironment`): the environment's reference and
-   where its files came from. A harness or sandbox provider the environment service lacks fails
-   the turn, as do a sandbox system the harness server is not built for and any other spawn
-   failure. The run releases the environment, applying its
-   retention, once the turn ends; a run cut short leaves it for the next run to acquire. Then start
-   a harness session in it with the turn's model access, the instructions the turn started with,
-   and the turn's budget as the session's context limit, with what a provider measured of the
-   transcript, and prepare the harness with the transcript `prepare` gave, read from the agent's log
-   for the thread, so a run continuing an interrupted turn repeats no input and asks for a fresh
-   response in place of one left unfinished.
+   recorded, record what was acquired (`recordEnvironment`): the environment's reference and
+   where its files came from, and prepare again, since a new sandbox in place of one that is gone
+   adds a note to the turn's input that the agent's earlier files are gone. A harness or sandbox
+   provider the environment service lacks fails the turn, as do a sandbox system the harness server
+   is not built for and any other spawn failure. A session that ended under the run, as when its
+   sandbox went, has the next attempt spawn again. The run releases the environment, applying its
+   retention, once the turn ends; a run cut short leaves it for the next run to acquire, and a run
+   that ends the turn without spawning releases the one its log names. Then, when the log names a
+   session that a run cut short left at work in the sandbox, attach to it (`attachSession`) and
+   record what it reported meanwhile, then go on from step 7, or prepare again when the session
+   found its context full or stopped after reporting. Otherwise record the new session's ID
+   (`recordSession`) and start it with the turn's model access, the instructions the turn started
+   with, and the turn's budget as the session's context limit, with what a provider measured of the
+   transcript, and prepare the harness with the transcript `prepare` gave, read from the agent's
+   log for the thread, so a run continuing an interrupted turn repeats no input and asks for a
+   fresh response in place of one left unfinished. A run cut short leaves its session at work;
+   every other end of an attempt ends it.
 6. Hand the harness the input the turn has not taken in, what was asked of the turn itself and
    what it accepted from the thread, as one batch recorded first (`recordSubmission`). A batch is named
    by its turn and the positions it follows and reaches, and its first record stands: submitting
@@ -189,7 +196,7 @@ nothing for 5 minutes."; a summary that fails says the earlier conversation coul
 summarized, and why. The harness's own reason, and a provider's message, which can name addresses
 and request details, go to the host's logs only, as do why an environment did not start or a
 transcript was refused. `abandon` fails a
-turn that runs could not finish.
+turn that runs could not finish, and releases the environment its log names.
 
 ## Limits
 
@@ -208,6 +215,8 @@ bun run test
 `test/runner/runner.test.ts` runs the runner over turn execution in memory, amends's own harness, and a
 scripted model: drafts as a response streams, a model gone silent interrupted until retries run out, a queued turn from start to reply with what the
 environment reported, input accepted while it works and while it waits, each answer owed, stopping, retrying from the log, failing without retry, a sandbox this host does not run, and turns
-already finished or stopping. The [local host's](../../hosts/local/README.md#verify) `turns.test.ts`
+already finished or stopping, attaching to a session a run cut short left, and releasing what an
+earlier run left. The [local host's](../../hosts/local/README.md#verify) `turns.test.ts`
 runs a turn end to end over PostgreSQL and Cluster against a local chat-completions server, in
-process and inside a local sandbox.
+process and inside a local sandbox, including one whose host is killed and one whose sandbox is
+destroyed partway.

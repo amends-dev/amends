@@ -1,30 +1,31 @@
 /**
- * The harness server: the program a host uploads into a sandbox to run a harness there, and the
- * protocol it serves. It carries the harness contract over Effect RPC on the program's standard
- * input and output, one session per process, so a turn drives a harness in a sandbox exactly as
- * one in process.
+ * The harness server: the program a host uploads into a sandbox to run harnesses there, and the
+ * protocol it serves. It runs in the background, apart from the host that started it, and carries
+ * the harness contract over Effect RPC on HTTP. It keeps what its session reported, so a host that
+ * comes back, or another one, attaches to the session still at work and collects what it missed.
  */
 import { ConnectionImplementation } from "@amends/connection";
 import type { ModelInference } from "@amends/connection/model-inference";
 import { Harness, HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
 import type { Sandbox } from "@amends/sandbox";
-import { Crypto, Deferred, Effect, Layer, Schema, Scope, Stream } from "effect";
+import { Crypto, Effect, Exit, Layer, PubSub, Schedule, Schema, Scope, Stream } from "effect";
 import {
-  Rpc,
-  RpcClient,
-  RpcClientError,
-  RpcGroup,
-  type RpcMessage,
-  RpcSerialization,
-  RpcServer,
-} from "effect/rpc";
+  HttpClient,
+  HttpClientRequest,
+  HttpRouter,
+  HttpServerRequest,
+  HttpServerResponse,
+} from "effect/http";
+import { Rpc, RpcClient, RpcClientError, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
 import { EnvironmentErrors } from "./errors.ts";
 
 /**
- * The session a harness server starts: the harness, the session's options, and the turn's model
- * access, naming the connection's implementation for the server to find its model code.
+ * The session a harness server starts: its ID, which the turn recorded, the harness, the session's
+ * options, and the turn's model access, naming the connection's implementation for the server to
+ * find its model code.
  */
 export const StartOptions = Schema.Struct({
+  sessionId: Schema.NonEmptyString,
   harnessId: Harness.Name,
   instructions: Schema.optional(Schema.String),
   contextLimit: Schema.optional(Schema.Int),
@@ -42,44 +43,102 @@ export const StartOptions = Schema.Struct({
 });
 export interface StartOptions extends Schema.Schema.Type<typeof StartOptions> {}
 
-/** The harness contract's session, as requests to the harness server. */
+/** The server does not hold the session: another replaced it, it ended, or the server restarted. */
+export class SessionGone extends Schema.TaggedError<SessionGone>()("HarnessServer.SessionGone", {
+  sessionId: Schema.String,
+}) {}
+
+/**
+ * Where a session stands: working on what it was given, idle with nothing owed, or stopped, since
+ * it failed, so it cannot go on.
+ */
+export const SessionState = Schema.Literals(["working", "idle", "stopped"]);
+export type SessionState = typeof SessionState.Type;
+
+/** What attaching to a session finds: what it reported after the events given, and where it stands. */
+export const Attachment = Schema.Struct({
+  missed: Schema.Array(HarnessEvent.Event),
+  state: SessionState,
+});
+export interface Attachment extends Schema.Schema.Type<typeof Attachment> {}
+
+const OfSession = { sessionId: Schema.NonEmptyString };
+/** How many of the events a log keeps came before: those a request skips. */
+const After = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
+
+/** The harness contract's session as requests to the harness server, each naming its session. */
 export const Rpcs = RpcGroup.make(
+  Rpc.make("Ping"),
   Rpc.make("Start", { payload: StartOptions, error: HarnessErrors.ExecutionFailed }),
+  Rpc.make("Attach", {
+    payload: { ...OfSession, after: After },
+    success: Attachment,
+    error: SessionGone,
+  }),
   Rpc.make("Prepare", {
-    payload: { transcript: Schema.Array(Transcript.Item) },
+    payload: { ...OfSession, transcript: Schema.Array(Transcript.Item) },
     error: Schema.Union([
       HarnessErrors.AlreadyPrepared,
       HarnessErrors.InvalidTranscript,
       HarnessErrors.Unsupported,
       HarnessErrors.ExecutionFailed,
+      SessionGone,
     ]),
   }),
   Rpc.make("Submit", {
-    payload: { batch: HarnessEvent.InputBatch },
-    error: Schema.Union([HarnessErrors.NotPrepared, HarnessErrors.ExecutionFailed]),
+    payload: { ...OfSession, batch: HarnessEvent.InputBatch },
+    error: Schema.Union([HarnessErrors.NotPrepared, HarnessErrors.ExecutionFailed, SessionGone]),
   }),
   Rpc.make("Resolve", {
-    payload: { callId: Transcript.ToolCallId, outcome: Transcript.ToolOutcome },
+    payload: { ...OfSession, callId: Transcript.ToolCallId, outcome: Transcript.ToolOutcome },
     error: Schema.Union([
       HarnessErrors.NotPrepared,
       HarnessErrors.NotPending,
       HarnessErrors.ExecutionFailed,
+      SessionGone,
     ]),
   }),
   Rpc.make("Resume", {
-    error: Schema.Union([HarnessErrors.NotPrepared, HarnessErrors.ExecutionFailed]),
+    payload: OfSession,
+    error: Schema.Union([HarnessErrors.NotPrepared, HarnessErrors.ExecutionFailed, SessionGone]),
   }),
   Rpc.make("Events", {
+    payload: { ...OfSession, after: After },
     success: HarnessEvent.Event,
-    error: HarnessErrors.ExecutionFailed,
+    error: Schema.Union([HarnessErrors.ExecutionFailed, SessionGone]),
     stream: true,
   }),
+  Rpc.make("End", { payload: OfSession }),
+  Rpc.make("Stop"),
 );
 
 /** The harnesses and model code a harness server runs. */
 export interface Served {
   readonly harnesses: ReadonlyArray<Harness.Interface<ModelInference.Services>>;
   readonly models: ReadonlyArray<ModelInference.Implementation>;
+}
+
+/** What a session's listeners receive: an event, with its place among those a log keeps, or its stop. */
+type Delivery =
+  | {
+      readonly _tag: "Event";
+      readonly event: HarnessEvent.Event;
+      readonly index: number | undefined;
+    }
+  | { readonly _tag: "Stopped"; readonly failure: HarnessErrors.ExecutionFailed };
+
+/** The session a harness server holds, and everything it reported that a log keeps. */
+interface Hosted {
+  readonly id: string;
+  readonly session: Harness.Session;
+  readonly scope: Scope.Closeable;
+  readonly kept: Array<HarnessEvent.Event>;
+  readonly deliveries: PubSub.PubSub<Delivery>;
+  /** The batches it was given, so one given again, as by a host that came back, is given once. */
+  readonly submitted: Set<string>;
+  prepared: boolean;
+  working: boolean;
+  stopped: HarnessErrors.ExecutionFailed | undefined;
 }
 
 /** A failure starting the session: the host asked for code this server was not built with. */
@@ -90,179 +149,340 @@ const notServed = (what: string) =>
     problem: "unexpected",
   });
 
+const sessionEnded = new HarnessErrors.ExecutionFailed({
+  reason: "The harness session ended.",
+  retryable: true,
+  problem: "ended",
+});
+
+/** Where a session stands, as attaching reports it. */
+const stateOf = (hosted: Hosted): SessionState =>
+  hosted.stopped !== undefined ? "stopped" : hosted.working ? "working" : "idle";
+
 /**
- * The handlers for one session. `Start` starts it for the server's lifetime, which ends when the
- * host closes its input; every other request waits for it.
+ * The handlers of a harness server that holds one session at a time: starting one ends the one
+ * before, and the server ends it when it shuts down. The session keeps every event a log keeps
+ * until another replaces it, so a host can attach and read what it missed.
  */
-const handlers = (served: Served) =>
-  Rpcs.toLayer(
-    Effect.gen(function* () {
-      const scope = yield* Effect.scope;
-      const crypto = yield* Crypto.Crypto;
-      const started = yield* Deferred.make<Harness.Session>();
-      const session = Deferred.await(started);
+const makeHandlers = Effect.fnUntraced(function* (served: Served, stopServer: Effect.Effect<void>) {
+  let current: Hosted | undefined;
 
-      const start = Effect.fnUntraced(function* (options: StartOptions) {
-        if (yield* Deferred.isDone(started))
-          return yield* Effect.die("The harness server's session already started.");
-        const harness = served.harnesses.find(
-          (candidate) => candidate.declaration.id === options.harnessId,
-        );
-        if (harness === undefined) return yield* notServed(`the ${options.harnessId} harness`);
-        const inference = served.models.find(
-          (candidate) => candidate.declaration.id === options.model.implementationId,
-        );
-        if (inference === undefined)
-          return yield* notServed(`${options.model.implementationId} models`);
-        const { settings, credential } = options.model.access;
-        const model = yield* Layer.build(
-          inference.languageModel({ settings, credential }, options.model.selection),
-        );
-        const harnessSession = yield* harness
-          .start({
-            sessionId: `session-${yield* Effect.orDie(crypto.randomUUIDv4)}`,
-            instructions: options.instructions,
-            contextLimit: options.contextLimit,
-            measured: options.measured,
-          })
-          .pipe(Effect.provideContext(model));
-        yield* Deferred.succeed(started, harnessSession);
-      });
+  const find = (sessionId: string) =>
+    current?.id === sessionId
+      ? Effect.succeed(current)
+      : Effect.fail(new SessionGone({ sessionId }));
 
-      return Rpcs.of({
-        Start: (options) => start(options).pipe(Scope.provide(scope)),
-        Prepare: ({ transcript }) =>
-          Effect.flatMap(session, (harnessSession) => harnessSession.prepare(transcript)),
-        Submit: ({ batch }) =>
-          Effect.flatMap(session, (harnessSession) => harnessSession.submit(batch)),
-        Resolve: ({ callId, outcome }) =>
-          Effect.flatMap(session, (harnessSession) => harnessSession.resolve(callId, outcome)),
-        Resume: () => Effect.flatMap(session, (harnessSession) => harnessSession.resume),
-        Events: () => Stream.unwrap(Effect.map(session, (harnessSession) => harnessSession.events)),
-      });
-    }),
+  const endCurrent = Effect.suspend(() => {
+    const hosted = current;
+    current = undefined;
+    return hosted === undefined ? Effect.void : Scope.close(hosted.scope, Exit.void);
+  });
+  // The server ends its session as it shuts down, so nothing the harness started outlives it.
+  yield* Effect.addFinalizer(() => endCurrent);
+
+  /** Keep an event a log keeps, note when the session has nothing left to do, and deliver it. */
+  const keep = (hosted: Hosted, event: HarnessEvent.Event) =>
+    Effect.suspend(() => {
+      const index = HarnessEvent.isDelta(event) ? undefined : hosted.kept.push(event) - 1;
+      if (HarnessEvent.Event.isAnyOf(["Idle", "ContextFull"])(event)) hosted.working = false;
+      return PubSub.publish(hosted.deliveries, { _tag: "Event", event, index });
+    });
+
+  /** Note that the session stopped, and tell its listeners. */
+  const stop = (hosted: Hosted, failure: HarnessErrors.ExecutionFailed) =>
+    Effect.suspend(() => {
+      hosted.stopped = failure;
+      hosted.working = false;
+      return PubSub.publish(hosted.deliveries, { _tag: "Stopped", failure });
+    });
+
+  const start = Effect.fnUntraced(function* (options: StartOptions) {
+    yield* endCurrent;
+    const harness = served.harnesses.find(
+      (candidate) => candidate.declaration.id === options.harnessId,
+    );
+    if (harness === undefined) return yield* notServed(`the ${options.harnessId} harness`);
+    const inference = served.models.find(
+      (candidate) => candidate.declaration.id === options.model.implementationId,
+    );
+    if (inference === undefined)
+      return yield* notServed(`${options.model.implementationId} models`);
+    const scope = yield* Scope.make();
+    const session = yield* Effect.gen(function* () {
+      const { settings, credential } = options.model.access;
+      const model = yield* Layer.build(
+        inference.languageModel({ settings, credential }, options.model.selection),
+      );
+      return yield* harness
+        .start({
+          sessionId: options.sessionId,
+          instructions: options.instructions,
+          contextLimit: options.contextLimit,
+          measured: options.measured,
+        })
+        .pipe(Effect.provideContext(model));
+    }).pipe(Scope.provide(scope));
+    const hosted: Hosted = {
+      id: options.sessionId,
+      session,
+      scope,
+      kept: [],
+      deliveries: yield* PubSub.unbounded<Delivery>(),
+      submitted: new Set(),
+      prepared: false,
+      working: false,
+      stopped: undefined,
+    };
+    current = hosted;
+    // However it ends, its listeners learn that it did.
+    yield* Scope.addFinalizer(
+      scope,
+      Effect.suspend(() =>
+        hosted.stopped === undefined ? stop(hosted, sessionEnded) : Effect.void,
+      ),
+    );
+    yield* session.events.pipe(
+      Stream.runForEach((event) => keep(hosted, event)),
+      Effect.andThen(stop(hosted, sessionEnded)),
+      Effect.catch((failure) => stop(hosted, failure)),
+      Effect.forkIn(scope),
+    );
+  });
+
+  /** The session's events after the first `after` it kept: those it kept, then as they come. */
+  const eventsAfter = (sessionId: string, after: number) =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const hosted = yield* find(sessionId);
+        const deliveries = yield* PubSub.subscribe(hosted.deliveries);
+        const missed = hosted.kept.slice(after);
+        const next = after + missed.length;
+        const live = Stream.fromSubscription(deliveries).pipe(
+          Stream.filter(
+            (delivery) =>
+              delivery._tag === "Stopped" || delivery.index === undefined || delivery.index >= next,
+          ),
+          Stream.mapEffect((delivery) =>
+            delivery._tag === "Stopped"
+              ? Effect.fail(delivery.failure)
+              : Effect.succeed(delivery.event),
+          ),
+        );
+        return Stream.concat(
+          Stream.fromIterable(missed),
+          hosted.stopped === undefined ? live : Stream.fail(hosted.stopped),
+        );
+      }),
+    );
+
+  return Rpcs.of({
+    Ping: () => Effect.void,
+    Start: start,
+    Attach: ({ sessionId, after }) =>
+      Effect.flatMap(find(sessionId), (hosted) =>
+        hosted.prepared
+          ? Effect.succeed({ missed: hosted.kept.slice(after), state: stateOf(hosted) })
+          : Effect.fail(new SessionGone({ sessionId })),
+      ),
+    Prepare: ({ sessionId, transcript }) =>
+      Effect.flatMap(find(sessionId), (hosted) =>
+        hosted.session.prepare(transcript).pipe(
+          Effect.andThen(
+            Effect.sync(() => {
+              hosted.prepared = true;
+            }),
+          ),
+        ),
+      ),
+    Submit: ({ sessionId, batch }) =>
+      Effect.flatMap(find(sessionId), (hosted) => {
+        if (hosted.submitted.has(batch.id)) return Effect.void;
+        hosted.submitted.add(batch.id);
+        hosted.working = true;
+        return hosted.session.submit(batch);
+      }),
+    Resolve: ({ sessionId, callId, outcome }) =>
+      Effect.flatMap(find(sessionId), (hosted) => {
+        hosted.working = true;
+        return hosted.session.resolve(callId, outcome);
+      }),
+    Resume: ({ sessionId }) =>
+      Effect.flatMap(find(sessionId), (hosted) => {
+        hosted.working = true;
+        return hosted.session.resume;
+      }),
+    Events: ({ sessionId, after }) => eventsAfter(sessionId, after),
+    End: ({ sessionId }) => (current?.id === sessionId ? endCurrent : Effect.void),
+    Stop: () => endCurrent.pipe(Effect.andThen(stopServer)),
+  });
+});
+
+/** Answers only requests that carry the server's token, since its address may be public. */
+const requireToken = (token: string) =>
+  HttpRouter.middleware(
+    (httpEffect) =>
+      Effect.flatMap(HttpServerRequest.HttpServerRequest, (request) =>
+        request.headers.authorization === `Bearer ${token}`
+          ? httpEffect
+          : Effect.succeed(HttpServerResponse.empty({ status: 401 })),
+      ),
+    { global: true },
   );
 
 /**
- * The harness server, serving one session over standard input and output as newline-delimited
- * JSON. It stops when its input ends.
+ * The harness server's routes: its protocol at `/rpc` as newline-delimited JSON over HTTP, for
+ * requests that carry `token`. A host serves them with an HTTP server; `stop` is how the server
+ * stops when asked to, after ending its session.
  */
-export const layer = (served: Served) =>
-  RpcServer.layer(Rpcs).pipe(
-    Layer.provide(handlers(served)),
-    Layer.provide(RpcServer.layerProtocolStdio),
+export const layerRoutes = (
+  served: Served,
+  options: { readonly token: string; readonly stop: Effect.Effect<void> },
+) =>
+  Layer.mergeAll(
+    RpcServer.layerHttp({ group: Rpcs, path: "/rpc", protocol: "http" }),
+    requireToken(options.token),
+  ).pipe(
+    Layer.provide(Rpcs.toLayer(makeHandlers(served, options.stop))),
     Layer.provide(RpcSerialization.layerNdjson),
   );
 
-/** The session failing because the harness server or the connection to it ended. */
-const ended = (error: RpcClientError.RpcClientError) =>
+/**
+ * Where a host reaches a harness server: its address from outside the sandbox, and the headers
+ * every request carries, the token among them.
+ */
+export interface Endpoint {
+  readonly url: string;
+  readonly headers: Readonly<Record<string, string>>;
+}
+
+/** A client of the harness server at `endpoint`, for the scope's lifetime. */
+const connect = Effect.fnUntraced(function* (endpoint: Endpoint) {
+  const httpClient = (yield* HttpClient.HttpClient).pipe(
+    HttpClient.mapRequest((request) =>
+      request.pipe(
+        HttpClientRequest.prependUrl(`${endpoint.url}/rpc`),
+        HttpClientRequest.setHeaders(endpoint.headers),
+      ),
+    ),
+  );
+  const protocol = yield* RpcClient.makeProtocolHttp(httpClient).pipe(
+    Effect.provideService(RpcSerialization.RpcSerialization, RpcSerialization.ndjson),
+  );
+  return yield* RpcClient.make(Rpcs).pipe(Effect.provideService(RpcClient.Protocol, protocol));
+});
+type Client = Effect.Success<ReturnType<typeof connect>>;
+
+/** The session failing because the harness server could not be reached or no longer holds it. */
+const ended = (error: RpcClientError.RpcClientError | SessionGone) =>
   new HarnessErrors.ExecutionFailed({
-    reason: `The harness server stopped answering: ${error.message}`,
+    reason:
+      error._tag === "HarnessServer.SessionGone"
+        ? "The harness server no longer holds the session."
+        : `The harness server stopped answering: ${error.message}`,
     retryable: true,
     problem: "ended",
   });
 
-/** A request the harness server could not answer fails as `ended`. */
+/** A request the harness server could not answer, or whose session it lost, fails as `ended`. */
 const failEnded = <A, E>(
-  request: Effect.Effect<A, E | RpcClientError.RpcClientError>,
-): Effect.Effect<A, Exclude<E, RpcClientError.RpcClientError> | HarnessErrors.ExecutionFailed> =>
+  request: Effect.Effect<A, E | RpcClientError.RpcClientError | SessionGone>,
+): Effect.Effect<
+  A,
+  Exclude<E, RpcClientError.RpcClientError | SessionGone> | HarnessErrors.ExecutionFailed
+> =>
   Effect.mapError(request, (error) =>
-    error instanceof RpcClientError.RpcClientError
+    error instanceof RpcClientError.RpcClientError || error instanceof SessionGone
       ? ended(error)
-      : (error as Exclude<E, RpcClientError.RpcClientError>),
+      : (error as Exclude<E, RpcClientError.RpcClientError | SessionGone>),
   );
 
 /**
- * The client side of the protocol over a harness server's process: requests as lines on its
- * standard input, responses read from its standard output. Its standard error is the server's log.
- * Once the process ends, every request outstanding or made after fails.
+ * How often reading events again follows losing the connection, as when a proxy closes a quiet
+ * one: soon, then less often, for about eight seconds.
  */
-const makeProtocol = (process: Sandbox.Process) =>
-  RpcClient.Protocol.make(
-    Effect.fnUntraced(function* (writeResponse, clientIds) {
-      const serialization = RpcSerialization.ndjson;
-      const parser = serialization.makeUnsafe();
-      let failure: RpcClientError.RpcClientError | undefined;
-      const broadcast = (response: RpcMessage.FromServerEncoded) =>
-        Effect.forEach(clientIds, (clientId) => writeResponse(clientId, response), {
-          discard: true,
-        });
+const reconnect = Schedule.while(
+  Schedule.exponential("250 millis"),
+  ({ input, attempt }) => input instanceof RpcClientError.RpcClientError && attempt <= 5,
+);
 
-      yield* process.output.pipe(
-        Stream.runForEach((output) =>
-          output.stream === "stderr"
-            ? Effect.logDebug("Harness server", { log: output.text })
-            : Effect.forEach(
-                parser.decode(output.text) as ReadonlyArray<RpcMessage.FromServerEncoded>,
-                broadcast,
-                { discard: true },
-              ),
-        ),
-        Effect.exit,
-        Effect.flatMap((exit) => {
-          failure = new RpcClientError.RpcClientError({
-            reason: new RpcClientError.RpcClientDefect({
-              message: "The harness server's process ended.",
-              cause: exit,
-            }),
-          });
-          return broadcast({ _tag: "ClientProtocolError", error: failure });
+/**
+ * The session as the harness contract's session. Its events continue after the first `kept` a log
+ * keeps; reading them again after the connection drops continues after those it delivered.
+ */
+const remoteSession = (client: Client, sessionId: string, kept: number): Harness.Session => {
+  let delivered = kept;
+  return {
+    prepare: (transcript) => failEnded(client.Prepare({ sessionId, transcript })),
+    submit: (batch) => failEnded(client.Submit({ sessionId, batch })),
+    resolve: (callId, outcome) => failEnded(client.Resolve({ sessionId, callId, outcome })),
+    resume: failEnded(client.Resume({ sessionId })),
+    events: Stream.suspend(() => client.Events({ sessionId, after: delivered })).pipe(
+      Stream.tap((event) =>
+        Effect.sync(() => {
+          if (!HarnessEvent.isDelta(event)) delivered += 1;
         }),
-        Effect.forkScoped,
-      );
+      ),
+      Stream.retry(reconnect),
+      Stream.mapError((error) =>
+        error instanceof RpcClientError.RpcClientError || error instanceof SessionGone
+          ? ended(error)
+          : error,
+      ),
+    ),
+  };
+};
 
-      return {
-        send: (_clientId, request) => {
-          if (failure !== undefined) return Effect.fail(failure);
-          const encoded = parser.encode(request);
-          if (encoded === undefined) return Effect.void;
-          return process.write(encoded as string).pipe(
-            Effect.mapError(
-              (cause) =>
-                new RpcClientError.RpcClientError({
-                  reason: new RpcClientError.RpcClientDefect({
-                    message: "Writing to the harness server failed.",
-                    cause,
-                  }),
-                }),
-            ),
-          );
-        },
-        supportsAck: true,
-        supportsTransferables: false,
-        codecFor: serialization.codecFor,
-      };
-    }),
+/**
+ * Ends the session when the scope closes, unless it closes because the run was cut short: then the
+ * session goes on, for the next run to attach to.
+ */
+const endWithScope = (client: Client, sessionId: string) =>
+  Effect.addFinalizer((exit) =>
+    Exit.hasInterrupts(exit) ? Effect.void : Effect.ignore(client.End({ sessionId })),
   );
 
 /**
- * Starts the session a harness server running as `process` serves, and returns it as the harness
- * contract's session. The process is killed when the scope closes. A request the server cannot
- * answer, because it or its process ended, fails the session as `ended`, worth retrying.
+ * Starts a session in the harness server at `endpoint`, replacing any it held, and returns it as
+ * the harness contract's session. It ends when the scope closes, unless the run is cut short.
  */
 export const startSession = Effect.fnUntraced(function* (
-  process: Sandbox.Process,
+  endpoint: Endpoint,
   options: StartOptions,
 ) {
-  yield* Effect.addFinalizer(() => Effect.ignore(process.kill));
-  const client = yield* RpcClient.make(Rpcs).pipe(
-    Effect.provideServiceEffect(RpcClient.Protocol, makeProtocol(process)),
-  );
+  const client = yield* connect(endpoint);
+  yield* endWithScope(client, options.sessionId);
   yield* failEnded(client.Start(options));
-  const session: Harness.Session = {
-    prepare: (transcript) => failEnded(client.Prepare({ transcript })),
-    submit: (batch) => failEnded(client.Submit({ batch })),
-    resolve: (callId, outcome) => failEnded(client.Resolve({ callId, outcome })),
-    resume: failEnded(client.Resume()),
-    events: client
-      .Events()
-      .pipe(
-        Stream.catchTag("RpcClientError", (error: RpcClientError.RpcClientError) =>
-          Stream.fail(ended(error)),
-        ),
-      ),
+  return remoteSession(client, options.sessionId, 0);
+});
+
+/** A session found still held, with what it reported after the events the turn recorded. */
+export interface Attached extends Attachment {
+  readonly session: Harness.Session;
+}
+
+/**
+ * Attaches to the session `sessionId` if the harness server at `endpoint` still holds it, prepared:
+ * what it reported after the first `recorded` events a log keeps, where it stands, and the session,
+ * whose events continue after those. Like a started one, it ends when the scope closes.
+ */
+export const attachSession = Effect.fnUntraced(function* (
+  endpoint: Endpoint,
+  session: { readonly sessionId: string; readonly recorded: number },
+) {
+  const client = yield* connect(endpoint);
+  const attachment = yield* client
+    .Attach({ sessionId: session.sessionId, after: session.recorded })
+    .pipe(
+      Effect.catchTag("HarnessServer.SessionGone", () => Effect.undefined),
+      Effect.mapError(ended),
+    );
+  if (attachment === undefined) return undefined;
+  yield* endWithScope(client, session.sessionId);
+  const attached: Attached = {
+    ...attachment,
+    session: remoteSession(client, session.sessionId, session.recorded + attachment.missed.length),
   };
-  return session;
+  return attached;
 });
 
 /** A sandbox's operating system and processor, as Bun names its build targets: `linux-x64`. */
@@ -298,12 +518,25 @@ export const platformOf = (system: string, processor: string): Platform | undefi
 };
 
 /**
- * Puts the harness server built for the sandbox's platform in its temporary directory, unless that
- * version is already there, and returns where. A new version is written beside it and renamed
- * into place, so a sandbox never runs a partly written one.
+ * The version of the protocol this package's server and client speak. Raise it whenever `Rpcs`
+ * change in a way a server or client built before could not follow, so a host that finds a server
+ * speaking another version replaces it rather than talking past it.
  */
-export const upload = Effect.fnUntraced(function* (sandbox: Sandbox.Running, program: Program) {
-  const crypto = yield* Crypto.Crypto;
+export const protocolVersion = 1;
+
+/** Where the harness server lives in a sandbox: its platform, and its directory and state file. */
+interface Location {
+  readonly platform: Platform;
+  readonly home: string;
+  readonly statePath: string;
+}
+
+/**
+ * Where the harness server lives in the sandbox: a directory in its temporary directory, holding
+ * the builds and a state file for each sandbox, by the sandbox's ID, since sandboxes on one
+ * machine can share a temporary directory.
+ */
+const locate = Effect.fnUntraced(function* (sandbox: Sandbox.Running) {
   const probe = yield* sandbox.exec({
     argv: ["sh", "-c", 'uname -s; uname -m; printf "%s" "${TMPDIR:-/tmp}"'],
   });
@@ -313,12 +546,26 @@ export const upload = Effect.fnUntraced(function* (sandbox: Sandbox.Running, pro
     return yield* new EnvironmentErrors.UnsupportedPlatform({
       platform: `${system.trim()} ${processor.trim()}`.trim(),
     });
-  const binary = yield* program.binary(platform);
-  const directory = `${temporary.replace(/\/+$/u, "")}/amends-harness-server/${binary.version}`;
-  const executable = `${directory}/harness-server`;
+  const home = `${temporary.replace(/\/+$/u, "")}/amends-harness-server`;
+  return { platform, home, statePath: `${home}/${sandbox.id}.json` } satisfies Location;
+});
+
+/**
+ * Puts the harness server built for the sandbox's platform in its temporary directory, unless that
+ * version is already there, and returns its path. A new version is written beside it and renamed
+ * into place, so a sandbox never runs a partly written one.
+ */
+const upload = Effect.fnUntraced(function* (
+  sandbox: Sandbox.Running,
+  program: Program,
+  location: Location,
+) {
+  const crypto = yield* Crypto.Crypto;
+  const binary = yield* program.binary(location.platform);
+  const executable = `${location.home}/${binary.version}/harness-server`;
   const present = yield* sandbox.exec({ argv: ["test", "-x", executable] });
   if (present.exitCode === 0) return executable;
-  const partial = `${directory}/harness-server.${yield* Effect.orDie(crypto.randomUUIDv4)}`;
+  const partial = `${executable}.${yield* Effect.orDie(crypto.randomUUIDv4)}`;
   yield* sandbox.writeFile(partial, binary.data);
   const installed = yield* sandbox.exec({
     argv: ["sh", "-c", 'chmod +x "$0" && mv -f "$0" "$1"', partial, executable],
@@ -329,6 +576,111 @@ export const upload = Effect.fnUntraced(function* (sandbox: Sandbox.Running, pro
       ...installed,
     });
   return executable;
+});
+
+/**
+ * Where a running harness server listens, its token, and the protocol version it speaks, as it
+ * writes them once it listens.
+ */
+export const State = Schema.Struct({
+  port: Schema.Int,
+  token: Schema.NonEmptyString,
+  protocolVersion: Schema.Int,
+});
+export interface State extends Schema.Schema.Type<typeof State> {}
+export const StateJson = Schema.fromJsonString(State);
+
+/** The state the harness server wrote in the sandbox, if it did. */
+const readState = (sandbox: Sandbox.Running, path: string) =>
+  Effect.flatMap(sandbox.exec({ argv: ["cat", path] }), (result) =>
+    result.exitCode === 0
+      ? Effect.map(Effect.option(Schema.decodeEffect(StateJson)(result.stdout)), (state) =>
+          state._tag === "Some" ? state.value : undefined,
+        )
+      : Effect.undefined,
+  );
+
+/** How to reach the server that wrote `state`, through the sandbox's exposure of its port. */
+const endpointOf = (sandbox: Sandbox.Running, state: State) =>
+  Effect.map(sandbox.expose(state.port), (exposure): Endpoint => ({
+    url: exposure.url.replace(/\/+$/u, ""),
+    headers: { ...exposure.headers, authorization: `Bearer ${state.token}` },
+  }));
+
+/** Whether the server at `endpoint` answers, with that token, within a few seconds. */
+const answers = (endpoint: Endpoint) =>
+  Effect.scoped(Effect.flatMap(connect(endpoint), (client) => client.Ping())).pipe(
+    Effect.timeout("5 seconds"),
+    Effect.match({ onFailure: () => false, onSuccess: () => true }),
+  );
+
+/** Ask the server that wrote `state` to stop; one that does not answer is gone already. */
+const askToStop = (sandbox: Sandbox.Running, state: State) =>
+  endpointOf(sandbox, state).pipe(
+    Effect.flatMap((endpoint) =>
+      Effect.scoped(Effect.flatMap(connect(endpoint), (client) => client.Stop())),
+    ),
+    Effect.timeout("5 seconds"),
+    Effect.ignore,
+  );
+
+/**
+ * Makes sure a harness server is running in the sandbox, and returns how to reach it. One already
+ * running is kept while it speaks this protocol version and answers, whichever host started it, so
+ * a session it holds carries on, as in a sandbox acquired again; one speaking another version is
+ * stopped. Otherwise the program is uploaded and started in the background, so it outlives this
+ * host, and reached once it says where it listens.
+ */
+export const ensureRunning = Effect.fnUntraced(function* (
+  sandbox: Sandbox.Running,
+  program: Program,
+) {
+  const location = yield* locate(sandbox);
+  const existing = yield* readState(sandbox, location.statePath);
+  if (existing !== undefined && existing.protocolVersion === protocolVersion) {
+    const endpoint = yield* endpointOf(sandbox, existing);
+    if (yield* answers(endpoint)) return endpoint;
+  } else if (existing !== undefined) yield* askToStop(sandbox, existing);
+  const executable = yield* upload(sandbox, program, location);
+  yield* sandbox.exec({ argv: ["rm", "-f", location.statePath] });
+  yield* sandbox.spawn({ argv: [executable, location.statePath] });
+  const silent = new EnvironmentErrors.HarnessServerFailed({
+    reason: "The harness server didn't say where it listens within 15 seconds.",
+  });
+  const started = yield* readState(sandbox, location.statePath).pipe(
+    Effect.filterOrFail(
+      (state): state is State => state !== undefined,
+      () => silent,
+    ),
+    Effect.retry(
+      Schedule.while(
+        Schedule.spaced("100 millis"),
+        ({ input, elapsed }) => input === silent && elapsed < 15_000,
+      ),
+    ),
+  );
+  const endpoint = yield* endpointOf(sandbox, started);
+  if (!(yield* answers(endpoint)))
+    return yield* new EnvironmentErrors.HarnessServerFailed({
+      reason: "The harness server started but doesn't answer.",
+    });
+  return endpoint;
+});
+
+/**
+ * Stops the harness server serving the sandbox, if one runs, ending its session, so releasing the
+ * sandbox leaves nothing at work, even with a provider whose stopping would leave it running, as
+ * when a host that started it is gone.
+ */
+export const stopRunning = Effect.fnUntraced(function* (sandbox: Sandbox.Running) {
+  const location = yield* locate(sandbox).pipe(
+    Effect.catchTag("Environment.UnsupportedPlatform", () => Effect.undefined),
+  );
+  if (location === undefined) return;
+  const state = yield* readState(sandbox, location.statePath);
+  if (state === undefined) return;
+  yield* askToStop(sandbox, state);
+  yield* sandbox.exec({ argv: ["rm", "-f", location.statePath] });
 });
 
 export * as HarnessServer from "./harness-server.ts";

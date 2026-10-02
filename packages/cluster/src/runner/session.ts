@@ -1,15 +1,16 @@
 /**
- * One harness session for a running turn. It starts a session in the turn's running environment
- * with the agent's model access, prepares it with the conversation so far, gives it the input the
- * turn has not taken in, and records what it reports until it is idle. Then it closes the turn;
- * when more input came for the agent while it worked, the harness takes that in and works again,
- * in the same session.
+ * One harness session for a running turn. It attaches to the session the turn last started when a
+ * run cut short left it at work, recording what it reported meanwhile; otherwise it starts one in
+ * the turn's running environment with the agent's model access, prepares it with the conversation
+ * so far, and gives it the input the turn has not taken in. It records what the session reports
+ * until it is idle, then closes the turn; when more input came for the agent while it worked, the
+ * harness takes that in and works again, in the same session.
  */
 import { TurnExecution } from "@amends/core/turn";
-import type { Environment } from "@amends/environment";
+import type { Environment, HarnessServer } from "@amends/environment";
 import { HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
 import type { Harness } from "@amends/harness";
-import { Clock, Duration, Effect, Pull, Result, Schema, Stream } from "effect";
+import { Clock, Crypto, Duration, Effect, Pull, Result, Schema, Stream } from "effect";
 import { ContextBudget } from "./context-budget.ts";
 import { Drafts } from "./drafts.ts";
 import { Ending } from "./ending.ts";
@@ -39,27 +40,16 @@ export const run = Effect.fnUntraced(
     work: NextStep.Work,
     environment: Environment.Running,
   ) {
-    const { plan, model, budget } = work;
-    const session = yield* environment.startSession({
-      model: {
-        inference: model,
-        access: { settings: plan.connection.settings, credential: plan.connection.credential },
-        selection: { model: plan.selection.model },
-      },
-      instructions: plan.instructions,
-      contextLimit: budget,
-      measured: plan.measured,
-    });
-    const awaitsResponse = yield* continueConversation(turnSteps, session, plan.transcript);
+    const attached = yield* attachLeftSession(turnSteps, work.plan, environment);
+    if (attached === "replan") return Ending.Again();
+    const session = attached?.session ?? (yield* startSession(turnSteps, work, environment));
+    // A new session takes up the conversation so far; one attached to has it, and works on.
+    const working =
+      attached === undefined
+        ? yield* giveWork(turnSteps, session, work.plan)
+        : attached.state === "working";
     const { recordUntilIdle } = yield* makeEventRecorder(turnSteps, settings, session);
-
-    // Work on the input the turn has not taken in, or answer what the conversation awaits.
-    const { pending } = plan;
-    if (pending !== undefined || awaitsResponse) {
-      if (pending !== undefined) yield* submitInput(turnSteps, session, pending);
-      else yield* session.resume.pipe(Effect.catchTags(dieOnUnexpected));
-      if ((yield* recordUntilIdle) === "full") return Ending.Again();
-    }
+    if (working && (yield* recordUntilIdle) === "full") return Ending.Again();
     // Then close the turn, unless more input came for its agent: take that in and work again.
     for (;;) {
       const closing = yield* turnSteps.close;
@@ -73,6 +63,84 @@ export const run = Effect.fnUntraced(
     Effect.succeed(Ending.Unrunnable({ reason: cannot.reason })),
   ),
 );
+
+/**
+ * What a run does with the session it attached to: go on in it; start another, since it stopped;
+ * or read the log again first, since what it reported changed what the turn continues from and
+ * it does no more, as when its context is full.
+ */
+export const afterAttaching = (attached: HarnessServer.Attachment) =>
+  attached.missed.some(HarnessEvent.Event.isAnyOf(["ContextFull"]))
+    ? ("replan" as const)
+    : attached.state !== "stopped"
+      ? ("continue" as const)
+      : attached.missed.length > 0
+        ? ("replan" as const)
+        : ("start" as const);
+
+/**
+ * The session the turn last started, if a run cut short left it at work in the environment, after
+ * recording what it reported meanwhile; `replan` when the run must read the log again first.
+ */
+const attachLeftSession = Effect.fnUntraced(function* (
+  turnSteps: TurnSteps.Interface,
+  plan: TurnExecution.Plan,
+  environment: Environment.Running,
+) {
+  if (plan.session === undefined) return undefined;
+  const attached = yield* environment.attachSession(plan.session);
+  if (attached === undefined) return undefined;
+  if (attached.missed.length > 0) yield* turnSteps.recordEvents(attached.missed);
+  const next = afterAttaching(attached);
+  yield* Effect.logInfo("Turn attached to its harness session", {
+    ...turnSteps.ids,
+    sessionId: plan.session.sessionId,
+    missed: attached.missed.length,
+    state: attached.state,
+  });
+  return next === "continue" ? attached : next === "replan" ? next : undefined;
+});
+
+/**
+ * Start a session in the environment with the agent's model access, the instructions the turn
+ * started with, and the turn's budget as its context limit, recording its ID first.
+ */
+const startSession = Effect.fnUntraced(function* (
+  turnSteps: TurnSteps.Interface,
+  work: NextStep.Work,
+  environment: Environment.Running,
+) {
+  const { plan, model, budget } = work;
+  const crypto = yield* Crypto.Crypto;
+  const sessionId = `session-${yield* Effect.orDie(crypto.randomUUIDv4)}`;
+  yield* turnSteps.recordSession(sessionId);
+  return yield* environment.startSession({
+    sessionId,
+    model: {
+      inference: model,
+      access: { settings: plan.connection.settings, credential: plan.connection.credential },
+      selection: { model: plan.selection.model },
+    },
+    instructions: plan.instructions,
+    contextLimit: budget,
+    measured: plan.measured,
+  });
+});
+
+/**
+ * Prepare a new session with the conversation so far, then give it the input the turn has not
+ * taken in, or ask it to answer what the conversation awaits; say whether it has work.
+ */
+const giveWork = Effect.fnUntraced(function* (
+  turnSteps: TurnSteps.Interface,
+  session: Harness.Session,
+  plan: TurnExecution.Plan,
+) {
+  const awaitsResponse = yield* continueConversation(turnSteps, session, plan.transcript);
+  if (plan.pending !== undefined) yield* submitInput(turnSteps, session, plan.pending);
+  else if (awaitsResponse) yield* session.resume.pipe(Effect.catchTags(dieOnUnexpected));
+  return plan.pending !== undefined || awaitsResponse;
+});
 
 /**
  * Prepare the harness with the conversation so far, read from the agent's log, and say whether it
@@ -126,11 +194,7 @@ const submitInput = Effect.fnUntraced(function* (
   session: Harness.Session,
   pending: PendingInput,
 ) {
-  // The same range of input always gets the same batch, so submitting it again after a restart
-  // records it once.
-  const batchId = HarnessEvent.BatchId.make(
-    `${turnSteps.ids.turnId}/after:${pending.afterSequence}/through:${pending.throughSequence}`,
-  );
+  const { batchId } = pending;
   const items = yield* turnSteps.recordSubmission({
     batchId,
     throughSequence: pending.throughSequence,
@@ -138,9 +202,6 @@ const submitInput = Effect.fnUntraced(function* (
   });
   yield* session.submit({ id: batchId, items }).pipe(Effect.catchTags(dieOnUnexpected));
 });
-
-/** Streaming deltas only show readers a block while it streams; the log keeps the rest. */
-const isDelta = HarnessEvent.Event.isAnyOf(["TextDelta", "ReasoningDelta"]);
 
 /**
  * Follow what the harness reports, to record it until it is idle or its context is full, showing
@@ -192,7 +253,7 @@ const makeEventRecorder = Effect.fnUntraced(function* (
         drafts.applyEvent(event);
       }
       yield* drafts.showWhenDue;
-      const events = chunk.filter((event) => !isDelta(event));
+      const events = chunk.filter((event) => !HarnessEvent.isDelta(event));
       if (events.length > 0) yield* turnSteps.recordEvents(events);
       if (events.some(HarnessEvent.Event.isAnyOf(["ContextFull"]))) return "full" as const;
       const lastEvent = events.at(-1);

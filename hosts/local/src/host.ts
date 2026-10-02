@@ -22,6 +22,7 @@ import {
   type Sharding,
   SingleRunner,
 } from "effect/cluster";
+import { FetchHttpClient } from "effect/http";
 import type { SqlClient } from "effect/sql";
 import { LocalHarnessServer } from "./harness-server.ts";
 
@@ -95,7 +96,7 @@ export const layerEnvironments = (directory: string) =>
       });
       return yield* Environment.make({ harnesses, sandboxes: [localSandbox], harnessServer });
     }),
-  ).pipe(Layer.provide(BunServices.layer));
+  ).pipe(Layer.provide([BunServices.layer, FetchHttpClient.layer]));
 
 /** The code that runs agents' turns with either model connection. */
 export const turnRunnerOptions: TurnRunner.Options = {

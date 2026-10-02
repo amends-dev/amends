@@ -90,6 +90,7 @@ const plan = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Plan =
   },
   environment,
   reacquire: undefined,
+  session: undefined,
   history: [],
   transcript: [],
   pending: undefined,

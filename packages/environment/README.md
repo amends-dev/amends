@@ -35,9 +35,10 @@ Spawning receives no conversation history or work to do, only what the runtime n
    `SnapshotUnavailable`, and a reference from another definition is `ForeignReference`.
 3. Run the definition's setup commands in order, each with `sh -c`. One that exits nonzero fails
    the spawn with `SetupFailed`, carrying its output.
-4. When the harness runs inside the sandbox, upload the harness server built for the sandbox's
-   system, unless that version is already there. A system it is not built for fails the spawn with
-   `UnsupportedPlatform`.
+4. When the harness runs inside the sandbox, make sure the [harness server](#the-harness-server)
+   runs there: keep the one already running, as in a sandbox acquired again, or upload the build for
+   the sandbox's system and start it. A system it is not built for fails the spawn with
+   `UnsupportedPlatform`, and a server that does not start fails it with `HarnessServerFailed`.
 
 A spawn that fails after acquiring destroys a sandbox it created and stops one it reacquired.
 
@@ -51,38 +52,67 @@ its log, and a later run of the turn spawns with that reference to acquire the s
 
 `startSession(options)` starts a harness session with the turn's model access: the connection's model
 code, its access, and the selected model, from which Effect AI's services for the session are built.
-It gives the session an ID of its own, the agent's instructions, and the context limit and
-measurement the turn computed. The session lives until the caller's scope closes, and the turn talks
-to it directly: `prepare`, `submit`, `resolve`, `resume`, and `events` are the
-[harness contract](../harness/README.md#sessions) itself, wherever the harness runs. Inside the
-sandbox, starting a session starts a process of the harness server; one that cannot start fails
-with `ExecutionFailed`, as `ended`.
+It gives the session the ID the turn chose and recorded, the agent's instructions, and the context
+limit and measurement the turn computed. The turn talks to it directly: `prepare`, `submit`,
+`resolve`, `resume`, and `events` are the [harness contract](../harness/README.md#sessions) itself,
+wherever the harness runs. A session in process lives until the caller's scope closes. One inside the
+sandbox ends when the scope closes too, unless the scope closes because the run was cut short: then
+the session goes on in the harness server, for a later run to attach to.
+
+`attachSession({ sessionId, recorded })` is how that later run finds it: when the harness server
+still holds the session, it returns the events the session reported after the `recorded` ones the
+turn has, whether it is `working`, `idle`, or `stopped`, and the session, whose `events` continue
+from there. A session in process, or one the server no longer holds, is `undefined`, and the turn
+starts a new one from its transcript.
 
 `snapshot` captures the sandbox's files; without a sandbox it is `Unsupported`. `release` applies the
-definition's retention once the turn is done: `stop` keeps the sandbox's files for acquiring again,
-and `destroy` deletes the sandbox. Repeating it after it succeeded does nothing, and after a failure
-retries. A run cut short never releases, so the sandbox stays as it is for the next run to acquire.
+definition's retention once the turn is done, after stopping the harness server in the sandbox:
+`stop` keeps the sandbox's files for acquiring again, and `destroy` deletes the sandbox. Repeating it
+after it succeeded does nothing, and after a failure retries. A run cut short never releases, so the
+sandbox stays as it is for the next run to acquire. The service's own `release(definition,
+reference)` does the same for a sandbox a run left without spawning it, as when a turn ends while
+nothing runs it; one the provider no longer has comes back new, and is destroyed.
 
 ## The harness server
 
 The harness server is the program that runs a harness inside a sandbox, and `HarnessServer` holds
 both sides of its protocol: the harness contract's session as Effect RPC requests (`Rpcs`), carried
-as newline-delimited JSON over the process's standard input and output. Each process serves one
-session. `Start` names the harness and carries the session's options and the turn's model access,
-with the connection's implementation ID so the server finds that connection's model code; then
-`Prepare`, `Submit`, `Resolve`, `Resume`, and the `Events` stream follow the contract one to one.
+as newline-delimited JSON over HTTP at `/rpc`. It runs in the background, apart from the host that
+started it, so a session goes on when that host stops, and holds one session at a time. `Start`
+names the session, its harness, its options, and the turn's model access, with the connection's
+implementation ID so the server finds that connection's model code; `Prepare`, `Submit`, `Resolve`,
+`Resume`, and the `Events` stream follow the contract one to one. `Attach` reports what a session
+kept, `End` ends it, and `Stop` ends it and stops the server.
 
-- `HarnessServer.layer(served)` is the server, for the program a host builds: the harnesses and
-  model code it runs, over `Stdio`. It stops when its input ends. A `Start` for a harness or model
-  code it lacks fails with `ExecutionFailed`, not worth retrying.
-- `HarnessServer.startSession(process, options)` is the client, over a sandbox process running the
-  server: it starts the session and returns it as a `Harness.Session`. A request the server cannot
-  answer, because it or its process ended, fails as `ExecutionFailed` with problem `ended`, worth
-  retrying. Closing the scope kills the process.
+The server keeps every event of its session that a turn's log keeps, all but text and reasoning
+deltas, until another session replaces it, so a host that comes back reads what it missed: `Events`
+takes the number of kept events to skip. It gives a batch submitted again, as by a host that is
+unsure its submission arrived, once. A session that ends, however it ends, fails its listeners'
+`Events` with `ExecutionFailed`, problem `ended`, and the server ends its session when it shuts
+down.
+
+- `HarnessServer.layerRoutes(served, { token, stop })` is the server's routes, for the program a
+  host builds: the harnesses and model code it runs, the token every request must carry as a bearer
+  token, and how it stops when asked to. A `Start` for a harness or model code it lacks fails with
+  `ExecutionFailed`, not worth retrying.
+- `HarnessServer.startSession(endpoint, options)` and `attachSession(endpoint, session)` are the
+  client, over the URL and headers that reach the server. A request the server cannot answer, or
+  about a session it no longer holds, fails as `ExecutionFailed` with problem `ended`, worth
+  retrying. `events` first reads again for about eight seconds when its connection drops,
+  continuing after the events it delivered.
 - `HarnessServer.Program` is what a host installs: the harnesses its build runs, and its build for a
-  platform, such as `linux-x64`, versioned by its contents. `upload` probes the sandbox's system
-  and temporary directory, and writes the build under `amends-harness-server/<version>` there
-  unless it is present, renaming it into place so a sandbox never runs a partial write.
+  platform, such as `linux-x64`, versioned by its contents.
+- `HarnessServer.ensureRunning(sandbox, program)` finds the server serving the sandbox from the
+  state file it wrote, `amends-harness-server/<sandbox ID>.json` in the sandbox's temporary
+  directory, holding its port, its token, and the protocol version it speaks
+  (`HarnessServer.protocolVersion`). One that speaks this version and answers is kept, whichever
+  build or host started it; one speaking another version is asked to stop. Otherwise it writes the
+  build under `amends-harness-server/<version>` unless present, renaming it into place so a sandbox
+  never runs a partial write, starts it in the background with the state file's path, and waits
+  for the state file. The server reaches the host through the sandbox's exposure of its port.
+- `HarnessServer.stopRunning(sandbox)` asks the server serving the sandbox to stop, for releasing
+  it. A provider's stop need not end processes a host it no longer runs started, as a local
+  sandbox's does not.
 
 [`hosts/harness-server`](../../hosts/harness-server/README.md) is the program amends builds.
 
@@ -97,10 +127,11 @@ These are implementation choices where the core model leaves the contract open:
 - A sandbox provider is installed as one provider, not per account, so providers that run under a
   workspace's account, such as Daytona, are not installed yet.
 
-- The harness server talks over its process's standard input and output, so a session ends with
-  the host that started it; a later attempt starts a new one from the transcript.
 - The model connection's key reaches the sandbox in the session's `Start` request.
+- The harness server's port is reachable wherever the sandbox exposes it; the token in its state
+  file, readable by the sandbox's user only, is what keeps others out.
+- A session a host left at work goes on until a host attaches or releases the sandbox. Nothing
+  else ends it, so a turn no run comes back to leaves its server running until its sandbox stops.
 
-Not implemented, because what they depend on does not exist yet: reconnecting to a harness server,
-configuring the harness with the amends MCP endpoint and a turn's credentials, and environment
-transfer.
+Not implemented, because what they depend on does not exist yet: configuring the harness with the
+amends MCP endpoint and a turn's credentials, and environment transfer.

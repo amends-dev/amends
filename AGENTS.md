@@ -59,8 +59,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   `cluster` runs jobs, the work outside requests, on Effect Cluster: an agent job for each agent,
   which accepts its work and stops its departed turns, and a turn job for each turn, entities whose
   requests a commit stores, with their retries and pruning. Jobs enter workspaces through the
-  gateway like any other caller. Its turn runner prepares each turn from core, spawns the turn's environment once per run and
-  starts a harness session in it for each attempt, records what the harness reports, and closes it;
+  gateway like any other caller. Its turn runner prepares each turn from core, spawns the turn's environment for its run and
+  starts a harness session in it for each attempt, or attaches to one a run cut short left, records
+  what the harness reports, and closes it;
   hosts install their harnesses through the environment service and pass the runner their model code.
   `connection` is the contract connection implementations fulfil: the declaration a host
   registers in its catalog, and each capability's code, such as model inference.

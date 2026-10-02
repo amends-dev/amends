@@ -104,7 +104,7 @@ const endAfterFailure = Effect.fnUntraced(function* (
     return Ending.Unrunnable({ reason: text });
   }
   yield* Effect.logWarning("Turn interrupted", logFields);
-  return Ending.Interrupted();
+  return Ending.Interrupted({ problem: failure.problem });
 });
 
 /**

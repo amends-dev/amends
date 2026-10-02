@@ -105,11 +105,15 @@ Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply
 The harness runs in process, or, in an environment that says so, inside a local sandbox: a
 directory under `AMENDS_SANDBOX_DIRECTORY`, where the turn runs the
 [harness server](../harness-server/README.md). The host compiles the harness server with the Bun
-running it the first time a sandbox needs it, into `harness-server/` in that directory, and
-uploads it into the sandbox's temporary directory unless that build is already there. Daytona
+running it the first time a sandbox needs one started, into `harness-server/` in that directory, and
+uploads it into the sandbox's temporary directory, which is the sandbox's own. Daytona
 environments' turns fail, since the host does not install that provider yet. Several processes over one
 database share turn jobs as they share background jobs, and a turn cut short by a restart
-continues from its log. Handled turn job requests are pruned with the rest.
+continues from its log. When a host dies while a turn works inside a sandbox, the harness server
+goes on with the session, and the process that takes the turn over attaches to it and collects what
+it reported. A host that stops cleanly ends the processes its local sandboxes run, so there the
+turn's next run starts a new session from its log. When the sandbox itself is gone, the turn
+continues in a new one, and the agent is told that its earlier files are gone. Handled turn job requests are pruned with the rest.
 
 ## Browser and desktop access
 

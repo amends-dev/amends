@@ -1,6 +1,7 @@
 import { HarnessEvent, Transcript } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime } from "effect";
+import { Environment } from "@amends/environment";
+import { DateTime, Schema } from "effect";
 import { ConnectionId } from "../../src/connection/id.ts";
 import { EnvironmentId } from "../../src/environment/id.ts";
 import { Log } from "../../src/journal/log.ts";
@@ -73,6 +74,70 @@ const replies = (...entries: ReadonlyArray<TurnLog.Entry>) =>
   TurnLog.read(recorded(...entries)).replies.map((reply) => reply.text);
 
 describe("TurnLog.read", () => {
+  it("names the session the turn last started, with how many of its events the log has", () => {
+    const session = (id: string): TurnLog.Entry => ({ _tag: "Session", turnId, sessionId: id });
+    const attempt = (kind: "session" | "summary"): TurnLog.Entry => ({
+      _tag: "Attempt",
+      turnId,
+      kind,
+    });
+    expect(TurnLog.read(recorded(took("b0"))).session).toBeUndefined();
+    const started = [session("s1"), took("b1"), ...responded("r1", [text("Hi.")])];
+    expect(TurnLog.read(recorded(...started)).session).toEqual({ sessionId: "s1", recorded: 3 });
+    // Another attempt in the same session goes on counting; a new session starts again.
+    expect(
+      TurnLog.read(recorded(...started, attempt("session"), harness({ _tag: "Idle" }))).session,
+    ).toEqual({ sessionId: "s1", recorded: 4 });
+    expect(TurnLog.read(recorded(...started, session("s2"))).session).toEqual({
+      sessionId: "s2",
+      recorded: 0,
+    });
+    // A summary or a checkpoint ends it.
+    expect(TurnLog.read(recorded(...started, attempt("summary"))).session).toBeUndefined();
+    expect(
+      TurnLog.read(
+        recorded(...started, {
+          _tag: "Checkpoint",
+          turnId,
+          summary: "Said hi.",
+          kept: [],
+          through: null,
+        }),
+      ).session,
+    ).toBeUndefined();
+  });
+
+  it("keeps what was asked of the turn pending until a batch holding it is taken in", () => {
+    const asked = (text: string): TurnLog.Entry => ({
+      _tag: "Requested",
+      turnId,
+      input: input(text),
+    });
+    const tookItems = (id: string, ...texts: ReadonlyArray<string>) =>
+      harness({
+        _tag: "InputIncorporated",
+        batch: {
+          id: HarnessEvent.BatchId.make(id),
+          items: [input(texts[0]!), ...texts.slice(1).map(input)],
+        },
+      });
+    const reading = (...entries: ReadonlyArray<TurnLog.Entry>) =>
+      TurnLog.read(recorded(...entries));
+    expect(reading(asked("Retry, please.")).requested).toEqual([input("Retry, please.")]);
+    expect(reading(asked("Retry, please.")).requestedAt).toBe(0);
+    expect(reading(asked("Retry, please."), tookItems("b1", "Retry, please.")).requested).toEqual(
+      [],
+    );
+    // Asked after a batch was taken in, it waits for the next one.
+    const later = reading(
+      asked("Retry, please."),
+      tookItems("b1", "Retry, please."),
+      asked("Your files are gone."),
+    );
+    expect(later.requested).toEqual([input("Your files are gone.")]);
+    expect(later.requestedAt).toBe(2);
+  });
+
   it("counts input as taken in only through batches the harness incorporated", () => {
     const entries: ReadonlyArray<TurnLog.Entry> = [
       submitted("b1", 3),
@@ -522,5 +587,34 @@ describe("TurnLog.splitIntoPieces", () => {
     expect(TurnLog.splitIntoPieces("short", 10)).toEqual(["short"]);
     expect(TurnLog.splitIntoPieces("", 10)).toEqual([""]);
     expect(TurnLog.splitIntoPieces("0123456789abc", 5)).toEqual(["01234", "56789", "abc"]);
+  });
+});
+
+describe("TurnLog.lostFiles", () => {
+  const reference = (sandboxId?: string) =>
+    Schema.decodeUnknownSync(Environment.Reference)(
+      sandboxId === undefined
+        ? { definitionId: "environment" }
+        : { definitionId: "environment", sandboxId },
+    );
+  const fresh = { _tag: "Fresh" } as const;
+
+  it("tells the agent its files are gone only when a new sandbox took another's place", () => {
+    expect(
+      TurnLog.lostFiles(reference("box-1"), { reference: reference("box-2"), filesystem: fresh }),
+    ).toBe(true);
+    // The first sandbox, the same one again, or one without a sandbox, lost nothing it had.
+    expect(TurnLog.lostFiles(undefined, { reference: reference("box-1"), filesystem: fresh })).toBe(
+      false,
+    );
+    expect(
+      TurnLog.lostFiles(reference("box-1"), {
+        reference: reference("box-1"),
+        filesystem: { _tag: "Retained" },
+      }),
+    ).toBe(false);
+    expect(
+      TurnLog.lostFiles(reference(), { reference: reference(), filesystem: { _tag: "None" } }),
+    ).toBe(false);
   });
 });

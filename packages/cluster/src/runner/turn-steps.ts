@@ -41,6 +41,11 @@ export const make = (gateway: Gateway.Interface, workspaceId: Workspace.Id, turn
       executeTurnStep((turnExecution) => turnExecution.recordEvents(turnId, events)),
     recordEnvironment: (acquired: Argument<"recordEnvironment">) =>
       executeTurnStep((turnExecution) => turnExecution.recordEnvironment(turnId, acquired)),
+    recordSession: (sessionId: string) =>
+      executeTurnStep((turnExecution) => turnExecution.recordSession(turnId, sessionId)),
+    readAcquiredEnvironment: executeTurnStep((turnExecution) =>
+      turnExecution.readAcquiredEnvironment(turnId),
+    ),
     showDraft: (piece: Argument<"showDraft">) =>
       executeTurnStep((turnExecution) => turnExecution.showDraft(turnId, piece)),
     recordInterruption: (stop: Argument<"recordInterruption">) =>

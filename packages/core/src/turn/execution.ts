@@ -100,6 +100,11 @@ export interface Plan {
   /** The running environment the turn's latest attempt worked in, to acquire again. */
   readonly reacquire: EnvironmentRuntime.Reference | undefined;
   /**
+   * The harness session the turn last started there, and how many of its events the log has, for
+   * a run to attach to when a run cut short left it at work.
+   */
+  readonly session: TurnLog.LatestSession | undefined;
+  /**
    * What the turn continues from, before its own work, read from its agent's log for the thread
    * since the latest checkpoint; for the first turn there, the thread's messages before its input.
    */
@@ -112,6 +117,11 @@ export interface Plan {
    */
   readonly pending:
     | {
+        /**
+         * The batch's ID: the same input always gets the same one, so submitting it again after
+         * a restart records it once.
+         */
+        readonly batchId: HarnessEvent.BatchId;
         /** How far the turn's input is taken in, which the batch follows. */
         readonly afterSequence: number;
         readonly throughSequence: number;
@@ -159,6 +169,29 @@ const pieceSize = 40_000;
 const historyEntrySize = 200_000;
 
 /**
+ * The batch of input pending after `afterSequence`: its ID names the thread positions it covers,
+ * and where the newest request of the turn itself it holds sits in the log, so two batches of
+ * requests at one position stay apart.
+ */
+const pendingBatch = (
+  turnId: Turn.Id,
+  batch: {
+    readonly afterSequence: number;
+    readonly throughSequence: number;
+    readonly requestedAt: Log.Position | undefined;
+    readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
+  },
+) => ({
+  batchId: HarnessEvent.BatchId.make(
+    `${turnId}/after:${batch.afterSequence}/through:${batch.throughSequence}` +
+      (batch.requestedAt === undefined ? "" : `/requested:${batch.requestedAt}`),
+  ),
+  afterSequence: batch.afterSequence,
+  throughSequence: batch.throughSequence,
+  items: batch.items,
+});
+
+/**
  * How closing went: the turn closed, publishing the agent's reply if it had one; its input is not
  * all taken in, so execution continues with what is pending; it stopped as asked; or the agent
  * could no longer post where it worked, which failed it.
@@ -193,6 +226,22 @@ export interface Interface {
     turnId: Turn.Id,
     selection: Turn.Selection,
   ) => Effect.Effect<Turn.Record, PrepareError>;
+  /**
+   * Record that execution starts a harness session with this ID, before starting it: the events
+   * recorded after are that session's.
+   */
+  readonly recordSession: (turnId: Turn.Id, sessionId: string) => Effect.Effect<void, Error>;
+  /**
+   * The running environment the turn last acquired, and its environment as stored now, whatever
+   * its status, for releasing one a run that ended short left behind. None when it acquired none.
+   */
+  readonly readAcquiredEnvironment: (
+    turnId: Turn.Id,
+  ) => Effect.Effect<
+    | { readonly environment: Environment.Record; readonly reference: EnvironmentRuntime.Reference }
+    | undefined,
+    Error | EnvironmentStore.Failure
+  >;
   /** Record that execution begins a harness session for a running turn, or a summary for it. */
   readonly recordAttempt: (
     turnId: Turn.Id,
@@ -235,7 +284,8 @@ export interface Interface {
   ) => Effect.Effect<void, Error>;
   /**
    * Record the running environment an attempt works in, as spawning acquired it, so a later attempt
-   * acquires the same one again.
+   * acquires the same one again. When a new sandbox took the place of the one the turn worked in,
+   * the agent is told its earlier files are gone, with its next input.
    */
   readonly recordEnvironment: (
     turnId: Turn.Id,
@@ -537,16 +587,18 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       },
       environment: environment.value,
       reacquire: context.own.environment,
+      session: context.own.session,
       history,
       transcript,
       pending:
         first === undefined
           ? undefined
-          : {
+          : pendingBatch(turn.id, {
               afterSequence: incorporated,
               throughSequence: waiting.length > 0 ? turn.acceptedThroughSequence : incorporated,
+              requestedAt: context.own.requested.length > 0 ? context.own.requestedAt : undefined,
               items: [first, ...rest],
-            },
+            }),
       log: context.entries,
       attempts: context.own.attempts,
       interruption: context.own.interruption,
@@ -729,9 +781,38 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* requireStatus(turn, ["running", "cancelling"]);
-        yield* openAgentLog(turn).append({ _tag: "Environment", turnId: turn.id, ...acquired });
+        const previous = TurnLog.read(yield* readOwnEntries(turn)).environment;
+        const entries: Array<TurnLog.Entry> = [
+          { _tag: "Environment", turnId: turn.id, ...acquired },
+        ];
+        if (TurnLog.lostFiles(previous, acquired))
+          entries.push({ _tag: "Requested", turnId: turn.id, input: TurnLog.lostFilesNote });
+        yield* openAgentLog(turn).appendAll(entries);
       }),
     );
+  });
+
+  const recordSession = Effect.fn("TurnExecution.recordSession")(function* (
+    turnId: Turn.Id,
+    sessionId: string,
+  ) {
+    yield* runAsAgent(turnId)((turn) =>
+      Effect.gen(function* () {
+        yield* requireStatus(turn, ["running", "cancelling"]);
+        const id = yield* Schema.decodeEffect(Schema.NonEmptyString)(sessionId);
+        yield* openAgentLog(turn).append({ _tag: "Session", turnId: turn.id, sessionId: id });
+      }),
+    );
+  });
+
+  const readAcquiredEnvironment = Effect.fn("TurnExecution.readAcquiredEnvironment")(function* (
+    turnId: Turn.Id,
+  ) {
+    const turn = yield* requireTurn(turnId);
+    const reference = TurnLog.read(yield* readOwnEntries(turn)).environment;
+    if (reference === undefined) return undefined;
+    const environment = yield* environmentStore.get(Environment.Id.make(reference.definitionId));
+    return Option.isNone(environment) ? undefined : { environment: environment.value, reference };
   });
 
   const recordAttempt = Effect.fn("TurnExecution.recordAttempt")(function* (
@@ -916,6 +997,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     recordSubmission,
     recordEvents,
     recordEnvironment,
+    recordSession,
+    readAcquiredEnvironment,
     showDraft,
     recordInterruption,
     readEntries,

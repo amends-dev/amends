@@ -133,6 +133,7 @@ its log:
 | `recordAttempt`                                | That a harness session, or a summary, is beginning. Attempts since the turn last got further are counted.                        |
 | `recordSubmission`                             | The batch of input handed to the harness, under a key of its range so a restart records it once.                                 |
 | `recordEnvironment`                            | The running environment the run's sessions work in, and where its files came from, so a later run acquires it again.             |
+| `recordSession`                                | The ID of the harness session a run starts, before starting it, so a run that comes back attaches to it.                         |
 | `recordEvents`                                 | What the harness produced: completed blocks, responses, tool results.                                                            |
 | `showDraft`                                    | Nothing durable: streaming text, as a `TurnDraft` signal for readers.                                                            |
 | `recordInterruption`, `fail`, `confirmStopped` | Why a run stopped short, or how the turn ended without a reply.                                                                  |
