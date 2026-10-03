@@ -1,4 +1,4 @@
-import type { Subject } from "@amends/harness-conformance";
+import type { Subject } from "@amends/harness/conformance";
 import { AmendsHarness } from "@amends/harness-amends";
 import { Effect, Layer, Stream } from "effect";
 import { AiError, LanguageModel } from "effect/ai";

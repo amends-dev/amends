@@ -44,7 +44,6 @@
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends/harness-conformance": "workspace:*",
         "@effect/platform-bun": "catalog:",
       },
     },
@@ -328,6 +327,7 @@
       "name": "@amends/harness",
       "version": "0.0.0",
       "dependencies": {
+        "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
     },
@@ -336,18 +336,6 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/harness": "workspace:*",
-        "effect": "catalog:",
-      },
-      "devDependencies": {
-        "@amends/harness-conformance": "workspace:*",
-      },
-    },
-    "packages/harness-conformance": {
-      "name": "@amends/harness-conformance",
-      "version": "0.0.0",
-      "dependencies": {
-        "@amends/harness": "workspace:*",
-        "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
     },
@@ -434,8 +422,6 @@
     "@amends/harness-acp": ["@amends/harness-acp@workspace:adapters/harness-acp"],
 
     "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
-
-    "@amends/harness-conformance": ["@amends/harness-conformance@workspace:packages/harness-conformance"],
 
     "@amends/harness-server": ["@amends/harness-server@workspace:hosts/harness-server"],
 

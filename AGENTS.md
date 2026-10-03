@@ -49,8 +49,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   fails differently. `harness` is the contract every harness implements: sessions, and the
   events and transcript a turn's log stores whichever harness ran, so work continues across
   environments. `harness-amends` is amends's own harness, an agent loop over Effect AI's
-  `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`.
-  `harness-conformance` holds the suites every harness runs against itself.
+  `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`. Every harness
+  runs the suites `harness` exports from `@amends/harness/conformance` against itself.
   `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
   `environment` runs the environments a workspace stores: it finds the harness and sandbox provider

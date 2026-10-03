@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { HarnessErrors } from "@amends/harness";
+import { HarnessErrors } from "../errors.ts";
 import { Effect, Stream } from "effect";
 import type { Subject } from "./subject.ts";
 import { answers, batch, kinds, start, untilIdle } from "./support.ts";

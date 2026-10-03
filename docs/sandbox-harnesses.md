@@ -123,7 +123,7 @@ compaction, so a conversation longer than its model's window is not yet covered 
    agent that speaks the Agent Client Protocol, with opencode its first agent. A session runs
    `opencode acp` configured for the connection's endpoint, which connections now give as well as
    Effect AI model access, and continues a conversation by writing it as an opencode session and
-   loading it. The [harness suites](../packages/harness-conformance/README.md) run for amends's
+   loading it. The [harness suites](../packages/harness/README.md#conformance-suites) run for amends's
    harness and for opencode over a local model; the local host's end-to-end test runs opencode in a
    local sandbox, where a follow-up in a new sandbox knows the first answer, and an opt-in live test
    runs it on Daytona with a real model, its setup installing the pinned release. Outside the

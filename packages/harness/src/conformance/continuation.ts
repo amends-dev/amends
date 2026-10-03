@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { HarnessErrors, Transcript } from "@amends/harness";
+import { HarnessErrors } from "../errors.ts";
+import { Transcript } from "../transcript.ts";
 import { Effect, Result } from "effect";
 import type { Subject } from "./subject.ts";
 import { answers, batch, input, kinds, response, start, text, untilIdle } from "./support.ts";

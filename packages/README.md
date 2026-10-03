@@ -167,8 +167,8 @@ applies retention on release. It depends on the harness and sandbox contracts on
 
 `@amends/harness` is the [harness contract](./harness/README.md): sessions, their capabilities, and
 the events and transcript every harness records, so a turn's log reads the same whichever harness
-ran it. It depends on Effect alone and knows nothing of core. `@amends/harness-amends` is
+ran it. It depends on Effect alone, besides `@effect/vitest` for the
+[conformance suites](./harness/README.md#conformance-suites) every harness runs against itself, such as
+amends's here and opencode's in `adapters/harness-acp`, and it knows nothing of core. `@amends/harness-amends` is
 amends's [own harness](./harness-amends/README.md), an agent loop over Effect AI's `LanguageModel`,
 which ships with `effect`; provider packages and other harnesses' dependencies belong in adapters.
-`@amends/harness-conformance` holds the [test suites](./harness-conformance/README.md) every harness
-runs against itself, such as amends's here and opencode's in `adapters/harness-acp`.

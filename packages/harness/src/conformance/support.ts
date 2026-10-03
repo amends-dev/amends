@@ -1,5 +1,6 @@
-import { HarnessEvent, Transcript } from "@amends/harness";
-import type { Harness } from "@amends/harness";
+import { HarnessEvent } from "../event.ts";
+import type { Harness } from "../harness.ts";
+import { Transcript } from "../transcript.ts";
 import { Effect, Stream } from "effect";
 import type { Script, Subject } from "./subject.ts";
 

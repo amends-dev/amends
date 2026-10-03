@@ -1,4 +1,4 @@
-import { Support } from "@amends/harness-conformance";
+import { Support } from "@amends/harness/conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { AcpConnection, AcpHarness } from "../src/index.ts";
 

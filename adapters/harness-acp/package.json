@@ -15,7 +15,6 @@
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/harness-conformance": "workspace:*",
     "@effect/platform-bun": "catalog:"
   }
 }

@@ -23,10 +23,9 @@ remaining gaps with links to their owning code.
 | [HTTP server](../packages/server-http/README.md)                                   | Handler registration, request scopes, and authentication wiring.                                                    |
 | [Adapters](../adapters/README.md)                                                  | Store validation, construction, and migration conventions.                                                          |
 | [Storage conformance](../packages/storage-conformance/README.md)                   | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
-| [Harness](../packages/harness/README.md)                                           | The harness contract: sessions, and the events and transcript every harness records.                                |
+| [Harness](../packages/harness/README.md)                                           | The harness contract: sessions, the events and transcript every harness records, and the suites every harness runs. |
 | [Amends harness](../packages/harness-amends/README.md)                             | Amends's own harness: an in-process agent loop over Effect AI.                                                      |
 | [ACP harnesses](../adapters/harness-acp/README.md)                                 | Agents that speak the Agent Client Protocol, such as opencode, as harnesses running in a sandbox.                   |
-| [Harness conformance](../packages/harness-conformance/README.md)                   | Test suites every harness runs, and the subject a harness supplies.                                                 |
 | [Connection](../packages/connection/README.md)                                     | The connection implementation contract: declarations for a host's catalog, and model inference.                     |
 | [Anthropic connection](../adapters/connection-anthropic/README.md)                 | Anthropic model connections over Effect AI.                                                                         |
 | [OpenAI-compatible connection](../adapters/connection-openai-compatible/README.md) | Chat-completions model connections, such as OpenAI, OpenRouter, or a local server.                                  |

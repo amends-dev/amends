@@ -1,5 +1,5 @@
 import { Transcript } from "@amends/harness";
-import { Support } from "@amends/harness-conformance";
+import { Support } from "@amends/harness/conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { Redacted } from "effect";
 import { OpenCodeHarness } from "../src/index.ts";

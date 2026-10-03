@@ -78,7 +78,7 @@ sudo env "PATH=$PATH" npm install --global opencode-ai@1.18.23
 
 ## Testing
 
-The tests run the [harness conformance suites](../../packages/harness-conformance/README.md)
+The tests run the [harness conformance suites](../../packages/harness/README.md#conformance-suites)
 against opencode with a model behind a local chat-completions server, and a test where that model
 has opencode run a command. They need opencode 1.18.23 on the `PATH` and skip without it:
 

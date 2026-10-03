@@ -1,4 +1,4 @@
-import type { Harness } from "@amends/harness";
+import type { Harness } from "../harness.ts";
 import type { Effect, Layer, Scope } from "effect";
 
 /** What the model under a test does: answer each request with the next reply, or refuse its key. */

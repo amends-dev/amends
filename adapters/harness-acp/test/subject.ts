@@ -1,5 +1,5 @@
 import { ModelInference } from "@amends/connection/model-inference";
-import type { Subject } from "@amends/harness-conformance";
+import type { Subject } from "@amends/harness/conformance";
 import { BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, Layer, Redacted } from "effect";
 import { AcpHarness, OpenCodeHarness } from "../src/index.ts";
