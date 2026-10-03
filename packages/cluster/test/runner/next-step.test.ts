@@ -4,7 +4,6 @@ import { Environment } from "@amends/core/environment";
 import { Turn } from "@amends/core/turn";
 import { TurnExecution } from "@amends/core/turn";
 import type { Transcript } from "@amends/harness";
-import { AmendsHarness } from "@amends/harness-amends";
 import { expect, it } from "@effect/vitest";
 import { Duration, Effect, Layer, Schema } from "effect";
 import { LanguageModel, Model } from "effect/ai";
@@ -41,27 +40,16 @@ const turn = (status: "queued" | "running") =>
     startedAt: status === "queued" ? null : createdAt,
     finishedAt: null,
   });
-const environment = (options: { readonly harnessId?: string; readonly sandbox?: boolean } = {}) =>
-  Schema.decodeUnknownSync(Environment.Record)({
-    id: "environment-one",
-    workspaceId: "workspace-one",
-    name: "In process",
-    harnessId: options.harnessId ?? "amends",
-    sandbox: options.sandbox
-      ? {
-          providerId: "local",
-          harness: "in-process",
-          connectionId: null,
-          template: null,
-          env: {},
-          setup: [],
-          retention: "stop",
-        }
-      : null,
-    status: "active",
-    createdBy: null,
-    createdAt,
-  });
+const environment = Schema.decodeUnknownSync(Environment.Record)({
+  id: "environment-one",
+  workspaceId: "workspace-one",
+  name: "In process",
+  harnessId: "amends",
+  sandbox: null,
+  status: "active",
+  createdBy: null,
+  createdAt,
+});
 const input = (text: string): Transcript.Input => ({
   _tag: "Input",
   author: { id: "member-alice", name: "Alice" },
@@ -85,10 +73,16 @@ const model = (limits: ModelInference.Limits): ModelInference.Implementation => 
       Layer.succeed(Model.ModelName, "test-model"),
     ),
   limits: () => limits,
+  endpoint: () => ({
+    interface: "test",
+    baseUrl: undefined,
+    apiKey: undefined,
+    model: "test-model",
+    limits,
+  }),
 });
 const roomy = model({ contextTokens: 1_000_000, outputTokens: 128_000 });
-const settings = (limits = roomy) =>
-  RunnerSettings.fromOptions({ harnesses: [AmendsHarness.make()], models: [limits] });
+const settings = (limits = roomy) => RunnerSettings.fromOptions({ models: [limits] });
 
 /** A running turn's plan, with nothing yet done in it. */
 const plan = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Plan => ({
@@ -101,7 +95,10 @@ const plan = (overrides: Partial<TurnExecution.Plan> = {}): TurnExecution.Plan =
     settings: {},
     credential: undefined,
   },
-  environment: environment(),
+  environment,
+  sandboxConnection: undefined,
+  reacquire: undefined,
+  session: undefined,
   history: [],
   transcript: [],
   pending: undefined,
@@ -127,7 +124,7 @@ it("a finished turn needs nothing, and one asked to stop is confirmed stopped", 
   );
 });
 
-it("fails a turn prepare finds unrunnable, or one this host cannot run", () => {
+it("fails a turn prepare finds unrunnable, or whose model this host cannot run", () => {
   const failed = (preparation: TurnExecution.Preparation) =>
     NextStep.decide(preparation, settings(), undefined);
   expect(
@@ -135,14 +132,6 @@ it("fails a turn prepare finds unrunnable, or one this host cannot run", () => {
   ).toEqual({
     _tag: "Fail",
     reason: "The agent was removed.",
-  });
-  expect(failed(ready({ environment: environment({ sandbox: true }) }))).toEqual({
-    _tag: "Fail",
-    reason: "Environments with a sandbox can't run turns yet.",
-  });
-  expect(failed(ready({ environment: environment({ harnessId: "elsewhere" }) }))).toEqual({
-    _tag: "Fail",
-    reason: "The elsewhere harness doesn't run on this server.",
   });
   expect(
     failed(

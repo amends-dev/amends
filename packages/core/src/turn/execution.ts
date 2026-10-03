@@ -3,7 +3,7 @@ import { Environment as EnvironmentRuntime } from "@amends/environment";
 import { type HarnessErrors, HarnessEvent } from "@amends/harness";
 import { Transcript } from "@amends/harness";
 import { type Redacted, Predicate } from "effect";
-import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import { type PlatformError } from "effect";
 import { AgentStore } from "../agent/store.ts";
 import { Authorization } from "../authorization/authorization.ts";
@@ -77,26 +77,40 @@ export type CloseError =
   | ThreadCommand.Error;
 
 /**
- * Everything execution needs to run a turn: the agent's instructions, the model access it runs
- * with and the connection's settings and key to reach it, its environment, the transcript it
+ * A connection as execution uses it: its name, its implementation, and its settings and key to
+ * reach the external system. The key is only ever handed to execution, redacted.
+ */
+export interface ConnectionAccess {
+  /** The name its readers know it by, for wording what went wrong with it. */
+  readonly name: string;
+  readonly implementationId: string;
+  readonly settings: Readonly<Record<string, string>>;
+  readonly credential: Redacted.Redacted<string> | undefined;
+}
+
+/**
+ * Everything execution needs to run a turn: the agent's instructions, the model connection it
+ * runs with, its environment and the connection its sandbox runs under, the transcript it
  * continues, the input the harness has not taken in yet as one batch and piece by piece, its own
  * entries so far, how its attempts have gone, and what a provider last measured, from which
- * execution tells, against its model's limits, whether a checkpoint must come first. The key is
- * only ever handed to execution, redacted.
+ * execution tells, against its model's limits, whether a checkpoint must come first.
  */
 export interface Plan {
   readonly turn: Turn.Record;
   /** The agent's instructions: as they were when the turn started, once it has. */
   readonly instructions: string;
   readonly selection: Turn.Selection;
-  readonly connection: {
-    /** The name its readers know it by, for wording what went wrong with it. */
-    readonly name: string;
-    readonly implementationId: string;
-    readonly settings: Readonly<Record<string, string>>;
-    readonly credential: Redacted.Redacted<string> | undefined;
-  };
+  readonly connection: ConnectionAccess;
   readonly environment: Environment.Record;
+  /** The account connection the environment's sandbox runs under, for a provider that needs one. */
+  readonly sandboxConnection: ConnectionAccess | undefined;
+  /** The running environment the turn's latest attempt worked in, to acquire again. */
+  readonly reacquire: EnvironmentRuntime.Reference | undefined;
+  /**
+   * The harness session the turn last started there, and how many of its events the log has, for
+   * a run to attach to when a run cut short left it at work.
+   */
+  readonly session: TurnLog.LatestSession | undefined;
   /**
    * What the turn continues from, before its own work, read from its agent's log for the thread
    * since the latest checkpoint; for the first turn there, the thread's messages before its input.
@@ -110,6 +124,11 @@ export interface Plan {
    */
   readonly pending:
     | {
+        /**
+         * The batch's ID: the same input always gets the same one, so submitting it again after
+         * a restart records it once.
+         */
+        readonly batchId: HarnessEvent.BatchId;
         /** How far the turn's input is taken in, which the batch follows. */
         readonly afterSequence: number;
         readonly throughSequence: number;
@@ -157,6 +176,29 @@ const pieceSize = 40_000;
 const historyEntrySize = 200_000;
 
 /**
+ * The batch of input pending after `afterSequence`: its ID names the thread positions it covers,
+ * and where the newest request of the turn itself it holds sits in the log, so two batches of
+ * requests at one position stay apart.
+ */
+const pendingBatch = (
+  turnId: Turn.Id,
+  batch: {
+    readonly afterSequence: number;
+    readonly throughSequence: number;
+    readonly requestedAt: Log.Position | undefined;
+    readonly items: readonly [Transcript.Input, ...Array<Transcript.Input>];
+  },
+) => ({
+  batchId: HarnessEvent.BatchId.make(
+    `${turnId}/after:${batch.afterSequence}/through:${batch.throughSequence}` +
+      (batch.requestedAt === undefined ? "" : `/requested:${batch.requestedAt}`),
+  ),
+  afterSequence: batch.afterSequence,
+  throughSequence: batch.throughSequence,
+  items: batch.items,
+});
+
+/**
  * How closing went: the turn closed, publishing the agent's reply if it had one; its input is not
  * all taken in, so execution continues with what is pending; it stopped as asked; or the agent
  * could no longer post where it worked, which failed it.
@@ -191,6 +233,25 @@ export interface Interface {
     turnId: Turn.Id,
     selection: Turn.Selection,
   ) => Effect.Effect<Turn.Record, PrepareError>;
+  /**
+   * Record that execution starts a harness session with this ID, before starting it: the events
+   * recorded after are that session's.
+   */
+  readonly recordSession: (turnId: Turn.Id, sessionId: string) => Effect.Effect<void, Error>;
+  /**
+   * The running environment the turn last acquired, its environment as stored now, whatever its
+   * status, and the connection its sandbox runs under while that can still be used, for releasing
+   * one a run that ended short left behind. None when it acquired none.
+   */
+  readonly readAcquiredEnvironment: (turnId: Turn.Id) => Effect.Effect<
+    | {
+        readonly environment: Environment.Record;
+        readonly reference: EnvironmentRuntime.Reference;
+        readonly sandboxConnection: ConnectionAccess | undefined;
+      }
+    | undefined,
+    Error | EnvironmentStore.Failure | ConnectionStore.Failure | ConnectionCredentialStore.Failure
+  >;
   /** Record that execution begins a harness session for a running turn, or a summary for it. */
   readonly recordAttempt: (
     turnId: Turn.Id,
@@ -224,12 +285,24 @@ export interface Interface {
     },
   ) => Effect.Effect<readonly [Transcript.Input, ...Array<Transcript.Input>], Error>;
   /**
-   * Record what the environment and its harness reported, in order. A batch the harness says it
-   * took in must be one submitted, as it was recorded; it counts as taken in from then on.
+   * Record what the harness reported, in order. A batch the harness says it took in must be one
+   * submitted, as it was recorded; it counts as taken in from then on.
    */
   readonly recordEvents: (
     turnId: Turn.Id,
-    events: ReadonlyArray<EnvironmentRuntime.Event>,
+    events: ReadonlyArray<HarnessEvent.Event>,
+  ) => Effect.Effect<void, Error>;
+  /**
+   * Record the running environment an attempt works in, as spawning acquired it, so a later attempt
+   * acquires the same one again. When a new sandbox took the place of the one the turn worked in,
+   * the agent is told its earlier files are gone, with its next input.
+   */
+  readonly recordEnvironment: (
+    turnId: Turn.Id,
+    acquired: {
+      readonly reference: EnvironmentRuntime.Reference;
+      readonly filesystem: EnvironmentRuntime.Filesystem;
+    },
   ) => Effect.Effect<void, Error>;
   /**
    * Show the turn's readers more of a response before it completes, as a signal: nothing is
@@ -451,6 +524,33 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
+  const sandboxConnectionGone =
+    "The connection the agent's environment runs under is no longer available.";
+
+  /**
+   * A connection's access, with its key read from protected storage, or in words why it can't be
+   * used: `gone` when it no longer exists or is inactive, or its key missing or unreadable here.
+   */
+  const readConnectionAccess = Effect.fnUntraced(function* (
+    connectionId: Connection.Id,
+    gone: string,
+  ) {
+    const connection = yield* connectionStore.get(connectionId);
+    if (Option.isNone(connection) || connection.value.status !== "active") return Result.fail(gone);
+    const { name, implementationId, settings, authentication } = connection.value;
+    let credential: Redacted.Redacted<string> | undefined;
+    if (Connection.Authentication.isAnyOf(["ApiKey"])(authentication)) {
+      if (authentication.credentialId === null) return Result.fail(`${name} needs its API key.`);
+      const stored = yield* connectionCredentialStore
+        .get(authentication.credentialId)
+        .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
+      if (Option.isNone(stored))
+        return Result.fail(`${name}'s API key can't be read on this server.`);
+      credential = stored.value.secret;
+    }
+    return Result.succeed<ConnectionAccess>({ name, implementationId, settings, credential });
+  });
+
   const prepare = Effect.fn("TurnExecution.prepare")(function* (turnId: Turn.Id) {
     const turn = yield* requireTurn(turnId);
     if (!Turn.active(turn.status)) return Preparation.Finished();
@@ -464,28 +564,21 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       reasoning: agent.value.model.reasoning,
       environmentId: agent.value.environmentId,
     };
-    const connection = yield* connectionStore.get(selection.connectionId);
-    if (Option.isNone(connection) || connection.value.status !== "active")
-      return Preparation.Unrunnable({
-        reason: "The agent's model connection is no longer available.",
-      });
-    const authentication = connection.value.authentication;
-    let credential: Redacted.Redacted<string> | undefined;
-    if (Connection.Authentication.isAnyOf(["ApiKey"])(authentication)) {
-      if (authentication.credentialId === null)
-        return Preparation.Unrunnable({ reason: `${connection.value.name} needs its API key.` });
-      const stored = yield* connectionCredentialStore
-        .get(authentication.credentialId)
-        .pipe(Effect.catchTag("ConnectionCredentialStore.Unavailable", () => Effect.succeedNone));
-      if (Option.isNone(stored))
-        return Preparation.Unrunnable({
-          reason: `${connection.value.name}'s API key can't be read on this server.`,
-        });
-      credential = stored.value.secret;
-    }
+    const connection = yield* readConnectionAccess(
+      selection.connectionId,
+      "The agent's model connection is no longer available.",
+    );
+    if (Result.isFailure(connection)) return Preparation.Unrunnable({ reason: connection.failure });
     const environment = yield* environmentStore.get(selection.environmentId);
     if (Option.isNone(environment) || environment.value.status !== "active")
       return Preparation.Unrunnable({ reason: "The agent's environment is no longer available." });
+    const sandboxConnectionId = environment.value.sandbox?.connectionId ?? null;
+    const sandboxConnection =
+      sandboxConnectionId === null
+        ? undefined
+        : yield* readConnectionAccess(sandboxConnectionId, sandboxConnectionGone);
+    if (sandboxConnection !== undefined && Result.isFailure(sandboxConnection))
+      return Preparation.Unrunnable({ reason: sandboxConnection.failure });
     if (Option.isNone(environmentCatalog.harness(environment.value.harnessId)))
       return Preparation.Unrunnable({
         reason: `The ${environment.value.harnessId} harness is not installed on this server.`,
@@ -516,23 +609,22 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       turn,
       instructions: context.own.started?.instructions ?? agent.value.instructions,
       selection,
-      connection: {
-        name: connection.value.name,
-        implementationId: connection.value.implementationId,
-        settings: connection.value.settings,
-        credential,
-      },
+      connection: connection.success,
       environment: environment.value,
+      sandboxConnection: sandboxConnection?.success,
+      reacquire: context.own.environment,
+      session: context.own.session,
       history,
       transcript,
       pending:
         first === undefined
           ? undefined
-          : {
+          : pendingBatch(turn.id, {
               afterSequence: incorporated,
               throughSequence: waiting.length > 0 ? turn.acceptedThroughSequence : incorporated,
+              requestedAt: context.own.requested.length > 0 ? context.own.requestedAt : undefined,
               items: [first, ...rest],
-            },
+            }),
       log: context.entries,
       attempts: context.own.attempts,
       interruption: context.own.interruption,
@@ -679,38 +771,87 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
 
   const recordEvents = Effect.fn("TurnExecution.recordEvents")(function* (
     turnId: Turn.Id,
-    events: ReadonlyArray<EnvironmentRuntime.Event>,
+    events: ReadonlyArray<HarnessEvent.Event>,
   ) {
     yield* runAsAgent(turnId)((turn) =>
       Effect.gen(function* () {
         yield* requireStatus(turn, ["running", "cancelling"]);
         // Input the harness took in is a batch execution submitted, exactly as recorded.
         for (const event of events) {
-          if (
-            !EnvironmentRuntime.Event.isAnyOf(["Harness"])(event) ||
-            !HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event.event)
-          )
-            continue;
-          const recorded = yield* findSubmittedBatch(turn, event.event.batch.id);
+          if (!HarnessEvent.Event.isAnyOf(["InputIncorporated"])(event)) continue;
+          const recorded = yield* findSubmittedBatch(turn, event.batch.id);
           if (recorded === undefined)
             return yield* new InvalidResponse({
               message: "Incorporated input was never submitted",
             });
-          if (!sameInput(recorded.items, event.event.batch.items))
+          if (!sameInput(recorded.items, event.batch.items))
             return yield* new InvalidResponse({
               message: "The harness took in other input than it was given",
             });
         }
         if (events.length > 0)
           yield* openAgentLog(turn).appendAll(
-            events.map((event): TurnLog.Entry =>
-              EnvironmentRuntime.Event.isAnyOf(["Harness"])(event)
-                ? { _tag: "Harness", turnId: turn.id, event: event.event }
-                : { _tag: "Environment", turnId: turn.id, event: event.event },
-            ),
+            events.map((event): TurnLog.Entry => ({ _tag: "Harness", turnId: turn.id, event })),
           );
       }),
     );
+  });
+
+  const recordEnvironment = Effect.fn("TurnExecution.recordEnvironment")(function* (
+    turnId: Turn.Id,
+    acquired: {
+      readonly reference: EnvironmentRuntime.Reference;
+      readonly filesystem: EnvironmentRuntime.Filesystem;
+    },
+  ) {
+    yield* runAsAgent(turnId)((turn) =>
+      Effect.gen(function* () {
+        yield* requireStatus(turn, ["running", "cancelling"]);
+        const previous = TurnLog.read(yield* readOwnEntries(turn)).environment;
+        const entries: Array<TurnLog.Entry> = [
+          { _tag: "Environment", turnId: turn.id, ...acquired },
+        ];
+        if (TurnLog.lostFiles(previous, acquired))
+          entries.push({ _tag: "Requested", turnId: turn.id, input: TurnLog.lostFilesNote });
+        yield* openAgentLog(turn).appendAll(entries);
+      }),
+    );
+  });
+
+  const recordSession = Effect.fn("TurnExecution.recordSession")(function* (
+    turnId: Turn.Id,
+    sessionId: string,
+  ) {
+    yield* runAsAgent(turnId)((turn) =>
+      Effect.gen(function* () {
+        yield* requireStatus(turn, ["running", "cancelling"]);
+        const id = yield* Schema.decodeEffect(Schema.NonEmptyString)(sessionId);
+        yield* openAgentLog(turn).append({ _tag: "Session", turnId: turn.id, sessionId: id });
+      }),
+    );
+  });
+
+  const readAcquiredEnvironment = Effect.fn("TurnExecution.readAcquiredEnvironment")(function* (
+    turnId: Turn.Id,
+  ) {
+    const turn = yield* requireTurn(turnId);
+    const reference = TurnLog.read(yield* readOwnEntries(turn)).environment;
+    if (reference === undefined) return undefined;
+    const environment = yield* environmentStore.get(Environment.Id.make(reference.definitionId));
+    if (Option.isNone(environment)) return undefined;
+    const sandboxConnectionId = environment.value.sandbox?.connectionId ?? null;
+    const sandboxConnection =
+      sandboxConnectionId === null
+        ? undefined
+        : yield* readConnectionAccess(sandboxConnectionId, sandboxConnectionGone);
+    return {
+      environment: environment.value,
+      reference,
+      sandboxConnection:
+        sandboxConnection !== undefined && Result.isSuccess(sandboxConnection)
+          ? sandboxConnection.success
+          : undefined,
+    };
   });
 
   const recordAttempt = Effect.fn("TurnExecution.recordAttempt")(function* (
@@ -894,6 +1035,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     recordCheckpoint,
     recordSubmission,
     recordEvents,
+    recordEnvironment,
+    recordSession,
+    readAcquiredEnvironment,
     showDraft,
     recordInterruption,
     readEntries,

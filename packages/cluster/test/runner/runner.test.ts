@@ -6,10 +6,13 @@ import { Log } from "@amends/core/journal";
 import { Turn, TurnErrors, TurnExecution, TurnLog } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { TurnRunner } from "@amends/cluster";
+import { Session } from "../../src/runner/session.ts";
 import { Gateway, type GatewayErrors } from "@amends/gateway";
-import type { Harness, HarnessEvent, Transcript } from "@amends/harness";
+import { HarnessEvent, Transcript } from "@amends/harness";
+import type { Harness } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { describe, expect, it } from "@effect/vitest";
+import { HttpClient } from "effect/http";
 import {
   Crypto,
   DateTime,
@@ -61,6 +64,13 @@ const selection = Schema.decodeUnknownSync(Turn.Selection)({
   reasoning: null,
   environmentId: "environment-one",
 });
+/** The account the sandboxed environment's provider runs under. */
+const sandboxConnection: TurnExecution.ConnectionAccess = {
+  name: "Sandbox account",
+  implementationId: "test-cloud",
+  settings: { account: "acme" },
+  credential: undefined,
+};
 const environment = (sandbox: boolean) =>
   Schema.decodeUnknownSync(Environment.Record)({
     id: "environment-one",
@@ -148,12 +158,18 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
         credential: undefined,
       },
       environment: environment(options.sandbox ?? false),
+      sandboxConnection: options.sandbox ? sandboxConnection : undefined,
+      reacquire: context.own.environment,
+      session: context.own.session,
       history: context.history,
       transcript: context.transcript,
       pending:
         first === undefined
           ? undefined
           : {
+              batchId: HarnessEvent.BatchId.make(
+                `${turnId}/after:${after}/through:${state.turn.acceptedThroughSequence}`,
+              ),
               afterSequence: after,
               throughSequence: state.turn.acceptedThroughSequence,
               items: [first, ...rest],
@@ -204,13 +220,32 @@ const fakeExecution = (options: { readonly sandbox?: boolean } = {}) => {
     recordEvents: (_, events) =>
       Effect.sync(() => {
         for (const event of events) {
-          state.steps.push(`report ${event.event._tag}`);
-          record(
-            EnvironmentRuntime.Event.isAnyOf(["Harness"])(event)
-              ? { _tag: "Harness", turnId, event: event.event }
-              : { _tag: "Environment", turnId, event: event.event },
-          );
+          state.steps.push(`report ${event._tag}`);
+          record({ _tag: "Harness", turnId, event });
         }
+      }),
+    recordEnvironment: (_, acquired) =>
+      Effect.gen(function* () {
+        yield* require(["running", "cancelling"]);
+        state.steps.push("environment");
+        record({ _tag: "Environment", turnId, ...acquired });
+      }),
+    recordSession: (_, sessionId) =>
+      Effect.gen(function* () {
+        yield* require(["running", "cancelling"]);
+        state.steps.push("session");
+        record({ _tag: "Session", turnId, sessionId });
+      }),
+    readAcquiredEnvironment: () =>
+      Effect.sync(() => {
+        const reference = TurnLog.read(state.log).environment;
+        return reference === undefined
+          ? undefined
+          : {
+              environment: environment(options.sandbox ?? false),
+              reference,
+              sandboxConnection: options.sandbox ? sandboxConnection : undefined,
+            };
       }),
     showDraft: (_, piece) =>
       Effect.sync(() => {
@@ -303,6 +338,13 @@ const scripted = Effect.fnUntraced(function* (
         Layer.succeed(Model.ModelName, "test-model"),
       ),
     limits: () => limits,
+    endpoint: () => ({
+      interface: "test",
+      baseUrl: undefined,
+      apiKey: undefined,
+      model: "test-model",
+      limits,
+    }),
   };
   return { implementation, prompts, summarized };
 });
@@ -338,13 +380,64 @@ const settle = <A, E>(fiber: Fiber.Fiber<A, E>) =>
     return yield* Fiber.join(fiber);
   });
 
+/**
+ * Environments whose every spawn gives this running environment, whose sessions run inside its
+ * sandbox, recording what they are asked to do.
+ */
+const sandboxEnvironments = (sessions: Pick<EnvironmentRuntime.Running, "attachSession">) => {
+  const calls: Array<string> = [];
+  const reference = Schema.decodeUnknownSync(EnvironmentRuntime.Reference)({
+    definitionId: "environment-one",
+    sandboxId: "box",
+  });
+  const environments: EnvironmentRuntime.Interface = {
+    spawn: (_, options) =>
+      Effect.sync(() => {
+        calls.push(`spawn under ${options?.sandboxConnection?.settings["account"]}`);
+        return {
+          reference,
+          filesystem: { _tag: "Retained" },
+          startSession: () => Effect.die(new Error("A new session is unexpected")),
+          ...sessions,
+          snapshot: Effect.die(new Error("unused")),
+          release: Effect.sync(() => void calls.push("release")),
+        };
+      }),
+    release: (_, released, connection) =>
+      Effect.sync(
+        () =>
+          void calls.push(`release ${released.sandboxId} under ${connection?.settings["account"]}`),
+      ),
+  };
+  return { environments, calls, reference };
+};
+
 const unexpected = () => Effect.die(new Error("Only turn execution is expected"));
 const runnerOver = (
   turnExecution: TurnExecution.Interface,
   model: ModelInference.Implementation,
-  options: Partial<TurnRunner.Options> = {},
+  {
+    harnesses = [AmendsHarness.harness],
+    environments: installedEnvironments,
+    ...options
+  }: Partial<TurnRunner.Options> &
+    Partial<EnvironmentRuntime.Installed> & {
+      readonly environments?: EnvironmentRuntime.Interface;
+    } = {},
 ) =>
-  TurnRunner.make({ harnesses: [AmendsHarness.make()], models: [model], ...options }).pipe(
+  Effect.gen(function* () {
+    const environments =
+      installedEnvironments ??
+      (yield* EnvironmentRuntime.make({ harnesses }).pipe(
+        Effect.provideService(
+          HttpClient.HttpClient,
+          HttpClient.make(() => Effect.die(new Error("No harness server here."))),
+        ),
+      ));
+    return yield* TurnRunner.make({ models: [model], ...options }).pipe(
+      Effect.provideService(EnvironmentRuntime.Service, environments),
+    );
+  }).pipe(
     Effect.provideService(
       Gateway.Service,
       Gateway.Service.of({
@@ -389,9 +482,10 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
+        "environment",
         "attempt session",
+        "session",
         "submitted turn-one/after:0/through:1",
-        "report Ready",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -400,8 +494,8 @@ describe("TurnRunner", () => {
       ]);
       expect(state.turn).toMatchObject({ status: "completed", selection });
       expect(state.replies).toEqual(["Noon is high tide."]);
-      // Deltas show a block while it streams; the log keeps completed blocks and what the
-      // environment reported.
+      // Deltas show a block while it streams; the log keeps completed blocks and the environment
+      // the turn worked in.
       expect(harnessEvents(state.log)).toEqual([
         "InputIncorporated",
         "BlockCompleted",
@@ -411,7 +505,8 @@ describe("TurnRunner", () => {
       expect(
         state.log.find(({ entry }) => TurnLog.Entry.isAnyOf(["Environment"])(entry))?.entry,
       ).toMatchObject({
-        event: { _tag: "Ready" },
+        reference: { definitionId: "environment-one" },
+        filesystem: { _tag: "None" },
       });
       expect(texts(prompts[0])).toEqual(["Be brief.", "Alice: What is the tide at noon?"]);
     }),
@@ -484,9 +579,10 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
+        "environment",
         "attempt session",
+        "session",
         "submitted turn-one/after:0/through:1",
-        "report Ready",
         "report InputIncorporated",
         "report BlockCompleted",
         "report ResponseFinished",
@@ -551,9 +647,10 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
+        "environment",
         "attempt session",
+        "session",
         "submitted turn-one/after:0/through:1",
-        "report Ready",
         "report InputIncorporated",
         "stopped",
       ]);
@@ -575,13 +672,14 @@ describe("TurnRunner", () => {
 
       expect(state.steps).toEqual([
         "start",
+        "environment",
         "attempt session",
+        "session",
         "submitted turn-one/after:0/through:1",
-        "report Ready",
         "report InputIncorporated",
         "interrupted retryable",
         "attempt session",
-        "report Ready",
+        "session",
         "report BlockCompleted",
         "report ResponseFinished",
         "report Idle",
@@ -655,7 +753,7 @@ describe("TurnRunner", () => {
       expect(state.steps).toEqual([]);
       yield* settle(fiber);
 
-      expect(state.steps[0]).toBe("attempt session");
+      expect(state.steps.slice(0, 2)).toEqual(["environment", "attempt session"]);
       expect(state.replies).toEqual(["Noon."]);
     }),
   );
@@ -698,11 +796,13 @@ describe("TurnRunner", () => {
 
       yield* runner.run(workspaceId, turnId);
 
-      expect(state.steps.slice(0, 5)).toEqual([
+      expect(state.steps.slice(0, 7)).toEqual([
         "start",
         "attempt summary",
         "checkpoint",
+        "environment",
         "attempt session",
+        "session",
         "submitted turn-one/after:0/through:1",
       ]);
       expect(state.checkpoints).toEqual([
@@ -803,8 +903,8 @@ describe("TurnRunner", () => {
    * A harness whose first session reports its context full once it takes its input in, as a
    * harness honoring its context limit does; later sessions are amends's own.
    */
-  const fillsUp = (): Harness.Interface<TurnRunner.ModelAccess> => {
-    const inner = AmendsHarness.make();
+  const fillsUp = (): Harness.Interface<ModelInference.Services> => {
+    const inner = AmendsHarness.harness;
     let sessions = 0;
     return {
       ...inner,
@@ -995,7 +1095,7 @@ describe("TurnRunner", () => {
     }),
   );
 
-  it.effect("fails a turn whose environment has a sandbox, without starting it", () =>
+  it.effect("fails a turn whose environment's sandbox this host does not run", () =>
     Effect.gen(function* () {
       const { state, turnExecution } = fakeExecution({ sandbox: true });
       const { implementation, prompts } = yield* scripted([]);
@@ -1003,7 +1103,7 @@ describe("TurnRunner", () => {
 
       yield* runner.run(workspaceId, turnId);
 
-      expect(state.steps).toEqual(["fail: Environments with a sandbox can't run turns yet."]);
+      expect(state.steps).toEqual(["start", "fail: The local sandbox doesn't run on this server."]);
       expect(prompts).toEqual([]);
     }),
   );
@@ -1020,6 +1120,121 @@ describe("TurnRunner", () => {
       yield* runner.run(workspaceId, turnId);
 
       expect(state.steps).toEqual(["stopped"]);
+    }),
+  );
+
+  it.effect(
+    "attaches to the session a cut-short run left, records what it missed, and closes the turn",
+    () =>
+      Effect.gen(function* () {
+        const { state, turnExecution } = fakeExecution({ sandbox: true });
+        const { implementation, prompts } = yield* scripted([]);
+        // An earlier run started the turn, gave its session the input, and was cut short.
+        const items: [Transcript.Input] = [input("What is the tide at noon?")];
+        const batch = { id: HarnessEvent.BatchId.make(`${turnId}/after:0/through:1`), items };
+        state.turn = Turn.change(state.turn, { status: "running", selection });
+        for (const entry of [
+          { _tag: "Started", turnId, selection, instructions: "Be brief." },
+          {
+            _tag: "Environment",
+            turnId,
+            reference: { definitionId: "environment-one", sandboxId: "box" },
+            filesystem: { _tag: "Fresh" },
+          },
+          { _tag: "Attempt", turnId, kind: "session" },
+          { _tag: "Session", turnId, sessionId: "session-left" },
+          { _tag: "Submitted", turnId, batchId: batch.id, throughSequence: 1, items },
+          { _tag: "Harness", turnId, event: { _tag: "InputIncorporated", batch } },
+        ] as const)
+          state.log.push({
+            entry: Schema.decodeUnknownSync(TurnLog.Entry)(entry),
+            at,
+            position: Log.Position.make(state.log.length),
+          });
+        const responseId = Transcript.ResponseId.make("session-left/response-1");
+        const attachedTo: Array<unknown> = [];
+        const { environments, calls } = sandboxEnvironments({
+          attachSession: (session) =>
+            Effect.sync(() => {
+              attachedTo.push(session);
+              return {
+                missed: [
+                  {
+                    _tag: "BlockCompleted",
+                    responseId,
+                    part: 0,
+                    block: { _tag: "Text", text: "High tide is at noon." },
+                  },
+                  { _tag: "ResponseFinished", responseId, finish: "stop" },
+                  { _tag: "Idle" },
+                ],
+                state: "idle",
+                session: {
+                  prepare: () => Effect.die(new Error("An attached session is prepared")),
+                  submit: () => Effect.die(new Error("Nothing is left to submit")),
+                  resolve: () => Effect.die(new Error("unused")),
+                  resume: Effect.die(new Error("An attached session works on")),
+                  events: Stream.never,
+                } satisfies Harness.Session,
+              };
+            }),
+        });
+        const runner = yield* runnerOver(turnExecution, implementation, { environments });
+
+        yield* settle(yield* Effect.forkChild(runner.run(workspaceId, turnId)));
+
+        expect(attachedTo).toEqual([{ sessionId: "session-left", recorded: 1 }]);
+        expect(state.steps).toEqual([
+          "environment",
+          "attempt session",
+          "report BlockCompleted",
+          "report ResponseFinished",
+          "report Idle",
+          "close",
+        ]);
+        expect(state.replies).toEqual(["High tide is at noon."]);
+        expect(prompts).toEqual([]);
+        expect(calls).toEqual(["spawn under acme", "release"]);
+      }),
+  );
+
+  it("decides what to do with a session it attached to from what it missed", () => {
+    const idle = HarnessEvent.Event.cases.Idle.make({});
+    const full = HarnessEvent.Event.cases.ContextFull.make({ estimatedTokens: 10 });
+    expect(Session.afterAttaching({ missed: [], state: "working" })).toBe("continue");
+    expect(Session.afterAttaching({ missed: [idle], state: "idle" })).toBe("continue");
+    expect(Session.afterAttaching({ missed: [full], state: "idle" })).toBe("replan");
+    expect(Session.afterAttaching({ missed: [], state: "stopped" })).toBe("start");
+    expect(Session.afterAttaching({ missed: [idle], state: "stopped" })).toBe("replan");
+  });
+
+  it.effect("releases the environment an earlier run left when it ends the turn without one", () =>
+    Effect.gen(function* () {
+      const { state, turnExecution } = fakeExecution({ sandbox: true });
+      const { implementation } = yield* scripted([]);
+      state.turn = Turn.change(state.turn, { status: "cancelling", cancelReason: "requested" });
+      state.log.push({
+        entry: Schema.decodeUnknownSync(TurnLog.Entry)({
+          _tag: "Environment",
+          turnId,
+          reference: { definitionId: "environment-one", sandboxId: "box" },
+          filesystem: { _tag: "Fresh" },
+        }),
+        at,
+        position: Log.Position.make(0),
+      });
+      const { environments, calls } = sandboxEnvironments({
+        attachSession: () => Effect.die(new Error("unused")),
+      });
+      const runner = yield* runnerOver(turnExecution, implementation, { environments });
+
+      yield* runner.run(workspaceId, turnId);
+      expect(state.steps).toEqual(["stopped"]);
+      expect(calls).toEqual(["release box under acme"]);
+
+      // Abandoning a turn releases it too.
+      yield* runner.abandon(workspaceId, turnId);
+      expect(calls).toEqual(["release box under acme", "release box under acme"]);
     }),
   );
 });

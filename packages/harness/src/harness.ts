@@ -2,6 +2,7 @@ import { Schema } from "effect";
 import type { Effect, Scope, Stream } from "effect";
 import type { HarnessErrors } from "./errors.ts";
 import type { HarnessEvent } from "./event.ts";
+import type { HarnessImplementation } from "./implementation.ts";
 import type { HarnessTool } from "./tool.ts";
 import type { Transcript } from "./transcript.ts";
 
@@ -43,13 +44,17 @@ export interface StartOptions {
 export interface Session {
   /**
    * Sets the conversation to continue, before any other operation. Preparing starts no work: a
-   * transcript that awaits a response gets one after `resume`.
+   * transcript that awaits a response gets one after `resume`. It fails with `ExecutionFailed`
+   * when the harness could not set up its own session, such as one running in a sandbox that ended.
    */
   readonly prepare: (
     transcript: ReadonlyArray<Transcript.Item>,
   ) => Effect.Effect<
     void,
-    HarnessErrors.AlreadyPrepared | HarnessErrors.InvalidTranscript | HarnessErrors.Unsupported
+    | HarnessErrors.AlreadyPrepared
+    | HarnessErrors.InvalidTranscript
+    | HarnessErrors.Unsupported
+    | HarnessErrors.ExecutionFailed
   >;
   /**
    * Hands over input. The session takes it in once no tool call is waiting, before its next
@@ -76,11 +81,12 @@ export interface Session {
 }
 
 /**
- * A harness implementation. `R` is what its sessions need from their environment, such as model
- * access; a session lives until its scope closes.
+ * A harness implementation: what it declares to a host's catalog, and its code. `R` is what its
+ * sessions need from their environment, such as model access; a session lives until its scope
+ * closes.
  */
 export interface Interface<R = never> {
-  readonly name: Name;
+  readonly declaration: HarnessImplementation.Declaration;
   readonly capabilities: Capabilities;
   readonly start: (options: StartOptions) => Effect.Effect<Session, never, Scope.Scope | R>;
 }

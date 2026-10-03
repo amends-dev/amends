@@ -1,0 +1,23 @@
+{
+  "name": "@amends/harness-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/server.ts",
+    "./index.ts": "./src/index.ts"
+  },
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/connection-anthropic": "workspace:*",
+    "@amends/connection-openai-compatible": "workspace:*",
+    "@amends/environment": "workspace:*",
+    "@amends/harness-acp": "workspace:*",
+    "@amends/harness-amends": "workspace:*",
+    "@effect/platform-bun": "catalog:",
+    "effect": "catalog:"
+  }
+}

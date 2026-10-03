@@ -73,9 +73,9 @@ export const withServer = async <A>(
       const text = await response.text();
       return { status: response.status, body: text === "" ? undefined : JSON.parse(text) };
     };
-    const stop: Stop = async () => {
+    const stop: Stop = async (signal = "SIGTERM") => {
       const started = performance.now();
-      child.kill("SIGTERM");
+      child.kill(signal);
       await child.exited;
       return performance.now() - started;
     };
@@ -93,8 +93,11 @@ export const withServer = async <A>(
   }
 };
 
-/** Stop the server as its process manager would, and say how long it took, in milliseconds. */
-export type Stop = () => Promise<number>;
+/**
+ * Stop the server as its process manager would, or as a crash does with `SIGKILL`, and say how long
+ * it took, in milliseconds.
+ */
+export type Stop = (signal?: "SIGTERM" | "SIGKILL") => Promise<number>;
 
 export type Call = (
   token: string,

@@ -8,10 +8,13 @@ directories on this machine. It is the reference provider for tests and developm
 network; `capabilities.isolated` is `false`. Do not run untrusted work in it.
 
 `LocalSandbox.make({ root })` needs Effect's `FileSystem`, `Path`, `ChildProcessSpawner`, and
-`Crypto` services, such as `BunServices.layer`, and a scope. Under `root` it keeps:
+`Crypto` services, such as `BunServices.layer`, and a scope. `LocalSandbox.implementation({ root })`
+is what a host installs: one such provider for every environment, since local sandboxes run under
+no account. Under `root` it keeps:
 
-- `sandboxes/<id>/`, each sandbox's working directory, and `sandboxes/<id>.json`, the environment
-  it was acquired with;
+- `sandboxes/<id>/`, each sandbox's working directory, `sandboxes/<id>.tmp/`, its temporary
+  directory, which its commands get as `TMPDIR`, and `sandboxes/<id>.json`, the environment it was
+  acquired with;
 - `snapshots/<id>/`, each snapshot as a copy of a working directory.
 
 `LocalSandbox.declaration` is what a host registers: a provider without an account or template.

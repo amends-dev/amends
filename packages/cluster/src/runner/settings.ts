@@ -1,15 +1,8 @@
 /** How a runner is set up: the code it runs turns with, and how long it waits for what. */
 import type { ModelInference } from "@amends/connection/model-inference";
-import type { Harness } from "@amends/harness";
 import { Duration } from "effect";
-import type { LanguageModel, Model } from "effect/ai";
-
-/** The model access an in-process harness takes: Effect AI's, from a connection's implementation. */
-export type ModelAccess = LanguageModel.LanguageModel | Model.ProviderName | Model.ModelName;
 
 export interface Options {
-  /** The harnesses this host runs in process, found by name. */
-  readonly harnesses: ReadonlyArray<Harness.Interface<ModelAccess>>;
   /** The code behind the model connections this host installs, found by implementation. */
   readonly models: ReadonlyArray<ModelInference.Implementation>;
   /** How often a running turn looks for a request to stop: every second by default. */
@@ -57,9 +50,8 @@ export const defaultContextPolicy: ContextPolicy = {
   shrinks: 3,
 };
 
-/** A runner's options with their defaults applied, and its harnesses and models found by name. */
+/** A runner's options with their defaults applied, and its models found by implementation. */
 export interface Settings {
-  readonly harnesses: ReadonlyMap<string, Harness.Interface<ModelAccess>>;
   readonly models: ReadonlyMap<string, ModelInference.Implementation>;
   readonly checkInterval: Duration.Duration;
   readonly retries: number;
@@ -70,7 +62,6 @@ export interface Settings {
 
 /** A runner's settings from its options, with the defaults applied. */
 export const fromOptions = (options: Options): Settings => ({
-  harnesses: new Map(options.harnesses.map((harness) => [harness.name as string, harness])),
   models: new Map(options.models.map((model) => [model.declaration.id as string, model])),
   checkInterval: Duration.fromInputUnsafe(options.checkInterval ?? "1 second"),
   retries: options.retries ?? 3,

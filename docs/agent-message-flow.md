@@ -132,7 +132,9 @@ its log:
 | `recordCheckpoint`                             | A summary of older history, when the conversation would not fit the model's context.                                             |
 | `recordAttempt`                                | That a harness session, or a summary, is beginning. Attempts since the turn last got further are counted.                        |
 | `recordSubmission`                             | The batch of input handed to the harness, under a key of its range so a restart records it once.                                 |
-| `recordEvents`                                 | What the environment and harness produced: completed blocks, responses, tool results, the environment ready.                     |
+| `recordEnvironment`                            | The running environment the run's sessions work in, and where its files came from, so a later run acquires it again.             |
+| `recordSession`                                | The ID of the harness session a run starts, before starting it, so a run that comes back attaches to it.                         |
+| `recordEvents`                                 | What the harness produced: completed blocks, responses, tool results.                                                            |
 | `showDraft`                                    | Nothing durable: streaming text, as a `TurnDraft` signal for readers.                                                            |
 | `recordInterruption`, `fail`, `confirmStopped` | Why a run stopped short, or how the turn ended without a reply.                                                                  |
 | `close`                                        | Commit D, below.                                                                                                                 |

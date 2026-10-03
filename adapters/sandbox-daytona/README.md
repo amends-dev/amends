@@ -21,8 +21,9 @@ client. Its options:
 `DaytonaSandbox.declaration` is what a host registers: an isolated provider that runs under an
 account and takes a snapshot name as its template. The account is a workspace connection:
 `DaytonaConnection.declaration` declares it, with the sandbox capability for `daytona`, an API key,
-and optional API URL and target settings, and `DaytonaConnection.client(access)` turns a
-connection's settings and key into the client configuration above.
+and optional API URL and target settings. `DaytonaSandbox.implementation(options)` is what a host
+installs: with Effect's `Crypto` service, it makes a provider for each environment's account from
+its connection's key, API URL, and target, with the other options above.
 
 How the contract maps onto Daytona:
 
@@ -51,6 +52,11 @@ create real sandboxes, so they run only when asked:
 ```sh
 AMENDS_TEST_DAYTONA=1 bun run test adapters/sandbox-daytona/test
 ```
+
+The [local host's](../../hosts/local/README.md#verify) `turns.test.ts` runs agents' turns on
+Daytona under the same flag: one whose model refuses its key, which needs no model account, and
+two that reply, on amends's harness and on opencode, which also need `OPENROUTER_API_KEY` or
+`ANTHROPIC_API_KEY`.
 
 Each test creates sandboxes labelled `amends: conformance` and deletes them and any snapshot it
 took when it ends. Daytona stops any a failed run leaves after 15 minutes and deletes them an hour

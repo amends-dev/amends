@@ -33,11 +33,15 @@ implementations that need them.
 ## Model inference
 
 `@amends/connection/model-inference` holds what an implementation with model inference supplies:
-a `ModelInference.Implementation` with its declaration, `languageModel(access, selection)`, and
-`limits(access, selection)`. `access` is the connection's settings and credential; `selection` is
+a `ModelInference.Implementation` with its declaration, `languageModel(access, selection)`,
+`endpoint(access, selection)`, and `limits(access, selection)`. `access` is the connection's settings and credential,
+`ConnectionImplementation.Access`, which every capability's code takes; `selection` is
 the model an agent chose, by the provider's own identifier. `languageModel` returns Effect AI model
 access, a `LanguageModel` with its provider and model names, which a harness such as
-[amends's own](../harness-amends/README.md) uses. `limits` says how much the model takes: its
+[amends's own](../harness-amends/README.md) uses. `endpoint` returns the model as a harness that
+speaks the provider's interface calls it itself, such as [opencode](../../adapters/harness-acp/README.md#opencode)
+in a sandbox: a `ModelInference.Endpoint` with the interface the connection declares, its base URL
+when the connection sets one, its key, the model, and its limits. `limits` says how much the model takes: its
 context window in tokens, and the most it writes in one response when known, from which
 [the turn runner](../cluster/README.md#running-a-turn) keeps a conversation within it. The module is separate so reading declarations never loads Effect AI.
 

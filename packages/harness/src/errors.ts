@@ -66,7 +66,7 @@ export class ExecutionFailed extends Schema.TaggedError<ExecutionFailed>()(
 ) {}
 
 /** How providers word refusing a request longer than their model's context window. */
-const overflow =
+export const contextOverflow =
   /prompt is too long|context[_ ]length|maximum context|context window|too many (?:input )?tokens|input is too long/iu;
 
 const reasons: {
@@ -82,7 +82,7 @@ const reasons: {
   InternalProviderError: () => "model-provider",
   ContentPolicyError: () => "model-content-policy",
   InvalidRequestError: (reason) =>
-    overflow.test([reason.description, reason.constraint, reason.http?.body].join(" "))
+    contextOverflow.test([reason.description, reason.constraint, reason.http?.body].join(" "))
       ? "model-context"
       : "model-request",
   UnsupportedSchemaError: () => "model-request",

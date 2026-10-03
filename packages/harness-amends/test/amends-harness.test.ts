@@ -62,7 +62,7 @@ const start = (
   model: LanguageModel.LanguageModel,
   options: Harness.StartOptions,
 ): Effect.Effect<Harness.Session, never, Scope.Scope> =>
-  AmendsHarness.make()
+  AmendsHarness.harness
     .start(options)
     .pipe(Effect.provideService(LanguageModel.LanguageModel, model));
 

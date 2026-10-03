@@ -14,6 +14,7 @@ const program = Effect.gen(function* () {
     runnerTransport,
     runnerTakeover,
     credentialKey,
+    sandboxDirectory,
   } = yield* LocalConfig.load();
   return yield* Layer.launch(
     LocalServer.layer(
@@ -23,6 +24,7 @@ const program = Effect.gen(function* () {
         runnerTransport,
         runnerTakeover,
         credentialKey,
+        sandboxDirectory,
       }),
       port,
     ),

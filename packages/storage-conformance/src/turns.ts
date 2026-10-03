@@ -2,7 +2,7 @@ import type * as Core from "@amends/core";
 import { AgentService } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { ConnectionService } from "@amends/core/connection";
-import { Environment } from "@amends/core/environment";
+import { Environment, EnvironmentService } from "@amends/core/environment";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
@@ -17,9 +17,11 @@ import {
 import { Turn, TurnService, TurnExecution, TurnLog } from "@amends/core/turn";
 import type { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
-import { HarnessEvent, Transcript } from "@amends/harness";
+import { Harness, HarnessEvent, Transcript } from "@amends/harness";
+import { Environment as EnvironmentRuntime } from "@amends/environment";
+import { Sandbox, SandboxImplementation } from "@amends/sandbox";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, Queue, Stream } from "effect";
+import { Effect, Option, Queue, Redacted, Stream } from "effect";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -32,6 +34,7 @@ import {
   runAgentJobs,
   Support,
   testImplementation,
+  testSandboxAccount,
 } from "./support.ts";
 
 const as = <A, E, R extends Core.Operations | Actor.Service>(
@@ -204,8 +207,6 @@ const batch = (id: string, text: string) => ({
   items: [input(text)] as const,
 });
 /** Harness events as execution reports them, in the environment's envelope. */
-const reported = (...events: ReadonlyArray<HarnessEvent.Event>) =>
-  events.map((event) => ({ _tag: "Harness" as const, event }));
 const took = (taken: HarnessEvent.InputBatch): HarnessEvent.Event => ({
   _tag: "InputIncorporated",
   batch: taken,
@@ -331,10 +332,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      turnId,
-                      reported(took(first), ...answered("r1", "An early answer.")),
-                    );
+                    yield* turnExecution.recordEvents(turnId, [
+                      took(first),
+                      ...answered("r1", "An early answer."),
+                    ]);
                   }),
                 ),
               );
@@ -367,10 +368,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: more.activity.sequence,
                       items: second.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      turnId,
-                      reported(took(second), ...answered("r2", "The plan, with its risks.")),
-                    );
+                    yield* turnExecution.recordEvents(turnId, [
+                      took(second),
+                      ...answered("r2", "The plan, with its risks."),
+                    ]);
                     return yield* turnExecution.close(turnId);
                   }),
                 ),
@@ -501,7 +502,7 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* turnExecution.recordEvents(turnId, reported(took(first)));
+                    yield* turnExecution.recordEvents(turnId, [took(first)]);
                   }),
                 );
                 expect(brief(yield* next)).toBe("changed 0:InputTaken");
@@ -521,10 +522,7 @@ export const turns = (harness: ConformanceHarness) => {
                 expect(brief(yield* late)).toBe("opened InputTaken");
                 expect(brief(yield* late)).toBe("drafted The ");
                 yield* run((turnExecution) =>
-                  turnExecution.recordEvents(
-                    turnId,
-                    reported(...answered("r1", "The plan is on track.")),
-                  ),
+                  turnExecution.recordEvents(turnId, answered("r1", "The plan is on track.")),
                 );
                 expect(brief(yield* next)).toBe("changed 1:The plan is on track. (reply)");
                 expect(brief(yield* late)).toBe("changed 1:The plan is on track. (reply)");
@@ -736,7 +734,7 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: first.items,
                     });
-                    yield* turnExecution.recordEvents(queued!.id, reported(took(first)));
+                    yield* turnExecution.recordEvents(queued!.id, [took(first)]);
                     yield* turnExecution.fail(queued!.id, "The model provider is unavailable.");
                   }),
                 ),
@@ -818,10 +816,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: request.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      retried.id,
-                      reported(took(request), ...answered("r1", "The notes.")),
-                    );
+                    yield* turnExecution.recordEvents(retried.id, [
+                      took(request),
+                      ...answered("r1", "The notes."),
+                    ]);
                     yield* turnExecution.close(retried.id);
                   }),
                 ),
@@ -834,6 +832,132 @@ export const turns = (harness: ConformanceHarness) => {
           ),
         ),
       60_000,
+    );
+
+    it.effect(
+      "a turn whose sandbox runs under an account runs with that connection's key, once it has one",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const workspace = yield* Operations.createWorkspace(alice.id);
+              const connect = <A, E>(
+                use: (service: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
+              ) => as(workspace.id, alice, Effect.flatMap(ConnectionService.Service, use));
+              const models = yield* connect((service) =>
+                service.create({
+                  name: "Models",
+                  implementationId: testImplementation.id,
+                  settings: { endpoint: "https://models.example" },
+                  authentication: "None",
+                }),
+              );
+              const account = yield* connect((service) =>
+                service.create({
+                  name: "Cloud account",
+                  implementationId: testSandboxAccount.id,
+                  settings: {},
+                  authentication: "ApiKey",
+                }),
+              );
+              const box = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(EnvironmentService.Service, (environmentService) =>
+                  environmentService.create({
+                    name: "Cloud box",
+                    harnessId: Harness.Name.make("boxed"),
+                    sandbox: {
+                      providerId: SandboxImplementation.Id.make("test-cloud"),
+                      harness: "in-sandbox",
+                      connectionId: account.id,
+                      template: null,
+                      env: {},
+                      setup: [],
+                      retention: "stop",
+                    },
+                  }),
+                ),
+              );
+              const agent = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(AgentService.Service, (agentService) =>
+                  agentService.create({
+                    name: "Scout",
+                    instructions: "Help the team.",
+                    model: { connectionId: models.id, model: "model-x", reasoning: null },
+                    environmentId: box.id,
+                    roleId: BuiltinRoles.MemberId,
+                  }),
+                ),
+              );
+              const started = yield* start(workspace.id, "Scout, build it.", [agent.memberId]);
+              yield* runAgentJobs(workspace.id);
+              const [turn] = yield* turnsOf(workspace.id, started.thread.id);
+              const run = <A, E>(
+                use: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>,
+              ) => execute(workspace.id, Effect.flatMap(TurnExecution.Service, use));
+
+              // Without the account's key the turn can't run.
+              expect(yield* run((turnExecution) => turnExecution.prepare(turn!.id))).toEqual(
+                TurnExecution.Preparation.Unrunnable({
+                  reason: "Cloud account needs its API key.",
+                }),
+              );
+              const keyed = yield* connect((service) =>
+                service.setCredential({
+                  connectionId: account.id,
+                  secret: Redacted.make("cloud-key"),
+                }),
+              ).pipe(
+                Effect.as(true),
+                Effect.catchTag("ConnectionService.CredentialsUnavailable", () =>
+                  Effect.succeed(false),
+                ),
+              );
+              if (!keyed) return;
+              // With it, the plan carries the account's access for the sandbox's provider.
+              const prepared = yield* run((turnExecution) => turnExecution.prepare(turn!.id));
+              expect(prepared).toMatchObject({
+                _tag: "Ready",
+                plan: {
+                  sandboxConnection: {
+                    name: "Cloud account",
+                    implementationId: "test-cloud",
+                    settings: {},
+                  },
+                },
+              });
+              const sandboxConnection =
+                prepared._tag === "Ready" ? prepared.plan.sandboxConnection : undefined;
+              expect(sandboxConnection?.credential?.pipe(Redacted.value)).toBe("cloud-key");
+              // So does what releasing a sandbox a run left reads, once the turn acquired one.
+              const acquired = yield* run((turnExecution) =>
+                Effect.gen(function* () {
+                  yield* turnExecution.start(turn!.id, {
+                    connectionId: models.id,
+                    model: "model-x",
+                    reasoning: null,
+                    environmentId: box.id,
+                  });
+                  yield* turnExecution.recordEnvironment(turn!.id, {
+                    reference: {
+                      definitionId: EnvironmentRuntime.DefinitionId.make(box.id),
+                      sandboxId: Sandbox.Id.make("box-1"),
+                    },
+                    filesystem: { _tag: "Fresh" },
+                  });
+                  return yield* turnExecution.readAcquiredEnvironment(turn!.id);
+                }),
+              );
+              expect(acquired?.sandboxConnection?.credential?.pipe(Redacted.value)).toBe(
+                "cloud-key",
+              );
+            }),
+          ),
+        ),
     );
 
     it.effect(
@@ -876,19 +1000,16 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: started.activity.sequence,
                       items: asked.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      first!.id,
-                      reported(
-                        took(asked),
-                        {
-                          _tag: "BlockCompleted",
-                          responseId: Transcript.ResponseId.make("s1/1"),
-                          part: 0,
-                          block: reasoning,
-                        },
-                        ...answered("s1/1", "Thursday.", 1),
-                      ),
-                    );
+                    yield* turnExecution.recordEvents(first!.id, [
+                      took(asked),
+                      {
+                        _tag: "BlockCompleted",
+                        responseId: Transcript.ResponseId.make("s1/1"),
+                        part: 0,
+                        block: reasoning,
+                      },
+                      ...answered("s1/1", "Thursday.", 1),
+                    ]);
                     yield* turnExecution.close(first!.id);
                   }),
                 ),
@@ -935,15 +1056,15 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: more.activity.sequence,
                       items: followUp.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      second!.id,
-                      reported(took(followUp), {
+                    yield* turnExecution.recordEvents(second!.id, [
+                      took(followUp),
+                      {
                         _tag: "BlockCompleted",
                         responseId: Transcript.ResponseId.make("s2/1"),
                         part: 0,
                         block: { _tag: "Text", text: "The rollback plan is" },
-                      }),
-                    );
+                      },
+                    ]);
                   }),
                 ),
               );
@@ -1019,10 +1140,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: last.activity.sequence,
                       items: dateOnly.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      third!.id,
-                      reported(took(dateOnly), ...answered("s3/1", "Thursday.")),
-                    );
+                    yield* turnExecution.recordEvents(third!.id, [
+                      took(dateOnly),
+                      ...answered("s3/1", "Thursday."),
+                    ]);
                     yield* turnExecution.close(third!.id);
                   }),
                 ),
@@ -1157,13 +1278,10 @@ export const turns = (harness: ConformanceHarness) => {
                       throughSequence: asked.activity.sequence,
                       items: took.items,
                     });
-                    yield* turnExecution.recordEvents(
-                      first!.id,
-                      reported(
-                        { _tag: "InputIncorporated", batch: took },
-                        ...answered("s1/1", "Here is the summary."),
-                      ),
-                    );
+                    yield* turnExecution.recordEvents(first!.id, [
+                      { _tag: "InputIncorporated", batch: took },
+                      ...answered("s1/1", "Here is the summary."),
+                    ]);
                     yield* turnExecution.close(first!.id);
                   }),
                 ),

@@ -35,6 +35,18 @@
         "effect": "catalog:",
       },
     },
+    "adapters/harness-acp": {
+      "name": "@amends/harness-acp",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@effect/platform-bun": "catalog:",
+      },
+    },
     "adapters/sandbox-daytona": {
       "name": "@amends/sandbox-daytona",
       "version": "0.0.0",
@@ -203,6 +215,19 @@
         "vite-plugin-solid": "^2.11.14",
       },
     },
+    "hosts/harness-server": {
+      "name": "@amends/harness-server",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection-anthropic": "workspace:*",
+        "@amends/connection-openai-compatible": "workspace:*",
+        "@amends/environment": "workspace:*",
+        "@amends/harness-acp": "workspace:*",
+        "@amends/harness-amends": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+        "effect": "catalog:",
+      },
+    },
     "hosts/local": {
       "name": "@amends/host-local",
       "version": "0.0.0",
@@ -211,8 +236,11 @@
         "@amends/connection-anthropic": "workspace:*",
         "@amends/connection-openai-compatible": "workspace:*",
         "@amends/core": "workspace:*",
+        "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
+        "@amends/harness-acp": "workspace:*",
         "@amends/harness-amends": "workspace:*",
+        "@amends/harness-server": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
         "@amends/sandbox-local": "workspace:*",
         "@amends/server-http": "workspace:*",
@@ -222,6 +250,7 @@
       },
       "devDependencies": {
         "@amends/api-http": "workspace:*",
+        "@daytona/sdk": "0.218.0",
         "@effect/sql-pg": "catalog:",
       },
     },
@@ -274,6 +303,7 @@
       "name": "@amends/environment",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
         "effect": "catalog:",
@@ -297,6 +327,7 @@
       "name": "@amends/harness",
       "version": "0.0.0",
       "dependencies": {
+        "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
     },
@@ -312,6 +343,7 @@
       "name": "@amends/sandbox",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -340,6 +372,7 @@
       "dependencies": {
         "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
+        "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -386,7 +419,11 @@
 
     "@amends/harness": ["@amends/harness@workspace:packages/harness"],
 
+    "@amends/harness-acp": ["@amends/harness-acp@workspace:adapters/harness-acp"],
+
     "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
+
+    "@amends/harness-server": ["@amends/harness-server@workspace:hosts/harness-server"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
 

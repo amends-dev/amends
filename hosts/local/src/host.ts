@@ -1,7 +1,11 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
+import { Environment } from "@amends/environment";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import { OpenCodeHarness } from "@amends/harness-acp";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
 import { LocalSandbox } from "@amends/sandbox-local";
@@ -10,8 +14,8 @@ import {
   PostgresDatabase,
   layer as postgres,
 } from "@amends/storage-postgresql";
-import { BunClusterSocket, BunCrypto } from "@effect/platform-bun";
-import { Duration, Layer, Option, type Redacted } from "effect";
+import { BunClusterSocket, BunCrypto, BunServices } from "@effect/platform-bun";
+import { Duration, Effect, Layer, Option, type Redacted } from "effect";
 import {
   type MessageStorage,
   RunnerAddress,
@@ -19,7 +23,9 @@ import {
   type Sharding,
   SingleRunner,
 } from "effect/cluster";
+import { FetchHttpClient } from "effect/http";
 import type { SqlClient } from "effect/sql";
+import { LocalHarnessServer } from "./harness-server.ts";
 
 /** Gateway and directory owned by one host lifetime. */
 export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
@@ -51,11 +57,20 @@ export interface Options {
    * host stores no credentials.
    */
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
+  /**
+   * The directory local sandboxes live in, beside the harness server builds this host uploads
+   * into them; `amends-sandboxes` in the system's temporary directory by default.
+   */
+  readonly sandboxDirectory?: string | undefined;
 }
+
+/** The harnesses this host runs agents' turns with: amends's own, in process. */
+const harnesses = [AmendsHarness.harness];
 
 /**
  * What this host installs, as its catalogs declare them: model connections and a Daytona account;
- * amends's own harness; and sandboxes as local directories, for development, and on Daytona.
+ * amends's harness, in process or in a sandbox, and opencode, in a sandbox; and sandboxes as local
+ * directories, for development, and on Daytona.
  */
 export const installed = {
   connections: [
@@ -63,13 +78,34 @@ export const installed = {
     OpenAiCompatibleConnection.declaration,
     DaytonaConnection.declaration,
   ],
-  harnesses: [AmendsHarness.declaration],
+  harnesses: [AmendsHarness.harness.declaration, OpenCodeHarness.declaration],
   sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
 };
 
-/** The code that runs agents' turns: amends's harness in process, with either model connection. */
+/**
+ * The environments this host runs: amends's harness in process, sandboxes as directories under
+ * `directory` and on each workspace's Daytona account, and the harness server it builds to run
+ * harnesses inside them.
+ *
+ * @category layers
+ */
+export const layerEnvironments = (directory: string) =>
+  Layer.effect(
+    Environment.Service,
+    Effect.gen(function* () {
+      const sandboxes = [
+        yield* LocalSandbox.implementation({ root: directory }),
+        yield* DaytonaSandbox.implementation(),
+      ];
+      const harnessServer = yield* LocalHarnessServer.make({
+        directory: join(directory, "harness-server"),
+      });
+      return yield* Environment.make({ harnesses, sandboxes, harnessServer });
+    }),
+  ).pipe(Layer.provide([BunServices.layer, FetchHttpClient.layer]));
+
+/** The code that runs agents' turns with either model connection. */
 export const turnRunnerOptions: TurnRunner.Options = {
-  harnesses: [AmendsHarness.make()],
   models: [AnthropicConnection.modelInference, OpenAiCompatibleConnection.modelInference],
 };
 
@@ -119,7 +155,12 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
       prune: PostgresClusterStorage.prune,
       entityTypes: [AgentJob.entity.type, TurnJob.entity.type],
     }),
-    TurnJob.layerWorker.pipe(Layer.provide(TurnRunner.layer(turnRunnerOptions))),
+    TurnJob.layerWorker.pipe(
+      Layer.provide(TurnRunner.layer(turnRunnerOptions)),
+      Layer.provide(
+        layerEnvironments(options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes")),
+      ),
+    ),
   ).pipe(
     Layer.provideMerge(
       Gateway.layer(installed).pipe(

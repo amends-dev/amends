@@ -6,16 +6,18 @@
  */
 import type { HarnessErrors } from "@amends/harness";
 import { Effect } from "effect";
-import { Checkpoint } from "./checkpoint.ts";
+import type { Checkpoint } from "./checkpoint.ts";
 import type { Compaction } from "./compaction.ts";
 import { Ending } from "./ending.ts";
 import { NextStep } from "./next-step.ts";
-import { Session } from "./session.ts";
+import type { Session } from "./session.ts";
 import { durationInWords, type Settings } from "./settings.ts";
 import type { TurnSteps } from "./turn-steps.ts";
 
 /** A step that runs the turn: summarizing its history, or working in a harness session. */
 export type Step = Extract<NextStep.Step, { readonly _tag: "Summarize" | "Work" }>;
+
+type Attempted = ReturnType<typeof Checkpoint.record> | ReturnType<typeof Session.run>;
 
 /** What a turn's readers know its model access by: the connection's name, and the model's. */
 interface ModelAccessNames {
@@ -102,26 +104,27 @@ const endAfterFailure = Effect.fnUntraced(function* (
     return Ending.Unrunnable({ reason: text });
   }
   yield* Effect.logWarning("Turn interrupted", logFields);
-  return Ending.Interrupted();
+  return Ending.Interrupted({ problem: failure.problem });
 });
 
-/** Run the step as the turn's next attempt, and say how it ended. */
+/**
+ * Run `attempt`, the work of the step, as the turn's next attempt, and say how it ended: a summary
+ * for a checkpoint, or a harness session.
+ */
 export const run = Effect.fnUntraced(function* (
   turnSteps: TurnSteps.Interface,
   settings: Settings,
   step: Step,
+  attempt: Effect.Effect<
+    Effect.Success<Attempted>,
+    Effect.Error<Attempted>,
+    Effect.Services<Attempted>
+  >,
 ) {
   const names = { connection: step.plan.connection.name, model: step.plan.selection.model };
   const idleTimeoutInWords = durationInWords(settings.idleTimeout);
   yield* turnSteps.recordAttempt(NextStep.Step.$is("Summarize")(step) ? "summary" : "session");
-  type RunStep = ReturnType<typeof Checkpoint.record> | ReturnType<typeof Session.run>;
-  const runStep = Effect.suspend(
-    (): Effect.Effect<Effect.Success<RunStep>, Effect.Error<RunStep>, Effect.Services<RunStep>> =>
-      NextStep.Step.$is("Summarize")(step)
-        ? Checkpoint.record(turnSteps, settings, step)
-        : Session.run(turnSteps, settings, step),
-  );
-  return yield* runStep.pipe(
+  return yield* attempt.pipe(
     Effect.raceFirst(waitUntilStopped(turnSteps, settings)),
     Effect.scoped,
     Effect.catchTags({

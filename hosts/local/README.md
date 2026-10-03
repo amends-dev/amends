@@ -22,15 +22,16 @@ The server listens on `http://127.0.0.1:8787`, with the OpenAPI document at
 `/openapi.json` and interactive documentation at `/docs`. The web development
 server proxies `/api` here. `bun run dev` restarts the host when its source changes.
 
-| Setting                     | Default           | Accepted value                                              |
-| --------------------------- | ----------------- | ----------------------------------------------------------- |
-| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port.  |
-| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                     |
-| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                            |
-| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.          |
-| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                      |
-| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.               |
-| `AMENDS_CREDENTIAL_KEY`     | Unset             | 32 bytes as base64, such as from `openssl rand -base64 32`. |
+| Setting                     | Default           | Accepted value                                                                  |
+| --------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+| `AMENDS_PORT`               | `8787`            | Integer from `0` through `65535`; `0` selects a free port.                      |
+| `AMENDS_DATABASE_URL`       | Required          | A `postgres://` or `postgresql://` URL.                                         |
+| `AMENDS_DATABASE_POOL_SIZE` | `20`              | Integer from `5` through `1000`.                                                |
+| `AMENDS_RUNNER_ADDRESS`     | `localhost:34431` | `host:port`, with a port from `1` through `65535`.                              |
+| `AMENDS_RUNNER_TRANSPORT`   | `storage`         | `storage` or `socket`.                                                          |
+| `AMENDS_RUNNER_TAKEOVER`    | `35 seconds`      | A duration from 6 seconds through 10 minutes.                                   |
+| `AMENDS_CREDENTIAL_KEY`     | Unset             | 32 bytes as base64, such as from `openssl rand -base64 32`.                     |
+| `AMENDS_SANDBOX_DIRECTORY`  | Temporary         | A directory; `amends-sandboxes` in the system's temporary directory by default. |
 
 `AMENDS_CREDENTIAL_KEY` seals connections' credentials at rest; without it the host stores none,
 and setting one reports `CredentialsUnavailable`. Keep it secret and stable: a changed key cannot
@@ -38,7 +39,8 @@ open credentials sealed with the old one, and nothing rotates them yet. The host
 [Anthropic](../../adapters/connection-anthropic/README.md) and
 [OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connection
 implementations and a [Daytona](../../adapters/sandbox-daytona/README.md) account connection;
-amends's own [harness](../../packages/harness-amends/README.md); and the
+amends's own [harness](../../packages/harness-amends/README.md), in process or in a sandbox, and
+[opencode](../../adapters/harness-acp/README.md#opencode), in a sandbox; and the
 [local](../../adapters/sandbox-local/README.md) and Daytona sandbox providers, all as
 `LocalHost.installed` declares them.
 
@@ -99,11 +101,23 @@ reachable on a private network.
 
 The host runs agents' turns as [turn jobs](../../packages/cluster/README.md#turn-jobs) on the same Cluster runner as
 its background jobs: each turn is its own job, so turns run side by side, and the request to
-run one is stored in the commit that created it. A turn runs amends's own harness in process,
-with the agent's Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply
-in its thread. Environments with a sandbox cannot run turns yet. Several processes over one
+run one is stored in the commit that created it. A turn runs its environment's harness, amends's
+own or opencode, with the agent's Anthropic or OpenAI-compatible connection, and ends by posting
+the agent's reply in its thread. opencode runs only inside a sandbox, which needs its pinned release
+on the `PATH`: the developer's own for a local sandbox, and on Daytona one the environment's setup
+installs.
+The harness runs in process, or, in an environment that says so, inside a sandbox, where the turn
+runs the [harness server](../harness-server/README.md): a local one, a directory under
+`AMENDS_SANDBOX_DIRECTORY`, or a Daytona one, under the workspace's Daytona connection, which the
+environment names. The host compiles the harness server with the Bun running it the first time a
+sandbox on each platform needs one started, into `harness-server/` in that directory, and uploads it
+into the sandbox's temporary directory. Several processes over one
 database share turn jobs as they share background jobs, and a turn cut short by a restart
-continues from its log. Handled turn job requests are pruned with the rest.
+continues from its log. When a host dies while a turn works inside a sandbox, the harness server
+goes on with the session, and the process that takes the turn over attaches to it and collects what
+it reported. A host that stops cleanly ends the processes its local sandboxes run, so there the
+turn's next run starts a new session from its log. When the sandbox itself is gone, the turn
+continues in a new one, and the agent is told that its earlier files are gone. Handled turn job requests are pruned with the rest.
 
 ## Browser and desktop access
 
@@ -121,16 +135,17 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                                                                                                            |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                        |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                              |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                     |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                       |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work and turns, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `turnRunnerOptions` is what runs turns. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                  |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                        |
-| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                                                                        |
+| Module                             | Responsibility                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                                                                                                                           |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                                                                                                                                 |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                                                                                                                                        |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                                                                                                                          |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with background work and turns, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `turnRunnerOptions`, with `layerEnvironments`, the environment service over the host's harnesses, local sandboxes, and harness server, is what runs turns. |
+| `harness-server.ts`                | `LocalHarnessServer.make({ directory })`, compiling the harness server for each platform a sandbox needs, once per process, versioned by a digest of the build.                                                                                                                                                                                                              |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                                                                                                                                     |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                                                                                                                           |
+| `status.ts`                        | The background status command: `LocalStatus.render` and `toJson`, run only when executed directly.                                                                                                                                                                                                                                                                           |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
@@ -200,7 +215,11 @@ runner address another process holds; and that over sockets a request reaches th
 its workspace well before that process's next read. `turns.test.ts` asks an agent in a thread over
 HTTP and waits for its reply, which its turn gets from a local chat-completions server, asks a
 second question while the agent answers the first and finds both answers posted, then retries a
-turn whose key was refused and stops a running one over HTTP.
+turn whose key was refused and stops a running one over HTTP. It runs turns inside local sandboxes,
+on amends's harness and, when opencode 1.18.23 is installed, on opencode, whose follow-up in a new
+sandbox loads the conversation from the log. With `AMENDS_TEST_DAYTONA=1` it runs turns on Daytona
+with amends's harness and opencode, as the [Daytona guide](../../adapters/sandbox-daytona/README.md#testing)
+describes.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

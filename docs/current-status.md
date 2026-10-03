@@ -17,8 +17,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   participants or muting.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
   local host [runs them](../packages/cluster/README.md), each closing with the agent's reply.
-  Turns are conversation only: agents have no tools, and environments with a sandbox fail their
-  turns. A turn posts every answer it completed when it closes, one message each, so an answer
+  Turns are conversation only: agents have no tools. A turn posts every answer it completed when it closes, one message each, so an answer
   given before more input arrived is posted after that input; a turn that fails or is stopped
   posts nothing, even answers it completed. Each turn continues from the agent's log for the thread, read from its latest
   checkpoint, and reads every message it has not seen, however many. When a turn's history and
@@ -46,22 +45,41 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) run agents' turns in process. No test
-  calls a real model provider: the host's end-to-end test uses a local chat-completions stand-in. That harness stops rather
+  [environment runtime](../packages/environment/README.md) run agents' turns in process. Only
+  opt-in live tests call a real model provider; the host's other end-to-end tests use a local
+  chat-completions stand-in. That harness stops rather
   than answering the model when a response calls a tool it was not offered or holds a part it
   cannot record, and whether providers accept history with calls to tools a later session no
   longer offers is unverified.
+- [opencode](../adapters/harness-acp/README.md#opencode) runs through the Agent Client Protocol,
+  only inside a sandbox, which needs release 1.18.23 on the `PATH`; on Daytona an environment's
+  setup installs it. A conversation it continues is written as an opencode session with earlier tool
+  calls and results as text, and without reasoning, and one that starts with a response, or whose
+  last calls await results, is `Unsupported`. ACP names a call by its kind, so its calls are
+  recorded under names such as `execute`. It ignores a session's context limit and does not compact
+  itself: a conversation longer than its model's window reaches the turn runner's checkpoint only
+  once the provider refuses a request, which the harness recognizes from the refusal's words, and
+  that path has not been run against a real provider. No other ACP agent is installed.
 - [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
   and an optional sandbox under an account connection, and every workspace starts with an
   in-process one; they are managed over HTTP and on the [Environments page](environments.md).
-  Turns spawn in-process environments only; one with a sandbox cannot run a turn yet. Only
-  amends's own harness is installed, and it runs in process only, so a sandbox
-  is where its tools would act, and none acts there yet. Environments hold no defaults for
+  The local host installs amends's own harness and opencode. Amends's runs in process, where a
+  sandbox is only where its tools would act, and none acts there yet, or, as opencode does, inside a
+  local or Daytona sandbox, served by the
+  [harness server](../packages/environment/README.md#the-harness-server), a Daytona one under the
+  workspace's Daytona connection; opt-in live tests run turns there with a real model. Each turn
+  acquires a sandbox of its own, so
+  with `stop` retention every turn leaves a stopped sandbox. Environments hold no defaults for
   optional settings, since no installed harness takes reasoning levels. Model providers suggest
   models, but the compatibility check accepts any model name, and nothing checks one with its
   provider.
-- The [sandbox contract](../packages/sandbox/README.md) has two providers, and nothing acquires
-  sandboxes outside tests. No harness runs inside a sandbox yet, and an environment's retention
+- The [sandbox contract](../packages/sandbox/README.md) has two providers, local and Daytona, and
+  the local host installs both, making a Daytona provider for each workspace's account as a turn
+  needs it. A harness server in a sandbox listens on a port
+  with a token of its own, and a session a dead host left goes on there for the next run to attach
+  to; a local sandbox's processes end when its host stops cleanly, so there the next run starts the
+  session again. A session no run comes back to keeps its server running until its sandbox stops.
+  The model connection's key reaches the sandbox in the session's start request. An environment's retention
   can only stop or destroy its sandbox, so no harness context survives a release. Environments
   do not yet supply the MCP endpoint or a turn's credentials. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
   is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes

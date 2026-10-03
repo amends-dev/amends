@@ -23,12 +23,13 @@ remaining gaps with links to their owning code.
 | [HTTP server](../packages/server-http/README.md)                                   | Handler registration, request scopes, and authentication wiring.                                                    |
 | [Adapters](../adapters/README.md)                                                  | Store validation, construction, and migration conventions.                                                          |
 | [Storage conformance](../packages/storage-conformance/README.md)                   | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
-| [Harness](../packages/harness/README.md)                                           | The harness contract: sessions, and the events and transcript every harness records.                                |
+| [Harness](../packages/harness/README.md)                                           | The harness contract: sessions, the events and transcript every harness records, and the suites every harness runs. |
 | [Amends harness](../packages/harness-amends/README.md)                             | Amends's own harness: an in-process agent loop over Effect AI.                                                      |
+| [ACP harnesses](../adapters/harness-acp/README.md)                                 | Agents that speak the Agent Client Protocol, such as opencode, as harnesses running in a sandbox.                   |
 | [Connection](../packages/connection/README.md)                                     | The connection implementation contract: declarations for a host's catalog, and model inference.                     |
 | [Anthropic connection](../adapters/connection-anthropic/README.md)                 | Anthropic model connections over Effect AI.                                                                         |
 | [OpenAI-compatible connection](../adapters/connection-openai-compatible/README.md) | Chat-completions model connections, such as OpenAI, OpenRouter, or a local server.                                  |
-| [Environment](../packages/environment/README.md)                                   | Spawning a harness with a sandbox, acquisition outcomes, snapshots, and release.                                    |
+| [Environment](../packages/environment/README.md)                                   | Running stored environments: harnesses and sandboxes, spawning, sessions, and the harness server.                   |
 | [Cluster](../packages/cluster/README.md)                                           | Work outside requests on Effect Cluster: agent jobs, turn jobs that run agents' turns, retries, and pruning.        |
 | [Sandbox](../packages/sandbox/README.md)                                           | The sandbox provider contract: acquisition, commands, processes, ports, files, and snapshots.                       |
 | [Sandbox conformance](../packages/sandbox-conformance/README.md)                   | Test suites every sandbox provider runs, and the harness a provider supplies.                                       |
@@ -37,6 +38,7 @@ remaining gaps with links to their owning code.
 | [Memory storage](../adapters/storage-memory/README.md)                             | The in-memory reference implementation of the storage contracts.                                                    |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)                             | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md)               | Runtime composition, configuration, startup, and development identity.                                              |
+| [Harness server](../hosts/harness-server/README.md)                                | The program a host uploads into a sandbox to run a harness there.                                                   |
 | [Apps](../apps/README.md) / [web](../apps/web/README.md)                           | Platform-owned routing and composition of client and UI.                                                            |
 | [Desktop](../apps/desktop/README.md)                                               | Tauri prerequisites, host connection, and native verification.                                                      |
 | [Client](../apps/client/README.md)                                                 | Headless credential scopes, API/query state, view hooks, and route helpers.                                         |
@@ -60,6 +62,8 @@ drawings, generation, and visual review in the UI workshop.
   model-connection detour.
   [Turns](turns.md) covers agents' turns in threads, where agents are at work, and turn logs.
   [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
+  [Harnesses in sandboxes](sandbox-harnesses.md) plans running agents' harnesses inside sandboxes,
+  its goal, and its milestones.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
 - [Design-system references](../design-system/) are product and visual mocks, not

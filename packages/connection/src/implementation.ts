@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import type { Redacted } from "effect";
 
 /** Names an implementation in connection records and the catalog, such as `anthropic`. */
 export const Id = Schema.NonEmptyString.check(Schema.isPattern(/^[a-z0-9][a-z0-9-]*$/)).pipe(
@@ -80,5 +81,14 @@ export const Declaration = Schema.Struct({
   authentication: Schema.NonEmptyArray(Authentication),
 });
 export interface Declaration extends Schema.Schema.Type<typeof Declaration> {}
+
+/**
+ * What a connection supplies to its implementation's code to reach the external system: its
+ * settings and its credential, such as an API key.
+ */
+export interface Access {
+  readonly settings: Readonly<Record<string, string>>;
+  readonly credential: Redacted.Redacted<string> | undefined;
+}
 
 export * as ConnectionImplementation from "./implementation.ts";

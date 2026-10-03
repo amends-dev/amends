@@ -1,8 +1,13 @@
+import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   Api,
   Authentication,
   ConnectionImplementation,
   Environment,
+  SandboxImplementation,
+  type Thread,
   type ThreadTimeline,
   Turn,
 } from "@amends/api-http";
@@ -10,28 +15,54 @@ import {
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
+import { OpenCodeHarness } from "@amends/harness-acp";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Fiber, Layer, Redacted, Schedule, Stream } from "effect";
+import { Base64 } from "effect/encoding";
+import { Daytona } from "@daytona/sdk";
 import { HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";
 import { LocalHost } from "../src/host.ts";
 import { LocalServer } from "../src/server.ts";
 import { setup } from "./database.ts";
+import { withServer } from "./server.ts";
 
 const alice = Identity.HumanId.make("alice");
+
+/** Whether opencode's pinned release is on the `PATH`, for the tests that run it in a sandbox. */
+const opencodeInstalled = (() => {
+  try {
+    return (
+      Bun.spawnSync(["opencode", "--version"]).stdout.toString().trim() === OpenCodeHarness.version
+    );
+  } catch {
+    return false;
+  }
+})();
 const asToken = (token: string) =>
   HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
-/** The real routes, gateway, PostgreSQL storage, and turn runner behind a Bun test server. */
-const server = (url: string) =>
+/**
+ * The real routes, gateway, PostgreSQL storage, and turn runner behind a Bun test server, with
+ * local sandboxes in `sandboxDirectory`, and connections' keys sealed with `credentialKey`.
+ */
+const server = (
+  url: string,
+  sandboxDirectory?: string,
+  credentialKey?: Redacted.Redacted<string>,
+) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       Layer.mergeAll(
-        LocalHost.layer(Redacted.make(url), { pollInterval: "100 millis" }),
+        LocalHost.layer(Redacted.make(url), {
+          pollInterval: "100 millis",
+          sandboxDirectory,
+          credentialKey,
+        }),
         DevelopmentAuthentication.layer(() => Effect.void).pipe(Layer.provide(BunCrypto.layer)),
       ),
     ),
@@ -91,8 +122,15 @@ const fakeModels = (...replies: ReadonlyArray<Reply>) =>
     (models) => Effect.promise(models.stop),
   );
 
-/** Alice's workspace with Scout, an agent whose model connection is the fake provider. */
-const workspaceWithScout = (baseUrl: string) =>
+/**
+ * Alice's workspace with Scout, an agent whose model connection is the fake provider, in the
+ * environment every workspace starts with or one with this sandbox and harness.
+ */
+const workspaceWithScout = (
+  baseUrl: string,
+  sandbox?: Environment.NewSandbox,
+  harnessId: typeof Environment.inProcessHarness = Environment.inProcessHarness,
+) =>
   Effect.gen(function* () {
     const asAlice = yield* client(alice);
     const workspace = yield* asAlice.workspaces.create({
@@ -110,6 +148,14 @@ const workspaceWithScout = (baseUrl: string) =>
         authentication: "None",
       },
     });
+    const environment =
+      sandbox === undefined
+        ? undefined
+        : yield* asAlice.environments.create({
+            params: { workspaceId },
+            headers: {},
+            payload: { name: "Sandboxed", harnessId, sandbox },
+          });
     const agent = yield* asAlice.agents.create({
       params: { workspaceId },
       headers: {},
@@ -117,7 +163,7 @@ const workspaceWithScout = (baseUrl: string) =>
         name: "Scout",
         instructions: "Answer in one sentence.",
         model: { connectionId: connection.id, model: "fake-model", reasoning: null },
-        environmentId: Environment.InProcessId,
+        environmentId: environment?.id ?? Environment.InProcessId,
         roleId: BuiltinRoles.MemberId,
       },
     });
@@ -128,7 +174,14 @@ const workspaceWithScout = (baseUrl: string) =>
         headers: {},
         payload: { text, mentions: [agent.memberId] },
       });
-    return { asAlice, workspaceId, agent, ask };
+    /** Ask Scout again in the thread `ask` started. */
+    const askAgain = (threadId: Thread.Id, text: string) =>
+      asAlice.threads.publish({
+        params: { workspaceId, threadId },
+        headers: {},
+        payload: { text, mentions: [agent.memberId] },
+      });
+    return { asAlice, workspaceId, agent, ask, askAgain };
   });
 
 /** Read again every 200 ms until `until` holds, for at most 20 seconds. */
@@ -137,6 +190,22 @@ const until = <A, E, R>(read: Effect.Effect<A, E, R>, done: (value: A) => boolea
 
 const texts = (items: ReadonlyArray<ThreadTimeline.Item>) =>
   items.flatMap((item) => ("message" in item ? [item.message.text] : []));
+
+/** A directory for one test's local sandboxes, removed afterwards. */
+const sandboxDirectory = Effect.acquireRelease(
+  Effect.sync(() => mkdtempSync(join(tmpdir(), "amends-host-sandboxes-"))),
+  (directory) => Effect.sync(() => rmSync(directory, { recursive: true, force: true })),
+);
+
+/** Call `read` every 200 ms until `done` holds, for at most 30 seconds. */
+const poll = async <A>(read: () => Promise<A>, done: (value: A) => boolean) => {
+  for (let attempt = 0; ; attempt++) {
+    const value = await read();
+    if (done(value)) return value;
+    if (attempt === 150) throw new Error(`Still waiting, with ${JSON.stringify(value)}`);
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+};
 
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
@@ -348,5 +417,509 @@ describe.skipIf(!available)("PostgreSQL", () => {
         }).pipe(Effect.scoped, Effect.provide(server(url))),
       ),
     40_000,
+  );
+
+  it.live(
+    "an agent whose harness runs inside a local sandbox replies the same way",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const directory = yield* sandboxDirectory;
+          yield* Effect.gen(function* () {
+            const models = yield* fakeModels({ answer: "The plan is on track." });
+            const { asAlice, workspaceId, ask } = yield* workspaceWithScout(models.baseUrl, {
+              providerId: SandboxImplementation.Id.make("local"),
+              harness: "in-sandbox",
+              connectionId: null,
+              template: null,
+              env: {},
+              setup: ["echo ready > setup.txt"],
+              retention: "destroy",
+            });
+            const started = yield* ask("Scout, how is the plan going?");
+            const params = { workspaceId, threadId: started.thread.id };
+            const turnsNow = asAlice.turns.listByThread({ params, query: { limit: 10 } });
+            // The turn spawns a sandbox, uploads the harness server into it, and runs amends's
+            // harness there, which asks the same model.
+            yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
+
+            const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+            expect(texts(timeline)).toEqual([
+              "Scout, how is the plan going?",
+              "The plan is on track.",
+            ]);
+            expect(models.requests[0]).toMatchObject([
+              { role: "system", content: "Answer in one sentence." },
+              { role: "user" },
+            ]);
+            // The environment's retention destroys the sandbox once the turn ends.
+            const sandboxes = Effect.sync(() => readdirSync(join(directory, "sandboxes")));
+            expect(yield* until(sandboxes, (entries) => entries.length === 0)).toEqual([]);
+          }).pipe(Effect.provide(server(url, directory)));
+        }).pipe(Effect.scoped),
+      ),
+    40_000,
+  );
+  it.live.skipIf(!opencodeInstalled)(
+    "an agent on opencode inside a local sandbox replies, and answers a follow-up knowing its answer",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const directory = yield* sandboxDirectory;
+          yield* Effect.gen(function* () {
+            const models = yield* fakeModels(
+              { answer: "The plan is on track." },
+              { answer: "Still on track, as I said." },
+            );
+            const { asAlice, workspaceId, ask, askAgain } = yield* workspaceWithScout(
+              models.baseUrl,
+              {
+                providerId: SandboxImplementation.Id.make("local"),
+                harness: "in-sandbox",
+                connectionId: null,
+                template: null,
+                env: {},
+                setup: [],
+                retention: "destroy",
+              },
+              OpenCodeHarness.declaration.id,
+            );
+            const started = yield* ask("Scout, how is the plan going?");
+            const params = { workspaceId, threadId: started.thread.id };
+            const turnsNow = asAlice.turns.listByThread({ params, query: { limit: 10 } });
+            // The harness server runs opencode in the sandbox, which asks the model itself.
+            yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
+            expect(JSON.stringify(models.requests[0])).toContain("Answer in one sentence.");
+
+            // The next turn's sandbox is new: opencode loads the conversation the log recorded.
+            yield* askAgain(started.thread.id, "Scout, and now?");
+            yield* until(
+              turnsNow,
+              (turns) => turns.length === 2 && turns.every((turn) => turn.status === "completed"),
+            );
+            const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+            expect(texts(timeline)).toEqual([
+              "Scout, how is the plan going?",
+              "The plan is on track.",
+              "Scout, and now?",
+              "Still on track, as I said.",
+            ]);
+            const followUp = JSON.stringify(models.requests[1]);
+            expect(followUp).toContain("Scout, how is the plan going?");
+            expect(followUp).toContain("The plan is on track.");
+            expect(followUp).toContain("Scout, and now?");
+            const sandboxes = Effect.sync(() => readdirSync(join(directory, "sandboxes")));
+            expect(yield* until(sandboxes, (entries) => entries.length === 0)).toEqual([]);
+          }).pipe(Effect.provide(server(url, directory)));
+        }).pipe(Effect.scoped),
+      ),
+    60_000,
+  );
+
+  it.live(
+    "a turn whose sandbox is destroyed continues in a new one, and the agent is told its files are gone",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const directory = yield* sandboxDirectory;
+          yield* Effect.gen(function* () {
+            const release = Promise.withResolvers<void>();
+            const models = yield* fakeModels(
+              { hold: release.promise },
+              { answer: "The plan is on track." },
+            );
+            const { asAlice, workspaceId, ask } = yield* workspaceWithScout(models.baseUrl, {
+              providerId: SandboxImplementation.Id.make("local"),
+              harness: "in-sandbox",
+              connectionId: null,
+              template: null,
+              env: {},
+              setup: [],
+              retention: "destroy",
+            });
+            const started = yield* ask("Scout, how is the plan going?");
+            const params = { workspaceId, threadId: started.thread.id };
+            const turnsNow = asAlice.turns.listByThread({ params, query: { limit: 10 } });
+            yield* until(turnsNow, () => models.requests.length === 1);
+            // The sandbox goes while the model holds its answer: the harness server in it, and
+            // its files.
+            const sandboxes = join(directory, "sandboxes");
+            yield* Effect.promise(() => Bun.spawn(["pkill", "-KILL", "-f", directory]).exited);
+            yield* Effect.sync(() => {
+              for (const entry of readdirSync(sandboxes))
+                rmSync(join(sandboxes, entry), { recursive: true, force: true });
+            });
+            release.resolve();
+            // The session ends with its server; the next attempt spawns a new sandbox and starts
+            // the session again from the turn's log.
+            yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
+
+            const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+            expect(texts(timeline)).toEqual([
+              "Scout, how is the plan going?",
+              "The plan is on track.",
+            ]);
+            expect(models.requests).toHaveLength(2);
+            expect(JSON.stringify(models.requests[1])).toContain("Scout, how is the plan going?");
+            expect(JSON.stringify(models.requests[1])).toContain(
+              "Your sandbox was replaced with a new one, so files from earlier in this conversation are gone.",
+            );
+            expect(
+              yield* until(
+                Effect.sync(() => readdirSync(sandboxes)),
+                (entries) => entries.length === 0,
+              ),
+            ).toEqual([]);
+          }).pipe(Effect.provide(server(url, directory)));
+        }).pipe(Effect.scoped),
+      ),
+    60_000,
+  );
+
+  it.live(
+    "a turn whose host is killed continues from another host, which reattaches to its session",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const directory = yield* sandboxDirectory;
+          const release = Promise.withResolvers<void>();
+          const models = yield* fakeModels({
+            hold: release.promise,
+            answer: "The plan is on track.",
+          });
+          /** A host process over the database and the sandboxes, at its own runner address. */
+          const host = <A>(port: number, run: Parameters<typeof withServer<A>>[1]) =>
+            withServer(url, run, {
+              env: {
+                AMENDS_SANDBOX_DIRECTORY: directory,
+                AMENDS_RUNNER_ADDRESS: `localhost:${port}`,
+                AMENDS_RUNNER_TAKEOVER: "6 seconds",
+              },
+            });
+          yield* Effect.promise(async () => {
+            const asked = await host(34481, async (call, _base, stop) => {
+              const body = async (...request: Parameters<typeof call>) =>
+                (await call(...request)).body as { readonly id: string };
+              const workspaceId = (await body(alice, "POST", "/workspaces", { name: "Studio" })).id;
+              const base = `/workspaces/${workspaceId}`;
+              const connection = await body(alice, "POST", `${base}/connections`, {
+                name: "Local models",
+                implementationId: "openai-compatible",
+                settings: { baseUrl: models.baseUrl },
+                authentication: "None",
+              });
+              const environment = await body(alice, "POST", `${base}/environments`, {
+                name: "Sandboxed",
+                harnessId: Environment.inProcessHarness,
+                sandbox: {
+                  providerId: "local",
+                  harness: "in-sandbox",
+                  connectionId: null,
+                  template: null,
+                  env: {},
+                  setup: [],
+                  retention: "destroy",
+                },
+              });
+              const agent = (
+                await call(alice, "POST", `${base}/agents`, {
+                  name: "Scout",
+                  instructions: "Answer in one sentence.",
+                  model: { connectionId: connection.id, model: "fake-model", reasoning: null },
+                  environmentId: environment.id,
+                  roleId: BuiltinRoles.MemberId,
+                })
+              ).body as { readonly memberId: string };
+              const started = (
+                await call(alice, "POST", `${base}/groups/${Group.GeneralId}/threads`, {
+                  text: "Scout, how is the plan going?",
+                  mentions: [agent.memberId],
+                })
+              ).body as { readonly thread: { readonly id: string } };
+              // The host dies while the harness server in the sandbox waits for the model.
+              await poll(
+                async () => models.requests.length,
+                (count) => count === 1,
+              );
+              await stop("SIGKILL");
+              return { base, threadId: started.thread.id };
+            });
+            // The session finishes with no host attached, and another host takes the turn over.
+            release.resolve();
+            await host(34482, async (call) => {
+              const turns = await poll(
+                async () =>
+                  (
+                    await call(
+                      alice,
+                      "GET",
+                      `${asked.base}/threads/${asked.threadId}/turns?limit=10`,
+                    )
+                  ).body as ReadonlyArray<{ readonly status: string }>,
+                (turns) => turns[0]?.status === "completed",
+              );
+              expect(turns).toHaveLength(1);
+              const timeline = (
+                await call(
+                  alice,
+                  "GET",
+                  `${asked.base}/threads/${asked.threadId}/timeline?limit=10`,
+                )
+              ).body as ReadonlyArray<ThreadTimeline.Item>;
+              expect(texts(timeline)).toEqual([
+                "Scout, how is the plan going?",
+                "The plan is on track.",
+              ]);
+              // It collected what the session reported: the model was asked once.
+              expect(models.requests).toHaveLength(1);
+              // Ending the turn stopped the harness server and destroyed the sandbox.
+              expect(
+                await poll(
+                  async () => readdirSync(join(directory, "sandboxes")),
+                  (entries) => entries.length === 0,
+                ),
+              ).toEqual([]);
+            });
+          });
+        }).pipe(Effect.scoped),
+      ),
+    90_000,
+  );
+});
+
+/**
+ * Real Daytona sandboxes, when `AMENDS_TEST_DAYTONA=1` asks for them and `DAYTONA_API_KEY` is set:
+ * they take minutes and cost money, so an ordinary run skips them.
+ */
+const daytona =
+  process.env["AMENDS_TEST_DAYTONA"] === "1" && (process.env["DAYTONA_API_KEY"] ?? "") !== "";
+
+/** A model connection to make, with its key, and the model an agent selects through it. */
+interface ModelAccount {
+  readonly name: string;
+  readonly implementationId: string;
+  readonly settings: Record<string, string>;
+  readonly key: string;
+  readonly model: string;
+}
+
+/** Anthropic's, with a key it refuses. */
+const refusedAnthropic: ModelAccount = {
+  name: "Anthropic",
+  implementationId: "anthropic",
+  settings: {},
+  key: "sk-ant-not-a-real-key",
+  model: "claude-haiku-4-5-20251001",
+};
+
+/**
+ * A real model, for a reply: OpenRouter's through the OpenAI-compatible connection when
+ * `OPENROUTER_API_KEY` is set, with `OPENROUTER_BASE_URL` and `OPENROUTER_MODEL`, or Anthropic's
+ * when `ANTHROPIC_API_KEY` is.
+ */
+const realModel: ModelAccount | undefined = process.env["OPENROUTER_API_KEY"]
+  ? {
+      name: "OpenRouter",
+      implementationId: "openai-compatible",
+      settings: { baseUrl: process.env["OPENROUTER_BASE_URL"] || "https://openrouter.ai/api/v1" },
+      key: process.env["OPENROUTER_API_KEY"],
+      model: process.env["OPENROUTER_MODEL"] || "anthropic/claude-haiku-4.5",
+    }
+  : process.env["ANTHROPIC_API_KEY"]
+    ? { ...refusedAnthropic, key: process.env["ANTHROPIC_API_KEY"] }
+    : undefined;
+
+/** The Daytona sandboxes labelled with this environment that are not destroyed or on their way. */
+const daytonaSandboxes = (environmentId: string) =>
+  Effect.promise(async () => {
+    const found = [];
+    for await (const sandbox of new Daytona().list({
+      labels: { "amends-environment": environmentId },
+    }))
+      if (sandbox.state !== "destroyed" && sandbox.state !== "destroying") found.push(sandbox);
+    return found;
+  });
+
+/** Delete what a failed run left in Daytona for this environment. */
+const deleteDaytonaSandboxes = (environmentId: string) =>
+  Effect.flatMap(daytonaSandboxes(environmentId), (sandboxes) =>
+    Effect.promise(() => Promise.all(sandboxes.map((sandbox) => sandbox.delete().catch(() => {})))),
+  );
+
+/**
+ * Ask Scout, whose environment runs a harness inside a Daytona sandbox under the workspace's
+ * Daytona account, amends's unless `harness` names another and how to set it up, with the model
+ * `account` gives. Waits for the turn to end and for the environment's retention to destroy the
+ * sandbox, then says how the turn ended, the thread's messages, and the sandboxes left. Whatever a
+ * failed run leaves in Daytona is deleted.
+ */
+const askOnDaytona = (
+  url: string,
+  account: ModelAccount,
+  question: string,
+  harness: {
+    readonly id: typeof Environment.inProcessHarness;
+    readonly setup: ReadonlyArray<string>;
+  } = { id: Environment.inProcessHarness, setup: [] },
+) =>
+  Effect.gen(function* () {
+    const directory = yield* sandboxDirectory;
+    const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
+    let environmentId: string | undefined;
+    return yield* Effect.gen(function* () {
+      const asAlice = yield* client(alice);
+      const { id: workspaceId } = yield* asAlice.workspaces.create({
+        headers: {},
+        payload: { name: "Studio" },
+      });
+      /** A connection with its key. */
+      const connect = (
+        name: string,
+        implementationId: string,
+        settings: Record<string, string>,
+        secret: string,
+      ) =>
+        Effect.gen(function* () {
+          const connection = yield* asAlice.connections.create({
+            params: { workspaceId },
+            headers: {},
+            payload: {
+              name,
+              implementationId: ConnectionImplementation.Id.make(implementationId),
+              settings,
+              authentication: "ApiKey",
+            },
+          });
+          yield* asAlice.connections.setCredential({
+            params: { workspaceId, connectionId: connection.id },
+            payload: { secret: Redacted.make(secret) },
+          });
+          return connection;
+        });
+      const models = yield* connect(
+        account.name,
+        account.implementationId,
+        account.settings,
+        account.key,
+      );
+      const daytonaAccount = yield* connect(
+        "Daytona",
+        "daytona",
+        {},
+        process.env["DAYTONA_API_KEY"]!,
+      );
+      const environment = yield* asAlice.environments.create({
+        params: { workspaceId },
+        headers: {},
+        payload: {
+          name: "Daytona",
+          harnessId: harness.id,
+          sandbox: {
+            providerId: SandboxImplementation.Id.make("daytona"),
+            harness: "in-sandbox",
+            connectionId: daytonaAccount.id,
+            template: null,
+            env: {},
+            setup: harness.setup,
+            retention: "destroy",
+          },
+        },
+      });
+      environmentId = environment.id;
+      const agent = yield* asAlice.agents.create({
+        params: { workspaceId },
+        headers: {},
+        payload: {
+          name: "Scout",
+          instructions: "Answer in one short sentence.",
+          model: { connectionId: models.id, model: account.model, reasoning: null },
+          environmentId: environment.id,
+          roleId: BuiltinRoles.MemberId,
+        },
+      });
+      const started = yield* asAlice.threads.start({
+        params: { workspaceId, groupId: Group.GeneralId },
+        headers: {},
+        payload: { text: question, mentions: [agent.memberId] },
+      });
+      const params = { workspaceId, threadId: started.thread.id };
+      // The turn spawns a Daytona sandbox under the workspace's account, uploads the harness
+      // server, and runs the harness there, which asks the model.
+      const [turn] = yield* asAlice.turns.listByThread({ params, query: { limit: 10 } }).pipe(
+        Effect.repeat({
+          until: (turns) =>
+            turns[0] !== undefined && !["queued", "running"].includes(turns[0].status),
+          schedule: Schedule.spaced("1 second"),
+          times: 300,
+        }),
+      );
+      const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+      const left = yield* until(daytonaSandboxes(environment.id), (found) => found.length === 0);
+      return { turn, messages: texts(timeline), left: left.map((sandbox) => sandbox.id) };
+    }).pipe(
+      Effect.provide(server(url, directory, credentialKey)),
+      Effect.ensuring(
+        Effect.suspend(() =>
+          environmentId === undefined
+            ? Effect.void
+            : Effect.ignore(deleteDaytonaSandboxes(environmentId)),
+        ),
+      ),
+    );
+  }).pipe(Effect.scoped);
+
+describe.skipIf(!available || !daytona)("PostgreSQL with Daytona", () => {
+  it.live(
+    "a turn on Daytona whose model refuses its key fails, and its sandbox is destroyed",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const asked = yield* askOnDaytona(url, refusedAnthropic, "Scout, are you there?");
+          // The harness inside the sandbox asked Anthropic, which refused the key.
+          expect(asked.turn).toMatchObject({
+            status: "failed",
+            failure: "Anthropic didn't accept its API key.",
+          });
+          expect(asked.left).toEqual([]);
+        }),
+      ),
+    600_000,
+  );
+
+  it.live.skipIf(realModel === undefined)(
+    "an agent whose harness runs inside a Daytona sandbox replies with a real model",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const asked = yield* askOnDaytona(url, realModel!, "Scout, what is two plus two?");
+          expect(asked.turn).toMatchObject({ status: "completed", failure: null });
+          expect(asked.messages[0]).toBe("Scout, what is two plus two?");
+          expect(asked.messages[1]).toMatch(/4|four/i);
+          expect(asked.left).toEqual([]);
+        }),
+      ),
+    600_000,
+  );
+
+  it.live.skipIf(realModel === undefined)(
+    "an agent on opencode inside a Daytona sandbox replies with a real model",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          // Daytona's image has another opencode release installed globally, as root; setup
+          // replaces it with the pinned one.
+          const asked = yield* askOnDaytona(url, realModel!, "Scout, what is two plus two?", {
+            id: OpenCodeHarness.declaration.id,
+            setup: [
+              `sudo env "PATH=$PATH" npm install --global opencode-ai@${OpenCodeHarness.version}`,
+            ],
+          });
+          expect(asked.turn).toMatchObject({ status: "completed", failure: null });
+          expect(asked.messages[0]).toBe("Scout, what is two plus two?");
+          expect(asked.messages[1]).toMatch(/4|four/i);
+          expect(asked.left).toEqual([]);
+        }),
+      ),
+    600_000,
   );
 });

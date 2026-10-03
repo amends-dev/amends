@@ -14,8 +14,11 @@
     "@amends/connection-anthropic": "workspace:*",
     "@amends/connection-openai-compatible": "workspace:*",
     "@amends/core": "workspace:*",
+    "@amends/environment": "workspace:*",
     "@amends/gateway": "workspace:*",
+    "@amends/harness-acp": "workspace:*",
     "@amends/harness-amends": "workspace:*",
+    "@amends/harness-server": "workspace:*",
     "@amends/sandbox-daytona": "workspace:*",
     "@amends/sandbox-local": "workspace:*",
     "@amends/server-http": "workspace:*",
@@ -25,6 +28,7 @@
   },
   "devDependencies": {
     "@amends/api-http": "workspace:*",
+    "@daytona/sdk": "0.218.0",
     "@effect/sql-pg": "catalog:"
   }
 }

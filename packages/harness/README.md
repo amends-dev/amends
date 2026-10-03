@@ -79,8 +79,9 @@ connection the host installed, or `Interfaces`, provider interfaces it speaks it
 
 ## Sessions
 
-`Harness.Interface<R>` names an implementation, declares its `Capabilities`, and starts sessions
-that live until their scope closes. `R` is what sessions need from their environment, such as model
+`Harness.Interface<R>` is an implementation: its `declaration`, which a host lists in its catalog
+from the same value it runs, its `Capabilities`, and how it starts sessions that live until their
+scope closes. `R` is what sessions need from their environment, such as model
 access. `StartOptions` carries the session ID, which prefixes the IDs a session assigns so they stay
 unique across the sessions sharing one log, and the agent's instructions and `HarnessTool.Tools`.
 It can also carry a `contextLimit`, the most tokens one model request may carry, with what a
@@ -93,7 +94,8 @@ A `Harness.Session` follows the core model's stages:
 
 1. `prepare(transcript)` sets the conversation to continue, once, before anything else. It starts
    no work. An invalid transcript fails with `InvalidTranscript`; a harness that cannot continue it
-   fails with `Unsupported`.
+   fails with `Unsupported`; one that could not set up its own session, such as a harness in a
+   sandbox whose process ended, fails with `ExecutionFailed`.
 2. `submit(batch)` hands over input, which the session takes in once no call is waiting and before
    its next model request.
 3. `resolve(callId, outcome)` answers a call the prepared transcript left pending, such as an
@@ -118,3 +120,33 @@ pending. A harness that restores only its own native sessions declares neither.
 `HarnessTool.Definition` describes a tool to the model with a JSON Schema for its parameters, and
 `Tools.invoke` runs a call to an outcome. A tool's own failure is an outcome the model reads
 (`HarnessTool.failure`), not an error; `Transcript.toolResult` pairs an outcome with its call.
+
+## Conformance suites
+
+`@amends/harness/conformance` holds test suites every harness runs against itself, so a new
+harness passes the same tests as the ones in this repository; it is the one module here that uses
+`@effect/vitest`, and only test files import it.
+
+A harness supplies a `Subject`, conventionally in `test/subject.ts`. It is called the subject
+rather than a harness, which names what is under test:
+
+| Member      | Meaning                                                                                |
+| ----------- | -------------------------------------------------------------------------------------- |
+| `name`      | Names the harness in suite titles.                                                     |
+| `available` | `false` skips every suite, as opencode's do when it is not installed.                  |
+| `harness`   | The harness under test, built for one test's scope.                                    |
+| `model`     | A model following a script, reached as the harness reaches a real one.                 |
+| `timeout`   | How long one test may take, in milliseconds; a harness that runs a program needs more. |
+
+A script lists the text the model answers each request with, or says it refuses its key. The model
+also returns each request it received as text, which the suites search for what the conversation
+said. Amends's harness gets an Effect AI model; opencode gets a chat-completions server on a local
+port. Each test file registers one suite, such as `Suites.sessions(subject)`. The tests use live
+time, since a harness may run a program.
+
+### Suites
+
+| Suite          | Covers                                                                                                                                                                                                           |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sessions`     | Input answered in a new session and attributed to its author, instructions reaching the model, input submitted while it works taken in order before it is idle, the order of operations, and a refused key.      |
+| `continuation` | Answering the input a transcript ends with in its context, tool calls and results another harness recorded reaching the model, idleness when nothing is owed, a transcript out of order, and pending tool calls. |

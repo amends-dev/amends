@@ -1,6 +1,8 @@
+import type { ConnectionImplementation } from "@amends/connection";
 import { Schema } from "effect";
-import type { Effect, Stream } from "effect";
+import type { Effect, Scope, Stream } from "effect";
 import type { SandboxErrors } from "./errors.ts";
+import type { SandboxImplementation } from "./implementation.ts";
 
 /** A sandbox's identity at its provider, by which it can be acquired again. */
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("SandboxId"));
@@ -140,6 +142,18 @@ export interface Provider {
   readonly deleteSnapshot: (
     snapshot: SnapshotReference,
   ) => Effect.Effect<void, SandboxErrors.SnapshotUnavailable | SandboxErrors.ProviderFailure>;
+}
+
+/**
+ * The code behind a sandbox implementation, as a host installs it: its declaration, and its
+ * provider, made with the access of the connection its sandboxes run under when the declaration
+ * says they run under an account. The provider lasts for the scope it is made in.
+ */
+export interface Implementation {
+  readonly declaration: SandboxImplementation.Declaration;
+  readonly provider: (
+    connection: ConnectionImplementation.Access | undefined,
+  ) => Effect.Effect<Provider, SandboxErrors.ProviderFailure, Scope.Scope>;
 }
 
 export * as Sandbox from "./sandbox.ts";

@@ -89,6 +89,12 @@ export const Event = Schema.TaggedUnion({
 });
 export type Event = typeof Event.Type;
 
+/**
+ * Whether an event only shows a block while it streams. A turn's log keeps every other event, and
+ * a harness that recovers its events counts only those.
+ */
+export const isDelta = Event.isAnyOf(["TextDelta", "ReasoningDelta"]);
+
 /** What a started call that never reported a result is answered with: its effect is unknown. */
 export const cutShort = (call: Pick<Transcript.ToolCall, "id" | "name">): Transcript.ToolResult =>
   Transcript.toolResult(call, {
