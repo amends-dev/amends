@@ -15,6 +15,7 @@
     "@amends/sandbox-v2": "workspace:*"
   },
   "devDependencies": {
+    "@effect/vitest": "catalog:",
     "effect": "catalog:"
   },
   "peerDependencies": {
