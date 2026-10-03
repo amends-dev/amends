@@ -354,6 +354,19 @@
         "effect": "catalog:",
       },
     },
+    "packages/harness-v2": {
+      "name": "@amends/harness-v2",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/sandbox-v2": "workspace:*",
+      },
+      "devDependencies": {
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/sandbox": {
       "name": "@amends/sandbox",
       "version": "0.0.0",
@@ -450,6 +463,8 @@
     "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
 
     "@amends/harness-server": ["@amends/harness-server@workspace:hosts/harness-server"],
+
+    "@amends/harness-v2": ["@amends/harness-v2@workspace:packages/harness-v2"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
 
