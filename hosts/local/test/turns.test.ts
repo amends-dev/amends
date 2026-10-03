@@ -7,6 +7,7 @@ import {
   ConnectionImplementation,
   Environment,
   SandboxImplementation,
+  type Thread,
   type ThreadTimeline,
   Turn,
 } from "@amends/api-http";
@@ -14,6 +15,7 @@ import {
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
+import { OpenCodeHarness } from "@amends/harness-acp";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Fiber, Layer, Redacted, Schedule, Stream } from "effect";
@@ -28,6 +30,17 @@ import { setup } from "./database.ts";
 import { withServer } from "./server.ts";
 
 const alice = Identity.HumanId.make("alice");
+
+/** Whether opencode's pinned release is on the `PATH`, for the tests that run it in a sandbox. */
+const opencodeInstalled = (() => {
+  try {
+    return (
+      Bun.spawnSync(["opencode", "--version"]).stdout.toString().trim() === OpenCodeHarness.version
+    );
+  } catch {
+    return false;
+  }
+})();
 const asToken = (token: string) =>
   HttpApiMiddleware.layerClient(Authentication, ({ next, request }) =>
     next(HttpClientRequest.bearerToken(request, token)),
@@ -111,9 +124,13 @@ const fakeModels = (...replies: ReadonlyArray<Reply>) =>
 
 /**
  * Alice's workspace with Scout, an agent whose model connection is the fake provider, in the
- * environment every workspace starts with or one with this sandbox.
+ * environment every workspace starts with or one with this sandbox and harness.
  */
-const workspaceWithScout = (baseUrl: string, sandbox?: Environment.NewSandbox) =>
+const workspaceWithScout = (
+  baseUrl: string,
+  sandbox?: Environment.NewSandbox,
+  harnessId: typeof Environment.inProcessHarness = Environment.inProcessHarness,
+) =>
   Effect.gen(function* () {
     const asAlice = yield* client(alice);
     const workspace = yield* asAlice.workspaces.create({
@@ -137,7 +154,7 @@ const workspaceWithScout = (baseUrl: string, sandbox?: Environment.NewSandbox) =
         : yield* asAlice.environments.create({
             params: { workspaceId },
             headers: {},
-            payload: { name: "Sandboxed", harnessId: Environment.inProcessHarness, sandbox },
+            payload: { name: "Sandboxed", harnessId, sandbox },
           });
     const agent = yield* asAlice.agents.create({
       params: { workspaceId },
@@ -157,7 +174,14 @@ const workspaceWithScout = (baseUrl: string, sandbox?: Environment.NewSandbox) =
         headers: {},
         payload: { text, mentions: [agent.memberId] },
       });
-    return { asAlice, workspaceId, agent, ask };
+    /** Ask Scout again in the thread `ask` started. */
+    const askAgain = (threadId: Thread.Id, text: string) =>
+      asAlice.threads.publish({
+        params: { workspaceId, threadId },
+        headers: {},
+        payload: { text, mentions: [agent.memberId] },
+      });
+    return { asAlice, workspaceId, agent, ask, askAgain };
   });
 
 /** Read again every 200 ms until `until` holds, for at most 20 seconds. */
@@ -436,6 +460,62 @@ describe.skipIf(!available)("PostgreSQL", () => {
       ),
     40_000,
   );
+  it.live.skipIf(!opencodeInstalled)(
+    "an agent on opencode inside a local sandbox replies, and answers a follow-up knowing its answer",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          const directory = yield* sandboxDirectory;
+          yield* Effect.gen(function* () {
+            const models = yield* fakeModels(
+              { answer: "The plan is on track." },
+              { answer: "Still on track, as I said." },
+            );
+            const { asAlice, workspaceId, ask, askAgain } = yield* workspaceWithScout(
+              models.baseUrl,
+              {
+                providerId: SandboxImplementation.Id.make("local"),
+                harness: "in-sandbox",
+                connectionId: null,
+                template: null,
+                env: {},
+                setup: [],
+                retention: "destroy",
+              },
+              OpenCodeHarness.declaration.id,
+            );
+            const started = yield* ask("Scout, how is the plan going?");
+            const params = { workspaceId, threadId: started.thread.id };
+            const turnsNow = asAlice.turns.listByThread({ params, query: { limit: 10 } });
+            // The harness server runs opencode in the sandbox, which asks the model itself.
+            yield* until(turnsNow, (turns) => turns[0]?.status === "completed");
+            expect(JSON.stringify(models.requests[0])).toContain("Answer in one sentence.");
+
+            // The next turn's sandbox is new: opencode loads the conversation the log recorded.
+            yield* askAgain(started.thread.id, "Scout, and now?");
+            yield* until(
+              turnsNow,
+              (turns) => turns.length === 2 && turns.every((turn) => turn.status === "completed"),
+            );
+            const timeline = yield* asAlice.threads.timeline({ params, query: { limit: 10 } });
+            expect(texts(timeline)).toEqual([
+              "Scout, how is the plan going?",
+              "The plan is on track.",
+              "Scout, and now?",
+              "Still on track, as I said.",
+            ]);
+            const followUp = JSON.stringify(models.requests[1]);
+            expect(followUp).toContain("Scout, how is the plan going?");
+            expect(followUp).toContain("The plan is on track.");
+            expect(followUp).toContain("Scout, and now?");
+            const sandboxes = Effect.sync(() => readdirSync(join(directory, "sandboxes")));
+            expect(yield* until(sandboxes, (entries) => entries.length === 0)).toEqual([]);
+          }).pipe(Effect.provide(server(url, directory)));
+        }).pipe(Effect.scoped),
+      ),
+    60_000,
+  );
+
   it.live(
     "a turn whose sandbox is destroyed continues in a new one, and the agent is told its files are gone",
     () =>
@@ -667,12 +747,21 @@ const deleteDaytonaSandboxes = (environmentId: string) =>
   );
 
 /**
- * Ask Scout, whose environment runs amends's harness inside a Daytona sandbox under the workspace's
- * Daytona account, with the model `account` gives. Waits for the turn to end and for the
- * environment's retention to destroy the sandbox, then says how the turn ended, the thread's
- * messages, and the sandboxes left. Whatever a failed run leaves in Daytona is deleted.
+ * Ask Scout, whose environment runs a harness inside a Daytona sandbox under the workspace's
+ * Daytona account, amends's unless `harness` names another and how to set it up, with the model
+ * `account` gives. Waits for the turn to end and for the environment's retention to destroy the
+ * sandbox, then says how the turn ended, the thread's messages, and the sandboxes left. Whatever a
+ * failed run leaves in Daytona is deleted.
  */
-const askOnDaytona = (url: string, account: ModelAccount, question: string) =>
+const askOnDaytona = (
+  url: string,
+  account: ModelAccount,
+  question: string,
+  harness: {
+    readonly id: typeof Environment.inProcessHarness;
+    readonly setup: ReadonlyArray<string>;
+  } = { id: Environment.inProcessHarness, setup: [] },
+) =>
   Effect.gen(function* () {
     const directory = yield* sandboxDirectory;
     const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
@@ -724,14 +813,14 @@ const askOnDaytona = (url: string, account: ModelAccount, question: string) =>
         headers: {},
         payload: {
           name: "Daytona",
-          harnessId: Environment.inProcessHarness,
+          harnessId: harness.id,
           sandbox: {
             providerId: SandboxImplementation.Id.make("daytona"),
             harness: "in-sandbox",
             connectionId: daytonaAccount.id,
             template: null,
             env: {},
-            setup: [],
+            setup: harness.setup,
             retention: "destroy",
           },
         },
@@ -755,7 +844,7 @@ const askOnDaytona = (url: string, account: ModelAccount, question: string) =>
       });
       const params = { workspaceId, threadId: started.thread.id };
       // The turn spawns a Daytona sandbox under the workspace's account, uploads the harness
-      // server, and runs amends's harness there, which asks Anthropic.
+      // server, and runs the harness there, which asks the model.
       const [turn] = yield* asAlice.turns.listByThread({ params, query: { limit: 10 } }).pipe(
         Effect.repeat({
           until: (turns) =>
@@ -803,6 +892,28 @@ describe.skipIf(!available || !daytona)("PostgreSQL with Daytona", () => {
       withDatabase((url) =>
         Effect.gen(function* () {
           const asked = yield* askOnDaytona(url, realModel!, "Scout, what is two plus two?");
+          expect(asked.turn).toMatchObject({ status: "completed", failure: null });
+          expect(asked.messages[0]).toBe("Scout, what is two plus two?");
+          expect(asked.messages[1]).toMatch(/4|four/i);
+          expect(asked.left).toEqual([]);
+        }),
+      ),
+    600_000,
+  );
+
+  it.live.skipIf(realModel === undefined)(
+    "an agent on opencode inside a Daytona sandbox replies with a real model",
+    () =>
+      withDatabase((url) =>
+        Effect.gen(function* () {
+          // Daytona's image has another opencode release installed globally, as root; setup
+          // replaces it with the pinned one.
+          const asked = yield* askOnDaytona(url, realModel!, "Scout, what is two plus two?", {
+            id: OpenCodeHarness.declaration.id,
+            setup: [
+              `sudo env "PATH=$PATH" npm install --global opencode-ai@${OpenCodeHarness.version}`,
+            ],
+          });
           expect(asked.turn).toMatchObject({ status: "completed", failure: null });
           expect(asked.messages[0]).toBe("Scout, what is two plus two?");
           expect(asked.messages[1]).toMatch(/4|four/i);

@@ -13,5 +13,8 @@
   "dependencies": {
     "@amends/harness": "workspace:*",
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@amends/harness-conformance": "workspace:*"
   }
 }

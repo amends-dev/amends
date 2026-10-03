@@ -13,6 +13,11 @@ Daytona's hosted sandboxes. Both run the [sandbox conformance suites](../package
 [connection contract](../packages/connection/README.md) for model providers over Effect AI: each
 declares itself for a host's catalog and turns a connection into model access.
 
+`harness-acp/` implements the [harness contract](../packages/harness/README.md) over coding agents
+that speak the Agent Client Protocol, which run in a sandbox and call the model themselves, with a
+module per agent; opencode is the first. It runs the
+[harness conformance suites](../packages/harness-conformance/README.md).
+
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
 and one column per record field, except a thread activity's kind-specific details, which

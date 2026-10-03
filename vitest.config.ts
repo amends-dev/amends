@@ -22,6 +22,7 @@ export default defineConfig({
             "adapters/sandbox-local/test/**/*.test.ts",
             "adapters/sandbox-daytona/test/**/*.test.ts",
             "adapters/connection-*/test/**/*.test.ts",
+            "adapters/harness-*/test/**/*.test.ts",
           ],
         },
       },

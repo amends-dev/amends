@@ -45,16 +45,27 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) run agents' turns in process. No test
-  calls a real model provider: the host's end-to-end test uses a local chat-completions stand-in. That harness stops rather
+  [environment runtime](../packages/environment/README.md) run agents' turns in process. Only
+  opt-in live tests call a real model provider; the host's other end-to-end tests use a local
+  chat-completions stand-in. That harness stops rather
   than answering the model when a response calls a tool it was not offered or holds a part it
   cannot record, and whether providers accept history with calls to tools a later session no
   longer offers is unverified.
+- [opencode](../adapters/harness-acp/README.md#opencode) runs through the Agent Client Protocol,
+  only inside a sandbox, which needs release 1.18.23 on the `PATH`; on Daytona an environment's
+  setup installs it. A conversation it continues is written as an opencode session with earlier tool
+  calls and results as text, and without reasoning, and one that starts with a response, or whose
+  last calls await results, is `Unsupported`. ACP names a call by its kind, so its calls are
+  recorded under names such as `execute`. It ignores a session's context limit and does not compact
+  itself: a conversation longer than its model's window reaches the turn runner's checkpoint only
+  once the provider refuses a request, which the harness recognizes from the refusal's words, and
+  that path has not been run against a real provider. No other ACP agent is installed.
 - [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
   and an optional sandbox under an account connection, and every workspace starts with an
   in-process one; they are managed over HTTP and on the [Environments page](environments.md).
-  Only amends's own harness is installed. It runs in process, where a sandbox is only where its
-  tools would act, and none acts there yet, or inside a local or Daytona sandbox, served by the
+  The local host installs amends's own harness and opencode. Amends's runs in process, where a
+  sandbox is only where its tools would act, and none acts there yet, or, as opencode does, inside a
+  local or Daytona sandbox, served by the
   [harness server](../packages/environment/README.md#the-harness-server), a Daytona one under the
   workspace's Daytona connection; opt-in live tests run turns there with a real model. Each turn
   acquires a sandbox of its own, so
@@ -64,7 +75,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   provider.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, local and Daytona, and
   the local host installs both, making a Daytona provider for each workspace's account as a turn
-  needs it; opencode is the next milestone of [harnesses in sandboxes](sandbox-harnesses.md). A harness server in a sandbox listens on a port
+  needs it. A harness server in a sandbox listens on a port
   with a token of its own, and a session a dead host left goes on there for the next run to attach
   to; a local sandbox's processes end when its host stops cleanly, so there the next run starts the
   session again. A session no run comes back to keeps its server running until its sandbox stops.

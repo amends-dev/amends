@@ -15,6 +15,7 @@
     "@amends/connection-anthropic": "workspace:*",
     "@amends/connection-openai-compatible": "workspace:*",
     "@amends/environment": "workspace:*",
+    "@amends/harness-acp": "workspace:*",
     "@amends/harness-amends": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"

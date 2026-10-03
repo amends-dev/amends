@@ -5,6 +5,7 @@ import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible
 import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
 import { Environment } from "@amends/environment";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
+import { OpenCodeHarness } from "@amends/harness-acp";
 import { AmendsHarness } from "@amends/harness-amends";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
 import { LocalSandbox } from "@amends/sandbox-local";
@@ -68,7 +69,8 @@ const harnesses = [AmendsHarness.harness];
 
 /**
  * What this host installs, as its catalogs declare them: model connections and a Daytona account;
- * its harnesses; and sandboxes as local directories, for development, and on Daytona.
+ * amends's harness, in process or in a sandbox, and opencode, in a sandbox; and sandboxes as local
+ * directories, for development, and on Daytona.
  */
 export const installed = {
   connections: [
@@ -76,7 +78,7 @@ export const installed = {
     OpenAiCompatibleConnection.declaration,
     DaytonaConnection.declaration,
   ],
-  harnesses: harnesses.map((harness) => harness.declaration),
+  harnesses: [AmendsHarness.harness.declaration, OpenCodeHarness.declaration],
   sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
 };
 

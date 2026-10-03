@@ -1,0 +1,17 @@
+{
+  "name": "@amends/harness-conformance",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/harness": "workspace:*",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  }
+}

@@ -16,6 +16,7 @@
     "@amends/core": "workspace:*",
     "@amends/environment": "workspace:*",
     "@amends/gateway": "workspace:*",
+    "@amends/harness-acp": "workspace:*",
     "@amends/harness-amends": "workspace:*",
     "@amends/harness-server": "workspace:*",
     "@amends/sandbox-daytona": "workspace:*",

@@ -119,4 +119,13 @@ compaction, so a conversation longer than its model's window is not yet covered 
    Opt-in live tests run a turn on Daytona whose model refuses its key, and one a real model
    answers, through OpenRouter or Anthropic, in about 13 seconds; each destroys its sandbox.
 5. The opencode adapter, which proves the goal: only the adapter, its registration, and the stored
-   environment change.
+   environment change. Built: [`harness-acp`](../adapters/harness-acp/README.md), a harness over any
+   agent that speaks the Agent Client Protocol, with opencode its first agent. A session runs
+   `opencode acp` configured for the connection's endpoint, which connections now give as well as
+   Effect AI model access, and continues a conversation by writing it as an opencode session and
+   loading it. The [harness suites](../packages/harness-conformance/README.md) run for amends's
+   harness and for opencode over a local model; the local host's end-to-end test runs opencode in a
+   local sandbox, where a follow-up in a new sandbox knows the first answer, and an opt-in live test
+   runs it on Daytona with a real model, its setup installing the pinned release. Outside the
+   adapter, the harness server gives sessions the sandbox's processes and files, and the host's
+   catalog lists opencode.

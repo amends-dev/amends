@@ -50,6 +50,7 @@ currently run through TypeScript. Check compatibility before changing this setup
   events and transcript a turn's log stores whichever harness ran, so work continues across
   environments. `harness-amends` is amends's own harness, an agent loop over Effect AI's
   `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`.
+  `harness-conformance` holds the suites every harness runs against itself.
   `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
   suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
   `environment` runs the environments a workspace stores: it finds the harness and sandbox provider
@@ -69,7 +70,9 @@ currently run through TypeScript. Check compatibility before changing this setup
   that system's dependencies. `sandbox-local` and `sandbox-daytona` implement the sandbox
   contract over this machine's directories and over Daytona; `sandbox-daytona` also declares the
   Daytona account connection its sandboxes run under. `connection-anthropic` and
-  `connection-openai-compatible` implement model-provider connections; hosts register them. `storage-postgresql` implements workspace storage and
+  `connection-openai-compatible` implement model-provider connections; hosts register them.
+  `harness-acp` implements harnesses over agents that speak the Agent Client Protocol and run
+  inside a sandbox, a module per agent, starting with opencode. `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
   per record field, except a thread activity's kind-specific `details`, stored as JSON;
   `storage-memory` implements them in process memory as the reference

@@ -70,7 +70,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           const implementations = yield* asBob.environments.implementations({
             params: { workspaceId },
           });
-          expect(implementations.harnesses.map(({ id }) => id)).toEqual(["amends"]);
+          expect(implementations.harnesses.map(({ id, placement }) => [id, placement])).toEqual([
+            ["amends", ["in-process", "in-sandbox"]],
+            ["opencode", ["in-sandbox"]],
+          ]);
           expect(implementations.sandboxes.map(({ id, account }) => [id, account])).toEqual([
             ["local", false],
             ["daytona", true],

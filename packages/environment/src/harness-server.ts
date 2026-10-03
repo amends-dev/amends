@@ -5,10 +5,12 @@
  * comes back, or another one, attaches to the session still at work and collects what it missed.
  */
 import { ConnectionImplementation } from "@amends/connection";
-import type { ModelInference } from "@amends/connection/model-inference";
+import { ModelInference } from "@amends/connection/model-inference";
 import { Harness, HarnessErrors, HarnessEvent, Transcript } from "@amends/harness";
 import type { Sandbox } from "@amends/sandbox";
 import { Crypto, Effect, Exit, Layer, PubSub, Schedule, Schema, Scope, Stream } from "effect";
+import type { FileSystem, Path } from "effect";
+import type { ChildProcessSpawner } from "effect/process";
 import {
   HttpClient,
   HttpClientRequest,
@@ -112,9 +114,21 @@ export const Rpcs = RpcGroup.make(
   Rpc.make("Stop"),
 );
 
+/**
+ * What a session in a harness server gets: the model both ways, as Effect AI model access and as
+ * the endpoint a harness that speaks the provider's interface calls, and the sandbox's processes
+ * and files, for a harness that runs a program of its own.
+ */
+export type SessionServices =
+  | ModelInference.Services
+  | ModelInference.Endpoint
+  | ChildProcessSpawner.ChildProcessSpawner
+  | FileSystem.FileSystem
+  | Path.Path;
+
 /** The harnesses and model code a harness server runs. */
 export interface Served {
-  readonly harnesses: ReadonlyArray<Harness.Interface<ModelInference.Services>>;
+  readonly harnesses: ReadonlyArray<Harness.Interface<SessionServices>>;
   readonly models: ReadonlyArray<ModelInference.Implementation>;
 }
 
@@ -210,8 +224,13 @@ const makeHandlers = Effect.fnUntraced(function* (served: Served, stopServer: Ef
     const scope = yield* Scope.make();
     const session = yield* Effect.gen(function* () {
       const { settings, credential } = options.model.access;
+      const access = { settings, credential };
+      const selection = options.model.selection;
       const model = yield* Layer.build(
-        inference.languageModel({ settings, credential }, options.model.selection),
+        Layer.merge(
+          inference.languageModel(access, selection),
+          Layer.succeed(ModelInference.Endpoint, inference.endpoint(access, selection)),
+        ),
       );
       return yield* harness
         .start({

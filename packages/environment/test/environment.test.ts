@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Crypto, Deferred, Effect, Fiber, Layer, Redacted, Stream } from "effect";
+import { Crypto, Deferred, Effect, Fiber, FileSystem, Layer, Path, Redacted, Stream } from "effect";
+import { ChildProcessSpawner } from "effect/process";
 import { HttpClient, HttpClientError, HttpClientResponse, HttpRouter } from "effect/http";
 import { LanguageModel, Model } from "effect/ai";
 import type { AiError, Prompt, Response } from "effect/ai";
@@ -10,6 +11,16 @@ import { Harness, HarnessErrors, HarnessEvent } from "@amends/harness";
 import { AmendsHarness } from "@amends/harness-amends";
 import { SandboxErrors, SandboxImplementation } from "@amends/sandbox";
 import type { Sandbox } from "@amends/sandbox";
+
+/** The processes and files of a machine that has none, for harness servers whose harnesses use neither. */
+const noPlatform = Layer.mergeAll(
+  FileSystem.layerNoop({}),
+  Path.layer,
+  Layer.succeed(
+    ChildProcessSpawner.ChildProcessSpawner,
+    ChildProcessSpawner.make(() => Effect.die(new Error("This machine runs no processes."))),
+  ),
+);
 
 type Script = Stream.Stream<Response.StreamPartEncoded, AiError.AiError>;
 
@@ -40,6 +51,13 @@ const scripted = Effect.fnUntraced(function* (scripts: ReadonlyArray<Script>) {
         Layer.succeed(Model.ModelName, "test-model"),
       ),
     limits: () => ({ contextTokens: 100_000, outputTokens: undefined }),
+    endpoint: () => ({
+      interface: "test",
+      baseUrl: undefined,
+      apiKey: undefined,
+      model: "test-model",
+      limits: { contextTokens: 100_000, outputTokens: undefined },
+    }),
   };
   const session: Environment.SessionOptions = {
     sessionId: "session-1",
@@ -151,7 +169,7 @@ const fakeProvider = (
             setTimeout(() => void server?.dispose(), 10);
           });
           const { handler, dispose } = HttpRouter.toWebHandler(
-            HarnessServer.layerRoutes(served, { token, stop }),
+            HarnessServer.layerRoutes(served, { token, stop }).pipe(Layer.provide(noPlatform)),
             { disableLogger: true },
           );
           servers.set(address, { sandboxId: id, handler, dispose });

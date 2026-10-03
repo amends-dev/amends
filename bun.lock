@@ -35,6 +35,19 @@
         "effect": "catalog:",
       },
     },
+    "adapters/harness-acp": {
+      "name": "@amends/harness-acp",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/connection": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "effect": "catalog:",
+      },
+      "devDependencies": {
+        "@amends/harness-conformance": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+      },
+    },
     "adapters/sandbox-daytona": {
       "name": "@amends/sandbox-daytona",
       "version": "0.0.0",
@@ -210,6 +223,7 @@
         "@amends/connection-anthropic": "workspace:*",
         "@amends/connection-openai-compatible": "workspace:*",
         "@amends/environment": "workspace:*",
+        "@amends/harness-acp": "workspace:*",
         "@amends/harness-amends": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
@@ -225,6 +239,7 @@
         "@amends/core": "workspace:*",
         "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
+        "@amends/harness-acp": "workspace:*",
         "@amends/harness-amends": "workspace:*",
         "@amends/harness-server": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
@@ -323,6 +338,18 @@
         "@amends/harness": "workspace:*",
         "effect": "catalog:",
       },
+      "devDependencies": {
+        "@amends/harness-conformance": "workspace:*",
+      },
+    },
+    "packages/harness-conformance": {
+      "name": "@amends/harness-conformance",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/harness": "workspace:*",
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
     },
     "packages/sandbox": {
       "name": "@amends/sandbox",
@@ -404,7 +431,11 @@
 
     "@amends/harness": ["@amends/harness@workspace:packages/harness"],
 
+    "@amends/harness-acp": ["@amends/harness-acp@workspace:adapters/harness-acp"],
+
     "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
+
+    "@amends/harness-conformance": ["@amends/harness-conformance@workspace:packages/harness-conformance"],
 
     "@amends/harness-server": ["@amends/harness-server@workspace:hosts/harness-server"],
 

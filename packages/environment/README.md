@@ -96,7 +96,10 @@ down.
 - `HarnessServer.layerRoutes(served, { token, stop })` is the server's routes, for the program a
   host builds: the harnesses and model code it runs, the token every request must carry as a bearer
   token, and how it stops when asked to. A `Start` for a harness or model code it lacks fails with
-  `ExecutionFailed`, not worth retrying.
+  `ExecutionFailed`, not worth retrying. A session gets `HarnessServer.SessionServices`: the
+  model both as Effect AI model access and as the endpoint (`ModelInference.Endpoint`) a harness
+  that speaks the provider's interface calls itself, and the machine's processes and files, for a
+  harness that runs a program of its own, such as opencode; the program provides those.
 - `HarnessServer.startSession(endpoint, options)` and `attachSession(endpoint, session)` are the
   client, over the URL and headers that reach the server. A request the server cannot answer, or
   about a session it no longer holds, fails as `ExecutionFailed` with problem `ended`, worth

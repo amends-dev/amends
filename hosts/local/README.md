@@ -39,7 +39,8 @@ open credentials sealed with the old one, and nothing rotates them yet. The host
 [Anthropic](../../adapters/connection-anthropic/README.md) and
 [OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connection
 implementations and a [Daytona](../../adapters/sandbox-daytona/README.md) account connection;
-amends's own [harness](../../packages/harness-amends/README.md); and the
+amends's own [harness](../../packages/harness-amends/README.md), in process or in a sandbox, and
+[opencode](../../adapters/harness-acp/README.md#opencode), in a sandbox; and the
 [local](../../adapters/sandbox-local/README.md) and Daytona sandbox providers, all as
 `LocalHost.installed` declares them.
 
@@ -100,8 +101,11 @@ reachable on a private network.
 
 The host runs agents' turns as [turn jobs](../../packages/cluster/README.md#turn-jobs) on the same Cluster runner as
 its background jobs: each turn is its own job, so turns run side by side, and the request to
-run one is stored in the commit that created it. A turn runs amends's own harness with the agent's
-Anthropic or OpenAI-compatible connection, and ends by posting the agent's reply in its thread.
+run one is stored in the commit that created it. A turn runs its environment's harness, amends's
+own or opencode, with the agent's Anthropic or OpenAI-compatible connection, and ends by posting
+the agent's reply in its thread. opencode runs only inside a sandbox, which needs its pinned release
+on the `PATH`: the developer's own for a local sandbox, and on Daytona one the environment's setup
+installs.
 The harness runs in process, or, in an environment that says so, inside a sandbox, where the turn
 runs the [harness server](../harness-server/README.md): a local one, a directory under
 `AMENDS_SANDBOX_DIRECTORY`, or a Daytona one, under the workspace's Daytona connection, which the
@@ -211,7 +215,11 @@ runner address another process holds; and that over sockets a request reaches th
 its workspace well before that process's next read. `turns.test.ts` asks an agent in a thread over
 HTTP and waits for its reply, which its turn gets from a local chat-completions server, asks a
 second question while the agent answers the first and finds both answers posted, then retries a
-turn whose key was refused and stops a running one over HTTP.
+turn whose key was refused and stops a running one over HTTP. It runs turns inside local sandboxes,
+on amends's harness and, when opencode 1.18.23 is installed, on opencode, whose follow-up in a new
+sandbox loads the conversation from the log. With `AMENDS_TEST_DAYTONA=1` it runs turns on Daytona
+with amends's harness and opencode, as the [Daytona guide](../../adapters/sandbox-daytona/README.md#testing)
+describes.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

@@ -73,6 +73,13 @@ const model = (limits: ModelInference.Limits): ModelInference.Implementation => 
       Layer.succeed(Model.ModelName, "test-model"),
     ),
   limits: () => limits,
+  endpoint: () => ({
+    interface: "test",
+    baseUrl: undefined,
+    apiKey: undefined,
+    model: "test-model",
+    limits,
+  }),
 });
 const roomy = model({ contextTokens: 1_000_000, outputTokens: 128_000 });
 const settings = (limits = roomy) => RunnerSettings.fromOptions({ models: [limits] });

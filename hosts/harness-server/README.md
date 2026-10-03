@@ -9,13 +9,16 @@ It runs apart from the host that started it, holding one session at a time, unti
 to stop. It logs to `<state file>.log`, since its output may reach no one.
 
 `HarnessServerHost.served` is what this build runs: amends's own
-[harness](../../packages/harness-amends/README.md), with the model code of the
+[harness](../../packages/harness-amends/README.md) and [opencode](../../adapters/harness-acp/README.md#opencode),
+whose sessions work in the directory the server starts in, the sandbox's, with the model code of the
 [Anthropic](../../adapters/connection-anthropic/README.md) and
 [OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connections. A host lists
 the same harnesses in the `HarnessServer.Program` it installs, as the
 [local host](../local/README.md#turns) does from this value, so what it uploads runs what it
-offers. `HarnessServerHost.run(statePath)` serves the routes over Bun's HTTP server, and
-`src/index.ts` launches it.
+offers. `HarnessServerHost.run(statePath)` serves the routes over Bun's HTTP server, with Bun's
+processes and files for the sessions, and `src/index.ts` launches it. opencode itself is not in
+the build: the sandbox needs its pinned release on the `PATH`, which an environment's setup can
+install.
 
 On `SIGTERM`, Bun's server lets requests in flight finish for up to 20 seconds, then the server ends
 its session and exits.
@@ -29,5 +32,5 @@ bun run test
 
 The [environment's tests](../../packages/environment/test/environment.test.ts) serve the protocol's
 routes in memory, and the local host's `turns.test.ts` compiles this program, uploads it into local
-sandboxes, and runs agents' turns through it, including one whose host is killed partway and one
-whose sandbox is destroyed partway.
+sandboxes, and runs agents' turns through it, including one whose host is killed partway, one
+whose sandbox is destroyed partway, and one on opencode, when it is installed.

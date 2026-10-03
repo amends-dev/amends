@@ -48,6 +48,13 @@ const unknownLimits: ModelInference.Limits = { contextTokens: 200_000, outputTok
 export const modelInference: ModelInference.Implementation = {
   declaration,
   limits: (_, selection) => limits[selection.model] ?? unknownLimits,
+  endpoint: (access, selection) => ({
+    interface: declaration.capabilities.modelInference!.interface,
+    baseUrl: access.settings["baseUrl"] || undefined,
+    apiKey: access.credential,
+    model: selection.model,
+    limits: limits[selection.model] ?? unknownLimits,
+  }),
   languageModel: (access, selection) =>
     AnthropicLanguageModel.model(selection.model).pipe(
       Layer.provide(

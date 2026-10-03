@@ -1,6 +1,7 @@
 import { AnthropicConnection } from "@amends/connection-anthropic";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { HarnessServer } from "@amends/environment";
+import { OpenCodeHarness } from "@amends/harness-acp";
 import { AmendsHarness } from "@amends/harness-amends";
 import { BunHttpServer } from "@effect/platform-bun";
 import { Context, Crypto, Deferred, Effect, FileSystem, Layer, Schema } from "effect";
@@ -8,11 +9,12 @@ import { Hex } from "effect/encoding";
 import { HttpRouter, HttpServer } from "effect/http";
 
 /**
- * What this build of the harness server runs: amends's own harness, with the model code of every
- * model connection the local host installs.
+ * What this build of the harness server runs: amends's own harness and opencode, working in the
+ * directory the server starts in, which is the sandbox's, with the model code of every model
+ * connection the local host installs.
  */
 export const served: HarnessServer.Served = {
-  harnesses: [AmendsHarness.harness],
+  harnesses: [AmendsHarness.harness, OpenCodeHarness.make(process.cwd())],
   models: [AnthropicConnection.modelInference, OpenAiCompatibleConnection.modelInference],
 };
 

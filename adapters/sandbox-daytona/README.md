@@ -54,8 +54,9 @@ AMENDS_TEST_DAYTONA=1 bun run test adapters/sandbox-daytona/test
 ```
 
 The [local host's](../../hosts/local/README.md#verify) `turns.test.ts` runs agents' turns on
-Daytona under the same flag: one whose model refuses its key, which needs no model account, and one
-that replies, which also needs `OPENROUTER_API_KEY` or `ANTHROPIC_API_KEY`.
+Daytona under the same flag: one whose model refuses its key, which needs no model account, and
+two that reply, on amends's harness and on opencode, which also need `OPENROUTER_API_KEY` or
+`ANTHROPIC_API_KEY`.
 
 Each test creates sandboxes labelled `amends: conformance` and deletes them and any snapshot it
 took when it ends. Daytona stops any a failed run leaves after 15 minutes and deletes them an hour

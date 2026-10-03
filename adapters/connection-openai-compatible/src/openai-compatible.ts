@@ -42,16 +42,26 @@ export const defaultContextTokens = 128_000;
  * A chat-completions model for a connection's access and an agent's selection, over fetch. Its
  * context window is the connection's setting, since servers and models vary.
  */
+/** A model's limits: its context window as the connection sets it. */
+const limitsOf = (access: ConnectionImplementation.Access): ModelInference.Limits => {
+  const configured = Number(access.settings["contextWindow"]);
+  return {
+    contextTokens:
+      Number.isSafeInteger(configured) && configured > 0 ? configured : defaultContextTokens,
+    outputTokens: undefined,
+  };
+};
+
 export const modelInference: ModelInference.Implementation = {
   declaration,
-  limits: (access) => {
-    const configured = Number(access.settings["contextWindow"]);
-    return {
-      contextTokens:
-        Number.isSafeInteger(configured) && configured > 0 ? configured : defaultContextTokens,
-      outputTokens: undefined,
-    };
-  },
+  limits: limitsOf,
+  endpoint: (access, selection) => ({
+    interface: declaration.capabilities.modelInference!.interface,
+    baseUrl: access.settings["baseUrl"] || undefined,
+    apiKey: access.credential,
+    model: selection.model,
+    limits: limitsOf(access),
+  }),
   languageModel: (access, selection) =>
     OpenAiLanguageModel.model(selection.model).pipe(
       Layer.provide(

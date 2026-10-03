@@ -338,6 +338,13 @@ const scripted = Effect.fnUntraced(function* (
         Layer.succeed(Model.ModelName, "test-model"),
       ),
     limits: () => limits,
+    endpoint: () => ({
+      interface: "test",
+      baseUrl: undefined,
+      apiKey: undefined,
+      model: "test-model",
+      limits,
+    }),
   };
   return { implementation, prompts, summarized };
 });
