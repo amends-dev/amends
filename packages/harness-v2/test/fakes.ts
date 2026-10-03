@@ -29,11 +29,16 @@ export interface FakeAgent {
 }
 
 /**
- * An agent whose turns follow `script`, recording what the harness asks of it. Its own state, which
+ * An agent whose turns follow `script`, recording what the harness asks of it. Like most agents, it
+ * requires a sandbox unless `options` says otherwise. Its own state, which
  * `suspend`, `detach`, and `stop` return, names the agent, so tests can tell whose state reached
  * `start`. `continue` finishes the unfinished turn with an answer of its own.
  */
-export const makeFakeAgent = (id: string, script: Script) =>
+export const makeFakeAgent = (
+  id: string,
+  script: Script,
+  options: { readonly requiresSandbox?: boolean } = {},
+) =>
   Effect.gen(function* () {
     const starts: Array<StartOptions> = [];
     const turns: Array<TurnOptions> = [];
@@ -42,6 +47,7 @@ export const makeFakeAgent = (id: string, script: Script) =>
 
     const agent: Agent = {
       id,
+      requiresSandbox: options.requiresSandbox ?? true,
       start: (options) =>
         Effect.gen(function* () {
           starts.push(options);

@@ -4,7 +4,9 @@
  * into the `Harness` service callers use, which adds whole-turn results, objects, the host's tools,
  * and the record of the conversation that lets a session move from one agent to another.
  *
- * An agent session is one conversation with the agent, which works in a sandbox. Each turn streams
+ * An agent session is one conversation with the agent. An agent that runs in a sandbox, as most
+ * do, `requiresSandbox`; one that runs in the host's process can also work without one, answering
+ * from its model alone. Each turn streams
  * `StreamPart`s until its `finish` part, and interrupting the stream aborts the turn. The harness
  * runs one turn of a session at a time, so an agent never sees a turn start while another runs.
  * A session outlives the process that started it: the agent keeps running after `detach` or
@@ -26,16 +28,22 @@ export const SessionId = Schema.String.check(
 
 export type SessionId = typeof SessionId.Type;
 
+/** Where an agent works for a session: a sandbox, and the session's directory in it. */
+export interface Workspace {
+  /** The sandbox, prepared with the agent's `template`. The agent never stops or destroys it. */
+  readonly sandbox: Sandbox.Sandbox["Service"];
+
+  /** The absolute directory in the sandbox for this session. It exists before `start`. */
+  readonly directory: string;
+}
+
 // TODO: Add a permission mode for the agent's own tools, and which of them it may use, once an
 // agent asks for approval before using its own tools.
 export interface StartOptions {
   readonly id: SessionId;
 
-  /** The sandbox the agent works in, prepared with its `template`. The agent never stops or destroys it. */
-  readonly sandbox: Sandbox.Sandbox["Service"];
-
-  /** The absolute directory in the sandbox that the agent works in for this session. It exists before `start`. */
-  readonly workingDirectory: string;
+  /** Where the agent works. Absent only for an agent that does not require a sandbox. */
+  readonly workspace?: Workspace;
 
   // TODO: Add a helper that writes a conversation as text into the first turn's instructions, for
   // agents that cannot load one natively.
@@ -138,6 +146,9 @@ export interface AgentSession {
 export interface Agent {
   /** Names the agent, such as `opencode`. Errors and saved sessions carry it. */
   readonly id: string;
+
+  /** Whether every session needs a sandbox. An agent that runs in the host's process may not. */
+  readonly requiresSandbox: boolean;
 
   /** Installs the agent in a sandbox. An agent that runs in the host's process has none. */
   readonly template?: Template.Template;

@@ -59,7 +59,8 @@ describe("Harness", () => {
         yield* Harness.make(codex.agent).startSession({ sandbox, id });
 
         expect(directories).toEqual(["/work/session-one"]);
-        expect(codex.starts[0]).toMatchObject({ id, workingDirectory: "/work/session-one" });
+        expect(codex.starts[0]?.id).toBe(id);
+        expect(codex.starts[0]?.workspace).toEqual({ sandbox, directory: "/work/session-one" });
         expect(codex.starts[0]?.history.content).toEqual([]);
         expect(codex.starts[0]?.resume).toBeUndefined();
         expect(codex.starts[0]?.unfinishedTurn).toBeUndefined();
@@ -150,6 +151,47 @@ describe("Harness", () => {
 
       expect(opencode.starts[0]?.unfinishedTurn).toBeUndefined();
       expect(result).toEqual(reply("opencode answers slow"));
+    }),
+  );
+
+  it.effect("starts a session without a sandbox for an agent that does not require one", () =>
+    Effect.gen(function* () {
+      const amends = yield* makeFakeAgent("amends", answersAs("amends"), {
+        requiresSandbox: false,
+      });
+
+      const session = yield* Harness.make(amends.agent).startSession({ id });
+      const result = yield* session.generate({ prompt: "how are you doing" });
+
+      expect(amends.starts[0]?.workspace).toBeUndefined();
+      expect(result.text).toBe("amends answers how are you doing");
+    }),
+  );
+
+  it.effect("needs a sandbox for an agent that requires one, also to take over a session", () =>
+    Effect.gen(function* () {
+      const amends = yield* makeFakeAgent("amends", answersAs("amends"), {
+        requiresSandbox: false,
+      });
+      const codex = yield* makeFakeAgent("codex", answersAs("codex"));
+      const onAmends = yield* Harness.make(amends.agent).startSession({ id });
+      yield* onAmends.generate({ prompt: "hello" });
+      const state = yield* onAmends.detach;
+      const harness = Harness.make(codex.agent);
+
+      const refusedStart = yield* Effect.flip(harness.startSession({ id }));
+      const refusedResume = yield* Effect.flip(harness.resumeSession({ state }));
+      const { sandbox } = yield* makeFakeSandbox;
+      const onCodex = yield* harness.resumeSession({ sandbox, state });
+      const result = yield* onCodex.generate({ prompt: "again" });
+
+      expect(refusedStart.reason._tag).toBe("UnsupportedError");
+      expect(refusedResume.reason._tag).toBe("UnsupportedError");
+      expect(textsOf(codex.starts[0]?.history ?? state.history)).toEqual([
+        "hello",
+        "amends answers hello",
+      ]);
+      expect(result.text).toBe("codex answers again");
     }),
   );
 
