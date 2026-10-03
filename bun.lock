@@ -73,6 +73,21 @@
         "@effect/platform-bun": "catalog:",
       },
     },
+    "adapters/sandbox-local-v2": {
+      "name": "@amends/sandbox-local-v2",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/sandbox-v2": "workspace:*",
+      },
+      "devDependencies": {
+        "@effect/platform-bun": "catalog:",
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "adapters/storage-memory": {
       "name": "@amends/storage-memory",
       "version": "0.0.0",
@@ -356,6 +371,17 @@
         "effect": "catalog:",
       },
     },
+    "packages/sandbox-v2": {
+      "name": "@amends/sandbox-v2",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/server-http": {
       "name": "@amends/server-http",
       "version": "0.0.0",
@@ -436,6 +462,10 @@
     "@amends/sandbox-daytona": ["@amends/sandbox-daytona@workspace:adapters/sandbox-daytona"],
 
     "@amends/sandbox-local": ["@amends/sandbox-local@workspace:adapters/sandbox-local"],
+
+    "@amends/sandbox-local-v2": ["@amends/sandbox-local-v2@workspace:adapters/sandbox-local-v2"],
+
+    "@amends/sandbox-v2": ["@amends/sandbox-v2@workspace:packages/sandbox-v2"],
 
     "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
 
