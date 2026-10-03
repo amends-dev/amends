@@ -85,12 +85,6 @@ export interface TurnOptions {
   readonly responseFormat: LanguageModel.ProviderOptions["responseFormat"];
 }
 
-/**
- * The settings the unfinished turn started with, given again: an agent that cannot reattach to the
- * turn runs it again with them.
- */
-export type ContinueOptions = Omit<TurnOptions, "prompt">;
-
 // TODO: Add `readHistory`, which reads the conversation from the agent's own store, including turns
 // the harness did not run, such as ones a person continued in the agent's own interface.
 // TODO: Add `sendMessage`, which gives the running turn another user message, for agents that take
@@ -100,11 +94,12 @@ export interface AgentSession {
   readonly prompt: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
   /**
-   * Streams the turn `suspend` cut short, in a session started with `unfinishedTurn`. An agent whose
-   * turn kept running streams the parts it had not delivered yet; one whose turn could not outlive
-   * its process runs it again from its own record, repeating the work that was in flight.
+   * Streams the turn `suspend` cut short, in a session started with `unfinishedTurn`, given the
+   * settings the turn started with again. An agent whose turn kept running streams the parts it had
+   * not delivered yet; one whose turn could not outlive its process runs it again with them, from
+   * its own record of the turn, repeating the work that was in flight.
    */
-  readonly continue: (options: ContinueOptions) => Stream.Stream<StreamPart, HarnessError>;
+  readonly continue: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
   /** Gives the running turn the result of a host tool it called. */
   readonly submitToolResult: (

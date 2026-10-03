@@ -361,12 +361,13 @@ export const make = Effect.fn("Session.make")(function* (options: {
         Effect.map(resumeTurn, (turn) => {
           const turnOptions = {
             ...turnOptionsOf(continueOptions),
+            prompt: turn.prompt,
             responseFormat: { type: "text" } as const,
           };
           // Only the agent that cut the turn short can continue it; any other runs it again.
           const agentTurn =
             turn.agentState === undefined
-              ? agentSession.prompt({ ...turnOptions, prompt: turn.prompt })
+              ? agentSession.prompt(turnOptions)
               : agentSession.continue(turnOptions);
           return runTurn("continue", turn.prompt, agentTurn, continueOptions.toolkit);
         }),
