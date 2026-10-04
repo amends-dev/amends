@@ -3,29 +3,28 @@
  * which Daytona names by the sandbox's id. It reaches Daytona through Daytona's SDK, with the API
  * key of the organization the sandboxes belong to, and closes the SDK's client with its scope.
  *
+ * A sandbox made from a template starts from a snapshot of the template's version once Daytona has
+ * made one, and is prepared on its own until then, as `Snapshots` describes; snapshots still being
+ * made when the provider's scope closes are left for the next create to make.
+ *
  * A sandbox runs until it is stopped or destroyed. Daytona stops a sandbox that sees no requests
  * to its API for a while, and requests to the sandbox's ports do not count, so a sandbox would stop
  * under an agent that only serves a host through a port; the provider turns that off unless the
  * options set it. A port's endpoint is Daytona's preview URL for it, which takes the sandbox's
  * preview token in a header and passes the request's other headers on.
  */
-import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox-v2";
+import { Network, Sandbox, SandboxError, SandboxProvider, type Template } from "@amends/sandbox-v2";
 import {
+  type CreateSandboxFromSnapshotParams,
   Daytona,
-  DaytonaAuthenticationError,
-  DaytonaBadGatewayError,
   DaytonaConflictError,
-  DaytonaConnectionError,
-  DaytonaForbiddenError,
-  DaytonaNotFoundError,
-  DaytonaRateLimitError,
   type Sandbox as DaytonaSandbox,
-  DaytonaServiceUnavailableError,
-  DaytonaTimeoutError,
 } from "@daytona/sdk";
-import { Crypto, Effect, Exit, Layer, Redacted, Schedule } from "effect";
+import { Crypto, Effect, Exit, Layer, Option, Redacted, Schedule } from "effect";
+import { call, fromDaytonaError, sandboxError } from "./Call.ts";
 import * as Files from "./Files.ts";
 import * as Processes from "./Processes.ts";
+import * as Snapshots from "./Snapshots.ts";
 
 export interface Options {
   /** The API key of the Daytona organization the sandboxes belong to. */
@@ -50,6 +49,12 @@ export interface Options {
 /** The label that keeps a sandbox's ports, for `resume` to read. */
 const portsLabel = "amends-ports";
 
+/** The label that names the template a sandbox prepares a version of. */
+const templateLabel = "amends-template";
+
+/** How long Daytona may take to make a snapshot of a prepared sandbox. */
+const snapshotSeconds = 15 * 60;
+
 /** States of a sandbox that Daytona has deleted or is deleting, which cannot be resumed. */
 const deletedStates = new Set(["destroyed", "destroying"]);
 
@@ -58,6 +63,8 @@ const stoppedStates = new Set(["stopped", "archived"]);
 
 export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options: Options) {
   const crypto = yield* Crypto.Crypto;
+  // Snapshots of templates are made in the background, until the provider closes.
+  const scope = yield* Effect.scope;
   // The client holds a connection for sandboxes' events, which keeps a process running until the
   // client is disposed.
   const daytona = yield* Effect.acquireDisposable(
@@ -125,6 +132,10 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           () => Effect.void,
         ),
       ),
+      // TODO: Close the moment, just after Daytona answers, in which a sandbox that was denied
+      // everything reaches anything while an allow list replaces the denial, once a sandbox's
+      // policy changes while code that should not get out runs in it. Daytona's runner lifts the
+      // block before it filters by the list, and denies no block together with a list.
       setNetworkPolicy: (policy) =>
         Effect.flatMap(networkSettingsOf(policy), (settings) =>
           retryConflicts(call(() => sandbox.updateNetworkSettings(settings))),
@@ -143,23 +154,18 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
   });
 
   /**
-   * Creates the Daytona sandbox named `id`. One that fails after Daytona may have made it, as when
-   * it does not start in time, is deleted, unless the name was taken by another.
+   * Creates the Daytona sandbox named `name`, failing with `AlreadyExistsError` when the name is
+   * taken. One that fails after Daytona may have made it, as when it does not start in time, is
+   * deleted.
    */
-  const createSandbox = (id: Sandbox.SandboxId, ports: ReadonlyArray<Network.Port>) =>
+  const createSandbox = (name: string, params: Omit<CreateSandboxFromSnapshotParams, "name">) =>
     Effect.tryPromise({
-      try: () =>
-        daytona.create({
-          name: id,
-          labels: { [portsLabel]: ports.join(",") },
-          autoStopInterval: options.autoStopInterval ?? 0,
-          ...(options.snapshot === undefined ? {} : { snapshot: options.snapshot }),
-        }),
+      try: () => daytona.create({ name, ...params }),
       catch: (error) =>
         error instanceof DaytonaConflictError
           ? sandboxError(
               new SandboxError.AlreadyExistsError({
-                description: `A sandbox named ${id} already exists`,
+                description: `A sandbox named ${name} already exists`,
               }),
               error,
             )
@@ -168,14 +174,45 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       Effect.tapError((error) =>
         error.reason._tag === "AlreadyExistsError"
           ? Effect.void
-          : call(() => daytona.get(id)).pipe(
+          : call(() => daytona.get(name)).pipe(
               Effect.flatMap((sandbox) => call(() => sandbox.delete())),
               Effect.ignore,
             ),
       ),
     );
 
-  // TODO(in progress): Create from the template's snapshot, preparing it once per identity, module 4.
+  /**
+   * Prepares `template` in a sandbox named `name`, which then becomes the snapshot of that name and
+   * is deleted. Succeeds with `false`, making nothing, when another create has claimed the name.
+   */
+  const makeSnapshot =
+    <E>(template: Template.Template<E>) =>
+    (name: string) =>
+      Effect.acquireUseRelease(
+        createSandbox(name, {
+          labels: { [templateLabel]: template.name },
+          autoStopInterval: 0,
+          ttlMinutes: Snapshots.claimMinutes,
+          ...(options.snapshot === undefined ? {} : { snapshot: options.snapshot }),
+        }),
+        (sandbox) =>
+          openSandbox(sandbox, Sandbox.SandboxId.make(name), []).pipe(
+            Effect.flatMap((opened) =>
+              template.prepare.pipe(Effect.provide(Sandbox.layerServices(opened))),
+            ),
+            Effect.andThen(call(() => sandbox.createSnapshot(name, snapshotSeconds))),
+            Effect.as(true),
+          ),
+        (sandbox) => Effect.ignore(call(() => sandbox.delete())),
+      ).pipe(
+        Effect.catchIf(
+          (error) =>
+            error instanceof SandboxError.SandboxError &&
+            error.reason._tag === "AlreadyExistsError",
+          () => Effect.succeed(false),
+        ),
+      );
+
   const create = Effect.fn("DaytonaSandboxProvider.create")(function* <E = never>(
     createOptions: SandboxProvider.CreateOptions<E> = {},
   ) {
@@ -190,11 +227,27 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       );
     const ports = createOptions.ports ?? [];
     const { template } = createOptions;
+    const templateSnapshot =
+      template === undefined
+        ? Option.none<string>()
+        : yield* Snapshots.find(
+            daytona,
+            scope,
+            template,
+            options.snapshot,
+            makeSnapshot(template),
+          ).pipe(Effect.provideService(Crypto.Crypto, crypto));
+    const snapshot = Option.getOrElse(templateSnapshot, () => options.snapshot);
     return yield* Effect.acquireUseRelease(
-      createSandbox(id, ports),
+      createSandbox(id, {
+        labels: { [portsLabel]: ports.join(",") },
+        autoStopInterval: options.autoStopInterval ?? 0,
+        ...(snapshot === undefined ? {} : { snapshot }),
+      }),
       (sandbox) =>
         Effect.tap(openSandbox(sandbox, id, ports), (opened) =>
-          template === undefined
+          // Until the template's snapshot is made, each sandbox is prepared on its own.
+          template === undefined || Option.isSome(templateSnapshot)
             ? Effect.void
             : template.prepare.pipe(Effect.provide(Sandbox.layerServices(opened))),
         ),
@@ -267,10 +320,6 @@ const describe = (workingDirectory: string, ports: ReadonlyArray<Network.Port>) 
       : [`Servers on ports ${ports.join(", ")} that listen on every interface are reachable.`]),
   ].join(" ");
 
-/** Calls Daytona, failing with the sandbox error its failure amounts to. */
-const call = <A>(request: () => Promise<A>) =>
-  Effect.tryPromise({ try: request, catch: fromDaytonaError });
-
 /**
  * Retries a change to a sandbox that Daytona refused because another change to it was in progress,
  * as one is after a network update, which Daytona applies after answering it.
@@ -280,27 +329,3 @@ const retryConflicts = <A, R>(change: Effect.Effect<A, SandboxError.SandboxError
     while: (error) => error.cause instanceof DaytonaConflictError,
     schedule: Schedule.spaced("250 millis").pipe(Schedule.upTo({ duration: "30 seconds" })),
   });
-
-const sandboxError = (reason: SandboxError.SandboxErrorReason, cause?: unknown) =>
-  new SandboxError.SandboxError({ provider: "daytona", reason, cause });
-
-const fromDaytonaError = (error: unknown) => sandboxError(reasonOf(error), error);
-
-/** The sandbox error reason a failure of Daytona's SDK amounts to. */
-const reasonOf = (error: unknown): SandboxError.SandboxErrorReason => {
-  const description = error instanceof Error ? error.message : String(error);
-  if (error instanceof DaytonaNotFoundError) return new SandboxError.NotFoundError({ description });
-  if (error instanceof DaytonaAuthenticationError || error instanceof DaytonaForbiddenError) {
-    return new SandboxError.AuthenticationError({ description });
-  }
-  if (
-    error instanceof DaytonaRateLimitError ||
-    error instanceof DaytonaTimeoutError ||
-    error instanceof DaytonaConnectionError ||
-    error instanceof DaytonaBadGatewayError ||
-    error instanceof DaytonaServiceUnavailableError
-  ) {
-    return new SandboxError.UnavailableError({ description });
-  }
-  return new SandboxError.UnknownError({ description });
-};

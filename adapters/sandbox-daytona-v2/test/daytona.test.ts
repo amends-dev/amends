@@ -1,22 +1,60 @@
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
-import type { Network, Sandbox, SandboxProvider } from "@amends/sandbox-v2";
-import { Daytona } from "@daytona/sdk";
+import * as Snapshots from "@amends/sandbox-daytona-v2/Snapshots";
+import type { Network, Sandbox, SandboxProvider, Template } from "@amends/sandbox-v2";
+import { Daytona, DaytonaNotFoundError } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, layer } from "@effect/vitest";
-import { Effect, Redacted } from "effect";
-import { ChildProcess } from "effect/process";
+import { Crypto, Data, Effect, Redacted, Ref, Schedule } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 /**
- * What the Daytona provider does beyond the conformance suites: what it asks of Daytona, and the
- * network policies Daytona enforces. These create real sandboxes too, so they run only with
- * `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`.
+ * What the Daytona provider does beyond the conformance suites: what it asks of Daytona, how it
+ * prepares each version of a template once, and the network policies Daytona enforces. These
+ * create real sandboxes too, so they run only with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`.
  */
 const apiKey = Redacted.make(process.env.DAYTONA_API_KEY ?? "");
 const timeout = 120_000;
+const snapshotTimeout = 15 * 60_000;
+
+class PrepareFailed extends Data.TaggedError("PrepareFailed") {}
+
+/** Daytona's own client, to look at what the provider asked of it. */
+const useDaytona = Effect.acquireDisposable(
+  Effect.sync(() => new Daytona({ apiKey: Redacted.value(apiKey) })),
+);
 
 /** A sandbox `provider` creates, destroyed when the test ends. */
-const createSandbox = (provider: SandboxProvider.SandboxProvider["Service"]) =>
-  Effect.acquireRelease(provider.create(), (sandbox) => Effect.ignore(sandbox.destroy));
+const createSandbox = <E>(
+  provider: SandboxProvider.SandboxProvider["Service"],
+  options?: SandboxProvider.CreateOptions<E>,
+) => Effect.acquireRelease(provider.create(options), (sandbox) => Effect.ignore(sandbox.destroy));
+
+/**
+ * A version of a template no other test or run prepares, with `prepare` as its preparation, and
+ * whose snapshot is deleted when the test ends.
+ */
+const useTemplate = <E>(prepare: Template.Template<E>["prepare"]) =>
+  Effect.gen(function* () {
+    const crypto = yield* Crypto.Crypto;
+    const daytona = yield* useDaytona;
+    const template = { name: "daytona-test", identity: yield* crypto.randomUUIDv4, prepare };
+    const snapshot = yield* Snapshots.nameOf(template, undefined);
+    yield* Effect.addFinalizer(() =>
+      Effect.ignore(Effect.tryPromise(() => daytona.snapshot.delete(snapshot))),
+    );
+    return { template, snapshot };
+  });
+
+/** A template that writes `prepared.txt` in the working directory, counting its runs in `runs`. */
+const writePrepared = (runs: Ref.Ref<number>) =>
+  Effect.gen(function* () {
+    yield* Ref.update(runs, (count) => count + 1);
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo ready > prepared.txt"]));
+  });
+
+const readPrepared = (sandbox: Sandbox.Sandbox["Service"]) =>
+  sandbox.fileSystem.readFileString(`${sandbox.workingDirectory}/prepared.txt`);
 
 /** Whether a request from inside `sandbox` reaches `host` over HTTPS within five seconds. */
 const reaches = (sandbox: Sandbox.Sandbox["Service"], host: string) =>
@@ -33,6 +71,19 @@ const reachable = (sandbox: Sandbox.Sandbox["Service"]) =>
     { concurrency: "unbounded" },
   );
 
+/**
+ * What `sandbox` reaches once the policy just set is applied, looking again while it reaches other
+ * than `expected`: Daytona applies a policy a moment after it answers.
+ */
+const reachableOnceApplied = (
+  sandbox: Sandbox.Sandbox["Service"],
+  expected: { readonly example: boolean; readonly npm: boolean },
+) =>
+  Effect.repeat(reachable(sandbox), {
+    until: ({ example, npm }) => example === expected.example && npm === expected.npm,
+    schedule: Schedule.spaced("1 second").pipe(Schedule.upTo({ duration: "20 seconds" })),
+  });
+
 const allowList = (
   allowedHosts: ReadonlyArray<string>,
   allowedCidrs: ReadonlyArray<string> = [],
@@ -47,9 +98,7 @@ describe.skipIf(
       "never stops a sandbox on its own, unless the options give an interval",
       () =>
         Effect.gen(function* () {
-          const daytona = yield* Effect.acquireDisposable(
-            Effect.sync(() => new Daytona({ apiKey: Redacted.value(apiKey) })),
-          );
+          const daytona = yield* useDaytona;
           const lasting = yield* createSandbox(yield* DaytonaSandboxProvider.make({ apiKey }));
           const stopping = yield* createSandbox(
             yield* DaytonaSandboxProvider.make({ apiKey, autoStopInterval: 30 }),
@@ -68,19 +117,113 @@ describe.skipIf(
     );
 
     it.effect(
-      "enforces each network policy as soon as it is set, in place of the one before",
+      "makes one snapshot of a version that hosts create sandboxes from, and starts later ones from it",
+      () =>
+        Effect.gen(function* () {
+          const daytona = yield* useDaytona;
+          const hosts = [
+            yield* DaytonaSandboxProvider.make({ apiKey }),
+            yield* DaytonaSandboxProvider.make({ apiKey }),
+          ] as const;
+          const runs = yield* Ref.make(0);
+          const { template, snapshot } = yield* useTemplate(writePrepared(runs));
+
+          // Until the snapshot is made, each sandbox is prepared on its own.
+          const first = yield* Effect.all(
+            [
+              createSandbox(hosts[0], { template }),
+              createSandbox(hosts[1], { template }),
+              createSandbox(hosts[1], { template }),
+            ],
+            { concurrency: "unbounded" },
+          );
+          yield* Effect.tryPromise(() => daytona.snapshot.get(snapshot)).pipe(
+            Effect.filterOrFail((found) => found.state === "active"),
+            Effect.retry(Schedule.spaced("2 seconds")),
+          );
+          // Three in the sandboxes, and one in the sandbox the snapshot was made of.
+          const prepared = yield* Ref.get(runs);
+          const later = yield* createSandbox(hosts[0], { template });
+
+          expect(prepared).toBe(4);
+          expect(yield* Ref.get(runs)).toBe(4);
+          for (const sandbox of [...first, later]) {
+            expect(yield* readPrepared(sandbox)).toBe("ready\n");
+          }
+        }),
+      // Daytona takes from seconds to several minutes to make a snapshot.
+      snapshotTimeout,
+    );
+
+    it.effect(
+      "leaves neither the sandbox that made a failing template's snapshot nor a snapshot of it",
+      () =>
+        Effect.gen(function* () {
+          const daytona = yield* useDaytona;
+          const provider = yield* DaytonaSandboxProvider.make({ apiKey });
+          const runs = yield* Ref.make(0);
+          const { template, snapshot } = yield* useTemplate(
+            Effect.andThen(
+              Ref.update(runs, (count) => count + 1),
+              Effect.fail(new PrepareFailed()),
+            ),
+          );
+
+          const error = yield* Effect.flip(provider.create({ template }));
+          // Once the template has failed in the sandbox the snapshot was to be made of too, that
+          // sandbox goes.
+          yield* Ref.get(runs).pipe(
+            Effect.filterOrFail((count) => count === 2),
+            Effect.retry(Schedule.spaced("1 second")),
+          );
+          yield* Effect.promise(() =>
+            daytona.get(snapshot).then(
+              (sandbox): string => sandbox.state ?? "unknown",
+              (error: unknown) => {
+                if (error instanceof DaytonaNotFoundError) return "missing";
+                throw error;
+              },
+            ),
+          ).pipe(
+            Effect.filterOrFail((state) => ["missing", "destroying", "destroyed"].includes(state)),
+            Effect.retry(Schedule.spaced("1 second").pipe(Schedule.upTo({ duration: "1 minute" }))),
+          );
+          const snapshotExists = yield* Effect.tryPromise(() =>
+            daytona.snapshot.get(snapshot),
+          ).pipe(
+            Effect.as(true),
+            Effect.orElseSucceed(() => false),
+          );
+
+          expect(error._tag).toBe("PrepareFailed");
+          expect(snapshotExists).toBe(false);
+        }),
+      timeout,
+    );
+
+    it.effect(
+      "enforces each network policy in place of the one before",
       () =>
         Effect.gen(function* () {
           const sandbox = yield* createSandbox(yield* DaytonaSandboxProvider.make({ apiKey }));
 
           yield* sandbox.setNetworkPolicy({ _tag: "DenyAll" });
-          expect(yield* reachable(sandbox)).toEqual({ example: false, npm: false });
+          expect(yield* reachableOnceApplied(sandbox, { example: false, npm: false })).toEqual({
+            example: false,
+            npm: false,
+          });
 
           yield* sandbox.setNetworkPolicy(allowList(["example.com"]));
-          expect(yield* reachable(sandbox)).toEqual({ example: true, npm: false });
+          expect(yield* reachableOnceApplied(sandbox, { example: true, npm: false })).toEqual({
+            example: true,
+            npm: false,
+          });
 
           yield* sandbox.setNetworkPolicy({ _tag: "AllowAll" });
-          expect(yield* reachable(sandbox)).toEqual({ example: true, npm: true });
+          expect(yield* reachableOnceApplied(sandbox, { example: true, npm: true })).toEqual({
+            example: true,
+            npm: true,
+          });
         }),
       timeout,
     );

@@ -1,8 +1,9 @@
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
 import { Network } from "@amends/sandbox-v2";
 import * as Conformance from "@amends/sandbox-v2/conformance";
+import { Daytona } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
-import { describe } from "@effect/vitest";
+import { afterAll, describe } from "@effect/vitest";
 import { Effect, Layer, Redacted } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcess } from "effect/process";
@@ -14,9 +15,29 @@ import { ChildProcess } from "effect/process";
  */
 const apiKey = process.env.DAYTONA_API_KEY;
 
+/**
+ * Deletes the snapshots of the suites' templates, which name each version anew, so that every run
+ * makes snapshots no later run starts from. One a run's test left being made when it ended is
+ * deleted by the next run.
+ */
+const deleteConformanceSnapshots = async () => {
+  const daytona = new Daytona({ apiKey: apiKey ?? "" });
+  try {
+    const { items } = await daytona.snapshot.list({ page: 1, limit: 100 });
+    await Promise.allSettled(
+      items
+        .filter((snapshot) => snapshot.name.startsWith("amends-template-conformance-"))
+        .map((snapshot) => daytona.snapshot.delete(snapshot.name)),
+    );
+  } finally {
+    await daytona[Symbol.asyncDispose]();
+  }
+};
+
 describe.skipIf(process.env.AMENDS_TEST_DAYTONA !== "1" || apiKey === undefined)(
   "DaytonaSandboxProvider",
   () => {
+    afterAll(deleteConformanceSnapshots, 60_000);
     Conformance.run({
       layer: Layer.merge(BunServices.layer, FetchHttpClient.layer),
       makeProvider: DaytonaSandboxProvider.make({ apiKey: Redacted.make(apiKey ?? "") }),
