@@ -1,9 +1,24 @@
-import { BridgeClient, Harness, type StreamPart } from "@amends/harness-v2";
+import { Bridge, BridgeClient, Harness, type StreamPart } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
-import type { Network, Sandbox } from "@amends/sandbox-v2";
-import { BunServices, BunSocket } from "@effect/platform-bun";
+import type { Network, Sandbox, Template } from "@amends/sandbox-v2";
+import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Path, Redacted, Schedule, Schema, Stream } from "effect";
+import {
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Path,
+  Redacted,
+  Schedule,
+  Schema,
+  Scope,
+  Stream,
+} from "effect";
+import { HttpRouter } from "effect/http";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
 import { freePort, isRunning, makeProxy, makeSandbox } from "./fixtures.ts";
 
 /**
@@ -23,15 +38,43 @@ const answer = (text: string): ReadonlyArray<StreamPart.StreamPart> => [
   { type: "finish", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
 ];
 
-/** A harness over the fake bridge on `port`, run by a host that derives tokens from `secret`. */
-const makeHarness = (port: Network.Port, secret = "the hosts' secret") =>
+/**
+ * The fake bridge's template at `version`, which installs the bridge in the sandbox's working
+ * directory as `bridge-<version>.ts`, a program that runs `fake-bridge.ts`.
+ */
+const templateOf = (version: string): Template.Template => ({
+  name: "fake-bridge",
+  identity: version,
+  prepare: Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const program = `import "${import.meta.dirname}/fake-bridge.ts";`;
+    yield* spawner.exitCode(
+      ChildProcess.make("sh", [
+        "-c",
+        'printf "%s\n" "$1" > "$2"',
+        "sh",
+        program,
+        `bridge-${version}.ts`,
+      ]),
+    );
+  }),
+});
+
+/**
+ * A harness over the fake bridge on `port`, at `version`, run by a host that derives tokens from
+ * `secret`.
+ */
+const makeHarness = (
+  port: Network.Port,
+  { secret = "the hosts' secret", version = "1" }: { secret?: string; version?: string } = {},
+) =>
   Effect.map(
     BridgeClient.make({
       id: "fake",
-      template: { name: "fake-bridge", identity: "none", prepare: Effect.void },
+      template: templateOf(version),
       port,
       command: process.execPath,
-      args: [`${import.meta.dirname}/fake-bridge.ts`],
+      args: [`bridge-${version}.ts`],
       token: (sandboxId) => Redacted.make(`${secret}/${sandboxId}`),
       agentOptions: { greeting: "hello" },
     }),
@@ -70,6 +113,43 @@ const killBridge = (sandbox: Sandbox.Sandbox["Service"]) =>
       while: (running) => running,
       schedule: Schedule.spaced("20 millis"),
     });
+  });
+
+/**
+ * Serves on `port`, from this process, a bridge of the fake agent that speaks `protocolVersion`,
+ * as a host of another version would have launched, answering only the requests every version
+ * keeps. It stops listening once a host asks it to exit, which the returned `Deferred` records.
+ */
+const serveOtherVersion = (port: Network.Port, protocolVersion: number) =>
+  Effect.gen(function* () {
+    const exitAsked = yield* Deferred.make<void>();
+    const Rpcs = RpcGroup.make(Bridge.Hello, Bridge.Exit);
+    const serverScope = yield* Scope.make();
+    // Bun's server finishes stopping only once hosts close their connections.
+    const stop = Effect.forkDetach(Scope.close(serverScope, Exit.void)).pipe(
+      Effect.flatMap(Fiber.await),
+      Effect.timeout("1 second"),
+      Effect.ignore,
+    );
+    yield* Effect.addFinalizer(() => stop);
+    yield* Layer.buildWithScope(
+      HttpRouter.serve(
+        RpcServer.layer(Rpcs).pipe(
+          Layer.provide(
+            Rpcs.toLayer({
+              Hello: () => Effect.succeed({ agent: "fake", protocolVersion }),
+              Exit: () => Effect.asVoid(Deferred.succeed(exitAsked, undefined)),
+            }),
+          ),
+          Layer.provide(RpcServer.layerProtocolWebsocket({ path: "/" })),
+          Layer.provide(RpcSerialization.layerJson),
+        ),
+        { disableLogger: true },
+      ).pipe(Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port }))),
+      serverScope,
+    );
+    yield* Effect.forkScoped(Effect.andThen(Deferred.await(exitAsked), stop));
+    return exitAsked;
   });
 
 /** Lets the stand-in agent finish a `wait` turn of the session `id`. */
@@ -115,6 +195,45 @@ describe("BridgeClient", () => {
       }).pipe(Effect.provide(TestLayer)),
     );
 
+    it.live("installs its bridge before it launches it, in a sandbox prepared for another", () =>
+      Effect.gen(function* () {
+        const port = yield* freePort;
+        const sandbox = yield* makeSandbox(port, templateOf("1"));
+        const harness = yield* makeHarness(port, { version: "2" });
+
+        const session = yield* harness.startSession({ sandbox, id });
+        const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
+
+        expect(parts).toEqual(answer("hello"));
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("replaces a bridge of an older protocol with its own", () =>
+      Effect.gen(function* () {
+        const { port, sandbox, harness } = yield* makeSetup;
+        const exitAsked = yield* serveOtherVersion(port, Bridge.protocolVersion - 1);
+
+        const session = yield* harness.startSession({ sandbox, id });
+        const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
+
+        expect(yield* Deferred.isDone(exitAsked)).toBe(true);
+        expect(parts).toEqual(answer("hello"));
+        expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(1);
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("refuses a bridge of a newer protocol, leaving it running", () =>
+      Effect.gen(function* () {
+        const { port, sandbox, harness } = yield* makeSetup;
+        const exitAsked = yield* serveOtherVersion(port, Bridge.protocolVersion + 1);
+
+        const error = yield* Effect.flip(harness.startSession({ sandbox, id }));
+
+        expect(error.reason._tag).toBe("UnsupportedError");
+        expect(yield* Deferred.isDone(exitAsked)).toBe(false);
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
     it.live("connects to the bridge another host launched", () =>
       Effect.gen(function* () {
         const { port, sandbox, harness } = yield* makeSetup;
@@ -136,7 +255,7 @@ describe("BridgeClient", () => {
       Effect.gen(function* () {
         const { port, sandbox, harness } = yield* makeSetup;
         yield* harness.startSession({ sandbox, id });
-        const strangerHarness = yield* makeHarness(port, "another secret");
+        const strangerHarness = yield* makeHarness(port, { secret: "another secret" });
 
         const error = yield* Effect.flip(strangerHarness.startSession({ sandbox, id }));
 

@@ -53,7 +53,11 @@ export interface Options {
   /** Names the agent, as its `Bridge.Agent` does. The bridge must answer with it. */
   readonly id: string;
 
-  /** Installs the bridge and the agent in a sandbox. */
+  /**
+   * Installs the bridge and the agent in a sandbox. A session runs it again before it launches the
+   * bridge, for a sandbox prepared with another version of it, so it keeps what the sandbox has and
+   * installs only what it lacks.
+   */
   readonly template: Template.Template;
 
   /** The port the bridge listens on in its sandbox, which the sandbox must be created with. */
@@ -104,10 +108,9 @@ const StateJson = Schema.toCodecJson(State);
 /** A client of the bridge in a sandbox. */
 type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientError>;
 
-/** A client of a bridge, and the agent the bridge answered that it runs. */
-interface Answer {
+/** A client of a bridge, with what the bridge answered to `Hello`. */
+interface Answer extends Schema.Schema.Type<typeof Bridge.Hello.successSchema> {
   readonly client: Client;
-  readonly agent: string;
 }
 
 const startSession = Effect.fn("BridgeClient.start")(function* (
@@ -390,9 +393,10 @@ const startSession = Effect.fn("BridgeClient.start")(function* (
 
 /**
  * A client of the bridge in `sandbox`, over a WebSocket open for as long as the scope is, launching
- * the bridge when none answers. The WebSocket is not opened again when it drops, so that requests
- * then fail with `RpcClientError` rather than reach a bridge that restarted without the session.
- * Fails with `UnsupportedError` when the bridge on the port runs another agent.
+ * the bridge when none answers, and replacing one that speaks an older version of the protocol. The
+ * WebSocket is not opened again when it drops, so that requests then fail with `RpcClientError`
+ * rather than reach a bridge that restarted without the session. Fails with `UnsupportedError` when
+ * the bridge on the port runs another agent, or speaks a newer version of the protocol.
  */
 const connect = Effect.fnUntraced(function* (
   options: Options,
@@ -415,15 +419,18 @@ const connect = Effect.fnUntraced(function* (
   const scope = yield* Effect.scope;
 
   /**
-   * A client over a new WebSocket, and the agent the bridge there runs, or nothing, with the
-   * WebSocket closed, when no bridge answers within 2 seconds. A bridge that is not running refuses
-   * the WebSocket, so the question fails rather than waits.
+   * A client over a new WebSocket, and what the bridge there answers to `Hello`, or nothing, with
+   * the WebSocket closed, when no bridge answers within 2 seconds. A bridge that is not running
+   * refuses the WebSocket, so the question fails rather than waits.
    */
   const answer = Effect.gen(function* () {
     const clientScope = yield* Scope.fork(scope);
     return yield* openClient(endpoint, token).pipe(
       Effect.flatMap((client) =>
-        Effect.map(Effect.timeout(client.Hello(), "2 seconds"), ({ agent }) => ({ client, agent })),
+        Effect.map(Effect.timeout(client.Hello(), "2 seconds"), (hello): Answer => ({
+          client,
+          ...hello,
+        })),
       ),
       Scope.provide(clientScope),
       Effect.onError((cause) => Scope.close(clientScope, Exit.failCause(cause))),
@@ -431,15 +438,36 @@ const connect = Effect.fnUntraced(function* (
     );
   });
 
-  const { client, agent } = (yield* answer) ?? (yield* launch(options, sandbox, token, answer));
-  if (agent !== options.id) {
-    const description = `The bridge on port ${options.port} runs ${agent}, not ${options.id}`;
-    return yield* new HarnessError({
-      agent: options.id,
-      reason: new UnsupportedError({ description }),
+  /**
+   * Asks a bridge of an older version of the protocol to exit, which aborts its turns, and launches
+   * this host's once no bridge answers.
+   */
+  const replace = (older: Answer) =>
+    Effect.gen(function* () {
+      yield* Effect.ignore(older.client.Exit());
+      yield* Effect.repeat(answer, {
+        until: (reply) => reply === undefined,
+        schedule: Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "30 seconds" })),
+      });
+      return yield* launch(options, sandbox, token, answer);
     });
+
+  const unsupported = (description: string) =>
+    new HarnessError({ agent: options.id, reason: new UnsupportedError({ description }) });
+
+  const found = (yield* answer) ?? (yield* launch(options, sandbox, token, answer));
+  if (found.agent !== options.id) {
+    return yield* unsupported(
+      `The bridge on port ${options.port} runs ${found.agent}, not ${options.id}`,
+    );
   }
-  return client;
+  const answered = found.protocolVersion < Bridge.protocolVersion ? yield* replace(found) : found;
+  if (answered.protocolVersion !== Bridge.protocolVersion) {
+    return yield* unsupported(
+      `The bridge on port ${options.port} speaks version ${answered.protocolVersion} of the bridge protocol, and this host version ${Bridge.protocolVersion}`,
+    );
+  }
+  return answered.client;
 });
 
 /**
@@ -474,9 +502,9 @@ const openClient = Effect.fnUntraced(function* (
 });
 
 /**
- * Launches the bridge, giving it its launch options on standard input, and waits until it answers,
- * as `answer` asks it. Unreferenced, the bridge outlives the scope that launched it and the host;
- * it stops with the sandbox.
+ * Launches the bridge, once the template has installed it, giving it its launch options on standard
+ * input, and waits until it answers, as `answer` asks it. Unreferenced, the bridge outlives the
+ * scope that launched it and the host; it stops with the sandbox.
  */
 const launch = Effect.fnUntraced(
   function* (
@@ -496,6 +524,8 @@ const launch = Effect.fnUntraced(
       stateDirectory: path.join(sandbox.workingDirectory, ".bridge", options.id),
       agentOptions: options.agentOptions,
     }).pipe(Effect.orDie);
+    // A sandbox prepared with another version of the template lacks this version's bridge.
+    yield* options.template.prepare;
     // TODO: Keep the bridge's own output in its state directory, for a host to report why the
     // bridge failed to start.
     const bridge = yield* spawner.spawn(

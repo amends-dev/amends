@@ -31,7 +31,9 @@ after the first on this machine, gets only a new bridge program, and a sandbox f
 prepared one is ready at once. The template's identity changes with the versions and the bundle.
 
 A session launches the bridge, when none answers, with `sh -c 'exec "$HOME/…/bun" "$HOME/…/bridge-<bundle>.js"'`,
-giving it its launch options on standard input. `src/bridge/main.ts` is the program: it makes
+giving it its launch options on standard input. It runs the template first, so that a sandbox a
+host of another version prepared gets this version's bridge program, and Bun and opencode if their
+versions changed. `src/bridge/main.ts` is the program: it makes
 the agent in `src/bridge/Agent.ts` from the agent options and serves it on the port with
 `BunBridge.serve`. Bun's server never finishes stopping once a WebSocket has been open, so
 `BunBridge` runs it in a scope of its own, which it gives a second to close.

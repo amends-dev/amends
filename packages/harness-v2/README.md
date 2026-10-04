@@ -53,18 +53,22 @@ session in it, on the agent's port, to hosts that present its token as `Authoriz
 runs each turn itself, so that a turn goes on when a host's connection drops or the host lets go,
 and numbers and keeps the turn's parts, so that a host reads them from any number: after
 reconnecting, or to `continue` a turn another host suspended. `Bridge.Rpcs` is the protocol, over a
-WebSocket.
+WebSocket, at the version `Bridge.protocolVersion` names, which `Hello` answers. A host asks a
+bridge that speaks an older version to `Exit`, aborting its turns, and launches its own in its
+place; it refuses a bridge that speaks a newer one. Every version keeps `Hello` and `Exit` as they
+are.
 
 - `Bridge.Agent` is what an adapter implements to run behind a bridge. It starts sessions and runs
   their turns, but needs neither to suspend nor to continue one: the bridge keeps the turns.
-- `BridgeServer.layer` serves an agent over the HTTP server a bridge program provides, with the
-  token and state directory from the `Bridge.LaunchOptions` that `BridgeServer.readLaunchOptions`
-  reads from standard input. Each turn's parts go to a file in the state directory as well as to
+- `BridgeServer.serve` serves an agent over the HTTP server a bridge program provides, until a host
+  asks the bridge to exit, with the token and state directory from the `Bridge.LaunchOptions` that
+  `BridgeServer.readLaunchOptions` reads from standard input. Each turn's parts go to a file in the state directory as well as to
   memory, and a session keeps only its latest turn. A bridge started again serves a turn that had
   finished or failed before it exited; a host runs again one that had not.
 - `BridgeClient.make` is the `Agent.Agent` hosts run. A session connects to the bridge at the
   sandbox's endpoint for the port, and launches it with the adapter's command when none answers,
-  giving it the launch options on standard input. The token comes from the host's `token`
+  giving it the launch options on standard input. It runs the template first, which installs only
+  what the sandbox lacks, so that a sandbox prepared with another version of it launches this one. The token comes from the host's `token`
   function, derived from the sandbox's id with a secret every host shares, so that any host
   connects to a bridge any of them launched. Each connection starts the session in the bridge from
   the state the bridge last gave, so that a bridge that died and was launched again has it again; a

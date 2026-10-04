@@ -9,10 +9,11 @@
  * so that a host reads them from any number: again after its connection drops, or to `continue` a
  * turn that another host suspended. The agent behind it needs to do neither.
  *
- * An agent's adapter implements `Bridge.Agent` to run behind a bridge, `BridgeServer.layer` serves
+ * An agent's adapter implements `Bridge.Agent` to run behind a bridge, `BridgeServer.serve` serves
  * it in the sandbox, and `BridgeClient.make` is the `Agent.Agent` hosts use to reach it.
  * `Rpcs` is the protocol between them, over a WebSocket whose host presents the token as
- * `Authorization: Bearer <token>` when it connects.
+ * `Authorization: Bearer <token>` when it connects. A host replaces a bridge that speaks an older
+ * version of it with its own, and refuses one that speaks a newer.
  */
 import { Network, Sandbox } from "@amends/sandbox-v2";
 import { type Effect, Schema, type Scope, type Stream } from "effect";
@@ -116,13 +117,33 @@ export const NumberedPart = Schema.Struct({ seq: Schema.Int, part: StreamPart })
 
 export interface NumberedPart extends Schema.Schema.Type<typeof NumberedPart> {}
 
+/**
+ * The version of `Rpcs` that this package speaks. Bump it when hosts or bridges of the version
+ * before could not read a change to the protocol.
+ */
+export const protocolVersion = 1;
+
+/**
+ * Answers which agent the bridge runs, and the version of the protocol it speaks, once it is
+ * listening. Every version of the protocol keeps it as it is, as it keeps `Exit`, for hosts and
+ * bridges of different versions to settle which bridge runs.
+ */
+export const Hello = Rpc.make("Hello", {
+  success: Schema.Struct({ agent: Schema.String, protocolVersion: Schema.Int }),
+});
+
+/**
+ * Ends every session, aborting its turn, and exits the bridge, for a host that speaks a newer
+ * version of the protocol to launch its own. The bridge may exit before it answers.
+ */
+export const Exit = Rpc.make("Exit");
+
 /** The session a request is about. Every request but `StartSession` needs it started. */
 const inSession = { session: SessionId };
 
-// TODO: Add the protocol's version to `Hello`, once a host meets a bridge older than itself.
 export class Rpcs extends RpcGroup.make(
-  /** Answers which agent the bridge runs, once it is listening. */
-  Rpc.make("Hello", { success: Schema.Struct({ agent: Schema.String }) }),
+  Hello,
+  Exit,
 
   /**
    * Starts the session, or takes up the one the bridge is running, which ignores `history` and

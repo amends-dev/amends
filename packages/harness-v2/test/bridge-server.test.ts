@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   type Cause,
+  Deferred,
   Effect,
   Exit,
   FileSystem,
@@ -37,12 +38,17 @@ const numbered = (parts: ReadonlyArray<StreamPart>, from = 1) =>
 
 /**
  * Starts a bridge for `agent` that keeps its turns in `fileSystem` and runs until `scope` closes,
- * returning a host's client of it.
+ * returning a host's client of it. `exit` is what the bridge does when a host asks it to exit.
  */
-const startBridge = (agent: Bridge.Agent, fileSystem: FileSystem.FileSystem, scope: Scope.Scope) =>
+const startBridge = (
+  agent: Bridge.Agent,
+  fileSystem: FileSystem.FileSystem,
+  scope: Scope.Scope,
+  exit: Effect.Effect<unknown> = Effect.void,
+) =>
   Effect.gen(function* () {
     const handlers = yield* Layer.buildWithScope(
-      BridgeServer.layerHandlers(agent, { stateDirectory: "/state" }).pipe(
+      BridgeServer.layerHandlers(agent, { stateDirectory: "/state", exit }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(FileSystem.FileSystem, fileSystem), Path.layer)),
       ),
       scope,
@@ -56,11 +62,29 @@ const setUp = Effect.gen(function* () {
   const fake = yield* makeFakeBridgeAgent(() => Stream.fromQueue(parts));
   const { fileSystem, files } = yield* makeMemoryFileSystem;
   const bridgeScope = yield* Scope.make();
-  const client = yield* startBridge(fake.agent, fileSystem, bridgeScope);
-  return { parts, fake, fileSystem, files, bridgeScope, client };
+  const exitAsked = yield* Deferred.make<void>();
+  const client = yield* startBridge(
+    fake.agent,
+    fileSystem,
+    bridgeScope,
+    Deferred.succeed(exitAsked, undefined),
+  );
+  return { parts, fake, fileSystem, files, bridgeScope, exitAsked, client };
 });
 
 describe("BridgeServer", () => {
+  it.effect("answers its agent and protocol version, and exits when a host asks it to", () =>
+    Effect.gen(function* () {
+      const { exitAsked, client } = yield* setUp;
+
+      const hello = yield* client.Hello();
+      yield* client.Exit();
+
+      expect(hello).toEqual({ agent: "fake", protocolVersion: Bridge.protocolVersion });
+      expect(yield* Deferred.isDone(exitAsked)).toBe(true);
+    }),
+  );
+
   it.effect("streams a turn's parts, numbered, until its last", () =>
     Effect.gen(function* () {
       const { parts, client } = yield* setUp;

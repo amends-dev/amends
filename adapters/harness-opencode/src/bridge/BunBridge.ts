@@ -1,6 +1,6 @@
 /**
  * Serves a bridge from Bun, as a bridge program does once it has made its agent: on every interface
- * of the sandbox, at the port the host's launch options name, until the scope closes.
+ * of the sandbox, at the port the host's launch options name, until a host asks it to exit.
  *
  * Bun's server never finishes stopping once a WebSocket has been open, so it runs in a scope of its
  * own, which the bridge gives a second to close after the bridge's own finalizers have run, rather
@@ -10,7 +10,7 @@ import { type Bridge, BridgeServer } from "@amends/harness-v2";
 import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, Exit, Fiber, Layer, Redacted, Scope } from "effect";
 
-/** Serves `agent` to hosts as `launch` says, until the scope closes. */
+/** Serves `agent` to hosts as `launch` says, until a host asks the bridge to exit. */
 export const serve = Effect.fnUntraced(function* (
   agent: Bridge.Agent,
   launch: Bridge.LaunchOptions,
@@ -31,9 +31,8 @@ export const serve = Effect.fnUntraced(function* (
     }),
     serverScope,
   );
-  const bridge = BridgeServer.layer(agent, {
+  return yield* BridgeServer.serve(agent, {
     token: Redacted.make(launch.token),
     stateDirectory: launch.stateDirectory,
-  });
-  return yield* Effect.provideContext(Layer.launch(bridge), server);
+  }).pipe(Effect.provideContext(server));
 });

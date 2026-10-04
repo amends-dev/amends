@@ -1,8 +1,8 @@
 /**
  * The bridge's side of `Bridge.Rpcs`, which runs in the sandbox and serves an agent's sessions to
- * hosts. `layer` serves them over a WebSocket at `/`, refusing a host that does not present the
- * bridge's token, and `layerHandlers` is the same bridge without a transport. `readLaunchOptions`
- * reads what the host that launched the bridge gave it.
+ * hosts. `serve` serves them over a WebSocket at `/`, refusing a host that does not present the
+ * bridge's token, until a host asks the bridge to exit, and `layerHandlers` is the same bridge
+ * without a transport. `readLaunchOptions` reads what the host that launched the bridge gave it.
  *
  * Each session the bridge starts runs in a scope of its own until a host stops or destroys it. The
  * bridge runs the session's turns itself, one at a time, in that scope, so that a turn does not end
@@ -14,6 +14,7 @@
  */
 import {
   Cause,
+  Deferred,
   Effect,
   Exit,
   Fiber,
@@ -30,7 +31,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect";
-import { HttpRouter, type HttpServer, HttpServerResponse } from "effect/http";
+import { HttpRouter, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 import type { SessionId } from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
@@ -51,22 +52,36 @@ export interface Options {
   readonly stateDirectory: string;
 }
 
-/** Serves `agent`'s sessions over a WebSocket at `/`, on the `HttpServer` provided. */
-export const layer = (
-  agent: Bridge.Agent,
-  options: Options,
-): Layer.Layer<never, never, HttpServer.HttpServer | FileSystem.FileSystem | Path.Path> =>
-  HttpRouter.serve(
-    RpcServer.layer(Bridge.Rpcs).pipe(
-      Layer.provide([layerHandlers(agent, options), layerProtocol(options.token)]),
-      Layer.provide(RpcSerialization.layerJson),
+/**
+ * Serves `agent`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, until a host
+ * asks the bridge to exit. The sessions end, aborting their turns, when the scope closes.
+ */
+export const serve = Effect.fnUntraced(function* (agent: Bridge.Agent, options: Options) {
+  const exitAsked = yield* Deferred.make<void>();
+  const handlers = layerHandlers(agent, {
+    stateDirectory: options.stateDirectory,
+    exit: Deferred.succeed(exitAsked, undefined),
+  });
+  yield* Layer.build(
+    HttpRouter.serve(
+      RpcServer.layer(Bridge.Rpcs).pipe(
+        Layer.provide([handlers, layerProtocol(options.token)]),
+        Layer.provide(RpcSerialization.layerJson),
+      ),
+      { disableLogger: true },
     ),
-    { disableLogger: true },
   );
+  yield* Deferred.await(exitAsked);
+});
 
-/** Handles `Bridge.Rpcs` for `agent`'s sessions, over whichever transport serves them. */
-export const layerHandlers = (agent: Bridge.Agent, options: Pick<Options, "stateDirectory">) =>
-  Bridge.Rpcs.toLayer(makeHandlers(agent, options.stateDirectory));
+/**
+ * Handles `Bridge.Rpcs` for `agent`'s sessions, over whichever transport serves them. `exit` ends
+ * the bridge when a host asks it to.
+ */
+export const layerHandlers = (
+  agent: Bridge.Agent,
+  options: { readonly stateDirectory: string; readonly exit: Effect.Effect<unknown> },
+) => Bridge.Rpcs.toLayer(makeHandlers(agent, options));
 
 /**
  * What the host that launched the bridge gave it on standard input, as one line of JSON. The bridge
@@ -127,7 +142,13 @@ interface StartedSession {
   fiber: Fiber.Fiber<void> | undefined;
 }
 
-const makeHandlers = Effect.fnUntraced(function* (agent: Bridge.Agent, stateDirectory: string) {
+const makeHandlers = Effect.fnUntraced(function* (
+  agent: Bridge.Agent,
+  {
+    stateDirectory,
+    exit,
+  }: { readonly stateDirectory: string; readonly exit: Effect.Effect<unknown> },
+) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   /** The handlers' scope, which every session's is forked from, so that sessions end with it. */
@@ -247,7 +268,9 @@ const makeHandlers = Effect.fnUntraced(function* (agent: Bridge.Agent, stateDire
     }).pipe(Effect.orElseSucceed(() => undefined));
 
   return Bridge.Rpcs.of({
-    Hello: () => Effect.succeed({ agent: agent.id }),
+    Hello: () => Effect.succeed({ agent: agent.id, protocolVersion: Bridge.protocolVersion }),
+
+    Exit: () => Effect.asVoid(exit),
 
     StartSession: ({ session, directory, history, agentState, unfinishedTurn }) =>
       Semaphore.withPermit(
