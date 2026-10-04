@@ -71,8 +71,14 @@ export const answer = (text: string) =>
 
 /** A response that calls the tool `name` with `params`, as the call `id`. */
 export const callTool = (id: string, name: string, params: unknown) =>
+  callTools([{ id, name, params }]);
+
+/** A response that calls several tools together, each `name` with `params`, as the call `id`. */
+export const callTools = (
+  calls: ReadonlyArray<{ readonly id: string; readonly name: string; readonly params: unknown }>,
+) =>
   Stream.fromIterable<Response.StreamPartEncoded>([
-    { type: "tool-call", id, name, params },
+    ...calls.map((call): Response.StreamPartEncoded => ({ type: "tool-call", ...call })),
     { type: "finish", reason: "tool-calls", usage },
   ]);
 

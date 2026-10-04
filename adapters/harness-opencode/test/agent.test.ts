@@ -5,6 +5,7 @@ import { expect, it, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Path, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
+import { TestClock } from "effect/testing";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import { type FakeOpencodeOptions, type FakeTurn, makeFakeOpencode } from "./fakes.ts";
 import { makeSandbox, tokens } from "./fixtures.ts";
@@ -309,6 +310,59 @@ layer(TestLayer)("OpencodeAgent", (it) => {
       expect(admittedBeforeResuming).toEqual([]);
       expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toHaveLength(1);
       expect(result.text).toBe("hello");
+    }),
+  );
+
+  it.effect(
+    "admits no prompt when the caller stops reading while it waits for opencode's models",
+    () =>
+      Effect.gen(function* () {
+        const asked = yield* Deferred.make<void>();
+        const loaded = yield* Deferred.make<void>();
+        const { fake, session } = yield* startSession(answer("hello"), {
+          loadingProvider: Effect.andThen(
+            Deferred.succeed(asked, undefined),
+            Deferred.await(loaded),
+          ),
+        });
+
+        const reading = yield* Stream.runCollect(session.stream({ prompt: "Say hi." })).pipe(
+          Effect.forkChild,
+        );
+        yield* Deferred.await(asked);
+        yield* Fiber.interrupt(reading);
+        yield* Deferred.succeed(loaded, undefined);
+        const result = yield* session.generate({ prompt: "Say hello." });
+
+        expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toHaveLength(1);
+        expect(result.text).toBe("hello");
+      }),
+  );
+
+  it.effect("refuses a model whose provider opencode has not loaded within 10 seconds", () =>
+    Effect.gen(function* () {
+      const { fake, session } = yield* startSession(answer("hello"));
+
+      // The agent asks opencode over HTTP between its waits, so the clock moves on a little at a
+      // time until it gives up.
+      const refused = yield* Effect.raceFirst(
+        Effect.flip(session.generate({ prompt: "Say hello.", model: "elsewhere/model" })),
+        Effect.forever(
+          Effect.andThen(
+            TestClock.adjust("200 millis"),
+            TestClock.withLive(Effect.sleep("5 millis")),
+          ),
+        ),
+      );
+
+      expect(refused._tag === "HarnessError" && refused.reason).toMatchObject({
+        _tag: "UnsupportedError",
+        description: "opencode has no model provider elsewhere",
+      });
+      expect(
+        fake.requests.filter((request) => request === "GET /api/provider/elsewhere").length,
+      ).toBeGreaterThan(1);
+      expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
     }),
   );
 

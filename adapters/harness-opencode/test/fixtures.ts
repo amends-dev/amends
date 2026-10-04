@@ -1,5 +1,6 @@
 import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
-import type { Network } from "@amends/sandbox-v2";
+import { Network } from "@amends/sandbox-v2";
+import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, FileSystem, Schema } from "effect";
 import { SessionEvent } from "../src/SessionEvent.ts";
 
@@ -17,6 +18,15 @@ export const makeSandbox = (port: Network.Port) =>
     yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
     return sandbox;
   });
+
+/** A port on this machine that nothing listens on, for a server the test starts on it. */
+export const freePort = Effect.scoped(
+  Effect.flatMap(BunHttpServer.make({ hostname: "127.0.0.1", port: 0 }), ({ address }) =>
+    address._tag === "UnixPathAddress"
+      ? Effect.die("The server listens on no port")
+      : Effect.succeed(Network.Port.make(address.port)),
+  ),
+);
 
 /**
  * Numbers events as opencode records them in the session `sessionID`, from `firstSeq`: the

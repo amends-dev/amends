@@ -5,7 +5,14 @@ import { expect, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Path, Schema, Stream } from "effect";
 import { AiError, type LanguageModel, Prompt, type Response, Tool, Toolkit } from "effect/ai";
 import * as AmendsAgent from "../src/AmendsAgent.ts";
-import { answer, callTool, makeSandbox, makeScriptedModel, toolResultsOf } from "./fixtures.ts";
+import {
+  answer,
+  callTool,
+  callTools,
+  makeSandbox,
+  makeScriptedModel,
+  toolResultsOf,
+} from "./fixtures.ts";
 
 const id = Agent.SessionId.make("session-one");
 
@@ -108,6 +115,37 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       expect(result.usage).toEqual({ inputTokens: { total: 30 }, outputTokens: { total: 15 } });
       expect(yield* readSessionFile(sandbox, "notes.txt")).toBe("hello");
     }),
+  );
+
+  it.effect("works in its sandbox with its own tools and the host's in the same step", () =>
+    Effect.gen(function* () {
+      const { model, requests } = yield* makeScriptedModel((request) =>
+        toolResultsOf(request).length === 0
+          ? callTools([
+              { id: "bash-1", name: "bash", params: { command: "echo 2" } },
+              { id: "add-1", name: "Add", params: { a: 2, b: 3 } },
+            ])
+          : answer("done"),
+      );
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
+        id,
+        sandbox: yield* makeSandbox,
+      });
+
+      const result = yield* session.generate({
+        prompt: "echo 2, and add 2 and 3",
+        toolkit: yield* MathToolkit,
+      });
+
+      expect(toolNamesOf(requests[0])).toEqual(["read", "write", "edit", "bash", "Add"]);
+      const [, answered] = requests.map(toolResultsOf);
+      expect(answered).toHaveLength(2);
+      expect(answered).toEqual(expect.arrayContaining([{ exitCode: 0, output: "2\n" }, 5]));
+      expect(
+        Object.fromEntries(result.toolResults.map((part) => [part.name, part.providerExecuted])),
+      ).toEqual({ bash: true, Add: false });
+      expect(result.text).toBe("done");
+    }).pipe(Effect.provide(MathHandlers)),
   );
 
   it.effect(
