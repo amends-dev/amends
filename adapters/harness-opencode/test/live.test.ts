@@ -1,24 +1,12 @@
 import { Agent, Harness, type StreamPart } from "@amends/harness-v2";
-import { Network } from "@amends/sandbox-v2";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import {
-  Deferred,
-  Effect,
-  Fiber,
-  FileSystem,
-  Layer,
-  Path,
-  Random,
-  Schedule,
-  Schema,
-  Stream,
-} from "effect";
+import { Deferred, Effect, Fiber, FileSystem, Layer, Path, Schedule, Schema, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import * as Server from "../src/Server.ts";
-import { makeSandbox } from "./fixtures.ts";
+import { freePort, makeSandbox } from "./fixtures.ts";
 
 /**
  * These tests run real opencode, 1.18.23 on the `PATH`, whose turns a model answers over the
@@ -40,7 +28,7 @@ const LiveLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
 const makeLiveHarness = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const port = Network.Port.make(yield* Random.nextIntBetween(20_000, 60_000));
+  const port = yield* freePort;
   const home = yield* fs.makeTempDirectoryScoped();
   const sandbox = yield* makeSandbox(port);
   const serverOptions = {
