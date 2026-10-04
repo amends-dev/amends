@@ -24,7 +24,7 @@ import {
   DaytonaTimeoutError,
 } from "@daytona/sdk";
 import { Crypto, Effect, Exit, FileSystem, Layer, Redacted, Schedule } from "effect";
-import { ChildProcessSpawner } from "effect/process";
+import * as Processes from "./Processes.ts";
 
 export interface Options {
   /** The API key of the Daytona organization the sandboxes belong to. */
@@ -82,9 +82,8 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       workingDirectory,
       // TODO(in progress): Replaced by the file system over Daytona's file API, module 3.
       fileSystem: FileSystem.makeNoop({}),
-      // TODO(in progress): Replaced by the spawner over Daytona's sessions, module 2.
-      childProcessSpawner: ChildProcessSpawner.make(() =>
-        Effect.die("The Daytona provider runs no processes yet"),
+      childProcessSpawner: yield* Processes.make(sandbox, workingDirectory).pipe(
+        Effect.provideService(Crypto.Crypto, crypto),
       ),
       ports,
       endpoint: (port, protocol) =>
