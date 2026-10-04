@@ -1,0 +1,31 @@
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
+import { Network } from "@amends/sandbox-v2";
+import * as Conformance from "@amends/sandbox-v2/conformance";
+import { BunServices } from "@effect/platform-bun";
+import { describe } from "@effect/vitest";
+import { Effect, Layer, Redacted } from "effect";
+import { FetchHttpClient } from "effect/http";
+import { ChildProcess } from "effect/process";
+
+/**
+ * The Daytona provider runs the conformance suites in Daytona's cloud, with the organization of
+ * `DAYTONA_API_KEY`. Its sandboxes are real machines that take minutes to test and cost money, so
+ * the suites run only with `AMENDS_TEST_DAYTONA=1`.
+ */
+const apiKey = process.env.DAYTONA_API_KEY;
+
+describe.skipIf(process.env.AMENDS_TEST_DAYTONA !== "1" || apiKey === undefined)(
+  "DaytonaSandboxProvider",
+  () => {
+    Conformance.run({
+      layer: Layer.merge(BunServices.layer, FetchHttpClient.layer),
+      makeProvider: DaytonaSandboxProvider.make({ apiKey: Redacted.make(apiKey ?? "") }),
+      // Each sandbox is a machine of its own, where nothing listens on a port until a test starts it.
+      freePort: Effect.succeed(Network.Port.make(4500)),
+      // Daytona's preview proxy reaches servers that listen on every interface.
+      serveFiles: (port) =>
+        ChildProcess.make("python3", ["-m", "http.server", String(port), "--bind", "0.0.0.0"]),
+      timeout: 120_000,
+    });
+  },
+);

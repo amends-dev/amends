@@ -214,6 +214,13 @@ version; the template's own live test installs them afresh in a temporary home d
 keeps opencode's configuration and data in temporary directories, apart from this machine's
 opencode.
 
+The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
+`adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports. The local
+provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
+policies Daytona enforces, create real sandboxes and cost money, so they run only with
+`AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
+`.env`; they take about a minute.
+
 ## Storage conformance
 
 The [conformance suites](../packages/storage-conformance/README.md) specify storage

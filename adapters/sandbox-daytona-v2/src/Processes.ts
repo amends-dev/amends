@@ -4,10 +4,10 @@
  * scope that spawned a process closes, its session is deleted, unless its handle was unreferenced;
  * the process then runs until the sandbox stops.
  *
- * Daytona keeps what a session's command writes and its exit code. Output streams from Daytona as
- * the process writes it, and once the process exits, the rest is read from what Daytona kept; the
- * exit code is polled. Daytona takes a process's input a line at a time and never ends it, so a
- * command that reads its input to the end waits forever.
+ * A process writes its output to files of its own in the sandbox, which its handle reads as they
+ * grow, byte for byte: Daytona's own record of a session's output keeps whole lines, and ends a
+ * last line that has no newline with one. The exit code is polled. Daytona takes a process's input
+ * a line at a time and never ends it, so a command that reads its input to the end waits forever.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
 import {
@@ -16,7 +16,17 @@ import {
   DaytonaNotFoundError,
   DaytonaTimeoutError,
 } from "@daytona/sdk";
-import { Crypto, Data, Effect, PlatformError, Queue, Schedule, Sink, Stream } from "effect";
+import {
+  Crypto,
+  Data,
+  Duration,
+  Effect,
+  Option,
+  PlatformError,
+  Schedule,
+  Sink,
+  Stream,
+} from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 /** What became of a process: running, exited with a code, or ended without one. */
@@ -30,6 +40,12 @@ const Status = Data.taggedEnum<Status>();
 
 /** Polls a process's status quickly at first, then once a second while it runs long. */
 const untilExit = Schedule.min([Schedule.exponential("50 millis"), Schedule.spaced("1 second")]);
+
+/** How long to wait before reading output again, after `idle` reads found nothing new. */
+const delayAfter = (idle: number) => Duration.millis(Math.min(50 * 2 ** idle, 1000));
+
+/** The most of a process's output one read returns, which reads again at once for the rest. */
+const readLimit = 1024 * 1024;
 
 /** The process spawner of `sandbox`, whose commands start in `workingDirectory`. */
 export const make = Effect.fn("Processes.make")(function* (
@@ -50,12 +66,22 @@ export const make = Effect.fn("Processes.make")(function* (
       });
     }
     const session = `amends-process-${yield* crypto.randomUUIDv4}`;
+    const outputDirectory = `/tmp/${session}`;
     let referenced = true;
     yield* Effect.acquireRelease(
       call("spawn", () => sandbox.process.createSession(session)),
+      // Deletes the session, ending the process, and removes its output, which stays when `kill`
+      // has deleted the session already.
       () =>
         referenced
-          ? Effect.ignore(call("kill", () => sandbox.process.deleteSession(session)))
+          ? Effect.andThen(
+              Effect.ignore(call("kill", () => sandbox.process.deleteSession(session))),
+              Effect.ignore(
+                call("kill", () =>
+                  sandbox.process.executeCommand(`rm -rf ${quote(outputDirectory)}`),
+                ),
+              ),
+            )
           : Effect.void,
     );
     // TODO: Keep environment values out of the command line, which Daytona keeps in its record of
@@ -65,7 +91,9 @@ export const make = Effect.fn("Processes.make")(function* (
         // Sessions run the user's shell, zsh on Daytona's own image, whose redirections differ
         // from sh's. The line runs in sh as a child, since Daytona loses the exit code of a
         // command that replaces the session's shell.
-        command: `sh -c ${quote(commandLine(command, workingDirectory))}`,
+        command: `sh -c ${quote(
+          `mkdir -p ${quote(outputDirectory)} && { ${commandLine(command, workingDirectory)}; } >${quote(`${outputDirectory}/stdout`)} 2>${quote(`${outputDirectory}/stderr`)}`,
+        )}`,
         runAsync: true,
         suppressInputEcho: true,
       }),
@@ -82,43 +110,43 @@ export const make = Effect.fn("Processes.make")(function* (
       schedule: untilExit,
     });
 
-    /** What the process writes to `output`, ending once the process has exited. */
+    /** What the process has written to `output` after its first `offset` bytes, up to `readLimit`. */
+    const readOutput = (output: "stdout" | "stderr", offset: number) =>
+      Effect.map(
+        call("read", () =>
+          sandbox.process.executeCommand(
+            `tail -c +${offset + 1} -- ${quote(`${outputDirectory}/${output}`)} 2>/dev/null | head -c ${readLimit} | base64 -w0`,
+          ),
+        ),
+        ({ result }) => new Uint8Array(Buffer.from(result, "base64")),
+      );
+
+    /**
+     * What the process writes to `output`, read as it grows, and to the end once the process has
+     * ended. While nothing new is written, the file is read again sooner after recent output and
+     * once a second after a while.
+     */
     const outputOf = (output: "stdout" | "stderr") =>
-      Stream.callback<Uint8Array, PlatformError.PlatformError>((queue) => {
-        const encoder = new TextEncoder();
-        let delivered = 0;
-        let ended = false;
-        const deliver = (text: string) => {
-          if (ended || text === "") return;
-          delivered += text.length;
-          Queue.offerUnsafe(queue, encoder.encode(text));
-        };
-        const ignore = () => {};
-        return Effect.gen(function* () {
-          // Daytona replays what the process wrote, then follows it, but keeps following after
-          // the process exits, until its session is deleted. The stream ends on the exit code
-          // instead, with whatever the connection has not yet delivered of what Daytona kept.
-          yield* Effect.sync(() => {
-            sandbox.process
-              .getSessionCommandLogs(
-                session,
-                cmdId,
-                output === "stdout" ? deliver : ignore,
-                output === "stderr" ? deliver : ignore,
-              )
-              .catch(ignore);
-          });
-          const status = yield* awaitExit;
-          if (status._tag === "Exited") {
-            const kept = yield* call("logs", () =>
-              sandbox.process.getSessionCommandLogs(session, cmdId),
-            );
-            deliver((kept[output] ?? "").slice(delivered));
+      Stream.paginate(
+        { offset: 0, idle: 0, ended: false },
+        Effect.fnUntraced(function* ({ offset, idle, ended }) {
+          const bytes = yield* readOutput(output, offset);
+          if (bytes.length > 0) {
+            return [
+              [bytes],
+              Option.some({ offset: offset + bytes.length, idle: 0, ended }),
+            ] as const;
           }
-          ended = true;
-          yield* Queue.end(queue);
-        }).pipe(Effect.catch((error) => Queue.fail(queue, error)));
-      });
+          if (ended) return [[], Option.none()] as const;
+          const status = yield* readStatus;
+          if (status._tag === "Running") yield* Effect.sleep(delayAfter(idle));
+          // A process that has ended wrote all it will, which one more read finds.
+          return [
+            [],
+            Option.some({ offset, idle: idle + 1, ended: status._tag !== "Running" }),
+          ] as const;
+        }),
+      );
 
     const input = stdinOf(command);
     const stdin =

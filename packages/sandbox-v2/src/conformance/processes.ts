@@ -97,6 +97,28 @@ export const processes = <R>(fixture: Fixture<R>) => {
     );
 
     it.effect(
+      "gives a command's output byte for byte, with no newline added and bytes that are not text",
+      () =>
+        inSandbox(() =>
+          Effect.gen(function* () {
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+            const handle = yield* spawner.spawn(
+              ChildProcess.make("sh", ["-c", "printf 'line\\nno newline\\000\\377'"]),
+            );
+
+            const chunks = yield* Stream.runCollect(handle.stdout);
+
+            expect(chunks.flatMap((chunk) => [...chunk])).toEqual([
+              ...Array.from("line\nno newline", (character) => character.charCodeAt(0)),
+              0,
+              255,
+            ]);
+          }),
+        ),
+      fixture.timeout,
+    );
+
+    it.effect(
       "streams a running process's stdin and stdout one line at a time",
       () =>
         inSandbox(() =>
