@@ -191,6 +191,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
 
           const sandbox = yield* provider.create({
             template: {
+              name: "conformance-prepared",
               identity: yield* newIdentity("prepared"),
               prepare: Effect.gen(function* () {
                 const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -217,6 +218,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             provider.create({
               id,
               template: {
+                name: "conformance-failing",
                 identity: yield* newIdentity("failing"),
                 prepare: Effect.fail(new PrepareFailed()),
               },
@@ -241,6 +243,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             provider.create({
               id,
               template: {
+                name: "conformance-endless",
                 identity: yield* newIdentity("endless"),
                 prepare: Deferred.succeed(preparing, undefined).pipe(Effect.andThen(Effect.never)),
               },

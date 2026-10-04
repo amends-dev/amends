@@ -118,6 +118,7 @@ export const make = Effect.fn("OpencodeTemplate.make")(function* () {
   const bridge = `bridge-${bundleHash}.js`;
   const installation: Installation = {
     template: {
+      name: "opencode",
       identity: `${programsHash}-${bundleHash}`,
       prepare: install(directory, bridge, bundle),
     },

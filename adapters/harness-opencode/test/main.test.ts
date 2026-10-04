@@ -23,7 +23,7 @@ const makeHarness = (
   Effect.map(
     BridgeClient.make({
       id: "opencode",
-      template: { identity: "none", prepare: Effect.void },
+      template: { name: "opencode", identity: "none", prepare: Effect.void },
       port,
       command: process.execPath,
       args: [`${import.meta.dirname}/../src/bridge/main.ts`],

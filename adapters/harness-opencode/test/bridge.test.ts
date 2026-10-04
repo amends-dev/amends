@@ -28,7 +28,7 @@ const makeHarness = (port: Network.Port, secret = "the hosts' secret") =>
   Effect.map(
     BridgeClient.make({
       id: "fake",
-      template: { identity: "none", prepare: Effect.void },
+      template: { name: "fake-bridge", identity: "none", prepare: Effect.void },
       port,
       command: process.execPath,
       args: [`${import.meta.dirname}/fake-bridge.ts`],
