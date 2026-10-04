@@ -9,8 +9,8 @@
  * so that a host reads them from any number: again after its connection drops, or to `continue` a
  * turn that another host suspended. The agent behind it needs to do neither.
  *
- * An agent's adapter implements `Bridge.Agent` to run behind a bridge, `BridgeServer.serve` runs
- * the bridge in the sandbox, and `BridgeClient.make` is the `Agent.Agent` hosts use to reach it.
+ * An agent's adapter implements `Bridge.Agent` to run behind a bridge, `BridgeServer.layer` serves
+ * it in the sandbox, and `BridgeClient.make` is the `Agent.Agent` hosts use to reach it.
  * `Rpcs` is the protocol between them, over a WebSocket whose host presents the token as
  * `Authorization: Bearer <token>` when it connects.
  */
