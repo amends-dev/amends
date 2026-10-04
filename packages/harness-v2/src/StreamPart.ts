@@ -15,7 +15,7 @@ import { Response } from "effect/ai";
 
 /** A call to any tool. The agent's own tools run inside the agent and are `providerExecuted`. */
 const ToolCallPart = Schema.Struct({
-  type: Schema.Literal("tool-call"),
+  type: Schema.tag("tool-call"),
   id: Schema.String,
   name: Schema.String,
   params: Schema.Unknown,
@@ -25,7 +25,7 @@ const ToolCallPart = Schema.Struct({
 
 /** The result of a call to any tool, which failed when `isFailure` is set. */
 const ToolResultPart = Schema.Struct({
-  type: Schema.Literal("tool-result"),
+  type: Schema.tag("tool-result"),
   id: Schema.String,
   name: Schema.String,
   result: Schema.Unknown,
