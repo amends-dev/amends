@@ -1,12 +1,11 @@
-import { Agent, Harness, type StreamPart } from "@amends/harness-v2";
+import { type Bridge, GenerateResult, type StreamPart } from "@amends/harness-v2";
+import { SessionId } from "@amends/harness-v2/Agent";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, FileSystem, Layer, Path, Schedule, Schema, Stream } from "effect";
+import { Effect, FileSystem, Layer, Path, Schema, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
-import * as OpencodeAgent from "../src/OpencodeAgent.ts";
-import * as Server from "../src/Server.ts";
-import { freePort, makeSandbox } from "./fixtures.ts";
+import * as OpencodeAgent from "../src/bridge/Agent.ts";
 
 /**
  * These tests run real opencode, 1.18.23 on the `PATH`, whose turns a model answers over the
@@ -16,36 +15,53 @@ import { freePort, makeSandbox } from "./fixtures.ts";
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
 const model = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "opencode/fledge-alpha-free";
 
-const id = Agent.SessionId.make("live");
+const id = SessionId.make("live");
 const timeout = 120_000;
 const LiveLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
 
 /**
- * A harness over the opencode agent in a new local sandbox, whose server stops with the sandbox when
- * the scope closes. opencode keeps its configuration and data in directories of its own, apart from
- * this machine's opencode, and shares only its cache.
+ * The opencode agent as a bridge runs it, on this machine, and a directory for its session.
+ * opencode keeps its configuration and data in directories of its own, apart from this machine's
+ * opencode, and shares only its cache; its server stops when the scope closes.
  */
-const makeLiveHarness = Effect.gen(function* () {
+const makeLiveAgent = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  const port = yield* freePort;
   const home = yield* fs.makeTempDirectoryScoped();
-  const sandbox = yield* makeSandbox(port);
-  const serverOptions = {
+  const directory = path.join(home, "work");
+  yield* fs.makeDirectory(directory);
+  const agent = yield* OpencodeAgent.make({
+    model,
     command: "opencode",
-    port,
     config: { model, autoupdate: false },
     env: {
       XDG_CONFIG_HOME: path.join(home, "config"),
       XDG_DATA_HOME: path.join(home, "data"),
       XDG_STATE_HOME: path.join(home, "state"),
     },
-  };
-  const agent = yield* OpencodeAgent.make({ model, ...serverOptions });
-  return { sandbox, harness: Harness.make(agent), serverOptions };
+  });
+  return { agent, directory };
 });
 
-/** The opencode session a session's agent state names. */
+const turnOptions = (text: string, options: Partial<Bridge.TurnOptions> = {}) => ({
+  prompt: Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] }),
+  tools: [],
+  responseFormat: { type: "text" } as const,
+  ...options,
+});
+
+/** Runs a turn asking `text` to its end, returning it whole. */
+const runTurn = (
+  session: Bridge.AgentSession,
+  text: string,
+  options?: Partial<Bridge.TurnOptions>,
+) =>
+  Effect.map(
+    Stream.runCollect(session.prompt(turnOptions(text, options))),
+    (parts: ReadonlyArray<StreamPart.StreamPart>) => new GenerateResult.GenerateResult(parts),
+  );
+
+/** The opencode session a session's state names. */
 const OpencodeState = Schema.Struct({ sessionID: Schema.String });
 
 describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
@@ -53,12 +69,13 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
     "runs a turn in which opencode runs a command with its own tool",
     () =>
       Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeLiveHarness;
-        const session = yield* harness.startSession({ sandbox, id });
+        const { agent, directory } = yield* makeLiveAgent;
+        const session = yield* agent.start({ id, directory, history: Prompt.empty });
 
-        const result = yield* session.generate({
-          prompt: "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
-        });
+        const result = yield* runTurn(
+          session,
+          "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
+        );
 
         expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
           expect.objectContaining({ name: "bash", providerExecuted: true }),
@@ -75,58 +92,10 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
   );
 
   it.live(
-    "continues a suspended turn, which opencode went on with, from the step it was in",
-    () =>
-      Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeLiveHarness;
-        const session = yield* harness.startSession({ sandbox, id });
-        const before: Array<StreamPart.StreamPart> = [];
-        const calledTool = yield* Deferred.make<void>();
-
-        const reading = yield* session
-          .stream({
-            prompt:
-              "Run `sleep 2; echo slept` with your bash tool, then reply with what it printed.",
-          })
-          .pipe(
-            Stream.runForEach((part) =>
-              Effect.andThen(
-                Effect.sync(() => before.push(part)),
-                part.type === "tool-call" ? Deferred.succeed(calledTool, undefined) : Effect.void,
-              ),
-            ),
-            Effect.forkChild,
-          );
-        yield* Deferred.await(calledTool);
-        const state = yield* session.suspend;
-        yield* Fiber.join(reading);
-        const resumed = yield* harness.resumeSession({ sandbox, state });
-        const after = yield* Stream.runCollect(resumed.continue({}));
-        const history = (yield* resumed.detach).history.content;
-
-        // The session had no step of the turn finished, so the step with the call comes again.
-        expect(before.at(-1)?.type).toBe("tool-call");
-        expect(after.filter((part) => part.type === "tool-call")).toHaveLength(1);
-        expect(after.filter((part) => part.type === "tool-result")).toEqual([
-          expect.objectContaining({ isFailure: false }),
-        ]);
-        expect(after.at(-1)?.type).toBe("finish");
-        expect(
-          history.flatMap((message) =>
-            message.role === "assistant"
-              ? message.content.filter((part) => part.type === "tool-call")
-              : [],
-          ),
-        ).toHaveLength(1);
-      }).pipe(Effect.provide(LiveLayer)),
-    timeout,
-  );
-
-  it.live(
     "answers from another agent's conversation, the results of its tools included",
     () =>
       Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeLiveHarness;
+        const { agent, directory } = yield* makeLiveAgent;
         const history = Prompt.make([
           {
             role: "user",
@@ -159,15 +128,12 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
           },
           { role: "assistant", content: [{ type: "text", text: "Noted." }] },
         ]);
-        const session = yield* harness.resumeSession({
-          sandbox,
-          state: { id, agent: "amends", history },
-        });
+        const session = yield* agent.start({ id, directory, history });
 
-        const result = yield* session.generate({
-          prompt:
-            "Without using any tools: what is the codename, and how many degrees Celsius did the weather tool return? Reply with both on one line.",
-        });
+        const result = yield* runTurn(
+          session,
+          "Without using any tools: what is the codename, and how many degrees Celsius did the weather tool return? Reply with both on one line.",
+        );
 
         expect(result.text).toContain("BLUE-MARLIN-9");
         expect(result.text).toContain("14");
@@ -176,66 +142,55 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
   );
 
   it.live(
-    "fails a turn whose model opencode cannot load",
+    "ends a turn whose model opencode cannot load with an error",
     () =>
       Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeLiveHarness;
-        const session = yield* harness.startSession({ sandbox, id });
+        const { agent, directory } = yield* makeLiveAgent;
+        const session = yield* agent.start({ id, directory, history: Prompt.empty });
 
-        const error = yield* Effect.flip(
-          session.generate({ prompt: "Say hi.", model: "opencode/no-such-model" }),
-        );
+        const result = yield* runTurn(session, "Say hi.", { model: "opencode/no-such-model" });
 
-        expect(error._tag === "HarnessError" && error.reason._tag).toBe("TurnFailedError");
+        expect(result.finishReason).toBe("error");
       }).pipe(Effect.provide(LiveLayer)),
     timeout,
   );
 
   it.live(
-    "deletes the session in opencode when it is destroyed, also after it was detached",
+    "deletes the session in opencode when it is destroyed",
     () =>
       Effect.gen(function* () {
-        const { sandbox, harness, serverOptions } = yield* makeLiveHarness;
-        const session = yield* harness.startSession({ sandbox, id });
-        const { sessionID } = yield* Schema.decodeUnknownEffect(OpencodeState)(
-          (yield* session.detach).agentState,
-        );
-        const server = yield* Server.connect(sandbox, serverOptions);
-        const existed = yield* server.hasSession(sessionID);
+        const { agent, directory } = yield* makeLiveAgent;
+        const session = yield* agent.start({ id, directory, history: Prompt.empty });
+        const agentState = yield* session.state;
 
         yield* session.destroy;
+        // opencode no longer has the session, so the agent starts another.
+        const again = yield* agent.start({ id, directory, history: Prompt.empty, agentState });
 
-        expect(existed).toBe(true);
-        expect(yield* server.hasSession(sessionID)).toBe(false);
+        const before = yield* Schema.decodeUnknownEffect(OpencodeState)(agentState);
+        const after = yield* Schema.decodeUnknownEffect(OpencodeState)(yield* again.state);
+        expect(after.sessionID).not.toBe(before.sessionID);
       }).pipe(Effect.provide(LiveLayer)),
     timeout,
   );
 
   it.live(
-    "stops the turn in opencode when the caller stops reading it",
+    "stops the turn in opencode when its stream ends before the turn does",
     () =>
       Effect.gen(function* () {
-        const { sandbox, harness, serverOptions } = yield* makeLiveHarness;
-        const session = yield* harness.startSession({ sandbox, id });
+        const { agent, directory } = yield* makeLiveAgent;
+        const session = yield* agent.start({ id, directory, history: Prompt.empty });
 
         yield* session
-          .stream({ prompt: "Run `sleep 60` with your bash tool, then say done." })
+          .prompt(turnOptions("Run `sleep 300` with your bash tool, then say done."))
           .pipe(
             Stream.takeUntil((part) => part.type === "tool-call"),
             Stream.runDrain,
           );
+        // A turn opencode still ran would keep the next waiting for five minutes.
+        const next = yield* runTurn(session, "Reply with just the word: ready");
 
-        const { sessionID } = yield* Schema.decodeUnknownEffect(OpencodeState)(
-          (yield* session.detach).agentState,
-        );
-        const server = yield* Server.connect(sandbox, serverOptions);
-        yield* server.isRunning(sessionID).pipe(
-          Effect.repeat({
-            while: (isRunning) => isRunning,
-            schedule: Schedule.spaced("100 millis"),
-          }),
-          Effect.timeout("10 seconds"),
-        );
+        expect(next.finishReason).not.toBe("error");
       }).pipe(Effect.provide(LiveLayer)),
     timeout,
   );

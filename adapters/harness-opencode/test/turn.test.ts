@@ -1,8 +1,8 @@
 import type { StreamPart } from "@amends/harness-v2";
 import { describe, expect, it } from "@effect/vitest";
 import { Result } from "effect";
-import type { SessionEvent } from "../src/SessionEvent.ts";
-import * as Turn from "../src/Turn.ts";
+import type { SessionEvent } from "../src/bridge/SessionEvent.ts";
+import * as Turn from "../src/bridge/Turn.ts";
 import { makeEvents, tokens } from "./fixtures.ts";
 
 /** Translates `events` in order, returning the turn after them and the parts they streamed. */

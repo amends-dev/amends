@@ -2,7 +2,7 @@ import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
 import { Network } from "@amends/sandbox-v2";
 import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, FileSystem, Schema } from "effect";
-import { SessionEvent } from "../src/SessionEvent.ts";
+import { SessionEvent } from "../src/bridge/SessionEvent.ts";
 
 /**
  * A new sandbox on this machine exposing `port`, destroyed with the processes it runs, such as

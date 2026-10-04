@@ -1,139 +1,141 @@
 /**
- * opencode as an agent. opencode's server runs in the sandbox and serves every session there; the
- * agent drives it over the server's session API, which opencode 1.18 added and which this adapter is
- * written against. Each harness session is an opencode session in the session's directory, and a
- * turn is a prompt to it, whose parts `Turn` translates from the events opencode records for the
- * turn, as they happen.
+ * opencode as the bridge runs it in its sandbox. One opencode server, which the agent starts when
+ * the first session starts, serves every session there, each an opencode session in the session's
+ * directory. A turn is a prompt to it, whose parts `Turn` translates from the events opencode
+ * records for the turn, as they happen. A session that starts with a conversation from another
+ * agent has it written into opencode's record by `History`, tool calls included, before its first
+ * turn.
  *
- * opencode keeps working when the host lets go. A turn `suspend` cut short goes on in opencode, and
- * `continue` streams its parts from opencode's record of the turn, after the steps the session has. A
- * session that starts with a conversation from another agent has it written into opencode's record
- * by `History`, tool calls included, before its first turn.
+ * opencode's server runs until the bridge stops. A server that fails to start is started again by
+ * the next session, and one that exits by itself completes `serverExited`, for the bridge to exit
+ * with it.
  *
  * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
  * tools, or a request to compact, which fail with `UnsupportedError`.
  */
-import { type Agent, HarnessError, type StreamPart } from "@amends/harness-v2";
-import { Network } from "@amends/sandbox-v2";
+import { type Bridge, HarnessError } from "@amends/harness-v2";
 import {
   Clock,
   type Crypto,
   Deferred,
   Effect,
+  Exit,
   Ref,
   Schedule,
   Schema,
+  Scope,
   Semaphore,
   Stream,
 } from "effect";
 import type { Prompt } from "effect/ai";
 import type { HttpClient } from "effect/http";
+import type { ChildProcessSpawner } from "effect/process";
 import * as History from "./History.ts";
 import * as Server from "./Server.ts";
 import type { ModelRef, SessionEvent } from "./SessionEvent.ts";
 import * as Turn from "./Turn.ts";
 
-export interface Options {
+/** What the host gives the bridge for opencode, as its agent options. */
+export const Options = Schema.Struct({
   /**
    * The model a turn runs on when it names none, as opencode names models: `provider/model`, such
    * as `anthropic/claude-sonnet-4-5`. A turn names another the same way.
    */
-  readonly model: string;
+  model: Schema.String,
 
-  /** The command that runs opencode in the sandbox, `opencode` by default. */
-  readonly command?: string;
+  /** The command that runs opencode in the sandbox. */
+  command: Schema.String,
 
+  /** opencode's configuration, as its `opencode.json` takes it. */
+  config: Schema.Record(Schema.String, Schema.Json),
+
+  /** Environment variables opencode runs with, such as a model provider's API key. */
+  env: Schema.Record(Schema.String, Schema.String),
+});
+
+export interface Options extends Schema.Schema.Type<typeof Options> {}
+
+export interface Agent extends Bridge.Agent {
   /**
-   * The port opencode's server listens on, `defaultPort` by default. The agent's `ports` name it,
-   * and the sandbox must be created with it.
+   * Completes when opencode's server exits before the bridge stops it, for the bridge to exit with
+   * it.
    */
-  readonly port?: Network.Port;
-
-  /**
-   * opencode's configuration, as its `opencode.json` takes it. It takes effect when the agent starts
-   * opencode's server; a server already running in the sandbox keeps the one it started with.
-   */
-  readonly config?: { readonly [key: string]: Schema.Json };
-
-  /** Environment variables opencode's server runs with, such as a model provider's API key. */
-  readonly env?: Readonly<Record<string, string>>;
+  readonly serverExited: Effect.Effect<void>;
 }
 
-/** The port opencode's server listens on unless the options name another. */
-export const defaultPort = Network.Port.make(4096);
-
-/** Where a turn starts in opencode's record of the session: the event that admitted its prompt. */
-const TurnStart = Schema.Struct({ admittedSeq: Schema.Int });
-
-type TurnStart = typeof TurnStart.Type;
-
-/** What `suspend`, `detach`, and `stop` return, for `start` to take back. */
+/** What `state` returns, for `start` to take back. */
 const State = Schema.Struct({
   sessionID: Schema.String,
 
   /** The model the session runs its turns on, as the options name models. */
   model: Schema.String,
-
-  /** The turn `suspend` cut short. */
-  unfinishedTurn: Schema.optionalKey(TurnStart),
 });
 
 const StateJson = Schema.toCodecJson(State);
 
-/** What `start` takes back, if anything: a state the agent returned. */
-const SavedState = Schema.UndefinedOr(StateJson);
-
-// TODO: Add a template that installs a pinned opencode, once a sandbox lacks it. opencode's
-// installer writes only to `~/.opencode`, so the local provider, which prepares sandboxes on this
-// machine, must not run it.
-/** The agent, which reaches opencode's server with the `HttpClient` it is made with. */
+/**
+ * The agent, which starts opencode's server with `options` when the first session starts. The
+ * server runs in the scope the agent is made in.
+ */
 export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
-  const services = yield* Effect.context<HttpClient.HttpClient | Crypto.Crypto>();
-  const agent: Agent.Agent = {
+  const services = yield* Effect.context<
+    ChildProcessSpawner.ChildProcessSpawner | HttpClient.HttpClient | Crypto.Crypto
+  >();
+  const agentScope = yield* Effect.scope;
+  const serverExited = yield* Deferred.make<void>();
+  const running = yield* Ref.make<Server.Server | undefined>(undefined);
+  /** Held while the server starts, so that sessions starting together start one. */
+  const starting = yield* Semaphore.make(1);
+
+  /** opencode's server, which the first session to need it starts. */
+  const startedServer = Semaphore.withPermit(
+    starting,
+    Effect.gen(function* () {
+      const current = yield* Ref.get(running);
+      if (current !== undefined) return current;
+      const serverScope = yield* Scope.fork(agentScope);
+      const server = yield* Server.start({
+        command: options.command,
+        config: options.config,
+        env: options.env,
+      }).pipe(
+        Scope.provide(serverScope),
+        Effect.onError((cause) => Scope.close(serverScope, Exit.failCause(cause))),
+      );
+      yield* Effect.forkIn(
+        Effect.andThen(server.exited, Deferred.succeed(serverExited, undefined)),
+        serverScope,
+      );
+      yield* Ref.set(running, server);
+      return server;
+    }),
+  ).pipe(Effect.provide(services));
+
+  const agent: Agent = {
     id: "opencode",
-    requiresSandbox: true,
-    ports: [options.port ?? defaultPort],
-    start: (startOptions) => Effect.provide(startSession(options, startOptions), services),
+    serverExited: Deferred.await(serverExited),
+    start: (startOptions) =>
+      Effect.flatMap(startedServer, (server) => startSession(server, options.model, startOptions)),
   };
   return agent;
 });
 
 const startSession = Effect.fn("OpencodeAgent.start")(function* (
-  options: Options,
-  startOptions: Agent.StartOptions,
+  server: Server.Server,
+  defaultModel: string,
+  startOptions: Bridge.StartOptions,
 ) {
-  const { workspace } = startOptions;
-  if (workspace === undefined) {
-    const description = "opencode works in a sandbox";
-    return yield* harnessError(new HarnessError.UnsupportedError({ description }));
-  }
-  const server = yield* Server.connect(workspace.sandbox, {
-    command: options.command ?? "opencode",
-    port: options.port ?? defaultPort,
-    config: options.config ?? {},
-    env: options.env ?? {},
-  });
-
-  // opencode in another sandbox than the one the session last ran in has no record of it, and
-  // starts a session from the conversation instead, which runs an unfinished turn again.
-  const saved = yield* readState(startOptions.unfinishedTurn ?? startOptions.agentState);
+  // opencode may have lost the session, as when the sandbox lost its data, and then starts one
+  // from the conversation.
+  const saved = yield* readState(startOptions.agentState);
   const state =
     saved !== undefined && (yield* server.hasSession(saved.sessionID))
       ? saved
-      : yield* createSession(server, workspace.directory, options.model, startOptions.history);
+      : yield* createSession(server, startOptions.directory, defaultModel, startOptions.history);
   const { sessionID } = state;
 
   /** The model the session runs its turns on, switched when a turn names another. */
   const sessionModel = yield* Ref.make(state.model);
-  /** The turn running, or the one `suspend` cut short, for `continue` to stream. */
-  const running = yield* Ref.make(state.unfinishedTurn);
-  /** Done once the session is suspended, stopped, or destroyed, ending the running turn's stream. */
-  const closed = yield* Deferred.make<void>();
-  /**
-   * Held while opencode admits a prompt and while the session closes, so that a closed session
-   * admits none, and the session closes knowing every turn opencode is running.
-   */
-  const admission = yield* Semaphore.make(1);
 
   /**
    * Waits until opencode has loaded `model`'s provider, failing when it has not within 10 seconds:
@@ -158,43 +160,38 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     );
   };
 
-  /**
-   * Gives opencode the turn's prompt on the turn's model, returning where the turn starts, or
-   * nothing once the session has closed.
-   */
-  const admitPrompt = Effect.fnUntraced(function* (turnOptions: Agent.TurnOptions) {
+  /** Gives opencode the turn's prompt on the turn's model, returning where the turn starts. */
+  const admitPrompt = Effect.fnUntraced(function* (turnOptions: Bridge.TurnOptions) {
     const unsupported = unsupportedIn(turnOptions);
     if (unsupported !== undefined) {
       return yield* harnessError(new HarnessError.UnsupportedError({ description: unsupported }));
     }
-    const model = turnOptions.model ?? options.model;
+    const model = turnOptions.model ?? defaultModel;
     const modelRef = yield* modelRefFor(model);
     yield* awaitProvider(modelRef);
-    return yield* Semaphore.withPermit(
-      admission,
-      Effect.gen(function* () {
-        if (yield* Deferred.isDone(closed)) return undefined;
-        if (model !== (yield* Ref.get(sessionModel))) {
-          yield* server.switchModel(sessionID, modelRef);
-          yield* Ref.set(sessionModel, model);
-        }
-        const admittedSeq = yield* server.prompt(sessionID, textOf(turnOptions.prompt));
-        const start: TurnStart = { admittedSeq };
-        yield* Ref.set(running, start);
-        return start;
-      }),
-    );
+    if (model !== (yield* Ref.get(sessionModel))) {
+      yield* server.switchModel(sessionID, modelRef);
+      yield* Ref.set(sessionModel, model);
+    }
+    return yield* server.prompt(sessionID, textOf(turnOptions.prompt));
   });
 
   /**
-   * Streams the turn that starts at `start`, from the step after its first `finishedSteps`, until
-   * its `finish`. A stream that ends before the turn finishes, unless the session closed,
-   * interrupts the turn in opencode.
+   * Runs a turn, streaming its parts until its `finish`. A stream that ends before the turn
+   * finishes, as when the bridge aborts the turn, interrupts the turn in opencode.
    */
-  const streamTurn = (start: TurnStart, finishedSteps: number) =>
+  const runTurn = (turnOptions: Bridge.TurnOptions) =>
     Stream.unwrap(
       Effect.gen(function* () {
         const finished = yield* Ref.make(false);
+        // Interrupting a session that runs no turn does nothing, so this holds from before opencode
+        // admits the prompt.
+        yield* Effect.addFinalizer(() =>
+          Effect.flatMap(Ref.get(finished), (done) =>
+            done ? Effect.void : Effect.ignore(server.interrupt(sessionID)),
+          ),
+        );
+        const admittedSeq = yield* admitPrompt(turnOptions);
         /** The turn as translated so far. */
         const translated = yield* Ref.make(Turn.initial);
         const translate = (event: SessionEvent) =>
@@ -208,68 +205,21 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
         const finishStopped = Stream.unwrap(
           Effect.map(Ref.get(translated), (turn) => Stream.fromIterable(Turn.finishStopped(turn))),
         );
-        const interruptUnfinished = Effect.gen(function* () {
-          if ((yield* Ref.get(finished)) || (yield* Deferred.isDone(closed))) return;
-          yield* Effect.ignore(server.interrupt(sessionID));
-        });
-        return eventsOfTurn(server, sessionID, start.admittedSeq).pipe(
+        return eventsOfTurn(server, sessionID, admittedSeq).pipe(
           Stream.mapEffect(translate),
           Stream.flattenIterable,
           // A failure reading the events fails the turn, rather than ending it as stopped.
           Stream.concat(finishStopped),
           Stream.takeUntil((part) => part.type === "finish"),
-          afterSteps(finishedSteps),
-          Stream.interruptWhen(Deferred.await(closed)),
           Stream.tap((part) => (part.type === "finish" ? Ref.set(finished, true) : Effect.void)),
-          Stream.ensuring(Effect.andThen(interruptUnfinished, Ref.set(running, undefined))),
         );
       }),
     );
 
-  const runTurn = (turnOptions: Agent.TurnOptions) =>
-    Stream.unwrap(
-      Effect.map(admitPrompt(turnOptions), (start) =>
-        start === undefined ? Stream.empty : streamTurn(start, 0),
-      ),
-    );
-
-  /** What the agent returns for `start` to take back, with the turn `suspend` cut short. */
-  const saveState = (unfinished: TurnStart | undefined) =>
-    Effect.flatMap(Ref.get(sessionModel), (model) =>
-      Schema.encodeEffect(StateJson)({
-        sessionID,
-        model,
-        ...(unfinished === undefined ? {} : { unfinishedTurn: unfinished }),
-      }),
-    ).pipe(Effect.orDie);
-
-  /** Closes the session once no prompt is being admitted, returning the turn running then. */
-  const close = Semaphore.withPermit(
-    admission,
-    Effect.flatMap(Ref.get(running), (turn) =>
-      Effect.as(Deferred.succeed(closed, undefined), turn),
-    ),
-  );
-
-  const session: Agent.AgentSession = {
-    hasUnfinishedTurn: state.unfinishedTurn !== undefined,
-
+  const session: Bridge.AgentSession = {
     prompt: runTurn,
 
-    continue: (_turnOptions, finishedSteps) =>
-      Stream.unwrap(
-        Effect.map(Ref.get(running), (start) =>
-          start === undefined
-            ? Stream.fail(
-                harnessError(
-                  new HarnessError.NoTurnError({ description: "opencode has no unfinished turn" }),
-                ),
-              )
-            : streamTurn(start, finishedSteps),
-        ),
-      ),
-
-    // TODO: Relay the host's tools to opencode, as a server in the sandbox that opencode calls.
+    // TODO: Relay the host's tools to opencode, as a server in the bridge that opencode calls.
     submitToolResult: () =>
       Effect.fail(
         harnessError(
@@ -297,16 +247,11 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
         ),
       ),
 
-    suspend: Effect.flatMap(close, saveState),
-
-    detach: saveState(undefined),
-
-    stop: Effect.andThen(Effect.andThen(close, server.interrupt(sessionID)), saveState(undefined)),
-
-    destroy: Effect.andThen(
-      Effect.andThen(close, server.interrupt(sessionID)),
-      server.deleteSession(sessionID),
+    state: Effect.flatMap(Ref.get(sessionModel), (model) =>
+      Effect.orDie(Schema.encodeEffect(StateJson)({ sessionID, model })),
     ),
+
+    destroy: server.deleteSession(sessionID),
   };
   return session;
 });
@@ -372,22 +317,11 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
     }),
   );
 
-/** Drops the parts of a turn's first `steps` steps. */
-const afterSteps = (steps: number) =>
-  Stream.mapAccum(
-    () => 0,
-    (finished: number, part: StreamPart.StreamPart) =>
-      [
-        part.type === "finish-step" ? finished + 1 : finished,
-        finished < steps ? [] : [part],
-      ] as const,
-  );
-
 // TODO: Give opencode a turn's instructions, once its session API takes them.
 // TODO: Answer in JSON, once opencode's session API takes a response format.
 // TODO: Send the files a prompt carries, once `Server.prompt` sends files.
 /** Why opencode cannot run a turn with `turnOptions`, or nothing when it can. */
-const unsupportedIn = (turnOptions: Agent.TurnOptions): string | undefined => {
+const unsupportedIn = (turnOptions: Bridge.TurnOptions): string | undefined => {
   if (turnOptions.instructions !== undefined) {
     return "opencode's session API takes no instructions for a turn";
   }
@@ -415,8 +349,9 @@ const modelRefFor = (model: string) => {
 const textOf = (message: Prompt.UserMessage) =>
   message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
 
+/** The state `start` was given, if any, as the state `state` returned. */
 const readState = (json: Schema.Json | undefined) =>
-  Schema.decodeEffect(SavedState)(json).pipe(
+  Schema.decodeEffect(Schema.UndefinedOr(StateJson))(json).pipe(
     Effect.mapError((cause) =>
       harnessError(
         new HarnessError.InvalidOutputError({

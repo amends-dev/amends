@@ -1,8 +1,9 @@
 import { Network } from "@amends/sandbox-v2";
 import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, Fiber, Schema, Stream, SubscriptionRef } from "effect";
+import { Deferred, Effect, Fiber, Schema, Sink, Stream, SubscriptionRef } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
-import { ModelRef } from "../src/SessionEvent.ts";
+import { type ChildProcess, ChildProcessSpawner } from "effect/process";
+import { ModelRef } from "../src/bridge/SessionEvent.ts";
 
 /** An event as opencode's server sends it, of any type. */
 interface RecordedEvent {
@@ -335,6 +336,55 @@ export const makeFakeOpencode = (
       forget: (sessionID) => sessions.delete(sessionID),
     };
     return fake;
+  });
+
+export interface FakeServerProcesses {
+  readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
+
+  /** The commands spawned, in order. */
+  readonly spawned: ReadonlyArray<ChildProcess.Command>;
+
+  /** Ends every server spawned so far, as when opencode's server crashes. */
+  readonly exit: Effect.Effect<void>;
+}
+
+/**
+ * A process spawner whose every process is opencode's server, announcing that it listens at `url`,
+ * where a fake opencode serves, and running until `exit` or until the scope that spawned it closes.
+ * The first `failing` servers exit before they listen, as a server that fails to start does.
+ */
+export const makeFakeServerProcesses = (url: string, options: { readonly failing?: number } = {}) =>
+  Effect.gen(function* () {
+    const spawned: Array<ChildProcess.Command> = [];
+    const exited = yield* Deferred.make<void>();
+    const exitCode = ChildProcessSpawner.ExitCode(1);
+    const spawner = ChildProcessSpawner.make((command) =>
+      Effect.sync(() => {
+        spawned.push(command);
+        const fails = spawned.length <= (options.failing ?? 0);
+        return ChildProcessSpawner.makeHandle({
+          pid: ChildProcessSpawner.ProcessId(spawned.length),
+          exitCode: fails ? Effect.succeed(exitCode) : Effect.as(Deferred.await(exited), exitCode),
+          isRunning: Effect.map(Deferred.isDone(exited), (done) => !fails && !done),
+          kill: () => Effect.void,
+          stdin: Sink.drain,
+          stdout: fails
+            ? Stream.empty
+            : Stream.encodeText(Stream.make(`opencode server listening on ${url}\n`)),
+          stderr: Stream.empty,
+          all: Stream.empty,
+          getInputFd: () => Sink.drain,
+          getOutputFd: () => Stream.empty,
+          unref: Effect.succeed(Effect.void),
+        });
+      }),
+    );
+    const processes: FakeServerProcesses = {
+      spawner,
+      spawned,
+      exit: Effect.asVoid(Deferred.succeed(exited, undefined)),
+    };
+    return processes;
   });
 
 const CreateBody = Schema.Struct({

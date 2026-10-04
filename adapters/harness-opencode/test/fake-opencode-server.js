@@ -1,8 +1,10 @@
 // A stand-in for `opencode serve`, which `server.test.ts` installs as the command that runs
-// opencode. It starts as opencode does, with `serve --hostname=… --port=…` and the server's password
-// and configuration in its environment, answers opencode's health check behind the password, and
-// adds a line to `starts.jsonl` in its working directory for each start. Given
-// `FAKE_OPENCODE_EXIT`, it exits with that code before it listens, as a server that fails does.
+// opencode. It starts as opencode does, with `serve --hostname=… --port=0` and the server's password
+// and configuration in its environment, listens on a port it picks, and announces it on its output
+// as opencode does. It answers opencode's health check behind the password, and adds a line to
+// `starts.jsonl` beside itself for each start. Given `FAKE_OPENCODE_EXIT`, it exits with that code
+// before it listens, as a server that fails does, and given `FAKE_OPENCODE_EXIT_AFTER`, it exits
+// that many milliseconds after it listens.
 import { appendFileSync } from "node:fs";
 
 const argument = (name) =>
@@ -13,17 +15,18 @@ if (process.env.FAKE_OPENCODE_EXIT !== undefined) {
 }
 
 appendFileSync(
-  "starts.jsonl",
+  `${import.meta.dir}/starts.jsonl`,
   `${JSON.stringify({
     args: process.argv.slice(2),
     config: JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? "null"),
     greeting: process.env.GREETING,
+    pid: process.pid,
   })}\n`,
 );
 
 const authorization = `Basic ${btoa(`opencode:${process.env.OPENCODE_SERVER_PASSWORD}`)}`;
 
-Bun.serve({
+const server = Bun.serve({
   hostname: argument("hostname"),
   port: Number(argument("port")),
   fetch: (request) => {
@@ -35,3 +38,9 @@ Bun.serve({
       : Response.json({ message: "Not found" }, { status: 404 });
   },
 });
+
+console.log(`opencode server listening on http://${server.hostname}:${server.port}`);
+
+if (process.env.FAKE_OPENCODE_EXIT_AFTER !== undefined) {
+  setTimeout(() => process.exit(1), Number(process.env.FAKE_OPENCODE_EXIT_AFTER));
+}
