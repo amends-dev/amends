@@ -43,10 +43,16 @@ export class Sandbox extends Context.Service<
   {
     readonly id: SandboxId;
 
-    /** Text for an agent's instructions: what the sandbox is and where to work. */
+    /**
+     * Text for an agent's instructions: what the sandbox is, where to work, and which of its ports
+     * servers are reachable on.
+     */
     readonly description: string;
 
-    /** The absolute directory that commands start in when they set no `cwd`. */
+    /**
+     * The absolute directory that commands start in when they set no `cwd`, and that a relative
+     * `cwd` is resolved against.
+     */
     readonly workingDirectory: string;
 
     /**

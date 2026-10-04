@@ -16,7 +16,11 @@ export const EndpointProtocol = Schema.Literals(["http", "ws"]);
 
 export type EndpointProtocol = typeof EndpointProtocol.Type;
 
-/** How to reach a sandbox port from outside: the URL, and any headers the provider requires. */
+/**
+ * How to reach a sandbox port from outside: the URL, and any headers the provider requires. A
+ * request to the URL with those headers reaches the server with its own headers too,
+ * `Authorization` included.
+ */
 export const Endpoint = Schema.Struct({
   url: Schema.String,
   headers: Schema.Record(Schema.String, Schema.Redacted(Schema.String)),

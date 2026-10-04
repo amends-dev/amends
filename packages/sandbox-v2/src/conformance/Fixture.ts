@@ -24,10 +24,10 @@ export interface Fixture<R> {
   readonly freePort: Effect.Effect<Port, unknown, R>;
 
   /**
-   * A command that serves the files of the directory it starts in over HTTP on `port`, where the
-   * sandbox's endpoint for the port reaches it.
+   * A command that serves HTTP on `port`, where the sandbox's endpoint for the port reaches it,
+   * answering each request with its headers as a JSON object, under their names in lowercase.
    */
-  readonly serveFiles: (port: Port) => ChildProcess.Command;
+  readonly serveHeaders: (port: Port) => ChildProcess.Command;
 
   /** How many milliseconds a test may take, more than the default for a provider on the network. */
   readonly timeout?: number;

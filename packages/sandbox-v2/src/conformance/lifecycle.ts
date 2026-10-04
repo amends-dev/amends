@@ -1,12 +1,9 @@
 import { expect, layer } from "@effect/vitest";
 import { Data, Deferred, Effect, Fiber, FileSystem, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { Port } from "../Network.ts";
 import { layerServices, type Sandbox } from "../Sandbox.ts";
 import { Name } from "../Template.ts";
 import { type Fixture, newIdentity, newSandboxId, useProvider } from "./Fixture.ts";
-
-const port = Port.make(3000);
 
 class PrepareFailed extends Data.TaggedError("PrepareFailed") {}
 
@@ -41,6 +38,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "resumes a sandbox with the id, working directory, and ports it was created with",
       () =>
         Effect.gen(function* () {
+          const port = yield* fixture.freePort;
           const provider = yield* useProvider(fixture);
           const id = yield* newSandboxId;
           const created = yield* provider.create({ id, ports: [port] });
@@ -50,6 +48,20 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
           expect(resumed.id).toBe(id);
           expect(resumed.workingDirectory).toBe(created.workingDirectory);
           expect(resumed.ports).toEqual([port]);
+        }),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "describes where to work, and the ports servers are reachable on",
+      () =>
+        Effect.gen(function* () {
+          const port = yield* fixture.freePort;
+          const provider = yield* useProvider(fixture);
+          const sandbox = yield* provider.create({ ports: [port] });
+
+          expect(sandbox.description).toContain(sandbox.workingDirectory);
+          expect(sandbox.description).toContain(String(port));
         }),
       fixture.timeout,
     );
@@ -118,7 +130,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
     );
 
     it.effect(
-      "keeps a stopped sandbox's files for resume, and stopping it again succeeds",
+      "resumes a stopped sandbox with its files, where processes run again, and stopping it again succeeds",
       () =>
         Effect.gen(function* () {
           const provider = yield* useProvider(fixture);
@@ -128,8 +140,14 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
 
           yield* sandbox.stop;
           yield* sandbox.stop;
+          const resumed = yield* provider.resume(id);
+          const read = yield* Effect.gen(function* () {
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+            return yield* spawner.string(ChildProcess.make("cat", ["kept.txt"]));
+          }).pipe(Effect.provide(layerServices(resumed)));
 
-          expect(yield* readFile(yield* provider.resume(id), "kept.txt")).toBe("kept");
+          expect(yield* readFile(resumed, "kept.txt")).toBe("kept");
+          expect(read).toBe("kept");
         }),
       fixture.timeout,
     );

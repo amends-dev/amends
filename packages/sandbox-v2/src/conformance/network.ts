@@ -1,27 +1,32 @@
 import { expect, layer } from "@effect/vitest";
-import { Effect, FileSystem, Path, Record, Redacted, Schedule } from "effect";
+import { Effect, Record, Redacted, Schedule } from "effect";
 import { HttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
-import { Port } from "../Network.ts";
+import { NetworkPolicy } from "../Network.ts";
 import { layerServices } from "../Sandbox.ts";
+import type { SandboxError } from "../SandboxError.ts";
 import { type Fixture, useProvider } from "./Fixture.ts";
 
-/** Reaching a sandbox's ports from outside it. */
+/** Whether `change` was applied, or the reason it failed with. */
+const outcomeOf = (change: Effect.Effect<void, SandboxError>) =>
+  change.pipe(
+    Effect.as("applied"),
+    Effect.catch((error) => Effect.succeed(error.reason._tag)),
+  );
+
+/** Reaching a sandbox's ports from outside it, and what the sandbox reaches outside. */
 export const network = <R>(fixture: Fixture<R>) =>
   layer(fixture.layer, { excludeTestServices: true })("sandbox network", (it) => {
     it.effect(
-      "reaches a server on a declared port through the port's endpoint",
+      "reaches a server on a declared port through the port's endpoint, with the request's headers",
       () =>
         Effect.gen(function* () {
           const port = yield* fixture.freePort;
           const provider = yield* useProvider(fixture);
           const sandbox = yield* provider.create({ ports: [port] });
           yield* Effect.gen(function* () {
-            const fs = yield* FileSystem.FileSystem;
-            const path = yield* Path.Path;
             const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-            yield* fs.writeFileString(path.join(sandbox.workingDirectory, "greeting.txt"), "hello");
-            yield* spawner.spawn(fixture.serveFiles(port));
+            yield* spawner.spawn(fixture.serveHeaders(port));
           }).pipe(Effect.provide(layerServices(sandbox)));
 
           const endpoint = yield* sandbox.endpoint(port, "http");
@@ -32,11 +37,18 @@ export const network = <R>(fixture: Fixture<R>) =>
               Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "30 seconds" })),
             ),
           );
-          const response = yield* client.get(`${endpoint.url}/greeting.txt`, {
-            headers: Record.map(endpoint.headers, Redacted.value),
+          const response = yield* client.get(endpoint.url, {
+            headers: {
+              ...Record.map(endpoint.headers, Redacted.value),
+              authorization: "Bearer conformance",
+              "x-conformance": "passed on",
+            },
           });
 
-          expect(yield* response.text).toBe("hello");
+          expect(yield* response.json).toMatchObject({
+            authorization: "Bearer conformance",
+            "x-conformance": "passed on",
+          });
         }),
       fixture.timeout,
     );
@@ -45,7 +57,7 @@ export const network = <R>(fixture: Fixture<R>) =>
       "gives a WebSocket URL for a declared port's ws endpoint",
       () =>
         Effect.gen(function* () {
-          const port = Port.make(3000);
+          const port = yield* fixture.freePort;
           const provider = yield* useProvider(fixture);
           const sandbox = yield* provider.create({ ports: [port] });
 
@@ -60,12 +72,39 @@ export const network = <R>(fixture: Fixture<R>) =>
       "fails with NotFoundError for a port the sandbox was not created with",
       () =>
         Effect.gen(function* () {
+          const port = yield* fixture.freePort;
           const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create({ ports: [Port.make(3000)] });
+          const sandbox = yield* provider.create();
 
-          const error = yield* Effect.flip(sandbox.endpoint(Port.make(3001), "http"));
+          const error = yield* Effect.flip(sandbox.endpoint(port, "http"));
 
           expect(error.reason._tag).toBe("NotFoundError");
+        }),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "applies a network policy and request transformations, or fails with UnsupportedError",
+      () =>
+        Effect.gen(function* () {
+          const provider = yield* useProvider(fixture);
+          const sandbox = yield* provider.create();
+
+          const policy = yield* outcomeOf(
+            sandbox.setNetworkPolicy(NetworkPolicy.cases.DenyAll.make({})),
+          );
+          const transformations = yield* outcomeOf(
+            sandbox.addRequestTransformations([
+              {
+                host: "api.example.com",
+                matchHeaders: { authorization: "Bearer placeholder" },
+                setHeaders: { authorization: Redacted.make("Bearer secret") },
+              },
+            ]),
+          );
+
+          expect(["applied", "UnsupportedError"]).toContain(policy);
+          expect(["applied", "UnsupportedError"]).toContain(transformations);
         }),
       fixture.timeout,
     );

@@ -1,5 +1,5 @@
 import { expect, layer } from "@effect/vitest";
-import { type Cause, Effect, FileSystem, Path, Queue, Stream } from "effect";
+import { type Cause, Effect, Exit, FileSystem, Path, Queue, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { layerServices, type Sandbox } from "../Sandbox.ts";
 import { type Fixture, useProvider } from "./Fixture.ts";
@@ -62,6 +62,88 @@ export const processes = <R>(fixture: Fixture<R>) => {
             const directory = yield* spawner.string(ChildProcess.make("pwd", ["-P"]));
 
             expect(directory.trim()).toBe(yield* fs.realPath(sandbox.workingDirectory));
+          }),
+        ),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "starts a command in its cwd, resolved against the working directory when relative",
+      () =>
+        inSandbox((sandbox) =>
+          Effect.gen(function* () {
+            const fs = yield* FileSystem.FileSystem;
+            const path = yield* Path.Path;
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+            const nested = path.join(sandbox.workingDirectory, "nested");
+            yield* fs.makeDirectory(nested);
+            const directoryOf = (cwd: string) =>
+              Effect.map(spawner.string(ChildProcess.make("pwd", ["-P"], { cwd })), (output) =>
+                output.trim(),
+              );
+
+            expect(yield* directoryOf("nested")).toBe(yield* fs.realPath(nested));
+            expect(yield* directoryOf(nested)).toBe(yield* fs.realPath(nested));
+          }),
+        ),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "gives a command only the environment it is given, or the sandbox's with it when extended",
+      () =>
+        inSandbox(() =>
+          Effect.gen(function* () {
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+            // Prints the greeting, and whether `HOME`, which the sandbox's own environment sets, is set.
+            const printEnvironment = (extendEnv: boolean) =>
+              spawner.string(
+                ChildProcess.make("/bin/sh", ["-c", 'printf "%s|%s" "$GREETING" "${HOME:+home}"'], {
+                  env: { GREETING: "hello" },
+                  extendEnv,
+                }),
+              );
+
+            expect(yield* printEnvironment(false)).toBe("hello|");
+            expect(yield* printEnvironment(true)).toBe("hello|home");
+          }),
+        ),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "pipes a command's stdout or stderr into another command's stdin",
+      () =>
+        inSandbox(() =>
+          Effect.gen(function* () {
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+            const writeBoth = ChildProcess.make("sh", ["-c", "echo out; echo err >&2"]);
+            const pipeInto = (from: "stdout" | "stderr") =>
+              spawner.string(
+                writeBoth.pipe(
+                  ChildProcess.pipeTo(ChildProcess.make("tr", ["a-z", "A-Z"]), { from }),
+                ),
+              );
+
+            expect(yield* pipeInto("stdout")).toBe("OUT\n");
+            expect(yield* pipeInto("stderr")).toBe("ERR\n");
+          }),
+        ),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "ends a process that kill ends, which then runs no more and has no exit code",
+      () =>
+        inSandbox(() =>
+          Effect.gen(function* () {
+            const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+            const handle = yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
+
+            yield* handle.kill();
+
+            expect(yield* handle.isRunning).toBe(false);
+            expect(Exit.isFailure(yield* Effect.exit(handle.exitCode))).toBe(true);
           }),
         ),
       fixture.timeout,

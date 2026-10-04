@@ -2,7 +2,7 @@
  * The test suites every sandbox provider runs against itself, so that code written against
  * `SandboxProvider` and `Sandbox` works the same on each. A provider's tests call `run` with a
  * `Fixture`, which makes the provider and gives what the suites cannot assume of every provider,
- * such as how to serve files on a port.
+ * such as how to serve HTTP on a port.
  *
  * The suites run on the live clock, as a provider takes real time. Each test names the sandboxes
  * and templates it creates as no other test or run does, and destroys its sandboxes when it ends,

@@ -6,17 +6,17 @@ import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcess } from "effect/process";
 
-/** A server, run by Bun, that serves the files of the directory it starts in on `PORT`. */
-const serveFiles = `Bun.serve({
+/** A server, run by Bun, that answers each request on `PORT` with its headers. */
+const serveHeaders = `Bun.serve({
   hostname: "127.0.0.1",
   port: Number(process.env.PORT),
-  fetch: (request) => new Response(Bun.file("." + new URL(request.url).pathname)),
+  fetch: (request) => Response.json(Object.fromEntries(request.headers)),
 })`;
 
 /**
  * The local provider runs the conformance suites over a temporary directory, which is removed
  * with every sandbox in it when each test ends. Its sandboxes' ports are this machine's, so the
- * network suite takes a port nothing listens on, and serves files with the Bun running the tests.
+ * network suite takes a port nothing listens on, and serves HTTP with the Bun running the tests.
  */
 Conformance.run({
   layer: Layer.merge(BunServices.layer, FetchHttpClient.layer),
@@ -31,8 +31,8 @@ Conformance.run({
         : Effect.succeed(Network.Port.make(address.port)),
     ),
   ),
-  serveFiles: (port) =>
-    ChildProcess.make(process.execPath, ["-e", serveFiles], {
+  serveHeaders: (port) =>
+    ChildProcess.make(process.execPath, ["-e", serveHeaders], {
       env: { PORT: String(port) },
       extendEnv: true,
     }),
