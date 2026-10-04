@@ -53,3 +53,69 @@ export const tokens = (input: number, output: number) => ({
   reasoning: 0,
   cache: { read: 0, write: 0 },
 });
+
+/** A proxy on this machine, whose connections a test can drop. */
+export interface Proxy {
+  /** The port the proxy listens on. */
+  readonly port: Network.Port;
+
+  /** Closes every connection through the proxy, which takes new ones as before. */
+  readonly drop: Effect.Effect<void>;
+}
+
+/** A proxy to `port` on this machine, stopped when the scope closes. */
+export const makeProxy = (port: Network.Port) =>
+  Effect.map(
+    Effect.acquireRelease(
+      Effect.sync(() => {
+        /** A connection to the proxy, and the one it opened to `port` for it. */
+        interface Pair {
+          upstream: Bun.Socket<undefined> | undefined;
+          /** What arrived before the upstream connection opened. */
+          pending: Array<Uint8Array>;
+        }
+        const pairs = new Set<Bun.Socket<Pair>>();
+        const listener = Bun.listen<Pair>({
+          hostname: "127.0.0.1",
+          port: 0,
+          socket: {
+            open: (client) => {
+              const pair: Pair = { upstream: undefined, pending: [] };
+              client.data = pair;
+              pairs.add(client);
+              // A port nothing listens on yet refuses the connection, which then closes.
+              Bun.connect({
+                hostname: "127.0.0.1",
+                port,
+                socket: {
+                  open: (upstream) => {
+                    pair.upstream = upstream;
+                    for (const chunk of pair.pending) upstream.write(chunk);
+                    pair.pending = [];
+                  },
+                  data: (_upstream, chunk) => void client.write(chunk),
+                  close: () => void client.end(),
+                  error: () => void client.end(),
+                },
+              }).catch(() => client.end());
+            },
+            data: (client, chunk) => {
+              const { upstream, pending } = client.data;
+              if (upstream === undefined) pending.push(chunk);
+              else upstream.write(chunk);
+            },
+            close: (client) => {
+              client.data.upstream?.end();
+              pairs.delete(client);
+            },
+          },
+        });
+        const drop = Effect.sync(() => {
+          for (const client of pairs) client.end();
+        });
+        return { listener, drop };
+      }),
+      ({ listener }) => Effect.sync(() => listener.stop(true)),
+    ),
+    ({ listener, drop }): Proxy => ({ port: Network.Port.make(listener.port), drop }),
+  );

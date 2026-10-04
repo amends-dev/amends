@@ -1,9 +1,10 @@
 import type { Port } from "@amends/sandbox-v2/Network";
 import { Sandbox, SandboxId } from "@amends/sandbox-v2/Sandbox";
-import { Deferred, Effect, FileSystem, Queue, Stream } from "effect";
+import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import { ChildProcessSpawner } from "effect/process";
-import type { Agent, AgentSession, StartOptions, TurnOptions } from "../src/Agent.ts";
+import type { Agent, AgentSession, SessionId, StartOptions, TurnOptions } from "../src/Agent.ts";
+import type * as Bridge from "../src/Bridge.ts";
 import type { HarnessError } from "../src/HarnessError.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
 
@@ -186,3 +187,118 @@ export const reply = (text: string): ReadonlyArray<StreamPart> => [
 
 const textOf = (message: Prompt.UserMessage) =>
   message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
+
+/**
+ * An agent behind a bridge whose turns stream what `script` gives for the prompt's text, recording
+ * what the bridge asks of it. A session's state names it and how many sessions the agent started,
+ * so tests can tell which start a state came from.
+ */
+export interface FakeBridgeAgent {
+  readonly agent: Bridge.Agent;
+
+  /** What each `start` was given, in order. */
+  readonly starts: ReadonlyArray<Bridge.StartOptions>;
+
+  /** What each turn was given, in order. */
+  readonly turns: ReadonlyArray<Bridge.TurnOptions>;
+
+  /** How each turn's stream ended, in order. */
+  readonly turnEnds: ReadonlyArray<"finished" | "failed" | "interrupted">;
+
+  /** The results the host submitted for its tools, in order. */
+  readonly submitted: ReadonlyArray<unknown>;
+
+  /** The sessions whose scope closed, in order. */
+  readonly ended: ReadonlyArray<SessionId>;
+
+  /** The sessions destroyed, in order. */
+  readonly destroyed: ReadonlyArray<SessionId>;
+}
+
+export const makeFakeBridgeAgent = (
+  script: (prompt: string) => Stream.Stream<StreamPart, HarnessError>,
+) =>
+  Effect.sync(() => {
+    const starts: Array<Bridge.StartOptions> = [];
+    const turns: Array<Bridge.TurnOptions> = [];
+    const turnEnds: Array<"finished" | "failed" | "interrupted"> = [];
+    const submitted: Array<unknown> = [];
+    const ended: Array<SessionId> = [];
+    const destroyed: Array<SessionId> = [];
+
+    const agent: Bridge.Agent = {
+      id: "fake",
+      start: (options) =>
+        Effect.gen(function* () {
+          starts.push(options);
+          yield* Effect.addFinalizer(() => Effect.sync(() => ended.push(options.id)));
+          const startNumber = starts.length;
+          const session: Bridge.AgentSession = {
+            prompt: (turn) =>
+              Stream.suspend(() => {
+                turns.push(turn);
+                return script(textOf(turn.prompt)).pipe(
+                  Stream.onExit((exit) =>
+                    Effect.sync(() =>
+                      turnEnds.push(
+                        Exit.isSuccess(exit)
+                          ? "finished"
+                          : Cause.hasInterruptsOnly(exit.cause)
+                            ? "interrupted"
+                            : "failed",
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            submitToolResult: (result) => Effect.sync(() => void submitted.push(result.result)),
+            approve: () => Effect.void,
+            compact: () => Effect.void,
+            state: Effect.succeed({ session: options.id, start: startNumber }),
+            destroy: Effect.sync(() => void destroyed.push(options.id)),
+          };
+          return session;
+        }),
+    };
+
+    const fake: FakeBridgeAgent = { agent, starts, turns, turnEnds, submitted, ended, destroyed };
+    return fake;
+  });
+
+/** A file system in memory, holding the text of each file by its path. */
+export interface MemoryFileSystem {
+  readonly fileSystem: FileSystem.FileSystem;
+  readonly files: Map<string, string>;
+}
+
+export const makeMemoryFileSystem = Effect.sync((): MemoryFileSystem => {
+  const files = new Map<string, string>();
+  const fileSystem = FileSystem.makeNoop({
+    makeDirectory: () => Effect.void,
+    readFileString: (path) =>
+      Effect.suspend(() => {
+        const text = files.get(path);
+        return text === undefined
+          ? Effect.fail(
+              PlatformError.systemError({
+                _tag: "NotFound",
+                module: "FileSystem",
+                method: "readFileString",
+                pathOrDescriptor: path,
+              }),
+            )
+          : Effect.succeed(text);
+      }),
+    writeFileString: (path, data, options) =>
+      Effect.sync(() => {
+        files.set(path, options?.flag === "a" ? (files.get(path) ?? "") + data : data);
+      }),
+    remove: (path) =>
+      Effect.sync(() => {
+        for (const file of files.keys()) {
+          if (file === path || file.startsWith(`${path}/`)) files.delete(file);
+        }
+      }),
+  });
+  return { fileSystem, files };
+});
