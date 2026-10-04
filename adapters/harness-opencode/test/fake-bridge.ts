@@ -1,23 +1,13 @@
-// A bridge over a stand-in agent, which `bridge.test.ts` has the bridge client launch, as the
-// command that runs a bridge. A turn follows its prompt: `reply <text>` answers `text`, and
-// `wait <text>` starts to answer `text` and finishes once the session's directory has a file named
-// `release`. Each launch adds a line to `launches.jsonl` in the bridge's working directory, with
-// its agent's options and whether its environment holds the token, and destroying a session writes
-// `destroyed-<session>` there.
+// A bridge over a stand-in agent, served as opencode's bridge program serves its agent, which
+// `bridge.test.ts` has the bridge client launch, as the command that runs a bridge. A turn follows
+// its prompt: `reply <text>` answers `text`, and `wait <text>` starts to answer `text` and finishes
+// once the session's directory has a file named `release`. Each launch adds a line to
+// `launches.jsonl` in the bridge's working directory, with its agent's options and whether its
+// environment holds the token, and destroying a session writes `destroyed-<session>` there.
 import { type Bridge, BridgeServer, type StreamPart } from "@amends/harness-v2";
-import { BunHttpServer, BunRuntime, BunServices } from "@effect/platform-bun";
-import {
-  Effect,
-  Exit,
-  Fiber,
-  FileSystem,
-  Layer,
-  Path,
-  Redacted,
-  Schedule,
-  Scope,
-  Stream,
-} from "effect";
+import { BunRuntime, BunServices } from "@effect/platform-bun";
+import { Effect, FileSystem, Path, Schedule, Stream } from "effect";
+import * as BunBridge from "../src/bridge/BunBridge.ts";
 
 /** The parts of a turn that answers `text` in one step. */
 const answer = (text: string): ReadonlyArray<StreamPart.StreamPart> => [
@@ -71,30 +61,7 @@ const program = Effect.gen(function* () {
       }),
   };
 
-  // Bun's server never finishes stopping once a WebSocket has been open, so it runs in a scope of
-  // its own, which the bridge gives a second to close after the bridge's own finalizers have run.
-  const serverScope = yield* Scope.make();
-  yield* Effect.addFinalizer(() =>
-    Effect.forkDetach(Scope.close(serverScope, Exit.void)).pipe(
-      Effect.flatMap(Fiber.await),
-      Effect.timeout("1 second"),
-      Effect.ignore,
-    ),
-  );
-  const server = yield* Layer.buildWithScope(
-    BunHttpServer.layer({
-      hostname: "127.0.0.1",
-      port: launch.port,
-      disablePreemptiveShutdown: true,
-    }),
-    serverScope,
-  );
-  return yield* Layer.launch(
-    BridgeServer.layer(agent, {
-      token: Redacted.make(launch.token),
-      stateDirectory: launch.stateDirectory,
-    }),
-  ).pipe(Effect.provideContext(server));
+  return yield* BunBridge.serve(agent, launch);
 });
 
 BunRuntime.runMain(program.pipe(Effect.scoped, Effect.provide(BunServices.layer)));

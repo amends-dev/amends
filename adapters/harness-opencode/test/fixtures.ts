@@ -1,7 +1,7 @@
 import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
 import { Network } from "@amends/sandbox-v2";
 import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, FileSystem, Schema } from "effect";
+import { Effect, FileSystem, Path, Schema } from "effect";
 import { SessionEvent } from "../src/bridge/SessionEvent.ts";
 
 /**
@@ -17,6 +17,49 @@ export const makeSandbox = (port: Network.Port) =>
     const sandbox = yield* provider.create({ ports: [port] });
     yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
     return sandbox;
+  });
+
+/**
+ * The stand-in for `opencode serve` in `fake-opencode-server.js`, installed as a command that runs
+ * on this Bun, in a directory of its own, where it records its starts.
+ */
+export const installStandIn = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const directory = yield* fs.makeTempDirectoryScoped();
+  const command = path.join(directory, "opencode");
+  const source = yield* fs.readFileString(
+    path.join(import.meta.dirname, "fake-opencode-server.js"),
+  );
+  yield* fs.writeFileString(command, `#!${process.execPath}\n${source}`);
+  yield* fs.chmod(command, 0o755);
+  return { command, directory };
+});
+
+/** How the stand-in installed in `directory` was started, once for each start. */
+export const startsIn = (directory: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const starts = yield* fs.readFileString(path.join(directory, "starts.jsonl"));
+    return starts
+      .trim()
+      .split("\n")
+      .map((line): { readonly pid: number } => JSON.parse(line));
+  });
+
+/**
+ * Whether a process with the id `pid` runs on this machine, or has exited without its parent
+ * learning so yet.
+ */
+export const isRunning = (pid: number) =>
+  Effect.sync(() => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
   });
 
 /** A port on this machine that nothing listens on, for a server the test starts on it. */

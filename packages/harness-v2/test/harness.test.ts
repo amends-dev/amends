@@ -88,8 +88,8 @@ const suspendSlowTurn = (harness: Harness.Harness["Service"], running: Deferred.
     yield* Deferred.succeed(running, undefined);
     const state = yield* session.suspend;
     yield* Fiber.join(slow);
-    const stored = yield* Schema.encodeEffect(Schema.fromJsonString(Session.SessionState))(state);
-    return yield* Schema.decodeEffect(Schema.fromJsonString(Session.SessionState))(stored);
+    const json = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState));
+    return yield* Schema.decodeEffect(json)(yield* Schema.encodeEffect(json)(state));
   });
 
 const textsOf = (history: Prompt.Prompt) =>
@@ -184,6 +184,7 @@ describe("Harness", () => {
         expect(state.unfinishedTurn?.steps.map((step) => step.content)).toMatchObject([
           readingMessages,
         ]);
+        expect(codex.starts[1]?.agentState).toBeUndefined();
         expect(codex.starts[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });
         expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError");
         expect(codex.continued).toEqual([1]);

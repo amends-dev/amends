@@ -1,8 +1,9 @@
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, FileSystem, Layer, Path } from "effect";
+import { Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as Server from "../src/bridge/Server.ts";
+import { installStandIn, isRunning, startsIn } from "./fixtures.ts";
 
 /**
  * `start` runs opencode's server on this machine, as here a stand-in for `opencode serve` that
@@ -10,52 +11,12 @@ import * as Server from "../src/bridge/Server.ts";
  */
 const TestLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
 
-/**
- * The stand-in for `opencode serve`, installed as a command that runs on this Bun, in a directory
- * of its own, where it records its starts.
- */
-const installStandIn = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  const directory = yield* fs.makeTempDirectoryScoped();
-  const command = path.join(directory, "opencode");
-  const source = yield* fs.readFileString(
-    path.join(import.meta.dirname, "fake-opencode-server.js"),
-  );
-  yield* fs.writeFileString(command, `#!${process.execPath}\n${source}`);
-  yield* fs.chmod(command, 0o755);
-  return { command, directory };
-});
-
 /** The options that start the stand-in installed as `command`, with `env` beside a greeting. */
 const optionsFor = (command: string, env: Readonly<Record<string, string>> = {}) => ({
   command,
   config: { model: "opencode/default-model" },
   env: { GREETING: "hello", ...env },
 });
-
-/** How the stand-in installed in `directory` was started, once for each start. */
-const startsIn = (directory: string) =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const starts = yield* fs.readFileString(path.join(directory, "starts.jsonl"));
-    return starts
-      .trim()
-      .split("\n")
-      .map((line): { readonly pid: number } => JSON.parse(line));
-  });
-
-/** Whether a process with the id `pid` runs on this machine. */
-const isRunning = (pid: number) =>
-  Effect.sync(() => {
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  });
 
 describe("Server", () => {
   it.live("starts opencode's server on this machine, answering behind the password it made", () =>

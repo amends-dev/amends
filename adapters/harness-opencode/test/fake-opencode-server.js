@@ -1,10 +1,10 @@
-// A stand-in for `opencode serve`, which `server.test.ts` installs as the command that runs
-// opencode. It starts as opencode does, with `serve --hostname=… --port=0` and the server's password
-// and configuration in its environment, listens on a port it picks, and announces it on its output
-// as opencode does. It answers opencode's health check behind the password, and adds a line to
-// `starts.jsonl` beside itself for each start. Given `FAKE_OPENCODE_EXIT`, it exits with that code
-// before it listens, as a server that fails does, and given `FAKE_OPENCODE_EXIT_AFTER`, it exits
-// that many milliseconds after it listens.
+// A stand-in for `opencode serve`, which tests install as the command that runs opencode. It
+// starts as opencode does, with `serve --hostname=… --port=0` and the server's password and
+// configuration in its environment, listens on a port it picks, and announces it on its output as
+// opencode does. Behind the password, it answers opencode's health check and creates sessions. It
+// adds a line to `starts.jsonl` beside itself for each start. Given `FAKE_OPENCODE_EXIT`, it exits
+// with that code before it listens, as a server that fails does, and given
+// `FAKE_OPENCODE_EXIT_AFTER`, it exits that many milliseconds after it listens.
 import { appendFileSync } from "node:fs";
 
 const argument = (name) =>
@@ -33,9 +33,12 @@ const server = Bun.serve({
     if (request.headers.get("authorization") !== authorization) {
       return new Response(null, { status: 401 });
     }
-    return new URL(request.url).pathname === "/api/health"
-      ? Response.json({ healthy: true })
-      : Response.json({ message: "Not found" }, { status: 404 });
+    const { pathname } = new URL(request.url);
+    if (pathname === "/api/health") return Response.json({ healthy: true });
+    if (request.method === "POST" && pathname === "/api/session") {
+      return Response.json({ data: { id: "ses_standin" } });
+    }
+    return Response.json({ message: "Not found" }, { status: 404 });
   },
 });
 

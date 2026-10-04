@@ -256,7 +256,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     id: options.id,
     agent: options.agent,
     history,
-    agentState,
+    ...(agentState === undefined ? {} : { agentState }),
     unfinishedTurn,
   });
 

@@ -31,7 +31,7 @@ export const UnfinishedTurn = Schema.Struct({
   steps: Schema.Array(Prompt.Prompt),
 
   /** What the agent's `suspend` returned. Without it, the next agent runs the turn again from `prompt`. */
-  agentState: Schema.optional(Schema.Json),
+  agentState: Schema.optionalKey(Schema.Json),
 });
 
 export interface UnfinishedTurn extends Schema.Schema.Type<typeof UnfinishedTurn> {}
@@ -48,8 +48,11 @@ export const SessionState = Schema.Struct({
    */
   history: Prompt.Prompt,
 
-  /** What the agent's `detach` or `stop` returned. */
-  agentState: Schema.optional(Schema.Json),
+  /**
+   * What the agent's `detach` or `stop` returned. It is left out rather than `undefined`, which
+   * JSON saves as `null`, a state an agent could have returned.
+   */
+  agentState: Schema.optionalKey(Schema.Json),
 
   unfinishedTurn: Schema.optional(UnfinishedTurn),
 });

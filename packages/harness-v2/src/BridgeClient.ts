@@ -156,7 +156,7 @@ const startSession = Effect.fn("BridgeClient.start")(function* (
       session,
       directory,
       history: startOptions.history,
-      agentState,
+      ...(agentState === undefined ? {} : { agentState }),
       unfinishedTurn,
     });
 

@@ -133,7 +133,7 @@ export class Rpcs extends RpcGroup.make(
       ...inSession,
       directory: Schema.String,
       history: Prompt.Prompt,
-      agentState: Schema.optional(Schema.Json),
+      agentState: Schema.optionalKey(Schema.Json),
       unfinishedTurn: Schema.optional(TurnId),
     },
     success: Schema.Struct({ hasUnfinishedTurn: Schema.Boolean }),
