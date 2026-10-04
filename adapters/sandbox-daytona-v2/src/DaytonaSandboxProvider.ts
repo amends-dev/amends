@@ -23,7 +23,8 @@ import {
   DaytonaServiceUnavailableError,
   DaytonaTimeoutError,
 } from "@daytona/sdk";
-import { Crypto, Effect, Exit, FileSystem, Layer, Redacted, Schedule } from "effect";
+import { Crypto, Effect, Exit, Layer, Redacted, Schedule } from "effect";
+import * as Files from "./Files.ts";
 import * as Processes from "./Processes.ts";
 
 export interface Options {
@@ -80,8 +81,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       id,
       description: describe(workingDirectory, ports),
       workingDirectory,
-      // TODO(in progress): Replaced by the file system over Daytona's file API, module 3.
-      fileSystem: FileSystem.makeNoop({}),
+      fileSystem: Files.make(sandbox, workingDirectory),
       childProcessSpawner: yield* Processes.make(sandbox, workingDirectory).pipe(
         Effect.provideService(Crypto.Crypto, crypto),
       ),
