@@ -1,8 +1,9 @@
 import * as Snapshots from "@amends/sandbox-daytona-v2/Snapshots";
+import { Sandbox, Template } from "@amends/sandbox-v2";
 import { SnapshotState } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it, layer } from "@effect/vitest";
-import { Effect, Option } from "effect";
+import { Effect, Option, Schema } from "effect";
 
 const hour = 60 * 60 * 1000;
 const now = Date.parse("2026-10-04T12:00:00Z");
@@ -57,7 +58,11 @@ describe("Snapshots", () => {
 layer(BunServices.layer)("Snapshots.nameOf", (it) => {
   it.effect("names a version by its template's name and a digest of its identity and base", () =>
     Effect.gen(function* () {
-      const template = { name: "opencode", identity: "one", prepare: Effect.void };
+      const template = {
+        name: Template.Name.make("opencode"),
+        identity: "one",
+        prepare: Effect.void,
+      };
 
       const name = yield* Snapshots.nameOf(template, undefined);
 
@@ -65,6 +70,20 @@ layer(BunServices.layer)("Snapshots.nameOf", (it) => {
       expect(yield* Snapshots.nameOf(template, undefined)).toBe(name);
       expect(yield* Snapshots.nameOf({ ...template, identity: "two" }, undefined)).not.toBe(name);
       expect(yield* Snapshots.nameOf(template, "daytona-large")).not.toBe(name);
+    }),
+  );
+
+  it.effect("names a version of a template with the longest name as a sandbox can be named", () =>
+    Effect.gen(function* () {
+      const template = {
+        name: Template.Name.make("a".repeat(30)),
+        identity: "one",
+        prepare: Effect.void,
+      };
+
+      const name = yield* Snapshots.nameOf(template, undefined);
+
+      expect(Schema.is(Sandbox.SandboxId)(name)).toBe(true);
     }),
   );
 });

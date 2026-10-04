@@ -11,7 +11,7 @@
  * sandbox sharing this machine's home with one prepared before, is ready at once, and a new bridge
  * program installs without downloading the programs again.
  */
-import type { Template } from "@amends/sandbox-v2";
+import { Template } from "@amends/sandbox-v2";
 import { Crypto, Effect, FileSystem, Path, PlatformError, Result, Stream } from "effect";
 import { Base64, Hex } from "effect/encoding";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -118,7 +118,7 @@ export const make = Effect.fn("OpencodeTemplate.make")(function* () {
   const bridge = `bridge-${bundleHash}.js`;
   const installation: Installation = {
     template: {
-      name: "opencode",
+      name: Template.Name.make("opencode"),
       identity: `${programsHash}-${bundleHash}`,
       prepare: install(directory, bridge, bundle),
     },

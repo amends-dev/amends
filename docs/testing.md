@@ -216,7 +216,8 @@ opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tes
 Daytona, in sandboxes started from the snapshot of the template's version once Daytona has made it.
 
 The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
-`adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports. The local
+`adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports, and
+`packages/sandbox-v2/test` checks the contract's own rules, such as what names a template. The local
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
 policies Daytona enforces, create real sandboxes and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored

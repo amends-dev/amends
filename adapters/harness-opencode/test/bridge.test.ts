@@ -1,6 +1,6 @@
 import { Bridge, BridgeClient, Harness, type StreamPart } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
-import type { Network, Sandbox, Template } from "@amends/sandbox-v2";
+import { type Network, type Sandbox, Template } from "@amends/sandbox-v2";
 import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -43,7 +43,7 @@ const answer = (text: string): ReadonlyArray<StreamPart.StreamPart> => [
  * directory as `bridge-<version>.ts`, a program that runs `fake-bridge.ts`.
  */
 const templateOf = (version: string): Template.Template => ({
-  name: "fake-bridge",
+  name: Template.Name.make("fake-bridge"),
   identity: version,
   prepare: Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;

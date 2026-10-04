@@ -1,6 +1,6 @@
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
 import * as Snapshots from "@amends/sandbox-daytona-v2/Snapshots";
-import type { Network, Sandbox, SandboxProvider, Template } from "@amends/sandbox-v2";
+import { type Network, type Sandbox, type SandboxProvider, Template } from "@amends/sandbox-v2";
 import { Daytona, DaytonaNotFoundError } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, layer } from "@effect/vitest";
@@ -37,7 +37,11 @@ const useTemplate = <E>(prepare: Template.Template<E>["prepare"]) =>
   Effect.gen(function* () {
     const crypto = yield* Crypto.Crypto;
     const daytona = yield* useDaytona;
-    const template = { name: "daytona-test", identity: yield* crypto.randomUUIDv4, prepare };
+    const template = {
+      name: Template.Name.make("daytona-test"),
+      identity: yield* crypto.randomUUIDv4,
+      prepare,
+    };
     const snapshot = yield* Snapshots.nameOf(template, undefined);
     yield* Effect.addFinalizer(() =>
       Effect.ignore(Effect.tryPromise(() => daytona.snapshot.delete(snapshot))),

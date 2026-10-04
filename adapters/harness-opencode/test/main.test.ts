@@ -1,6 +1,6 @@
 import { BridgeClient, Harness } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
-import type { Network } from "@amends/sandbox-v2";
+import { type Network, Template } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Redacted, Schedule } from "effect";
@@ -23,7 +23,7 @@ const makeHarness = (
   Effect.map(
     BridgeClient.make({
       id: "opencode",
-      template: { name: "opencode", identity: "none", prepare: Effect.void },
+      template: { name: Template.Name.make("opencode"), identity: "none", prepare: Effect.void },
       port,
       command: process.execPath,
       args: [`${import.meta.dirname}/../src/bridge/main.ts`],

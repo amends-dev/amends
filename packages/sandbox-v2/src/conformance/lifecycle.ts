@@ -3,6 +3,7 @@ import { Data, Deferred, Effect, Fiber, FileSystem, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { Port } from "../Network.ts";
 import { layerServices, type Sandbox } from "../Sandbox.ts";
+import { Name } from "../Template.ts";
 import { type Fixture, newIdentity, newSandboxId, useProvider } from "./Fixture.ts";
 
 const port = Port.make(3000);
@@ -191,7 +192,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
 
           const sandbox = yield* provider.create({
             template: {
-              name: "conformance-prepared",
+              name: Name.make("conformance-prepared"),
               identity: yield* newIdentity("prepared"),
               prepare: Effect.gen(function* () {
                 const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -218,7 +219,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             provider.create({
               id,
               template: {
-                name: "conformance-failing",
+                name: Name.make("conformance-failing"),
                 identity: yield* newIdentity("failing"),
                 prepare: Effect.fail(new PrepareFailed()),
               },
@@ -243,7 +244,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             provider.create({
               id,
               template: {
-                name: "conformance-endless",
+                name: Name.make("conformance-endless"),
                 identity: yield* newIdentity("endless"),
                 prepare: Deferred.succeed(preparing, undefined).pipe(Effect.andThen(Effect.never)),
               },
