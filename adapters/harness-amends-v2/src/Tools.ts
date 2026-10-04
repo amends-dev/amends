@@ -3,10 +3,12 @@
  * and running shell commands. Their names and inputs are those AI SDK's harnesses share, so a model
  * meets the same tools whichever agent runs it.
  *
- * File paths resolve against the session's directory and cannot leave it. `bash` runs a shell in
- * that directory, which can reach anything the sandbox can, and kills a command that outruns its
- * timeout. A tool that cannot do what it was asked, such as an `edit` whose text is not in the file,
- * answers the model with why, so the model can try again, instead of failing the turn.
+ * File paths resolve against the session's directory, and the tools refuse a path that names a place
+ * outside it. That keeps the model's work in its directory but confines nothing: a symbolic link in
+ * the directory can lead outside it, and `bash`, which runs a shell in the directory, can reach
+ * anything the sandbox can. `bash` kills a command that outruns its timeout. A tool that cannot do
+ * what it was asked, such as an `edit` whose text is not in the file, answers the model with why,
+ * so the model can try again, instead of failing the turn.
  */
 import type { Agent } from "@amends/harness-v2";
 import { Sandbox } from "@amends/sandbox-v2";
@@ -82,7 +84,10 @@ export const layer = (
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
       const commandTimeout = options.commandTimeout ?? defaultCommandTimeout;
 
-      /** The absolute path `filePath` names, failing when it is outside the session's directory. */
+      /**
+       * The absolute path `filePath` names, failing when it names a place outside the session's
+       * directory. It reads the path alone, not where a symbolic link in it leads.
+       */
       const resolve = (filePath: string) => {
         const resolved = path.resolve(workspace.directory, filePath);
         const relative = path.relative(workspace.directory, resolved);
@@ -109,6 +114,9 @@ export const layer = (
         }),
 
         edit: Effect.fn("Tools.edit")(function* ({ file_path, old_string, new_string }) {
+          if (old_string === "") {
+            return yield* Effect.fail("old_string is empty: give the text to replace");
+          }
           const resolved = yield* resolve(file_path);
           const text = yield* fs
             .readFileString(resolved)

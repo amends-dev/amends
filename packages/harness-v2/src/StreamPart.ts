@@ -7,7 +7,8 @@
  *
  * Tool calls and results name any tool and keep its params and result as they came. An agent runs
  * tools of its own that no toolkit declares, while Effect AI's decoded tool parts exist only for
- * the tools of a toolkit.
+ * the tools of a toolkit. Params and results are therefore `unknown`, as JSON, even for the host's
+ * tools; a caller that needs their types decodes them with the tool's schemas.
  */
 import { Schema } from "effect";
 import { Response } from "effect/ai";

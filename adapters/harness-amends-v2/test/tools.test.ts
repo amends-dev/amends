@@ -125,12 +125,17 @@ layer(BunServices.layer)("Tools", (it) => {
   );
 
   it.effect(
-    "refuses an edit whose text is missing or appears more than once, leaving the file",
+    "refuses an edit whose text is empty, missing, or appears more than once, leaving the file",
     () =>
       Effect.gen(function* () {
         const { call } = yield* makeTools();
         yield* call("write", { file_path: "notes.txt", content: "one two one" });
 
+        const empty = yield* call("edit", {
+          file_path: "notes.txt",
+          old_string: "",
+          new_string: "0",
+        });
         const missing = yield* call("edit", {
           file_path: "notes.txt",
           old_string: "three",
@@ -142,6 +147,10 @@ layer(BunServices.layer)("Tools", (it) => {
           new_string: "1",
         });
 
+        expect(empty).toEqual({
+          isFailure: true,
+          result: "old_string is empty: give the text to replace",
+        });
         expect(missing).toEqual({ isFailure: true, result: "old_string is not in notes.txt" });
         expect(repeated).toEqual({
           isFailure: true,

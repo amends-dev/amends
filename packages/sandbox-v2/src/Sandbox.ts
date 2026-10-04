@@ -22,12 +22,13 @@ import type {
 import type { SandboxError } from "./SandboxError.ts";
 
 /**
- * Names a sandbox with letters, digits, `-`, and `_`, starting with a letter or digit and at most
- * 63 characters long, so that any provider can use it as a directory name or in a URL.
+ * Checks a name of letters, digits, `-`, and `_`, starting with a letter or digit and at most 63
+ * characters long, which any provider can use as a directory name or in a URL.
  */
-export const SandboxId = Schema.String.check(
-  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/),
-).pipe(Schema.brand("SandboxId"));
+export const isName = Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/);
+
+/** Names a sandbox, as `isName` checks. */
+export const SandboxId = Schema.String.check(isName).pipe(Schema.brand("SandboxId"));
 
 export type SandboxId = typeof SandboxId.Type;
 

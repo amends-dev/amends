@@ -12,19 +12,17 @@
  * A session outlives the process that started it: the agent keeps running after `detach` or
  * `suspend`, and `start` picks the session up again from what those returned.
  */
-import type { Network, Sandbox, Template } from "@amends/sandbox-v2";
+import { type Network, Sandbox, type Template } from "@amends/sandbox-v2";
 import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
 import type { StreamPart } from "./StreamPart.ts";
 
 /**
- * Names a session with letters, digits, `-`, and `_`, starting with a letter or digit and at most
- * 63 characters long, so that it can name the session's directory and the agent's own session.
+ * Names a session, as `Sandbox.isName` checks, so that it can name the session's directory in the
+ * sandbox and the agent's own session.
  */
-export const SessionId = Schema.String.check(
-  Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/),
-).pipe(Schema.brand("SessionId"));
+export const SessionId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("SessionId"));
 
 export type SessionId = typeof SessionId.Type;
 

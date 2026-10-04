@@ -13,7 +13,8 @@ import { Context, Effect, FileSystem, Layer, Path } from "effect";
 import { Prompt } from "effect/ai";
 import type { Agent, SessionId, Workspace } from "./Agent.ts";
 import { HarnessError, UnknownError, UnsupportedError } from "./HarnessError.ts";
-import * as Session from "./Session.ts";
+import { makeSession } from "./internal/session.ts";
+import type * as Session from "./Session.ts";
 
 export interface StartSessionOptions {
   /**
@@ -81,24 +82,24 @@ export const make = (agent: Agent): Harness["Service"] => {
   };
 
   /** The session's workspace in `sandbox`, creating its directory if it does not exist yet. */
-  const makeWorkspace = (sandbox: Sandbox.Sandbox["Service"], id: SessionId) =>
-    Effect.gen(function* () {
+  const makeWorkspace = Effect.fnUntraced(
+    function* (sandbox: Sandbox.Sandbox["Service"], id: SessionId) {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const directory = path.join(sandbox.workingDirectory, id);
       yield* fs.makeDirectory(directory, { recursive: true });
       return { sandbox, directory } satisfies Workspace;
-    }).pipe(
-      Effect.provide(Sandbox.layerServices(sandbox)),
-      Effect.mapError(
-        (cause) =>
-          new HarnessError({
-            agent: agent.id,
-            reason: new UnknownError({ description: cause.message }),
-            cause,
-          }),
-      ),
-    );
+    },
+    (effect, sandbox) => Effect.provide(effect, Sandbox.layerServices(sandbox)),
+    Effect.mapError(
+      (cause) =>
+        new HarnessError({
+          agent: agent.id,
+          reason: new UnknownError({ description: cause.message }),
+          cause,
+        }),
+    ),
+  );
 
   return Harness.of({
     agent: agent.id,
@@ -110,7 +111,7 @@ export const make = (agent: Agent): Harness["Service"] => {
       yield* checkSandbox(sandbox);
       const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, id);
       const agentSession = yield* agent.start({ id, workspace, history: Prompt.empty });
-      return yield* Session.make({
+      return yield* makeSession({
         id,
         agent: agent.id,
         agentSession,
@@ -132,7 +133,7 @@ export const make = (agent: Agent): Harness["Service"] => {
         agentState: own ? state.agentState : undefined,
         unfinishedTurn: own ? state.unfinishedTurn?.agentState : undefined,
       });
-      return yield* Session.make({
+      return yield* makeSession({
         id: state.id,
         agent: agent.id,
         agentSession,

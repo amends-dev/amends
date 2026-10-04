@@ -87,7 +87,10 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const keepsTurn = yield* Ref.make(false);
   /** Done once the session is suspended, stopped, or destroyed, stopping the running turn. */
   const closed = yield* Deferred.make<void>();
-  /** The results the host submits for calls of its tools, by call id, until a stand-in takes them. */
+  /**
+   * The results the host submits for calls of its tools in the running turn, by call id, until a
+   * stand-in takes them. A turn starts with none, dropping any for calls no stand-in answered.
+   */
   const hostResults = new Map<string, Deferred.Deferred<unknown, unknown>>();
 
   /** The model a turn names, or the agent's default. */
@@ -254,6 +257,7 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
       Effect.gen(function* () {
         const emit: Emit = (parts) => Queue.offerAll(queue, parts);
         yield* Ref.set(turn, { prompt: turnOptions.prompt, steps: finishedSteps });
+        yield* Effect.sync(() => hostResults.clear());
         const languageModel = yield* modelFor(turnOptions.model);
         const toolkit = yield* toolkitFor(turnOptions.tools);
         const { instructions, responseFormat } = turnOptions;

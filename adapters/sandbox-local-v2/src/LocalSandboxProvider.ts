@@ -61,24 +61,23 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
    * closes, the spawner ends the process unless its handle was unreferenced; one still running
    * then stays in `running` until the sandbox stops.
    */
-  const spawnInto = (
+  const spawnInto = Effect.fnUntraced(function* (
     running: Set<ChildProcessSpawner.ChildProcessHandle>,
     command: ChildProcess.Command,
-  ) =>
-    Effect.gen(function* () {
-      // The spawner ends the process in a scope of its own, which this one closes before it
-      // looks at whether the process still runs.
-      const spawnScope = yield* Scope.fork(yield* Effect.scope);
-      const handle = yield* Scope.provide(spawner.spawn(command), spawnScope);
-      running.add(handle);
-      const forgetEnded = Effect.flatMap(handle.isRunning, (isRunning) =>
-        isRunning ? Effect.void : Effect.sync(() => running.delete(handle)),
-      );
-      yield* Effect.addFinalizer((exit) =>
-        Effect.andThen(Scope.close(spawnScope, exit), Effect.ignore(forgetEnded)),
-      );
-      return handle;
-    });
+  ) {
+    // The spawner ends the process in a scope of its own, which this one closes before it
+    // looks at whether the process still runs.
+    const spawnScope = yield* Scope.fork(yield* Effect.scope);
+    const handle = yield* Scope.provide(spawner.spawn(command), spawnScope);
+    running.add(handle);
+    const forgetEnded = Effect.flatMap(handle.isRunning, (isRunning) =>
+      isRunning ? Effect.void : Effect.sync(() => running.delete(handle)),
+    );
+    yield* Effect.addFinalizer((exit) =>
+      Effect.andThen(Scope.close(spawnScope, exit), Effect.ignore(forgetEnded)),
+    );
+    return handle;
+  });
 
   const openSandbox = (
     id: Sandbox.SandboxId,

@@ -17,6 +17,7 @@ import {
   Option,
   Path,
   type PlatformError,
+  Record,
   Redacted,
   Schedule,
   Schema,
@@ -43,7 +44,7 @@ export interface ServerOptions {
   readonly config: { readonly [key: string]: Schema.Json };
 
   /** Environment variables opencode runs with, such as a model provider's API key. */
-  readonly env: Readonly<Record<string, string>>;
+  readonly env: Record.ReadonlyRecord<string, string>;
 }
 
 // TODO: Give `prompt` the files a user message carries, once a turn's prompt has files.
@@ -132,11 +133,7 @@ export const connect = Effect.fn("Server.connect")(function* (
     HttpClient.mapRequest(
       flow(
         HttpClientRequest.prependUrl(endpoint.url),
-        HttpClientRequest.setHeaders(
-          Object.fromEntries(
-            Object.entries(endpoint.headers).map(([name, value]) => [name, Redacted.value(value)]),
-          ),
-        ),
+        HttpClientRequest.setHeaders(Record.map(endpoint.headers, Redacted.value)),
         HttpClientRequest.basicAuth("opencode", password),
       ),
     ),
@@ -316,8 +313,8 @@ const HistoryPage = Schema.Struct({ data: Schema.Array(StreamedEvent), hasMore: 
  * The server's password, kept in the sandbox's working directory so that every host connecting to
  * the server uses the one it started with. The first host to connect creates it.
  */
-const passwordIn = (sandbox: Sandbox.Sandbox["Service"]) =>
-  Effect.gen(function* () {
+const passwordIn = Effect.fnUntraced(
+  function* (sandbox: Sandbox.Sandbox["Service"]) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const crypto = yield* Crypto.Crypto;
@@ -329,19 +326,22 @@ const passwordIn = (sandbox: Sandbox.Sandbox["Service"]) =>
       .writeFileString(file, created, { flag: "wx", mode: 0o600 })
       .pipe(Effect.catchReason("PlatformError", "AlreadyExists", () => Effect.void));
     return Redacted.make(yield* fs.readFileString(file));
-  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)), Effect.mapError(fromPlatformError));
+  },
+  (effect, sandbox) => Effect.provide(effect, Sandbox.layerServices(sandbox)),
+  Effect.mapError((error) => fromPlatformError(error)),
+);
 
 /**
  * Starts the server and waits until it answers. Unreferenced, the server outlives the scope that
  * started it and the host; it stops with the sandbox.
  */
-const start = (
-  sandbox: Sandbox.Sandbox["Service"],
-  options: ServerOptions,
-  password: Redacted.Redacted<string>,
-  isAnswering: Effect.Effect<boolean>,
-) =>
-  Effect.gen(function* () {
+const start = Effect.fnUntraced(
+  function* (
+    sandbox: Sandbox.Sandbox["Service"],
+    options: ServerOptions,
+    password: Redacted.Redacted<string>,
+    isAnswering: Effect.Effect<boolean>,
+  ) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const server = yield* spawner.spawn(
       ChildProcess.make(
@@ -392,11 +392,11 @@ const start = (
         reason._tag === "PlatformError" ? fromPlatformError(reason) : harnessError(reason),
       ),
     );
-  }).pipe(
-    Effect.scoped,
-    Effect.provide(Sandbox.layerServices(sandbox)),
-    Effect.catchTag("PlatformError", (error) => Effect.fail(fromPlatformError(error))),
-  );
+  },
+  Effect.scoped,
+  (effect, sandbox) => Effect.provide(effect, Sandbox.layerServices(sandbox)),
+  Effect.catchTag("PlatformError", (error) => Effect.fail(fromPlatformError(error))),
+);
 
 /** The error a request that failed with `error` reports. */
 const fromRequestError = (

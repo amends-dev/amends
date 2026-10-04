@@ -532,6 +532,37 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
     }),
   );
 
+  it.effect("drops a result the host submitted for no call, before the next turn", () =>
+    Effect.gen(function* () {
+      const { model } = yield* makeScriptedModel((request) => {
+        const [sum] = toolResultsOf(request);
+        return typeof sum === "number"
+          ? answer(`The sum is ${sum}`)
+          : callTool("add-1", "Add", { a: 2, b: 3 });
+      });
+      const agent = yield* AmendsAgent.make({ model });
+      const agentSession = yield* agent.start({ id, history: Prompt.empty });
+      const resultOf = (sum: number) =>
+        agentSession.submitToolResult({ id: "add-1", name: "Add", result: sum, isFailure: false });
+
+      yield* resultOf(99);
+      const parts = yield* agentSession
+        .prompt({
+          prompt: Prompt.makeMessage("user", {
+            content: [Prompt.makePart("text", { text: "add 2 and 3" })],
+          }),
+          tools: [Add],
+          responseFormat: { type: "text" },
+        })
+        .pipe(
+          Stream.tap((part) => (part.type === "tool-call" ? resultOf(5) : Effect.void)),
+          Stream.runCollect,
+        );
+
+      expect(new GenerateResult.GenerateResult(parts).text).toBe("The sum is 5");
+    }),
+  );
+
   it.effect("asks for no approvals and does not compact yet", () =>
     Effect.gen(function* () {
       const { model } = yield* makeScriptedModel(() => answer("unused"));
