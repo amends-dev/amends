@@ -427,6 +427,7 @@
         "effect": "catalog:",
       },
       "peerDependencies": {
+        "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
     },
