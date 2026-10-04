@@ -1,20 +1,22 @@
 import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
-import { Network } from "@amends/sandbox-v2";
+import { Network, type Template } from "@amends/sandbox-v2";
 import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, FileSystem, Path, Schema } from "effect";
 import { SessionEvent } from "../src/bridge/SessionEvent.ts";
 
 /**
- * A new sandbox on this machine exposing `port`, destroyed with the processes it runs, such as
- * opencode's server, when the scope closes.
+ * A new sandbox on this machine exposing `port`, prepared with `template` if given, and destroyed
+ * with the processes it runs, such as opencode's server, when the scope closes.
  */
-export const makeSandbox = (port: Network.Port) =>
+export const makeSandbox = (port: Network.Port, template?: Template.Template) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const provider = yield* LocalSandboxProvider.make({
       directory: yield* fs.makeTempDirectoryScoped(),
     });
-    const sandbox = yield* provider.create({ ports: [port] });
+    const sandbox = yield* provider.create(
+      template === undefined ? { ports: [port] } : { ports: [port], template },
+    );
     yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
     return sandbox;
   });

@@ -43,8 +43,11 @@ export const Options = Schema.Struct({
    */
   model: Schema.String,
 
-  /** The command that runs opencode in the sandbox. */
-  command: Schema.String,
+  /**
+   * The command that runs opencode in the sandbox, when it is not the opencode the template installs
+   * beside the bridge program.
+   */
+  command: Schema.optionalKey(Schema.String),
 
   /** opencode's configuration, as its `opencode.json` takes it. */
   config: Schema.Record(Schema.String, Schema.Json),
@@ -77,7 +80,7 @@ const StateJson = Schema.toCodecJson(State);
  * The agent, which starts opencode's server with `options` when the first session starts. The
  * server runs in the scope the agent is made in.
  */
-export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
+export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required<Options>) {
   const services = yield* Effect.context<
     ChildProcessSpawner.ChildProcessSpawner | HttpClient.HttpClient | Crypto.Crypto
   >();
