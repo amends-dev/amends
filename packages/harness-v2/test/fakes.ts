@@ -62,10 +62,12 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
       start: (startOptions) =>
         Effect.gen(function* () {
           starts.push(startOptions);
-          const suspended = yield* Deferred.make<void>();
+          /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
+          const closed = yield* Deferred.make<void>();
+          const close = Deferred.succeed(closed, undefined);
           const follow = (turn: TurnOptions) =>
             script(textOf(turn.prompt), { toolResult: Queue.take(toolResults) }).pipe(
-              Stream.interruptWhen(Deferred.await(suspended)),
+              Stream.interruptWhen(Deferred.await(closed)),
             );
           const session: AgentSession = {
             hasUnfinishedTurn:
@@ -89,11 +91,11 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
             compact: () => Effect.void,
             suspend: Effect.andThen(
               options.beforeSuspend ?? Effect.void,
-              Effect.as(Deferred.succeed(suspended, undefined), { agent: id, turn: true }),
+              Effect.as(close, { agent: id, turn: true }),
             ),
             detach: Effect.succeed({ agent: id }),
-            stop: Effect.succeed({ agent: id }),
-            destroy: Effect.void,
+            stop: Effect.as(close, { agent: id }),
+            destroy: Effect.asVoid(close),
           };
           return session;
         }),

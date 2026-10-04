@@ -368,6 +368,9 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
         Effect.map(Ref.get(lastSeq), (seq) => server.history(sessionID, seq)),
       );
       return server.events(sessionID, admittedSeq).pipe(
+        Stream.interruptWhen(stopped),
+        // Only an event streamed counts: one read just as opencode stops is dropped there, and
+        // comes from the history instead.
         Stream.tap((event) =>
           Effect.andThen(
             Ref.set(lastSeq, event.durable.seq),
@@ -376,7 +379,6 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
               : Effect.void,
           ),
         ),
-        Stream.interruptWhen(stopped),
         Stream.concat(recordedAfterLast),
       );
     }),

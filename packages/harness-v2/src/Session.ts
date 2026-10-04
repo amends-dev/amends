@@ -46,7 +46,10 @@ export const SessionState = Schema.Struct({
   /** The agent that last ran the session, whose `agentState` only it can read. */
   agent: Schema.String,
 
-  /** The conversation so far: each finished turn's prompt, the tools its steps called, and its answer. */
+  /**
+   * The conversation so far: each turn's prompt, the tools its steps called, and its answer. A turn
+   * that ended early, as when `stop` aborted it, is kept as far as it got.
+   */
   history: Prompt.Prompt,
 
   /** What the agent's `detach` or `stop` returned. */
@@ -110,8 +113,9 @@ export interface Session {
   readonly id: SessionId;
 
   /**
-   * Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. A
-   * failure the agent reports arrives as an `error` part, and the turn finishes with `error`.
+   * Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn, which
+   * the conversation keeps as far as it got. A failure the agent reports arrives as an `error` part,
+   * and the turn finishes with `error`.
    */
   readonly stream: <Tools extends Record<string, Tool.Any> = {}>(
     options: StreamOptions<Tools>,
@@ -160,7 +164,10 @@ export interface Session {
   /** Lets go of the session between turns while the agent keeps running. */
   readonly detach: Effect.Effect<SessionState, HarnessError>;
 
-  /** Stops the agent, aborting a running turn, and returns the session to start again later. */
+  /**
+   * Stops the agent, aborting a running turn, whose stream ends with an error and which the
+   * conversation keeps as far as it got, and returns the session to start again later.
+   */
   readonly stop: Effect.Effect<SessionState, HarnessError>;
 
   /** Stops the agent for good. */
@@ -210,7 +217,7 @@ export const make = Effect.fn("Session.make")(function* (options: {
                 ...current,
                 status: Status.Running({
                   turn: { prompt, steps: [], stepParts: [] },
-                  suspending: false,
+                  lettingGo: undefined,
                 }),
               },
             ]
@@ -227,7 +234,7 @@ export const make = Effect.fn("Session.make")(function* (options: {
         const turn = { prompt, steps, stepParts: [] };
         return [
           Effect.succeed(status.turn),
-          { ...current, status: Status.Running({ turn, suspending: false }) },
+          { ...current, status: Status.Running({ turn, lettingGo: undefined }) },
         ];
       }
       const reason =
@@ -244,10 +251,10 @@ export const make = Effect.fn("Session.make")(function* (options: {
   const startSuspending = Effect.flatten(
     Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
       const { status } = current;
-      if (status._tag === "Running" && !status.suspending) {
+      if (status._tag === "Running" && status.lettingGo === undefined) {
         return [
           Effect.void,
-          { ...current, status: Status.Running({ turn: status.turn, suspending: true }) },
+          { ...current, status: Status.Running({ turn: status.turn, lettingGo: "suspend" }) },
         ];
       }
       const reason =
@@ -258,11 +265,19 @@ export const make = Effect.fn("Session.make")(function* (options: {
     }),
   );
 
+  /** Marks the running turn, if the session runs one, as one `stop` or `destroy` aborts. */
+  const startAborting = Ref.update(state, (current) =>
+    current.status._tag === "Running" && current.status.lettingGo === undefined
+      ? { ...current, status: Status.Running({ turn: current.status.turn, lettingGo: "abort" }) }
+      : current,
+  );
+
   /**
    * Streams the parts of the running turn that `agentTurn` streams, running the host's tools it
    * calls. A part is delivered only while the session runs the turn, so once `suspend` or `stop`
-   * let go of it, the session holds every part the caller has. A stream that ends otherwise
-   * without the turn's `finish` leaves the session ready for another turn.
+   * let go of it, the session holds every part the caller has. The stream of a turn `stop` or
+   * `destroy` aborted ends with an error, and a stream that ends otherwise without the turn's
+   * `finish` ends the turn as far as it got.
    */
   const runTurn = <Tools extends Record<string, Tool.Any>>(
     method: string,
@@ -276,10 +291,20 @@ export const make = Effect.fn("Session.make")(function* (options: {
           : Stream.succeed(part),
       ),
       Stream.takeWhileEffect((part) => Ref.modify(state, (current) => deliver(current, part))),
+      Stream.concat(
+        Stream.unwrap(
+          Effect.map(Ref.get(state), ({ status }) =>
+            wasAborted(status) ? Stream.fromIterable(abortedEnding) : Stream.empty,
+          ),
+        ),
+      ),
       Stream.ensuring(
         Ref.update(state, (current) =>
-          current.status._tag === "Running" && !current.status.suspending
-            ? { ...current, status: Status.Idle() }
+          current.status._tag === "Running" && current.status.lettingGo === undefined
+            ? {
+                status: Status.Idle(),
+                history: withEndedTurn(current.history, current.status.turn),
+              }
             : current,
         ),
       ),
@@ -344,7 +369,10 @@ export const make = Effect.fn("Session.make")(function* (options: {
   };
 
   /** Lets go of the session, returning where it was and its conversation when it did. */
-  const close = Ref.getAndUpdate(state, (current) => ({ ...current, status: Status.Closed() }));
+  const close = Ref.getAndUpdate(state, (current) => ({
+    ...current,
+    status: Status.Closed({ abortedTurn: wasAborted(current.status) }),
+  }));
 
   /** What `suspend`, `detach`, and `stop` return. */
   const savedState = (
@@ -443,10 +471,11 @@ export const make = Effect.fn("Session.make")(function* (options: {
 
     stop: Effect.gen(function* () {
       yield* checkStatus("stop");
+      yield* startAborting;
       const agentState = yield* agentSession.stop;
       const { status, history } = yield* close;
       return savedState(
-        history,
+        status._tag === "Running" ? withEndedTurn(history, status.turn) : history,
         agentState,
         status._tag === "Unfinished" ? status.turn : undefined,
       );
@@ -454,6 +483,7 @@ export const make = Effect.fn("Session.make")(function* (options: {
 
     destroy: Effect.gen(function* () {
       yield* checkStatus("destroy");
+      yield* startAborting;
       yield* agentSession.destroy;
       yield* close;
     }),
@@ -477,13 +507,30 @@ type Status = Data.TaggedEnum<{
   Running: {
     readonly turn: RunningTurn;
 
-    /** Whether `suspend` is letting go of the turn, which its stream then ends without finishing. */
-    readonly suspending: boolean;
+    /**
+     * Whether `suspend` is letting go of the turn to continue it later, or `stop` or `destroy` is
+     * aborting it. Its stream then ends without its `finish`, and they end the turn themselves.
+     */
+    readonly lettingGo: "suspend" | "abort" | undefined;
   };
-  Closed: {};
+  Closed: {
+    /** Whether `stop` or `destroy` aborted a running turn, before its `finish`. */
+    readonly abortedTurn: boolean;
+  };
 }>;
 
 const Status = Data.taggedEnum<Status>();
+
+/** Whether `stop` or `destroy` aborted the turn a session ran, before its `finish`. */
+const wasAborted = (status: Status) =>
+  (status._tag === "Running" && status.lettingGo === "abort") ||
+  (status._tag === "Closed" && status.abortedTurn);
+
+/** How the stream of a turn `stop` or `destroy` aborted ends: as a turn that failed. */
+const abortedEnding: ReadonlyArray<StreamPart> = [
+  { type: "error", error: { type: "aborted", message: "The session was stopped during the turn" } },
+  { type: "finish", reason: "error", usage: { inputTokens: {}, outputTokens: {} } },
+];
 
 /** A turn a session is running, as far as its stream has delivered it. */
 interface RunningTurn {
@@ -510,14 +557,14 @@ const deliver = (state: State, part: StreamPart): [boolean, State] => {
       { status: Status.Idle(), history: Prompt.concat(state.history, conversationOf(turn)) },
     ];
   }
-  const { suspending } = state.status;
+  const { lettingGo } = state.status;
   if (part.type === "finish-step") {
     const step = Prompt.fromMessages(messagesOfStep(turn.stepParts));
     const next = { ...turn, steps: [...turn.steps, step], stepParts: [] };
-    return [true, { ...state, status: Status.Running({ turn: next, suspending }) }];
+    return [true, { ...state, status: Status.Running({ turn: next, lettingGo }) }];
   }
   const next = { ...turn, stepParts: [...turn.stepParts, part] };
-  return [true, { ...state, status: Status.Running({ turn: next, suspending }) }];
+  return [true, { ...state, status: Status.Running({ turn: next, lettingGo }) }];
 };
 
 type Operation = "stream" | "approve" | "compact" | "detach" | "stop" | "destroy";
@@ -564,7 +611,16 @@ const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
   tools: options.toolkit === undefined ? [] : Object.values<Tool.Any>(options.toolkit.tools),
 });
 
-/** A finished turn as the conversation records it: its prompt, then each step it took. */
+/**
+ * The conversation with a turn that ended without its `finish`, other than by `suspend`, as far as
+ * the session delivered it. A turn that delivered nothing, such as one the agent refused, is left out.
+ */
+const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
+  turn.steps.length === 0 && turn.stepParts.length === 0
+    ? history
+    : Prompt.concat(history, conversationOf(turn));
+
+/** A turn as the conversation records it: its prompt, then each step it took. */
 const conversationOf = (turn: RunningTurn) =>
   Prompt.fromMessages([
     turn.prompt,
@@ -579,6 +635,10 @@ const conversationOf = (turn: RunningTurn) =>
  * the tools it called, followed by a tool message with the results, and none for a step that wrote
  * nothing and called none. In a prompt, a `providerExecuted` call is one the model's provider ran,
  * so every call is recorded as one the model made, whoever ran the tool, which any model reads.
+ *
+ * A step its turn ended partway through keeps what it wrote so far, and each call it left without a
+ * result is answered as interrupted, as Effect AI answers the calls of a response cut short, since
+ * models refuse a conversation with a call no result answers.
  */
 const messagesOfStep = (step: ReadonlyArray<StreamPart>): ReadonlyArray<Prompt.Message> => {
   const said: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
@@ -621,11 +681,30 @@ const messagesOfStep = (step: ReadonlyArray<StreamPart>): ReadonlyArray<Prompt.M
         break;
     }
   }
+  for (const text of writing.values()) {
+    if (text !== "") said.push(Prompt.makePart("text", { text }));
+  }
+  const answered = new Set(results.map((result) => result.id));
+  for (const part of said) {
+    if (part.type === "tool-call" && !answered.has(part.id)) {
+      results.push(interruptedResultOf(part));
+    }
+  }
   return [
     ...(said.length === 0 ? [] : [Prompt.makeMessage("assistant", { content: said })]),
     ...(results.length === 0 ? [] : [Prompt.makeMessage("tool", { content: results })]),
   ];
 };
+
+/** The result of a call its turn ended before answering, as Effect AI writes one. */
+const interruptedResultOf = (call: Prompt.ToolCallPart) =>
+  Prompt.makePart("tool-result", {
+    id: call.id,
+    name: call.name,
+    isFailure: true,
+    result: { type: "execution-interrupted", reason: "The turn ended before the tool finished" },
+    providerExecuted: false,
+  });
 
 const isToolName = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,

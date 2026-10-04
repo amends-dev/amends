@@ -482,6 +482,44 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       }),
   );
 
+  it.effect("keeps a turn stop aborted in its conversation, as far as its steps went", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* makeSandbox;
+      /** Done once the turn's second step is running, which stop then aborts. */
+      const secondStep = yield* Deferred.make<void>();
+      const { model } = yield* makeScriptedModel((request) =>
+        toolResultsOf(request).length === 0
+          ? callTool("log-1", "bash", { command: "echo ran >> log.txt" })
+          : untilSuspended(secondStep, answer("unused")),
+      );
+      const harness = Harness.make(AmendsAgent.make({ model }));
+      const session = yield* harness.startSession({ id, sandbox });
+      const tookFirstStep = yield* Deferred.make<void>();
+      const reading = yield* session.stream({ prompt: "log a line" }).pipe(
+        Stream.tap((part) =>
+          part.type === "finish-step" ? Deferred.succeed(tookFirstStep, undefined) : Effect.void,
+        ),
+        Stream.runCollect,
+        Effect.forkChild,
+      );
+      yield* Deferred.await(tookFirstStep);
+      yield* Deferred.await(secondStep);
+      const state = yield* throughJson(yield* session.stop);
+      const parts = yield* Fiber.join(reading);
+
+      const later = yield* makeScriptedModel(() => answer("done"));
+      const resumed = yield* Harness.make(AmendsAgent.make({ model: later.model })).resumeSession({
+        sandbox,
+        state,
+      });
+      yield* resumed.generate({ prompt: "what did you do" });
+
+      expect(parts.at(-1)).toMatchObject({ type: "finish", reason: "error" });
+      expect(rolesOf(state.history)).toEqual(["user", "assistant", "tool"]);
+      expect(rolesOf(later.requests[0]?.prompt)).toEqual(["user", "assistant", "tool", "user"]);
+    }),
+  );
+
   it.effect("asks for no approvals and does not compact yet", () =>
     Effect.gen(function* () {
       const { model } = yield* makeScriptedModel(() => answer("unused"));

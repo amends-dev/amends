@@ -184,6 +184,7 @@ layer(TestLayer)("OpencodeAgent", (it) => {
         refusals.map((error) => (error._tag === "HarnessError" ? error.reason._tag : error._tag)),
       ).toEqual(Array(5).fill("UnsupportedError"));
       expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
+      expect((yield* session.detach).history.content).toEqual([]);
     }),
   );
 
@@ -352,28 +353,37 @@ layer(TestLayer)("OpencodeAgent", (it) => {
     }),
   );
 
-  it.effect("stops a running turn in opencode, keeping the session to resume", () =>
-    Effect.gen(function* () {
-      const { fake, sandbox, harness, session } = yield* startSession((turn) =>
-        Effect.andThen(callBash(turn), Effect.never),
-      );
-      const calledBash = yield* Deferred.make<void>();
-      const reading = yield* session.stream({ prompt: "Build it." }).pipe(
-        Stream.runForEach((part) =>
-          part.type === "tool-call" ? Deferred.succeed(calledBash, undefined) : Effect.void,
-        ),
-        Effect.forkChild,
-      );
-      yield* Deferred.await(calledBash);
+  it.effect(
+    "stops a running turn in opencode, keeping it as far as it got and the session to resume",
+    () =>
+      Effect.gen(function* () {
+        const { fake, sandbox, harness, session } = yield* startSession((turn) =>
+          Effect.andThen(callBash(turn), Effect.never),
+        );
+        const calledBash = yield* Deferred.make<void>();
+        const reading = yield* session.stream({ prompt: "Build it." }).pipe(
+          Stream.tap((part) =>
+            part.type === "tool-call" ? Deferred.succeed(calledBash, undefined) : Effect.void,
+          ),
+          Stream.runCollect,
+          Effect.forkChild,
+        );
+        yield* Deferred.await(calledBash);
 
-      const state = yield* session.stop;
-      yield* Fiber.join(reading);
+        const state = yield* session.stop;
+        const parts = yield* Fiber.join(reading);
 
-      expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toHaveLength(1);
-      const resumed = yield* harness.resumeSession({ sandbox, state });
-      yield* resumed.detach;
-      expect((yield* fake.sessions).size).toBe(1);
-    }),
+        expect(parts.at(-1)).toMatchObject({ type: "finish", reason: "error" });
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "Build it." }] },
+          { role: "assistant", content: [{ type: "tool-call", id: "call_1", name: "bash" }] },
+          { role: "tool", content: [{ type: "tool-result", id: "call_1", isFailure: true }] },
+        ]);
+        expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toHaveLength(1);
+        const resumed = yield* harness.resumeSession({ sandbox, state });
+        yield* resumed.detach;
+        expect((yield* fake.sessions).size).toBe(1);
+      }),
   );
 
   it.effect("writes another agent's conversation into a new opencode session", () =>

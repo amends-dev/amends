@@ -70,13 +70,15 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     (resumed ?? suspended)?.conversation ?? startOptions.history,
   );
   /**
-   * The running turn, or the last one cut short. A turn joins the conversation once the session
-   * takes its `finish`, so that a turn which finished before the session had all of it can still be
-   * continued.
+   * The running turn, or the one `suspend` cut short. A turn joins the conversation once the
+   * session takes its `finish`, so that a turn which finished before the session had all of it can
+   * still be continued, or as far as it got when its stream ends early.
    */
   const turn = yield* Ref.make<Turn | undefined>(undefined);
-  /** Held while a turn runs, so that `suspend` reads the turn's steps once it has stopped. */
+  /** Held while a turn runs, so that `suspend` and `stop` read the turn once it has stopped. */
   const turnPermit = yield* Semaphore.make(1);
+  /** Whether `suspend` let go of the session, keeping the running turn for `continue`. */
+  const keepsTurn = yield* Ref.make(false);
   /** Done once the session is suspended, stopped, or destroyed, stopping the running turn. */
   const closed = yield* Deferred.make<void>();
   /** The results the host submits for calls of its tools, by call id, until a stand-in takes them. */
@@ -163,12 +165,12 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
       current === undefined ? current : { ...current, steps: [...current.steps, step] },
     );
 
-  /** Adds the turn to the conversation, once the session has taken its `finish`. */
-  const finishTurn = Effect.flatMap(Ref.getAndSet(turn, undefined), (finished) =>
-    finished === undefined
+  /** Adds the turn, as far as it got, to the conversation. */
+  const recordTurn = Effect.flatMap(Ref.getAndSet(turn, undefined), (ended) =>
+    ended === undefined
       ? Effect.void
       : Ref.update(conversation, (current) =>
-          Prompt.concat(current, Prompt.fromMessages(messagesOf(finished))),
+          Prompt.concat(current, Prompt.fromMessages(messagesOf(ended))),
         ),
   );
 
@@ -274,10 +276,16 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
         Semaphore.withPermit(turnPermit),
         Queue.into(queue),
       ),
-    ).pipe(Stream.tap((part) => (part.type === "finish" ? finishTurn : Effect.void)));
+    ).pipe(
+      Stream.tap((part) => (part.type === "finish" ? recordTurn : Effect.void)),
+      Stream.ensuring(
+        Effect.flatMap(Ref.get(keepsTurn), (keeps) => (keeps ? Effect.void : recordTurn)),
+      ),
+    );
 
-  /** Waits for the running turn to stop, once the session has closed, and reads it. */
-  const stoppedTurn = Semaphore.withPermit(turnPermit, Ref.get(turn));
+  /** Runs `effect` once the running turn has stopped, after the session closed. */
+  const onceStopped = <A, E>(effect: Effect.Effect<A, E>) =>
+    Semaphore.withPermit(turnPermit, effect);
 
   /** What the agent returns for `start` to take back, with the steps of a turn `suspend` cut short. */
   const saveState = (unfinishedTurn?: ReadonlyArray<Prompt.Prompt>) =>
@@ -322,13 +330,13 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
       ),
 
     suspend: Effect.andThen(
-      close,
-      Effect.flatMap(stoppedTurn, (unfinished) => saveState(unfinished?.steps)),
+      Effect.andThen(Ref.set(keepsTurn, true), close),
+      onceStopped(Effect.flatMap(Ref.get(turn), (unfinished) => saveState(unfinished?.steps))),
     ),
 
     detach: saveState(),
 
-    stop: Effect.andThen(close, Effect.andThen(stoppedTurn, saveState())),
+    stop: Effect.andThen(close, onceStopped(Effect.andThen(recordTurn, saveState()))),
 
     destroy: close,
   };

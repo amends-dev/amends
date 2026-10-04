@@ -2,6 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
+import { HarnessError, UnsupportedError } from "../src/HarnessError.ts";
 import * as Harness from "../src/Harness.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
 import {
@@ -22,6 +23,44 @@ const MathToolkit = Toolkit.make(Add);
 const MathHandlers = MathToolkit.toLayer({ Add: ({ a, b }) => Effect.succeed(a + b) });
 
 const answers: Script = (prompt) => Stream.fromIterable(reply(`codex answers ${prompt}`));
+
+/** A step that reads the notes with the agent's own tool. */
+const readingStep: ReadonlyArray<StreamPart> = [
+  { type: "text-start", id: "plan" },
+  { type: "text-delta", id: "plan", delta: "Reading the notes first." },
+  { type: "text-end", id: "plan" },
+  {
+    type: "tool-call",
+    id: "call-read",
+    name: "read",
+    params: { path: "notes.md" },
+    providerExecuted: true,
+  },
+  {
+    type: "tool-result",
+    id: "call-read",
+    name: "read",
+    result: "2 and 3",
+    isFailure: false,
+    providerExecuted: true,
+  },
+  { type: "finish-step", reason: "tool-calls", usage: { inputTokens: {}, outputTokens: {} } },
+];
+
+/** The messages that record `readingStep` in a conversation. */
+const readingMessages = [
+  {
+    role: "assistant",
+    content: [
+      { type: "text", text: "Reading the notes first." },
+      { type: "tool-call", id: "call-read", name: "read", providerExecuted: false },
+    ],
+  },
+  {
+    role: "tool",
+    content: [{ type: "tool-result", id: "call-read", result: "2 and 3", isFailure: false }],
+  },
+];
 
 /** Starts a session on a fake agent following `script`. */
 const startSession = (script: Script, options?: FakeAgentOptions) =>
@@ -243,6 +282,121 @@ describe("Session", () => {
       }),
   );
 
+  it.effect("ends a turn stop aborted with an error, keeping it as far as it got", () =>
+    Effect.gen(function* () {
+      const running = yield* Deferred.make<void>();
+      const { session } = yield* startSession(() =>
+        Stream.concat(
+          Stream.fromIterable<StreamPart>([
+            ...readingStep,
+            { type: "text-start", id: "answer" },
+            { type: "text-delta", id: "answer", delta: "The notes s" },
+          ]),
+          Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
+        ),
+      );
+
+      const reading = yield* Stream.runCollect(session.stream({ prompt: "Read the notes" })).pipe(
+        Effect.forkChild,
+      );
+      yield* Deferred.await(running);
+      const state = yield* session.stop;
+      const parts = yield* Fiber.join(reading);
+
+      expect(parts.slice(-2)).toMatchObject([
+        { type: "error", error: { type: "aborted" } },
+        { type: "finish", reason: "error" },
+      ]);
+      expect(state.unfinishedTurn).toBeUndefined();
+      expect(state.history.content).toMatchObject([
+        { role: "user", content: [{ type: "text", text: "Read the notes" }] },
+        ...readingMessages,
+        { role: "assistant", content: [{ type: "text", text: "The notes s" }] },
+      ]);
+    }),
+  );
+
+  it.effect(
+    "keeps a turn the caller stopped reading in the conversation, answering the call it left",
+    () =>
+      Effect.gen(function* () {
+        const { session } = yield* startSession(() =>
+          Stream.concat(Stream.fromIterable(readingStep.slice(0, 4)), Stream.never),
+        );
+
+        yield* session.stream({ prompt: "Read the notes" }).pipe(
+          Stream.takeUntil((part) => part.type === "tool-call"),
+          Stream.runDrain,
+        );
+        const state = yield* session.detach;
+
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "Read the notes" }] },
+          {
+            role: "assistant",
+            content: [
+              { type: "text", text: "Reading the notes first." },
+              { type: "tool-call", id: "call-read" },
+            ],
+          },
+          {
+            role: "tool",
+            content: [
+              {
+                type: "tool-result",
+                id: "call-read",
+                isFailure: true,
+                result: { type: "execution-interrupted" },
+              },
+            ],
+          },
+        ]);
+      }),
+  );
+
+  it.effect("answers the calls of a turn that failed partway through a step", () =>
+    Effect.gen(function* () {
+      const { session } = yield* startSession(() =>
+        Stream.fromIterable<StreamPart>([
+          ...readingStep.slice(0, 4),
+          { type: "error", error: { message: "The connection broke" } },
+          { type: "finish", reason: "error", usage: { inputTokens: {}, outputTokens: {} } },
+        ]),
+      );
+
+      yield* Effect.flip(session.generate({ prompt: "Read the notes" }));
+      const state = yield* session.detach;
+
+      expect(state.history.content.map((message) => message.role)).toEqual([
+        "user",
+        "assistant",
+        "tool",
+      ]);
+      expect(state.history.content[2]).toMatchObject({
+        content: [{ type: "tool-result", id: "call-read", isFailure: true }],
+      });
+    }),
+  );
+
+  it.effect("leaves a turn the agent refused before it began out of the conversation", () =>
+    Effect.gen(function* () {
+      const { session } = yield* startSession(() =>
+        Stream.fail(
+          new HarnessError({
+            harness: "codex",
+            method: "prompt",
+            reason: new UnsupportedError({ description: "No such model" }),
+          }),
+        ),
+      );
+
+      yield* Effect.flip(session.generate({ prompt: "hello" }));
+      const state = yield* session.detach;
+
+      expect(state.history.content).toEqual([]);
+    }),
+  );
+
   it.effect("refuses to detach while a turn runs", () =>
     Effect.gen(function* () {
       const running = yield* Deferred.make<void>();
@@ -264,25 +418,7 @@ describe("Session", () => {
       Effect.gen(function* () {
         const usage = { inputTokens: {}, outputTokens: {} };
         const readStep: ReadonlyArray<StreamPart> = [
-          { type: "text-start", id: "plan" },
-          { type: "text-delta", id: "plan", delta: "Reading the notes first." },
-          { type: "text-end", id: "plan" },
-          {
-            type: "tool-call",
-            id: "call-read",
-            name: "read",
-            params: { path: "notes.md" },
-            providerExecuted: true,
-          },
-          {
-            type: "tool-result",
-            id: "call-read",
-            name: "read",
-            result: "2 and 3",
-            isFailure: false,
-            providerExecuted: true,
-          },
-          { type: "finish-step", reason: "tool-calls", usage },
+          ...readingStep,
           { type: "tool-call", id: "call-add", name: "Add", params: { a: 2, b: 3 } },
         ];
         const { session } = yield* startSession((_prompt, host) =>
