@@ -6,7 +6,7 @@
  * which adds the object that answer decoded to.
  */
 import type { Response } from "effect/ai";
-import type { FileChangePart, StreamPart } from "./StreamPart.ts";
+import { type FileChangePart, type StreamPart, stepsOf } from "./StreamPart.ts";
 
 // TODO: Add `steps`, each step's parts with its own text, reasoning, and usage, once a caller needs
 // more of the turn than its answer.
@@ -59,15 +59,6 @@ export class GenerateObjectResult<A> extends GenerateResult {
   }
 }
 
-/**
- * The parts of the turn's last step that has any. Steps end at `finish-step` parts, and a turn that
- * reports none is one step.
- */
-const lastStep = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<StreamPart> => {
-  const steps: Array<Array<StreamPart>> = [[]];
-  for (const part of parts) {
-    if (part.type === "finish-step") steps.push([]);
-    else if (part.type !== "finish") steps.at(-1)?.push(part);
-  }
-  return steps.findLast((step) => step.length > 0) ?? [];
-};
+/** The parts of the turn's last step that has any. */
+const lastStep = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<StreamPart> =>
+  stepsOf(parts).findLast((step) => step.length > 0) ?? [];

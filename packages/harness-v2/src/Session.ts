@@ -22,7 +22,7 @@ import {
   TurnFailedError,
   TurnInProgressError,
 } from "./HarnessError.ts";
-import type { StreamPart } from "./StreamPart.ts";
+import { type StreamPart, stepsOf } from "./StreamPart.ts";
 
 /** A turn that `suspend` cut short, kept so that the session can finish it later. */
 export const UnfinishedTurn = Schema.Struct({
@@ -40,7 +40,7 @@ export const SessionState = Schema.Struct({
   /** The agent that last ran the session, whose `agentState` only it can read. */
   agent: Schema.String,
 
-  /** The conversation so far: each finished turn's prompt and answer. */
+  /** The conversation so far: each finished turn's prompt, the tools its steps called, and its answer. */
   history: Prompt.Prompt,
 
   /** What the agent's `detach` or `stop` returned. */
@@ -469,19 +469,63 @@ const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
   tools: options.toolkit === undefined ? [] : Object.values<Tool.Any>(options.toolkit.tools),
 });
 
-// TODO: Record the turn's tool calls and results too, once an agent can load them from the
-// conversation.
-/** A finished turn as the conversation records it: its prompt and its answer. */
-const conversationOf = (prompt: Prompt.UserMessage, parts: ReadonlyArray<StreamPart>) => {
-  const answer = new GenerateResult(parts).text;
-  return Prompt.fromMessages(
-    answer === ""
-      ? [prompt]
-      : [
-          prompt,
-          Prompt.makeMessage("assistant", { content: [Prompt.makePart("text", { text: answer })] }),
-        ],
-  );
+// TODO: Record what the model reasoned, and the files it wrote, once a model can read them back
+// from another: providers read back only the reasoning they produced.
+/**
+ * A finished turn as the conversation records it: its prompt, then each step the model took, as an
+ * assistant message with what it wrote and the tools it called, followed by a tool message with the
+ * results. In a prompt, a `providerExecuted` call is one the model's provider ran, so every call is
+ * recorded as one the model made, whoever ran the tool, which any model reads.
+ */
+const conversationOf = (prompt: Prompt.UserMessage, parts: ReadonlyArray<StreamPart>) =>
+  Prompt.fromMessages([prompt, ...stepsOf(parts).flatMap(messagesOfStep)]);
+
+/** The messages that record one step of a turn: none for a step that wrote nothing and called none. */
+const messagesOfStep = (step: ReadonlyArray<StreamPart>): ReadonlyArray<Prompt.Message> => {
+  const said: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
+  const results: Array<Prompt.ToolResultPart> = [];
+  /** The text of each text the step is writing, by its id, until it ends. */
+  const writing = new Map<string, string>();
+  for (const part of step) {
+    switch (part.type) {
+      case "text-delta":
+        writing.set(part.id, (writing.get(part.id) ?? "") + part.delta);
+        break;
+      case "text-end": {
+        const text = writing.get(part.id) ?? "";
+        writing.delete(part.id);
+        if (text !== "") said.push(Prompt.makePart("text", { text }));
+        break;
+      }
+      case "tool-call":
+        said.push(
+          Prompt.makePart("tool-call", {
+            id: part.id,
+            name: part.name,
+            params: part.params,
+            providerExecuted: false,
+          }),
+        );
+        break;
+      case "tool-result":
+        if (part.preliminary !== true) {
+          results.push(
+            Prompt.makePart("tool-result", {
+              id: part.id,
+              name: part.name,
+              isFailure: part.isFailure,
+              result: part.result,
+              providerExecuted: false,
+            }),
+          );
+        }
+        break;
+    }
+  }
+  return [
+    ...(said.length === 0 ? [] : [Prompt.makeMessage("assistant", { content: said })]),
+    ...(results.length === 0 ? [] : [Prompt.makeMessage("tool", { content: results })]),
+  ];
 };
 
 const isToolName = <Tools extends Record<string, Tool.Any>>(

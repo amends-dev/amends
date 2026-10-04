@@ -3,6 +3,7 @@ import { Deferred, Effect, Fiber, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
 import * as Harness from "../src/Harness.ts";
+import type { StreamPart } from "../src/StreamPart.ts";
 import { makeFakeAgent, makeFakeSandbox, reply, type Script } from "./fakes.ts";
 
 const id = SessionId.make("session-one");
@@ -207,6 +208,111 @@ describe("Session", () => {
 
       expect(refused.reason._tag).toBe("TurnInProgressError");
     }),
+  );
+
+  it.effect(
+    "records each step of a turn, with the tools called and their results, whoever ran them",
+    () =>
+      Effect.gen(function* () {
+        const usage = { inputTokens: {}, outputTokens: {} };
+        const readStep: ReadonlyArray<StreamPart> = [
+          { type: "text-start", id: "plan" },
+          { type: "text-delta", id: "plan", delta: "Reading the notes first." },
+          { type: "text-end", id: "plan" },
+          {
+            type: "tool-call",
+            id: "call-read",
+            name: "read",
+            params: { path: "notes.md" },
+            providerExecuted: true,
+          },
+          {
+            type: "tool-result",
+            id: "call-read",
+            name: "read",
+            result: "2 and 3",
+            isFailure: false,
+            providerExecuted: true,
+          },
+          { type: "finish-step", reason: "tool-calls", usage },
+          { type: "tool-call", id: "call-add", name: "Add", params: { a: 2, b: 3 } },
+        ];
+        const { session } = yield* startSession((_prompt, host) =>
+          Stream.concat(
+            Stream.fromIterable(readStep),
+            Stream.unwrap(
+              Effect.map(host.toolResult, (sum) =>
+                Stream.fromIterable<StreamPart>([
+                  { type: "finish-step", reason: "tool-calls", usage },
+                  ...reply(`The sum is ${String(sum)}`),
+                ]),
+              ),
+            ),
+          ),
+        );
+
+        yield* session.generate({
+          prompt: "Add the numbers in notes.md",
+          toolkit: yield* MathToolkit,
+        });
+        const state = yield* session.detach;
+
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "Add the numbers in notes.md" }] },
+          {
+            role: "assistant",
+            content: [
+              { type: "text", text: "Reading the notes first." },
+              {
+                type: "tool-call",
+                id: "call-read",
+                name: "read",
+                params: { path: "notes.md" },
+                providerExecuted: false,
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: [
+              {
+                type: "tool-result",
+                id: "call-read",
+                name: "read",
+                result: "2 and 3",
+                isFailure: false,
+                providerExecuted: false,
+              },
+            ],
+          },
+          {
+            role: "assistant",
+            content: [
+              {
+                type: "tool-call",
+                id: "call-add",
+                name: "Add",
+                params: { a: 2, b: 3 },
+                providerExecuted: false,
+              },
+            ],
+          },
+          {
+            role: "tool",
+            content: [
+              {
+                type: "tool-result",
+                id: "call-add",
+                name: "Add",
+                result: 5,
+                isFailure: false,
+                providerExecuted: false,
+              },
+            ],
+          },
+          { role: "assistant", content: [{ type: "text", text: "The sum is 5" }] },
+        ]);
+      }).pipe(Effect.provide(MathHandlers)),
   );
 
   it.effect("records each finished turn's prompt and answer in the conversation it returns", () =>

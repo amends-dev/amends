@@ -107,3 +107,18 @@ export type StreamPart = Superset<typeof StreamPart.Type, Response.StreamPartEnc
  * missing from `StreamPart`.
  */
 type Superset<Whole, Subset extends Whole> = Whole | Subset;
+
+/**
+ * A turn's parts, split into its steps at their `finish-step` parts. The turn's `finish` part ends
+ * the turn rather than a step, so no step holds it; a turn that reports no steps is one.
+ */
+export const stepsOf = (
+  parts: ReadonlyArray<StreamPart>,
+): ReadonlyArray<ReadonlyArray<StreamPart>> => {
+  const steps: Array<Array<StreamPart>> = [[]];
+  for (const part of parts) {
+    if (part.type === "finish-step") steps.push([]);
+    else if (part.type !== "finish") steps.at(-1)?.push(part);
+  }
+  return steps;
+};
