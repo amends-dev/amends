@@ -387,6 +387,49 @@ export const makeFakeServerProcesses = (url: string, options: { readonly failing
     return processes;
   });
 
+export interface ScriptedCommands {
+  readonly spawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
+
+  /** Each command run, with its arguments, in order. */
+  readonly ran: ReadonlyArray<ReadonlyArray<string>>;
+}
+
+/**
+ * A process spawner that runs nothing, but answers each command with the output and exit code
+ * `answer` gives it: none and 0 unless it says otherwise.
+ */
+export const makeScriptedCommands = (
+  answer: (
+    command: string,
+    args: ReadonlyArray<string>,
+  ) => { readonly output?: string; readonly code?: number },
+): ScriptedCommands => {
+  const ran: Array<ReadonlyArray<string>> = [];
+  const spawner = ChildProcessSpawner.make((command) =>
+    Effect.suspend(() => {
+      if (command._tag !== "StandardCommand") return Effect.die("Scripted commands are not piped");
+      ran.push([command.command, ...command.args]);
+      const { output = "", code = 0 } = answer(command.command, command.args);
+      return Effect.succeed(
+        ChildProcessSpawner.makeHandle({
+          pid: ChildProcessSpawner.ProcessId(ran.length),
+          exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(code)),
+          isRunning: Effect.succeed(false),
+          kill: () => Effect.void,
+          stdin: Sink.drain,
+          stdout: Stream.encodeText(Stream.make(output)),
+          stderr: Stream.empty,
+          all: Stream.empty,
+          getInputFd: () => Sink.drain,
+          getOutputFd: () => Stream.empty,
+          unref: Effect.succeed(Effect.void),
+        }),
+      );
+    }),
+  );
+  return { spawner, ran };
+};
+
 const CreateBody = Schema.Struct({
   location: Schema.Struct({ directory: Schema.String }),
   model: Schema.optional(ModelRef),

@@ -70,10 +70,10 @@
       "dependencies": {
         "@amends/harness-v2": "workspace:*",
         "@amends/sandbox-v2": "workspace:*",
+        "@effect/platform-bun": "catalog:",
       },
       "devDependencies": {
         "@amends/sandbox-local-v2": "workspace:*",
-        "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
