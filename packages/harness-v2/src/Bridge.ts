@@ -126,7 +126,8 @@ export class Rpcs extends RpcGroup.make(
 
   /**
    * Starts the session, or takes up the one the bridge is running, which ignores `history` and
-   * `agentState`. Answers whether the bridge has `unfinishedTurn`, for `ReadTurn` to stream.
+   * `agentState`. Answers whether the bridge has `unfinishedTurn`, for `ReadTurn` to stream, and
+   * the session's state, as `ReadState` does.
    */
   Rpc.make("StartSession", {
     payload: {
@@ -136,7 +137,7 @@ export class Rpcs extends RpcGroup.make(
       agentState: Schema.optionalKey(Schema.Json),
       unfinishedTurn: Schema.optional(TurnId),
     },
-    success: Schema.Struct({ hasUnfinishedTurn: Schema.Boolean }),
+    success: Schema.Struct({ hasUnfinishedTurn: Schema.Boolean, agentState: Schema.Json }),
     error: HarnessError,
   }),
 

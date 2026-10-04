@@ -3,8 +3,8 @@ import { SessionId } from "@amends/harness-v2/Agent";
 import type { Network, Sandbox } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Layer, Path, Redacted, Stream } from "effect";
-import { freePort, makeProxy, makeSandbox } from "./fixtures.ts";
+import { Deferred, Effect, Fiber, Layer, Path, Redacted, Schedule, Schema, Stream } from "effect";
+import { freePort, isRunning, makeProxy, makeSandbox } from "./fixtures.ts";
 
 /**
  * The bridge client launches `fake-bridge.ts`, a bridge over a stand-in agent, in a sandbox on this
@@ -58,6 +58,20 @@ const linesOf = (sandbox: Sandbox.Sandbox["Service"], file: string) =>
       .map((line): unknown => JSON.parse(line));
   });
 
+/** Kills the bridge launched last in the sandbox, as when it crashes, once it has exited. */
+const killBridge = (sandbox: Sandbox.Sandbox["Service"]) =>
+  Effect.gen(function* () {
+    const launches = yield* linesOf(sandbox, "launches.jsonl");
+    const { pid } = yield* Schema.decodeUnknownEffect(Schema.Struct({ pid: Schema.Int }))(
+      launches.at(-1),
+    );
+    process.kill(pid, "SIGKILL");
+    yield* Effect.repeat(isRunning(pid), {
+      while: (running) => running,
+      schedule: Schedule.spaced("20 millis"),
+    });
+  });
+
 /** Lets the stand-in agent finish a `wait` turn of the session `id`. */
 const release = (sandbox: Sandbox.Sandbox["Service"]) =>
   Effect.gen(function* () {
@@ -92,7 +106,11 @@ describe("BridgeClient", () => {
 
         expect(parts).toEqual(answer("hello"));
         expect(yield* linesOf(sandbox, "launches.jsonl")).toEqual([
-          { agentOptions: { greeting: "hello" }, tokenInEnvironment: false },
+          {
+            pid: expect.any(Number),
+            agentOptions: { greeting: "hello" },
+            tokenInEnvironment: false,
+          },
         ]);
       }).pipe(Effect.provide(TestLayer)),
     );
@@ -173,6 +191,52 @@ describe("BridgeClient", () => {
         const parts = yield* Fiber.join(reading);
 
         expect(parts).toEqual(answer("across"));
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live(
+      "starts the session again, from its latest state, in the bridge launched after its own died",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeSetup;
+          const session = yield* harness.startSession({ sandbox, id });
+          yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
+
+          yield* killBridge(sandbox);
+          const parts = yield* Stream.runCollect(session.stream({ prompt: "reply second" }));
+          const state = yield* session.stop;
+
+          expect(parts).toEqual(answer("second"));
+          expect(state.agentState).toEqual({ agentState: { turns: 2 } });
+          expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
+        }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("fails a turn its bridge lost when it died, and runs the next in another", () =>
+      Effect.gen(function* () {
+        const { sandbox, harness } = yield* makeSetup;
+        const session = yield* harness.startSession({ sandbox, id });
+        const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
+
+        yield* killBridge(sandbox);
+        const error = yield* Effect.flip(Fiber.join(reading));
+        const parts = yield* Stream.runCollect(session.stream({ prompt: "reply next" }));
+
+        expect(error._tag === "HarnessError" && error.reason._tag).toBe("NoTurnError");
+        expect(parts).toEqual(answer("next"));
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("lets go with the state its bridge last gave when its sandbox is gone", () =>
+      Effect.gen(function* () {
+        const { sandbox, harness } = yield* makeSetup;
+        const session = yield* harness.startSession({ sandbox, id });
+        yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
+
+        yield* sandbox.destroy;
+        const state = yield* session.detach;
+
+        expect(state.agentState).toEqual({ agentState: { turns: 1 } });
       }).pipe(Effect.provide(TestLayer)),
     );
 

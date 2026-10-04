@@ -66,9 +66,14 @@ WebSocket.
   sandbox's endpoint for the port, and launches it with the adapter's command when none answers,
   giving it the launch options on standard input. The token comes from the host's `token`
   function, derived from the sandbox's id with a secret every host shares, so that any host
-  connects to a bridge any of them launched. A turn is `StartTurn`, under an id the host picks,
-  and `ReadTurn`; both are sent again while the connection is down, for up to 30 seconds. A
-  session closes its connection when it lets go, or once it has gone unused for a minute.
+  connects to a bridge any of them launched. Each connection starts the session in the bridge from
+  the state the bridge last gave, so that a bridge that died and was launched again has it again; a
+  turn the bridge was running then is lost. A connection that drops is not opened again: requests
+  it dropped are sent again over another, for up to 30 seconds, except a tool's result, an
+  approval, and a request to compact, which the bridge must not receive twice. A turn is
+  `StartTurn`, under an id the host picks, and `ReadTurn`, which reads on from the last part read.
+  A session closes its connection when it lets go, or once it has gone unused for a minute. One
+  whose bridge cannot answer, as when its sandbox is gone, lets go with the state it last gave.
 
 opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
 program, a template that installs it, and a `make` over `BridgeClient`.

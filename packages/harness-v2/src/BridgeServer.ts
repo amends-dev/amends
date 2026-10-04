@@ -256,7 +256,8 @@ const makeHandlers = Effect.fnUntraced(function* (agent: Bridge.Agent, stateDire
           const started =
             sessions.get(session) ??
             (yield* startSession({ id: session, directory, history, agentState }));
-          if (unfinishedTurn === undefined) return { hasUnfinishedTurn: false };
+          const state = yield* started.agentSession.state;
+          if (unfinishedTurn === undefined) return { hasUnfinishedTurn: false, agentState: state };
           if (started.turn === undefined) {
             started.turn = yield* readTurnFile(unfinishedTurn, turnFile(session, unfinishedTurn));
           }
@@ -266,6 +267,7 @@ const makeHandlers = Effect.fnUntraced(function* (agent: Bridge.Agent, stateDire
             hasUnfinishedTurn:
               turn?.id === unfinishedTurn &&
               (yield* SubscriptionRef.get(turn.progress)).end?._tag !== "Aborted",
+            agentState: state,
           };
         }),
       ),

@@ -224,14 +224,16 @@ describe("BridgeServer", () => {
     }),
   );
 
-  it.effect("takes up a session it runs instead of starting it again", () =>
+  it.effect("takes up a session it runs instead of starting it again, answering its state", () =>
     Effect.gen(function* () {
       const { fake, client } = yield* setUp;
 
-      yield* client.StartSession(startOptions);
-      yield* client.StartSession(startOptions);
+      const started = yield* client.StartSession(startOptions);
+      const takenUp = yield* client.StartSession(startOptions);
 
       expect(fake.starts).toHaveLength(1);
+      expect(started).toEqual({ hasUnfinishedTurn: false, agentState: { session, start: 1 } });
+      expect(takenUp).toEqual(started);
     }),
   );
 
