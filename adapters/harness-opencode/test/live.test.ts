@@ -102,7 +102,7 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
   );
 
   it.live(
-    "continues a suspended turn, which opencode went on with, after the parts it delivered",
+    "continues a suspended turn, which opencode went on with, from the step it was in",
     () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeLiveHarness;
@@ -129,14 +129,22 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
         yield* Fiber.join(reading);
         const resumed = yield* harness.resumeSession({ sandbox, state });
         const after = yield* Stream.runCollect(resumed.continue({}));
-        const whole = [...before, ...after];
+        const history = (yield* resumed.detach).history.content;
 
+        // The session had no step of the turn finished, so the step with the call comes again.
         expect(before.at(-1)?.type).toBe("tool-call");
-        expect(after.at(-1)?.type).toBe("finish");
-        expect(whole.filter((part) => part.type === "tool-call")).toHaveLength(1);
-        expect(whole.filter((part) => part.type === "tool-result")).toEqual([
+        expect(after.filter((part) => part.type === "tool-call")).toHaveLength(1);
+        expect(after.filter((part) => part.type === "tool-result")).toEqual([
           expect.objectContaining({ isFailure: false }),
         ]);
+        expect(after.at(-1)?.type).toBe("finish");
+        expect(
+          history.flatMap((message) =>
+            message.role === "assistant"
+              ? message.content.filter((part) => part.type === "tool-call")
+              : [],
+          ),
+        ).toHaveLength(1);
       }).pipe(Effect.provide(LiveLayer)),
     timeout,
   );

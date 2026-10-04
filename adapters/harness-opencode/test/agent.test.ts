@@ -1,11 +1,11 @@
-import { Agent, Harness, type StreamPart } from "@amends/harness-v2";
+import { Agent, GenerateResult, Harness } from "@amends/harness-v2";
 import { BunServices } from "@effect/platform-bun";
 import { expect, it, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Path, Schema, Stream } from "effect";
 import { Prompt, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
-import { type FakeTurn, makeFakeOpencode } from "./fakes.ts";
+import { type FakeOpencodeOptions, type FakeTurn, makeFakeOpencode } from "./fakes.ts";
 import { makeSandbox, tokens } from "./fixtures.ts";
 
 const id = Agent.SessionId.make("session-one");
@@ -21,17 +21,23 @@ const EchoHandlers = EchoToolkit.toLayer({ Echo: ({ text }) => Effect.succeed(te
  * A harness over the opencode agent, whose sandbox on this machine reaches a fake opencode that
  * runs each turn with `runTurn`.
  */
-const makeHarness = (runTurn: (turn: FakeTurn) => Effect.Effect<void>) =>
+const makeHarness = (
+  runTurn: (turn: FakeTurn) => Effect.Effect<void>,
+  options?: FakeOpencodeOptions,
+) =>
   Effect.gen(function* () {
-    const fake = yield* makeFakeOpencode(runTurn);
+    const fake = yield* makeFakeOpencode(runTurn, options);
     const sandbox = yield* makeSandbox(fake.port);
     const agent = yield* OpencodeAgent.make({ model: "opencode/default-model", port: fake.port });
     return { fake, sandbox, harness: Harness.make(agent) };
   });
 
-const startSession = (runTurn: (turn: FakeTurn) => Effect.Effect<void>) =>
+const startSession = (
+  runTurn: (turn: FakeTurn) => Effect.Effect<void>,
+  options?: FakeOpencodeOptions,
+) =>
   Effect.gen(function* () {
-    const made = yield* makeHarness(runTurn);
+    const made = yield* makeHarness(runTurn, options);
     const session = yield* made.harness.startSession({ sandbox: made.sandbox, id });
     return { ...made, session };
   });
@@ -83,11 +89,10 @@ const callBash = (turn: FakeTurn) =>
     });
   });
 
-/** A turn that calls `bash`, which finishes once `done` is, and then answers. */
-const callBashUntil = (done: Deferred.Deferred<void>) => (turn: FakeTurn) =>
+/** A turn that runs `bash` in a first step, and answers in a second once `answering` is done. */
+const buildThenAnswer = (answering: Deferred.Deferred<void>) => (turn: FakeTurn) =>
   Effect.gen(function* () {
     yield* callBash(turn);
-    yield* Deferred.await(done);
     yield* turn.record("session.next.tool.success", {
       assistantMessageID: "msg_tool",
       callID: "call_1",
@@ -101,8 +106,17 @@ const callBashUntil = (done: Deferred.Deferred<void>) => (turn: FakeTurn) =>
       cost: 0,
       tokens: tokens(10, 5),
     });
+    yield* Deferred.await(answering);
     yield* answer("The build finished.")(turn);
   });
+
+/** The conversation `buildThenAnswer` records for the prompt `Build it.` */
+const builtThenAnswered = [
+  { role: "user", content: [{ type: "text", text: "Build it." }] },
+  { role: "assistant", content: [{ type: "tool-call", id: "call_1", name: "bash" }] },
+  { role: "tool", content: [{ type: "tool-result", id: "call_1", isFailure: false }] },
+  { role: "assistant", content: [{ type: "text", text: "The build finished." }] },
+];
 
 const TestLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer, EchoHandlers);
 
@@ -173,31 +187,65 @@ layer(TestLayer)("OpencodeAgent", (it) => {
     }),
   );
 
-  it.effect("suspends a running turn and continues it after the parts it delivered", () =>
-    Effect.gen(function* () {
-      const done = yield* Deferred.make<void>();
-      const { fake, sandbox, harness, session } = yield* startSession(callBashUntil(done));
-      const before: Array<StreamPart.StreamPart> = [];
-      const calledBash = yield* Deferred.make<void>();
+  it.effect(
+    "suspends a running turn, which goes on in opencode, and continues it after the steps the session has",
+    () =>
+      Effect.gen(function* () {
+        const answering = yield* Deferred.make<void>();
+        const { fake, sandbox, harness, session } = yield* startSession(buildThenAnswer(answering));
+        const tookFirstStep = yield* Deferred.make<void>();
 
+        const reading = yield* session.stream({ prompt: "Build it." }).pipe(
+          Stream.runForEach((part) =>
+            part.type === "finish-step" ? Deferred.succeed(tookFirstStep, undefined) : Effect.void,
+          ),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(tookFirstStep);
+        const state = yield* session.suspend;
+        yield* Fiber.join(reading);
+        yield* Deferred.succeed(answering, undefined);
+        const resumed = yield* harness.resumeSession({ sandbox, state });
+        const after = yield* Stream.runCollect(resumed.continue({}));
+
+        expect(after.map((part) => part.type)).toEqual([
+          "response-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "finish-step",
+          "finish",
+        ]);
+        expect((yield* resumed.detach).history.content).toMatchObject(builtThenAnswered);
+        // The turn went on in opencode while no host read it.
+        expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toEqual([]);
+      }),
+  );
+
+  it.effect("continues a turn suspended within a step from the start of that step", () =>
+    Effect.gen(function* () {
+      const answering = yield* Deferred.make<void>();
+      const { sandbox, harness, session } = yield* startSession(buildThenAnswer(answering));
+      // The caller takes the call of `bash` and then waits, so the session has no step finished.
+      const calledBash = yield* Deferred.make<void>();
+      const suspended = yield* Deferred.make<void>();
       const reading = yield* session.stream({ prompt: "Build it." }).pipe(
         Stream.runForEach((part) =>
-          Effect.andThen(
-            Effect.sync(() => before.push(part)),
-            part.type === "tool-call" ? Deferred.succeed(calledBash, undefined) : Effect.void,
-          ),
+          part.type === "tool-call"
+            ? Effect.andThen(Deferred.succeed(calledBash, undefined), Deferred.await(suspended))
+            : Effect.void,
         ),
         Effect.forkChild,
       );
       yield* Deferred.await(calledBash);
       const state = yield* session.suspend;
+      yield* Deferred.succeed(suspended, undefined);
       yield* Fiber.join(reading);
-      yield* Deferred.succeed(done, undefined);
+      yield* Deferred.succeed(answering, undefined);
       const resumed = yield* harness.resumeSession({ sandbox, state });
       const after = yield* Stream.runCollect(resumed.continue({}));
 
-      expect(before.at(-1)?.type).toBe("tool-call");
-      expect([...before, ...after].map((part) => part.type)).toEqual([
+      expect(after.map((part) => part.type)).toEqual([
         "response-metadata",
         "tool-params-start",
         "tool-params-delta",
@@ -212,8 +260,79 @@ layer(TestLayer)("OpencodeAgent", (it) => {
         "finish-step",
         "finish",
       ]);
-      // The turn went on in opencode while no host read it.
-      expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toEqual([]);
+      expect((yield* resumed.detach).history.content).toMatchObject(builtThenAnswered);
+    }),
+  );
+
+  it.effect(
+    "fails a turn whose events it cannot read, and interrupts the turn in opencode, rather than finishing it",
+    () =>
+      Effect.gen(function* () {
+        const { fake, session } = yield* startSession((turn) =>
+          Effect.andThen(
+            Effect.andThen(callBash(turn), turn.record("fake.unreadable", {})),
+            Effect.never,
+          ),
+        );
+
+        const error = yield* Effect.flip(session.generate({ prompt: "Build it." }));
+
+        expect(error._tag === "HarnessError" && error.reason._tag).toBe("InvalidOutputError");
+        expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toHaveLength(1);
+        expect((yield* session.detach).history.content).toEqual([]);
+      }),
+  );
+
+  it.effect("admits no prompt once suspended while it waited for opencode's models", () =>
+    Effect.gen(function* () {
+      const asked = yield* Deferred.make<void>();
+      const loaded = yield* Deferred.make<void>();
+      const { fake, sandbox, harness, session } = yield* startSession(answer("hello"), {
+        loadingProvider: Effect.andThen(Deferred.succeed(asked, undefined), Deferred.await(loaded)),
+      });
+
+      const reading = yield* Stream.runCollect(session.stream({ prompt: "Say hello." })).pipe(
+        Effect.forkChild,
+      );
+      yield* Deferred.await(asked);
+      const state = yield* session.suspend;
+      yield* Deferred.succeed(loaded, undefined);
+      yield* Fiber.join(reading);
+      const admittedBeforeResuming = fake.requests.filter((request) => request.endsWith("/prompt"));
+      const resumed = yield* harness.resumeSession({ sandbox, state });
+      const result = new GenerateResult.GenerateResult(
+        yield* Stream.runCollect(resumed.continue({})),
+      );
+
+      expect(admittedBeforeResuming).toEqual([]);
+      expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toHaveLength(1);
+      expect(result.text).toBe("hello");
+    }),
+  );
+
+  it.effect("keeps a prompt opencode admitted while the session suspended, prompting once", () =>
+    Effect.gen(function* () {
+      const admitting = yield* Deferred.make<void>();
+      const admit = yield* Deferred.make<void>();
+      const { fake, sandbox, harness, session } = yield* startSession(answer("hello"), {
+        admitting: Effect.andThen(Deferred.succeed(admitting, undefined), Deferred.await(admit)),
+      });
+
+      const reading = yield* Stream.runCollect(session.stream({ prompt: "Say hello." })).pipe(
+        Effect.forkChild,
+      );
+      yield* Deferred.await(admitting);
+      const suspending = yield* Effect.forkChild(session.suspend);
+      yield* Deferred.succeed(admit, undefined);
+      const state = yield* Fiber.join(suspending);
+      yield* Fiber.join(reading);
+      const resumed = yield* harness.resumeSession({ sandbox, state });
+      const result = new GenerateResult.GenerateResult(
+        yield* Stream.runCollect(resumed.continue({})),
+      );
+
+      expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toHaveLength(1);
+      expect(result.text).toBe("hello");
     }),
   );
 

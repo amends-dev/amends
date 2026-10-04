@@ -4,25 +4,70 @@ import type { Prompt } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
 import * as Harness from "../src/Harness.ts";
 import * as Session from "../src/Session.ts";
+import type { StreamPart } from "../src/StreamPart.ts";
 import { makeFakeAgent, makeFakeSandbox, reply, type Script } from "./fakes.ts";
 
 const id = SessionId.make("session-one");
 
+/** A step that reads the notes with the agent's own tool. */
+const readingStep: ReadonlyArray<StreamPart> = [
+  { type: "text-start", id: "plan" },
+  { type: "text-delta", id: "plan", delta: "Reading the notes." },
+  { type: "text-end", id: "plan" },
+  {
+    type: "tool-call",
+    id: "call-read",
+    name: "read",
+    params: { path: "notes.md" },
+    providerExecuted: true,
+  },
+  {
+    type: "tool-result",
+    id: "call-read",
+    name: "read",
+    result: "2 and 3",
+    isFailure: false,
+    providerExecuted: true,
+  },
+  { type: "finish-step", reason: "tool-calls", usage: { inputTokens: {}, outputTokens: {} } },
+];
+
+/** The messages that record `readingStep` in a conversation. */
+const readingMessages = [
+  {
+    role: "assistant",
+    content: [
+      { type: "text", text: "Reading the notes." },
+      { type: "tool-call", id: "call-read", name: "read", params: { path: "notes.md" } },
+    ],
+  },
+  { role: "tool", content: [{ type: "tool-result", id: "call-read", result: "2 and 3" }] },
+];
+
 /**
- * Answers each prompt, except that the first `slow` turn runs until it is suspended. Run again, a
- * `slow` turn is answered like any other.
+ * Answers each prompt in one step, except `slow`, which first reads the notes in a step of its own.
+ * The first `slow` turn stops partway through its answer until it is suspended; run again, it
+ * finishes.
  */
 const answersAs =
   (agent: string, running?: Deferred.Deferred<void>): Script =>
   (prompt) => {
     const answer = Stream.fromIterable(reply(`${agent} answers ${prompt}`));
     if (prompt !== "slow" || running === undefined) return answer;
-    const runUntilSuspended = Stream.concat(
-      Stream.fromEffectDrain(Deferred.succeed(running, undefined)),
-      Stream.never,
+    const answerUntilSuspended = Stream.concat(
+      Stream.fromIterable<StreamPart>([
+        { type: "text-start", id: "answer" },
+        { type: "text-delta", id: "answer", delta: `${agent} answ` },
+      ]),
+      Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
     );
-    return Stream.unwrap(
-      Effect.map(Deferred.isDone(running), (ranBefore) => (ranBefore ? answer : runUntilSuspended)),
+    return Stream.concat(
+      Stream.fromIterable(readingStep),
+      Stream.unwrap(
+        Effect.map(Deferred.isDone(running), (ranBefore) =>
+          ranBefore ? answer : answerUntilSuspended,
+        ),
+      ),
     );
   };
 
@@ -116,26 +161,33 @@ describe("Harness", () => {
     }),
   );
 
-  it.effect("continues an unfinished turn on the agent that suspended it", () =>
-    Effect.gen(function* () {
-      const running = yield* Deferred.make<void>();
-      const codex = yield* makeFakeAgent("codex", answersAs("codex", running));
-      const harness = Harness.make(codex.agent);
-      const state = yield* suspendSlowTurn(harness, running);
-      const { sandbox } = yield* makeFakeSandbox;
+  it.effect(
+    "continues an unfinished turn on the agent that suspended it, after the steps it finished",
+    () =>
+      Effect.gen(function* () {
+        const running = yield* Deferred.make<void>();
+        const codex = yield* makeFakeAgent("codex", answersAs("codex", running));
+        const harness = Harness.make(codex.agent);
+        const state = yield* suspendSlowTurn(harness, running);
+        const { sandbox } = yield* makeFakeSandbox;
 
-      const session = yield* harness.resumeSession({ sandbox, state });
-      const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
-      const result = yield* Stream.runCollect(session.continue({}));
+        const session = yield* harness.resumeSession({ sandbox, state });
+        const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
+        const result = yield* Stream.runCollect(session.continue({}));
 
-      expect(codex.starts[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError");
-      expect(result).toEqual(reply("codex finished the unfinished turn"));
-      expect(textsOf((yield* session.detach).history)).toEqual([
-        "slow",
-        "codex finished the unfinished turn",
-      ]);
-    }),
+        expect(state.unfinishedTurn?.steps.map((step) => step.content)).toMatchObject([
+          readingMessages,
+        ]);
+        expect(codex.starts[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });
+        expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError");
+        expect(codex.continued).toEqual([1]);
+        expect(result).toEqual(reply("codex answers slow"));
+        expect((yield* session.detach).history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "slow" }] },
+          ...readingMessages,
+          { role: "assistant", content: [{ type: "text", text: "codex answers slow" }] },
+        ]);
+      }),
   );
 
   it.effect("runs an unfinished turn again from its prompt on another agent", () =>
@@ -151,7 +203,34 @@ describe("Harness", () => {
 
       expect(opencode.starts[0]?.unfinishedTurn).toBeUndefined();
       expect(result).toEqual(reply("opencode answers slow"));
+      expect(textsOf((yield* session.detach).history)).toEqual(["slow", "opencode answers slow"]);
     }),
+  );
+
+  it.effect(
+    "runs an unfinished turn again from its prompt, without the steps it finished, on an agent that lost it",
+    () =>
+      Effect.gen(function* () {
+        const running = yield* Deferred.make<void>();
+        const codex = yield* makeFakeAgent("codex", answersAs("codex", running), {
+          losesUnfinishedTurns: true,
+        });
+        const harness = Harness.make(codex.agent);
+        const state = yield* suspendSlowTurn(harness, running);
+        const { sandbox } = yield* makeFakeSandbox;
+
+        const session = yield* harness.resumeSession({ sandbox, state });
+        const result = yield* Stream.runCollect(session.continue({}));
+
+        expect(codex.continued).toEqual([]);
+        expect(codex.turns).toHaveLength(2);
+        expect(result).toEqual([...readingStep, ...reply("codex answers slow")]);
+        expect((yield* session.detach).history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "slow" }] },
+          ...readingMessages,
+          { role: "assistant", content: [{ type: "text", text: "codex answers slow" }] },
+        ]);
+      }),
   );
 
   it.effect("starts a session without a sandbox for an agent that does not require one", () =>

@@ -6,11 +6,22 @@
  * only the host's tools.
  *
  * Its own state is its conversation, tool calls and results included, so a session it resumes goes
- * on as it left off. A turn does not outlive the process running it: `continue` runs a turn that
- * `suspend` cut short again, from the last step the turn finished.
+ * on as it left off. A turn does not outlive the process running it: `continue` goes on from the
+ * steps of a turn `suspend` cut short that the session has, and runs the step in flight again.
  */
 import { type Agent, HarnessError, type StreamPart } from "@amends/harness-v2";
-import { Deferred, Effect, flow, Layer, Queue, Ref, Result, Schema, Stream } from "effect";
+import {
+  Deferred,
+  Effect,
+  flow,
+  Layer,
+  Queue,
+  Ref,
+  Result,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect";
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/ai";
 import * as Tools from "./Tools.ts";
 
@@ -32,8 +43,8 @@ const State = Schema.Struct({
   /** The finished turns, with their tool calls and results. */
   conversation: Prompt.Prompt,
 
-  /** The turn `suspend` cut short: its prompt and the steps it finished. */
-  unfinishedTurn: Schema.optionalKey(Prompt.Prompt),
+  /** The steps of the turn `suspend` cut short, each as the messages that record it. */
+  unfinishedTurn: Schema.optionalKey(Schema.Array(Prompt.Prompt)),
 });
 
 const StateJson = Schema.toCodecJson(State);
@@ -58,9 +69,15 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const conversation = yield* Ref.make(
     (resumed ?? suspended)?.conversation ?? startOptions.history,
   );
-  /** The running turn, or the one `suspend` cut short: its prompt and the steps it finished. */
-  const turn = yield* Ref.make(suspended?.unfinishedTurn);
-  /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
+  /**
+   * The running turn, or the last one cut short. A turn joins the conversation once the session
+   * takes its `finish`, so that a turn which finished before the session had all of it can still be
+   * continued.
+   */
+  const turn = yield* Ref.make<Turn | undefined>(undefined);
+  /** Held while a turn runs, so that `suspend` reads the turn's steps once it has stopped. */
+  const turnPermit = yield* Semaphore.make(1);
+  /** Done once the session is suspended, stopped, or destroyed, stopping the running turn. */
   const closed = yield* Deferred.make<void>();
   /** The results the host submits for calls of its tools, by call id, until a stand-in takes them. */
   const hostResults = new Map<string, Deferred.Deferred<unknown, unknown>>();
@@ -136,13 +153,24 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
           ? []
           : [Prompt.makeMessage("system", { content: instructions })]),
         ...finished.content,
-        ...(current?.content ?? []),
+        ...(current === undefined ? [] : messagesOf(current)),
       ]),
     );
 
   /** Adds a finished step's messages to the running turn. */
-  const recordStep = (messages: Prompt.Prompt) =>
-    Ref.update(turn, (current) => Prompt.concat(current ?? Prompt.empty, messages));
+  const recordStep = (step: Prompt.Prompt) =>
+    Ref.update(turn, (current) =>
+      current === undefined ? current : { ...current, steps: [...current.steps, step] },
+    );
+
+  /** Adds the turn to the conversation, once the session has taken its `finish`. */
+  const finishTurn = Effect.flatMap(Ref.getAndSet(turn, undefined), (finished) =>
+    finished === undefined
+      ? Effect.void
+      : Ref.update(conversation, (current) =>
+          Prompt.concat(current, Prompt.fromMessages(messagesOf(finished))),
+        ),
+  );
 
   /**
    * Runs one step: streams the model's response to the conversation so far while Effect AI runs the
@@ -158,11 +186,17 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     yield* LanguageModel.streamText({ prompt, toolkit }).pipe(
       Stream.runForEach((part) => {
         parts.push(part);
-        return Effect.flatMap(streamPartsOf(part, isOwnTool), emit);
+        // A step is recorded before its `finish-step` goes out, so that `continue` can go on after
+        // any step the session has. Effect AI streams `finish` after the step's tool results.
+        const record =
+          part.type === "finish" ? recordStep(Prompt.fromResponseParts(parts)) : Effect.void;
+        return Effect.andThen(record, Effect.flatMap(streamPartsOf(part, isOwnTool), emit));
       }),
     );
-    yield* recordStep(Prompt.fromResponseParts(parts));
-    return parts.findLast((part) => part.type === "finish") ?? unknownFinish;
+    const finish = parts.findLast((part) => part.type === "finish");
+    // A response that did not say how it finished ended no step, and is recorded as it stands.
+    if (finish === undefined) yield* recordStep(Prompt.fromResponseParts(parts));
+    return finish ?? unknownFinish;
   });
 
   /**
@@ -192,7 +226,6 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
       { type: "text-delta", id: "json-answer", delta: answer.text },
       { type: "text-end", id: "json-answer" },
     ]);
-    yield* Effect.flatMap(streamPartsOf(answer.finish, isOwnTool), emit);
     yield* recordStep(
       Prompt.fromMessages([
         Prompt.makeMessage("assistant", {
@@ -200,19 +233,24 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
         }),
       ]),
     );
+    yield* Effect.flatMap(streamPartsOf(answer.finish, isOwnTool), emit);
     return answer.finish;
   });
 
   /**
-   * Streams a turn from `progress`, its prompt and the steps it finished: steps until the model stops
-   * calling tools, a step answering in JSON when the turn asks for JSON, and then the turn's
-   * `finish`. A failure of the model ends the turn with an `error` part.
+   * Streams a turn after the steps it finished: steps until the model stops calling tools, a step
+   * answering in JSON when the turn asks for JSON, and then the turn's `finish`. A failure of the
+   * model ends the turn with an `error` part. The turn stops when the session closes.
    */
-  const runTurn = (method: string, turnOptions: Agent.TurnOptions, progress: Prompt.Prompt) =>
+  const runTurn = (
+    method: string,
+    turnOptions: Agent.TurnOptions,
+    finishedSteps: ReadonlyArray<Prompt.Prompt>,
+  ) =>
     Stream.callback<StreamPart.StreamPart, HarnessError.HarnessError>((queue) =>
       Effect.gen(function* () {
         const emit: Emit = (parts) => Queue.offerAll(queue, parts);
-        yield* Ref.set(turn, progress);
+        yield* Ref.set(turn, { prompt: turnOptions.prompt, steps: finishedSteps });
         const languageModel = yield* modelFor(method, turnOptions.model);
         const toolkit = yield* toolkitFor(method, turnOptions.tools);
         const { instructions, responseFormat } = turnOptions;
@@ -231,14 +269,18 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
         );
         if (Result.isFailure(outcome)) yield* emit([yield* errorPartOf(outcome.failure)]);
         yield* emit([yield* turnFinishOf(steps, Result.isFailure(outcome))]);
+      }).pipe(
+        Effect.raceFirst(Deferred.await(closed)),
+        Semaphore.withPermit(turnPermit),
+        Queue.into(queue),
+      ),
+    ).pipe(Stream.tap((part) => (part.type === "finish" ? finishTurn : Effect.void)));
 
-        const finished = yield* Ref.get(turn);
-        yield* Ref.update(conversation, (current) => Prompt.concat(current, finished ?? []));
-      }).pipe(Effect.ensuring(Ref.set(turn, undefined)), Queue.into(queue)),
-    ).pipe(Stream.interruptWhen(Deferred.await(closed)));
+  /** Waits for the running turn to stop, once the session has closed, and reads it. */
+  const stoppedTurn = Semaphore.withPermit(turnPermit, Ref.get(turn));
 
-  /** What the agent returns for `start` to take back, with the turn `suspend` cut short. */
-  const saveState = (unfinishedTurn?: Prompt.Prompt) =>
+  /** What the agent returns for `start` to take back, with the steps of a turn `suspend` cut short. */
+  const saveState = (unfinishedTurn?: ReadonlyArray<Prompt.Prompt>) =>
     Effect.flatMap(Ref.get(conversation), (current) =>
       Schema.encodeEffect(StateJson)({
         conversation: current,
@@ -249,15 +291,12 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const close = Deferred.succeed(closed, undefined);
 
   const session: Agent.AgentSession = {
-    prompt: (turnOptions) =>
-      runTurn("prompt", turnOptions, Prompt.fromMessages([turnOptions.prompt])),
+    hasUnfinishedTurn: suspended?.unfinishedTurn !== undefined,
 
-    continue: (turnOptions) =>
-      Stream.unwrap(
-        Effect.map(Ref.get(turn), (unfinished) =>
-          runTurn("continue", turnOptions, unfinished ?? Prompt.fromMessages([turnOptions.prompt])),
-        ),
-      ),
+    prompt: (turnOptions) => runTurn("prompt", turnOptions, []),
+
+    continue: (turnOptions, finishedSteps) =>
+      runTurn("continue", turnOptions, suspended?.unfinishedTurn?.slice(0, finishedSteps) ?? []),
 
     submitToolResult: ({ id, result, isFailure }) =>
       Effect.flatMap(hostResultOf(id), (deferred) =>
@@ -282,18 +321,28 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
         ),
       ),
 
-    suspend: Effect.flatMap(Ref.get(turn), (unfinished) =>
-      Effect.tap(saveState(unfinished), () => close),
+    suspend: Effect.andThen(
+      close,
+      Effect.flatMap(stoppedTurn, (unfinished) => saveState(unfinished?.steps)),
     ),
 
     detach: saveState(),
 
-    stop: Effect.andThen(close, saveState()),
+    stop: Effect.andThen(close, Effect.andThen(stoppedTurn, saveState())),
 
     destroy: close,
   };
   return session;
 });
+
+/** A turn as far as it got: its prompt, and the steps it finished, each as the messages that record it. */
+interface Turn {
+  readonly prompt: Prompt.UserMessage;
+  readonly steps: ReadonlyArray<Prompt.Prompt>;
+}
+
+/** The messages that record `turn` in a conversation. */
+const messagesOf = (turn: Turn) => [turn.prompt, ...turn.steps.flatMap((step) => step.content)];
 
 /** A host's tool as the model sees it: through a stand-in that answers with the host's result. */
 type HostTool = ReturnType<typeof standInFor>;

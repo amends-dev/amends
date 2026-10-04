@@ -28,6 +28,14 @@ export interface FakeTurn {
   readonly record: (type: string, data: Readonly<Record<string, unknown>>) => Effect.Effect<void>;
 }
 
+export interface FakeOpencodeOptions {
+  /** Runs before the server says whether it has a provider, as while opencode loads its models. */
+  readonly loadingProvider?: Effect.Effect<void>;
+
+  /** Runs before the server admits a prompt. */
+  readonly admitting?: Effect.Effect<void>;
+}
+
 export interface FakeSession {
   readonly directory: string;
   readonly model: ModelRef | undefined;
@@ -57,9 +65,14 @@ interface Session {
 /**
  * A fake of opencode's server, with the requests of its session API that the agent makes, which
  * runs each turn with `runTurn` after recording the turn's prompt. A session runs while its turn
- * does, and an interrupt interrupts the turn. The server stops when the scope closes.
+ * does, and an interrupt interrupts the turn. An event of the type `fake.unreadable` reaches the
+ * agent as something that is not an event, as from a broken connection. The server stops when the
+ * scope closes.
  */
-export const makeFakeOpencode = (runTurn: (turn: FakeTurn) => Effect.Effect<void>) =>
+export const makeFakeOpencode = (
+  runTurn: (turn: FakeTurn) => Effect.Effect<void>,
+  options: FakeOpencodeOptions = {},
+) =>
   Effect.gen(function* () {
     const scope = yield* Effect.scope;
     const sessions = new Map<string, Session>();
@@ -111,10 +124,13 @@ export const makeFakeOpencode = (runTurn: (turn: FakeTurn) => Effect.Effect<void
         HttpRouter.route(
           "GET",
           "/api/provider/:providerID",
-          Effect.map(HttpRouter.params, ({ providerID }) =>
-            providerID === "opencode"
-              ? HttpServerResponse.jsonUnsafe({ data: { id: providerID } })
-              : HttpServerResponse.jsonUnsafe({ message: "Provider not found" }, { status: 404 }),
+          Effect.andThen(
+            options.loadingProvider ?? Effect.void,
+            Effect.map(HttpRouter.params, ({ providerID }) =>
+              providerID === "opencode"
+                ? HttpServerResponse.jsonUnsafe({ data: { id: providerID } })
+                : HttpServerResponse.jsonUnsafe({ message: "Provider not found" }, { status: 404 }),
+            ),
           ),
         ),
 
@@ -160,6 +176,7 @@ export const makeFakeOpencode = (runTurn: (turn: FakeTurn) => Effect.Effect<void
           withSession((sessionID, session) =>
             Effect.gen(function* () {
               const { prompt } = yield* HttpServerRequest.schemaBodyJson(PromptBody);
+              yield* options.admitting ?? Effect.void;
               const record = recorderOf(sessionID, session);
               const input = { messageID: `msg_${sessionID}`, prompt, delivery: "steer" };
               yield* record("session.next.prompt.admitted", input);
@@ -211,7 +228,11 @@ export const makeFakeOpencode = (runTurn: (turn: FakeTurn) => Effect.Effect<void
                     () => Number(after ?? -1),
                     (last, events) => [Math.max(last, events.length - 1), events.slice(last + 1)],
                   ),
-                  Stream.map((event) => `data: ${JSON.stringify(event)}\n\n`),
+                  Stream.map((event) =>
+                    event.type === "fake.unreadable"
+                      ? "data: not an event\n\n"
+                      : `data: ${JSON.stringify(event)}\n\n`,
+                  ),
                   Stream.encodeText,
                 ),
                 { contentType: "text/event-stream" },

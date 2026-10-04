@@ -21,44 +21,65 @@ export interface FakeAgent {
   /** What each `start` was given, in order. */
   readonly starts: ReadonlyArray<StartOptions>;
 
-  /** What each turn the agent ran was given, in order. */
+  /** What each turn the agent ran from its prompt was given, in order. */
   readonly turns: ReadonlyArray<TurnOptions>;
+
+  /** How many steps the harness had of each turn the agent continued, in order. */
+  readonly continued: ReadonlyArray<number>;
 
   /** The results the host submitted for its tools, in order. */
   readonly submitted: ReadonlyArray<unknown>;
 }
 
+export interface FakeAgentOptions {
+  /** Whether every session needs a sandbox, as most agents do. True by default. */
+  readonly requiresSandbox?: boolean;
+
+  /** Whether the agent loses the turns `suspend` cuts short, as opencode does in another sandbox. */
+  readonly losesUnfinishedTurns?: boolean;
+
+  /** Runs when the session suspends, before the agent lets go of the running turn. */
+  readonly beforeSuspend?: Effect.Effect<void>;
+}
+
 /**
- * An agent whose turns follow `script`, recording what the harness asks of it. Like most agents, it
- * requires a sandbox unless `options` says otherwise. Its own state, which
+ * An agent whose turns follow `script`, recording what the harness asks of it. Its own state, which
  * `suspend`, `detach`, and `stop` return, names the agent, so tests can tell whose state reached
- * `start`. `continue` finishes the unfinished turn with an answer of its own.
+ * `start`. Like an agent whose turn keeps running, `continue` follows the script for the turn again
+ * after the steps the harness has.
  */
-export const makeFakeAgent = (
-  id: string,
-  script: Script,
-  options: { readonly requiresSandbox?: boolean } = {},
-) =>
+export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOptions = {}) =>
   Effect.gen(function* () {
     const starts: Array<StartOptions> = [];
     const turns: Array<TurnOptions> = [];
+    const continued: Array<number> = [];
     const submitted: Array<unknown> = [];
     const toolResults = yield* Queue.unbounded<unknown>();
 
     const agent: Agent = {
       id,
       requiresSandbox: options.requiresSandbox ?? true,
-      start: (options) =>
+      start: (startOptions) =>
         Effect.gen(function* () {
-          starts.push(options);
+          starts.push(startOptions);
           const suspended = yield* Deferred.make<void>();
+          const follow = (turn: TurnOptions) =>
+            script(textOf(turn.prompt), { toolResult: Queue.take(toolResults) }).pipe(
+              Stream.interruptWhen(Deferred.await(suspended)),
+            );
           const session: AgentSession = {
+            hasUnfinishedTurn:
+              startOptions.unfinishedTurn !== undefined && options.losesUnfinishedTurns !== true,
             prompt: (turn) =>
               Stream.suspend(() => {
                 turns.push(turn);
-                return script(textOf(turn.prompt), { toolResult: Queue.take(toolResults) });
-              }).pipe(Stream.interruptWhen(Deferred.await(suspended))),
-            continue: () => Stream.fromIterable(reply(`${id} finished the unfinished turn`)),
+                return follow(turn);
+              }),
+            continue: (turn, finishedSteps) =>
+              Stream.suspend(() => {
+                continued.push(finishedSteps);
+                return follow(turn).pipe(afterSteps(finishedSteps));
+              }),
             submitToolResult: (result) =>
               Effect.andThen(
                 Effect.sync(() => submitted.push(result.result)),
@@ -66,7 +87,10 @@ export const makeFakeAgent = (
               ),
             approve: () => Effect.void,
             compact: () => Effect.void,
-            suspend: Effect.as(Deferred.succeed(suspended, undefined), { agent: id, turn: true }),
+            suspend: Effect.andThen(
+              options.beforeSuspend ?? Effect.void,
+              Effect.as(Deferred.succeed(suspended, undefined), { agent: id, turn: true }),
+            ),
             detach: Effect.succeed({ agent: id }),
             stop: Effect.succeed({ agent: id }),
             destroy: Effect.void,
@@ -75,9 +99,20 @@ export const makeFakeAgent = (
         }),
     };
 
-    const fake: FakeAgent = { agent, starts, turns, submitted };
+    const fake: FakeAgent = { agent, starts, turns, continued, submitted };
     return fake;
   });
+
+/** Drops the parts of a turn's first `steps` steps. */
+const afterSteps = (steps: number) =>
+  Stream.mapAccum(
+    () => 0,
+    (finished: number, part: StreamPart) =>
+      [
+        part.type === "finish-step" ? finished + 1 : finished,
+        finished < steps ? [] : [part],
+      ] as const,
+  );
 
 /**
  * A sandbox that only creates directories, recording them, for agents that never touch the

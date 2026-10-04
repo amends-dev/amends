@@ -4,7 +4,13 @@ import { Tool, Toolkit } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
 import * as Harness from "../src/Harness.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
-import { makeFakeAgent, makeFakeSandbox, reply, type Script } from "./fakes.ts";
+import {
+  type FakeAgentOptions,
+  makeFakeAgent,
+  makeFakeSandbox,
+  reply,
+  type Script,
+} from "./fakes.ts";
 
 const id = SessionId.make("session-one");
 
@@ -18,9 +24,9 @@ const MathHandlers = MathToolkit.toLayer({ Add: ({ a, b }) => Effect.succeed(a +
 const answers: Script = (prompt) => Stream.fromIterable(reply(`codex answers ${prompt}`));
 
 /** Starts a session on a fake agent following `script`. */
-const startSession = (script: Script) =>
+const startSession = (script: Script, options?: FakeAgentOptions) =>
   Effect.gen(function* () {
-    const fake = yield* makeFakeAgent("codex", script);
+    const fake = yield* makeFakeAgent("codex", script, options);
     const { sandbox } = yield* makeFakeSandbox;
     const session = yield* Harness.make(fake.agent).startSession({ sandbox, id });
     return { fake, session };
@@ -193,6 +199,48 @@ describe("Session", () => {
       expect(state.history.content).toEqual([]);
       expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("NotFoundError");
     }),
+  );
+
+  it.effect(
+    "records a turn that finishes while the session suspends, and leaves no turn unfinished",
+    () =>
+      Effect.gen(function* () {
+        const started = yield* Deferred.make<void>();
+        const answering = yield* Deferred.make<void>();
+        const answered = yield* Deferred.make<void>();
+        const { session } = yield* startSession(
+          () =>
+            Stream.concat(
+              Stream.fromEffectDrain(
+                Effect.andThen(Deferred.succeed(started, undefined), Deferred.await(answering)),
+              ),
+              Stream.fromIterable(reply("Done")),
+            ),
+          // The turn finishes while the agent lets go of it.
+          {
+            beforeSuspend: Effect.andThen(
+              Deferred.succeed(answering, undefined),
+              Deferred.await(answered),
+            ),
+          },
+        );
+
+        const reading = yield* session.stream({ prompt: "hello" }).pipe(
+          Stream.runForEach((part) =>
+            part.type === "finish" ? Deferred.succeed(answered, undefined) : Effect.void,
+          ),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(started);
+        const state = yield* session.suspend;
+        yield* Fiber.join(reading);
+
+        expect(state.unfinishedTurn).toBeUndefined();
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "hello" }] },
+          { role: "assistant", content: [{ type: "text", text: "Done" }] },
+        ]);
+      }),
   );
 
   it.effect("refuses to detach while a turn runs", () =>

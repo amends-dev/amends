@@ -122,20 +122,22 @@ export const make = (agent: Agent): Harness["Service"] => {
         sandbox === undefined
           ? undefined
           : yield* makeWorkspace("resumeSession", sandbox, state.id);
-      const { agentState, unfinishedTurn } = stateFor(agent.id, state);
+      // An agent's own state means something only to the agent that wrote it. Any other agent
+      // starts from the conversation, and the session runs an unfinished turn again on it.
+      const own = state.agent === agent.id;
       const agentSession = yield* agent.start({
         id: state.id,
         workspace,
         history: state.history,
-        resume: agentState,
-        unfinishedTurn: unfinishedTurn?.agentState,
+        resume: own ? state.agentState : undefined,
+        unfinishedTurn: own ? state.unfinishedTurn?.agentState : undefined,
       });
       return yield* Session.make({
         id: state.id,
         agent: agent.id,
         agentSession,
         history: state.history,
-        unfinishedTurn,
+        unfinishedTurn: state.unfinishedTurn,
       });
     }),
   });
@@ -143,21 +145,3 @@ export const make = (agent: Agent): Harness["Service"] => {
 
 /** A harness over `agent`, for programs that run one agent. */
 export const layer = (agent: Agent): Layer.Layer<Harness> => Layer.succeed(Harness, make(agent));
-
-/**
- * What of `state` the agent `agentId` can use. An agent's own state means something only to the
- * agent that wrote it, so any other agent gets the unfinished turn's prompt alone.
- */
-const stateFor = (agentId: string, state: Session.SessionState) => {
-  const own = state.agent === agentId;
-  return {
-    agentState: own ? state.agentState : undefined,
-    unfinishedTurn:
-      state.unfinishedTurn === undefined
-        ? undefined
-        : {
-            prompt: state.unfinishedTurn.prompt,
-            agentState: own ? state.unfinishedTurn.agentState : undefined,
-          },
-  };
-};

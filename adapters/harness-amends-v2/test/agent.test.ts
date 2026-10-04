@@ -3,7 +3,7 @@ import type { Sandbox } from "@amends/sandbox-v2";
 import { BunServices } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Path, Schema, Stream } from "effect";
-import { AiError, type LanguageModel, Prompt, Tool, Toolkit } from "effect/ai";
+import { AiError, type LanguageModel, Prompt, type Response, Tool, Toolkit } from "effect/ai";
 import * as AmendsAgent from "../src/AmendsAgent.ts";
 import { answer, callTool, makeSandbox, makeScriptedModel, toolResultsOf } from "./fixtures.ts";
 
@@ -31,11 +31,27 @@ const readSessionFile = (sandbox: Sandbox.Sandbox["Service"], name: string) =>
     return yield* sandbox.fileSystem.readFileString(path.join(sandbox.workingDirectory, id, name));
   });
 
-const rolesOf = (request: LanguageModel.ProviderOptions | undefined) =>
-  request?.prompt.content.map((message) => message.role);
+const rolesOf = (prompt: Prompt.Prompt | undefined) =>
+  prompt?.content.map((message) => message.role);
 
 const toolNamesOf = (request: LanguageModel.ProviderOptions | undefined) =>
   request?.tools.map((tool) => tool.name);
+
+/**
+ * Responds with `response`, except the first time, when it signals `running` and then runs until
+ * suspend cuts it short.
+ */
+const untilSuspended = (
+  running: Deferred.Deferred<void>,
+  response: Stream.Stream<Response.StreamPartEncoded, AiError.AiError>,
+) =>
+  Stream.unwrap(
+    Effect.map(Deferred.isDone(running), (ranBefore) =>
+      ranBefore
+        ? response
+        : Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
+    ),
+  );
 
 layer(BunServices.layer)("AmendsAgent", (it) => {
   it.effect("answers from its model alone when the session has no sandbox", () =>
@@ -175,7 +191,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       expect(requests.map((request) => request.responseFormat.type)).toEqual(["text", "json"]);
       expect(requests[1]?.responseFormat).toMatchObject({ objectName: "output" });
       expect(toolNamesOf(requests[1])).toEqual([]);
-      expect(rolesOf(requests[1])).toEqual(["user", "assistant"]);
+      expect(rolesOf(requests[1]?.prompt)).toEqual(["user", "assistant"]);
       expect(result.value).toEqual({ answer: 42 });
       expect(result.usage).toEqual({ inputTokens: { total: 20 }, outputTokens: { total: 10 } });
     }),
@@ -284,8 +300,8 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       yield* session.generate({ prompt: "write notes.txt" });
       yield* session.generate({ prompt: "again", instructions: "Answer in one word." });
 
-      expect(rolesOf(requests[0])).toEqual(["user"]);
-      expect(rolesOf(requests.at(-1))).toEqual([
+      expect(rolesOf(requests[0]?.prompt)).toEqual(["user"]);
+      expect(rolesOf(requests.at(-1)?.prompt)).toEqual([
         "system",
         "user",
         "assistant",
@@ -322,7 +338,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       });
       yield* resumed.generate({ prompt: "again" });
 
-      expect(rolesOf(later.requests[0])).toEqual([
+      expect(rolesOf(later.requests[0]?.prompt)).toEqual([
         "user",
         "assistant",
         "tool",
@@ -348,7 +364,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const session = yield* Harness.make(AmendsAgent.make({ model })).resumeSession({ state });
       yield* session.generate({ prompt: "again" });
 
-      expect(rolesOf(requests[0])).toEqual(["user", "assistant", "user"]);
+      expect(rolesOf(requests[0]?.prompt)).toEqual(["user", "assistant", "user"]);
     }),
   );
 
@@ -370,7 +386,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
     }),
   );
 
-  it.effect("continues a turn that suspend cut short from the last step the turn finished", () =>
+  it.effect("continues a turn that suspend cut short after the steps it finished", () =>
     Effect.gen(function* () {
       const sandbox = yield* makeSandbox;
       /** Done once the turn's second step is running, which suspend then cuts short. */
@@ -379,33 +395,91 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         if (toolResultsOf(request).length === 0) {
           return callTool("log-1", "bash", { command: "echo ran >> log.txt" });
         }
-        const runUntilSuspended = Stream.concat(
-          Stream.fromEffectDrain(Deferred.succeed(secondStep, undefined)),
-          Stream.never,
-        );
-        return Stream.unwrap(
-          Effect.map(Deferred.isDone(secondStep), (ranBefore) =>
-            ranBefore ? answer("logged") : runUntilSuspended,
-          ),
-        );
+        return untilSuspended(secondStep, answer("logged"));
       });
       const harness = Harness.make(AmendsAgent.make({ model }));
       const session = yield* harness.startSession({ id, sandbox });
-      const running = yield* Stream.runCollect(session.stream({ prompt: "log a line" })).pipe(
+      const tookFirstStep = yield* Deferred.make<void>();
+      const reading = yield* session.stream({ prompt: "log a line" }).pipe(
+        Stream.runForEach((part) =>
+          part.type === "finish-step" ? Deferred.succeed(tookFirstStep, undefined) : Effect.void,
+        ),
         Effect.forkChild,
       );
+      yield* Deferred.await(tookFirstStep);
       yield* Deferred.await(secondStep);
       const state = yield* throughJson(yield* session.suspend);
-      yield* Fiber.join(running);
+      yield* Fiber.join(reading);
 
       const resumed = yield* harness.resumeSession({ sandbox, state });
       const continued = yield* Stream.runCollect(resumed.continue({}));
 
       // The first step ran once; only the step in flight ran again.
       expect(requests.map((request) => toolResultsOf(request).length)).toEqual([0, 1, 1]);
+      expect(rolesOf(requests[2]?.prompt)).toEqual(["user", "assistant", "tool"]);
       expect(yield* readSessionFile(sandbox, "log.txt")).toBe("ran\n");
       expect(new GenerateResult.GenerateResult(continued).text).toBe("logged");
+      expect(rolesOf((yield* resumed.detach).history)).toEqual([
+        "user",
+        "assistant",
+        "tool",
+        "assistant",
+      ]);
     }),
+  );
+
+  it.effect(
+    "continues after the steps the session has, though the turn finished more before suspend",
+    () =>
+      Effect.gen(function* () {
+        const sandbox = yield* makeSandbox;
+        /** Done once the turn's third step is running, which suspend then cuts short. */
+        const thirdStep = yield* Deferred.make<void>();
+        const { model, requests } = yield* makeScriptedModel((request) => {
+          const ran = toolResultsOf(request).length;
+          if (ran < 2) {
+            return callTool(`log-${ran + 1}`, "bash", { command: `echo ${ran + 1} >> log.txt` });
+          }
+          return untilSuspended(thirdStep, answer("logged"));
+        });
+        const harness = Harness.make(AmendsAgent.make({ model }));
+        const session = yield* harness.startSession({ id, sandbox });
+        // The caller takes the first step and then waits, while the agent goes on without it.
+        const tookFirstStep = yield* Deferred.make<void>();
+        const suspended = yield* Deferred.make<void>();
+        const reading = yield* session.stream({ prompt: "log two lines" }).pipe(
+          Stream.runForEach((part) =>
+            part.type === "finish-step"
+              ? Effect.andThen(
+                  Deferred.succeed(tookFirstStep, undefined),
+                  Deferred.await(suspended),
+                )
+              : Effect.void,
+          ),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(tookFirstStep);
+        yield* Deferred.await(thirdStep);
+        const state = yield* throughJson(yield* session.suspend);
+        yield* Deferred.succeed(suspended, undefined);
+        yield* Fiber.join(reading);
+
+        const resumed = yield* harness.resumeSession({ sandbox, state });
+        yield* Stream.runCollect(resumed.continue({}));
+
+        // The session had the first step only, so the second ran again.
+        expect(state.unfinishedTurn?.steps).toHaveLength(1);
+        expect(requests.map((request) => toolResultsOf(request).length)).toEqual([0, 1, 2, 1, 2]);
+        expect(yield* readSessionFile(sandbox, "log.txt")).toBe("1\n2\n2\n");
+        expect(rolesOf((yield* resumed.detach).history)).toEqual([
+          "user",
+          "assistant",
+          "tool",
+          "assistant",
+          "tool",
+          "assistant",
+        ]);
+      }),
   );
 
   it.effect("asks for no approvals and does not compact yet", () =>

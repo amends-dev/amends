@@ -59,7 +59,7 @@ export interface StartOptions {
 
   /**
    * What this agent's `suspend` returned when the session's last turn was cut short on this agent.
-   * The session starts ready for `continue` instead of a new turn.
+   * The session starts ready for `continue` instead of a new turn, if the agent still has the turn.
    */
   readonly unfinishedTurn?: Schema.Json;
 }
@@ -90,16 +90,26 @@ export interface TurnOptions {
 // TODO: Add `sendMessage`, which gives the running turn another user message, for agents that take
 // input while they work.
 export interface AgentSession {
+  /**
+   * Whether the session started with the turn `suspend` cut short, for `continue` to finish. An
+   * agent given an `unfinishedTurn` it no longer has, such as opencode in a sandbox other than the
+   * one the turn ran in, has none, and the harness runs the turn again from its prompt.
+   */
+  readonly hasUnfinishedTurn: boolean;
+
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
   readonly prompt: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
   /**
-   * Streams the turn `suspend` cut short, in a session started with `unfinishedTurn`, given the
-   * settings the turn started with again. An agent whose turn kept running streams the parts it had
-   * not delivered yet; one whose turn could not outlive its process runs it again with them, from
-   * its own record of the turn, repeating the work that was in flight.
+   * Streams the turn `suspend` cut short from the step after its first `finishedSteps`, which the
+   * harness already has, given the settings the turn started with again. The step that was in
+   * flight starts over: an agent whose turn kept running streams its parts again as they were, and
+   * one whose turn could not outlive its process runs the step again.
    */
-  readonly continue: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
+  readonly continue: (
+    options: TurnOptions,
+    finishedSteps: number,
+  ) => Stream.Stream<StreamPart, HarnessError>;
 
   /** Gives the running turn the result of a host tool it called. */
   readonly submitToolResult: (
@@ -122,9 +132,9 @@ export interface AgentSession {
   readonly compact: (instructions?: string) => Effect.Effect<void, HarnessError>;
 
   /**
-   * Ends the running turn's stream after the parts delivered so far while the agent keeps working,
-   * and returns what `start` takes as `unfinishedTurn` to continue the turn with no part missed or
-   * repeated.
+   * Ends the running turn's stream, while the agent keeps working where it can, and returns what
+   * `start` takes as `unfinishedTurn` to continue the turn after any step whose `finish-step` it
+   * delivered.
    */
   readonly suspend: Effect.Effect<Schema.Json, HarnessError>;
 

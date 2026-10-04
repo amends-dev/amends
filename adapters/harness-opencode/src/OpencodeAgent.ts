@@ -6,21 +6,31 @@
  * turn, as they happen.
  *
  * opencode keeps working when the host lets go. A turn `suspend` cut short goes on in opencode, and
- * `continue` streams its parts from opencode's record of the turn, after the ones it delivered. A
+ * `continue` streams its parts from opencode's record of the turn, after the steps the session has. A
  * session that starts with a conversation from another agent has it written into opencode's record
  * by `History`, tool calls included, before its first turn.
  *
  * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
  * tools, or a request to compact, which fail with `UnsupportedError`.
  */
-import { type Agent, HarnessError } from "@amends/harness-v2";
+import { type Agent, HarnessError, type StreamPart } from "@amends/harness-v2";
 import { Network } from "@amends/sandbox-v2";
-import { Clock, type Crypto, Deferred, Effect, Ref, Schedule, Schema, Stream } from "effect";
+import {
+  Clock,
+  type Crypto,
+  Deferred,
+  Effect,
+  Ref,
+  Schedule,
+  Schema,
+  Semaphore,
+  Stream,
+} from "effect";
 import type { Prompt } from "effect/ai";
 import type { HttpClient } from "effect/http";
 import * as History from "./History.ts";
 import * as Server from "./Server.ts";
-import type { ModelRef } from "./SessionEvent.ts";
+import type { ModelRef, SessionEvent } from "./SessionEvent.ts";
 import * as Turn from "./Turn.ts";
 
 export interface Options {
@@ -49,10 +59,10 @@ export interface Options {
 /** The port opencode's server listens on unless the options name another. */
 export const defaultPort = Network.Port.make(4096);
 
-/** Where a turn is: the event that admitted its prompt, and how many of its parts it delivered. */
-const Progress = Schema.Struct({ admittedSeq: Schema.Int, delivered: Schema.Int });
+/** Where a turn starts in opencode's record of the session: the event that admitted its prompt. */
+const TurnStart = Schema.Struct({ admittedSeq: Schema.Int });
 
-type Progress = typeof Progress.Type;
+type TurnStart = typeof TurnStart.Type;
 
 /** What `suspend`, `detach`, and `stop` return, for `start` to take back. */
 const State = Schema.Struct({
@@ -62,7 +72,7 @@ const State = Schema.Struct({
   model: Schema.String,
 
   /** The turn `suspend` cut short. */
-  unfinishedTurn: Schema.optionalKey(Progress),
+  unfinishedTurn: Schema.optionalKey(TurnStart),
 });
 
 const StateJson = Schema.toCodecJson(State);
@@ -113,12 +123,15 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
 
   /** The model the session runs its turns on, switched when a turn names another. */
   const sessionModel = yield* Ref.make(state.model);
-  /** The turn `suspend` cut short, until `continue` takes it. */
-  const unfinishedTurn = yield* Ref.make(state.unfinishedTurn);
-  /** The turn running: how many of its parts it delivered, and when its stream ended. */
-  const running = yield* Ref.make<RunningTurn | undefined>(undefined);
+  /** The turn running, or the one `suspend` cut short, for `continue` to stream. */
+  const running = yield* Ref.make(state.unfinishedTurn);
   /** Done once the session is suspended, stopped, or destroyed, ending the running turn's stream. */
   const closed = yield* Deferred.make<void>();
+  /**
+   * Held while opencode admits a prompt and while the session closes, so that a closed session
+   * admits none, and the session closes knowing every turn opencode is running.
+   */
+  const admission = yield* Semaphore.make(1);
 
   /**
    * Waits until opencode has loaded `model`'s provider, failing when it has not within 10 seconds:
@@ -136,7 +149,10 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     return yield* harnessError(method, new HarnessError.UnsupportedError({ description }));
   });
 
-  /** Gives opencode the turn's prompt on the turn's model, returning where the turn starts. */
+  /**
+   * Gives opencode the turn's prompt on the turn's model, returning where the turn starts, or
+   * nothing once the session has closed.
+   */
   const admitPrompt = Effect.fnUntraced(function* (method: string, turnOptions: Agent.TurnOptions) {
     const unsupported = unsupportedIn(turnOptions);
     if (unsupported !== undefined) {
@@ -148,68 +164,76 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     const model = turnOptions.model ?? options.model;
     const modelRef = yield* modelRefFor(method, model);
     yield* awaitProvider(method, modelRef);
-    if (model !== (yield* Ref.get(sessionModel))) {
-      yield* server.switchModel(sessionID, modelRef).pipe(Effect.mapError(fromServerError(method)));
-      yield* Ref.set(sessionModel, model);
-    }
-    const admittedSeq = yield* server
-      .prompt(sessionID, textOf(turnOptions.prompt))
-      .pipe(Effect.mapError(fromServerError(method)));
-    return { admittedSeq, delivered: 0 } satisfies Progress;
+    return yield* Semaphore.withPermit(
+      admission,
+      Effect.gen(function* () {
+        if (yield* Deferred.isDone(closed)) return undefined;
+        if (model !== (yield* Ref.get(sessionModel))) {
+          yield* server
+            .switchModel(sessionID, modelRef)
+            .pipe(Effect.mapError(fromServerError(method)));
+          yield* Ref.set(sessionModel, model);
+        }
+        const admittedSeq = yield* server
+          .prompt(sessionID, textOf(turnOptions.prompt))
+          .pipe(Effect.mapError(fromServerError(method)));
+        const start: TurnStart = { admittedSeq };
+        yield* Ref.set(running, start);
+        return start;
+      }),
+    );
   });
 
   /**
-   * Streams the turn at `progress` until its `finish`, after the parts it delivered. A stream that
-   * ends before the turn finishes, unless the session closed, interrupts the turn in opencode.
+   * Streams the turn that starts at `start`, from the step after its first `finishedSteps`, until
+   * its `finish`. A stream that ends before the turn finishes, unless the session closed,
+   * interrupts the turn in opencode.
    */
-  const streamTurn = (method: string, progress: Progress) =>
+  const streamTurn = (method: string, start: TurnStart, finishedSteps: number) =>
     Stream.unwrap(
       Effect.gen(function* () {
-        const delivered = yield* Ref.make(progress.delivered);
         const finished = yield* Ref.make(false);
-        const ended = yield* Deferred.make<void>();
-        yield* Ref.set(running, { admittedSeq: progress.admittedSeq, delivered, ended });
-
+        /** The turn as translated so far. */
+        const translated = yield* Ref.make(Turn.initial);
+        const translate = (event: SessionEvent) =>
+          Effect.flatMap(Ref.get(translated), (turn) =>
+            Effect.fromResult(Turn.translate(turn, event)),
+          ).pipe(
+            Effect.flatMap(([turn, parts]) => Effect.as(Ref.set(translated, turn), parts)),
+            Effect.mapError((reason) => harnessError(method, reason)),
+          );
+        /** What ends the turn when its events end before its `finish`: opencode stopped it. */
+        const finishStopped = Stream.unwrap(
+          Effect.map(Ref.get(translated), (turn) => Stream.fromIterable(Turn.finishStopped(turn))),
+        );
         const interruptUnfinished = Effect.gen(function* () {
           if ((yield* Ref.get(finished)) || (yield* Deferred.isDone(closed))) return;
           yield* Effect.ignore(server.interrupt(sessionID));
         });
-        return eventsOfTurn(server, sessionID, progress.admittedSeq).pipe(
+        return eventsOfTurn(server, sessionID, start.admittedSeq).pipe(
           Stream.mapError(fromServerError(method)),
-          Stream.mapAccumEffect(
-            () => Turn.initial,
-            (turn, event) =>
-              Effect.mapError(Effect.fromResult(Turn.translate(turn, event)), (reason) =>
-                harnessError(method, reason),
-              ),
-            { onHalt: Turn.finishStopped },
-          ),
+          Stream.mapEffect(translate),
+          Stream.flattenIterable,
+          // A failure reading the events fails the turn, rather than ending it as stopped.
+          Stream.concat(finishStopped),
           Stream.takeUntil((part) => part.type === "finish"),
-          Stream.drop(progress.delivered),
+          afterSteps(finishedSteps),
           Stream.interruptWhen(Deferred.await(closed)),
-          Stream.tap((part) =>
-            Effect.andThen(
-              Ref.update(delivered, (count) => count + 1),
-              part.type === "finish" ? Ref.set(finished, true) : Effect.void,
-            ),
-          ),
-          Stream.ensuring(
-            Effect.andThen(
-              interruptUnfinished,
-              Effect.andThen(Ref.set(running, undefined), Deferred.succeed(ended, undefined)),
-            ),
-          ),
+          Stream.tap((part) => (part.type === "finish" ? Ref.set(finished, true) : Effect.void)),
+          Stream.ensuring(Effect.andThen(interruptUnfinished, Ref.set(running, undefined))),
         );
       }),
     );
 
   const runTurn = (method: string, turnOptions: Agent.TurnOptions) =>
     Stream.unwrap(
-      Effect.map(admitPrompt(method, turnOptions), (progress) => streamTurn(method, progress)),
+      Effect.map(admitPrompt(method, turnOptions), (start) =>
+        start === undefined ? Stream.empty : streamTurn(method, start, 0),
+      ),
     );
 
   /** What the agent returns for `start` to take back, with the turn `suspend` cut short. */
-  const saveState = (unfinished: Progress | undefined) =>
+  const saveState = (unfinished: TurnStart | undefined) =>
     Effect.flatMap(Ref.get(sessionModel), (model) =>
       Schema.encodeEffect(StateJson)({
         sessionID,
@@ -218,21 +242,35 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
       }),
     ).pipe(Effect.orDie);
 
-  const close = Deferred.succeed(closed, undefined);
+  /** Closes the session once no prompt is being admitted, returning the turn running then. */
+  const close = Semaphore.withPermit(
+    admission,
+    Effect.flatMap(Ref.get(running), (turn) =>
+      Effect.as(Deferred.succeed(closed, undefined), turn),
+    ),
+  );
 
   const interrupt = (method: string) =>
     server.interrupt(sessionID).pipe(Effect.mapError(fromServerError(method)));
 
   const session: Agent.AgentSession = {
+    hasUnfinishedTurn: state.unfinishedTurn !== undefined,
+
     prompt: (turnOptions) => runTurn("prompt", turnOptions),
 
-    // A turn whose session opencode no longer had runs again from its prompt.
-    continue: (turnOptions) =>
+    continue: (_turnOptions, finishedSteps) =>
       Stream.unwrap(
-        Effect.map(Ref.getAndSet(unfinishedTurn, undefined), (progress) =>
-          progress === undefined
-            ? runTurn("continue", turnOptions)
-            : streamTurn("continue", progress),
+        Effect.map(Ref.get(running), (start) =>
+          start === undefined
+            ? Stream.fail(
+                harnessError(
+                  "continue",
+                  new HarnessError.NotFoundError({
+                    description: "opencode has no unfinished turn",
+                  }),
+                ),
+              )
+            : streamTurn("continue", start, finishedSteps),
         ),
       ),
 
@@ -267,16 +305,7 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
         ),
       ),
 
-    suspend: Effect.gen(function* () {
-      const turn = yield* Ref.get(running);
-      yield* close;
-      if (turn === undefined) return yield* saveState(undefined);
-      yield* Deferred.await(turn.ended);
-      return yield* saveState({
-        admittedSeq: turn.admittedSeq,
-        delivered: yield* Ref.get(turn.delivered),
-      });
-    }),
+    suspend: Effect.flatMap(close, saveState),
 
     detach: saveState(undefined),
 
@@ -289,13 +318,6 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
   };
   return session;
 });
-
-/** A turn the session is streaming. */
-interface RunningTurn {
-  readonly admittedSeq: number;
-  readonly delivered: Ref.Ref<number>;
-  readonly ended: Deferred.Deferred<void>;
-}
 
 /**
  * A new opencode session in `directory` on `model`, holding `history`. A session the history could
@@ -358,6 +380,17 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
         Stream.concat(recordedAfterLast),
       );
     }),
+  );
+
+/** Drops the parts of a turn's first `steps` steps. */
+const afterSteps = (steps: number) =>
+  Stream.mapAccum(
+    () => 0,
+    (finished: number, part: StreamPart.StreamPart) =>
+      [
+        part.type === "finish-step" ? finished + 1 : finished,
+        finished < steps ? [] : [part],
+      ] as const,
   );
 
 // TODO: Give opencode a turn's instructions, once its session API takes them.
