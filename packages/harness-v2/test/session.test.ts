@@ -1,8 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, Schema, Stream } from "effect";
+import { Deferred, Effect, Fiber, Ref, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
-import { HarnessError, UnsupportedError } from "../src/HarnessError.ts";
+import { HarnessError, UnavailableError, UnsupportedError } from "../src/HarnessError.ts";
 import * as Harness from "../src/Harness.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
 import {
@@ -264,7 +264,7 @@ describe("Session", () => {
             ),
           // The turn finishes while the agent lets go of it.
           {
-            beforeSuspend: Effect.andThen(
+            beforeLettingGo: Effect.andThen(
               Deferred.succeed(answering, undefined),
               Deferred.await(answered),
             ),
@@ -449,6 +449,53 @@ describe("Session", () => {
       const state = yield* session.detach;
 
       expect(state.history.content).toEqual([]);
+    }),
+  );
+
+  it.effect("starts no turn while it lets go", () =>
+    Effect.gen(function* () {
+      const lettingGo = yield* Deferred.make<void>();
+      const letGo = yield* Deferred.make<void>();
+      const { fake, session } = yield* startSession(answers, {
+        beforeLettingGo: Effect.andThen(
+          Deferred.succeed(lettingGo, undefined),
+          Deferred.await(letGo),
+        ),
+      });
+
+      const detaching = yield* Effect.forkChild(session.detach);
+      yield* Deferred.await(lettingGo);
+      const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
+      yield* Deferred.succeed(letGo, undefined);
+      const state = yield* Fiber.join(detaching);
+
+      expect(refused.reason._tag).toBe("SessionClosedError");
+      expect(fake.turns).toEqual([]);
+      expect(state.history.content).toEqual([]);
+    }),
+  );
+
+  it.effect("stays open when the agent fails to let go, so that it can be tried again", () =>
+    Effect.gen(function* () {
+      const attempts = yield* Ref.make(0);
+      const unavailable = new HarnessError({ agent: "codex", reason: new UnavailableError({}) });
+      const { session } = yield* startSession(answers, {
+        beforeLettingGo: Effect.flatMap(
+          Ref.getAndUpdate(attempts, (n) => n + 1),
+          (attempt) => (attempt === 0 ? Effect.fail(unavailable) : Effect.void),
+        ),
+      });
+
+      const failed = yield* Effect.flip(session.stop);
+      const result = yield* session.generate({ prompt: "hello" });
+      const state = yield* session.stop;
+
+      expect(failed.reason._tag).toBe("UnavailableError");
+      expect(result.text).toBe("codex answers hello");
+      expect(state.history.content).toMatchObject([
+        { role: "user", content: [{ type: "text", text: "hello" }] },
+        { role: "assistant", content: [{ type: "text", text: "codex answers hello" }] },
+      ]);
     }),
   );
 

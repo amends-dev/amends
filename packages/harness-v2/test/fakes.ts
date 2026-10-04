@@ -42,8 +42,11 @@ export interface FakeAgentOptions {
   /** Whether the agent loses the turns `suspend` cuts short, as opencode does in another sandbox. */
   readonly losesUnfinishedTurns?: boolean;
 
-  /** Runs when the session suspends, before the agent lets go of the running turn. */
-  readonly beforeSuspend?: Effect.Effect<void>;
+  /**
+   * Runs when the session suspends, detaches, stops, or is destroyed, before the agent lets go.
+   * When it fails, so does the agent, letting go of nothing.
+   */
+  readonly beforeLettingGo?: Effect.Effect<void, HarnessError>;
 }
 
 /**
@@ -70,6 +73,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
           /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
           const closed = yield* Deferred.make<void>();
           const close = Deferred.succeed(closed, undefined);
+          const beforeLettingGo = options.beforeLettingGo ?? Effect.void;
           const follow = (turn: TurnOptions) =>
             script(textOf(turn.prompt), { toolResult: Queue.take(toolResults) }).pipe(
               Stream.interruptWhen(Deferred.await(closed)),
@@ -94,13 +98,10 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
               ),
             approve: () => Effect.void,
             compact: () => Effect.void,
-            suspend: Effect.andThen(
-              options.beforeSuspend ?? Effect.void,
-              Effect.as(close, { agent: id, turn: true }),
-            ),
-            detach: Effect.succeed({ agent: id }),
-            stop: Effect.as(close, { agent: id }),
-            destroy: Effect.asVoid(close),
+            suspend: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id, turn: true })),
+            detach: Effect.andThen(beforeLettingGo, Effect.succeed({ agent: id })),
+            stop: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id })),
+            destroy: Effect.andThen(beforeLettingGo, Effect.asVoid(close)),
           };
           return session;
         }),
