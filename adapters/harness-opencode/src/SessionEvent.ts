@@ -53,7 +53,8 @@ const PromptSource = Schema.Struct({
   text: Schema.String,
 });
 
-const Prompt = Schema.Struct({
+/** A user's prompt as opencode records it: its text, and the files and agents it mentions. */
+const UserPrompt = Schema.Struct({
   text: Schema.String,
   files: Schema.optionalKey(
     Schema.Array(
@@ -114,7 +115,7 @@ export const Prompted = Schema.Struct({
   data: Schema.Struct({
     ...inSession,
     messageID: Schema.String,
-    prompt: Prompt,
+    prompt: UserPrompt,
     delivery: Schema.Literals(["steer", "queue"]),
   }),
 });

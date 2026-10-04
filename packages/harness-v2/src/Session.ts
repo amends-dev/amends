@@ -8,7 +8,7 @@
  * session up on any agent: the agent that last ran it resumes from its own state, and any other
  * loads the conversation, and runs an unfinished turn again from its prompt.
  */
-import { Data, Effect, Ref, Schema, Stream } from "effect";
+import { type Cause, Data, Effect, Queue, Ref, Schema, type Scope, Stream } from "effect";
 import type { AiError, Response, Toolkit } from "effect/ai";
 import { Prompt, type Tool } from "effect/ai";
 import { type AgentSession, SessionId } from "./Agent.ts";
@@ -17,7 +17,8 @@ import {
   HarnessError,
   type HarnessErrorReason,
   InvalidOutputError,
-  NotFoundError,
+  NoTurnError,
+  SessionClosedError,
   StructuredOutputError,
   TurnFailedError,
   TurnInProgressError,
@@ -170,7 +171,10 @@ export interface Session {
    */
   readonly stop: Effect.Effect<SessionState, HarnessError>;
 
-  /** Stops the agent for good. */
+  /**
+   * Stops the agent for good, aborting a running turn. It also destroys a session already let go
+   * of, and destroying it again succeeds.
+   */
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
 
@@ -195,18 +199,18 @@ export const make = Effect.fn("Session.make")(function* (options: {
     history: options.history,
   });
 
-  const harnessError = (method: string, reason: HarnessErrorReason, cause?: unknown) =>
-    new HarnessError({ harness: options.agent, method, reason, cause });
+  const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
+    new HarnessError({ agent: options.agent, reason, cause });
 
   /** Fails when `operation` cannot run in the session's current status. */
   const checkStatus = (operation: Operation) =>
     Effect.flatMap(Ref.get(state), ({ status }) => {
       const reason = refusal(status, operation);
-      return reason === undefined ? Effect.void : Effect.fail(harnessError(operation, reason));
+      return reason === undefined ? Effect.void : Effect.fail(harnessError(reason));
     });
 
   /** Marks the session as running a new turn of `prompt`, failing when it cannot start one now. */
-  const startTurn = (method: string, prompt: Prompt.UserMessage) =>
+  const startTurn = (prompt: Prompt.UserMessage) =>
     Effect.flatten(
       Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
         const reason = refusal(current.status, "stream");
@@ -221,7 +225,7 @@ export const make = Effect.fn("Session.make")(function* (options: {
                 }),
               },
             ]
-          : [Effect.fail(harnessError(method, reason)), current];
+          : [Effect.fail(harnessError(reason)), current];
       }),
     );
 
@@ -239,11 +243,11 @@ export const make = Effect.fn("Session.make")(function* (options: {
       }
       const reason =
         status._tag === "Closed"
-          ? closedReason()
+          ? new SessionClosedError({})
           : status._tag === "Running"
             ? new TurnInProgressError({})
-            : new NotFoundError({ description: "The session has no unfinished turn" });
-      return [Effect.fail(harnessError("continue", reason)), current];
+            : new NoTurnError({ description: "The session has no unfinished turn" });
+      return [Effect.fail(harnessError(reason)), current];
     }),
   );
 
@@ -259,9 +263,9 @@ export const make = Effect.fn("Session.make")(function* (options: {
       }
       const reason =
         status._tag === "Closed"
-          ? closedReason()
-          : new NotFoundError({ description: "The session is not running a turn" });
-      return [Effect.fail(harnessError("suspend", reason)), current];
+          ? new SessionClosedError({})
+          : new NoTurnError({ description: "The session is not running a turn" });
+      return [Effect.fail(harnessError(reason)), current];
     }),
   );
 
@@ -273,23 +277,17 @@ export const make = Effect.fn("Session.make")(function* (options: {
   );
 
   /**
-   * Streams the parts of the running turn that `agentTurn` streams, running the host's tools it
-   * calls. A part is delivered only while the session runs the turn, so once `suspend` or `stop`
-   * let go of it, the session holds every part the caller has. The stream of a turn `stop` or
-   * `destroy` aborted ends with an error, and a stream that ends otherwise without the turn's
+   * Streams the parts of the running turn that `agentTurn` streams, with the results of the host's
+   * tools it calls. A part is delivered only while the session runs the turn, so once `suspend` or
+   * `stop` let go of it, the session holds every part the caller has. The stream of a turn `stop`
+   * or `destroy` aborted ends with an error, and a stream that ends otherwise without the turn's
    * `finish` ends the turn as far as it got.
    */
   const runTurn = <Tools extends Record<string, Tool.Any>>(
-    method: string,
     agentTurn: Stream.Stream<StreamPart, HarnessError>,
     toolkit: Toolkit.WithHandler<Tools> | undefined,
   ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> =>
-    agentTurn.pipe(
-      Stream.flatMap((part) =>
-        part.type === "tool-call" && part.providerExecuted !== true
-          ? Stream.concat(Stream.succeed(part), runHostTool(method, toolkit, part))
-          : Stream.succeed(part),
-      ),
+    withHostTools(agentTurn, toolkit).pipe(
       Stream.takeWhileEffect((part) => Ref.modify(state, (current) => deliver(current, part))),
       Stream.concat(
         Stream.unwrap(
@@ -310,15 +308,53 @@ export const make = Effect.fn("Session.make")(function* (options: {
       ),
     );
 
+  /**
+   * The agent's parts, each call of the host's tools followed by the tool's results. A host's tool
+   * starts as soon as the agent calls it, so the tools of calls the agent makes together run side
+   * by side, while their results stream in the order of the calls.
+   */
+  const withHostTools = <Tools extends Record<string, Tool.Any>>(
+    agentTurn: Stream.Stream<StreamPart, HarnessError>,
+    toolkit: Toolkit.WithHandler<Tools> | undefined,
+  ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> =>
+    Stream.unwrap(
+      Effect.map(Effect.scope, (scope) =>
+        agentTurn.pipe(
+          Stream.mapEffect((part) =>
+            part.type === "tool-call" && part.providerExecuted !== true
+              ? Effect.map(startHostTool(toolkit, part, scope), (results) =>
+                  Stream.concat(Stream.succeed(part), results),
+                )
+              : Effect.succeed(Stream.succeed(part)),
+          ),
+          // Reads the agent's parts ahead, so that a tool it calls next starts while the results
+          // of an earlier one still stream.
+          Stream.buffer({ capacity: "unbounded" }),
+          Stream.flatten(),
+        ),
+      ),
+    );
+
+  /** Starts the host's tool `call` names in `scope`, returning the stream of its results. */
+  const startHostTool = <Tools extends Record<string, Tool.Any>>(
+    toolkit: Toolkit.WithHandler<Tools> | undefined,
+    call: Response.ToolCallPartEncoded,
+    scope: Scope.Scope,
+  ) =>
+    Effect.gen(function* () {
+      const results = yield* Queue.unbounded<StreamPart, TurnError<Tools> | Cause.Done>();
+      yield* runHostTool(toolkit, call).pipe(Stream.runIntoQueue(results), Effect.forkIn(scope));
+      return Stream.fromQueue(results);
+    });
+
   /** Runs the host's tool `call` names, streaming its results and giving the final one to the agent. */
   const runHostTool = <Tools extends Record<string, Tool.Any>>(
-    method: string,
     toolkit: Toolkit.WithHandler<Tools> | undefined,
     call: Response.ToolCallPartEncoded,
   ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> => {
     if (toolkit === undefined || !isToolName(toolkit, call.name)) {
       const description = `The agent called ${call.name}, which is not one of the host's tools`;
-      return Stream.fail(harnessError(method, new InvalidOutputError({ description })));
+      return Stream.fail(harnessError(new InvalidOutputError({ description })));
     }
     // `handle` decodes the params with the tool's schema and fails on a mismatch, so they need no
     // type of their own here.
@@ -343,16 +379,14 @@ export const make = Effect.fn("Session.make")(function* (options: {
 
   /** Runs a new turn with the caller's prompt, once the session can start one. */
   const promptTurn = <Tools extends Record<string, Tool.Any>>(
-    method: string,
     options: StreamOptions<Tools>,
     responseFormat: Parameters<AgentSession["prompt"]>[0]["responseFormat"],
   ) => {
     const prompt = userMessageOf(options.prompt);
     return Stream.unwrap(
       Effect.as(
-        startTurn(method, prompt),
+        startTurn(prompt),
         runTurn(
-          method,
           agentSession.prompt({ ...turnOptionsOf(options), prompt, responseFormat }),
           options.toolkit,
         ),
@@ -361,11 +395,11 @@ export const make = Effect.fn("Session.make")(function* (options: {
   };
 
   /** The whole turn, failing with `TurnFailedError` when the agent reported a failure. */
-  const resultOf = (method: string, parts: ReadonlyArray<StreamPart>) => {
+  const resultOf = (parts: ReadonlyArray<StreamPart>) => {
     const error = parts.find((part) => part.type === "error");
     return error === undefined
       ? Effect.succeed(new GenerateResult(parts))
-      : Effect.fail(harnessError(method, new TurnFailedError({ error: error.error })));
+      : Effect.fail(harnessError(new TurnFailedError({ error: error.error })));
   };
 
   /** Lets go of the session, returning where it was and its conversation when it did. */
@@ -390,30 +424,27 @@ export const make = Effect.fn("Session.make")(function* (options: {
   const session: Session = {
     id: options.id,
 
-    stream: (streamOptions) => promptTurn("stream", streamOptions, { type: "text" }),
+    stream: (streamOptions) => promptTurn(streamOptions, { type: "text" }),
 
     generate: Effect.fn("Session.generate")(function* (generateOptions) {
-      const parts = yield* Stream.runCollect(
-        promptTurn("generate", generateOptions, { type: "text" }),
-      );
-      return yield* resultOf("generate", parts);
+      const parts = yield* Stream.runCollect(promptTurn(generateOptions, { type: "text" }));
+      return yield* resultOf(parts);
     }),
 
     generateObject: Effect.fn("Session.generateObject")(function* (objectOptions) {
       const parts = yield* Stream.runCollect(
-        promptTurn("generateObject", objectOptions, {
+        promptTurn(objectOptions, {
           type: "json",
           objectName: objectOptions.objectName ?? "output",
           schema: objectOptions.schema,
         }),
       );
-      const result = yield* resultOf("generateObject", parts);
+      const result = yield* resultOf(parts);
       const value = yield* Schema.decodeEffect(Schema.fromJsonString(objectOptions.schema))(
         result.text,
       ).pipe(
         Effect.mapError((cause) =>
           harnessError(
-            "generateObject",
             new StructuredOutputError({
               description: cause.message,
               responseText: result.text,
@@ -437,7 +468,7 @@ export const make = Effect.fn("Session.make")(function* (options: {
           const agentTurn = agentSession.hasUnfinishedTurn
             ? agentSession.continue(turnOptions, turn.steps.length)
             : agentSession.prompt(turnOptions);
-          return runTurn("continue", agentTurn, continueOptions.toolkit);
+          return runTurn(agentTurn, continueOptions.toolkit);
         }),
       ),
 
@@ -571,7 +602,9 @@ type Operation = "stream" | "approve" | "compact" | "detach" | "stop" | "destroy
 
 /** Why `operation` cannot run in a session in `status`, or nothing when it can. */
 const refusal = (status: Status, operation: Operation): HarnessErrorReason | undefined => {
-  if (status._tag === "Closed") return closedReason();
+  if (status._tag === "Closed") {
+    return operation === "destroy" ? undefined : new SessionClosedError({});
+  }
   switch (operation) {
     case "stream":
       if (status._tag === "Unfinished") {
@@ -593,9 +626,6 @@ const refusal = (status: Status, operation: Operation): HarnessErrorReason | und
       return undefined;
   }
 };
-
-const closedReason = () =>
-  new NotFoundError({ description: "The session was suspended, detached, stopped, or destroyed" });
 
 const userMessageOf = (prompt: string | Prompt.UserMessage): Prompt.UserMessage =>
   typeof prompt === "string"

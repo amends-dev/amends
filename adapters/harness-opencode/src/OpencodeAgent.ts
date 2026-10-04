@@ -43,7 +43,10 @@ export interface Options {
   /** The command that runs opencode in the sandbox, `opencode` by default. */
   readonly command?: string;
 
-  /** The port opencode's server listens on, `defaultPort` by default. The sandbox must expose it. */
+  /**
+   * The port opencode's server listens on, `defaultPort` by default. The agent's `ports` name it,
+   * and the sandbox must be created with it.
+   */
   readonly port?: Network.Port;
 
   /**
@@ -83,13 +86,13 @@ const SavedState = Schema.UndefinedOr(StateJson);
 // TODO: Add a template that installs a pinned opencode, once a sandbox lacks it. opencode's
 // installer writes only to `~/.opencode`, so the local provider, which prepares sandboxes on this
 // machine, must not run it.
-// TODO: Tell the harness which ports the sandbox must expose, once the harness creates sandboxes.
 /** The agent, which reaches opencode's server with the `HttpClient` it is made with. */
 export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
   const services = yield* Effect.context<HttpClient.HttpClient | Crypto.Crypto>();
   const agent: Agent.Agent = {
     id: "opencode",
     requiresSandbox: true,
+    ports: [options.port ?? defaultPort],
     start: (startOptions) => Effect.provide(startSession(options, startOptions), services),
   };
   return agent;
@@ -102,21 +105,20 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
   const { workspace } = startOptions;
   if (workspace === undefined) {
     const description = "opencode works in a sandbox";
-    return yield* harnessError("start", new HarnessError.UnsupportedError({ description }));
+    return yield* harnessError(new HarnessError.UnsupportedError({ description }));
   }
   const server = yield* Server.connect(workspace.sandbox, {
     command: options.command ?? "opencode",
     port: options.port ?? defaultPort,
     config: options.config ?? {},
     env: options.env ?? {},
-  }).pipe(Effect.mapError(fromServerError("start")));
+  });
 
   // opencode in another sandbox than the one the session last ran in has no record of it, and
   // starts a session from the conversation instead, which runs an unfinished turn again.
-  const saved = yield* readState(startOptions.unfinishedTurn ?? startOptions.resume);
+  const saved = yield* readState(startOptions.unfinishedTurn ?? startOptions.agentState);
   const state =
-    saved !== undefined &&
-    (yield* server.hasSession(saved.sessionID).pipe(Effect.mapError(fromServerError("start"))))
+    saved !== undefined && (yield* server.hasSession(saved.sessionID))
       ? saved
       : yield* createSession(server, workspace.directory, options.model, startOptions.history);
   const { sessionID } = state;
@@ -137,46 +139,46 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
    * Waits until opencode has loaded `model`'s provider, failing when it has not within 10 seconds:
    * opencode drops a turn on a model it does not have, recording nothing.
    */
-  const awaitProvider = Effect.fnUntraced(function* (method: string, model: ModelRef) {
-    for (let check = 0; check < 50; check++) {
-      const loaded = yield* server
-        .hasProvider(model.providerID)
-        .pipe(Effect.mapError(fromServerError(method)));
-      if (loaded) return;
-      yield* Effect.sleep("200 millis");
-    }
-    const description = `opencode has no model provider ${model.providerID}`;
-    return yield* harnessError(method, new HarnessError.UnsupportedError({ description }));
-  });
+  const awaitProvider = (model: ModelRef) => {
+    const missing = harnessError(
+      new HarnessError.UnsupportedError({
+        description: `opencode has no model provider ${model.providerID}`,
+      }),
+    );
+    return server.hasProvider(model.providerID).pipe(
+      Effect.filterOrFail(
+        (loaded) => loaded,
+        () => missing,
+      ),
+      // A request that fails is not tried again.
+      Effect.retry({
+        while: (error) => error === missing,
+        schedule: Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "10 seconds" })),
+      }),
+    );
+  };
 
   /**
    * Gives opencode the turn's prompt on the turn's model, returning where the turn starts, or
    * nothing once the session has closed.
    */
-  const admitPrompt = Effect.fnUntraced(function* (method: string, turnOptions: Agent.TurnOptions) {
+  const admitPrompt = Effect.fnUntraced(function* (turnOptions: Agent.TurnOptions) {
     const unsupported = unsupportedIn(turnOptions);
     if (unsupported !== undefined) {
-      return yield* harnessError(
-        method,
-        new HarnessError.UnsupportedError({ description: unsupported }),
-      );
+      return yield* harnessError(new HarnessError.UnsupportedError({ description: unsupported }));
     }
     const model = turnOptions.model ?? options.model;
-    const modelRef = yield* modelRefFor(method, model);
-    yield* awaitProvider(method, modelRef);
+    const modelRef = yield* modelRefFor(model);
+    yield* awaitProvider(modelRef);
     return yield* Semaphore.withPermit(
       admission,
       Effect.gen(function* () {
         if (yield* Deferred.isDone(closed)) return undefined;
         if (model !== (yield* Ref.get(sessionModel))) {
-          yield* server
-            .switchModel(sessionID, modelRef)
-            .pipe(Effect.mapError(fromServerError(method)));
+          yield* server.switchModel(sessionID, modelRef);
           yield* Ref.set(sessionModel, model);
         }
-        const admittedSeq = yield* server
-          .prompt(sessionID, textOf(turnOptions.prompt))
-          .pipe(Effect.mapError(fromServerError(method)));
+        const admittedSeq = yield* server.prompt(sessionID, textOf(turnOptions.prompt));
         const start: TurnStart = { admittedSeq };
         yield* Ref.set(running, start);
         return start;
@@ -189,7 +191,7 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
    * its `finish`. A stream that ends before the turn finishes, unless the session closed,
    * interrupts the turn in opencode.
    */
-  const streamTurn = (method: string, start: TurnStart, finishedSteps: number) =>
+  const streamTurn = (start: TurnStart, finishedSteps: number) =>
     Stream.unwrap(
       Effect.gen(function* () {
         const finished = yield* Ref.make(false);
@@ -200,7 +202,7 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
             Effect.fromResult(Turn.translate(turn, event)),
           ).pipe(
             Effect.flatMap(([turn, parts]) => Effect.as(Ref.set(translated, turn), parts)),
-            Effect.mapError((reason) => harnessError(method, reason)),
+            Effect.mapError((reason) => harnessError(reason)),
           );
         /** What ends the turn when its events end before its `finish`: opencode stopped it. */
         const finishStopped = Stream.unwrap(
@@ -211,7 +213,6 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
           yield* Effect.ignore(server.interrupt(sessionID));
         });
         return eventsOfTurn(server, sessionID, start.admittedSeq).pipe(
-          Stream.mapError(fromServerError(method)),
           Stream.mapEffect(translate),
           Stream.flattenIterable,
           // A failure reading the events fails the turn, rather than ending it as stopped.
@@ -225,10 +226,10 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
       }),
     );
 
-  const runTurn = (method: string, turnOptions: Agent.TurnOptions) =>
+  const runTurn = (turnOptions: Agent.TurnOptions) =>
     Stream.unwrap(
-      Effect.map(admitPrompt(method, turnOptions), (start) =>
-        start === undefined ? Stream.empty : streamTurn(method, start, 0),
+      Effect.map(admitPrompt(turnOptions), (start) =>
+        start === undefined ? Stream.empty : streamTurn(start, 0),
       ),
     );
 
@@ -250,13 +251,10 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     ),
   );
 
-  const interrupt = (method: string) =>
-    server.interrupt(sessionID).pipe(Effect.mapError(fromServerError(method)));
-
   const session: Agent.AgentSession = {
     hasUnfinishedTurn: state.unfinishedTurn !== undefined,
 
-    prompt: (turnOptions) => runTurn("prompt", turnOptions),
+    prompt: runTurn,
 
     continue: (_turnOptions, finishedSteps) =>
       Stream.unwrap(
@@ -264,13 +262,10 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
           start === undefined
             ? Stream.fail(
                 harnessError(
-                  "continue",
-                  new HarnessError.NotFoundError({
-                    description: "opencode has no unfinished turn",
-                  }),
+                  new HarnessError.NoTurnError({ description: "opencode has no unfinished turn" }),
                 ),
               )
-            : streamTurn("continue", start, finishedSteps),
+            : streamTurn(start, finishedSteps),
         ),
       ),
 
@@ -278,7 +273,6 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     submitToolResult: () =>
       Effect.fail(
         harnessError(
-          "submitToolResult",
           new HarnessError.UnsupportedError({ description: "opencode runs no host tools yet" }),
         ),
       ),
@@ -287,7 +281,6 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     approve: () =>
       Effect.fail(
         harnessError(
-          "approve",
           new HarnessError.UnsupportedError({
             description: "The opencode agent answers no permission requests yet",
           }),
@@ -298,7 +291,6 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     compact: () =>
       Effect.fail(
         harnessError(
-          "compact",
           new HarnessError.UnsupportedError({
             description: "opencode's session API does not compact on request yet",
           }),
@@ -309,11 +301,11 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
 
     detach: saveState(undefined),
 
-    stop: Effect.andThen(Effect.andThen(close, interrupt("stop")), saveState(undefined)),
+    stop: Effect.andThen(Effect.andThen(close, server.interrupt(sessionID)), saveState(undefined)),
 
     destroy: Effect.andThen(
-      Effect.andThen(close, interrupt("destroy")),
-      server.deleteSession(sessionID).pipe(Effect.mapError(fromServerError("destroy"))),
+      Effect.andThen(close, server.interrupt(sessionID)),
+      server.deleteSession(sessionID),
     ),
   };
   return session;
@@ -329,17 +321,13 @@ const createSession = Effect.fnUntraced(function* (
   model: string,
   history: Prompt.Prompt,
 ) {
-  const modelRef = yield* modelRefFor("start", model);
-  const sessionID = yield* server
-    .createSession({ directory, model: modelRef })
-    .pipe(Effect.mapError(fromServerError("start")));
+  const modelRef = yield* modelRefFor(model);
+  const sessionID = yield* server.createSession({ directory, model: modelRef });
   if (history.content.length > 0) {
     const now = yield* Clock.currentTimeMillis;
     yield* Effect.fromResult(History.eventsOf(history, { sessionID, now })).pipe(
-      Effect.mapError((reason) => harnessError("start", reason)),
-      Effect.flatMap((events) =>
-        server.replay(directory, events).pipe(Effect.mapError(fromServerError("start"))),
-      ),
+      Effect.mapError((reason) => harnessError(reason)),
+      Effect.flatMap((events) => server.replay(directory, events)),
       Effect.onError(() => Effect.ignore(server.deleteSession(sessionID))),
     );
   }
@@ -414,11 +402,11 @@ const unsupportedIn = (turnOptions: Agent.TurnOptions): string | undefined => {
 };
 
 /** The model `model` names as opencode names it, `provider/model`, failing for another name. */
-const modelRefFor = (method: string, model: string) => {
+const modelRefFor = (model: string) => {
   const slash = model.indexOf("/");
   if (slash <= 0 || slash === model.length - 1) {
     const description = `opencode names models provider/model, which ${model} is not`;
-    return Effect.fail(harnessError(method, new HarnessError.UnsupportedError({ description })));
+    return Effect.fail(harnessError(new HarnessError.UnsupportedError({ description })));
   }
   const modelRef: ModelRef = { providerID: model.slice(0, slash), id: model.slice(slash + 1) };
   return Effect.succeed(modelRef);
@@ -431,7 +419,6 @@ const readState = (json: Schema.Json | undefined) =>
   Schema.decodeEffect(SavedState)(json).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        "start",
         new HarnessError.InvalidOutputError({
           description: `opencode cannot read the state it was given: ${cause.message}`,
         }),
@@ -440,8 +427,5 @@ const readState = (json: Schema.Json | undefined) =>
     ),
   );
 
-const fromServerError = (method: string) => (error: Server.ServerError) =>
-  harnessError(method, error.reason, error.cause);
-
-const harnessError = (method: string, reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
-  new HarnessError.HarnessError({ harness: "opencode", method, reason, cause });
+const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+  new HarnessError.HarnessError({ agent: "opencode", reason, cause });

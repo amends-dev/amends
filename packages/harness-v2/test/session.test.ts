@@ -9,6 +9,7 @@ import {
   type FakeAgentOptions,
   makeFakeAgent,
   makeFakeSandbox,
+  readUntil,
   reply,
   type Script,
 } from "./fakes.ts";
@@ -217,18 +218,11 @@ describe("Session", () => {
 
   it.effect("suspends a running turn, ending its stream, and returns it unfinished", () =>
     Effect.gen(function* () {
-      const running = yield* Deferred.make<void>();
       const { session } = yield* startSession(() =>
-        Stream.concat(
-          Stream.make({ type: "text-start", id: "answer" }),
-          Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
-        ),
+        Stream.concat(Stream.make({ type: "text-start", id: "answer" }), Stream.never),
       );
 
-      const slow = yield* Stream.runCollect(session.stream({ prompt: "slow" })).pipe(
-        Effect.forkChild,
-      );
-      yield* Deferred.await(running);
+      const slow = yield* readUntil(session.stream({ prompt: "slow" }), () => true);
       const state = yield* session.suspend;
       const parts = yield* Fiber.join(slow);
       const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
@@ -236,7 +230,20 @@ describe("Session", () => {
       expect(parts).toEqual([{ type: "text-start", id: "answer" }]);
       expect(state.unfinishedTurn?.agentState).toEqual({ agent: "codex", turn: true });
       expect(state.history.content).toEqual([]);
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("NotFoundError");
+      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("SessionClosedError");
+    }),
+  );
+
+  it.effect("destroys a session already let go of, and again after it is destroyed", () =>
+    Effect.gen(function* () {
+      const { session } = yield* startSession(answers);
+      yield* session.detach;
+
+      yield* session.destroy;
+      yield* session.destroy;
+      const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
+
+      expect(refused.reason._tag).toBe("SessionClosedError");
     }),
   );
 
@@ -284,7 +291,6 @@ describe("Session", () => {
 
   it.effect("ends a turn stop aborted with an error, keeping it as far as it got", () =>
     Effect.gen(function* () {
-      const running = yield* Deferred.make<void>();
       const { session } = yield* startSession(() =>
         Stream.concat(
           Stream.fromIterable<StreamPart>([
@@ -292,14 +298,14 @@ describe("Session", () => {
             { type: "text-start", id: "answer" },
             { type: "text-delta", id: "answer", delta: "The notes s" },
           ]),
-          Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
+          Stream.never,
         ),
       );
 
-      const reading = yield* Stream.runCollect(session.stream({ prompt: "Read the notes" })).pipe(
-        Effect.forkChild,
+      const reading = yield* readUntil(
+        session.stream({ prompt: "Read the notes" }),
+        (part) => part.type === "text-delta" && part.id === "answer",
       );
-      yield* Deferred.await(running);
       const state = yield* session.stop;
       const parts = yield* Fiber.join(reading);
 
@@ -378,13 +384,62 @@ describe("Session", () => {
     }),
   );
 
+  it.effect(
+    "runs the host's tools the agent calls together side by side, streaming results in call order",
+    () =>
+      Effect.gen(function* () {
+        const opened = yield* Deferred.make<void>();
+        const Wait = Tool.make("Wait", { success: Schema.String });
+        const Open = Tool.make("Open", { success: Schema.String });
+        const GateToolkit = Toolkit.make(Wait, Open);
+        const toolkit = yield* GateToolkit.pipe(
+          Effect.provide(
+            GateToolkit.toLayer({
+              Wait: () => Effect.as(Deferred.await(opened), "waited"),
+              Open: () => Effect.as(Deferred.succeed(opened, undefined), "opened"),
+            }),
+          ),
+        );
+        const { fake, session } = yield* startSession((_prompt, host) =>
+          Stream.concat(
+            Stream.make(
+              { type: "tool-call", id: "call-wait", name: "Wait", params: {} },
+              { type: "tool-call", id: "call-open", name: "Open", params: {} },
+            ),
+            Stream.unwrap(
+              Effect.as(
+                Effect.andThen(host.toolResult, host.toolResult),
+                Stream.fromIterable(reply("Done")),
+              ),
+            ),
+          ),
+        );
+
+        const parts = yield* Stream.runCollect(session.stream({ prompt: "gate", toolkit }));
+
+        // The turn ends only if Open runs while Wait waits for it.
+        expect(fake.submitted).toHaveLength(2);
+        expect(
+          parts.flatMap((part) =>
+            part.type === "tool-call" || part.type === "tool-result"
+              ? [`${part.type} ${part.id}`]
+              : [],
+          ),
+        ).toEqual([
+          "tool-call call-wait",
+          "tool-result call-wait",
+          "tool-call call-open",
+          "tool-result call-open",
+        ]);
+      }),
+  );
+
   it.effect("leaves a turn the agent refused before it began out of the conversation", () =>
     Effect.gen(function* () {
       const { session } = yield* startSession(() =>
         Stream.fail(
           new HarnessError({
-            harness: "codex",
-            method: "prompt",
+            agent: "codex",
             reason: new UnsupportedError({ description: "No such model" }),
           }),
         ),

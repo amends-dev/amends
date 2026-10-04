@@ -1,3 +1,5 @@
+import { Port } from "@amends/sandbox-v2/Network";
+import { Sandbox } from "@amends/sandbox-v2/Sandbox";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Schema, Stream } from "effect";
 import type { Prompt } from "effect/ai";
@@ -5,7 +7,7 @@ import { SessionId } from "../src/Agent.ts";
 import * as Harness from "../src/Harness.ts";
 import * as Session from "../src/Session.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
-import { makeFakeAgent, makeFakeSandbox, reply, type Script } from "./fakes.ts";
+import { makeFakeAgent, makeFakeSandbox, readUntil, reply, type Script } from "./fakes.ts";
 
 const id = SessionId.make("session-one");
 
@@ -46,8 +48,8 @@ const readingMessages = [
 
 /**
  * Answers each prompt in one step, except `slow`, which first reads the notes in a step of its own.
- * The first `slow` turn stops partway through its answer until it is suspended; run again, it
- * finishes.
+ * The first `slow` turn stops partway through its answer until it is suspended; run again once
+ * `running` is done, it finishes.
  */
 const answersAs =
   (agent: string, running?: Deferred.Deferred<void>): Script =>
@@ -59,7 +61,7 @@ const answersAs =
         { type: "text-start", id: "answer" },
         { type: "text-delta", id: "answer", delta: `${agent} answ` },
       ]),
-      Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
+      Stream.never,
     );
     return Stream.concat(
       Stream.fromIterable(readingStep),
@@ -71,15 +73,19 @@ const answersAs =
     );
   };
 
-/** Suspends a turn running on `harness`, returning the session as a caller would store it: as JSON. */
+/**
+ * Suspends a turn running on `harness` once the caller has read part of its answer, marking
+ * `running` done, and returns the session as a caller would store it: as JSON.
+ */
 const suspendSlowTurn = (harness: Harness.Harness["Service"], running: Deferred.Deferred<void>) =>
   Effect.gen(function* () {
     const { sandbox } = yield* makeFakeSandbox;
     const session = yield* harness.startSession({ sandbox, id });
-    const slow = yield* Stream.runCollect(session.stream({ prompt: "slow" })).pipe(
-      Effect.forkChild,
+    const slow = yield* readUntil(
+      session.stream({ prompt: "slow" }),
+      (part) => part.type === "text-delta" && part.id === "answer",
     );
-    yield* Deferred.await(running);
+    yield* Deferred.succeed(running, undefined);
     const state = yield* session.suspend;
     yield* Fiber.join(slow);
     const stored = yield* Schema.encodeEffect(Schema.fromJsonString(Session.SessionState))(state);
@@ -107,7 +113,7 @@ describe("Harness", () => {
         expect(codex.starts[0]?.id).toBe(id);
         expect(codex.starts[0]?.workspace).toEqual({ sandbox, directory: "/work/session-one" });
         expect(codex.starts[0]?.history.content).toEqual([]);
-        expect(codex.starts[0]?.resume).toBeUndefined();
+        expect(codex.starts[0]?.agentState).toBeUndefined();
         expect(codex.starts[0]?.unfinishedTurn).toBeUndefined();
       }),
   );
@@ -123,7 +129,7 @@ describe("Harness", () => {
 
       yield* harness.resumeSession({ sandbox, state });
 
-      expect(codex.starts[1]?.resume).toEqual({ agent: "codex" });
+      expect(codex.starts[1]?.agentState).toEqual({ agent: "codex" });
       expect(textsOf(codex.starts[1]?.history ?? state.history)).toEqual([
         "hello",
         "codex answers hello",
@@ -146,7 +152,7 @@ describe("Harness", () => {
       yield* onOpencode.generate({ prompt: "again" });
       const state = yield* onOpencode.detach;
 
-      expect(opencode.starts[0]?.resume).toBeUndefined();
+      expect(opencode.starts[0]?.agentState).toBeUndefined();
       expect(textsOf(opencode.starts[0]?.history ?? state.history)).toEqual([
         "hello",
         "codex answers hello",
@@ -271,6 +277,25 @@ describe("Harness", () => {
         "amends answers hello",
       ]);
       expect(result.text).toBe("codex answers again");
+    }),
+  );
+
+  it.effect("needs a sandbox created with the ports the agent listens on", () =>
+    Effect.gen(function* () {
+      const port = Port.make(4096);
+      const opencode = yield* makeFakeAgent("opencode", answersAs("opencode"), { ports: [port] });
+      const harness = Harness.make(opencode.agent);
+      const { sandbox } = yield* makeFakeSandbox;
+
+      const refused = yield* Effect.flip(harness.startSession({ sandbox, id }));
+      yield* harness.startSession({ sandbox: Sandbox.of({ ...sandbox, ports: [port] }), id });
+
+      expect(harness.ports).toEqual([port]);
+      expect(refused.reason._tag).toBe("UnsupportedError");
+      expect(refused.message).toBe(
+        "opencode: opencode listens on ports 4096, which the sandbox was not created with",
+      );
+      expect(opencode.starts).toHaveLength(1);
     }),
   );
 

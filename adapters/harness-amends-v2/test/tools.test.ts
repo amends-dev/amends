@@ -1,6 +1,7 @@
 import { BunServices } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
-import { Effect, Path, Stream } from "effect";
+import { Duration, Effect, Path, Stream } from "effect";
+import { TestClock } from "effect/testing";
 import type { Tool } from "effect/ai";
 import * as Tools from "../src/Tools.ts";
 import { makeSandbox } from "./fixtures.ts";
@@ -11,32 +12,33 @@ type ToolsByName = typeof Tools.toolkit.tools;
  * The tools working in a session's directory in a new local sandbox, called as the model calls them:
  * by name, with encoded params, getting back the result the model reads.
  */
-const makeTools = Effect.gen(function* () {
-  const path = yield* Path.Path;
-  const sandbox = yield* makeSandbox;
-  const workspace = { sandbox, directory: path.join(sandbox.workingDirectory, "session-one") };
-  yield* sandbox.fileSystem.makeDirectory(workspace.directory);
-  const toolkit = yield* Effect.provide(Tools.toolkit, Tools.layer(workspace));
+const makeTools = (options?: Parameters<typeof Tools.layer>[1]) =>
+  Effect.gen(function* () {
+    const path = yield* Path.Path;
+    const sandbox = yield* makeSandbox;
+    const workspace = { sandbox, directory: path.join(sandbox.workingDirectory, "session-one") };
+    yield* sandbox.fileSystem.makeDirectory(workspace.directory);
+    const toolkit = yield* Effect.provide(Tools.toolkit, Tools.layer(workspace, options));
 
-  const call = <Name extends keyof ToolsByName>(
-    name: Name,
-    params: Tool.ParametersEncoded<ToolsByName[Name]>,
-  ) =>
-    Effect.flatMap(toolkit.handle(name, params), Stream.runCollect).pipe(
-      // The tools stream no preliminary results, only the one the model reads.
-      Effect.map(([handled]) => ({
-        isFailure: handled?.isFailure,
-        result: handled?.encodedResult,
-      })),
-    );
+    const call = <Name extends keyof ToolsByName>(
+      name: Name,
+      params: Tool.ParametersEncoded<ToolsByName[Name]>,
+    ) =>
+      Effect.flatMap(toolkit.handle(name, params), Stream.runCollect).pipe(
+        // The tools stream no preliminary results, only the one the model reads.
+        Effect.map(([handled]) => ({
+          isFailure: handled?.isFailure,
+          result: handled?.encodedResult,
+        })),
+      );
 
-  return { call, workspace, fs: sandbox.fileSystem, path };
-});
+    return { call, workspace, fs: sandbox.fileSystem, path };
+  });
 
 layer(BunServices.layer)("Tools", (it) => {
   it.effect("writes a file, creating its directories, and reads it back", () =>
     Effect.gen(function* () {
-      const { call } = yield* makeTools;
+      const { call } = yield* makeTools();
 
       const written = yield* call("write", { file_path: "notes/today.md", content: "# Today\n" });
       const read = yield* call("read", { file_path: "notes/today.md" });
@@ -48,7 +50,7 @@ layer(BunServices.layer)("Tools", (it) => {
 
   it.effect("resolves paths against the session's directory, and takes absolute ones in it", () =>
     Effect.gen(function* () {
-      const { call, workspace, fs, path } = yield* makeTools;
+      const { call, workspace, fs, path } = yield* makeTools();
 
       yield* call("write", { file_path: "relative.txt", content: "relative" });
       const absolute = path.join(workspace.directory, "absolute.txt");
@@ -68,7 +70,7 @@ layer(BunServices.layer)("Tools", (it) => {
     "answers the model that a path outside the session's directory is, without touching it",
     () =>
       Effect.gen(function* () {
-        const { call, workspace, fs, path } = yield* makeTools;
+        const { call, workspace, fs, path } = yield* makeTools();
         const outside = (file: string) =>
           `${file} is outside the session's directory, ${workspace.directory}`;
 
@@ -94,7 +96,7 @@ layer(BunServices.layer)("Tools", (it) => {
 
   it.effect("answers the model when a file cannot be read", () =>
     Effect.gen(function* () {
-      const { call } = yield* makeTools;
+      const { call } = yield* makeTools();
 
       const read = yield* call("read", { file_path: "missing.txt" });
 
@@ -105,7 +107,7 @@ layer(BunServices.layer)("Tools", (it) => {
 
   it.effect("replaces text that appears once, taking the new text literally", () =>
     Effect.gen(function* () {
-      const { call } = yield* makeTools;
+      const { call } = yield* makeTools();
       yield* call("write", { file_path: "greeting.txt", content: "hello world" });
 
       const edited = yield* call("edit", {
@@ -126,7 +128,7 @@ layer(BunServices.layer)("Tools", (it) => {
     "refuses an edit whose text is missing or appears more than once, leaving the file",
     () =>
       Effect.gen(function* () {
-        const { call } = yield* makeTools;
+        const { call } = yield* makeTools();
         yield* call("write", { file_path: "notes.txt", content: "one two one" });
 
         const missing = yield* call("edit", {
@@ -156,7 +158,7 @@ layer(BunServices.layer)("Tools", (it) => {
     "runs a command in the session's directory, returning its exit code and its output",
     () =>
       Effect.gen(function* () {
-        const { call, workspace, fs } = yield* makeTools;
+        const { call, workspace, fs } = yield* makeTools();
 
         const located = yield* call("bash", { command: "pwd -P" });
         const failed = yield* call("bash", { command: "echo failed >&2; exit 3" });
@@ -168,5 +170,37 @@ layer(BunServices.layer)("Tools", (it) => {
         // A command that fails still answers the model, with its stderr in the output.
         expect(failed).toEqual({ isFailure: false, result: { exitCode: 3, output: "failed\n" } });
       }),
+  );
+
+  it.effect("keeps the start and end of a command's long output, saying how much it dropped", () =>
+    Effect.gen(function* () {
+      const { call } = yield* makeTools();
+      const half = Tools.maxOutputLength / 2;
+
+      const { result } = yield* call("bash", {
+        command: `printf 'a%.0s' $(seq ${half}); printf 'b%.0s' $(seq 10); printf 'c%.0s' $(seq ${half})`,
+      });
+
+      expect(result).toEqual({
+        exitCode: 0,
+        output: `${"a".repeat(half)}\n[10 characters of output dropped]\n${"c".repeat(half)}`,
+      });
+    }),
+  );
+
+  it.effect("kills a command that outruns its timeout, answering the model with its output", () =>
+    Effect.gen(function* () {
+      const { call } = yield* makeTools({ commandTimeout: Duration.millis(300) });
+
+      // The command runs on this machine, so its timeout runs on the live clock.
+      const timedOut = yield* TestClock.withLive(
+        call("bash", { command: "echo started; sleep 30 & wait" }),
+      );
+
+      expect(timedOut).toEqual({
+        isFailure: true,
+        result: "The command did not finish within 300ms and was killed. Its output:\nstarted\n",
+      });
+    }),
   );
 });

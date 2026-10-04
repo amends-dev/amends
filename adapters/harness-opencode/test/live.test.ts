@@ -16,7 +16,6 @@ import {
 } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import * as Server from "../src/Server.ts";
 import { makeSandbox } from "./fixtures.ts";
@@ -34,17 +33,16 @@ const timeout = 120_000;
 const LiveLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
 
 /**
- * A harness over the opencode agent in a new local sandbox. opencode keeps its configuration and
- * data in directories of its own, apart from this machine's opencode, and shares only its cache. The local provider leaves
- * opencode's server running after the sandbox, so it is stopped when the scope closes.
+ * A harness over the opencode agent in a new local sandbox, whose server stops with the sandbox when
+ * the scope closes. opencode keeps its configuration and data in directories of its own, apart from
+ * this machine's opencode, and shares only its cache.
  */
 const makeLiveHarness = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const port = Network.Port.make(yield* Random.nextIntBetween(20_000, 60_000));
-  const sandbox = yield* makeSandbox(port);
   const home = yield* fs.makeTempDirectoryScoped();
-  yield* Effect.addFinalizer(() => stopServer(port));
+  const sandbox = yield* makeSandbox(port);
   const serverOptions = {
     command: "opencode",
     port,
@@ -58,19 +56,6 @@ const makeLiveHarness = Effect.gen(function* () {
   const agent = yield* OpencodeAgent.make({ model, ...serverOptions });
   return { sandbox, harness: Harness.make(agent), serverOptions };
 });
-
-const stopServer = (port: Network.Port) =>
-  Effect.gen(function* () {
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    yield* spawner.exitCode(
-      // opencode can ignore a request to stop while it runs a turn.
-      ChildProcess.make("pkill", [
-        "-KILL",
-        "-f",
-        `opencode serve --hostname=0.0.0.0 --port=${port}`,
-      ]),
-    );
-  }).pipe(Effect.ignore);
 
 /** The opencode session a session's agent state names. */
 const OpencodeState = Schema.Struct({ sessionID: Schema.String });
@@ -214,6 +199,26 @@ describe.skipIf(!enabled)("OpencodeAgent on opencode", () => {
         );
 
         expect(error._tag === "HarnessError" && error.reason._tag).toBe("TurnFailedError");
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+
+  it.live(
+    "deletes the session in opencode when it is destroyed, also after it was detached",
+    () =>
+      Effect.gen(function* () {
+        const { sandbox, harness, serverOptions } = yield* makeLiveHarness;
+        const session = yield* harness.startSession({ sandbox, id });
+        const { sessionID } = yield* Schema.decodeUnknownEffect(OpencodeState)(
+          (yield* session.detach).agentState,
+        );
+        const server = yield* Server.connect(sandbox, serverOptions);
+        const existed = yield* server.hasSession(sessionID);
+
+        yield* session.destroy;
+
+        expect(existed).toBe(true);
+        expect(yield* server.hasSession(sessionID)).toBe(false);
       }).pipe(Effect.provide(LiveLayer)),
     timeout,
   );

@@ -5,7 +5,10 @@
  * service for: the sandbox's identity, its ports, its network, and its lifecycle.
  *
  * A sandbox outlives the process that created it, so its lifetime is not tied to a `Scope`: it
- * runs until `stop` or `destroy`, and a provider can resume it later by its id.
+ * runs until `stop` or `destroy`, and a provider can resume it later by its id. A process in it
+ * ends with the scope that spawned it, unless its handle's `unref` lets it outlive that scope, as a
+ * server that should keep running after the host lets go does; it then runs until the sandbox
+ * stops.
  */
 import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
 import { ChildProcessSpawner } from "effect/process";
@@ -64,7 +67,10 @@ export class Sandbox extends Context.Service<
       protocol: EndpointProtocol,
     ) => Effect.Effect<Endpoint, SandboxError>;
 
-    /** Stops the sandbox so that it can be resumed later. Stopping a stopped sandbox succeeds. */
+    /**
+     * Stops the sandbox, ending every process in it, so that it can be resumed later. Stopping a
+     * stopped sandbox succeeds.
+     */
     readonly stop: Effect.Effect<void, SandboxError>;
 
     /**

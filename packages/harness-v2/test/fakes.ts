@@ -1,3 +1,4 @@
+import type { Port } from "@amends/sandbox-v2/Network";
 import { Sandbox, SandboxId } from "@amends/sandbox-v2/Sandbox";
 import { Deferred, Effect, FileSystem, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
@@ -35,6 +36,9 @@ export interface FakeAgentOptions {
   /** Whether every session needs a sandbox, as most agents do. True by default. */
   readonly requiresSandbox?: boolean;
 
+  /** The ports the agent listens on in its sandbox. None by default. */
+  readonly ports?: ReadonlyArray<Port>;
+
   /** Whether the agent loses the turns `suspend` cuts short, as opencode does in another sandbox. */
   readonly losesUnfinishedTurns?: boolean;
 
@@ -59,6 +63,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
     const agent: Agent = {
       id,
       requiresSandbox: options.requiresSandbox ?? true,
+      ports: options.ports,
       start: (startOptions) =>
         Effect.gen(function* () {
           starts.push(startOptions);
@@ -103,6 +108,26 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
 
     const fake: FakeAgent = { agent, starts, turns, continued, submitted };
     return fake;
+  });
+
+/**
+ * Reads `turn` in the background, returning the fiber that collects its parts once the reader has
+ * the part `reached` accepts. The session delivers a part the agent sent only when it is read, so a
+ * test that lets go of a turn after a part waits for the reader, not the agent.
+ */
+export const readUntil = <E, R>(
+  turn: Stream.Stream<StreamPart, E, R>,
+  reached: (part: StreamPart) => boolean,
+) =>
+  Effect.gen(function* () {
+    const read = yield* Deferred.make<void>();
+    const reading = yield* turn.pipe(
+      Stream.tap((part) => (reached(part) ? Deferred.succeed(read, undefined) : Effect.void)),
+      Stream.runCollect,
+      Effect.forkChild,
+    );
+    yield* Deferred.await(read);
+    return reading;
   });
 
 /** Drops the parts of a turn's first `steps` steps. */

@@ -3,94 +3,86 @@
  * stopping, and configuring it. File and process operations inside a sandbox fail with Effect's
  * `PlatformError` instead, as `FileSystem` and `ChildProcessSpawner` define.
  *
- * `SandboxError` says where a failure happened and holds the reason, so callers can recover from
- * one reason with `Effect.catchReason("SandboxError", "NotFoundError", ...)`.
+ * `SandboxError` says which provider failed and holds the reason, so callers can recover from one
+ * reason with `Effect.catchReason("SandboxError", "NotFoundError", ...)`. The operation that failed
+ * is the one the caller ran, which its span names.
  */
 import { Schema } from "effect";
 
-export class AuthenticationError extends Schema.TaggedError<AuthenticationError>(
-  "@amends/sandbox-v2/SandboxError/AuthenticationError",
-)("AuthenticationError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+/** The field every reason has: what happened, in the provider's words. */
+const described = { description: Schema.optional(Schema.String) };
 
-  override get message(): string {
-    return this.description ?? "The provider's credentials are missing, invalid, or not authorized";
-  }
-}
+/**
+ * Gives a reason its message, its description or `defaults.message` without one, and whether
+ * trying again may succeed.
+ */
+const withDefaults = <
+  // A class a mixin extends must take `any[]`, as TypeScript requires.
+  Base extends new (...args: any[]) => { readonly description?: string | undefined },
+>(
+  Base: Base,
+  defaults: { readonly message: string; readonly isRetryable: boolean },
+) =>
+  class extends Base {
+    get isRetryable(): boolean {
+      return defaults.isRetryable;
+    }
 
-export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends/sandbox-v2/SandboxError/NotFoundError",
-)("NotFoundError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+    get message(): string {
+      return this.description ?? defaults.message;
+    }
+  };
 
-  override get message(): string {
-    return this.description ?? "The sandbox does not exist";
-  }
-}
+export class AuthenticationError extends withDefaults(
+  Schema.TaggedError<AuthenticationError>("@amends/sandbox-v2/SandboxError/AuthenticationError")(
+    "AuthenticationError",
+    described,
+  ),
+  {
+    message: "The provider's credentials are missing, invalid, or not authorized",
+    isRetryable: false,
+  },
+) {}
 
-export class AlreadyExistsError extends Schema.TaggedError<AlreadyExistsError>(
-  "@amends/sandbox-v2/SandboxError/AlreadyExistsError",
-)("AlreadyExistsError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+export class NotFoundError extends withDefaults(
+  Schema.TaggedError<NotFoundError>("@amends/sandbox-v2/SandboxError/NotFoundError")(
+    "NotFoundError",
+    described,
+  ),
+  { message: "The sandbox does not exist", isRetryable: false },
+) {}
 
-  override get message(): string {
-    return this.description ?? "A sandbox with this id already exists";
-  }
-}
+export class AlreadyExistsError extends withDefaults(
+  Schema.TaggedError<AlreadyExistsError>("@amends/sandbox-v2/SandboxError/AlreadyExistsError")(
+    "AlreadyExistsError",
+    described,
+  ),
+  { message: "A sandbox with this id already exists", isRetryable: false },
+) {}
 
-export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends/sandbox-v2/SandboxError/UnsupportedError",
-)("UnsupportedError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+export class UnsupportedError extends withDefaults(
+  Schema.TaggedError<UnsupportedError>("@amends/sandbox-v2/SandboxError/UnsupportedError")(
+    "UnsupportedError",
+    described,
+  ),
+  { message: "The provider does not support this operation", isRetryable: false },
+) {}
 
-  override get message(): string {
-    return this.description ?? "The provider does not support this operation";
-  }
-}
+export class UnavailableError extends withDefaults(
+  Schema.TaggedError<UnavailableError>("@amends/sandbox-v2/SandboxError/UnavailableError")(
+    "UnavailableError",
+    described,
+  ),
+  { message: "The provider is temporarily unavailable", isRetryable: true },
+) {}
 
-export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends/sandbox-v2/SandboxError/UnavailableError",
-)("UnavailableError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return true;
-  }
-
-  override get message(): string {
-    return this.description ?? "The provider is temporarily unavailable";
-  }
-}
-
-export class UnknownError extends Schema.TaggedError<UnknownError>(
-  "@amends/sandbox-v2/SandboxError/UnknownError",
-)("UnknownError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
-
-  override get message(): string {
-    return this.description ?? "The provider failed";
-  }
-}
+export class UnknownError extends withDefaults(
+  Schema.TaggedError<UnknownError>("@amends/sandbox-v2/SandboxError/UnknownError")(
+    "UnknownError",
+    described,
+  ),
+  { message: "The provider failed", isRetryable: false },
+) {}
 
 export const SandboxErrorReason = Schema.Union([
   AuthenticationError,
@@ -106,8 +98,8 @@ export type SandboxErrorReason = typeof SandboxErrorReason.Type;
 export class SandboxError extends Schema.TaggedError<SandboxError>(
   "@amends/sandbox-v2/SandboxError",
 )("SandboxError", {
+  /** The provider that failed, such as `local`. */
   provider: Schema.String,
-  method: Schema.String,
   reason: SandboxErrorReason,
   cause: Schema.optional(Schema.Defect()),
 }) {
@@ -116,6 +108,6 @@ export class SandboxError extends Schema.TaggedError<SandboxError>(
   }
 
   override get message(): string {
-    return `${this.provider}.${this.method}: ${this.reason.message}`;
+    return `${this.provider}: ${this.reason.message}`;
   }
 }

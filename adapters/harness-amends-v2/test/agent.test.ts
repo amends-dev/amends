@@ -57,7 +57,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
   it.effect("answers from its model alone when the session has no sandbox", () =>
     Effect.gen(function* () {
       const { model, requests } = yield* makeScriptedModel(() => answer("I am well"));
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({ id });
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({ id });
 
       const result = yield* session.generate({ prompt: "how are you doing" });
 
@@ -84,7 +84,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         if (results.length === 1) return callTool("read-1", "read", { file_path: "notes.txt" });
         return answer(`The file says ${String(results[1])}`);
       });
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
         id,
         sandbox,
       });
@@ -120,7 +120,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
             ? answer(`The sum is ${sum}`)
             : callTool("add-1", "Add", { a: 2, b: 3 });
         });
-        const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({ id });
+        const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
+          id,
+        });
 
         const result = yield* session.generate({
           prompt: "add 2 and 3",
@@ -161,7 +163,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           NotesToolkit.toLayer({ read: () => Effect.succeed("a note") }),
         );
         const { model } = yield* makeScriptedModel(() => answer("done"));
-        const harness = Harness.make(AmendsAgent.make({ model }));
+        const harness = Harness.make(yield* AmendsAgent.make({ model }));
         const inSandbox = yield* harness.startSession({ id, sandbox: yield* makeSandbox });
         const withoutSandbox = yield* harness.startSession({ id });
 
@@ -178,7 +180,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const { model, requests } = yield* makeScriptedModel((request) =>
         request.responseFormat.type === "json" ? answer('{"answer":42}') : answer("Let me think"),
       );
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
         id,
         sandbox: yield* makeSandbox,
       });
@@ -202,7 +204,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const { model } = yield* makeScriptedModel((request) =>
         request.responseFormat.type === "json" ? answer("not JSON") : answer("Let me think"),
       );
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({ id });
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({ id });
 
       const error = yield* Effect.flip(
         session.generateObject({
@@ -226,7 +228,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         reason: new AiError.RateLimitError({}),
       });
       const { model } = yield* makeScriptedModel(() => Stream.fail(failure));
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({ id });
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({ id });
 
       const parts = yield* Stream.runCollect(session.stream({ prompt: "hello" }));
       const error = yield* Effect.flip(session.generate({ prompt: "again" }));
@@ -251,7 +253,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
     Effect.gen(function* () {
       const main = yield* makeScriptedModel(() => answer("from main"));
       const fast = yield* makeScriptedModel(() => answer("from fast"));
-      const agent = AmendsAgent.make({ model: main.model, models: { fast: fast.model } });
+      const agent = yield* AmendsAgent.make({ model: main.model, models: { fast: fast.model } });
       const session = yield* Harness.make(agent).startSession({ id });
 
       const named = yield* session.generate({ prompt: "hello", model: "fast" });
@@ -272,7 +274,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const { model, requests } = yield* makeScriptedModel((request) =>
         callTool(`bash-${toolResultsOf(request).length}`, "bash", { command: "true" }),
       );
-      const session = yield* Harness.make(AmendsAgent.make({ model, maxSteps: 2 })).startSession({
+      const session = yield* Harness.make(
+        yield* AmendsAgent.make({ model, maxSteps: 2 }),
+      ).startSession({
         id,
         sandbox: yield* makeSandbox,
       });
@@ -292,7 +296,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           ? callTool("write-1", "write", { file_path: "notes.txt", content: "hello" })
           : answer("done"),
       );
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
         id,
         sandbox: yield* makeSandbox,
       });
@@ -324,7 +328,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           ? callTool("write-1", "write", { file_path: "notes.txt", content: "hello" })
           : answer("done"),
       );
-      const session = yield* Harness.make(AmendsAgent.make({ model: earlier.model })).startSession({
+      const session = yield* Harness.make(
+        yield* AmendsAgent.make({ model: earlier.model }),
+      ).startSession({
         id,
         sandbox,
       });
@@ -332,7 +338,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const state = yield* throughJson(yield* session.detach);
 
       const later = yield* makeScriptedModel(() => answer("still here"));
-      const resumed = yield* Harness.make(AmendsAgent.make({ model: later.model })).resumeSession({
+      const resumed = yield* Harness.make(
+        yield* AmendsAgent.make({ model: later.model }),
+      ).resumeSession({
         sandbox,
         state,
       });
@@ -361,7 +369,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         agentState: { thread: "codex's own" },
       };
 
-      const session = yield* Harness.make(AmendsAgent.make({ model })).resumeSession({ state });
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).resumeSession({
+        state,
+      });
       yield* session.generate({ prompt: "again" });
 
       expect(rolesOf(requests[0]?.prompt)).toEqual(["user", "assistant", "user"]);
@@ -379,7 +389,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       };
 
       const error = yield* Effect.flip(
-        Harness.make(AmendsAgent.make({ model })).resumeSession({ state }),
+        Harness.make(yield* AmendsAgent.make({ model })).resumeSession({ state }),
       );
 
       expect(error.reason._tag).toBe("InvalidOutputError");
@@ -397,7 +407,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         }
         return untilSuspended(secondStep, answer("logged"));
       });
-      const harness = Harness.make(AmendsAgent.make({ model }));
+      const harness = Harness.make(yield* AmendsAgent.make({ model }));
       const session = yield* harness.startSession({ id, sandbox });
       const tookFirstStep = yield* Deferred.make<void>();
       const reading = yield* session.stream({ prompt: "log a line" }).pipe(
@@ -442,7 +452,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           }
           return untilSuspended(thirdStep, answer("logged"));
         });
-        const harness = Harness.make(AmendsAgent.make({ model }));
+        const harness = Harness.make(yield* AmendsAgent.make({ model }));
         const session = yield* harness.startSession({ id, sandbox });
         // The caller takes the first step and then waits, while the agent goes on without it.
         const tookFirstStep = yield* Deferred.make<void>();
@@ -492,7 +502,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           ? callTool("log-1", "bash", { command: "echo ran >> log.txt" })
           : untilSuspended(secondStep, answer("unused")),
       );
-      const harness = Harness.make(AmendsAgent.make({ model }));
+      const harness = Harness.make(yield* AmendsAgent.make({ model }));
       const session = yield* harness.startSession({ id, sandbox });
       const tookFirstStep = yield* Deferred.make<void>();
       const reading = yield* session.stream({ prompt: "log a line" }).pipe(
@@ -508,7 +518,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const parts = yield* Fiber.join(reading);
 
       const later = yield* makeScriptedModel(() => answer("done"));
-      const resumed = yield* Harness.make(AmendsAgent.make({ model: later.model })).resumeSession({
+      const resumed = yield* Harness.make(
+        yield* AmendsAgent.make({ model: later.model }),
+      ).resumeSession({
         sandbox,
         state,
       });
@@ -523,7 +535,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
   it.effect("asks for no approvals and does not compact yet", () =>
     Effect.gen(function* () {
       const { model } = yield* makeScriptedModel(() => answer("unused"));
-      const session = yield* Harness.make(AmendsAgent.make({ model })).startSession({ id });
+      const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({ id });
 
       const approval = yield* Effect.flip(
         session.approve({ approvalId: "approval-1", approved: true }),

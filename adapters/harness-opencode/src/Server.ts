@@ -5,8 +5,7 @@
  * host connects to it again with the password the server keeps in the sandbox.
  *
  * The server listens on every interface of the sandbox, at a port the sandbox exposes, behind HTTP
- * basic authentication. A failed request fails with `ServerError`, which carries the harness's
- * reason for it, for the agent to report with the method that made the request.
+ * basic authentication. A failed request fails with the `HarnessError` the agent reports.
  */
 import { HarnessError } from "@amends/harness-v2";
 import { type Network, Sandbox, type SandboxError } from "@amends/sandbox-v2";
@@ -47,14 +46,6 @@ export interface ServerOptions {
   readonly env: Readonly<Record<string, string>>;
 }
 
-/** A request to the server failed, for the harness's `reason`. */
-export class ServerError extends Schema.TaggedError<ServerError>(
-  "@amends/harness-opencode/ServerError",
-)("ServerError", {
-  reason: HarnessError.HarnessErrorReason,
-  cause: Schema.optional(Schema.Defect()),
-}) {}
-
 // TODO: Give `prompt` the files a user message carries, once a turn's prompt has files.
 // TODO: Read a session's events again when the connection drops mid-turn, after the last one
 // delivered, once a host sees connections drop.
@@ -63,34 +54,40 @@ export interface Server {
   readonly createSession: (options: {
     readonly directory: string;
     readonly model?: ModelRef;
-  }) => Effect.Effect<string, ServerError>;
+  }) => Effect.Effect<string, HarnessError.HarnessError>;
 
   /**
    * Whether opencode has loaded the model provider `providerID`, which a server loads a moment after
    * it starts answering, and only when it can use the provider.
    */
-  readonly hasProvider: (providerID: string) => Effect.Effect<boolean, ServerError>;
+  readonly hasProvider: (providerID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
 
   /** Whether the server has the session, as it does unless the sandbox lost opencode's data. */
-  readonly hasSession: (sessionID: string) => Effect.Effect<boolean, ServerError>;
+  readonly hasSession: (sessionID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
 
   /**
    * Gives the session a prompt, which starts a turn, or steers the turn running, returning the
    * number of the event that admitted it. The turn's events follow it.
    */
-  readonly prompt: (sessionID: string, text: string) => Effect.Effect<number, ServerError>;
+  readonly prompt: (
+    sessionID: string,
+    text: string,
+  ) => Effect.Effect<number, HarnessError.HarnessError>;
 
   /** Runs the session's next turns on `model`. */
-  readonly switchModel: (sessionID: string, model: ModelRef) => Effect.Effect<void, ServerError>;
+  readonly switchModel: (
+    sessionID: string,
+    model: ModelRef,
+  ) => Effect.Effect<void, HarnessError.HarnessError>;
 
   /** Ends the session's running turn. Interrupting a session that runs none does nothing. */
-  readonly interrupt: (sessionID: string) => Effect.Effect<void, ServerError>;
+  readonly interrupt: (sessionID: string) => Effect.Effect<void, HarnessError.HarnessError>;
 
   /** Whether opencode is running the session: working on a turn, from taking its prompt. */
-  readonly isRunning: (sessionID: string) => Effect.Effect<boolean, ServerError>;
+  readonly isRunning: (sessionID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
 
   /** Deletes the session and everything it recorded. Deleting a deleted session succeeds. */
-  readonly deleteSession: (sessionID: string) => Effect.Effect<void, ServerError>;
+  readonly deleteSession: (sessionID: string) => Effect.Effect<void, HarnessError.HarnessError>;
 
   /**
    * The session's events numbered after `after`, or all of them, and then each new one as it
@@ -100,13 +97,16 @@ export interface Server {
   readonly events: (
     sessionID: string,
     after: number | undefined,
-  ) => Stream.Stream<SessionEvent, ServerError>;
+  ) => Stream.Stream<SessionEvent, HarnessError.HarnessError>;
 
   /**
    * The session's events numbered after `after` that it has recorded so far, ending with the last.
    * Events of types the adapter does not read are left out.
    */
-  readonly history: (sessionID: string, after: number) => Stream.Stream<SessionEvent, ServerError>;
+  readonly history: (
+    sessionID: string,
+    after: number,
+  ) => Stream.Stream<SessionEvent, HarnessError.HarnessError>;
 
   /**
    * Appends `events` to the session in `directory` they name, as if it had recorded them. They are
@@ -115,7 +115,7 @@ export interface Server {
   readonly replay: (
     directory: string,
     events: ReadonlyArray<SessionEvent>,
-  ) => Effect.Effect<void, ServerError>;
+  ) => Effect.Effect<void, HarnessError.HarnessError>;
 }
 
 /** Connects to the server in `sandbox`, starting it when it is not running. */
@@ -209,6 +209,8 @@ export const connect = Effect.fn("Server.connect")(function* (
         Effect.mapError(fromRequestError),
       ),
 
+    // The session API has no route that deletes a session yet, so this is the server's older one.
+    // It answers 404 for a session it does not have.
     deleteSession: (sessionID) =>
       client
         .del(`/session/${encodeURIComponent(sessionID)}`)
@@ -273,10 +275,10 @@ export const connect = Effect.fn("Server.connect")(function* (
         ),
         Effect.catchTag("SchemaError", (cause) =>
           Effect.fail(
-            new ServerError({
-              reason: new HarnessError.InvalidOutputError({ description: cause.message }),
+            harnessError(
+              new HarnessError.InvalidOutputError({ description: cause.message }),
               cause,
-            }),
+            ),
           ),
         ),
       ),
@@ -333,9 +335,6 @@ const passwordIn = (sandbox: Sandbox.Sandbox["Service"]) =>
  * Starts the server and waits until it answers. Unreferenced, the server outlives the scope that
  * started it and the host; it stops with the sandbox.
  */
-// TODO: Stop the server with the sandbox on the local provider too, once the sandbox contract says
-// what becomes of a process that outlives the scope that spawned it; the local provider leaves it
-// running.
 const start = (
   sandbox: Sandbox.Sandbox["Service"],
   options: ServerOptions,
@@ -390,7 +389,7 @@ const start = (
     );
     yield* Effect.raceFirst(answered, exited).pipe(
       Effect.mapError((reason) =>
-        reason._tag === "PlatformError" ? fromPlatformError(reason) : new ServerError({ reason }),
+        reason._tag === "PlatformError" ? fromPlatformError(reason) : harnessError(reason),
       ),
     );
   }).pipe(
@@ -399,57 +398,50 @@ const start = (
     Effect.catchTag("PlatformError", (error) => Effect.fail(fromPlatformError(error))),
   );
 
-/** The harness's reason for a request that failed with `error`. */
+/** The error a request that failed with `error` reports. */
 const fromRequestError = (
   error: HttpClientError.HttpClientError | Schema.SchemaError | Sse.SseError | Sse.Retry,
-): ServerError => {
+) => {
   switch (error._tag) {
     case "HttpClientError": {
       const { reason } = error;
+      const description = error.message;
       if (reason._tag === "TransportError") {
-        return new ServerError({
-          reason: new HarnessError.UnavailableError({ description: error.message }),
-          cause: error,
-        });
+        return harnessError(new HarnessError.UnavailableError({ description }), error);
       }
       const status = reason._tag === "StatusCodeError" ? reason.response.status : undefined;
-      const description = error.message;
-      return new ServerError({
-        reason:
-          status === 404
-            ? new HarnessError.NotFoundError({ description })
-            : status === 429 || (status !== undefined && status >= 500)
-              ? new HarnessError.UnavailableError({ description })
-              : new HarnessError.UnknownError({ description }),
-        cause: error,
-      });
+      return harnessError(
+        status === 404
+          ? new HarnessError.NotFoundError({ description })
+          : status === 429 || (status !== undefined && status >= 500)
+            ? new HarnessError.UnavailableError({ description })
+            : new HarnessError.UnknownError({ description }),
+        error,
+      );
     }
     case "SchemaError":
     case "SseError":
-      return new ServerError({
-        reason: new HarnessError.InvalidOutputError({ description: error.message }),
-        cause: error,
-      });
+      return harnessError(
+        new HarnessError.InvalidOutputError({ description: error.message }),
+        error,
+      );
     case "Retry":
-      return new ServerError({
-        reason: new HarnessError.UnavailableError({
-          description: "opencode's server asked to be retried",
-        }),
-      });
+      return harnessError(
+        new HarnessError.UnavailableError({ description: "opencode's server asked to be retried" }),
+      );
   }
 };
 
 const fromSandboxError = (error: SandboxError.SandboxError) =>
-  new ServerError({
-    reason:
-      error.reason._tag === "UnavailableError"
-        ? new HarnessError.UnavailableError({ description: error.message })
-        : new HarnessError.UnknownError({ description: error.message }),
-    cause: error,
-  });
+  harnessError(
+    error.reason._tag === "UnavailableError"
+      ? new HarnessError.UnavailableError({ description: error.message })
+      : new HarnessError.UnknownError({ description: error.message }),
+    error,
+  );
 
 const fromPlatformError = (error: PlatformError.PlatformError) =>
-  new ServerError({
-    reason: new HarnessError.UnknownError({ description: error.message }),
-    cause: error,
-  });
+  harnessError(new HarnessError.UnknownError({ description: error.message }), error);
+
+const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+  new HarnessError.HarnessError({ agent: "opencode", reason, cause });

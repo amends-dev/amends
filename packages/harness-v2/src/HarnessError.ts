@@ -5,136 +5,137 @@
  * finishes with the reason `error`. Only `generate` and `generateObject`, which return a whole turn,
  * fail on it, with `TurnFailedError`.
  *
- * `HarnessError` says which harness and method failed and holds the reason, so callers can recover
- * from one reason with `Effect.catchReason("HarnessError", "NotFoundError", ...)`.
+ * `HarnessError` says which agent failed and holds the reason, so callers can recover from one
+ * reason with `Effect.catchReason("HarnessError", "NotFoundError", ...)`. The operation that failed
+ * is the one the caller ran, which its span names.
  */
 import { Schema } from "effect";
 import { Response } from "effect/ai";
 
-export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends/harness-v2/HarnessError/UnsupportedError",
-)("UnsupportedError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+/** The field every reason has: what happened, in the words of whoever reports it. */
+const described = { description: Schema.optional(Schema.String) };
 
-  override get message(): string {
-    return this.description ?? "The harness does not support this operation";
-  }
-}
+/**
+ * Gives a reason its message, its description or `defaults.message` without one, and whether
+ * trying again may succeed.
+ */
+const withDefaults = <
+  // A class a mixin extends must take `any[]`, as TypeScript requires.
+  Base extends new (...args: any[]) => { readonly description?: string | undefined },
+>(
+  Base: Base,
+  defaults: { readonly message: string; readonly isRetryable: boolean },
+) =>
+  class extends Base {
+    get isRetryable(): boolean {
+      return defaults.isRetryable;
+    }
 
-export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends/harness-v2/HarnessError/NotFoundError",
-)("NotFoundError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+    get message(): string {
+      return this.description ?? defaults.message;
+    }
+  };
 
-  override get message(): string {
-    return this.description ?? "The session no longer exists";
-  }
-}
+export class UnsupportedError extends withDefaults(
+  Schema.TaggedError<UnsupportedError>("@amends/harness-v2/HarnessError/UnsupportedError")(
+    "UnsupportedError",
+    described,
+  ),
+  { message: "The harness does not support this operation", isRetryable: false },
+) {}
 
-export class TurnInProgressError extends Schema.TaggedError<TurnInProgressError>(
-  "@amends/harness-v2/HarnessError/TurnInProgressError",
-)("TurnInProgressError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
+/** Something the agent was asked about does not exist, such as a session it lost. */
+export class NotFoundError extends withDefaults(
+  Schema.TaggedError<NotFoundError>("@amends/harness-v2/HarnessError/NotFoundError")(
+    "NotFoundError",
+    described,
+  ),
+  { message: "The agent has no such session", isRetryable: false },
+) {}
 
-  override get message(): string {
-    return this.description ?? "The session is already running a turn";
-  }
-}
+/** The session was let go of: `Harness.resumeSession` picks it up again from what that returned. */
+export class SessionClosedError extends withDefaults(
+  Schema.TaggedError<SessionClosedError>("@amends/harness-v2/HarnessError/SessionClosedError")(
+    "SessionClosedError",
+    described,
+  ),
+  {
+    message: "The session was suspended, detached, stopped, or destroyed",
+    isRetryable: false,
+  },
+) {}
+
+export class TurnInProgressError extends withDefaults(
+  Schema.TaggedError<TurnInProgressError>("@amends/harness-v2/HarnessError/TurnInProgressError")(
+    "TurnInProgressError",
+    described,
+  ),
+  { message: "The session is already running a turn", isRetryable: false },
+) {}
+
+/** The session has no turn for the operation: none running to suspend, or none to continue. */
+export class NoTurnError extends withDefaults(
+  Schema.TaggedError<NoTurnError>("@amends/harness-v2/HarnessError/NoTurnError")(
+    "NoTurnError",
+    described,
+  ),
+  { message: "The session has no turn for this", isRetryable: false },
+) {}
 
 /** The agent reported that the turn failed, with the error of its `error` part. */
-export class TurnFailedError extends Schema.TaggedError<TurnFailedError>(
-  "@amends/harness-v2/HarnessError/TurnFailedError",
-)("TurnFailedError", {
-  description: Schema.optional(Schema.String),
-  error: Schema.Unknown,
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
-
-  override get message(): string {
-    return this.description ?? "The agent reported that the turn failed";
-  }
-}
+export class TurnFailedError extends withDefaults(
+  Schema.TaggedError<TurnFailedError>("@amends/harness-v2/HarnessError/TurnFailedError")(
+    "TurnFailedError",
+    { ...described, error: Schema.Unknown },
+  ),
+  { message: "The agent reported that the turn failed", isRetryable: false },
+) {}
 
 /** The agent sent output the harness cannot read, such as an event it cannot translate. */
-export class InvalidOutputError extends Schema.TaggedError<InvalidOutputError>(
-  "@amends/harness-v2/HarnessError/InvalidOutputError",
-)("InvalidOutputError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
-
-  override get message(): string {
-    return this.description ?? "The agent sent output the harness cannot read";
-  }
-}
+export class InvalidOutputError extends withDefaults(
+  Schema.TaggedError<InvalidOutputError>("@amends/harness-v2/HarnessError/InvalidOutputError")(
+    "InvalidOutputError",
+    described,
+  ),
+  { message: "The agent sent output the harness cannot read", isRetryable: false },
+) {}
 
 /** The agent's answer to a request for an object did not match its schema. Asking again may succeed. */
-export class StructuredOutputError extends Schema.TaggedError<StructuredOutputError>(
-  "@amends/harness-v2/HarnessError/StructuredOutputError",
-)("StructuredOutputError", {
-  description: Schema.optional(Schema.String),
-  responseText: Schema.String,
-  usage: Schema.optional(Schema.toEncoded(Response.Usage)),
-}) {
-  get isRetryable(): boolean {
-    return true;
-  }
+export class StructuredOutputError extends withDefaults(
+  Schema.TaggedError<StructuredOutputError>(
+    "@amends/harness-v2/HarnessError/StructuredOutputError",
+  )("StructuredOutputError", {
+    ...described,
+    responseText: Schema.String,
+    usage: Schema.optional(Schema.toEncoded(Response.Usage)),
+  }),
+  { message: "The agent's answer did not match the requested schema", isRetryable: true },
+) {}
 
-  override get message(): string {
-    return this.description ?? "The agent's answer did not match the requested schema";
-  }
-}
+export class UnavailableError extends withDefaults(
+  Schema.TaggedError<UnavailableError>("@amends/harness-v2/HarnessError/UnavailableError")(
+    "UnavailableError",
+    described,
+  ),
+  { message: "The agent cannot be reached right now", isRetryable: true },
+) {}
 
-export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends/harness-v2/HarnessError/UnavailableError",
-)("UnavailableError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return true;
-  }
-
-  override get message(): string {
-    return this.description ?? "The agent cannot be reached right now";
-  }
-}
-
-export class UnknownError extends Schema.TaggedError<UnknownError>(
-  "@amends/harness-v2/HarnessError/UnknownError",
-)("UnknownError", {
-  description: Schema.optional(Schema.String),
-}) {
-  get isRetryable(): boolean {
-    return false;
-  }
-
-  override get message(): string {
-    return this.description ?? "The harness failed";
-  }
-}
+export class UnknownError extends withDefaults(
+  Schema.TaggedError<UnknownError>("@amends/harness-v2/HarnessError/UnknownError")(
+    "UnknownError",
+    described,
+  ),
+  { message: "The harness failed", isRetryable: false },
+) {}
 
 // TODO: Add a HistoryUnavailableError reason with reading the agent's own history, for an agent
 // whose store the harness cannot reach from where it runs.
 export const HarnessErrorReason = Schema.Union([
   UnsupportedError,
   NotFoundError,
+  SessionClosedError,
   TurnInProgressError,
+  NoTurnError,
   TurnFailedError,
   InvalidOutputError,
   StructuredOutputError,
@@ -147,8 +148,8 @@ export type HarnessErrorReason = typeof HarnessErrorReason.Type;
 export class HarnessError extends Schema.TaggedError<HarnessError>(
   "@amends/harness-v2/HarnessError",
 )("HarnessError", {
-  harness: Schema.String,
-  method: Schema.String,
+  /** The agent that failed, as `Agent.id` names it. */
+  agent: Schema.String,
   reason: HarnessErrorReason,
   cause: Schema.optional(Schema.Defect()),
 }) {
@@ -157,6 +158,6 @@ export class HarnessError extends Schema.TaggedError<HarnessError>(
   }
 
   override get message(): string {
-    return `${this.harness}.${this.method}: ${this.reason.message}`;
+    return `${this.agent}: ${this.reason.message}`;
   }
 }

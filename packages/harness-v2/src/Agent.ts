@@ -12,7 +12,7 @@
  * A session outlives the process that started it: the agent keeps running after `detach` or
  * `suspend`, and `start` picks the session up again from what those returned.
  */
-import type { Sandbox, Template } from "@amends/sandbox-v2";
+import type { Network, Sandbox, Template } from "@amends/sandbox-v2";
 import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
@@ -49,13 +49,13 @@ export interface StartOptions {
   // agents that cannot load one natively.
   /**
    * The conversation so far, empty for a new session. An agent that last ran this session, and is
-   * given `resume` or `unfinishedTurn`, has it already. Any other agent loads it before its first
-   * turn, so that a session started on one agent can continue on another.
+   * given `agentState` or `unfinishedTurn`, has it already. Any other agent loads it before its
+   * first turn, so that a session started on one agent can continue on another.
    */
   readonly history: Prompt.Prompt;
 
   /** What this agent's `detach` or `stop` returned when the session last ran on this agent. */
-  readonly resume?: Schema.Json;
+  readonly agentState?: Schema.Json;
 
   /**
    * What this agent's `suspend` returned when the session's last turn was cut short on this agent.
@@ -138,13 +138,22 @@ export interface AgentSession {
    */
   readonly suspend: Effect.Effect<Schema.Json, HarnessError>;
 
-  /** Lets go of the session between turns while the agent keeps running, returning what `start` takes as `resume`. */
+  /**
+   * Lets go of the session between turns while the agent keeps running, returning what `start`
+   * takes as `agentState`.
+   */
   readonly detach: Effect.Effect<Schema.Json, HarnessError>;
 
-  /** Stops the agent, returning what `start` takes as `resume` to start it again with its conversation. */
+  /**
+   * Stops the agent, returning what `start` takes as `agentState` to start it again with its
+   * conversation.
+   */
   readonly stop: Effect.Effect<Schema.Json, HarnessError>;
 
-  /** Stops the agent for good. */
+  /**
+   * Stops the agent for good, deleting what it keeps of the session. It also destroys a session
+   * `suspend`, `detach`, or `stop` let go of, and destroying it again succeeds.
+   */
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
 
@@ -157,6 +166,9 @@ export interface Agent {
 
   /** Installs the agent in a sandbox. An agent that runs in the host's process has none. */
   readonly template?: Template.Template;
+
+  /** The ports the agent listens on in its sandbox, which the sandbox must be created with. */
+  readonly ports?: ReadonlyArray<Network.Port>;
 
   /** Starts a session: a new one, or one picked up again from what an earlier session returned. */
   readonly start: (options: StartOptions) => Effect.Effect<AgentSession, HarnessError>;

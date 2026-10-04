@@ -12,6 +12,7 @@
 import { type Agent, HarnessError, type StreamPart } from "@amends/harness-v2";
 import {
   Deferred,
+  type Duration,
   Effect,
   flow,
   Layer,
@@ -36,6 +37,9 @@ export interface Options {
 
   /** The most steps a turn takes, ending it even while the model calls tools. Unlimited by default. */
   readonly maxSteps?: number;
+
+  /** How long a `bash` command runs before the agent kills it, 2 minutes by default. */
+  readonly commandTimeout?: Duration.Duration;
 }
 
 /** What `suspend`, `detach`, and `stop` return, for `start` to take back. */
@@ -52,11 +56,13 @@ const StateJson = Schema.toCodecJson(State);
 /** What `start` takes back, if anything: a state the agent returned. */
 const SavedState = Schema.UndefinedOr(StateJson);
 
-export const make = (options: Options): Agent.Agent => ({
-  id: "amends",
-  requiresSandbox: false,
-  start: (startOptions) => startSession(options, startOptions),
-});
+/** The agent. It needs no services of its own: a turn runs on the models the options give it. */
+export const make = (options: Options): Effect.Effect<Agent.Agent> =>
+  Effect.succeed({
+    id: "amends",
+    requiresSandbox: false,
+    start: (startOptions) => startSession(options, startOptions),
+  });
 
 const startSession = Effect.fn("AmendsAgent.start")(function* (
   options: Options,
@@ -64,7 +70,7 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
 ) {
   const { workspace } = startOptions;
   const maxSteps = options.maxSteps ?? Number.POSITIVE_INFINITY;
-  const resumed = yield* readState(startOptions.resume);
+  const resumed = yield* readState(startOptions.agentState);
   const suspended = yield* readState(startOptions.unfinishedTurn);
   const conversation = yield* Ref.make(
     (resumed ?? suspended)?.conversation ?? startOptions.history,
@@ -85,7 +91,7 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const hostResults = new Map<string, Deferred.Deferred<unknown, unknown>>();
 
   /** The model a turn names, or the agent's default. */
-  const modelFor = (method: string, name: string | undefined) => {
+  const modelFor = (name: string | undefined) => {
     if (name === undefined) return Effect.succeed(options.model);
     const model =
       options.models !== undefined && Object.hasOwn(options.models, name)
@@ -94,7 +100,6 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     return model === undefined
       ? Effect.fail(
           harnessError(
-            method,
             new HarnessError.UnsupportedError({ description: `amends has no model named ${name}` }),
           ),
         )
@@ -124,7 +129,7 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
    * The tools a turn offers the model, with their handlers: the agent's own when it works in a
    * sandbox, and stand-ins for the host's.
    */
-  const toolkitFor = (method: string, hostTools: ReadonlyArray<Tool.Any>) => {
+  const toolkitFor = (hostTools: ReadonlyArray<Tool.Any>) => {
     const standIns = hostTools.map(standInFor);
     const hostHandlers = Toolkit.make(...standIns).toLayer(
       Object.fromEntries(standIns.map((tool) => [tool.name, awaitHostResult])),
@@ -135,11 +140,11 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     const clash = hostTools.find((tool) => Object.hasOwn(Tools.toolkit.tools, tool.name));
     if (clash !== undefined) {
       const description = `The host's tool ${clash.name} has the name of one of amends's own tools`;
-      return Effect.fail(harnessError(method, new HarnessError.UnsupportedError({ description })));
+      return Effect.fail(harnessError(new HarnessError.UnsupportedError({ description })));
     }
     return Effect.provide(
       Toolkit.make<ReadonlyArray<TurnTool>>(...Object.values(Tools.toolkit.tools), ...standIns),
-      Layer.merge(Tools.layer(workspace), hostHandlers),
+      Layer.merge(Tools.layer(workspace, { commandTimeout: options.commandTimeout }), hostHandlers),
     );
   };
 
@@ -244,17 +249,13 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
    * answering in JSON when the turn asks for JSON, and then the turn's `finish`. A failure of the
    * model ends the turn with an `error` part. The turn stops when the session closes.
    */
-  const runTurn = (
-    method: string,
-    turnOptions: Agent.TurnOptions,
-    finishedSteps: ReadonlyArray<Prompt.Prompt>,
-  ) =>
+  const runTurn = (turnOptions: Agent.TurnOptions, finishedSteps: ReadonlyArray<Prompt.Prompt>) =>
     Stream.callback<StreamPart.StreamPart, HarnessError.HarnessError>((queue) =>
       Effect.gen(function* () {
         const emit: Emit = (parts) => Queue.offerAll(queue, parts);
         yield* Ref.set(turn, { prompt: turnOptions.prompt, steps: finishedSteps });
-        const languageModel = yield* modelFor(method, turnOptions.model);
-        const toolkit = yield* toolkitFor(method, turnOptions.tools);
+        const languageModel = yield* modelFor(turnOptions.model);
+        const toolkit = yield* toolkitFor(turnOptions.tools);
         const { instructions, responseFormat } = turnOptions;
 
         const steps: Array<Response.FinishPart> = [];
@@ -301,10 +302,10 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const session: Agent.AgentSession = {
     hasUnfinishedTurn: suspended?.unfinishedTurn !== undefined,
 
-    prompt: (turnOptions) => runTurn("prompt", turnOptions, []),
+    prompt: (turnOptions) => runTurn(turnOptions, []),
 
     continue: (turnOptions, finishedSteps) =>
-      runTurn("continue", turnOptions, suspended?.unfinishedTurn?.slice(0, finishedSteps) ?? []),
+      runTurn(turnOptions, suspended?.unfinishedTurn?.slice(0, finishedSteps) ?? []),
 
     submitToolResult: ({ id, result, isFailure }) =>
       Effect.flatMap(hostResultOf(id), (deferred) =>
@@ -315,7 +316,6 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     approve: () =>
       Effect.fail(
         harnessError(
-          "approve",
           new HarnessError.UnsupportedError({ description: "amends asks for no approvals" }),
         ),
       ),
@@ -324,7 +324,6 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     compact: () =>
       Effect.fail(
         harnessError(
-          "compact",
           new HarnessError.UnsupportedError({ description: "amends does not compact yet" }),
         ),
       ),
@@ -513,7 +512,6 @@ const readState = (json: Schema.Json | undefined) =>
   Schema.decodeEffect(SavedState)(json).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        "start",
         new HarnessError.InvalidOutputError({
           description: `amends cannot read the state it was given: ${cause.message}`,
         }),
@@ -522,5 +520,5 @@ const readState = (json: Schema.Json | undefined) =>
     ),
   );
 
-const harnessError = (method: string, reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
-  new HarnessError.HarnessError({ harness: "amends", method, reason, cause });
+const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
+  new HarnessError.HarnessError({ agent: "amends", reason, cause });

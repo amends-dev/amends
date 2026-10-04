@@ -3,14 +3,19 @@ import type { Network } from "@amends/sandbox-v2";
 import { Effect, FileSystem, Schema } from "effect";
 import { SessionEvent } from "../src/SessionEvent.ts";
 
-/** A new sandbox on this machine exposing `port`, removed with its directory when the scope closes. */
+/**
+ * A new sandbox on this machine exposing `port`, destroyed with the processes it runs, such as
+ * opencode's server, when the scope closes.
+ */
 export const makeSandbox = (port: Network.Port) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const provider = yield* LocalSandboxProvider.make({
       directory: yield* fs.makeTempDirectoryScoped(),
     });
-    return yield* provider.create({ ports: [port] });
+    const sandbox = yield* provider.create({ ports: [port] });
+    yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
+    return sandbox;
   });
 
 /**

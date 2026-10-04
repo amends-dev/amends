@@ -8,7 +8,7 @@
  * by its id, so that its files stay in place when the session moves from one agent to another. A
  * session needs no sandbox when its agent does not require one, such as for a plain conversation.
  */
-import { Sandbox, type Template } from "@amends/sandbox-v2";
+import { type Network, Sandbox, type Template } from "@amends/sandbox-v2";
 import { Context, Effect, FileSystem, Layer, Path } from "effect";
 import { Prompt } from "effect/ai";
 import type { Agent, SessionId, Workspace } from "./Agent.ts";
@@ -48,6 +48,12 @@ export class Harness extends Context.Service<
     /** Whether every session needs a sandbox. Starting one without fails with `UnsupportedError`. */
     readonly requiresSandbox: boolean;
 
+    /**
+     * The ports the agent listens on in its sandbox, which the sandbox must be created with.
+     * Starting a session in a sandbox without them fails with `UnsupportedError`.
+     */
+    readonly ports: ReadonlyArray<Network.Port>;
+
     /** Starts a new session. */
     readonly startSession: (
       options: StartSessionOptions,
@@ -64,20 +70,18 @@ export class Harness extends Context.Service<
 >()("@amends/harness-v2/Harness") {}
 
 export const make = (agent: Agent): Harness["Service"] => {
-  /** Fails when the agent requires a sandbox and the session has none. */
-  const checkSandbox = (method: string, sandbox: Sandbox.Sandbox["Service"] | undefined) =>
-    sandbox === undefined && agent.requiresSandbox
-      ? Effect.fail(
-          new HarnessError({
-            harness: agent.id,
-            method,
-            reason: new UnsupportedError({ description: `${agent.id} works in a sandbox` }),
-          }),
-        )
-      : Effect.void;
+  /** Fails with `UnsupportedError` when the agent cannot work in `sandbox`. */
+  const checkSandbox = (sandbox: Sandbox.Sandbox["Service"] | undefined) => {
+    const description = sandboxRefusal(agent, sandbox);
+    return description === undefined
+      ? Effect.void
+      : Effect.fail(
+          new HarnessError({ agent: agent.id, reason: new UnsupportedError({ description }) }),
+        );
+  };
 
   /** The session's workspace in `sandbox`, creating its directory if it does not exist yet. */
-  const makeWorkspace = (method: string, sandbox: Sandbox.Sandbox["Service"], id: SessionId) =>
+  const makeWorkspace = (sandbox: Sandbox.Sandbox["Service"], id: SessionId) =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
@@ -89,8 +93,7 @@ export const make = (agent: Agent): Harness["Service"] => {
       Effect.mapError(
         (cause) =>
           new HarnessError({
-            harness: agent.id,
-            method,
+            agent: agent.id,
             reason: new UnknownError({ description: cause.message }),
             cause,
           }),
@@ -101,11 +104,11 @@ export const make = (agent: Agent): Harness["Service"] => {
     agent: agent.id,
     template: agent.template,
     requiresSandbox: agent.requiresSandbox,
+    ports: agent.ports ?? [],
 
     startSession: Effect.fn("Harness.startSession")(function* ({ sandbox, id }) {
-      yield* checkSandbox("startSession", sandbox);
-      const workspace =
-        sandbox === undefined ? undefined : yield* makeWorkspace("startSession", sandbox, id);
+      yield* checkSandbox(sandbox);
+      const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, id);
       const agentSession = yield* agent.start({ id, workspace, history: Prompt.empty });
       return yield* Session.make({
         id,
@@ -117,11 +120,8 @@ export const make = (agent: Agent): Harness["Service"] => {
     }),
 
     resumeSession: Effect.fn("Harness.resumeSession")(function* ({ sandbox, state }) {
-      yield* checkSandbox("resumeSession", sandbox);
-      const workspace =
-        sandbox === undefined
-          ? undefined
-          : yield* makeWorkspace("resumeSession", sandbox, state.id);
+      yield* checkSandbox(sandbox);
+      const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, state.id);
       // An agent's own state means something only to the agent that wrote it. Any other agent
       // starts from the conversation, and the session runs an unfinished turn again on it.
       const own = state.agent === agent.id;
@@ -129,7 +129,7 @@ export const make = (agent: Agent): Harness["Service"] => {
         id: state.id,
         workspace,
         history: state.history,
-        resume: own ? state.agentState : undefined,
+        agentState: own ? state.agentState : undefined,
         unfinishedTurn: own ? state.unfinishedTurn?.agentState : undefined,
       });
       return yield* Session.make({
@@ -141,6 +141,23 @@ export const make = (agent: Agent): Harness["Service"] => {
       });
     }),
   });
+};
+
+/**
+ * Why `agent` cannot work in `sandbox`, or nothing when it can: it requires a sandbox and has none,
+ * or listens on ports the sandbox was not created with.
+ */
+const sandboxRefusal = (
+  agent: Agent,
+  sandbox: Sandbox.Sandbox["Service"] | undefined,
+): string | undefined => {
+  if (sandbox === undefined) {
+    return agent.requiresSandbox ? `${agent.id} works in a sandbox` : undefined;
+  }
+  const missing = (agent.ports ?? []).filter((port) => !sandbox.ports.includes(port));
+  return missing.length === 0
+    ? undefined
+    : `${agent.id} listens on ports ${missing.join(", ")}, which the sandbox was not created with`;
 };
 
 /** A harness over `agent`, for programs that run one agent. */

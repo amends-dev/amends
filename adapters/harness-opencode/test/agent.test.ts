@@ -1,4 +1,5 @@
 import { Agent, GenerateResult, Harness } from "@amends/harness-v2";
+import { Network } from "@amends/sandbox-v2";
 import { BunServices } from "@effect/platform-bun";
 import { expect, it, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Path, Schema, Stream } from "effect";
@@ -442,6 +443,19 @@ layer(TestLayer)("OpencodeAgent", (it) => {
       yield* session.destroy;
 
       expect((yield* fake.sessions).size).toBe(0);
+    }),
+  );
+
+  it.effect("needs a sandbox created with the port opencode's server listens on", () =>
+    Effect.gen(function* () {
+      const { fake, harness } = yield* makeHarness(answer("hello"));
+      const otherPort = Network.Port.make(fake.port === 4096 ? 4097 : 4096);
+      const sandbox = yield* makeSandbox(otherPort);
+
+      const refused = yield* Effect.flip(harness.startSession({ sandbox, id }));
+
+      expect(harness.ports).toEqual([fake.port]);
+      expect(refused.reason._tag).toBe("UnsupportedError");
     }),
   );
 });

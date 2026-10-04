@@ -8,9 +8,13 @@
  * settings `resume` needs in `sandbox.json` and the sandbox's files in `workspace`, its working
  * directory. Processes start in the working directory and resolve a relative `cwd` against it.
  * File paths are this machine's paths.
+ *
+ * `stop` and `destroy` end the processes the provider started for the sandbox, through any
+ * `Sandbox` value for it, including those that outlived their scopes. A provider made again, as
+ * when the host restarts, does not know of processes an earlier one left running.
  */
 import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox-v2";
-import { Crypto, Effect, FileSystem, Layer, Path, type PlatformError, Schema } from "effect";
+import { Crypto, Effect, FileSystem, Layer, Path, type PlatformError, Schema, Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 export interface Options {
@@ -39,33 +43,56 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     };
   };
 
-  // The processes each sandbox started that are still in their callers' scopes, so that `stop`
-  // can end them whichever `Sandbox` value started them.
+  // TODO: Keep the processes that outlive their scopes in the sandbox's directory, so that a
+  // provider made after the host restarts ends them too, once a host restarts while one runs.
+  /**
+   * The processes running in each sandbox, so that `stop` and `destroy` end them whichever
+   * `Sandbox` value started them.
+   */
   const processes = new Map<Sandbox.SandboxId, Set<ChildProcessSpawner.ChildProcessHandle>>();
   const processesOf = (id: Sandbox.SandboxId) => {
-    const started = processes.get(id) ?? new Set();
-    processes.set(id, started);
-    return started;
+    const running = processes.get(id) ?? new Set();
+    processes.set(id, running);
+    return running;
   };
+
+  /**
+   * Spawns `command`, keeping its process in `running` while it runs. When the caller's scope
+   * closes, the spawner ends the process unless its handle was unreferenced; one still running
+   * then stays in `running` until the sandbox stops.
+   */
+  const spawnInto = (
+    running: Set<ChildProcessSpawner.ChildProcessHandle>,
+    command: ChildProcess.Command,
+  ) =>
+    Effect.gen(function* () {
+      // The spawner ends the process in a scope of its own, which this one closes before it
+      // looks at whether the process still runs.
+      const spawnScope = yield* Scope.fork(yield* Effect.scope);
+      const handle = yield* Scope.provide(spawner.spawn(command), spawnScope);
+      running.add(handle);
+      const forgetEnded = Effect.flatMap(handle.isRunning, (isRunning) =>
+        isRunning ? Effect.void : Effect.sync(() => running.delete(handle)),
+      );
+      yield* Effect.addFinalizer((exit) =>
+        Effect.andThen(Scope.close(spawnScope, exit), Effect.ignore(forgetEnded)),
+      );
+      return handle;
+    });
 
   const openSandbox = (
     id: Sandbox.SandboxId,
     ports: ReadonlyArray<Network.Port>,
   ): Sandbox.Sandbox["Service"] => {
     const paths = pathsOf(id);
-    const started = processesOf(id);
+    const running = processesOf(id);
     return Sandbox.Sandbox.of({
       id,
       description: describe(paths.workspace, ports),
       workingDirectory: paths.workspace,
       fileSystem: fs,
       childProcessSpawner: ChildProcessSpawner.make((command) =>
-        Effect.acquireRelease(
-          Effect.tap(spawner.spawn(resolveCwd(path, paths.workspace, command)), (handle) =>
-            Effect.sync(() => started.add(handle)),
-          ),
-          (handle) => Effect.sync(() => started.delete(handle)),
-        ),
+        spawnInto(running, resolveCwd(path, paths.workspace, command)),
       ),
       ports,
       endpoint: (port, protocol) =>
@@ -73,16 +100,15 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
           ? Effect.succeed({ url: `${protocol}://127.0.0.1:${port}`, headers: {} })
           : Effect.fail(
               sandboxError(
-                "endpoint",
                 new SandboxError.NotFoundError({
                   description: `Port ${port} was not exposed when the sandbox was created`,
                 }),
               ),
             ),
-      stop: killProcesses(started).pipe(Effect.mapError(fromPlatformError("stop"))),
-      destroy: killProcesses(started).pipe(
+      stop: endProcesses(running).pipe(Effect.mapError(fromPlatformError)),
+      destroy: endProcesses(running).pipe(
         Effect.andThen(fs.remove(paths.root, { recursive: true, force: true })),
-        Effect.mapError(fromPlatformError("destroy")),
+        Effect.mapError(fromPlatformError),
         Effect.andThen(Effect.sync(() => processes.delete(id))),
       ),
       setNetworkPolicy: (policy) =>
@@ -90,7 +116,6 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
           ? Effect.void
           : Effect.fail(
               sandboxError(
-                "setNetworkPolicy",
                 new SandboxError.UnsupportedError({
                   description: "A local sandbox shares this machine's network",
                 }),
@@ -99,7 +124,6 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
       addRequestTransformations: () =>
         Effect.fail(
           sandboxError(
-            "addRequestTransformations",
             new SandboxError.UnsupportedError({
               description: "A local sandbox's requests leave this machine without a proxy",
             }),
@@ -113,14 +137,12 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
   ) {
     const id =
       createOptions.id ??
-      Sandbox.SandboxId.make(
-        yield* crypto.randomUUIDv4.pipe(Effect.mapError(fromPlatformError("create"))),
-      );
+      Sandbox.SandboxId.make(yield* crypto.randomUUIDv4.pipe(Effect.mapError(fromPlatformError)));
     const ports = createOptions.ports ?? [];
     const paths = pathsOf(id);
 
     // Creating the sandbox's directory claims its id, failing when the id is taken.
-    yield* fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError("create")));
+    yield* fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError));
     return yield* Effect.gen(function* () {
       // Ports are already valid, so encoding them cannot fail.
       const settings = yield* Schema.encodeEffect(Settings)({ ports }).pipe(Effect.orDie);
@@ -128,7 +150,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
       yield* fs.writeFileString(paths.settings, settings);
       return openSandbox(id, ports);
     }).pipe(
-      Effect.mapError(fromPlatformError("create")),
+      Effect.mapError(fromPlatformError),
       // TODO: Prepare each template identity once and copy its workspace into new sandboxes, as a
       // snapshot would, once preparing on every create is too slow.
       Effect.tap((sandbox) =>
@@ -146,11 +168,10 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
   const resume = Effect.fn("LocalSandboxProvider.resume")(function* (id: Sandbox.SandboxId) {
     const settings = yield* fs
       .readFileString(pathsOf(id).settings)
-      .pipe(Effect.mapError(fromPlatformError("resume")));
+      .pipe(Effect.mapError(fromPlatformError));
     const { ports } = yield* Schema.decodeEffect(Settings)(settings).pipe(
       Effect.mapError((cause) =>
         sandboxError(
-          "resume",
           new SandboxError.UnknownError({ description: "The sandbox's settings are unreadable" }),
           cause,
         ),
@@ -179,14 +200,14 @@ const resolveCwd = (
         command.options,
       );
 
-/** Ends the processes still running, waiting for each to exit. */
-const killProcesses = (started: ReadonlySet<ChildProcessSpawner.ChildProcessHandle>) =>
+/** Ends the processes in `running`, waiting for each to exit, and forgets them. */
+const endProcesses = (running: Set<ChildProcessSpawner.ChildProcessHandle>) =>
   Effect.forEach(
-    started,
+    running,
     (handle) =>
       Effect.flatMap(handle.isRunning, (isRunning) =>
         isRunning ? handle.kill({ forceKillAfter: "5 seconds" }) : Effect.void,
-      ),
+      ).pipe(Effect.andThen(Effect.sync(() => running.delete(handle)))),
     { concurrency: "unbounded", discard: true },
   );
 
@@ -196,11 +217,11 @@ const describe = (workingDirectory: string, ports: ReadonlyArray<Network.Port>) 
     ...(ports.length === 0 ? [] : [`Servers on ports ${ports.join(", ")} are reachable.`]),
   ].join(" ");
 
-const sandboxError = (method: string, reason: SandboxError.SandboxErrorReason, cause?: unknown) =>
-  new SandboxError.SandboxError({ provider: "local", method, reason, cause });
+const sandboxError = (reason: SandboxError.SandboxErrorReason, cause?: unknown) =>
+  new SandboxError.SandboxError({ provider: "local", reason, cause });
 
-const fromPlatformError = (method: string) => (error: PlatformError.PlatformError) =>
-  sandboxError(method, reasonOf(error), error);
+const fromPlatformError = (error: PlatformError.PlatformError) =>
+  sandboxError(reasonOf(error), error);
 
 /** The sandbox error reason a failure of this machine's file system or processes amounts to. */
 const reasonOf = (error: PlatformError.PlatformError): SandboxError.SandboxErrorReason => {

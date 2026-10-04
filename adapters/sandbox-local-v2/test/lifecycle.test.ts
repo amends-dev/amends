@@ -24,6 +24,16 @@ const readFile = (sandbox: Sandbox.Sandbox["Service"], name: string) =>
     return yield* fs.readFileString(path.join(sandbox.workingDirectory, name));
   }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
+/** Spawns a long command whose handle is unreferenced, so that it outlives the scope it spawned in. */
+const spawnOutliving = (sandbox: Sandbox.Sandbox["Service"]) =>
+  Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    const handle = yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
+    // Never referenced again, so the effect that would do so is dropped.
+    yield* Effect.asVoid(handle.unref);
+    return handle;
+  }).pipe(Effect.scoped, Effect.provide(Sandbox.layerServices(sandbox)));
+
 layer(BunServices.layer)("sandbox lifecycle", (it) => {
   it.effect("resumes a sandbox with the id, working directory, and ports it was created with", () =>
     Effect.gen(function* () {
@@ -109,6 +119,32 @@ layer(BunServices.layer)("sandbox lifecycle", (it) => {
       }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
       yield* sandbox.stop;
+
+      expect(yield* handle.isRunning).toBe(false);
+    }),
+  );
+
+  it.effect("ends a process that outlived the scope that spawned it when the sandbox stops", () =>
+    Effect.gen(function* () {
+      const provider = yield* makeProvider;
+      const sandbox = yield* provider.create({ id });
+
+      const handle = yield* spawnOutliving(sandbox);
+      const outlived = yield* handle.isRunning;
+      yield* sandbox.stop;
+
+      expect(outlived).toBe(true);
+      expect(yield* handle.isRunning).toBe(false);
+    }),
+  );
+
+  it.effect("ends a process that outlived the scope that spawned it when it is destroyed", () =>
+    Effect.gen(function* () {
+      const provider = yield* makeProvider;
+      const sandbox = yield* provider.create({ id });
+
+      const handle = yield* spawnOutliving(sandbox);
+      yield* sandbox.destroy;
 
       expect(yield* handle.isRunning).toBe(false);
     }),
