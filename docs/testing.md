@@ -200,6 +200,13 @@ model has opencode run a command, and so does the local host's turn on opencode 
 sandbox; all of these need opencode 1.18.23 on the `PATH` and are reported as skipped without it,
 as in CI.
 
+The opencode agent being rebuilt in `adapters/harness-opencode` runs everywhere against a fake of
+opencode's server, which the tests script turn by turn. Its live tests run real opencode, 1.18.23 on
+the `PATH`, whose turns a free model of opencode's own provider answers over the network; they take
+about 20 seconds, so they run only with `AMENDS_TEST_OPENCODE=1`, and `AMENDS_TEST_OPENCODE_MODEL`
+names another model. Each keeps opencode's configuration and data in temporary directories, apart
+from this machine's opencode.
+
 ## Storage conformance
 
 The [conformance suites](../packages/storage-conformance/README.md) specify storage

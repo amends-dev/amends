@@ -64,6 +64,23 @@
         "effect": "catalog:",
       },
     },
+    "adapters/harness-opencode": {
+      "name": "@amends/harness-opencode",
+      "version": "0.0.0",
+      "dependencies": {
+        "@amends/harness-v2": "workspace:*",
+        "@amends/sandbox-v2": "workspace:*",
+      },
+      "devDependencies": {
+        "@amends/sandbox-local-v2": "workspace:*",
+        "@effect/platform-bun": "catalog:",
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "adapters/sandbox-daytona": {
       "name": "@amends/sandbox-daytona",
       "version": "0.0.0",
@@ -481,6 +498,8 @@
     "@amends/harness-amends": ["@amends/harness-amends@workspace:packages/harness-amends"],
 
     "@amends/harness-amends-v2": ["@amends/harness-amends-v2@workspace:adapters/harness-amends-v2"],
+
+    "@amends/harness-opencode": ["@amends/harness-opencode@workspace:adapters/harness-opencode"],
 
     "@amends/harness-server": ["@amends/harness-server@workspace:hosts/harness-server"],
 

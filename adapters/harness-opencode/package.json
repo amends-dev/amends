@@ -1,0 +1,27 @@
+{
+  "name": "@amends/harness-opencode",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@amends/harness-v2": "workspace:*",
+    "@amends/sandbox-v2": "workspace:*"
+  },
+  "devDependencies": {
+    "@amends/sandbox-local-v2": "workspace:*",
+    "@effect/platform-bun": "catalog:",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}
