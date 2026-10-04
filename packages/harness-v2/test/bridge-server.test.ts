@@ -1,5 +1,16 @@
 import { describe, expect, it } from "@effect/vitest";
-import { type Cause, Effect, Exit, FileSystem, Layer, Path, Queue, Scope, Stream } from "effect";
+import {
+  type Cause,
+  Effect,
+  Exit,
+  FileSystem,
+  Layer,
+  Path,
+  Queue,
+  Scope,
+  Stdio,
+  Stream,
+} from "effect";
 import { Prompt } from "effect/ai";
 import { RpcTest } from "effect/rpc";
 import { SessionId } from "../src/Agent.ts";
@@ -273,6 +284,27 @@ describe("BridgeServer", () => {
       expect(fake.destroyed).toEqual([session]);
       expect(fake.ended).toEqual([session]);
       expect(files.size).toBe(0);
+    }),
+  );
+
+  it.effect("reads its launch options from the first line of an input that does not end", () =>
+    Effect.gen(function* () {
+      const launch = {
+        token: "the host's token",
+        port: 4500,
+        stateDirectory: "/state",
+        agentOptions: { model: "a/b" },
+      };
+      const stdin = Stream.concat(
+        Stream.encodeText(Stream.make(`${JSON.stringify(launch)}\n`)),
+        Stream.never,
+      );
+
+      const read = yield* BridgeServer.readLaunchOptions.pipe(
+        Effect.provide(Stdio.layerTest({ stdin })),
+      );
+
+      expect(read).toEqual(launch);
     }),
   );
 });

@@ -426,7 +426,8 @@ const launch = Effect.fnUntraced(
     const bridge = yield* spawner.spawn(
       ChildProcess.make(options.command, options.args ?? [], {
         cwd: sandbox.workingDirectory,
-        stdin: Stream.encodeText(Stream.make(launchOptions)),
+        // One line, which the bridge reads without waiting for its input to end.
+        stdin: Stream.encodeText(Stream.make(`${launchOptions}\n`)),
         stdout: "ignore",
         stderr: "ignore",
       }),

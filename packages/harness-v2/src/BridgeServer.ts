@@ -19,6 +19,7 @@ import {
   Fiber,
   FileSystem,
   Layer,
+  Option,
   Path,
   Redacted,
   Result,
@@ -67,11 +68,16 @@ export const layer = (
 export const layerHandlers = (agent: Bridge.Agent, options: Pick<Options, "stateDirectory">) =>
   Bridge.Rpcs.toLayer(makeHandlers(agent, options.stateDirectory));
 
-/** What the host that launched the bridge gave it on standard input, which the host then closes. */
+/**
+ * What the host that launched the bridge gave it on standard input, as one line of JSON. The bridge
+ * reads no further, since a sandbox may never end a process's standard input, as Daytona does not.
+ */
 export const readLaunchOptions = Effect.gen(function* () {
   const stdio = yield* Stdio.Stdio;
-  const text = yield* stdio.stdin.pipe(Stream.decodeText(), Stream.mkString);
-  return yield* Schema.decodeEffect(Schema.fromJsonString(Bridge.LaunchOptions))(text);
+  const line = yield* stdio.stdin.pipe(Stream.decodeText(), Stream.splitLines, Stream.runHead);
+  return yield* Schema.decodeEffect(Schema.fromJsonString(Bridge.LaunchOptions))(
+    Option.getOrElse(line, () => ""),
+  );
 });
 
 /**
