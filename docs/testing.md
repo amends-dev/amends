@@ -212,7 +212,8 @@ bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it ru
 opencode its template installs in this machine's home, under `~/.amends/opencode`, once for each
 version; the template's own live test installs them afresh in a temporary home directory. Each
 keeps opencode's configuration and data in temporary directories, apart from this machine's
-opencode.
+opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on
+Daytona, in sandboxes started from the snapshot of the template's version once Daytona has made it.
 
 The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
 `adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports. The local

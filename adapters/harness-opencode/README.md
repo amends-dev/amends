@@ -69,4 +69,5 @@ over a stand-in agent, in a local sandbox, and reach it over a WebSocket: launch
 refusing a wrong token, and continuing on another host. `test/template.test.ts` runs the template
 with its commands answered as a sandbox would answer them. `test/live.test.ts`, and the template's
 live test, which installs Bun and opencode in a temporary home, run only with
-`AMENDS_TEST_OPENCODE=1`; [Testing](../../docs/testing.md) says what they run.
+`AMENDS_TEST_OPENCODE=1`, and the hosts' tests run on Daytona too with `AMENDS_TEST_DAYTONA=1`;
+[Testing](../../docs/testing.md) says what they run.

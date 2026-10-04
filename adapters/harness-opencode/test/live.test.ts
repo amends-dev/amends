@@ -1,8 +1,21 @@
 import { type Bridge, GenerateResult, Harness, type StreamPart } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
+import { Network, type Sandbox, type Template } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Deferred, Effect, Fiber, FileSystem, Layer, Path, Redacted, Schema, Stream } from "effect";
+import {
+  Deferred,
+  Effect,
+  Fiber,
+  FileSystem,
+  Layer,
+  Path,
+  Redacted,
+  Schema,
+  type Scope,
+  Stream,
+} from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import * as BridgeAgent from "../src/bridge/Agent.ts";
@@ -57,28 +70,68 @@ const makeLiveAgent = Effect.gen(function* () {
   return { agent, directory };
 });
 
+/** The sandboxes hosts run opencode in, the port its bridge listens on there, and its settings. */
+interface Sandboxes {
+  readonly freePort: Effect.Effect<Network.Port, unknown, Scope.Scope>;
+  readonly settings: Effect.Effect<
+    Pick<OpencodeAgent.Options, "config" | "env">,
+    unknown,
+    Scope.Scope | FileSystem.FileSystem | Path.Path
+  >;
+  readonly create: (
+    port: Network.Port,
+    template: Template.Template | undefined,
+  ) => Effect.Effect<Sandbox.Sandbox["Service"], unknown, Scope.Scope | HostServices>;
+}
+
+type HostServices = Layer.Success<typeof HostLayer>;
+
+/** Directories on this machine, where opencode keeps apart from this machine's own. */
+const localSandboxes: Sandboxes = {
+  freePort,
+  settings: makeOpencodeSettings,
+  create: makeSandbox,
+};
+
+/** Machines of their own in Daytona's cloud, where nothing listens on a port yet. */
+const daytonaSandboxes: Sandboxes = {
+  freePort: Effect.succeed(Network.Port.make(4096)),
+  settings: Effect.succeed({ config: { model, autoupdate: false } }),
+  create: (port, template) =>
+    Effect.gen(function* () {
+      const provider = yield* DaytonaSandboxProvider.make({
+        apiKey: Redacted.make(process.env.DAYTONA_API_KEY ?? ""),
+      });
+      return yield* Effect.acquireRelease(
+        provider.create(template === undefined ? { ports: [port] } : { ports: [port], template }),
+        (sandbox) => Effect.ignore(sandbox.destroy),
+      );
+    }),
+};
+
 /**
  * Harnesses over the opencode agent as two hosts run it, which share the secret their bridge tokens
- * derive from, and a new local sandbox prepared with the agent's template. The bridge and
+ * derive from, and a new sandbox of `sandboxes` prepared with the agent's template. The bridge and
  * opencode's server stop with the sandbox when the scope closes.
  */
-const makeLiveHosts = Effect.gen(function* () {
-  const port = yield* freePort;
-  const settings = yield* makeOpencodeSettings;
-  const makeHarness = Effect.map(
-    OpencodeAgent.make({
-      model,
-      port,
-      token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
-      ...settings,
-    }),
-    Harness.make,
-  );
-  const harness = yield* makeHarness;
-  const nextHarness = yield* makeHarness;
-  const sandbox = yield* makeSandbox(port, harness.template);
-  return { sandbox, harness, nextHarness };
-});
+const makeLiveHosts = (sandboxes: Sandboxes) =>
+  Effect.gen(function* () {
+    const port = yield* sandboxes.freePort;
+    const settings = yield* sandboxes.settings;
+    const makeHarness = Effect.map(
+      OpencodeAgent.make({
+        model,
+        port,
+        token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
+        ...settings,
+      }),
+      Harness.make,
+    );
+    const harness = yield* makeHarness;
+    const nextHarness = yield* makeHarness;
+    const sandbox = yield* sandboxes.create(port, harness.template);
+    return { sandbox, harness, nextHarness };
+  });
 
 const turnOptions = (text: string, options: Partial<Bridge.TurnOptions> = {}) => ({
   prompt: Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] }),
@@ -233,71 +286,84 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
   );
 });
 
-describe.skipIf(!enabled)("opencode as hosts run it, through its bridge", () => {
-  it.live(
-    "runs a turn in which opencode runs a command with its own tool",
-    () =>
-      Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeLiveHosts;
-        const session = yield* harness.startSession({ sandbox, id });
+/** What hosts do with opencode through its bridge, on sandboxes of `sandboxes`. */
+const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, timeout: number) =>
+  describe.skipIf(!enabled)(title, () => {
+    it.live(
+      "runs a turn in which opencode runs a command with its own tool",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeLiveHosts(sandboxes);
+          const session = yield* harness.startSession({ sandbox, id });
 
-        const result = yield* session.generate({
-          prompt: "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
-        });
-
-        expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
-          expect.objectContaining({ name: "bash", providerExecuted: true }),
-        );
-        expect(result.text).toContain("live-opencode");
-      }).pipe(Effect.provide(HostLayer)),
-    timeout,
-  );
-
-  it.live(
-    "continues on another host a suspended turn, which opencode went on with, from the step it was in",
-    () =>
-      Effect.gen(function* () {
-        const { sandbox, harness, nextHarness } = yield* makeLiveHosts;
-        const session = yield* harness.startSession({ sandbox, id });
-        const before: Array<StreamPart.StreamPart> = [];
-        const calledTool = yield* Deferred.make<void>();
-
-        const reading = yield* session
-          .stream({
+          const result = yield* session.generate({
             prompt:
-              "Run `sleep 2; echo slept` with your bash tool, then reply with what it printed.",
-          })
-          .pipe(
-            Stream.runForEach((part) =>
-              Effect.andThen(
-                Effect.sync(() => before.push(part)),
-                part.type === "tool-call" ? Deferred.succeed(calledTool, undefined) : Effect.void,
-              ),
-            ),
-            Effect.forkChild,
-          );
-        yield* Deferred.await(calledTool);
-        const state = yield* session.suspend;
-        yield* Fiber.join(reading);
-        const resumed = yield* nextHarness.resumeSession({ sandbox, state });
-        const after = yield* Stream.runCollect(resumed.continue({}));
-        const history = (yield* resumed.detach).history.content;
+              "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
+          });
 
-        // The session had no step of the turn finished, so the step with the call comes again.
-        expect(before.at(-1)?.type).toBe("tool-call");
-        expect(after.filter((part) => part.type === "tool-call")).toHaveLength(1);
-        expect(after.filter((part) => part.type === "tool-result")).toEqual([
-          expect.objectContaining({ isFailure: false }),
-        ]);
-        expect(after.at(-1)?.type).toBe("finish");
-        expect(
-          history.flatMap((message) =>
-            message.role === "assistant"
-              ? message.content.filter((part) => part.type === "tool-call")
-              : [],
-          ),
-        ).toHaveLength(1);
-      }).pipe(Effect.provide(HostLayer)),
-    timeout,
-  );
-});
+          expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
+            expect.objectContaining({ name: "bash", providerExecuted: true }),
+          );
+          expect(result.text).toContain("live-opencode");
+        }).pipe(Effect.provide(HostLayer)),
+      timeout,
+    );
+
+    it.live(
+      "continues on another host a suspended turn, which opencode went on with, from the step it was in",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness, nextHarness } = yield* makeLiveHosts(sandboxes);
+          const session = yield* harness.startSession({ sandbox, id });
+          const before: Array<StreamPart.StreamPart> = [];
+          const calledTool = yield* Deferred.make<void>();
+
+          const reading = yield* session
+            .stream({
+              prompt:
+                "Run `sleep 2; echo slept` with your bash tool, then reply with what it printed.",
+            })
+            .pipe(
+              Stream.runForEach((part) =>
+                Effect.andThen(
+                  Effect.sync(() => before.push(part)),
+                  part.type === "tool-call" ? Deferred.succeed(calledTool, undefined) : Effect.void,
+                ),
+              ),
+              Effect.forkChild,
+            );
+          yield* Deferred.await(calledTool);
+          const state = yield* session.suspend;
+          yield* Fiber.join(reading);
+          const resumed = yield* nextHarness.resumeSession({ sandbox, state });
+          const after = yield* Stream.runCollect(resumed.continue({}));
+          const history = (yield* resumed.detach).history.content;
+
+          // The session had no step of the turn finished, so the step with the call comes again.
+          expect(before.at(-1)?.type).toBe("tool-call");
+          expect(after.filter((part) => part.type === "tool-call")).toHaveLength(1);
+          expect(after.filter((part) => part.type === "tool-result")).toEqual([
+            expect.objectContaining({ isFailure: false }),
+          ]);
+          expect(after.at(-1)?.type).toBe("finish");
+          expect(
+            history.flatMap((message) =>
+              message.role === "assistant"
+                ? message.content.filter((part) => part.type === "tool-call")
+                : [],
+            ),
+          ).toHaveLength(1);
+        }).pipe(Effect.provide(HostLayer)),
+      timeout,
+    );
+  });
+
+describeHosts("opencode as hosts run it, through its bridge", enabled, localSandboxes, timeout);
+
+// Daytona's sandboxes cost money, so hosts run opencode there only with `AMENDS_TEST_DAYTONA=1` too.
+describeHosts(
+  "opencode as hosts run it on Daytona, through its bridge",
+  enabled && process.env.AMENDS_TEST_DAYTONA === "1" && process.env.DAYTONA_API_KEY !== undefined,
+  daytonaSandboxes,
+  300_000,
+);

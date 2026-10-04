@@ -17,6 +17,7 @@
     "@effect/platform-bun": "catalog:"
   },
   "devDependencies": {
+    "@amends/sandbox-daytona-v2": "workspace:*",
     "@amends/sandbox-local-v2": "workspace:*",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"
