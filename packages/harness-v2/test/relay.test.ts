@@ -463,7 +463,7 @@ describe("HostToolRelay", () => {
         yield* offerWithoutReading(session, [echo]);
 
         yield* session.submitToolResult({
-          id: "relay-99",
+          id: "no-such-call",
           name: "echo",
           result: "late",
           isFailure: false,

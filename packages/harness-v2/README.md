@@ -122,7 +122,11 @@ approvals still decide.
   model API's 64 characters too few: its `maxToolNameLength` says how many it takes, for the host to
   name its tools to fit.
 
-No agent uses the relay yet.
+No agent uses the relay yet. opencode's adapter would, but the runner behind opencode's `/api/session`
+(1.18.23) shows its model only the tools registered in its own process, and not those of MCP servers, so the
+adapter refuses a turn with host tools. The relay was run against opencode's older session API, where the
+model called a host tool through it and answered with the result the host gave. The relay's server must
+not close idle connections: Bun's does after ten seconds, unless it is made with `idleTimeout: 0`.
 
 ## Testing
 

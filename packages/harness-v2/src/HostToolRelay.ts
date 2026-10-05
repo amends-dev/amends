@@ -12,7 +12,9 @@
  * decide.
  *
  * `make` is the relay without a transport: it answers the MCP messages it is given. `layer` serves
- * it over the `HttpServer` provided, and is what a bridge program uses.
+ * it over the `HttpServer` provided, and is what a bridge program uses. A call waits for the host
+ * for as long as an approval takes, so the server must not close a connection for being idle, as
+ * Bun's does after ten seconds unless its `idleTimeout` is 0.
  */
 import {
   type Cause,
@@ -173,7 +175,6 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
   const heartbeat = options?.heartbeat ?? "10 seconds";
   const maxWait = options?.maxWait ?? "1 hour";
   const entries = yield* Ref.make<ReadonlyArray<Entry>>([]);
-  const callCount = yield* Ref.make(0);
 
   const open: Relay["open"] = Effect.fnUntraced(function* (_id) {
     const token = Hex.encode(yield* Effect.orDie(crypto.randomBytes(32)));
@@ -285,7 +286,7 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
       });
     }
 
-    const callId = `relay-${yield* Ref.updateAndGet(callCount, (count) => count + 1)}`;
+    const callId = yield* Effect.orDie(crypto.randomUUIDv4);
     const answered = yield* Deferred.make<Outcome>();
     yield* Ref.update(entry.pending, HashMap.set(callId, { requestId, answered }));
     yield* Queue.offer(running.value, {
