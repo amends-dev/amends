@@ -53,8 +53,12 @@
       "dependencies": {
         "@amends/harness-v2": "workspace:*",
         "@amends/sandbox-v2": "workspace:*",
+        "@effect/ai-anthropic": "catalog:",
+        "@effect/ai-openai": "catalog:",
+        "@effect/ai-openai-compat": "catalog:",
       },
       "devDependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/sandbox-local-v2": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
@@ -357,6 +361,9 @@
     "packages/connection-v2": {
       "name": "@amends/connection-v2",
       "version": "0.0.0",
+      "dependencies": {
+        "@amends/harness-v2": "workspace:*",
+      },
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -507,6 +514,7 @@
   },
   "catalog": {
     "@effect/ai-anthropic": "4.0.0",
+    "@effect/ai-openai": "4.0.0",
     "@effect/ai-openai-compat": "4.0.0",
     "@effect/atom-solid": "4.0.0",
     "@effect/platform-bun": "4.0.0",
@@ -677,6 +685,8 @@
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.12.1", "", {}, "sha512-yHwomvolVafvUXhy5TdiJVkuNCxXn+bKOs2aWiWEQh/5YaV97Oa/abJz3dmx7lxgIUsUlS1Jl4mEfvJPo3YsVw=="],
 
     "@effect/ai-anthropic": ["@effect/ai-anthropic@4.0.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-/xZYmvRE9yDLKiz1pOIx0CVaB+o0zdJd6sTG9KQbFSkM+Ule0U/6yeN+Q6KD9I7Z73t3WxhK9Xmg1eqU6+IVmQ=="],
+
+    "@effect/ai-openai": ["@effect/ai-openai@4.0.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-WjLvyFW4urzXkNy+Ki1YQE912yOxMYHps5gbiPfiUDghuHz0hfA+jzprGL8vj4fTwZI56TIwkviKRqfQNwka7w=="],
 
     "@effect/ai-openai-compat": ["@effect/ai-openai-compat@4.0.0", "", { "peerDependencies": { "effect": "^4.0.0" } }, "sha512-zoFwI5M7pUEj4UMHMbPsQGaVRxirIAIqzfVZAtpjJPXWwd/acwxN4kI1nS9gfn/lCHvFIc9xPEMstforcODesw=="],
 

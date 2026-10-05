@@ -104,6 +104,9 @@ describe("ModelsDev.toCatalog", () => {
             model("responses"),
             model("chat", { provider: { shape: "completions" } }),
           ]),
+          provider("router", "@openrouter/ai-sdk-provider", [model("vendor/model")], {
+            api: "https://router.example/api/v1",
+          }),
           provider(
             "gateway",
             "@ai-sdk/openai-compatible",
@@ -125,6 +128,9 @@ describe("ModelsDev.toCatalog", () => {
       expect(reached("openai")).toEqual([
         { id: "chat", protocol: "openai-chat", url: "https://api.openai.com/v1" },
         { id: "responses", protocol: "openai-responses", url: "https://api.openai.com/v1" },
+      ]);
+      expect(reached("router")).toEqual([
+        { id: "vendor/model", protocol: "openai-chat", url: "https://router.example/api/v1" },
       ]);
       expect(reached("gateway")).toEqual([
         { id: "chat", protocol: "openai-chat", url: "https://gateway.example/v1" },

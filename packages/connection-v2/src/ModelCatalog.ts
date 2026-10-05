@@ -10,26 +10,14 @@
  * A catalog holds no credentials. A connection to a provider holds those, and gives the settings
  * that the provider's URLs name.
  */
+import { ModelEndpoint } from "@amends/harness-v2";
 import { Context, Effect, Layer, Schema } from "effect";
 import { snapshot } from "./snapshot.ts";
-
-/**
- * The API a model is reached through: Anthropic's Messages API, OpenAI's Responses API, or the Chat
- * Completions API that OpenAI defined and most providers serve.
- */
-export const Protocol = Schema.Literals(["anthropic-messages", "openai-responses", "openai-chat"]);
-
-export type Protocol = typeof Protocol.Type;
 
 /** A kind of content a model takes or gives. */
 export const Modality = Schema.Literals(["text", "image", "audio", "video", "pdf"]);
 
 export type Modality = typeof Modality.Type;
-
-/** How hard a model reasons before it answers, from least to most, as providers name the levels. */
-export const Effort = Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
-
-export type Effort = typeof Effort.Type;
 
 /**
  * How a request controls a model's reasoning. A model that reasons and has none of these controls
@@ -40,7 +28,7 @@ export const Reasoning = Schema.Struct({
   toggle: Schema.Boolean,
 
   /** The levels of effort a request can ask for, from least to most. */
-  efforts: Schema.Array(Effort),
+  efforts: Schema.Array(ModelEndpoint.Effort),
 
   /** The tokens a request can let the model reason with, at least `min` and at most `max`. */
   budget: Schema.optionalKey(
@@ -77,7 +65,8 @@ export const Model = Schema.Struct({
 
   name: Schema.String,
 
-  protocol: Protocol,
+  /** The API the model is reached through, as an endpoint for it names it. */
+  protocol: ModelEndpoint.Protocol,
 
   /**
    * The base URL of the model's API, which the protocol's paths follow, such as

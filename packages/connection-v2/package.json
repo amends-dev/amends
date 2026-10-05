@@ -12,6 +12,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.tools.json",
     "update-models": "bun run scripts/update-models.ts"
   },
+  "dependencies": {
+    "@amends/harness-v2": "workspace:*"
+  },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "effect": "catalog:"

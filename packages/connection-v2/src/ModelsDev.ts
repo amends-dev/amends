@@ -7,6 +7,7 @@
  * package, base URL, and API. The catalog keeps the models whose package speaks a protocol amends
  * speaks, and the providers that have any.
  */
+import type { ModelEndpoint } from "@amends/harness-v2";
 import { Effect, Schema } from "effect";
 import type * as ModelCatalog from "./ModelCatalog.ts";
 
@@ -97,11 +98,15 @@ export const toCatalog = Effect.fn("ModelsDev.toCatalog")(function* (document: u
   } satisfies ModelCatalog.Catalog;
 });
 
-/** The packages whose API amends speaks, with the base URL each uses when given none. */
+/**
+ * The packages whose API amends speaks, with the base URL each uses when given none. OpenRouter's
+ * serves the Chat Completions API.
+ */
 const packages: Record<string, { readonly url?: string }> = {
   "@ai-sdk/anthropic": { url: "https://api.anthropic.com/v1" },
   "@ai-sdk/openai": { url: "https://api.openai.com/v1" },
   "@ai-sdk/openai-compatible": {},
+  "@openrouter/ai-sdk-provider": {},
 };
 
 /** The provider as the catalog keeps it, with the models it serves through a protocol amends speaks. */
@@ -128,7 +133,7 @@ const providerOf = (provider: Provider): ModelCatalog.Provider => {
 const reachOf = (
   provider: Provider,
   model: Model,
-): { readonly protocol: ModelCatalog.Protocol; readonly url: string } | undefined => {
+): { readonly protocol: ModelEndpoint.Protocol; readonly url: string } | undefined => {
   // A provider's package decides how a request authenticates, so a provider whose package amends
   // does not speak is left out, even where its models name one that it does.
   if (!Object.hasOwn(packages, provider.npm)) return undefined;
@@ -148,7 +153,7 @@ const reachOf = (
 
 const modelOf = (
   model: Model,
-  reached: { readonly protocol: ModelCatalog.Protocol; readonly url: string },
+  reached: { readonly protocol: ModelEndpoint.Protocol; readonly url: string },
 ): ModelCatalog.Model => {
   const reasoning = model.reasoning ? reasoningOf(model.reasoning_options ?? []) : undefined;
   return {
@@ -166,7 +171,7 @@ const modelOf = (
   };
 };
 
-const efforts: ReadonlyArray<ModelCatalog.Effort> = [
+const efforts: ReadonlyArray<ModelEndpoint.Effort> = [
   "none",
   "minimal",
   "low",
