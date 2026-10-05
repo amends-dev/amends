@@ -108,9 +108,27 @@ export const toolkit = Effect.fn("Assembly.toolkit")(function* (
   });
 });
 
-/** The name the model knows a tool by: its source's, then its own, in the characters agents accept. */
-const nameOf = (source: string, tool: string) =>
-  `${source}__${tool}`.replace(/[^A-Za-z0-9_-]/g, "_").slice(0, maxNameLength);
+/**
+ * The name the model knows a tool by: its source's, then its own, in the characters agents accept. A
+ * name that is too long is cut, and ends with a fingerprint of the whole name, so that tools whose
+ * names differ only after the cut are still told apart, and a name is the same whenever it is made.
+ */
+const nameOf = (source: string, tool: string) => {
+  const whole = `${source}__${tool}`;
+  const safe = whole.replace(/[^A-Za-z0-9_-]/g, "_");
+  if (safe.length <= maxNameLength) return safe;
+  const fingerprint = fingerprintOf(whole);
+  return `${safe.slice(0, maxNameLength - fingerprint.length - 1)}_${fingerprint}`;
+};
+
+/** Eight hexadecimal digits that are the same for the same text, and rarely for different texts. */
+const fingerprintOf = (text: string) => {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index++) {
+    hash = Math.imul(hash ^ text.charCodeAt(index), 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+};
 
 /** The tools that share a name, for each name that more than one tool has, in the order met. */
 const findClashes = (

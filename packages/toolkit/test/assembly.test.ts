@@ -249,13 +249,64 @@ describe("the name of a tool", () => {
     }),
   );
 
-  it.effect("is no longer than the model APIs allow", () =>
-    Effect.gen(function* () {
-      const [name] = yield* namesOf("github", ["a".repeat(120)]);
+  it.effect(
+    "is no longer than the model APIs allow, and ends with a fingerprint when it is cut",
+    () =>
+      Effect.gen(function* () {
+        const [name, short] = yield* namesOf("github", ["a".repeat(120), "b"]);
 
-      expect(name).toHaveLength(64);
-      expect(name).toMatch(/^github__a+$/);
+        expect(name).toHaveLength(64);
+        expect(name).toMatch(/^github__a+_[0-9a-f]{8}$/);
+        expect(short).toBe("github__b");
+      }),
+  );
+
+  it.effect("is not cut to the same name for tools that differ only after the cut", () =>
+    Effect.gen(function* () {
+      const long = "repos/get-the-billing-premium-request-usage-report-for-";
+
+      const names = yield* namesOf("github", [`${long}organization`, `${long}user`]);
+
+      expect(names).toHaveLength(2);
+      expect(new Set(names).size).toBe(2);
+      expect(names.every((name) => name.length === 64)).toBe(true);
     }),
+  );
+
+  it.effect("is the same whenever it is made", () =>
+    Effect.gen(function* () {
+      const tool = `repos/${"x".repeat(100)}`;
+
+      const first = yield* namesOf("github", [tool]);
+      const again = yield* namesOf("github", [tool]);
+
+      expect(again).toEqual(first);
+      // Pinned, as a name is stored in what the model said, so how it is made must not change.
+      expect(first).toEqual(["github__repos_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx_bf0dac0e"]);
+    }),
+  );
+
+  it.effect("has a fingerprint of eight digits, which has leading zeros when the number has", () =>
+    Effect.gen(function* () {
+      const names = yield* namesOf("github", [
+        "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+      ]);
+
+      expect(names).toEqual(["github__yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy_0561d867"]);
+    }),
+  );
+
+  it.effect(
+    "is cut with the fingerprint of the name as it was, so tools whose characters differ stay apart",
+    () =>
+      Effect.gen(function* () {
+        const [dotted, underscored] = yield* namesOf("github", [
+          `${"a".repeat(80)}.b`,
+          `${"a".repeat(80)}_b`,
+        ]);
+
+        expect(dotted).not.toBe(underscored);
+      }),
   );
 });
 
