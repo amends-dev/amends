@@ -6,8 +6,14 @@
  *
  * A process writes its output to files of its own in the sandbox, which its handle reads as they
  * grow, byte for byte: Daytona's own record of a session's output keeps whole lines, and ends a
- * last line that has no newline with one. The exit code is polled. Daytona takes a process's input
- * a line at a time and never ends it, so a command that reads its input to the end waits forever.
+ * last line that has no newline with one. Reading an output and awaiting the exit code poll
+ * Daytona, a request at a time. Daytona takes a process's input a line at a time and never ends
+ * it, so a command that reads its input to the end waits forever.
+ *
+ * Daytona gives no process ids, so a handle's `pid` numbers the process among those the spawner
+ * started, from 1; it is not the process's id in the sandbox. `kill` deletes the process's session,
+ * which sends SIGTERM to the process and its children and then SIGKILL, whatever signal it is
+ * asked for.
  *
  * Daytona keeps every command line in its record of the session, so a command's environment goes
  * in a script of its own, written through Daytona's file API, which runs the command with it and

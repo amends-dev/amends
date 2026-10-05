@@ -48,15 +48,27 @@ and runs the command with it; the line names only the script.
 
 A process writes its output to files of its own under `/tmp`, which its handle reads as they grow,
 up to a megabyte at a time, byte for byte. Daytona's own record of a session's output keeps whole
-lines, and ends a last line that has no newline with one. The exit code is polled, quickly at first,
-then once a second. Daytona takes a process's input a line at a time and never ends it, so a
-command that reads its input to the end waits forever.
+lines, and ends a last line that has no newline with one. Daytona takes a process's input a line at
+a time and never ends it, so a command that reads its input to the end waits forever.
+
+The handle polls Daytona, a request at a time. Reading an output asks for what is new, and again
+at once when it found some. A read that found nothing also asks for the process's status, and the
+next comes 50 milliseconds later, then twice as long after each such read, up to a second.
+Awaiting the exit code asks for the status, quickly at first, then once a second. So a process
+idle for a while, whose exit code is awaited and whose two outputs are read, makes about five
+requests a second; one whose outputs are ignored and whose exit code nobody awaits makes none.
+
+Daytona gives no process ids, so a handle's `pid` numbers the process among those its sandbox's
+spawner started, from 1, and again from 1 in a sandbox resumed again; it is not the process's id in
+the sandbox. `kill` deletes the process's session, which sends SIGTERM to the process and its
+children and then SIGKILL, whatever signal it is asked for.
 
 ## Files
 
-A file's contents are read and written whole through Daytona's file API. Everything else is done
-with the sandbox's own tools, one `sh` command each, which Daytona answers at once: `stat`,
-`find`, `mkdir`, `rm`, `mv`, `cp`, `ln`, `mktemp`, and the like. They run with `LC_ALL=C`, and a
+A file's contents are read and written whole through Daytona's file API, so a read holds the whole
+file in the host's memory, whatever its size, and `open`, which `stream` and `sink` use, fails with
+`BadArgument`. Everything else is done with the sandbox's own tools, one `sh` command each, which
+Daytona answers at once: `stat`, `find`, `mkdir`, `rm`, `mv`, `cp`, `ln`, `mktemp`, and the like. They run with `LC_ALL=C`, and a
 failure is the error the tool's message names, as Effect's own file systems name an `errno`.
 Writing a file checks first that its directory exists, and that the file does not when the flag
 asks so, since Daytona's file API would make the one and write over the other.

@@ -1,8 +1,9 @@
 /**
- * A Daytona sandbox's files, read and written whole through Daytona's file API, and otherwise
- * worked on with the sandbox's POSIX tools, one command each, which Daytona runs and answers at
- * once. Paths are the sandbox's; a relative one is resolved against the working directory. A
- * failure is the error the tool's message names, as Effect's own file systems name an `errno`.
+ * A Daytona sandbox's files, read and written whole through Daytona's file API, so that a read
+ * holds the whole file in memory, whatever its size, and otherwise worked on with the sandbox's
+ * POSIX tools, one command each, which Daytona runs and answers at once. Paths are the sandbox's;
+ * a relative one is resolved against the working directory. A failure is the error the tool's
+ * message names, as Effect's own file systems name an `errno`.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
 import {

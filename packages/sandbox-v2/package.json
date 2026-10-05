@@ -19,5 +19,10 @@
   "peerDependencies": {
     "@effect/vitest": "catalog:",
     "effect": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@effect/vitest": {
+      "optional": true
+    }
   }
 }

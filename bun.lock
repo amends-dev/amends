@@ -447,6 +447,9 @@
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
+      "optionalPeers": [
+        "@effect/vitest",
+      ],
     },
     "packages/server-http": {
       "name": "@amends/server-http",
