@@ -43,6 +43,9 @@ export interface FakeAgentOptions {
   /** The ports the agent listens on in its sandbox. None by default. */
   readonly ports?: ReadonlyArray<Port>;
 
+  /** The longest name of a host tool the agent takes. No limit by default. */
+  readonly maxToolNameLength?: number;
+
   /** Whether the agent loses the turns `suspend` cuts short, as opencode does in another sandbox. */
   readonly losesUnfinishedTurns?: boolean;
 
@@ -72,6 +75,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
       id,
       requiresSandbox: options.requiresSandbox ?? true,
       ports: options.ports,
+      maxToolNameLength: options.maxToolNameLength,
       start: (startOptions) =>
         Effect.gen(function* () {
           starts.push(startOptions);

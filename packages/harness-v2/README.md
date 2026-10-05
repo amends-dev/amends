@@ -90,9 +90,49 @@ are.
 opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
 program, a template that installs it, and a `make` over `BridgeClient`.
 
+## Host tools through a relay
+
+An agent in a sandbox can use the host's tools only through something it can call there.
+`HostToolRelay` is that, for any agent that is an MCP client over HTTP: an MCP server, on the
+loopback of the sandbox it runs in, that lists the tools of a session's running turn and turns each
+call into a `tool-call` part of that turn. The host runs the tool as it runs any host tool, with its
+approval if the tool needs one, and `submitToolResult` gives the agent's call its answer. The tools'
+handlers never leave the host, so no credential reaches the sandbox: the agent holds only the token
+of its session, which lets it ask the host to run that session's tools, and the host's toolkit and
+approvals still decide.
+
+- `HostToolRelay.make` is the relay without a transport. `open` starts a session, which has a token of
+  its own, until its scope closes, and `answer` takes an MCP message with the `Authorization`
+  header it came with. A session's `offerTools` lists the tools of a turn, for as long as the
+  turn's scope lasts, and returns the stream of the calls the agent makes. The tools stay listed
+  after the turn, so that an agent that read them once keeps them, but a call between turns fails.
+  `HostToolRelay.layer` serves the relay on the `HttpServer` a program provides, at
+  `http://127.0.0.1:<port>/mcp`, and is what a bridge program uses.
+- It speaks the part of MCP that tools need, in the versions 2025-11-25, 2025-06-18, 2025-03-26, and
+  2024-11-05 over Streamable HTTP: `initialize`, `ping`, `tools/list`, `tools/call`, and
+  cancellation. It lists no resources or prompts, and sends no notification of its own except
+  progress. A call is answered with an event stream. Because the host may wait on a person, the
+  relay sends progress notifications every ten seconds while it waits, if the agent asked for them
+  with a `progressToken`, which an agent with a time limit for a request takes as a sign of life. It
+  gives up on a call the host has not answered in an hour.
+- A result the model reads is a text as it is, a failure by its message, a refusal by its reason,
+  and anything else as JSON. A call that the agent cancels, or that the end of the turn ends, fails
+  with that said.
+- An agent that adds to the names of the tools it is given, as opencode prefixes `host_`, leaves a
+  model API's 64 characters too few: its `maxToolNameLength` says how many it takes, for the host to
+  name its tools to fit.
+
+No agent uses the relay yet. opencode's adapter would, but the runner behind opencode's `/api/session`
+(1.18.23) shows its model only the tools registered in its own process, and not those of MCP servers, so the
+adapter refuses a turn with host tools. The relay was run against opencode's older session API, where the
+model called a host tool through it and answered with the result the host gave. The relay's server must
+not close idle connections: Bun's does after ten seconds, unless it is made with `idleTimeout: 0`.
+
 ## Testing
 
 `test/harness.test.ts` and `test/session.test.ts` run sessions over fake agents from
 `test/fakes.ts`, and `test/bridge-server.test.ts` runs the bridge's handlers without a transport,
-over a fake `Bridge.Agent` and a file system in memory. The bridge over a real WebSocket, launched
+over a fake `Bridge.Agent` and a file system in memory. `test/relay.test.ts` runs the relay without
+a transport, with the test clock for its progress and its time limit; its HTTP server is tested in
+the opencode adapter. The bridge over a real WebSocket, launched
 in a local sandbox, is tested in the opencode adapter. Run them with `bun run test packages/harness-v2`.

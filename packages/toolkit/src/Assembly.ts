@@ -52,11 +52,19 @@ export class NameClash extends Schema.TaggedError<NameClash>("@amends/toolkit/As
   }
 }
 
-/**
- * The longest name that the model APIs of Anthropic and OpenAI accept for a tool. An agent that
- * prefixes the names it is given has less room, which a delivery to it has to account for.
- */
-const maxNameLength = 64;
+/** The longest name that the model APIs of Anthropic and OpenAI accept for a tool. */
+const modelApiNameLength = 64;
+
+/** A name is cut to its fingerprint and an underscore at least, with a few characters before them. */
+const shortestNameLength = 16;
+
+export interface Options {
+  /**
+   * The longest name a tool may have, for an agent that adds to the names it is given and so takes
+   * fewer than the model APIs' 64 characters, such as a harness's `maxToolNameLength`. At least 16.
+   */
+  readonly maxNameLength?: number;
+}
 
 /**
  * Builds the toolkit of `members`. The tools of a member that `decide` blocks are left out, and the
@@ -67,14 +75,21 @@ const maxNameLength = 64;
 export const toolkit = Effect.fn("Assembly.toolkit")(function* (
   members: ReadonlyArray<Member>,
   decide: (source: string, definition: ToolDefinition) => Decision,
+  options?: Options,
 ) {
+  const maxNameLength = options?.maxNameLength ?? modelApiNameLength;
+  if (!Number.isInteger(maxNameLength) || maxNameLength < shortestNameLength) {
+    return yield* Effect.die(
+      new Error(`maxNameLength must be a whole number of at least ${shortestNameLength}`),
+    );
+  }
   const offered = members
     .flatMap(({ source, definitions }) =>
       definitions.map((definition) => ({
         source,
         definition,
         decision: decide(source.name, definition),
-        name: nameOf(source.name, definition.name),
+        name: nameOf(source.name, definition.name, maxNameLength),
       })),
     )
     .filter((tool) => tool.decision !== "block");
@@ -113,7 +128,7 @@ export const toolkit = Effect.fn("Assembly.toolkit")(function* (
  * name that is too long is cut, and ends with a fingerprint of the whole name, so that tools whose
  * names differ only after the cut are still told apart, and a name is the same whenever it is made.
  */
-const nameOf = (source: string, tool: string) => {
+const nameOf = (source: string, tool: string, maxNameLength: number) => {
   const whole = `${source}__${tool}`;
   const safe = whole.replace(/[^A-Za-z0-9_-]/g, "_");
   if (safe.length <= maxNameLength) return safe;

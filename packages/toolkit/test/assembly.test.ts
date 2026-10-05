@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Schema, Stream } from "effect";
+import { Cause, Effect, Schema, Stream } from "effect";
 import { Tool } from "effect/ai";
 import * as Assembly from "../src/Assembly.ts";
 import type { ToolDefinition } from "../src/ToolDefinition.ts";
@@ -258,6 +258,59 @@ describe("the name of a tool", () => {
         expect(name).toHaveLength(64);
         expect(name).toMatch(/^github__a+_[0-9a-f]{8}$/);
         expect(short).toBe("github__b");
+      }),
+  );
+
+  it.effect("is no longer than an agent takes, when the agent takes fewer characters", () =>
+    Effect.gen(function* () {
+      const toolkit = yield* Assembly.toolkit(
+        [
+          {
+            source: sourceOf("github").source,
+            definitions: [define("a".repeat(120)), define("short"), define("b".repeat(40))],
+          },
+        ],
+        allowAll,
+        { maxNameLength: 59 },
+      );
+
+      const [cut, short, fits] = Object.keys(toolkit.tools);
+
+      expect(cut).toHaveLength(59);
+      expect(cut).toMatch(/^github__a+_[0-9a-f]{8}$/);
+      expect(short).toBe("github__short");
+      // Fits as it is.
+      expect(fits).toBe(`github__${"b".repeat(40)}`);
+    }),
+  );
+
+  it.effect("is cut only as the agent's limit asks, and the call still reaches the tool", () =>
+    Effect.gen(function* () {
+      const github = sourceOf("github");
+      const tool = "a".repeat(70);
+      const toolkit = yield* Assembly.toolkit(
+        [{ source: github.source, definitions: [define(tool)] }],
+        allowAll,
+        { maxNameLength: 20 },
+      );
+      const [name = ""] = Object.keys(toolkit.tools);
+
+      yield* toolkit.handle(name, {}).pipe(Effect.flatMap(Stream.runCollect));
+
+      expect(name).toHaveLength(20);
+      expect(github.calls).toEqual([{ tool, input: {} }]);
+    }),
+  );
+
+  it.effect.each([0, 15, 20.5, Number.NaN])(
+    "refuses a limit of %s, which is not a whole number of at least 16",
+    (limit) =>
+      Effect.gen(function* () {
+        const exit = yield* Effect.exit(Assembly.toolkit([], allowAll, { maxNameLength: limit }));
+
+        expect(exit._tag === "Failure" ? Cause.pretty(exit.cause) : "").toContain(
+          "maxNameLength must be a whole number of at least 16",
+        );
       }),
   );
 

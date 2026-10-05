@@ -225,11 +225,15 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
 
     prompt: runTurn,
 
-    // TODO: Relay the host's tools to opencode, as a server in the bridge that opencode calls.
+    // TODO: Give opencode the host's tools through `HostToolRelay`, as an MCP server in the bridge,
+    // once its session API shows MCP tools to the model, which 1.18.23 does not: the runner behind
+    // `/api/session` takes only the tools registered in its process. Its older session API does.
     submitToolResult: () =>
       Effect.fail(
         harnessError(
-          new HarnessError.UnsupportedError({ description: "opencode runs no host tools yet" }),
+          new HarnessError.UnsupportedError({
+            description: "opencode's session API does not offer the host's tools to its model yet",
+          }),
         ),
       ),
 
@@ -337,7 +341,9 @@ const unsupportedIn = (turnOptions: Bridge.TurnOptions): string | undefined => {
   if (turnOptions.responseFormat.type === "json") {
     return "opencode's session API does not answer in JSON";
   }
-  if (turnOptions.tools.length > 0) return "opencode runs no host tools yet";
+  if (turnOptions.tools.length > 0) {
+    return "opencode's session API does not offer the host's tools to its model yet";
+  }
   if (turnOptions.prompt.content.some((part) => part.type === "file")) {
     return "The opencode agent does not send files with a prompt yet";
   }

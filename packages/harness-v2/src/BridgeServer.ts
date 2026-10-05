@@ -38,6 +38,7 @@ import { HttpRouter, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 import type { SessionId } from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
+import { isPresented } from "./internal/bearer.ts";
 import {
   HarnessError,
   type HarnessErrorReason,
@@ -494,16 +495,3 @@ const layerProtocol = (token: Redacted.Redacted<string>) =>
       return protocol;
     }),
   );
-
-/**
- * Whether `presented` is `expected`, compared in a time that does not depend on where they
- * differ, so that a caller cannot guess the token a character at a time.
- */
-const isPresented = (presented: string | undefined, expected: string) => {
-  if (presented === undefined || presented.length !== expected.length) return false;
-  let difference = 0;
-  for (let i = 0; i < expected.length; i++) {
-    difference |= presented.charCodeAt(i) ^ expected.charCodeAt(i);
-  }
-  return difference === 0;
-};

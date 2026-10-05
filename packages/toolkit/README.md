@@ -138,7 +138,7 @@ ask for, is the client's to set.
 
 ## Assembly
 
-`Assembly.toolkit(members, decide)` makes the one toolkit of a turn from the sources a workspace has,
+`Assembly.toolkit(members, decide, options?)` makes the one toolkit of a turn from the sources a workspace has,
 each with the definitions of its tools that the workspace holds. `decide` says, for a source's name
 and a definition, `allow`, `approve`, or `block` (the `Decision` schema, so that a policy can be
 stored). A blocked tool is left out, and an approved one is marked as needing approval. Which is
@@ -151,15 +151,98 @@ apart, and a name is the same whenever it is made. A call reaches the source tha
 the name that source knows it by. Tools that would still have one name fail the assembly with
 `NameClash`, which holds every clash. Building contacts none of the sources.
 
-An agent that prefixes the tool names it is given has less than 64 characters to spare, which a
-delivery to that agent has to take into account.
+An agent that adds to the tool names it is given has fewer than 64 characters to spare. The
+`maxNameLength` option, at least 16, cuts names to what the agent takes, as a harness's
+`maxToolNameLength` says: `Assembly.toolkit(members, decide, { maxNameLength })`.
+
+## Search
+
+`ToolSearch.toolkit(presented, options?)` presents a toolkit to a model as two tools, in place of
+one for each, which suits a large set of tools, or one that changes from turn to turn. It takes the
+toolkit of an assembly, or any other, and gives another.
+
+```ts
+const assembled = yield * Assembly.toolkit(members, decide);
+const toolkit = yield * ToolSearch.toolkit(assembled);
+```
+
+- `tool_search({ query, limit? })` finds tools by what they do, and returns for each its `name`,
+  `description`, and `inputSchema`, with `matched`, how many tools match, and `available`, how many
+  there are, so that a model knows when a search cut its matches short. A word of the query scores for
+  a word of a tool's name that is the same, or that it begins, and for one of its description, the name
+  counting most; a name is read in words whether it is `create_issue`, `create-issue`, or
+  `createIssue`. A tool that scores nothing does not match, and a query with no words lists the tools
+  in order. A search returns five tools unless it asks for more, up to twenty, or the `limit` option
+  changes the five. It is a plain match on words, not a search by meaning.
+- `tool_call({ name, input })` runs the tool of that name, which the presented toolkit does as it
+  does when a model calls it directly: it checks the input against the tool's parameters, runs the
+  handler, and gives the tool's result. A failure is a result the model reads, as `Failure`, and a name
+  that is no tool is `NotFoundError`. A tool that was blocked is not in the presented toolkit, so it
+  can be neither found nor called.
+
+A tool that needs approval needs it when the model calls it through `tool_call`: the approval is the
+tool's own, as its `needsApproval` says, asked about the input the model gave, so a session asks
+about the call as it asks about any other, and the model cannot reach a tool that needs approval by
+another way. `tool_search` runs nothing and needs none.
+
+What the model is shown is the same two tools however many there are, and what it reads of the others
+is what it searched for. The names of the presented tools are only text the model reads and writes,
+so Search is also a way past the length of tool names that an agent leaves. The host chooses between
+this and showing every tool, with no default: showing every tool costs the tokens of all of them on
+every turn, and Search costs a search for the model to make first.
+
+## Code mode
+
+`CodeMode.toolkit(presented, runtime, options?)` presents a toolkit as one tool, `execute`, that
+runs code the model writes, which calls the tools of the presented toolkit as functions. A model does
+in one run what takes it many calls otherwise: it calls a tool, reads the result in code, filters it or
+goes on with the next call, and only what the code returns comes back to it.
+
+```ts
+const assembled = yield * Assembly.toolkit(members, decide);
+const toolkit = yield * CodeMode.toolkit(assembled, runtime);
+```
+
+- `execute({ code })` takes the body of an async function. The code calls a tool as
+  `await tools.<name>(input)`, notes what it wants to see with `console.log`, and `return`s JSON. What
+  the model reads of `execute` declares the tools as TypeScript, written from their JSON Schemas:
+  the shape of an input, the properties it requires, the values an enum allows, and the
+  descriptions as comments, with `unknown` for what a type cannot say, such as a cyclic schema or one
+  nested more than six levels. A tool is called as it is when a model calls it directly: its input is
+  checked, and a failure is what it says, which the code reads as an error it can catch.
+- The run gives back `{ result, logs }`, `result` being `null` when the code returns nothing. It
+  fails as a result the model reads, with `CodeError`, and what the code logged before, when the code
+  throws; with `Timeout` when it runs longer than `timeout`, a minute by default, which its tool calls
+  count in; and with `ResultTooLarge` when its JSON is longer than `maxResultLength`, 50,000
+  characters by default, so that code that returns too much is told to return less.
+- A tool that needs approval cannot be called from code, since a session cannot ask a person in the
+  middle of a run. It is a tool of its own beside `execute`, so that a session asks about its calls as
+  it asks about any other, and a tool whose `needsApproval` is a function of the call is treated as
+  one that needs it. `execute` itself needs none. Asking about a whole run is not done.
+
+Running the code is a `CodeRuntime`'s, an interface this package does not implement: `run` takes the
+code, the names of the tools it may call, and `call`, which calls one, and gives the result and logs,
+or fails with `CodeError`. A runtime has to run the code in an isolate that can reach nothing but
+those tools, gives it `tools` and `console`, and stops when interrupted. It is the adapter that has
+such an isolate, such as one of QuickJS or a sandbox's, that implements it. No adapter does yet, so
+nothing runs `execute`, and the tests of this module use a runtime that runs the code in the same
+process, which isolates nothing and must not be used for anything else.
+
+## Presentations
+
+Search and Code mode share `Presentation`: each takes the toolkit an assembly gave, which is the
+model's to use, and gives another, through which the model reaches the first. `Presentation.call`
+runs a tool of the first and gives its result as JSON, or fails as a `Failure`; a tool that gives
+nothing gives `null`. `restrict` and `merge` make a toolkit of some tools of one, or of both of two,
+which run as they do in the toolkit they come from. Showing every tool is the third way, with
+nothing to present.
 
 ## What the host does
 
 The host builds the HTTP client and so owns every credential, decides what each tool may do, stores
 definitions and operations and refreshes them with `discover` or `readOperations`, and passes the
-assembled toolkit to a session. How an agent is shown host tools, natively or through MCP or code
-mode, is not decided here.
+assembled toolkit to a session, as it is or presented with Search. How a session's tools reach an
+agent, natively or through MCP or code mode, is not decided here.
 
 ## Conformance
 
@@ -190,7 +273,9 @@ They require of a source that it:
 ## Testing
 
 `test/tool-source.test.ts`, `test/tool-source-error.test.ts`, `test/tool-definition.test.ts`, and
-`test/assembly.test.ts` run over fake sources. `test/conformance.test.ts` runs the suites above for
+`test/assembly.test.ts`, `test/tool-search.test.ts`, `test/presentation.test.ts`, and
+`test/code/code-mode.test.ts` run over fake sources and toolkits, and `test/code/declarations.test.ts`
+holds what the TypeScript declarations say of each kind of schema. `test/conformance.test.ts` runs the suites above for
 four subjects: the MCP source over Effect AI's own server speaking the stateless protocol and one
 speaking with sessions, the HTTP source over operations written by hand, and the HTTP source over the
 operations of an OpenAPI document, the last two against a server of `Bun.serve`, which
