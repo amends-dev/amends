@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer, Logger, Schema, Stream } from "effect";
-import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
+import { Context, Effect, Layer, Logger, Schema, Stream } from "effect";
+import { McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import * as Mcp from "../src/Mcp.ts";
 import * as ToolSource from "../src/ToolSource.ts";
@@ -37,9 +37,14 @@ const appToolkitLayer = AppToolkit.toLayer({
   explode: () => Effect.die("private defect at 10.0.3.7"),
 });
 
-const serverLayer = (protocols: ReadonlyArray<McpProtocol.ProtocolAdapter>) =>
-  McpServer.toolkit(AppToolkit).pipe(
-    Layer.provide(appToolkitLayer),
+const serverLayer = (
+  protocols: ReadonlyArray<McpProtocol.ProtocolAdapter>,
+  moreTools: Layer.Layer<never, never, McpServer.McpServer> = Layer.empty,
+) =>
+  Layer.mergeAll(
+    McpServer.toolkit(AppToolkit).pipe(Layer.provide(appToolkitLayer)),
+    moreTools,
+  ).pipe(
     Layer.provide(
       McpServer.layerHttp({
         name: "everything",
@@ -66,10 +71,14 @@ interface Sent {
  */
 const serve = Effect.fnUntraced(function* (
   protocols: ReadonlyArray<McpProtocol.ProtocolAdapter>,
-  options?: { readonly fault?: (request: Request) => Response | Promise<never> | undefined },
+  options?: {
+    readonly fault?: (request: Request) => Response | Promise<never> | undefined;
+    readonly moreTools?: Layer.Layer<never, never, McpServer.McpServer>;
+  },
 ) {
   const sent: Array<Sent> = [];
-  const start = () => HttpRouter.toWebHandler(serverLayer(protocols), { disableLogger: true });
+  const start = () =>
+    HttpRouter.toWebHandler(serverLayer(protocols, options?.moreTools), { disableLogger: true });
   let current = start();
   yield* Effect.addFinalizer(() => Effect.promise(() => current.dispose()));
 
@@ -104,6 +113,62 @@ const serve = Effect.fnUntraced(function* (
 });
 
 const methods = (sent: ReadonlyArray<Sent>) => sent.map((request) => request.method);
+
+const paramHeaders = (request: Sent | undefined) =>
+  Object.fromEntries(
+    Object.entries(request?.headers ?? {}).filter(([name]) => name.startsWith("mcp-param-")),
+  );
+
+/** What `run_query` takes, which marks four of its parameters as headers, one of them below another. */
+const queryInput = (regionHeader: string): McpSchema.ToolJson => ({
+  type: "object",
+  properties: {
+    region: { type: "string", "x-mcp-header": regionHeader },
+    query: { type: "string" },
+    shard: { type: "integer", "x-mcp-header": "Shard" },
+    dryRun: { type: "boolean", "x-mcp-header": "Dry-Run" },
+    routing: { type: "object", properties: { zone: { type: "string", "x-mcp-header": "Zone" } } },
+  },
+  required: ["region", "query"],
+});
+
+/**
+ * Tools of a server that marks parameters as headers, with the arguments of each call that reached
+ * them, and a way to change what `run_query` takes while the server is up. The Effect AI server
+ * refuses a call that has not the headers a tool marks, on the stateless protocol.
+ */
+const markedTools = () => {
+  const received: Array<unknown> = [];
+  let register: ((inputSchema: McpSchema.ToolJson) => Effect.Effect<void>) | undefined;
+  const layer = Layer.effectDiscard(
+    Effect.gen(function* () {
+      const server = yield* McpServer.McpServer;
+      const handle = (payload: unknown) =>
+        Effect.sync(() => {
+          received.push(payload);
+          return new McpSchema.CallToolResult({ content: [] });
+        });
+      register = (inputSchema) =>
+        server.addTool({
+          tool: new McpSchema.Tool({ name: "run_query", inputSchema }),
+          annotations: Context.empty(),
+          handle,
+        });
+      yield* register(queryInput("Region"));
+      yield* server.addTool({
+        tool: new McpSchema.Tool({
+          name: "café",
+          inputSchema: { type: "object", properties: {} },
+        }),
+        annotations: Context.empty(),
+        handle,
+      });
+    }),
+  );
+  const redefine = (inputSchema: McpSchema.ToolJson) =>
+    register === undefined ? Effect.die("The server has not started") : register(inputSchema);
+  return { layer, received, redefine };
+};
 
 describe.each([
   ["stateless", [McpProtocol.v2026_07_28]],
@@ -306,6 +371,184 @@ describe("a server that cannot be used", () => {
 
       expect(error.reason._tag).toBe("UnavailableError");
       expect(error.reason.modelMessage).not.toContain("10.0.3.7");
+    }),
+  );
+});
+
+describe("a tool that has parameters sent as headers too", () => {
+  const stateless = [McpProtocol.v2026_07_28];
+  const call = {
+    region: "us-west1",
+    query: "select 1",
+    shard: 7,
+    dryRun: false,
+    routing: { zone: "a" },
+  };
+
+  it.effect("is called with the headers when the source has listed the tools", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve(stateless, { moreTools: tools.layer });
+      yield* source.discover;
+      sent.length = 0;
+
+      yield* source.call("run_query", call);
+
+      expect(methods(sent)).toEqual(["tools/call"]);
+      expect(paramHeaders(sent[0])).toEqual({
+        "mcp-param-region": "us-west1",
+        "mcp-param-shard": "7",
+        "mcp-param-dry-run": "false",
+        "mcp-param-zone": "a",
+      });
+      expect(tools.received).toEqual([call]);
+    }),
+  );
+
+  it.effect("is called again with the headers when the server refuses a call without them", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve(stateless, { moreTools: tools.layer });
+
+      yield* source.call("run_query", call);
+
+      expect(methods(sent)).toEqual(["server/discover", "tools/call", "tools/list", "tools/call"]);
+      expect(paramHeaders(sent[1])).toEqual({});
+      expect(Object.keys(paramHeaders(sent[3])).sort()).toEqual([
+        "mcp-param-dry-run",
+        "mcp-param-region",
+        "mcp-param-shard",
+        "mcp-param-zone",
+      ]);
+      // The server refused the first before it ran the tool.
+      expect(tools.received).toEqual([call]);
+
+      sent.length = 0;
+      yield* source.call("run_query", call);
+
+      expect(methods(sent)).toEqual(["tools/call"]);
+      expect(Object.keys(paramHeaders(sent[0]))).toHaveLength(4);
+    }),
+  );
+
+  it.effect("is called with the headers the server asks for now, when it has changed them", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve(stateless, { moreTools: tools.layer });
+      yield* source.discover;
+      yield* tools.redefine(queryInput("Area"));
+      sent.length = 0;
+
+      yield* source.call("run_query", call);
+
+      expect(methods(sent)).toEqual(["tools/call", "tools/list", "tools/call"]);
+      expect(paramHeaders(sent[0])["mcp-param-region"]).toBe("us-west1");
+      expect(paramHeaders(sent[2])["mcp-param-area"]).toBe("us-west1");
+      expect(paramHeaders(sent[2])["mcp-param-region"]).toBeUndefined();
+      expect(tools.received).toEqual([call]);
+    }),
+  );
+
+  it.effect("has the headers only of the parameters that the call gives", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve(stateless, { moreTools: tools.layer });
+      yield* source.discover;
+      sent.length = 0;
+
+      yield* source.call("run_query", { region: "eu", query: "select 1" });
+
+      expect(paramHeaders(sent[0])).toEqual({ "mcp-param-region": "eu" });
+    }),
+  );
+
+  // The server decodes a header that has to be base64 and compares it with the body.
+  it.effect.each([
+    "Région 世界",
+    " padded ",
+    "a\tb",
+    "=?base64?x?=",
+    "us west 1",
+    "",
+    "eu\r\nx-evil: 1",
+  ])("is called with %j for a parameter, which the server reads as it is", (region) =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve(stateless, { moreTools: tools.layer });
+      yield* source.discover;
+      sent.length = 0;
+
+      yield* source.call("run_query", { region, query: "select 1" });
+
+      expect(methods(sent)).toEqual(["tools/call"]);
+      expect(tools.received).toEqual([{ region, query: "select 1" }]);
+    }),
+  );
+
+  it.effect("is named in a header, even when the name is not ASCII", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve(stateless, { moreTools: tools.layer });
+      yield* source.discover;
+      sent.length = 0;
+
+      yield* source.call("café", {});
+
+      expect(sent[0]?.headers["mcp-name"]).toBe("=?base64?Y2Fmw6k=?=");
+      expect(tools.received).toEqual([{}]);
+    }),
+  );
+
+  it.effect(
+    "is left out of the tools, and the leaving out is logged, when its marks are wrong",
+    () =>
+      Effect.gen(function* () {
+        const tools = markedTools();
+        const { source } = yield* serve(stateless, { moreTools: tools.layer });
+        yield* tools.redefine(queryInput("My Region"));
+        const logged: Array<string> = [];
+        const log = Logger.make<unknown, void>((options) => {
+          if (options.logLevel === "Warn") logged.push(JSON.stringify(options.message));
+        });
+
+        const definitions = yield* source.discover.pipe(Effect.provide(Logger.layer([log])));
+
+        expect(definitions.map((definition) => definition.name)).not.toContain("run_query");
+        expect(definitions.map((definition) => definition.name)).toContain("echo");
+        expect(logged).toHaveLength(1);
+        expect(logged[0]).toContain("run_query");
+        expect(logged[0]).toContain("My Region");
+      }),
+  );
+
+  it.effect("keeps the marks in its definition, as the server wrote them", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source } = yield* serve(stateless, { moreTools: tools.layer });
+
+      const definitions = yield* source.discover;
+
+      const query = definitions.find((definition) => definition.name === "run_query");
+      expect(query?.inputSchema).toMatchObject({
+        properties: { region: { "x-mcp-header": "Region" } },
+      });
+    }),
+  );
+
+  it.effect("is called with no headers, and is not left out, by a server that has sessions", () =>
+    Effect.gen(function* () {
+      const tools = markedTools();
+      const { source, sent } = yield* serve([McpProtocol.v2025_11_25], {
+        moreTools: tools.layer,
+      });
+      yield* tools.redefine(queryInput("My Region"));
+
+      const definitions = yield* source.discover;
+      yield* source.call("run_query", call);
+
+      expect(definitions.map((definition) => definition.name)).toContain("run_query");
+      expect(sent.some((request) => Object.keys(paramHeaders(request)).length > 0)).toBe(false);
+      expect(tools.received).toEqual([call]);
     }),
   );
 });

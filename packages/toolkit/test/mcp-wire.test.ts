@@ -510,3 +510,277 @@ describe("a server with sessions", () => {
     }),
   );
 });
+
+describe("a call that a server refuses for its headers", () => {
+  const marking = (header: string) => ({
+    name: "run",
+    inputSchema: {
+      type: "object",
+      properties: { region: { type: "string", "x-mcp-header": header } },
+    },
+  });
+  const paramHeaders = (call: Call | undefined) =>
+    Object.fromEntries(
+      Object.entries(call?.headers ?? {}).filter(([n]) => n.startsWith("mcp-param-")),
+    );
+  const methodsOf = (calls: ReadonlyArray<Call>) => calls.map((call) => call.method);
+
+  /** A server that runs `run` only for a call that has the header it marks, and refuses it otherwise. */
+  const requiring =
+    (header: string, options?: { readonly status?: number }) =>
+    (call: Call): Answer => {
+      if (call.method === "tools/list") return ok(call, { tools: [marking(header)] });
+      if (call.headers[`mcp-param-${header.toLowerCase()}`] !== undefined) return ok(call, {});
+      return {
+        ...rpcError(call, -32020, "Header mismatch"),
+        ...(options?.status === undefined ? {} : { status: options.status }),
+      };
+    };
+
+  it.effect.each([200, 400])("is sent again with the headers the tools mark, for a %s", (status) =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(stateless(requiring("Region", { status })));
+      const source = yield* connect(client);
+
+      const result = yield* source.call("run", { region: "eu" });
+
+      expect(result).toEqual([]);
+      expect(methodsOf(calls)).toEqual([
+        "server/discover",
+        "tools/call",
+        "tools/list",
+        "tools/call",
+      ]);
+      expect(paramHeaders(calls[1])).toEqual({});
+      expect(paramHeaders(calls[3])).toEqual({ "mcp-param-region": "eu" });
+    }),
+  );
+
+  it.effect("is sent with the headers at once, by a source that has listed the tools", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(stateless(requiring("Region")));
+      const source = yield* connect(client);
+      yield* source.discover;
+      calls.length = 0;
+
+      yield* source.call("run", { region: "eu" });
+      yield* source.call("run", { region: "us" });
+
+      expect(methodsOf(calls)).toEqual(["tools/call", "tools/call"]);
+      expect(paramHeaders(calls[1])).toEqual({ "mcp-param-region": "us" });
+    }),
+  );
+
+  it.effect("is sent no more than twice, if the server refuses what it asked for", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(
+        stateless((call) =>
+          call.method === "tools/list"
+            ? ok(call, { tools: [marking("Region")] })
+            : rpcError(call, -32020, "Header mismatch"),
+        ),
+      );
+      const source = yield* connect(client);
+
+      const error = yield* Effect.flip(source.call("run", { region: "eu" }));
+
+      expect(methodsOf(calls)).toEqual([
+        "server/discover",
+        "tools/call",
+        "tools/list",
+        "tools/call",
+      ]);
+      expect(error.reason._tag).toBe("UnsupportedError");
+      expect(error.reason.message).toContain("Header mismatch");
+    }),
+  );
+
+  it.effect("is not sent again when the tools do not change the headers it was sent with", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(
+        stateless((call) =>
+          call.method === "tools/list"
+            ? ok(call, { tools: [tool("run")] })
+            : rpcError(call, -32020, "Header mismatch"),
+        ),
+      );
+      const source = yield* connect(client);
+
+      const error = yield* Effect.flip(source.call("run", { region: "eu" }));
+
+      expect(methodsOf(calls)).toEqual(["server/discover", "tools/call", "tools/list"]);
+      expect(error.reason._tag).toBe("UnsupportedError");
+    }),
+  );
+
+  it.effect("is not sent again when it was sent with the headers the tools mark already", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(
+        stateless((call) =>
+          call.method === "tools/list"
+            ? ok(call, { tools: [marking("Region")] })
+            : rpcError(call, -32020, "Header mismatch"),
+        ),
+      );
+      const source = yield* connect(client);
+      yield* source.discover;
+      calls.length = 0;
+
+      const error = yield* Effect.flip(source.call("run", { region: "eu" }));
+
+      expect(methodsOf(calls)).toEqual(["tools/call", "tools/list"]);
+      expect(paramHeaders(calls[0])).toEqual({ "mcp-param-region": "eu" });
+      expect(error.reason._tag).toBe("UnsupportedError");
+    }),
+  );
+
+  it.effect("fails as the listing of the tools fails, when the server cannot give them", () =>
+    Effect.gen(function* () {
+      const { client } = scripted(
+        stateless((call) =>
+          call.method === "tools/list"
+            ? { status: 503 }
+            : rpcError(call, -32020, "Header mismatch"),
+        ),
+      );
+      const source = yield* connect(client);
+
+      const error = yield* Effect.flip(source.call("run", { region: "eu" }));
+
+      expect(error.reason._tag).toBe("UnavailableError");
+    }),
+  );
+
+  it.effect("is read by the code -32020 alone, and no other code asks for the tools", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(
+        stateless((call) => rpcError(call, -32001, "Header mismatch")),
+      );
+      const source = yield* connect(client);
+
+      const error = yield* Effect.flip(source.call("run", { region: "eu" }));
+
+      expect(methodsOf(calls)).toEqual(["server/discover", "tools/call"]);
+      expect(error.reason._tag).toBe("UnknownError");
+    }),
+  );
+
+  it.effect("is not sent again over a session, which has no headers to send", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted((call) => {
+        switch (call.method) {
+          case "server/discover":
+            return rpcError(call, -32601, "Method not found");
+          case "initialize":
+            return {
+              ...ok(call, { protocolVersion: "2025-11-25", capabilities: {} }),
+              headers: { "mcp-session-id": "abc" },
+            };
+          case "notifications/initialized":
+            return { status: 202 };
+          default:
+            return rpcError(call, -32020, "Header mismatch");
+        }
+      });
+      const source = yield* connect(client);
+
+      const error = yield* Effect.flip(source.call("run", { region: "eu" }));
+
+      expect(methodsOf(calls).filter((method) => method === "tools/list")).toEqual([]);
+      expect(methodsOf(calls).filter((method) => method === "tools/call")).toHaveLength(1);
+      expect(error.reason._tag).toBe("UnsupportedError");
+    }),
+  );
+
+  it.effect(
+    "is sent with the header named as the tools mark it, in the case of a header name",
+    () =>
+      Effect.gen(function* () {
+        const { client, calls } = scripted(stateless(requiring("Shard-ID")));
+        const source = yield* connect(client);
+        yield* source.discover;
+        calls.length = 0;
+
+        yield* source.call("run", { region: "eu" });
+
+        expect(paramHeaders(calls[0])).toEqual({ "mcp-param-shard-id": "eu" });
+      }),
+  );
+});
+
+describe("the tools of a stateless server that mark their parameters", () => {
+  const marking = (name: string, header: unknown, type: unknown = "string") => ({
+    name,
+    inputSchema: {
+      type: "object",
+      properties: { region: { type, "x-mcp-header": header } },
+    },
+  });
+
+  it.effect("are left out of the listing when a mark is not one the protocol allows", () =>
+    Effect.gen(function* () {
+      const { client } = scripted(
+        stateless((call) =>
+          ok(call, {
+            tools: [
+              marking("good", "Region"),
+              marking("spaced", "My Region"),
+              marking("empty", ""),
+              marking("object", "Region", "object"),
+              tool("plain"),
+            ],
+          }),
+        ),
+      );
+      const source = yield* connect(client);
+
+      const definitions = yield* source.discover;
+
+      expect(definitions.map((definition) => definition.name)).toEqual(["good", "plain"]);
+    }),
+  );
+
+  it.effect("are left in the listing of a server with sessions, which sends no headers", () =>
+    Effect.gen(function* () {
+      const { client } = scripted((call) => {
+        switch (call.method) {
+          case "server/discover":
+            return rpcError(call, -32601, "Method not found");
+          case "initialize":
+            return ok(call, { protocolVersion: "2025-11-25", capabilities: {} });
+          case "notifications/initialized":
+            return { status: 202 };
+          default:
+            return ok(call, { tools: [marking("spaced", "My Region")] });
+        }
+      });
+      const source = yield* connect(client);
+
+      const definitions = yield* source.discover;
+
+      expect(definitions.map((definition) => definition.name)).toEqual(["spaced"]);
+    }),
+  );
+
+  it.effect("are called without headers when the server no longer lists them", () =>
+    Effect.gen(function* () {
+      const { client, calls } = scripted(
+        stateless((call) =>
+          call.method === "tools/list"
+            ? ok(call, { tools: [marking("spaced", "My Region")] })
+            : ok(call, {}),
+        ),
+      );
+      const source = yield* connect(client);
+      yield* source.discover;
+      calls.length = 0;
+
+      yield* source.call("spaced", { region: "eu" });
+
+      expect(calls.map((call) => call.method)).toEqual(["tools/call"]);
+      expect(
+        Object.keys(calls[0]?.headers ?? {}).filter((n) => n.startsWith("mcp-param-")),
+      ).toEqual([]);
+    }),
+  );
+});

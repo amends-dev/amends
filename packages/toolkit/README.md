@@ -79,11 +79,24 @@ wrote them. A tool that reports `isError` is a failed call, with the text it sai
 reads. A tool that asks for input first, as `input_required`, is `UnsupportedError`. The definitions
 carry the hints a server gives.
 
-Not done: arguments that a tool marks `x-mcp-header` are not sent as `Mcp-Param-*` headers, since
-`call` is given no schema to find them in; a tool name that is not plain ASCII is not encoded in
-`Mcp-Name`; a session is not ended when the source is no longer used; a request has no time limit;
-and stdio servers are not reached, though `effect/process` and `effect/encoding` hold what a source
-would need.
+A server of the stateless protocol may mark parameters of a tool with `x-mcp-header`, so that a load
+balancer can route on them. The source sends each such parameter that a call gives as a header
+`Mcp-Param-<name>` as well, and the server refuses a call that lacks one. A value that a header cannot
+hold as it is, such as one with a character that is not printable ASCII or that ends in a space,
+is sent as its UTF-8 in base64 between `=?base64?` and `?=`, so that no value adds a header, and so is
+the name of a tool, in `Mcp-Name`. The source knows which parameters a tool marks from the last time
+it listed the tools. A source that has not listed them sends the call without the headers, and when
+the server refuses the call with `-32020`, it lists the tools and sends the call once more, if the
+headers they ask for are other than those it sent, which is also how it learns of a server that has
+changed its tools. A tool whose marks the protocol does not allow, such as two of one name or one on a
+parameter that is an object, is left out of `discover`, with a warning logged. A mark on a number is
+allowed, as the MCP SDK's client allows it, though the protocol says otherwise. Only the parameters
+that `properties` lead to are marks: one under `items`, `anyOf`, `$defs`, or the like makes the tool
+unusable. A server with sessions has no such headers, and its tools are listed as they are.
+
+Not done: a session is not ended when the source is no longer used; a request has no time limit; and
+stdio servers are not reached, though `effect/process` and `effect/encoding` hold what a source would
+need.
 
 ## HTTP and OpenAPI
 
@@ -141,21 +154,56 @@ delivery to that agent has to take into account.
 The host builds the HTTP client and so owns every credential, decides what each tool may do, stores
 definitions and operations and refreshes them with `discover` or `readOperations`, and passes the
 assembled toolkit to a session. How an agent is shown host tools, natively or through MCP or code
-mode, is not decided here, and there are no conformance suites for `ToolSource` yet.
+mode, is not decided here.
+
+## Conformance
+
+`@amends/toolkit/conformance` holds the suites every kind of tool source runs against itself, so that
+code written against `ToolSource` works the same on each. A source's tests call `run` with a
+`Fixture`, which makes the source for one test over a system that serves three tools: `echo`, which
+answers with the text it is given, `failing`, which reports that it failed, and `blocking`, which does
+not answer. The fixture makes the source over the system as it is for the suite that asks: `working`,
+`unauthorized`, `unavailable`, or `unreachable`. The suites need `@effect/vitest`, an optional peer
+dependency that only a source's tests install, and run on the live clock.
+
+They require of a source that it:
+
+- lists definitions that a catalog can store as JSON, under distinct names, and the same each time;
+- runs a tool by the name it lists, returns JSON, and answers calls that run together each with its
+  own answer;
+- fails a tool that reports its failure as `CallFailedError`, and a tool it does not have as an
+  error of the source and not a defect, with every failure a `ToolSourceError` that names the source,
+  and runs tools again after one;
+- stops a call that is interrupted;
+- fails with `AuthenticationError`, which is not retryable, when its credentials are refused, and with
+  `UnavailableError`, which is, when the system says it is down or cannot be reached, as a request for
+  the tools does too if the source asks the system for them;
+- tells a model no credential and no address of the system;
+- is read by a model through `ToolSource.toolkit` as results, with the failures above as results and an
+  input its parameters do not allow refused, and is assembled by `Assembly.toolkit`.
 
 ## Testing
 
 `test/tool-source.test.ts`, `test/tool-source-error.test.ts`, `test/tool-definition.test.ts`, and
-`test/assembly.test.ts` run over fake sources. `test/mcp.test.ts` runs Effect AI's own MCP server in
+`test/assembly.test.ts` run over fake sources. `test/conformance.test.ts` runs the suites above for
+four subjects: the MCP source over Effect AI's own server speaking the stateless protocol and one
+speaking with sessions, the HTTP source over operations written by hand, and the HTTP source over the
+operations of an OpenAPI document, the last two against a server of `Bun.serve`, which
+`test/conformance-servers.ts` starts for each test. `test/mcp.test.ts` runs Effect AI's own MCP server in
 the process, speaking the stateless protocol, one with sessions, or either, behind a `fetch` that
 records each request, and `test/mcp-wire.test.ts` answers from a script what a server never sends:
-event streams with other messages in them, pagination, and each status and error code.
+event streams with other messages in them, pagination, each status and error code, and a server that
+refuses a call for its headers. `test/mcp-headers.test.ts` holds the rules for the headers that mirror
+parameters: the table of encodings the protocol gives, and every way a mark may be wrong.
 `test/http.test.ts` records the requests of a scripted client, and sends a few over the wire to a
 server of `Bun.serve`. `test/openapi.test.ts` reads documents written in each test, and takes one
 through the toolkit to a request. These tests need `Request`, `Response`, and `Bun`, which shared
 packages do not have, so the root `tsconfig.json` checks this package's tests. Run them with
 `bun run test packages/toolkit`.
 
-The MCP source was also run by hand against the official TypeScript SDK's server, and the HTTP source
-and OpenAPI reader against GitHub's published OpenAPI document and its API, and the reader against
-Vercel's and Cloudflare's. Those runs are not part of the suite.
+The MCP source was also run by hand against the official TypeScript SDK's servers: version 1, which
+speaks the protocols with sessions, and version 2, which speaks the stateless protocol and checks the
+headers that mirror parameters, to which the source sent values with every kind of encoding, a tool
+with a name that is not ASCII, and a call that the server refused for a header it had renamed. The
+HTTP source and OpenAPI reader were run against GitHub's published OpenAPI document and its API, and
+the reader against Vercel's and Cloudflare's. Those runs are not part of the suite.
