@@ -8,6 +8,10 @@
  * grow, byte for byte: Daytona's own record of a session's output keeps whole lines, and ends a
  * last line that has no newline with one. The exit code is polled. Daytona takes a process's input
  * a line at a time and never ends it, so a command that reads its input to the end waits forever.
+ *
+ * Daytona keeps every command line in its record of the session, so a command's environment goes
+ * in a script of its own, written through Daytona's file API, which runs the command with it and
+ * deletes itself first.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
 import {
@@ -84,15 +88,29 @@ export const make = Effect.fn("Processes.make")(function* (
             )
           : Effect.void,
     );
-    // TODO: Keep environment values out of the command line, which Daytona keeps in its record of
-    // the session, once a command's environment carries a secret.
+    const environmentScripts = new Map(
+      standardCommandsOf(command).flatMap((standard, index) =>
+        standard.options.env === undefined
+          ? []
+          : [[standard, `${outputDirectory}/environment-${index}`] as const],
+      ),
+    );
+    // Daytona makes the directory the first script goes in.
+    yield* Effect.forEach(
+      environmentScripts,
+      ([standard, file]) =>
+        call("spawn", () =>
+          sandbox.fs.uploadFile(Buffer.from(environmentScriptOf(standard)), file),
+        ),
+      { discard: true },
+    );
     const { cmdId } = yield* call("spawn", () =>
       sandbox.process.executeSessionCommand(session, {
         // Sessions run the user's shell, zsh on Daytona's own image, whose redirections differ
         // from sh's. The line runs in sh as a child, since Daytona loses the exit code of a
         // command that replaces the session's shell.
         command: `sh -c ${quote(
-          `mkdir -p ${quote(outputDirectory)} && { ${commandLine(command, workingDirectory)}; } >${quote(`${outputDirectory}/stdout`)} 2>${quote(`${outputDirectory}/stderr`)}`,
+          `mkdir -p ${quote(outputDirectory)} && { ${commandLine(command, workingDirectory, environmentScripts)}; } >${quote(`${outputDirectory}/stdout`)} 2>${quote(`${outputDirectory}/stderr`)}`,
         )}`,
         runAsync: true,
         suppressInputEcho: true,
@@ -264,15 +282,20 @@ const unsupportedOption = (command: ChildProcess.Command): string | undefined =>
 
 /**
  * The sh line that runs `command` in `workingDirectory`, or in the directory its `cwd` names,
- * resolved against `workingDirectory`, each command of a pipe in a subshell of its own.
+ * resolved against `workingDirectory`, each command of a pipe in a subshell of its own. A command
+ * given an environment runs through the script `environmentScripts` names for it.
  */
-const commandLine = (command: ChildProcess.Command, workingDirectory: string): string => {
+const commandLine = (
+  command: ChildProcess.Command,
+  workingDirectory: string,
+  environmentScripts: ReadonlyMap<ChildProcess.StandardCommand, string>,
+): string => {
   if (command._tag === "PipedCommand") {
     const from = command.options.from ?? "stdout";
     const redirect = from === "stdout" ? "" : from === "all" ? " 2>&1" : " 2>&1 >/dev/null";
-    return `${commandLine(command.left, workingDirectory)}${redirect} | ${commandLine(command.right, workingDirectory)}`;
+    return `${commandLine(command.left, workingDirectory, environmentScripts)}${redirect} | ${commandLine(command.right, workingDirectory, environmentScripts)}`;
   }
-  const { cwd, env, extendEnv, shell, stdout, stderr } = command.options;
+  const { cwd, shell, stdout, stderr } = command.options;
   const directory =
     cwd === undefined ? workingDirectory : cwd.startsWith("/") ? cwd : `${workingDirectory}/${cwd}`;
   const program =
@@ -284,23 +307,32 @@ const commandLine = (command: ChildProcess.Command, workingDirectory: string): s
     outputOptionOf(stdout) === "ignore" ? " >/dev/null" : "",
     outputOptionOf(stderr) === "ignore" ? " 2>/dev/null" : "",
   ].join("");
-  const words = [...environmentOf(env, extendEnv), ...program].map(quote).join(" ");
+  const environmentScript = environmentScripts.get(command);
+  const words = [...(environmentScript === undefined ? [] : ["sh", environmentScript]), ...program]
+    .map(quote)
+    .join(" ");
   return `(cd ${quote(directory)} && exec ${words}${redirects})`;
 };
 
+/** The commands `command` runs, in order: itself, or each command of its pipe. */
+const standardCommandsOf = (
+  command: ChildProcess.Command,
+): ReadonlyArray<ChildProcess.StandardCommand> =>
+  command._tag === "PipedCommand"
+    ? [...standardCommandsOf(command.left), ...standardCommandsOf(command.right)]
+    : [command];
+
 /**
- * The `env` words that give a command its environment: the sandbox's own, without any; only `env`,
- * without `extendEnv`; or the sandbox's with `env` over it. An undefined value unsets the variable.
+ * A script that deletes itself, then runs the command its arguments name with `command`'s
+ * environment: only `env`, without `extendEnv`, or the sandbox's own with `env` over it. An
+ * undefined value unsets the variable.
  */
-const environmentOf = (
-  env: Readonly<Record<string, string | undefined>> | undefined,
-  extendEnv: boolean | undefined,
-): ReadonlyArray<string> => {
-  if (env === undefined) return [];
-  const entries = Object.entries(env);
+const environmentScriptOf = (command: ChildProcess.StandardCommand) => {
+  const entries = Object.entries(command.options.env ?? {});
   const set = entries.flatMap(([name, value]) => (value === undefined ? [] : [`${name}=${value}`]));
   const unset = entries.flatMap(([name, value]) => (value === undefined ? ["-u", name] : []));
-  return ["env", ...(extendEnv === true ? unset : ["-i"]), ...set];
+  const words = ["env", ...(command.options.extendEnv === true ? unset : ["-i"]), ...set];
+  return `rm -f -- "$0"\nexec ${words.map(quote).join(" ")} "$@"\n`;
 };
 
 /** The input of the first command `command` runs. */

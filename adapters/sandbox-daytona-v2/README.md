@@ -42,7 +42,9 @@ it, and deleting the session ends the process and its children. When the scope t
 process closes, its session is deleted, unless its handle was unreferenced; the process then runs
 until the sandbox stops. A session runs the user's shell, zsh on Daytona's image, so each command
 runs as a line of `sh`, which honours the command's directory, environment, `shell` option, ignored
-streams, and pipes.
+streams, and pipes. Daytona keeps every command line in its record of the session, so a command's
+environment goes in a script of its own, written through Daytona's file API, which deletes itself
+and runs the command with it; the line names only the script.
 
 A process writes its output to files of its own under `/tmp`, which its handle reads as they grow,
 up to a megabyte at a time, byte for byte. Daytona's own record of a session's output keeps whole
@@ -102,6 +104,7 @@ the suites `@amends/sandbox-v2/conformance` exports, and deletes the snapshots o
 when it ends. `test/daytona.test.ts` checks what the provider asks of Daytona: that sandboxes do
 not stop on their own, that one snapshot is made of a version that several hosts create sandboxes
 from at once, that a failing template leaves neither its sandbox nor a snapshot, the network
-policies Daytona enforces and those it cannot, when a sandbox created with one is under it, and
-destroying a sandbox from several callers at once. It deletes, when it ends, what its templates
+policies Daytona enforces and those it cannot, when a sandbox created with one is under it, that a
+command's environment stays out of Daytona's record of its session, and destroying a sandbox from
+several callers at once. It deletes, when it ends, what its templates
 left being made in the background. [Testing](../../docs/testing.md) says how to run them.

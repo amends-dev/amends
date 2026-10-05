@@ -4,7 +4,7 @@ import { type Network, type Sandbox, type SandboxProvider, Template } from "@ame
 import { Daytona, DaytonaNotFoundError } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { afterAll, describe, expect, layer } from "@effect/vitest";
-import { Crypto, Data, Effect, Redacted, Ref, Schedule } from "effect";
+import { Crypto, Data, Effect, Redacted, Ref, Schedule, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 /**
@@ -322,6 +322,39 @@ describe.skipIf(
 
           expect(both.reason._tag).toBe("UnsupportedError");
           expect(denying.reason._tag).toBe("UnsupportedError");
+        }),
+      timeout,
+    );
+
+    it.effect(
+      "keeps a command's environment out of Daytona's record of its session",
+      () =>
+        Effect.gen(function* () {
+          const daytona = yield* useDaytona;
+          const sandbox = yield* createSandbox(yield* DaytonaSandboxProvider.make({ apiKey }));
+
+          const { printed, recorded } = yield* Effect.scoped(
+            Effect.gen(function* () {
+              const handle = yield* sandbox.childProcessSpawner.spawn(
+                ChildProcess.make("sh", ["-c", 'printf %s "$SECRET"'], {
+                  env: { SECRET: "kept out of the record" },
+                  extendEnv: true,
+                }),
+              );
+              const printed = yield* Stream.mkString(Stream.decodeText(handle.stdout));
+              // The process's session lasts until the scope closes.
+              const found = yield* Effect.promise(() => daytona.get(sandbox.id));
+              const sessions = yield* Effect.promise(() => found.process.listSessions());
+              const recorded = sessions.flatMap((session) =>
+                session.commands.map(({ command }) => command),
+              );
+              return { printed, recorded };
+            }),
+          );
+
+          expect(printed).toBe("kept out of the record");
+          expect(recorded.length).toBeGreaterThan(0);
+          expect(recorded.filter((command) => command.includes("kept out of"))).toEqual([]);
         }),
       timeout,
     );
