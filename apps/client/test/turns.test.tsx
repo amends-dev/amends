@@ -385,6 +385,13 @@ function followed(
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
     if (path === "/workspaces/one/turns/atlas-1") return json(turn);
+    // The workspace's change feed is live, so that nothing here depends on how long a test takes: a
+    // feed that never connected would count as down once `liveGrace` passed.
+    if (path === "/workspaces/one/changes") {
+      const feed = eventStream(request);
+      feed.send({ _tag: "Ready", workspaceId: "one", cursor: null, reset: false });
+      return feed.response;
+    }
     if (path === "/workspaces/one/turns/atlas-1/log/events") {
       const refused = refuse(subscriptions++);
       if (refused !== undefined) return refused;
