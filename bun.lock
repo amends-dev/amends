@@ -354,6 +354,17 @@
         "effect": "catalog:",
       },
     },
+    "packages/connection-v2": {
+      "name": "@amends/connection-v2",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/core": {
       "name": "@amends/core",
       "version": "0.0.0",
@@ -483,8 +494,12 @@
         "effect": "catalog:",
       },
       "peerDependencies": {
+        "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
+      "optionalPeers": [
+        "@effect/vitest",
+      ],
     },
   },
   "overrides": {
@@ -514,6 +529,8 @@
     "@amends/connection-anthropic": ["@amends/connection-anthropic@workspace:adapters/connection-anthropic"],
 
     "@amends/connection-openai-compatible": ["@amends/connection-openai-compatible@workspace:adapters/connection-openai-compatible"],
+
+    "@amends/connection-v2": ["@amends/connection-v2@workspace:packages/connection-v2"],
 
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
