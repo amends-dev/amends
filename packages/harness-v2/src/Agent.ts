@@ -75,7 +75,8 @@ export interface TurnOptions {
 
   /**
    * Tools the host runs. When the agent calls one, the turn streams a `tool-call` part that is not
-   * `providerExecuted` and waits for `submitToolResult`.
+   * `providerExecuted` and waits for `submitToolResult`. The host may ask for approval before it runs
+   * a tool; the agent waits for the result either way, and gets `execution-denied` for a refusal.
    */
   readonly tools: ReadonlyArray<Tool.Any>;
 

@@ -4,6 +4,7 @@ import { Tool, Toolkit } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
 import { HarnessError, UnavailableError, UnsupportedError } from "../src/HarnessError.ts";
 import * as Harness from "../src/Harness.ts";
+import type { Session } from "../src/Session.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
 import {
   type FakeAgentOptions,
@@ -70,6 +71,68 @@ const startSession = (script: Script, options?: FakeAgentOptions) =>
     const { sandbox } = yield* makeFakeSandbox;
     const session = yield* Harness.make(fake.agent).startSession({ sandbox, id });
     return { fake, session };
+  });
+
+/** A host tool that deletes a file, which needs approval, and counts how often it ran. */
+const makeDeleteToolkit = Effect.gen(function* () {
+  const runs = yield* Ref.make(0);
+  const Delete = Tool.make("Delete", {
+    parameters: Schema.Struct({ path: Schema.String }),
+    success: Schema.String,
+    needsApproval: true,
+  });
+  const DeleteToolkit = Toolkit.make(Delete);
+  const toolkit = yield* DeleteToolkit.pipe(
+    Effect.provide(
+      DeleteToolkit.toLayer({
+        Delete: ({ path }) =>
+          Effect.as(
+            Ref.update(runs, (count) => count + 1),
+            `deleted ${path}`,
+          ),
+      }),
+    ),
+  );
+  return { toolkit, runs };
+});
+
+/** An agent that calls `Delete` once and answers with what the host gives back. */
+const callingDelete: Script = (_prompt, host) =>
+  Stream.concat(
+    Stream.make({
+      type: "tool-call",
+      id: "call-delete",
+      name: "Delete",
+      params: { path: "notes.md" },
+    }),
+    Stream.unwrap(
+      Effect.map(host.toolResult, (result) => Stream.fromIterable(reply(JSON.stringify(result)))),
+    ),
+  );
+
+/** Answers each approval request of a turn with `answer`, as the caller reading the turn would. */
+const answering =
+  (session: Session, answer: { readonly approved: boolean; readonly reason?: string }) =>
+  <E, R>(turn: Stream.Stream<StreamPart, E, R>) =>
+    Stream.tap(turn, (part) =>
+      part.type === "tool-approval-request"
+        ? session.approve({ approvalId: part.approvalId, ...answer })
+        : Effect.void,
+    );
+
+/** The tool calls, approval requests, and tool results of a turn, in order, as the calls they name. */
+const toolActivity = (parts: Iterable<StreamPart>) =>
+  Array.from(parts).flatMap((part) => {
+    switch (part.type) {
+      case "tool-call":
+        return [`call ${part.id}`];
+      case "tool-approval-request":
+        return [`ask ${part.toolCallId}`];
+      case "tool-result":
+        return [`result ${part.id}`];
+      default:
+        return [];
+    }
   });
 
 describe("Session", () => {
@@ -432,6 +495,185 @@ describe("Session", () => {
           "tool-result call-open",
         ]);
       }),
+  );
+
+  it.effect("asks before running a host tool that needs approval, and runs it once approved", () =>
+    Effect.gen(function* () {
+      const { toolkit, runs } = yield* makeDeleteToolkit;
+      const { fake, session } = yield* startSession(callingDelete);
+      const whenAsked: Array<{ readonly runs: number; readonly submitted: number }> = [];
+
+      const parts = yield* Stream.runCollect(
+        session.stream({ prompt: "clean", toolkit }).pipe(
+          Stream.tap((part) =>
+            part.type === "tool-approval-request"
+              ? Effect.gen(function* () {
+                  whenAsked.push({ runs: yield* Ref.get(runs), submitted: fake.submitted.length });
+                  yield* session.approve({ approvalId: part.approvalId, approved: true });
+                })
+              : Effect.void,
+          ),
+        ),
+      );
+
+      // Neither the tool nor the agent had anything before the answer.
+      expect(whenAsked).toEqual([{ runs: 0, submitted: 0 }]);
+      expect(yield* Ref.get(runs)).toBe(1);
+      expect(fake.submitted).toEqual(["deleted notes.md"]);
+      expect(toolActivity(parts)).toEqual([
+        "call call-delete",
+        "ask call-delete",
+        "result call-delete",
+      ]);
+    }),
+  );
+
+  it.effect("answers a call that approve refuses as denied, and does not run the tool", () =>
+    Effect.gen(function* () {
+      const { toolkit, runs } = yield* makeDeleteToolkit;
+      const { fake, session } = yield* startSession(callingDelete);
+
+      const parts = yield* Stream.runCollect(
+        session
+          .stream({ prompt: "clean", toolkit })
+          .pipe(answering(session, { approved: false, reason: "Not now" })),
+      );
+      const state = yield* session.detach;
+
+      const denied = { type: "execution-denied", reason: "Not now" };
+      expect(yield* Ref.get(runs)).toBe(0);
+      expect(fake.submitted).toEqual([denied]);
+      expect(Array.from(parts).filter((part) => part.type === "tool-result")).toMatchObject([
+        { id: "call-delete", isFailure: true, providerExecuted: false, result: denied },
+      ]);
+      // The conversation records the call and its denial, which any model reads.
+      expect(state.history.content.find((message) => message.role === "tool")).toMatchObject({
+        content: [{ type: "tool-result", id: "call-delete", isFailure: true, result: denied }],
+      });
+    }),
+  );
+
+  it.effect("gives a refusal without a reason one the agent can read", () =>
+    Effect.gen(function* () {
+      const { toolkit } = yield* makeDeleteToolkit;
+      const { fake, session } = yield* startSession(callingDelete);
+
+      yield* Stream.runDrain(
+        session.stream({ prompt: "clean", toolkit }).pipe(answering(session, { approved: false })),
+      );
+
+      expect(fake.submitted).toEqual([
+        { type: "execution-denied", reason: expect.stringMatching(/\S/) },
+      ]);
+    }),
+  );
+
+  it.effect(
+    "decides per call when needsApproval is a function of the params and the conversation",
+    () =>
+      Effect.gen(function* () {
+        const seen: Array<{
+          readonly amount: number;
+          readonly toolCallId: string;
+          readonly roles: ReadonlyArray<string>;
+        }> = [];
+        const Transfer = Tool.make("Transfer", {
+          parameters: Schema.Struct({ amount: Schema.Finite }),
+          success: Schema.String,
+          needsApproval: ({ amount }, { toolCallId, messages }) => {
+            seen.push({ amount, toolCallId, roles: messages.map((message) => message.role) });
+            return amount > 100;
+          },
+        });
+        const TransferToolkit = Toolkit.make(Transfer);
+        const toolkit = yield* TransferToolkit.pipe(
+          Effect.provide(
+            TransferToolkit.toLayer({
+              Transfer: ({ amount }) => Effect.succeed(`moved ${amount}`),
+            }),
+          ),
+        );
+        const { fake, session } = yield* startSession((_prompt, host) =>
+          Stream.concat(
+            Stream.make(
+              { type: "tool-call", id: "call-small", name: "Transfer", params: { amount: 50 } },
+              { type: "tool-call", id: "call-large", name: "Transfer", params: { amount: 500 } },
+            ),
+            Stream.unwrap(
+              Effect.as(
+                Effect.andThen(host.toolResult, host.toolResult),
+                Stream.fromIterable(reply("Done")),
+              ),
+            ),
+          ),
+        );
+
+        const parts = yield* Stream.runCollect(
+          session.stream({ prompt: "pay", toolkit }).pipe(answering(session, { approved: true })),
+        );
+
+        // Only the large transfer asks; the conversation the function reads holds the turn's prompt.
+        expect(toolActivity(parts)).toEqual([
+          "call call-small",
+          "result call-small",
+          "call call-large",
+          "ask call-large",
+          "result call-large",
+        ]);
+        expect(fake.submitted).toEqual(["moved 50", "moved 500"]);
+        expect(seen).toEqual([
+          { amount: 50, toolCallId: "call-small", roles: ["user"] },
+          { amount: 500, toolCallId: "call-large", roles: ["user"] },
+        ]);
+      }),
+  );
+
+  it.effect("denies approval requests in a turn it returns whole, and does not run the tool", () =>
+    Effect.gen(function* () {
+      const { toolkit, runs } = yield* makeDeleteToolkit;
+      const { fake, session } = yield* startSession(callingDelete);
+
+      const result = yield* session.generate({ prompt: "clean", toolkit });
+
+      expect(yield* Ref.get(runs)).toBe(0);
+      expect(fake.submitted).toMatchObject([{ type: "execution-denied" }]);
+      expect(result.toolResults).toMatchObject([
+        { id: "call-delete", isFailure: true, result: { type: "execution-denied" } },
+      ]);
+    }),
+  );
+
+  it.effect("passes on approvals it did not ask for, also once the stream that asked ended", () =>
+    Effect.gen(function* () {
+      const { toolkit, runs } = yield* makeDeleteToolkit;
+      const { fake, session } = yield* startSession(callingDelete);
+      const asked = yield* Deferred.make<string>();
+      const reading = yield* Effect.forkChild(
+        Stream.runDrain(
+          session
+            .stream({ prompt: "clean", toolkit })
+            .pipe(
+              Stream.tap((part) =>
+                part.type === "tool-approval-request"
+                  ? Deferred.succeed(asked, part.approvalId)
+                  : Effect.void,
+              ),
+            ),
+        ),
+      );
+      const approvalId = yield* Deferred.await(asked);
+      yield* Fiber.interrupt(reading);
+
+      // The request ended with its stream, so its answer is the agent's to take, as is any other.
+      yield* session.approve({ approvalId, approved: true });
+      yield* session.approve({ approvalId: "agent-asked", approved: false, reason: "No" });
+
+      expect(fake.approvals).toEqual([
+        { approvalId, approved: true },
+        { approvalId: "agent-asked", approved: false, reason: "No" },
+      ]);
+      expect(yield* Ref.get(runs)).toBe(0);
+    }),
   );
 
   it.effect("leaves a turn the agent refused before it began out of the conversation", () =>
