@@ -1,0 +1,320 @@
+/**
+ * A Daytona sandbox's files, read and written whole through Daytona's file API, so that a read
+ * holds the whole file in memory, whatever its size, and otherwise worked on with the sandbox's
+ * POSIX tools, one command each, which Daytona runs and answers at once. Paths are the sandbox's;
+ * a relative one is resolved against the working directory. A failure is the error the tool's
+ * message names, as Effect's own file systems name an `errno`.
+ */
+import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
+import {
+  DaytonaAuthenticationError,
+  DaytonaForbiddenError,
+  DaytonaNotFoundError,
+  DaytonaTimeoutError,
+} from "@daytona/sdk";
+import { ByteSize, Effect, FileSystem, Option, PlatformError, Stream } from "effect";
+
+/** The file system of `sandbox`, whose relative paths start in `workingDirectory`. */
+export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSystem.FileSystem => {
+  const resolve = (path: string) => (path.startsWith("/") ? path : `${workingDirectory}/${path}`);
+
+  /**
+   * Runs `script` in sh with `args` as its positional parameters, the first being the path it works
+   * on, and returns what it prints. `fail path message` fails it with a message of the tools' own.
+   */
+  const run = (method: string, script: string, args: ReadonlyArray<string>) =>
+    Effect.tryPromise({
+      try: () =>
+        sandbox.process.executeCommand(
+          `sh -c ${quote(`fail() { printf '%s: %s\\n' "$1" "$2" >&2; exit 1; }; ${script}`)} sh ${args.map(quote).join(" ")}`,
+          undefined,
+          // The tools' messages name their errors in English.
+          { LC_ALL: "C" },
+        ),
+      catch: (error) => toPlatformError(method, args[0], error),
+    }).pipe(
+      Effect.flatMap(({ exitCode, result }) =>
+        exitCode === 0
+          ? Effect.succeed(result)
+          : Effect.fail(
+              PlatformError.systemError({
+                _tag: systemErrorTagOf(result),
+                module: "FileSystem",
+                method,
+                pathOrDescriptor: args[0],
+                description: result.trim(),
+              }),
+            ),
+      ),
+    );
+
+  /** Calls Daytona's file API for `path`, failing with the error its failure amounts to. */
+  const call = <A>(method: string, path: string, request: () => Promise<A>) =>
+    Effect.tryPromise({ try: request, catch: (error) => toPlatformError(method, path, error) });
+
+  const makeTempDirectory: FileSystem.FileSystem["makeTempDirectory"] = (options) =>
+    Effect.map(
+      run("makeTempDirectory", 'mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX"', [
+        options?.directory === undefined ? "" : resolve(options.directory),
+        options?.prefix ?? "",
+      ]),
+      withoutNewline,
+    );
+
+  // A temporary file is made in a temporary directory of its own, as Effect's own file systems do.
+  const makeTempFile: FileSystem.FileSystem["makeTempFile"] = (options) =>
+    Effect.map(
+      run(
+        "makeTempFile",
+        'directory=$(mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX") && mktemp --suffix="$3" -- "$directory/XXXXXXXXXXXX"',
+        [
+          options?.directory === undefined ? "" : resolve(options.directory),
+          options?.prefix ?? "",
+          options?.suffix ?? "",
+        ],
+      ),
+      withoutNewline,
+    );
+
+  const remove: FileSystem.FileSystem["remove"] = (path, options) =>
+    Effect.asVoid(
+      run(
+        "remove",
+        `rm${options?.recursive === true ? " -r" : ""}${options?.force === true ? " -f" : ""} -- "$1"`,
+        [resolve(path)],
+      ),
+    );
+
+  return FileSystem.make({
+    access: (path, options) =>
+      Effect.asVoid(
+        run(
+          "access",
+          [
+            '[ -e "$1" ] || fail "$1" "No such file or directory"',
+            ...(options?.readable === true ? ['[ -r "$1" ] || fail "$1" "Permission denied"'] : []),
+            ...(options?.writable === true ? ['[ -w "$1" ] || fail "$1" "Permission denied"'] : []),
+          ].join("; "),
+          [resolve(path)],
+        ),
+      ),
+    // `--update=none` leaves existing files as they are, as Node's `cp` does without `force`.
+    copy: (fromPath, toPath, options) =>
+      Effect.asVoid(
+        run(
+          "copy",
+          `cp -RT${options?.overwrite === true ? "" : " --update=none"}${options?.preserveTimestamps === true ? " --preserve=timestamps" : ""} -- "$1" "$2"`,
+          [resolve(fromPath), resolve(toPath)],
+        ),
+      ),
+    copyFile: (fromPath, toPath) =>
+      Effect.asVoid(run("copyFile", 'cp -T -- "$1" "$2"', [resolve(fromPath), resolve(toPath)])),
+    chmod: (path, mode) =>
+      Effect.asVoid(run("chmod", `chmod ${mode.toString(8)} -- "$1"`, [resolve(path)])),
+    chown: (path, uid, gid) =>
+      Effect.asVoid(run("chown", `chown ${uid}:${gid} -- "$1"`, [resolve(path)])),
+    // TODO: Match paths against a pattern, once a caller globs a sandbox's files.
+    glob: () => Effect.fail(unsupported("glob", "A Daytona sandbox's files are not globbed yet")),
+    link: (fromPath, toPath) =>
+      Effect.asVoid(run("link", 'ln -- "$1" "$2"', [resolve(fromPath), resolve(toPath)])),
+    makeDirectory: (path, options) =>
+      Effect.asVoid(
+        run(
+          "makeDirectory",
+          `mkdir${options?.recursive === true ? " -p" : ""}${options?.mode === undefined ? "" : ` -m ${options.mode.toString(8)}`} -- "$1"`,
+          [resolve(path)],
+        ),
+      ),
+    makeTempDirectory,
+    makeTempDirectoryScoped: (options) =>
+      Effect.acquireRelease(makeTempDirectory(options), (directory) =>
+        Effect.orDie(remove(directory, { recursive: true })),
+      ),
+    makeTempFile,
+    makeTempFileScoped: (options) =>
+      Effect.acquireRelease(makeTempFile(options), (file) =>
+        Effect.orDie(remove(file.slice(0, file.lastIndexOf("/")), { recursive: true })),
+      ),
+    // TODO: Open a file to read and write it in parts, once a caller streams a sandbox's file;
+    // `stream` and `sink` open the file too.
+    open: () =>
+      Effect.fail(unsupported("open", "A Daytona sandbox's files are read and written whole")),
+    readDirectory: (path, options) =>
+      Effect.map(
+        run(
+          "readDirectory",
+          [
+            '[ -e "$1" ] || fail "$1" "No such file or directory"',
+            '[ -d "$1" ] || fail "$1" "Not a directory"',
+            `cd -- "$1" && find . -mindepth 1${options?.recursive === true ? "" : " -maxdepth 1"} -printf '%P\\0'`,
+          ].join("; "),
+          [resolve(path)],
+        ),
+        // Names end in NUL, which no name holds.
+        (names) => names.split("\0").slice(0, -1),
+      ),
+    readFile: (path) =>
+      Effect.map(
+        call("readFile", resolve(path), () => sandbox.fs.downloadFile(resolve(path))),
+        (buffer) => new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+      ),
+    readLink: (path) => run("readLink", 'readlink -vn -- "$1"', [resolve(path)]),
+    realPath: (path) =>
+      Effect.map(run("realPath", 'realpath -e -- "$1"', [resolve(path)]), withoutNewline),
+    remove,
+    rename: (oldPath, newPath) =>
+      Effect.asVoid(run("rename", 'mv -T -- "$1" "$2"', [resolve(oldPath), resolve(newPath)])),
+    stat: (path) =>
+      Effect.map(
+        run("stat", `stat -L -c '%f %s %.9Y %.9X %.9W %d %i %h %u %g %r %o %b' -- "$1"`, [
+          resolve(path),
+        ]),
+        fileInfoOf,
+      ),
+    // A link's target is kept as given; a relative one is relative to the link's directory.
+    symlink: (target, path) =>
+      Effect.asVoid(run("symlink", 'ln -s -- "$1" "$2"', [target, resolve(path)])),
+    truncate: (path, length) =>
+      Effect.asVoid(
+        run(
+          "truncate",
+          `[ -e "$1" ] || fail "$1" "No such file or directory"; truncate -s ${length ?? 0} -- "$1"`,
+          [resolve(path)],
+        ),
+      ),
+    utimes: (path, atime, mtime) =>
+      Effect.asVoid(
+        run(
+          "utimes",
+          '[ -e "$1" ] || fail "$1" "No such file or directory"; touch -c -a -d "@$2" -- "$1" && touch -c -m -d "@$3" -- "$1"',
+          [resolve(path), secondsOf(atime), secondsOf(mtime)],
+        ),
+      ),
+    // TODO: Watch a sandbox's files, once a caller watches them.
+    watch: () => Stream.fail(unsupported("watch", "A Daytona sandbox's files are not watched yet")),
+    writeFile: Effect.fnUntraced(function* (path, data, options) {
+      const flag = options?.flag ?? "w";
+      // TODO: Append to a file, once a caller appends to a sandbox's file.
+      if (flag !== "w" && flag !== "w+" && flag !== "wx" && flag !== "wx+") {
+        return yield* unsupported(
+          "writeFile",
+          `A Daytona sandbox's files are not opened with ${flag}`,
+        );
+      }
+      const resolved = resolve(path);
+      // Daytona makes a file's missing directories, and writes over a file it is asked not to,
+      // so the directory and the file are checked first, as opening the file would.
+      const created = yield* run(
+        "writeFile",
+        [
+          '[ -d "$(dirname -- "$1")" ] || fail "$1" "No such file or directory"',
+          ...(flag.startsWith("wx") ? ['[ ! -e "$1" ] || fail "$1" "File exists"'] : []),
+          '[ -e "$1" ] || printf created',
+        ].join("; "),
+        [resolved],
+      );
+      yield* call("writeFile", resolved, () =>
+        sandbox.fs.uploadFile(Buffer.from(data.buffer, data.byteOffset, data.byteLength), resolved),
+      );
+      // A mode applies to the file the write creates, as when a file is opened.
+      if (options?.mode !== undefined && created === "created") {
+        yield* run("writeFile", `chmod ${options.mode.toString(8)} -- "$1"`, [resolved]);
+      }
+    }),
+  });
+};
+
+/** The file information `stat` prints in the format the file system asks it for. */
+const fileInfoOf = (printed: string): FileSystem.File.Info => {
+  const [mode, size, mtime, atime, birthtime, dev, ino, nlink, uid, gid, rdev, blksize, blocks] =
+    withoutNewline(printed).split(" ");
+  const modeBits = Number.parseInt(mode ?? "0", 16);
+  return {
+    type: fileTypeOf(modeBits),
+    mtime: dateOf(mtime),
+    atime: dateOf(atime),
+    birthtime: dateOf(birthtime),
+    dev: Number(dev),
+    ino: Option.some(Number(ino)),
+    mode: modeBits,
+    nlink: Option.some(Number(nlink)),
+    uid: Option.some(Number(uid)),
+    gid: Option.some(Number(gid)),
+    rdev: Option.some(Number(rdev)),
+    size: ByteSize.bytes(BigInt(size ?? "0")),
+    blksize: Option.some(ByteSize.bytes(BigInt(blksize ?? "0"))),
+    blocks: Option.some(Number(blocks)),
+  };
+};
+
+/** The type a file's mode names in its format bits. */
+const fileTypeOf = (mode: number): FileSystem.File.Type => {
+  switch (mode & 0o170000) {
+    case 0o100000:
+      return "File";
+    case 0o040000:
+      return "Directory";
+    case 0o120000:
+      return "SymbolicLink";
+    case 0o060000:
+      return "BlockDevice";
+    case 0o020000:
+      return "CharacterDevice";
+    case 0o010000:
+      return "FIFO";
+    case 0o140000:
+      return "Socket";
+    default:
+      return "Unknown";
+  }
+};
+
+/** A time `stat` prints in seconds, which it prints as 0 or `-` when the file system keeps none. */
+const dateOf = (seconds: string | undefined): Option.Option<Date> => {
+  const value = Number(seconds);
+  return Number.isFinite(value) && value > 0 ? Option.some(new Date(value * 1000)) : Option.none();
+};
+
+const secondsOf = (time: Date | number) =>
+  String(typeof time === "number" ? time : time.getTime() / 1000);
+
+const withoutNewline = (printed: string) =>
+  printed.endsWith("\n") ? printed.slice(0, -1) : printed;
+
+const quote = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
+
+const unsupported = (method: string, description: string) =>
+  PlatformError.badArgument({ module: "FileSystem", method, description });
+
+const toPlatformError = (method: string, path: string | undefined, error: unknown) =>
+  PlatformError.systemError({
+    _tag:
+      error instanceof DaytonaNotFoundError
+        ? "NotFound"
+        : error instanceof DaytonaAuthenticationError || error instanceof DaytonaForbiddenError
+          ? "PermissionDenied"
+          : error instanceof DaytonaTimeoutError
+            ? "TimedOut"
+            : systemErrorTagOf(error instanceof Error ? error.message : String(error)),
+    module: "FileSystem",
+    method,
+    pathOrDescriptor: path,
+    description: error instanceof Error ? error.message : String(error),
+    cause: error,
+  });
+
+/** The error a message of the sandbox's tools, or of Daytona's file API, names. */
+const systemErrorTagOf = (message: string): PlatformError.SystemErrorTag => {
+  if (/no such file or directory|file not found/i.test(message)) return "NotFound";
+  if (/file exists|already exists/i.test(message)) return "AlreadyExists";
+  if (/permission denied|operation not permitted/i.test(message)) return "PermissionDenied";
+  if (
+    /not a directory|is a directory|points to a directory|too many levels of symbolic links/i.test(
+      message,
+    )
+  ) {
+    return "BadResource";
+  }
+  if (/resource busy/i.test(message)) return "Busy";
+  return "Unknown";
+};

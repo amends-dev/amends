@@ -1,0 +1,232 @@
+import { BridgeClient, Harness } from "@amends/harness-v2";
+import { SessionId } from "@amends/harness-v2/Agent";
+import { Sandbox } from "@amends/sandbox-v2";
+import { BunServices, BunSocket } from "@effect/platform-bun";
+import { describe, expect, it } from "@effect/vitest";
+import { Effect, FileSystem, Layer, Path, Redacted } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import * as Template from "../src/Template.ts";
+import { makeScriptedCommands } from "./fakes.ts";
+import { freePort, makeSandbox } from "./fixtures.ts";
+
+/**
+ * `make` bundles the bridge program with the Bun running the tests. The template it gives runs on
+ * this machine, in a home directory of the test's own, with the commands it runs answered as a
+ * sandbox would answer them. Installing for real downloads Bun and opencode, so it runs only with
+ * `AMENDS_TEST_OPENCODE=1`.
+ */
+const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
+const model = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "opencode/fledge-alpha-free";
+
+const homeLookup = ["sh", "-c", 'printf %s "$HOME"'];
+
+/** Where `installation` launches Bun and the bridge program from, relative to the home directory. */
+const launchedFrom = (installation: Template.Installation) => {
+  const [bun = "", bridge = ""] = [
+    ...(installation.args[1] ?? "").matchAll(/"\$HOME\/([^"]+)"/g),
+  ].map(([, file]) => file);
+  return { bun, bridge };
+};
+
+/**
+ * Commands as a sandbox whose home is `home` answers them: the home lookup with `home`, and every
+ * other command as `answer` says.
+ */
+const makeSandboxCommands = (
+  home: string,
+  answer: (
+    command: string,
+    args: ReadonlyArray<string>,
+  ) => { readonly output?: string; readonly code?: number } = () => ({}),
+) => {
+  const commands = makeScriptedCommands((command, args) =>
+    [command, ...args].join(" ") === homeLookup.join(" ")
+      ? { output: home }
+      : answer(command, args),
+  );
+  return {
+    ran: commands.ran,
+    /** Runs `effect`, such as a template's `prepare`, with these commands. */
+    provide: Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, commands.spawner),
+  };
+};
+
+/** `spawner`, running each command with `home` as its home directory, as in a sandbox of its own. */
+const withHome = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], home: string) =>
+  ChildProcessSpawner.make((command) =>
+    spawner.spawn(
+      command._tag === "StandardCommand"
+        ? ChildProcess.make(command.command, command.args, {
+            ...command.options,
+            env: { ...command.options.env, HOME: home },
+            extendEnv: command.options.env === undefined || command.options.extendEnv,
+          })
+        : command,
+    ),
+  );
+
+describe("Template", () => {
+  it("names the platform `uname -sm` prints, and none the bridge does not install on", () => {
+    expect(Template.platformOf("Darwin arm64\n")).toBe("darwin-arm64");
+    expect(Template.platformOf("Darwin x86_64")).toBe("darwin-x64");
+    expect(Template.platformOf("Linux aarch64")).toBe("linux-arm64");
+    expect(Template.platformOf("Linux x86_64")).toBe("linux-x64");
+    expect(Template.platformOf("Linux armv7l")).toBeUndefined();
+    expect(Template.platformOf("FreeBSD amd64")).toBeUndefined();
+  });
+
+  it.effect(
+    "launches the bridge from where the template installs it, under the same identity",
+    () =>
+      Effect.gen(function* () {
+        const installation = yield* Template.make();
+        const again = yield* Template.make();
+        const [programs, bundle] = installation.template.identity.split("-");
+
+        expect(again.template.identity).toBe(installation.template.identity);
+        expect(installation.command).toBe("sh");
+        expect(launchedFrom(installation)).toEqual({
+          bun: `.amends/opencode/${programs}/bun`,
+          bridge: `.amends/opencode/${programs}/bridge-${bundle}.js`,
+        });
+      }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect("keeps the programs and the bridge program the sandbox has", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fs.makeTempDirectoryScoped();
+      const installation = yield* Template.make();
+      const { bridge } = launchedFrom(installation);
+      yield* fs.makeDirectory(path.join(home, path.dirname(bridge)), { recursive: true });
+      yield* fs.writeFileString(path.join(home, bridge), "the bridge program");
+
+      const commands = makeSandboxCommands(home);
+
+      yield* installation.template.prepare.pipe(commands.provide);
+
+      expect(commands.ran).toEqual([homeLookup]);
+      expect(yield* fs.readFileString(path.join(home, bridge))).toBe("the bridge program");
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect("installs a new bridge program beside the programs the sandbox has", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fs.makeTempDirectoryScoped();
+      const installation = yield* Template.make();
+      const { bridge } = launchedFrom(installation);
+      yield* fs.makeDirectory(path.join(home, path.dirname(bridge)), { recursive: true });
+
+      const commands = makeSandboxCommands(home);
+
+      yield* installation.template.prepare.pipe(commands.provide);
+
+      expect(commands.ran).toEqual([homeLookup]);
+      expect(yield* fs.readDirectory(path.join(home, path.dirname(bridge)))).toEqual([
+        path.basename(bridge),
+      ]);
+      expect(yield* fs.readFileString(path.join(home, bridge))).toContain("// @bun");
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect("installs nothing on a platform the bridge does not install on", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fs.makeTempDirectoryScoped();
+      const installation = yield* Template.make();
+
+      const commands = makeSandboxCommands(home, (command) =>
+        command === "uname" ? { output: "FreeBSD amd64\n" } : {},
+      );
+
+      const refused = yield* Effect.flip(installation.template.prepare.pipe(commands.provide));
+
+      expect(refused.reason.description).toBe(
+        "opencode's bridge installs on macOS and on Linux with glibc, on arm64 and x64, not on FreeBSD amd64",
+      );
+      expect(commands.ran).toEqual([homeLookup, ["uname", "-sm"]]);
+      expect(yield* fs.exists(path.join(home, ".amends"))).toBe(false);
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect("installs nothing from a package that does not match its integrity", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const home = yield* fs.makeTempDirectoryScoped();
+      const installation = yield* Template.make();
+
+      const commands = makeSandboxCommands(home, (command) =>
+        command === "uname"
+          ? { output: "Linux x86_64\n" }
+          : command === "sh"
+            ? { output: `${"0".repeat(128)}  bun.tgz\n` }
+            : {},
+      );
+
+      const refused = yield* Effect.flip(installation.template.prepare.pipe(commands.provide));
+
+      expect(refused.reason).toMatchObject({
+        _tag: "InvalidData",
+        description: "@oven/bun-linux-x64@1.3.14 does not match the integrity npm published for it",
+      });
+      expect(commands.ran.map(([command]) => command)).toEqual(["sh", "uname", "curl", "sh"]);
+      expect(commands.ran[2]).toContain(
+        "https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.3.14.tgz",
+      );
+      expect(yield* fs.readDirectory(path.join(home, ".amends", "opencode"))).toEqual([]);
+    }).pipe(Effect.provide(BunServices.layer)),
+  );
+});
+
+describe.skipIf(!enabled)("Template on this machine", () => {
+  it.live(
+    "installs Bun and opencode in the sandbox's home, from where the bridge launches and starts opencode",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const home = yield* fs.makeTempDirectoryScoped();
+        const port = yield* freePort;
+        const local = yield* makeSandbox(port);
+        const sandbox: Sandbox.Sandbox["Service"] = {
+          ...local,
+          childProcessSpawner: withHome(local.childProcessSpawner, home),
+        };
+        const installation = yield* Template.make();
+
+        yield* installation.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+
+        const { bun, bridge } = launchedFrom(installation);
+        const installed = path.join(home, path.dirname(bun));
+        expect((yield* fs.readDirectory(installed)).toSorted()).toEqual([
+          path.basename(bridge),
+          "bun",
+          "opencode",
+        ]);
+        const harness = Harness.make(
+          yield* BridgeClient.make({
+            id: "opencode",
+            template: installation.template,
+            port,
+            command: installation.command,
+            args: installation.args,
+            token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
+            agentOptions: {
+              model,
+              command: path.join(installed, "opencode"),
+              config: {},
+              env: {},
+            },
+          }),
+        );
+        const session = yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+        yield* session.destroy;
+      }).pipe(Effect.provide(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))),
+    180_000,
+  );
+});
