@@ -68,7 +68,12 @@ of any other reason, whose description may name an address or another internal.
 the tools with `tools/list` and runs them with `tools/call`, and does nothing else of MCP: it reads
 no resources or prompts, and answers no request a server makes of its client.
 
-It speaks the stateless protocol of 2026-07-28 to a server that does, which it finds out with
+It is made of three modules in `src/mcp`. `Transport` speaks to the server, and knows nothing of tools:
+it settles how the server is spoken to and sends a request. `Headers` holds the rules for the headers
+that mirror a tool's parameters. `index` is the source, which lists the tools and runs them over a
+transport.
+
+The transport speaks the stateless protocol of 2026-07-28 to a server that does, which it finds out with
 `server/discover` when it first needs the server. A server that does not answer that, unless it
 refuses the source or cannot be reached, is spoken to with a session, begun with `initialize`, in the
 version it answers with of 2025-11-25, 2025-06-18, 2025-03-26, and 2024-11-05. When a server ends the
@@ -189,11 +194,11 @@ They require of a source that it:
 four subjects: the MCP source over Effect AI's own server speaking the stateless protocol and one
 speaking with sessions, the HTTP source over operations written by hand, and the HTTP source over the
 operations of an OpenAPI document, the last two against a server of `Bun.serve`, which
-`test/conformance-servers.ts` starts for each test. `test/mcp.test.ts` runs Effect AI's own MCP server in
+`test/conformance-servers.ts` starts for each test. `test/mcp/source.test.ts` runs Effect AI's own MCP server in
 the process, speaking the stateless protocol, one with sessions, or either, behind a `fetch` that
-records each request, and `test/mcp-wire.test.ts` answers from a script what a server never sends:
+records each request, and `test/mcp/wire.test.ts` answers from a script what a server never sends:
 event streams with other messages in them, pagination, each status and error code, and a server that
-refuses a call for its headers. `test/mcp-headers.test.ts` holds the rules for the headers that mirror
+refuses a call for its headers. `test/mcp/headers.test.ts` holds the rules for the headers that mirror
 parameters: the table of encodings the protocol gives, and every way a mark may be wrong.
 `test/http.test.ts` records the requests of a scripted client, and sends a few over the wire to a
 server of `Bun.serve`. `test/openapi.test.ts` reads documents written in each test, and takes one

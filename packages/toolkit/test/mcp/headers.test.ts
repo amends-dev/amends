@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Result, type Schema } from "effect";
-import { encodeHeaderValue, findBindings, headersOf } from "../src/McpHeaders.ts";
+import { encodeHeaderValue, findBindings, headersOf } from "../../src/mcp/Headers.ts";
 
 const schemaOf = (properties: Schema.Json): Schema.JsonObject => ({ type: "object", properties });
 

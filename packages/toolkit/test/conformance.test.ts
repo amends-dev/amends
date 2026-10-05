@@ -2,7 +2,7 @@ import { describe } from "@effect/vitest";
 import { Effect } from "effect";
 import { McpProtocol } from "effect/ai";
 import * as Http from "../src/Http.ts";
-import * as Mcp from "../src/Mcp.ts";
+import * as Mcp from "../src/mcp/index.ts";
 import * as OpenApi from "../src/OpenApi.ts";
 import { run } from "../src/conformance/index.ts";
 import type { Fixture, Subject } from "../src/conformance/index.ts";
