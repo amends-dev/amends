@@ -31,6 +31,9 @@ export interface FakeAgent {
 
   /** The results the host submitted for its tools, in order. */
   readonly submitted: ReadonlyArray<unknown>;
+
+  /** The approvals the host gave the agent, for requests of its own, in order. */
+  readonly approvals: ReadonlyArray<Parameters<AgentSession["approve"]>[0]>;
 }
 
 export interface FakeAgentOptions {
@@ -62,6 +65,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
     const turns: Array<TurnOptions> = [];
     const continued: Array<number> = [];
     const submitted: Array<unknown> = [];
+    const approvals: Array<Parameters<AgentSession["approve"]>[0]> = [];
     const toolResults = yield* Queue.unbounded<unknown>();
 
     const agent: Agent = {
@@ -97,7 +101,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
                 Effect.sync(() => submitted.push(result.result)),
                 Queue.offer(toolResults, result.result),
               ),
-            approve: () => Effect.void,
+            approve: (response) => Effect.sync(() => void approvals.push(response)),
             compact: () => Effect.void,
             suspend: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id, turn: true })),
             detach: Effect.andThen(beforeLettingGo, Effect.succeed({ agent: id })),
@@ -108,7 +112,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
         }),
     };
 
-    const fake: FakeAgent = { agent, starts, turns, continued, submitted };
+    const fake: FakeAgent = { agent, starts, turns, continued, submitted, approvals };
     return fake;
   });
 

@@ -26,8 +26,12 @@ stay in place when it moves from one agent to another.
 A `Session.Session` is what callers hold. `stream` runs a turn, `generate` returns it whole as a
 `GenerateResult`, and `generateObject` decodes its answer in JSON with a schema. A turn's
 `toolkit` gives the agent the host's tools: when the agent calls one, the session runs its handler
-on the host and gives the agent the result. `approve` answers a `tool-approval-request`, and
-`compact` asks the agent to summarize the conversation so far.
+on the host and gives the agent the result. A tool with `needsApproval` is asked about first: the
+turn streams a `tool-approval-request` after the call and waits, while the agent waits for the
+result, until `approve` allows the call or refuses it, which answers the agent `execution-denied`.
+`generate` and `generateObject` return only when the turn ends, so they refuse every request.
+`approve` also passes on the requests an agent makes for its own tools, and `compact` asks the
+agent to summarize the conversation so far.
 
 `suspend`, `detach`, and `stop` return a `SessionState` for the caller to store, as JSON with
 `Schema.toCodecJson(Session.SessionState)`. It records the conversation as Effect AI `Prompt`

@@ -12,6 +12,7 @@
     "packages/harness/test/**/*.ts",
     "packages/harness-amends/test/**/*.ts",
     "packages/server-http/test/**/*.ts",
+    "packages/toolkit/test/**/*.ts",
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "repos", "dist", "out", "coverage"]

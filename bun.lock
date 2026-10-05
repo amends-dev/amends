@@ -475,6 +475,17 @@
         "effect": "catalog:",
       },
     },
+    "packages/toolkit": {
+      "name": "@amends/toolkit",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@effect/vitest": "catalog:",
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
   },
   "overrides": {
     "vite-node": "5.0.0",
@@ -551,6 +562,8 @@
     "@amends/storage-memory": ["@amends/storage-memory@workspace:adapters/storage-memory"],
 
     "@amends/storage-postgresql": ["@amends/storage-postgresql@workspace:adapters/storage-postgresql"],
+
+    "@amends/toolkit": ["@amends/toolkit@workspace:packages/toolkit"],
 
     "@amends/ui": ["@amends/ui@workspace:apps/ui"],
 

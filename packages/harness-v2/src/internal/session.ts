@@ -3,7 +3,19 @@
  * delivery of each turn's parts, the host's tools, and the record of the conversation. `Harness`
  * makes sessions with `makeSession`; the package does not export this module.
  */
-import { type Cause, Data, Effect, Queue, Ref, Schema, type Scope, Stream } from "effect";
+import {
+  type Cause,
+  Data,
+  Deferred,
+  Effect,
+  HashMap,
+  Option,
+  Queue,
+  Ref,
+  Schema,
+  type Scope,
+  Stream,
+} from "effect";
 import type { Response, Toolkit } from "effect/ai";
 import { Prompt, type Tool } from "effect/ai";
 import type { AgentSession, SessionId } from "../Agent.ts";
@@ -50,6 +62,15 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     history: options.history,
     lettingGo: undefined,
   });
+
+  /**
+   * The calls of the host's tools that wait for `approve`, each with the answer its request
+   * awaits, by the request's id. They are not in `state`, which holds what saving the session
+   * records: a request lives only as long as the stream that made it.
+   */
+  const pendingApprovals = yield* Ref.make(
+    HashMap.empty<string, Deferred.Deferred<ApprovalResponse>>(),
+  );
 
   const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
     new HarnessError({ agent: options.agent, reason, cause });
@@ -148,9 +169,10 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     );
 
   /**
-   * The agent's parts, each call of the host's tools followed by the tool's results. A host's tool
-   * starts as soon as the agent calls it, so the tools of calls the agent makes together run side
-   * by side, while their results stream in the order of the calls.
+   * The agent's parts, each call of the host's tools followed by the tool's results, or by the
+   * request to approve it first. A host's tool starts as soon as the agent calls it, so the tools
+   * of calls the agent makes together run side by side, while their results, and the requests
+   * to approve them, stream in the order of the calls.
    */
   const withHostTools = <Tools extends Record<string, Tool.Any>>(
     agentTurn: Stream.Stream<StreamPart, HarnessError>,
@@ -185,35 +207,109 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     return Stream.fromQueue(results);
   });
 
-  /** Runs the host's tool `call` names, streaming its results and giving the final one to the agent. */
+  /**
+   * Runs the host's tool `call` names, streaming its results and giving the final one to the agent.
+   * A tool that needs approval first runs only once `approve` allows it, and is answered as denied
+   * when `approve` refuses it.
+   */
   const runHostTool = <Tools extends Record<string, Tool.Any>>(
     toolkit: Toolkit.WithHandler<Tools> | undefined,
     call: Response.ToolCallPartEncoded,
   ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> => {
-    if (toolkit === undefined || !isToolName(toolkit, call.name)) {
+    const found = toolkit === undefined ? undefined : findTool(toolkit, call.name);
+    if (toolkit === undefined || found === undefined) {
       const description = `The agent called ${call.name}, which is not one of the host's tools`;
       return Stream.fail(harnessError(new InvalidOutputError({ description })));
     }
+    const { name, tool } = found;
     // `handle` decodes the params with the tool's schema and fails on a mismatch, so they need no
     // type of their own here.
-    const params = call.params as Tool.ParametersEncoded<Tools[typeof call.name]>;
-    return Stream.unwrap(toolkit.handle(call.name, params, call.id)).pipe(
+    const params = call.params as Tool.ParametersEncoded<Tools[typeof name]>;
+    const callTool: Stream.Stream<
+      StreamPart,
+      TurnError<Tools>,
+      TurnServices<Tools>
+    > = Stream.unwrap(toolkit.handle(name, params, call.id)).pipe(
       Stream.mapEffect((handled) => {
         const part = {
           type: "tool-result",
           id: call.id,
-          name: call.name,
+          name,
           result: handled.encodedResult,
           isFailure: handled.isFailure,
           providerExecuted: false,
           preliminary: handled.preliminary,
         } as const;
-        return handled.preliminary
-          ? Effect.succeed(part)
-          : Effect.as(agentSession.submitToolResult(part), part);
+        return handled.preliminary ? Effect.succeed(part) : submitResult(part);
       }),
     );
+    const conversation = Effect.map(Ref.get(state), recordedConversation);
+    return Stream.unwrap(
+      Effect.map(needsApproval(tool, call, conversation), (needed) =>
+        needed ? askThenRun(call, callTool) : callTool,
+      ),
+    );
   };
+
+  // TODO: Ask about the calls an agent makes together all at once, so that a caller can answer a
+  // later call's request before an earlier one's: requests now stream in the order of the calls, as
+  // their results do.
+  /**
+   * Streams a `tool-approval-request` for the host's tool `call`, and then `ifApproved`, or the call
+   * answered as denied once `approve` refuses it. The request waits in `pendingApprovals` until the
+   * stream ends, whether `approve` answered it or the turn was let go of.
+   */
+  const askThenRun = <E, R>(
+    call: Response.ToolCallPartEncoded,
+    ifApproved: Stream.Stream<StreamPart, E, R>,
+  ): Stream.Stream<StreamPart, E | HarnessError, R> =>
+    Stream.unwrap(
+      Effect.gen(function* () {
+        const approvalId = approvalIdOf(call);
+        const answer = yield* Effect.acquireRelease(
+          Effect.tap(Deferred.make<ApprovalResponse>(), (deferred) =>
+            Ref.update(pendingApprovals, HashMap.set(approvalId, deferred)),
+          ),
+          () => Ref.update(pendingApprovals, HashMap.remove(approvalId)),
+        );
+        const request: StreamPart = {
+          type: "tool-approval-request",
+          approvalId,
+          toolCallId: call.id,
+        };
+        const decided = Stream.unwrap(
+          Effect.map(
+            Deferred.await(answer),
+            (response): Stream.Stream<StreamPart, E | HarnessError, R> =>
+              response.approved ? ifApproved : denyHostTool(call, response.reason),
+          ),
+        );
+        return Stream.concat(Stream.make(request), decided);
+      }),
+    );
+
+  /**
+   * Answers the host's tool `call` as denied, without running the tool. The agent gets the denial
+   * as the tool's result.
+   */
+  const denyHostTool = (
+    call: Response.ToolCallPartEncoded,
+    reason: string | undefined,
+  ): Stream.Stream<StreamPart, HarnessError> => {
+    const part = {
+      type: "tool-result",
+      id: call.id,
+      name: call.name,
+      result: { type: "execution-denied", reason: reason ?? "The tool call was denied" },
+      isFailure: true,
+      providerExecuted: false,
+    } as const;
+    return Stream.fromEffect(submitResult(part));
+  };
+
+  /** Gives the agent `part`, the result of one of the host's tools, and returns it to stream. */
+  const submitResult = <Part extends Parameters<AgentSession["submitToolResult"]>[0]>(part: Part) =>
+    Effect.as(agentSession.submitToolResult(part), part);
 
   /** Runs a new turn with the caller's prompt, once the session can start one. */
   const promptTurn = <Tools extends Record<string, Tool.Any>>(
@@ -260,18 +356,49 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     unfinishedTurn,
   });
 
+  /**
+   * Answers an approval request: one the session made for the host's tool, which it answers once,
+   * or else one of the agent's own, which it passes on.
+   */
+  const approve = Effect.fn("Session.approve")(function* (response: ApprovalResponse) {
+    yield* checkStatus("approve");
+    const asked = yield* Ref.modify(pendingApprovals, (current) => [
+      HashMap.get(current, response.approvalId),
+      HashMap.remove(current, response.approvalId),
+    ]);
+    if (Option.isNone(asked)) return yield* agentSession.approve(response);
+    yield* Deferred.succeed(asked.value, response);
+  });
+
+  /**
+   * Collects a turn that is returned whole. Nothing can answer its approval requests before it
+   * ends, so it denies each, and its tools that need approval do not run.
+   */
+  const collectDenyingApprovals = <E, R>(turn: Stream.Stream<StreamPart, E, R>) =>
+    Stream.runCollect(
+      Stream.tap(turn, (part) =>
+        part.type === "tool-approval-request"
+          ? approve({
+              approvalId: part.approvalId,
+              approved: false,
+              reason: "The turn returns whole, so it cannot ask for approval",
+            })
+          : Effect.void,
+      ),
+    );
+
   const session: Session = {
     id: options.id,
 
     stream: (streamOptions) => promptTurn(streamOptions, { type: "text" }),
 
     generate: Effect.fn("Session.generate")(function* (generateOptions) {
-      const parts = yield* Stream.runCollect(promptTurn(generateOptions, { type: "text" }));
+      const parts = yield* collectDenyingApprovals(promptTurn(generateOptions, { type: "text" }));
       return yield* resultOf(parts);
     }),
 
     generateObject: Effect.fn("Session.generateObject")(function* (objectOptions) {
-      const parts = yield* Stream.runCollect(
+      const parts = yield* collectDenyingApprovals(
         promptTurn(objectOptions, {
           type: "json",
           objectName: objectOptions.objectName ?? "output",
@@ -311,7 +438,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         }),
       ),
 
-    approve: (response) => Effect.andThen(checkStatus("approve"), agentSession.approve(response)),
+    approve,
 
     compact: (instructions) =>
       Effect.andThen(checkStatus("compact"), agentSession.compact(instructions)),
@@ -493,11 +620,27 @@ const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
 
 /** A turn as the conversation records it: its prompt, then each step it took. */
 const conversationOf = (turn: RunningTurn) =>
-  Prompt.fromMessages([
-    turn.prompt,
-    ...turn.steps.flatMap((step) => step.content),
-    ...messagesOfStep(turn.stepParts),
-  ]);
+  Prompt.concat(
+    conversationOfFinishedSteps(turn),
+    Prompt.fromMessages(messagesOfStep(turn.stepParts)),
+  );
+
+/** A turn's prompt and the steps it finished, as the conversation records them. */
+const conversationOfFinishedSteps = (turn: RunningTurn) =>
+  Prompt.fromMessages([turn.prompt, ...turn.steps.flatMap((step) => step.content)]);
+
+// TODO: Give `needsApproval` the parts of the step its call is in, and of the steps the caller has
+// not read yet, by deciding at the call's delivery rather than when the session reads the call.
+/**
+ * The conversation as the session has recorded it: the turns before, and the running turn's prompt
+ * and finished steps. The session reads the agent's parts ahead of the caller, so a step the caller
+ * has not read to its end yet may be missing.
+ */
+const recordedConversation = ({ status, history }: State): ReadonlyArray<Prompt.Message> =>
+  (status._tag === "Running"
+    ? Prompt.concat(history, conversationOfFinishedSteps(status.turn))
+    : history
+  ).content;
 
 // TODO: Record what the model reasoned, and the files it wrote, once a model can read them back
 // from another: providers read back only the reasoning they produced.
@@ -576,6 +719,51 @@ const interruptedResultOf = (call: Prompt.ToolCallPart) =>
     result: { type: "execution-interrupted", reason: "The turn ended before the tool finished" },
     providerExecuted: false,
   });
+
+/** What `approve` answers a request with. */
+type ApprovalResponse = Parameters<AgentSession["approve"]>[0];
+
+/** Names the request to approve the host's tool `call` after the call: unique, and no counter. */
+const approvalIdOf = (call: Response.ToolCallPartEncoded) => `approval-${call.id}`;
+
+/**
+ * Whether the host's `tool` needs approval before running `call`, as Effect AI decides it for a
+ * language model: a boolean, or a function of the call's decoded params and the conversation, which
+ * is read only for a function. Params that do not decode need none, since the tool's handler
+ * rejects them without running.
+ */
+const needsApproval = Effect.fnUntraced(
+  function* <T extends Tool.Any>(
+    tool: T,
+    call: Response.ToolCallPartEncoded,
+    conversation: Effect.Effect<ReadonlyArray<Prompt.Message>>,
+  ): Effect.fn.Return<boolean, Schema.SchemaError, Tool.HandlerServices<T>> {
+    const { needsApproval: needed } = tool;
+    if (typeof needed !== "function") return needed === true;
+    // Decoding needs the services `HandlerServices` names for the tool, which TypeScript cannot
+    // relate to the schema of a tool it knows only as `Tool.Any`, as in Effect AI's own check.
+    const decodeParams = Schema.decodeUnknownEffect(tool.parametersSchema) as (
+      params: unknown,
+    ) => Effect.Effect<unknown, Schema.SchemaError, Tool.HandlerServices<T>>;
+    const params = yield* decodeParams(call.params);
+    const answer = needed(params, { toolCallId: call.id, messages: yield* conversation });
+    return Effect.isEffect(answer) ? yield* answer : answer;
+  },
+  Effect.orElseSucceed(() => false),
+);
+
+/**
+ * The host's tool that `name` names, with the name as the toolkit declares it, or nothing when the
+ * toolkit has none.
+ */
+const findTool = <Tools extends Record<string, Tool.Any>>(
+  toolkit: Toolkit.WithHandler<Tools>,
+  name: string,
+) => {
+  if (!isToolName(toolkit, name)) return undefined;
+  const tool = toolkit.tools[name];
+  return tool === undefined ? undefined : { name, tool };
+};
 
 const isToolName = <Tools extends Record<string, Tool.Any>>(
   toolkit: Toolkit.WithHandler<Tools>,

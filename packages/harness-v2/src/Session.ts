@@ -61,8 +61,6 @@ export interface SessionState extends Schema.Schema.Type<typeof SessionState> {}
 
 // TODO: Add `continueGenerate`, which finishes an unfinished turn and returns it whole, and let
 // `continue` finish a turn that answers in JSON, once a caller continues such turns.
-// TODO: Ask the host before running its tools that need approval, as `LanguageModel` does for
-// tools with `needsApproval`.
 export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
   /** What the turn asks: text, or a user message that can also carry files. */
   readonly prompt: string | Prompt.UserMessage;
@@ -76,6 +74,12 @@ export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
   /**
    * The host's tools, with their handlers. When the agent calls one, the session runs its handler,
    * streams the result as a `tool-result` part, and gives the result back to the agent.
+   *
+   * A tool that needs approval, by its `needsApproval`, runs only once `approve` allows it: the turn
+   * streams a `tool-approval-request` part after the call and waits, while the agent waits for the
+   * result. A call `approve` refuses is answered as `execution-denied`, a failure the agent reads.
+   * `needsApproval` as a function reads the call's decoded params and the conversation as the
+   * session has recorded it, which lacks the parts the caller has not read yet.
    */
   readonly toolkit?: Toolkit.WithHandler<Tools>;
 }
@@ -120,7 +124,11 @@ export interface Session {
     options: StreamOptions<Tools>,
   ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
 
-  /** Runs a turn and returns it whole. Fails with `TurnFailedError` when the agent reports a failure. */
+  /**
+   * Runs a turn and returns it whole. Fails with `TurnFailedError` when the agent reports a failure.
+   * Nothing can answer an approval request before the turn ends, so each is denied; `stream` is the
+   * way to ask.
+   */
   readonly generate: <Tools extends Record<string, Tool.Any> = {}>(
     options: StreamOptions<Tools>,
   ) => Effect.Effect<GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
@@ -128,7 +136,7 @@ export interface Session {
   /**
    * Runs a turn that answers in JSON and decodes the answer with `schema`. Fails with
    * `StructuredOutputError` when the answer does not decode, and with `UnsupportedError` when the
-   * agent cannot answer in JSON.
+   * agent cannot answer in JSON. Like `generate`, it denies every approval request.
    */
   readonly generateObject: <S extends Schema.Top, Tools extends Record<string, Tool.Any> = {}>(
     options: GenerateObjectOptions<S, Tools>,
@@ -148,7 +156,11 @@ export interface Session {
     options: ContinueOptions<Tools>,
   ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
 
-  /** Answers a `tool-approval-request` from the agent. */
+  /**
+   * Answers a `tool-approval-request` of the running turn: one the session made for a host tool
+   * that needs approval, which `approved` allows or refuses, or else one from the agent for its own
+   * tools. A request the session made is answered once, and ends with the stream that made it.
+   */
   readonly approve: AgentSession["approve"];
 
   /** Asks the agent to replace its conversation so far with a summary, which arrives as a `compaction` part. */

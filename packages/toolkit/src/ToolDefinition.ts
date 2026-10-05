@@ -1,0 +1,57 @@
+/**
+ * A tool definition is a tool as data: what a model is told about a tool, in a form a catalog can
+ * store as JSON and a source can report before anything runs the tool. Effect AI's `Tool` is the
+ * tool at runtime, with a handler. A definition keeps the tool's parameters as the JSON Schema its
+ * source gave, since a tool that a source such as an MCP server lists has no Effect schema, and a
+ * JSON Schema is what an agent reads in any case.
+ */
+import { Schema } from "effect";
+import { McpSchema } from "effect/ai";
+
+/**
+ * What a source says about a tool besides what it takes, under the names Effect AI gives its tool
+ * annotations. They are the source's claims, hints and not guarantees, so a decision about what a
+ * tool may do must not rest on them alone. A hint left out means Effect AI's default for it: the
+ * tool writes (`readOnly` false), may destroy (`destructive` true), is not safe to repeat
+ * (`idempotent` false), and reaches beyond the system it belongs to (`openWorld` true). Only a tool
+ * that is not read only can be destructive or idempotent.
+ */
+export const Annotations = Schema.Struct({
+  /** A name for people to read. */
+  title: Schema.optionalKey(Schema.String),
+
+  /** The tool changes nothing. */
+  readOnly: Schema.optionalKey(Schema.Boolean),
+
+  /** The tool may destroy or overwrite what it changes, rather than only add to it. */
+  destructive: Schema.optionalKey(Schema.Boolean),
+
+  /** Calling the tool again with the same params has no further effect. */
+  idempotent: Schema.optionalKey(Schema.Boolean),
+
+  /** The tool reaches beyond the system it belongs to, such as the web, rather than a closed one. */
+  openWorld: Schema.optionalKey(Schema.Boolean),
+});
+
+export interface Annotations extends Schema.Schema.Type<typeof Annotations> {}
+
+// TODO: Add the tool's output schema, which MCP and OpenAPI report, once code mode or search
+// presents tools by their results.
+export const ToolDefinition = Schema.Struct({
+  /** The source's own name for the tool, which is how the source is asked to run it. */
+  name: Schema.NonEmptyString,
+
+  /** What the tool does, for the model to decide when to call it. */
+  description: Schema.optionalKey(Schema.String),
+
+  /**
+   * The tool's parameters, as the JSON Schema with an object root that Effect AI's MCP module
+   * uses, and that every agent requires of a tool's parameters. Keywords beyond the ones it names,
+   * such as `$defs`, are kept.
+   */
+  inputSchema: McpSchema.ToolJson,
+
+  annotations: Annotations,
+});
+
+export interface ToolDefinition extends Schema.Schema.Type<typeof ToolDefinition> {}
