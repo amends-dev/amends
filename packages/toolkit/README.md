@@ -155,12 +155,48 @@ An agent that adds to the tool names it is given has fewer than 64 characters to
 `maxNameLength` option, at least 16, cuts names to what the agent takes, as a harness's
 `maxToolNameLength` says: `Assembly.toolkit(members, decide, { maxNameLength })`.
 
+## Search
+
+`ToolSearch.toolkit(presented, options?)` presents a toolkit to a model as two tools, in place of
+one for each, which suits a large set of tools, or one that changes from turn to turn. It takes the
+toolkit of an assembly, or any other, and gives another.
+
+```ts
+const assembled = yield * Assembly.toolkit(members, decide);
+const toolkit = yield * ToolSearch.toolkit(assembled);
+```
+
+- `tool_search({ query, limit? })` finds tools by what they do, and returns for each its `name`,
+  `description`, and `inputSchema`, with `matched`, how many tools match, and `available`, how many
+  there are, so that a model knows when a search cut its matches short. A word of the query scores for
+  a word of a tool's name that is the same, or that it begins, and for one of its description, the name
+  counting most; a name is read in words whether it is `create_issue`, `create-issue`, or
+  `createIssue`. A tool that scores nothing does not match, and a query with no words lists the tools
+  in order. A search returns five tools unless it asks for more, up to twenty, or the `limit` option
+  changes the five. It is a plain match on words, not a search by meaning.
+- `tool_call({ name, input })` runs the tool of that name, which the presented toolkit does as it
+  does when a model calls it directly: it checks the input against the tool's parameters, runs the
+  handler, and gives the tool's result. A failure is a result the model reads, as `Failure`, and a name
+  that is no tool is `NotFoundError`. A tool that was blocked is not in the presented toolkit, so it
+  can be neither found nor called.
+
+A tool that needs approval needs it when the model calls it through `tool_call`: the approval is the
+tool's own, as its `needsApproval` says, asked about the input the model gave, so a session asks
+about the call as it asks about any other, and the model cannot reach a tool that needs approval by
+another way. `tool_search` runs nothing and needs none.
+
+What the model is shown is the same two tools however many there are, and what it reads of the others
+is what it searched for. The names of the presented tools are only text the model reads and writes,
+so Search is also a way past the length of tool names that an agent leaves. The host chooses between
+this and showing every tool, with no default: showing every tool costs the tokens of all of them on
+every turn, and Search costs a search for the model to make first.
+
 ## What the host does
 
 The host builds the HTTP client and so owns every credential, decides what each tool may do, stores
 definitions and operations and refreshes them with `discover` or `readOperations`, and passes the
-assembled toolkit to a session. How an agent is shown host tools, natively or through MCP or code
-mode, is not decided here.
+assembled toolkit to a session, as it is or presented with Search. How a session's tools reach an
+agent, natively or through MCP or code mode, is not decided here.
 
 ## Conformance
 
@@ -191,7 +227,7 @@ They require of a source that it:
 ## Testing
 
 `test/tool-source.test.ts`, `test/tool-source-error.test.ts`, `test/tool-definition.test.ts`, and
-`test/assembly.test.ts` run over fake sources. `test/conformance.test.ts` runs the suites above for
+`test/assembly.test.ts`, and `test/tool-search.test.ts` run over fake sources and toolkits. `test/conformance.test.ts` runs the suites above for
 four subjects: the MCP source over Effect AI's own server speaking the stateless protocol and one
 speaking with sessions, the HTTP source over operations written by hand, and the HTTP source over the
 operations of an OpenAPI document, the last two against a server of `Bun.serve`, which
