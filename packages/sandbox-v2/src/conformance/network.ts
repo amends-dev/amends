@@ -1,11 +1,11 @@
 import { expect, layer } from "@effect/vitest";
-import { Effect, Record, Redacted, Schedule } from "effect";
+import { Effect, Exit, Record, Redacted, Schedule } from "effect";
 import { HttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import { NetworkPolicy } from "../Network.ts";
 import { layerServices } from "../Sandbox.ts";
 import type { SandboxError } from "../SandboxError.ts";
-import { type Fixture, useProvider } from "./Fixture.ts";
+import { type Fixture, newSandboxId, useProvider } from "./Fixture.ts";
 
 /** Whether `change` was applied, or the reason it failed with. */
 const outcomeOf = (change: Effect.Effect<void, SandboxError>) =>
@@ -79,6 +79,26 @@ export const network = <R>(fixture: Fixture<R>) =>
           const error = yield* Effect.flip(sandbox.endpoint(port, "http"));
 
           expect(error.reason._tag).toBe("NotFoundError");
+        }),
+      fixture.timeout,
+    );
+
+    it.effect(
+      "creates a sandbox under a network policy, or fails with UnsupportedError and creates none",
+      () =>
+        Effect.gen(function* () {
+          const provider = yield* useProvider(fixture);
+          const id = yield* newSandboxId;
+
+          const outcome = yield* outcomeOf(
+            Effect.asVoid(
+              provider.create({ id, networkPolicy: NetworkPolicy.cases.DenyAll.make({}) }),
+            ),
+          );
+          const resumed = yield* Effect.exit(provider.resume(id));
+
+          expect(["applied", "UnsupportedError"]).toContain(outcome);
+          expect(Exit.isSuccess(resumed)).toBe(outcome === "applied");
         }),
       fixture.timeout,
     );

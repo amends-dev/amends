@@ -71,6 +71,10 @@ both, and denies none, as Daytona does; one Daytona cannot enforce fails with `U
 and one that allows nothing blocks everything. Daytona filters hosts through its proxy and DNS.
 Each policy replaces the one before, and Daytona applies it a moment after it answers.
 
+A sandbox created with a policy starts under it, as Daytona applies the policy before it starts
+the sandbox. One its template prepares on its own, before the template's snapshot is made, gets the
+policy once prepared, a moment after.
+
 ## Templates and snapshots
 
 Each version of a template, its name and identity, is made once into a Daytona snapshot that later
@@ -98,5 +102,6 @@ the suites `@amends/sandbox-v2/conformance` exports, and deletes the snapshots o
 when it ends. `test/daytona.test.ts` checks what the provider asks of Daytona: that sandboxes do
 not stop on their own, that one snapshot is made of a version that several hosts create sandboxes
 from at once, that a failing template leaves neither its sandbox nor a snapshot, the network
-policies Daytona enforces and those it cannot, and destroying a sandbox from several callers at
-once. [Testing](../../docs/testing.md) says how to run them.
+policies Daytona enforces and those it cannot, when a sandbox created with one is under it, and
+destroying a sandbox from several callers at once. It deletes, when it ends, what its templates
+left being made in the background. [Testing](../../docs/testing.md) says how to run them.

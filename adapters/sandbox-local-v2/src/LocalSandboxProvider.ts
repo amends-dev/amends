@@ -110,16 +110,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
         Effect.mapError(fromPlatformError),
         Effect.andThen(Effect.sync(() => processes.delete(id))),
       ),
-      setNetworkPolicy: (policy) =>
-        policy._tag === "AllowAll"
-          ? Effect.void
-          : Effect.fail(
-              sandboxError(
-                new SandboxError.UnsupportedError({
-                  description: "A local sandbox shares this machine's network",
-                }),
-              ),
-            ),
+      setNetworkPolicy: allowAllOnly,
       addRequestTransformations: () =>
         Effect.fail(
           sandboxError(
@@ -139,6 +130,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
       Sandbox.SandboxId.make(yield* crypto.randomUUIDv4.pipe(Effect.mapError(fromPlatformError)));
     const ports = createOptions.ports ?? [];
     const paths = pathsOf(id);
+    if (createOptions.networkPolicy !== undefined) yield* allowAllOnly(createOptions.networkPolicy);
 
     // Creating the sandbox's directory claims its id, failing when the id is taken.
     yield* fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError));
@@ -215,6 +207,18 @@ const describe = (workingDirectory: string, ports: ReadonlyArray<Network.Port>) 
     `Work in ${workingDirectory}, a directory on this machine, where commands start.`,
     ...(ports.length === 0 ? [] : [`Servers on ports ${ports.join(", ")} are reachable.`]),
   ].join(" ");
+
+/** Succeeds for `AllowAll` only, the network a local sandbox has, as it shares this machine's. */
+const allowAllOnly = (policy: Network.NetworkPolicy) =>
+  policy._tag === "AllowAll"
+    ? Effect.void
+    : Effect.fail(
+        sandboxError(
+          new SandboxError.UnsupportedError({
+            description: "A local sandbox shares this machine's network",
+          }),
+        ),
+      );
 
 const sandboxError = (reason: SandboxError.SandboxErrorReason, cause?: unknown) =>
   new SandboxError.SandboxError({ provider: "local", reason, cause });

@@ -3,7 +3,7 @@ import * as Snapshots from "@amends/sandbox-daytona-v2/Snapshots";
 import { type Network, type Sandbox, type SandboxProvider, Template } from "@amends/sandbox-v2";
 import { Daytona, DaytonaNotFoundError } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
-import { describe, expect, layer } from "@effect/vitest";
+import { afterAll, describe, expect, layer } from "@effect/vitest";
 import { Crypto, Data, Effect, Redacted, Ref, Schedule } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
@@ -88,6 +88,31 @@ const reachableOnceApplied = (
     schedule: Schedule.spaced("1 second").pipe(Schedule.upTo({ duration: "20 seconds" })),
   });
 
+/**
+ * Deletes what the tests' templates leave being made in the background when a test ends: the
+ * sandboxes that make their snapshots, and the snapshots. One that Daytona is still making is
+ * deleted by the next run.
+ */
+const deleteTemplateLeftovers = async () => {
+  const daytona = new Daytona({ apiKey: Redacted.value(apiKey) });
+  try {
+    const makers = [];
+    for await (const sandbox of daytona.list({ labels: { "amends-template": "daytona-test" } })) {
+      makers.push(sandbox);
+    }
+    const { items } = await daytona.snapshot.list({ page: 1, limit: 100 });
+    // Daytona refuses to delete a sandbox while it makes a snapshot, which its time limit ends.
+    await Promise.allSettled([
+      ...makers.map((sandbox) => sandbox.delete()),
+      ...items
+        .filter((snapshot) => snapshot.name.startsWith("amends-template-daytona-test-"))
+        .map((snapshot) => daytona.snapshot.delete(snapshot.name)),
+    ]);
+  } finally {
+    await daytona[Symbol.asyncDispose]();
+  }
+};
+
 const allowList = (
   allowedHosts: ReadonlyArray<string>,
   allowedCidrs: ReadonlyArray<string> = [],
@@ -97,6 +122,8 @@ const allowList = (
 describe.skipIf(
   process.env.AMENDS_TEST_DAYTONA !== "1" || process.env.DAYTONA_API_KEY === undefined,
 )("DaytonaSandboxProvider", () => {
+  afterAll(deleteTemplateLeftovers, 60_000);
+
   layer(BunServices.layer, { excludeTestServices: true })("in Daytona's cloud", (it) => {
     it.effect(
       "never stops a sandbox on its own, unless the options give an interval",
@@ -227,6 +254,54 @@ describe.skipIf(
           expect(yield* reachableOnceApplied(sandbox, { example: true, npm: true })).toEqual({
             example: true,
             npm: true,
+          });
+        }),
+      timeout,
+    );
+
+    it.effect(
+      "starts a sandbox created under a network policy with the policy in force",
+      () =>
+        Effect.gen(function* () {
+          const sandbox = yield* createSandbox(yield* DaytonaSandboxProvider.make({ apiKey }), {
+            networkPolicy: { _tag: "DenyAll" },
+          });
+
+          // Looked at once: the policy applies before the sandbox starts.
+          expect(yield* reachable(sandbox)).toEqual({ example: false, npm: false });
+        }),
+      timeout,
+    );
+
+    it.effect(
+      "prepares a sandbox on its own before its network policy applies",
+      () =>
+        Effect.gen(function* () {
+          const { template } = yield* useTemplate(
+            Effect.gen(function* () {
+              const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+              const exitCode = yield* spawner.exitCode(
+                ChildProcess.make("curl", [
+                  "-sS",
+                  "-o",
+                  "/dev/null",
+                  "-m",
+                  "5",
+                  "https://registry.npmjs.org",
+                ]),
+              );
+              if (exitCode !== 0) return yield* new PrepareFailed();
+            }),
+          );
+
+          const sandbox = yield* createSandbox(yield* DaytonaSandboxProvider.make({ apiKey }), {
+            template,
+            networkPolicy: { _tag: "DenyAll" },
+          });
+
+          expect(yield* reachableOnceApplied(sandbox, { example: false, npm: false })).toEqual({
+            example: false,
+            npm: false,
           });
         }),
       timeout,

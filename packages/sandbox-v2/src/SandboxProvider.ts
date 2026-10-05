@@ -5,7 +5,7 @@
  * which provider it uses.
  */
 import { Context, type Effect } from "effect";
-import type { Port } from "./Network.ts";
+import type { NetworkPolicy, Port } from "./Network.ts";
 import type { Sandbox, SandboxId } from "./Sandbox.ts";
 import type { SandboxError } from "./SandboxError.ts";
 import type { Template } from "./Template.ts";
@@ -24,6 +24,14 @@ export interface CreateOptions<E> {
 
   /** Prepares the sandbox before `create` returns it. */
   readonly template?: Template<E>;
+
+  /**
+   * The outbound network policy the sandbox starts with, `AllowAll` when omitted, so that nothing
+   * run in it reaches further. The template prepares the sandbox before the policy applies, as
+   * preparing may download what it installs. Fails with `UnsupportedError`, creating nothing, when
+   * the provider cannot enforce the policy, as `Sandbox.setNetworkPolicy` does.
+   */
+  readonly networkPolicy?: NetworkPolicy;
 }
 
 export class SandboxProvider extends Context.Service<

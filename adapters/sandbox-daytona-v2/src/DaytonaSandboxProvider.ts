@@ -226,7 +226,10 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
         ),
       );
     const ports = createOptions.ports ?? [];
-    const { template } = createOptions;
+    const { template, networkPolicy } = createOptions;
+    // A policy Daytona cannot enforce fails before anything is created.
+    const networkSettings =
+      networkPolicy === undefined ? undefined : yield* networkSettingsOf(networkPolicy);
     const templateSnapshot =
       template === undefined
         ? Option.none<string>()
@@ -238,18 +241,32 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
             makeSnapshot(template),
           ).pipe(Effect.provideService(Crypto.Crypto, crypto));
     const snapshot = Option.getOrElse(templateSnapshot, () => options.snapshot);
+    // Until the template's snapshot is made, each sandbox is prepared on its own, before its
+    // network policy applies, as preparing may download what the template installs.
+    const preparesHere = template !== undefined && Option.isNone(templateSnapshot);
     return yield* Effect.acquireUseRelease(
       createSandbox(id, {
         labels: { [portsLabel]: ports.join(",") },
         autoStopInterval: options.autoStopInterval ?? 0,
         ...(snapshot === undefined ? {} : { snapshot }),
+        // Daytona applies a policy it is created with before the sandbox starts.
+        ...(preparesHere ? {} : networkSettings),
       }),
       (sandbox) =>
         Effect.tap(openSandbox(sandbox, id, ports), (opened) =>
-          // Until the template's snapshot is made, each sandbox is prepared on its own.
-          template === undefined || Option.isSome(templateSnapshot)
-            ? Effect.void
-            : template.prepare.pipe(Effect.provide(Sandbox.layerServices(opened))),
+          preparesHere
+            ? template.prepare.pipe(
+                Effect.provide(Sandbox.layerServices(opened)),
+                // TODO: Close the moment after create returns in which a sandbox prepared on its
+                // own still reaches what its policy denies, once code that should not get out runs
+                // in such a sandbox at once: Daytona applies an update a moment after it answers.
+                Effect.andThen(
+                  networkSettings === undefined
+                    ? Effect.void
+                    : retryConflicts(call(() => sandbox.updateNetworkSettings(networkSettings))),
+                ),
+              )
+            : Effect.void,
         ),
       // A failed create leaves no sandbox behind to resume.
       (sandbox, exit) =>
