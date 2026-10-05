@@ -128,6 +128,46 @@ describe("ToolSource.toolkit", () => {
   );
 });
 
+describe("the tools a model must ask about", () => {
+  it.effect("are marked as needing approval, and the others are not", () =>
+    Effect.gen(function* () {
+      const { source } = fakeSource();
+
+      const toolkit = yield* ToolSource.toolkit(source, [createIssue, ping], {
+        needsApproval: (definition) => definition.name === "create_issue",
+      });
+
+      expect(toolkit.tools["create_issue"]?.needsApproval).toBe(true);
+      expect(toolkit.tools["ping"]?.needsApproval).toBeUndefined();
+    }),
+  );
+
+  it.effect("are none unless the caller names some", () =>
+    Effect.gen(function* () {
+      const { source } = fakeSource();
+
+      const toolkit = yield* ToolSource.toolkit(source, [createIssue]);
+
+      expect(toolkit.tools["create_issue"]?.needsApproval).toBeUndefined();
+    }),
+  );
+
+  it.effect("still run when called, as the session has asked before it does", () =>
+    Effect.gen(function* () {
+      const { source, calls } = fakeSource();
+      const toolkit = yield* ToolSource.toolkit(source, [createIssue], {
+        needsApproval: () => true,
+      });
+
+      yield* toolkit
+        .handle("create_issue", { title: "Broken build" })
+        .pipe(Effect.flatMap(Stream.runCollect));
+
+      expect(calls).toEqual([{ tool: "create_issue", input: { title: "Broken build" } }]);
+    }),
+  );
+});
+
 describe("a tool call's input", () => {
   const reads = (outcome: { readonly result: unknown }) => outcome.result as ToolSource.Failure;
 

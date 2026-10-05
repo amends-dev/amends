@@ -66,17 +66,23 @@ export interface Failure extends Schema.Schema.Type<typeof Failure> {}
 
 /**
  * Builds the toolkit for exactly these `definitions`, which must have distinct names, as a catalog
- * keyed by them has. Its tools are named as the definitions name them.
+ * keyed by them has. Its tools are named as the definitions name them. A tool that `needsApproval`
+ * names is one the session asks about before it runs the tool.
  */
 export const toolkit = Effect.fn("ToolSource.toolkit")(function* (
   source: ToolSource,
   definitions: ReadonlyArray<ToolDefinition>,
+  options?: { readonly needsApproval?: (definition: ToolDefinition) => boolean },
 ) {
   const names = new Set(definitions.map((definition) => definition.name));
   if (names.size !== definitions.length) {
     return yield* Effect.die(new Error(`${source.name} has more than one tool of the same name`));
   }
-  const toolkit = Toolkit.make(...definitions.map(toolOf));
+  const toolkit = Toolkit.make(
+    ...definitions.map((definition) =>
+      toolOf(definition, options?.needsApproval?.(definition) === true),
+    ),
+  );
   const handlers = Object.fromEntries(
     definitions.map((definition) => [definition.name, handlerOf(source, definition)]),
   );
@@ -84,8 +90,8 @@ export const toolkit = Effect.fn("ToolSource.toolkit")(function* (
 });
 
 /** The dynamic tool for `definition`, without a handler, with the hints its source gave. */
-const toolOf = (definition: ToolDefinition) =>
-  Tool.dynamic(definition.name, {
+const toolOf = (definition: ToolDefinition, needsApproval: boolean) => {
+  const tool = Tool.dynamic(definition.name, {
     description: definition.description,
     parameters: definition.inputSchema,
     success: Schema.Json,
@@ -93,6 +99,8 @@ const toolOf = (definition: ToolDefinition) =>
     // A failure is a result the model reads, not a failure of the turn.
     failureMode: "return",
   }).annotateMerge(annotationsOf(definition.annotations));
+  return needsApproval ? tool.setNeedsApproval(true) : tool;
+};
 
 /** The annotations of the hints a source gave, so a hint it left out keeps Effect AI's default. */
 const annotationsOf = (hints: Annotations) =>
