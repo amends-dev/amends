@@ -1,8 +1,9 @@
 // A bridge over a stand-in agent, served as opencode's bridge program serves its agent, which
 // `bridge.test.ts` has the bridge client launch, as the command that runs a bridge. A turn follows
-// its prompt: `reply <text>` answers `text`, and `wait <text>` starts to answer `text` and finishes
-// once the session's directory has a file named `release`. A session's state counts the turns it
-// has run, on from the state it started with. Each launch adds a line to `launches.jsonl` in the
+// its prompt: `reply <text>` answers `text`, `wait <text>` starts to answer `text` and finishes
+// once the session's directory has a file named `release`, and any other prompt, such as the
+// bridge's `Continue.`, is answered with itself. A session's state counts the turns it has run, on
+// from the state it started with, whose conversation the session keeps. Each launch adds a line to `launches.jsonl` in the
 // bridge's working directory, with its process id, its agent's options, and whether its environment
 // holds the token, and destroying a session writes `destroyed-<session>` there.
 import { type Bridge, BridgeServer, type StreamPart } from "@amends/harness-v2";
@@ -47,12 +48,15 @@ const program = Effect.gen(function* () {
           }),
         );
         const session: Bridge.AgentSession = {
+          keptConversation: options.agentState !== undefined,
           prompt: (turn) => {
             const text = turn.prompt.content
               .flatMap((part) => (part.type === "text" ? [part.text] : []))
               .join("");
             const [command = "", ...words] = text.split(" ");
-            const parts = answer(words.join(" "));
+            const parts = answer(
+              command === "reply" || command === "wait" ? words.join(" ") : text,
+            );
             const released = fs.exists(path.join(options.directory, "release")).pipe(
               Effect.repeat({
                 until: (exists) => exists,

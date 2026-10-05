@@ -191,7 +191,8 @@ const textOf = (message: Prompt.UserMessage) =>
 /**
  * An agent behind a bridge whose turns stream what `script` gives for the prompt's text, recording
  * what the bridge asks of it. A session's state names it and how many sessions the agent started,
- * so tests can tell which start a state came from.
+ * so tests can tell which start a state came from, and a session started from a state keeps its
+ * conversation.
  */
 export interface FakeBridgeAgent {
   readonly agent: Bridge.Agent;
@@ -234,6 +235,7 @@ export const makeFakeBridgeAgent = (
           yield* Effect.addFinalizer(() => Effect.sync(() => ended.push(options.id)));
           const startNumber = starts.length;
           const session: Bridge.AgentSession = {
+            keptConversation: options.agentState !== undefined,
             prompt: (turn) =>
               Stream.suspend(() => {
                 turns.push(turn);

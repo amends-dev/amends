@@ -9,11 +9,13 @@
  * with the connection of the host that started it. It numbers a turn's parts as the turn streams
  * them and keeps them in memory and in a file in its state directory, a line each, followed by how
  * the turn ended. A session keeps only its latest turn, which hosts read from any number while it
- * runs and after it ends. A bridge started again reads a turn from its file, if the turn ended
- * before the bridge last exited.
+ * runs and after it ends. A bridge started again reads a turn from its file. A turn whose file has
+ * no end, which the bridge ran when it died, ended then, aborted. A turn the bridge aborted that a
+ * host starts again continues, in the conversation the agent kept, from the steps it finished.
  */
 import {
   Cause,
+  Data,
   Deferred,
   Effect,
   Exit,
@@ -31,6 +33,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect";
+import { Prompt } from "effect/ai";
 import { HttpRouter, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 import type { SessionId } from "./Agent.ts";
@@ -142,6 +145,25 @@ interface StartedSession {
   fiber: Fiber.Fiber<void> | undefined;
 }
 
+/** How the bridge starts a turn that a host asks it to start. */
+type TurnStart = Data.TaggedEnum<{
+  /** Not again: the bridge started the turn and did not abort it. */
+  Started: { readonly turn: Turn };
+
+  /** By prompting the agent to continue the turn, which keeps the parts of the steps it finished. */
+  Continue: { readonly parts: ReadonlyArray<Bridge.NumberedPart> };
+
+  /** From its prompt, as a turn the bridge does not have. */
+  New: {};
+}>;
+
+const TurnStart = Data.taggedEnum<TurnStart>();
+
+/** What the bridge prompts an agent with to continue a turn it aborted, as AI SDK's harness does. */
+const continuePrompt = Prompt.makeMessage("user", {
+  content: [Prompt.makePart("text", { text: "Continue." })],
+});
+
 const makeHandlers = Effect.fnUntraced(function* (
   agent: Bridge.Agent,
   {
@@ -246,8 +268,8 @@ const makeHandlers = Effect.fnUntraced(function* (
     );
 
   /**
-   * The turn `id` kept in `file`, if the file has its end. A turn the bridge was running when it
-   * died has none.
+   * The turn `id` kept in `file`, if the bridge has its file. A turn the bridge was running when it
+   * died has no end there, and ended then, aborted.
    */
   const readTurnFile = (id: Bridge.TurnId, file: string) =>
     Effect.gen(function* () {
@@ -257,15 +279,34 @@ const makeHandlers = Effect.fnUntraced(function* (
         (line) => Schema.decodeEffect(TurnLineJson)(line),
       );
       const last = lines.at(-1);
-      if (last === undefined || !("end" in last)) return undefined;
       const parts = lines.filter((line) => "seq" in line);
       const progress = yield* SubscriptionRef.make<Progress>({
         count: parts.length,
-        end: last.end,
+        end: last !== undefined && "end" in last ? last.end : TurnEnd.cases.Aborted.make({}),
       });
       const turn: Turn = { id, parts, progress };
       return turn;
     }).pipe(Effect.orElseSucceed(() => undefined));
+
+  /**
+   * How the bridge starts the session's turn `id` when a host asks it to, from the turn as the
+   * bridge has it, in memory or else in the turn's file. A turn it aborted, as it aborts the turns
+   * it runs when it exits or dies, continues in a conversation the agent kept, which holds it.
+   */
+  const turnStartOf = Effect.fnUntraced(function* (
+    session: SessionId,
+    started: StartedSession,
+    id: Bridge.TurnId,
+  ) {
+    const previous =
+      started.turn?.id === id ? started.turn : yield* readTurnFile(id, turnFile(session, id));
+    if (previous === undefined) return TurnStart.New();
+    const { end } = yield* SubscriptionRef.get(previous.progress);
+    if (end?._tag !== "Aborted") return TurnStart.Started({ turn: previous });
+    return started.agentSession.keptConversation
+      ? TurnStart.Continue({ parts: finishedStepsOf(previous.parts) })
+      : TurnStart.New();
+  });
 
   return Bridge.Rpcs.of({
     Hello: () => Effect.succeed({ agent: agent.id, protocolVersion: Bridge.protocolVersion }),
@@ -281,17 +322,10 @@ const makeHandlers = Effect.fnUntraced(function* (
             (yield* startSession({ id: session, directory, history, agentState }));
           const state = yield* started.agentSession.state;
           if (unfinishedTurn === undefined) return { hasUnfinishedTurn: false, agentState: state };
-          if (started.turn === undefined) {
-            started.turn = yield* readTurnFile(unfinishedTurn, turnFile(session, unfinishedTurn));
-          }
-          const { turn } = started;
-          // A turn aborted, as the bridge aborts its turns when it exits, is not one to continue.
-          return {
-            hasUnfinishedTurn:
-              turn?.id === unfinishedTurn &&
-              (yield* SubscriptionRef.get(turn.progress)).end?._tag !== "Aborted",
-            agentState: state,
-          };
+          const turnStart = yield* turnStartOf(session, started, unfinishedTurn);
+          // A bridge started again has a turn that ended before it exited only in the turn's file.
+          if (turnStart._tag === "Started") started.turn = turnStart.turn;
+          return { hasUnfinishedTurn: turnStart._tag !== "New", agentState: state };
         }),
       ),
 
@@ -300,29 +334,42 @@ const makeHandlers = Effect.fnUntraced(function* (
         lock,
         Effect.gen(function* () {
           const started = yield* startedSession(session);
-          if (started.turn?.id === id) return;
+          const turnStart = yield* turnStartOf(session, started, id);
+          if (turnStart._tag === "Started") {
+            started.turn = turnStart.turn;
+            return;
+          }
           if (
             started.turn !== undefined &&
             (yield* SubscriptionRef.get(started.turn.progress)).end === undefined
           ) {
             return yield* harnessError(new TurnInProgressError({}));
           }
-          // A session keeps only its latest turn.
+          // A session keeps only its latest turn; a turn it continues keeps the steps it finished.
+          const kept = turnStart._tag === "Continue" ? turnStart.parts : [];
           const directory = sessionDirectory(session);
+          const file = turnFile(session, id);
           yield* fs.remove(directory, { recursive: true, force: true });
           yield* fs.makeDirectory(directory, { recursive: true });
+          yield* Effect.forEach(kept, (part) => appendLine(file, part), { discard: true });
           const turn: Turn = {
             id,
-            parts: [],
-            progress: yield* SubscriptionRef.make<Progress>({ count: 0 }),
+            parts: [...kept],
+            progress: yield* SubscriptionRef.make<Progress>({ count: kept.length }),
           };
+          const turnOptions =
+            turnStart._tag === "Continue" ? { ...options, prompt: continuePrompt } : options;
           const fiber = yield* Effect.forkIn(
-            runTurn(started.agentSession, turn, options, turnFile(session, id)),
+            runTurn(started.agentSession, turn, turnOptions, file),
             started.scope,
           );
           started.turn = turn;
           started.fiber = fiber;
-        }).pipe(Effect.catchTag("PlatformError", (error) => Effect.fail(bridgeFailure(error)))),
+        }).pipe(
+          Effect.catchTag(["PlatformError", "SchemaError"], (error) =>
+            Effect.fail(bridgeFailure(error)),
+          ),
+        ),
       ),
 
     ReadTurn: ({ session, turn: id, after }) =>
@@ -407,6 +454,10 @@ const readTurn = (turn: Turn, after: number): Stream.Stream<Bridge.NumberedPart,
       ),
     ),
   );
+
+/** The parts of the steps a turn finished: those up to its last `finish-step`. */
+const finishedStepsOf = (parts: ReadonlyArray<Bridge.NumberedPart>) =>
+  parts.slice(0, parts.findLastIndex(({ part }) => part.type === "finish-step") + 1);
 
 /**
  * How a turn whose run exited with `exit` ended. `bridgeFailure` gives the error for any failure

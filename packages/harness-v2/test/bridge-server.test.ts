@@ -150,7 +150,7 @@ describe("BridgeServer", () => {
     }),
   );
 
-  it.effect("aborts a turn, ending its readers, and leaves no turn to continue", () =>
+  it.effect("aborts a turn, ending its readers", () =>
     Effect.gen(function* () {
       const { parts, fake, client } = yield* setUp;
       const answer = reply("hello");
@@ -165,14 +165,9 @@ describe("BridgeServer", () => {
       const read = yield* Stream.runCollect(
         client.ReadTurn({ session, turn: firstTurn, after: 0 }),
       );
-      const { hasUnfinishedTurn } = yield* client.StartSession({
-        ...startOptions,
-        unfinishedTurn: firstTurn,
-      });
 
       expect(read).toEqual(numbered(answer.slice(0, 2)));
       expect(fake.turnEnds).toEqual(["interrupted"]);
-      expect(hasUnfinishedTurn).toBe(false);
     }),
   );
 
@@ -198,35 +193,77 @@ describe("BridgeServer", () => {
     }),
   );
 
-  it.effect("reads a turn that finished from its file once the bridge starts again", () =>
-    Effect.gen(function* () {
-      const { parts, fake, fileSystem, bridgeScope, client } = yield* setUp;
-      yield* client.StartSession(startOptions);
-      yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
-      yield* Queue.offerAll(parts, reply("hello"));
-      yield* Queue.end(parts);
-      yield* Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 0 }));
-      const agentState = yield* client.ReadState({ session });
-      yield* Scope.close(bridgeScope, Exit.void);
-      expect(fake.ended).toEqual([session]);
+  it.effect(
+    "reads a turn that finished from its file once the bridge starts again, and runs it once",
+    () =>
+      Effect.gen(function* () {
+        const { parts, fake, fileSystem, bridgeScope, client } = yield* setUp;
+        yield* client.StartSession(startOptions);
+        yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
+        yield* Queue.offerAll(parts, reply("hello"));
+        yield* Queue.end(parts);
+        yield* Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 0 }));
+        const agentState = yield* client.ReadState({ session });
+        yield* Scope.close(bridgeScope, Exit.void);
+        expect(fake.ended).toEqual([session]);
 
-      const restarted = yield* startBridge(fake.agent, fileSystem, yield* Scope.make());
-      const { hasUnfinishedTurn } = yield* restarted.StartSession({
-        ...startOptions,
-        agentState,
-        unfinishedTurn: firstTurn,
-      });
-      const read = yield* Stream.runCollect(
-        restarted.ReadTurn({ session, turn: firstTurn, after: 0 }),
-      );
+        const restarted = yield* startBridge(fake.agent, fileSystem, yield* Scope.make());
+        const { hasUnfinishedTurn } = yield* restarted.StartSession({
+          ...startOptions,
+          agentState,
+          unfinishedTurn: firstTurn,
+        });
+        yield* restarted.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
+        const read = yield* Stream.runCollect(
+          restarted.ReadTurn({ session, turn: firstTurn, after: 0 }),
+        );
 
-      expect(fake.starts[1]?.agentState).toEqual({ session, start: 1 });
-      expect(hasUnfinishedTurn).toBe(true);
-      expect(read).toEqual(numbered(reply("hello")));
-    }),
+        expect(fake.starts[1]?.agentState).toEqual({ session, start: 1 });
+        expect(hasUnfinishedTurn).toBe(true);
+        expect(fake.turns).toHaveLength(1);
+        expect(read).toEqual(numbered(reply("hello")));
+      }),
   );
 
-  it.effect("loses a turn it was running when it exited", () =>
+  it.effect(
+    "continues a turn it ran when it died, after the steps it finished, in the agent's conversation",
+    () =>
+      Effect.gen(function* () {
+        const { parts, fake, files, fileSystem, bridgeScope, client } = yield* setUp;
+        const firstStep = reply("first").slice(0, 4);
+        yield* client.StartSession(startOptions);
+        yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
+        yield* Queue.offerAll(parts, [...firstStep, { type: "text-start", id: "second" }]);
+        yield* client
+          .ReadTurn({ session, turn: firstTurn, after: 0 })
+          .pipe(Stream.take(5), Stream.runDrain);
+        const agentState = yield* client.ReadState({ session });
+        yield* Scope.close(bridgeScope, Exit.void);
+        // A bridge that dies while the turn runs leaves the turn's file without its end.
+        const file = `/state/${session}/${firstTurn}.jsonl`;
+        files.set(file, (files.get(file) ?? "").replace(/[^\n]*\n$/, ""));
+
+        const restarted = yield* startBridge(fake.agent, fileSystem, yield* Scope.make());
+        const { hasUnfinishedTurn } = yield* restarted.StartSession({
+          ...startOptions,
+          agentState,
+          unfinishedTurn: firstTurn,
+        });
+        yield* restarted.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
+        yield* Queue.offerAll(parts, reply("second"));
+        yield* Queue.end(parts);
+        const read = yield* Stream.runCollect(
+          restarted.ReadTurn({ session, turn: firstTurn, after: 0 }),
+        );
+
+        expect(hasUnfinishedTurn).toBe(true);
+        expect(fake.turns[1]?.prompt).toEqual(turnOptions("Continue.").prompt);
+        expect(read).toEqual(numbered([...firstStep, ...reply("second")]));
+        expect(files.get(file)?.trim().split("\n")).toHaveLength(10);
+      }),
+  );
+
+  it.effect("cannot continue a turn it ran when it exited, in a conversation the agent lost", () =>
     Effect.gen(function* () {
       const { parts, fake, fileSystem, bridgeScope, client } = yield* setUp;
       yield* client.StartSession(startOptions);

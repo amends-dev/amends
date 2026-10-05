@@ -144,6 +144,25 @@ layer(TestLayer)("OpencodeAgent", (it) => {
     }),
   );
 
+  it.effect("streams a turn from opencode taking its prompt, not the call it failed before", () =>
+    Effect.gen(function* () {
+      const { session } = yield* startSession(answer("hello"), {
+        takingPrompt: (record) =>
+          record("session.next.tool.failed", {
+            assistantMessageID: "msg_before",
+            callID: "call_before",
+            error: { type: "unknown", message: "Tool execution interrupted" },
+            provider: { executed: false },
+          }),
+      });
+
+      const parts = yield* runTurn(session, "Continue.");
+
+      expect(textOf(parts)).toBe("hello");
+      expect(parts.filter((part) => part.type === "tool-result")).toEqual([]);
+    }),
+  );
+
   it.effect("starts opencode's server once, when the first session starts", () =>
     Effect.gen(function* () {
       const { processes, agent } = yield* makeAgent(answer("hello"));

@@ -280,6 +280,29 @@ describe("BridgeClient", () => {
       }).pipe(Effect.provide(TestLayer)),
     );
 
+    it.live(
+      "continues a suspended turn its bridge lost when it died, in the agent's conversation",
+      () =>
+        Effect.gen(function* () {
+          const { port, sandbox, harness } = yield* makeSetup;
+          const session = yield* harness.startSession({ sandbox, id });
+          const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
+
+          const state = yield* session.suspend;
+          yield* Fiber.join(reading);
+          yield* killBridge(sandbox);
+          const otherHarness = yield* makeHarness(port);
+          const resumed = yield* otherHarness.resumeSession({ sandbox, state });
+          const parts = yield* Stream.runCollect(resumed.continue({}));
+          const { history } = yield* resumed.detach;
+
+          // The agent continues the turn rather than run its prompt again, which would wait forever.
+          expect(parts).toEqual(answer("Continue."));
+          expect(history.content.map((message) => message.role)).toEqual(["user", "assistant"]);
+          expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
+        }).pipe(Effect.provide(TestLayer)),
+    );
+
     it.live("aborts a turn whose stream the caller ends", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;

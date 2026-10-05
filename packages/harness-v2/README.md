@@ -64,15 +64,19 @@ are.
   asks the bridge to exit, with the token and state directory from the `Bridge.LaunchOptions` that
   `BridgeServer.readLaunchOptions` reads from standard input. Each turn's parts go to a file in the state directory as well as to
   memory, and a session keeps only its latest turn. A bridge started again serves a turn that had
-  finished or failed before it exited; a host runs again one that had not.
+  finished or failed before it exited. One it aborted, as when it exited or died during the turn,
+  it continues when a host starts it again: the turn keeps the steps it finished, and the bridge
+  prompts the agent with `Continue.`, as AI SDK's harness does, if the agent kept the conversation
+  that holds the turn. Otherwise the host runs the turn again from its prompt.
 - `BridgeClient.make` is the `Agent.Agent` hosts run. A session connects to the bridge at the
   sandbox's endpoint for the port, and launches it with the adapter's command when none answers,
   giving it the launch options on standard input. It runs the template first, which installs only
   what the sandbox lacks, so that a sandbox prepared with another version of it launches this one. The token comes from the host's `token`
   function, derived from the sandbox's id with a secret every host shares, so that any host
   connects to a bridge any of them launched. Each connection starts the session in the bridge from
-  the state the bridge last gave, so that a bridge that died and was launched again has it again; a
-  turn the bridge was running then is lost. A connection that drops is not opened again: requests
+  the state the bridge last gave, so that a bridge that died and was launched again has it again.
+  `continue` starts the turn again, which the bridge continues if it did not finish it, but a turn
+  the bridge loses while a stream reads it fails with `NoTurnError`. A connection that drops is not opened again: requests
   it dropped are sent again over another, for up to 30 seconds, except a tool's result, an
   approval, and a request to compact, which the bridge must not receive twice. A turn is
   `StartTurn`, under an id the host picks, and `ReadTurn`, which reads on from the last part read.

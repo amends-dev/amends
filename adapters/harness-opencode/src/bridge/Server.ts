@@ -116,6 +116,9 @@ export interface Server {
   ) => Effect.Effect<void, HarnessError.HarnessError>;
 }
 
+// TODO: Stop a server left running by a bridge that died, as one killed does. In a process group of
+// its own, the server outlives the bridge and goes on with the turn the bridge ran, while the next
+// bridge's server continues the same session. AI SDK's harness leaves its server running so too.
 /** Starts the server, which runs until the scope closes, and waits until it listens. */
 export const start = Effect.fn("Server.start")(
   function* (options: ServerOptions) {

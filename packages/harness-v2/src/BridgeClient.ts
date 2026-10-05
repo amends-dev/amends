@@ -11,9 +11,10 @@
  *
  * A turn is two requests: `StartTurn`, under an id the host picks, and `ReadTurn`, which reads the
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge
- * whoever reads it, so `suspend` only stops reading, and `continue` reads the turn again from its
- * start, after the steps the harness has. A session whose bridge cannot answer, as when its sandbox
- * is gone, lets go with the state the bridge last gave.
+ * whoever reads it, so `suspend` only stops reading, and `continue` starts the turn again, which
+ * the bridge continues if it did not finish it, as when it died, and reads it again from its start,
+ * after the steps the harness has. A session whose bridge cannot answer, as when its sandbox is
+ * gone, lets go with the state the bridge last gave.
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox-v2";
 import {
@@ -159,7 +160,8 @@ const startSession = Effect.fn("BridgeClient.start")(function* (
 
   /**
    * Starts the session in the bridge from its latest state, with the turn running, or takes up the
-   * one the bridge runs. A turn the bridge does not have, as one it ran when it died, is over.
+   * one the bridge runs. A turn the session cannot continue, as one the bridge ran when it died in
+   * a conversation the agent then lost, is over.
    */
   const startInBridge = Effect.fnUntraced(function* (client: Client) {
     const agentState = yield* Ref.get(latestState);
@@ -288,8 +290,8 @@ const startSession = Effect.fn("BridgeClient.start")(function* (
             ),
           ),
         );
-        // TODO: Run a turn the bridge lost, as when it died while the turn ran, again from its
-        // prompt, rather than fail its stream with `NoTurnError`.
+        // TODO: Continue a turn the bridge lost while the stream read it, as when it died, as
+        // `continue` does after `suspend`, rather than fail the stream with `NoTurnError`.
         return readAfterLast.pipe(
           Stream.tap(({ seq }) => Ref.set(lastSeq, seq)),
           Stream.tapError(forgetDropped),
@@ -304,10 +306,12 @@ const startSession = Effect.fn("BridgeClient.start")(function* (
       }),
     );
 
-  /** Starts a turn in the bridge, returning its id, or nothing once the session has closed. */
-  const startTurn = Effect.fnUntraced(function* (turnOptions: Agent.TurnOptions) {
+  /** Starts `turn` in the bridge, returning it, or nothing once the session has closed. */
+  const startTurn = Effect.fnUntraced(function* (
+    turn: Bridge.TurnId,
+    turnOptions: Agent.TurnOptions,
+  ) {
     const bridgeOptions = yield* bridgeOptionsOf(options.id, turnOptions);
-    const turn = Bridge.TurnId.make(yield* Effect.orDie(crypto.randomUUIDv4));
     return yield* Semaphore.withPermit(
       admission,
       Effect.gen(function* () {
@@ -325,22 +329,25 @@ const startSession = Effect.fn("BridgeClient.start")(function* (
 
     prompt: (turnOptions) =>
       Stream.unwrap(
-        Effect.map(startTurn(turnOptions), (turn) =>
-          turn === undefined ? Stream.empty : readTurn(turn, 0),
-        ),
+        Effect.gen(function* () {
+          const id = Bridge.TurnId.make(yield* Effect.orDie(crypto.randomUUIDv4));
+          const turn = yield* startTurn(id, turnOptions);
+          return turn === undefined ? Stream.empty : readTurn(turn, 0);
+        }),
       ),
 
-    continue: (_turnOptions, finishedSteps) =>
+    // The bridge continues the turn if it did not finish it, and has it already otherwise.
+    continue: (turnOptions, finishedSteps) =>
       Stream.unwrap(
-        Effect.map(Ref.get(running), (turn) =>
-          turn === undefined
-            ? Stream.fail(
-                harnessError(
-                  new NoTurnError({ description: `${options.id} has no unfinished turn` }),
-                ),
-              )
-            : readTurn(turn, finishedSteps),
-        ),
+        Effect.gen(function* () {
+          const unfinished = yield* Ref.get(running);
+          if (unfinished === undefined) {
+            const description = `${options.id} has no unfinished turn`;
+            return Stream.fail(harnessError(new NoTurnError({ description })));
+          }
+          const turn = yield* startTurn(unfinished, turnOptions);
+          return turn === undefined ? Stream.empty : readTurn(turn, finishedSteps);
+        }),
       ),
 
     submitToolResult: ({ id, name, result, isFailure }) =>

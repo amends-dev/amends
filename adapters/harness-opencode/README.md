@@ -42,7 +42,9 @@ When the first session starts, the bridge starts opencode's server, `opencode se
 `127.0.0.1` at a port the server picks, behind a password it makes for that start and gives the
 server only in its environment. One server serves every session in the sandbox, each in its own
 directory. A server that fails to start is started again by the next session; one that exits by
-itself takes the bridge with it, and the next session launches both again. opencode keeps its
+itself takes the bridge with it, and the next session launches both again. A bridge that dies, as
+when it is killed, leaves its server running, still on the turn the bridge ran, beside the server
+the next bridge starts. opencode keeps its
 configuration and data where it would for any user of the sandbox, under its home, unless `env`
 moves them, as with `XDG_DATA_HOME`.
 
@@ -51,7 +53,8 @@ moves them, as with `XDG_DATA_HOME`.
 Each session is an opencode session, and the agent's state names it with the session's model. A
 session that starts in a sandbox whose opencode has no record of it, such as one that started on
 another agent, starts a new opencode session from the conversation: `History` writes the
-conversation as the events opencode records, tool calls included, and replays them into it.
+conversation as the events opencode records, tool calls included, and replays them into it. Only a
+session whose opencode session was kept continues there a turn the bridge did not finish.
 
 A turn is a prompt to the session, on the model the turn names, which switches the session's model,
 once opencode has loaded that model's provider. `Turn` translates the events opencode records for
@@ -68,8 +71,8 @@ opencode, and destroying a session deletes it there.
 program launched by `BridgeClient`, with `test/fake-opencode-server.js` standing in for
 `opencode serve`. `test/bridge.test.ts` has `BridgeClient` launch `test/fake-bridge.ts`, a bridge
 over a stand-in agent, in a local sandbox, and reach it over a WebSocket: launching, reconnecting,
-launching it again after it dies, letting go when the sandbox is gone, refusing a wrong token, and
-continuing on another host. `test/template.test.ts` runs the template
+launching it again after it dies, continuing a turn it lost then, letting go when the sandbox is
+gone, refusing a wrong token, and continuing on another host. `test/template.test.ts` runs the template
 with its commands answered as a sandbox would answer them. `test/live.test.ts`, and the template's
 live test, which installs Bun and opencode in a temporary home, run only with
 `AMENDS_TEST_OPENCODE=1`, and the hosts' tests run on Daytona too with `AMENDS_TEST_DAYTONA=1`;

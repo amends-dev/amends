@@ -35,6 +35,12 @@ export interface FakeOpencodeOptions {
 
   /** Runs before the server admits a prompt. */
   readonly admitting?: Effect.Effect<void>;
+
+  /**
+   * Records what opencode records after it admits a prompt and before it takes it, such as the
+   * failure of a call it was running when it stopped.
+   */
+  readonly takingPrompt?: (record: FakeTurn["record"]) => Effect.Effect<void>;
 }
 
 export interface FakeSession {
@@ -182,7 +188,8 @@ export const makeFakeOpencode = (
               const input = { messageID: `msg_${sessionID}`, prompt, delivery: "steer" };
               yield* record("session.next.prompt.admitted", input);
               const admittedSeq = (yield* SubscriptionRef.get(session.events)).length - 1;
-              const turn = record("session.next.prompted", input).pipe(
+              const turn = (options.takingPrompt?.(record) ?? Effect.void).pipe(
+                Effect.andThen(record("session.next.prompted", input)),
                 Effect.andThen(runTurn({ prompt: prompt.text, model: session.model, record })),
                 Effect.ensuring(Effect.sync(() => running.delete(sessionID))),
               );

@@ -131,10 +131,11 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
   // opencode may have lost the session, as when the sandbox lost its data, and then starts one
   // from the conversation.
   const saved = yield* readState(startOptions.agentState);
+  const kept =
+    saved !== undefined && (yield* server.hasSession(saved.sessionID)) ? saved : undefined;
   const state =
-    saved !== undefined && (yield* server.hasSession(saved.sessionID))
-      ? saved
-      : yield* createSession(server, startOptions.directory, defaultModel, startOptions.history);
+    kept ??
+    (yield* createSession(server, startOptions.directory, defaultModel, startOptions.history));
   const { sessionID } = state;
 
   /** The model the session runs its turns on, switched when a turn names another. */
@@ -220,6 +221,8 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     );
 
   const session: Bridge.AgentSession = {
+    keptConversation: kept !== undefined,
+
     prompt: runTurn,
 
     // TODO: Relay the host's tools to opencode, as a server in the bridge that opencode calls.
@@ -284,9 +287,11 @@ const createSession = Effect.fnUntraced(function* (
 });
 
 /**
- * The events of the turn whose prompt opencode admitted at `admittedSeq`, as they happen. A turn
- * can stop without an event that says so, so they end once opencode stops running the session after
- * taking the prompt, with the events it recorded after the last one streamed.
+ * The events of the turn whose prompt opencode admitted at `admittedSeq`, as they happen, from
+ * opencode taking the prompt. Those before are not the turn's: opencode first fails a call that it
+ * was running when it stopped, as when the bridge died. A turn can stop without an event that says
+ * so, so they end once opencode stops running the session after taking the prompt, with the events
+ * it recorded after the last one streamed.
  */
 const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: number) =>
   Stream.unwrap(
@@ -316,6 +321,7 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
           ),
         ),
         Stream.concat(recordedAfterLast),
+        Stream.dropWhile((event) => event.type !== "session.next.prompted"),
       );
     }),
   );

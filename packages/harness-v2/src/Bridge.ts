@@ -7,7 +7,9 @@
  * The bridge runs each turn itself, so that a turn goes on when a host's connection drops or the
  * host lets go, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
  * so that a host reads them from any number: again after its connection drops, or to `continue` a
- * turn that another host suspended. The agent behind it needs to do neither.
+ * turn that another host suspended. The agent behind it needs to do neither. A turn the bridge did
+ * not finish, as one it ran when it died, it continues when a host starts it again, by prompting
+ * the agent with `Continue.` in the conversation that holds the turn, as AI SDK's harness does.
  *
  * An agent's adapter implements `Bridge.Agent` to run behind a bridge, `BridgeServer.serve` serves
  * it in the sandbox, and `BridgeClient.make` is the `Agent.Agent` hosts use to reach it.
@@ -77,6 +79,13 @@ export interface StartOptions {
  * turns' parts, and ends it by closing its scope.
  */
 export interface AgentSession {
+  /**
+   * Whether the session started in the conversation the agent kept for it, which `agentState`
+   * names, rather than from `history`, as it does when it lost that conversation or had none. The
+   * bridge continues a turn it did not finish only in a conversation the agent kept.
+   */
+  readonly keptConversation: boolean;
+
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
   readonly prompt: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
@@ -147,8 +156,8 @@ export class Rpcs extends RpcGroup.make(
 
   /**
    * Starts the session, or takes up the one the bridge is running, which ignores `history` and
-   * `agentState`. Answers whether the bridge has `unfinishedTurn`, for `ReadTurn` to stream, and
-   * the session's state, as `ReadState` does.
+   * `agentState`. Answers whether the session can continue `unfinishedTurn`, as `StartTurn` does,
+   * and the session's state, as `ReadState` does.
    */
   Rpc.make("StartSession", {
     payload: {
@@ -165,7 +174,9 @@ export class Rpcs extends RpcGroup.make(
   /**
    * Starts a turn, which runs until it finishes or `AbortTurn`, whoever reads it. Starting a turn
    * the session already started does nothing; starting one while another runs fails with
-   * `TurnInProgressError`.
+   * `TurnInProgressError`. Starting again a turn the bridge aborted, as it aborts the turns it runs
+   * when it exits, or one it ran when it died, continues the turn after the steps it finished, by
+   * prompting the agent to continue, when the agent kept the conversation that holds the turn.
    */
   Rpc.make("StartTurn", {
     payload: { ...inSession, turn: TurnId, options: TurnOptions },
