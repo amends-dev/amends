@@ -138,7 +138,7 @@ ask for, is the client's to set.
 
 ## Assembly
 
-`Assembly.toolkit(members, decide)` makes the one toolkit of a turn from the sources a workspace has,
+`Assembly.toolkit(members, decide, options?)` makes the one toolkit of a turn from the sources a workspace has,
 each with the definitions of its tools that the workspace holds. `decide` says, for a source's name
 and a definition, `allow`, `approve`, or `block` (the `Decision` schema, so that a policy can be
 stored). A blocked tool is left out, and an approved one is marked as needing approval. Which is
@@ -151,8 +151,9 @@ apart, and a name is the same whenever it is made. A call reaches the source tha
 the name that source knows it by. Tools that would still have one name fail the assembly with
 `NameClash`, which holds every clash. Building contacts none of the sources.
 
-An agent that prefixes the tool names it is given has less than 64 characters to spare, which a
-delivery to that agent has to take into account.
+An agent that adds to the tool names it is given has fewer than 64 characters to spare. The
+`maxNameLength` option, at least 16, cuts names to what the agent takes, as a harness's
+`maxToolNameLength` says: `Assembly.toolkit(members, decide, { maxNameLength })`.
 
 ## What the host does
 

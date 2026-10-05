@@ -169,6 +169,12 @@ export interface Agent {
   /** The ports the agent listens on in its sandbox, which the sandbox must be created with. */
   readonly ports?: ReadonlyArray<Network.Port>;
 
+  /**
+   * The longest name of a host tool the agent takes, for an agent that adds to the names it is given
+   * and so leaves a model API's 64 characters too few. A host names its tools to fit.
+   */
+  readonly maxToolNameLength?: number;
+
   /** Starts a session: a new one, or one picked up again from what an earlier session returned. */
   readonly start: (options: StartOptions) => Effect.Effect<AgentSession, HarnessError>;
 }

@@ -300,6 +300,18 @@ describe("Harness", () => {
     }),
   );
 
+  it.effect("tells how long a name the agent takes for a host tool, when it limits it", () =>
+    Effect.gen(function* () {
+      const limited = yield* makeFakeAgent("opencode", answersAs("opencode"), {
+        maxToolNameLength: 59,
+      });
+      const unlimited = yield* makeFakeAgent("codex", answersAs("codex"));
+
+      expect(Harness.make(limited.agent).maxToolNameLength).toBe(59);
+      expect(Harness.make(unlimited.agent).maxToolNameLength).toBeUndefined();
+    }),
+  );
+
   it.effect("provides the harness through its layer", () =>
     Effect.gen(function* () {
       const codex = yield* makeFakeAgent("codex", answersAs("codex"));

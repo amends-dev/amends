@@ -64,6 +64,9 @@ export interface Options {
   /** The port the bridge listens on in its sandbox, which the sandbox must be created with. */
   readonly port: Network.Port;
 
+  /** The longest name of a host tool the agent takes, as `Agent.maxToolNameLength` has it. */
+  readonly maxToolNameLength?: number;
+
   /** The command that runs the bridge in the sandbox, and its arguments. */
   readonly command: string;
 
@@ -90,6 +93,7 @@ export const make = Effect.fn("BridgeClient.make")(function* (options: Options) 
     requiresSandbox: true,
     template: options.template,
     ports: [options.port],
+    maxToolNameLength: options.maxToolNameLength,
     start: (startOptions) => Effect.provide(startSession(options, startOptions), services),
   };
   return agent;

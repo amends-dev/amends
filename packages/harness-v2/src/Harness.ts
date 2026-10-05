@@ -55,6 +55,12 @@ export class Harness extends Context.Service<
      */
     readonly ports: ReadonlyArray<Network.Port>;
 
+    /**
+     * The longest name of a host tool the agent takes, when it takes fewer than the 64 characters
+     * that model APIs allow. A host names its tools to fit, with `Assembly.toolkit`'s `maxNameLength`.
+     */
+    readonly maxToolNameLength?: number;
+
     /** Starts a new session. */
     readonly startSession: (
       options: StartSessionOptions,
@@ -106,6 +112,7 @@ export const make = (agent: Agent): Harness["Service"] => {
     template: agent.template,
     requiresSandbox: agent.requiresSandbox,
     ports: agent.ports ?? [],
+    maxToolNameLength: agent.maxToolNameLength,
 
     startSession: Effect.fn("Harness.startSession")(function* ({ sandbox, id }) {
       yield* checkSandbox(sandbox);
