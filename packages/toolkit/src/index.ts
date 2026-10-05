@@ -1,7 +1,9 @@
 export * as Assembly from "./Assembly.ts";
+export * as CodeMode from "./code/index.ts";
 export * as Http from "./Http.ts";
 export * as Mcp from "./mcp/index.ts";
 export * as OpenApi from "./OpenApi.ts";
+export * as Presentation from "./Presentation.ts";
 export * as ToolDefinition from "./ToolDefinition.ts";
 export * as ToolSearch from "./ToolSearch.ts";
 export * as ToolSource from "./ToolSource.ts";

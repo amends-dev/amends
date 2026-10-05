@@ -9,8 +9,9 @@
  * Running a tool is the presented toolkit's own, so what it decides stays decided: a tool that needs
  * approval needs it when the model calls it through `tool_call`, and a call fails as it fails there.
  */
-import { Effect, Option, Schema, Stream } from "effect";
+import { Effect, Schema } from "effect";
 import { Tool, Toolkit } from "effect/ai";
+import * as Presentation from "./Presentation.ts";
 import { Failure } from "./ToolSource.ts";
 
 /** The most tools a search may return, which a call can ask for fewer of. */
@@ -111,70 +112,19 @@ export const toolkit = Effect.fn("ToolSearch.toolkit")(function* <
         };
       }),
 
-    tool_call: ({ name, input }) => callOf(presented, name, input).pipe(Effect.provide(services)),
+    tool_call: ({ name, input }) =>
+      (Presentation.hasTool(presented, name)
+        ? Presentation.call(presented, name, input)
+        : Effect.fail(
+            Presentation.failure(
+              "NotFoundError",
+              `There is no tool named ${name}. Search for one with tool_search`,
+            ),
+          )
+      ).pipe(Effect.provide(services)),
   });
   return yield* SearchToolkit.pipe(Effect.provide(handlers));
 });
-
-/** The tool of `presented` named `name`, run with `input`, whose result is the call's. */
-const callOf = <Tools extends Record<string, Tool.Any>>(
-  presented: Toolkit.WithHandler<Tools>,
-  name: string,
-  input: Schema.JsonObject,
-) =>
-  Effect.gen(function* () {
-    if (!isNameOf(presented, name)) {
-      return yield* Effect.fail(
-        failure("NotFoundError", `There is no tool named ${name}. Search for one with tool_search`),
-      );
-    }
-    // The presented toolkit checks the input against the tool's parameters.
-    const results = yield* presented.handle(
-      name,
-      input as Tool.ParametersEncoded<Tools[typeof name]>,
-    );
-    // The results before the last are preliminary.
-    const last = yield* Stream.runLast(results);
-    if (Option.isNone(last))
-      return yield* Effect.fail(failure("CallFailed", `${name} gave no result`));
-    const { encodedResult, isFailure } = last.value;
-    if (isFailure) return yield* Effect.fail(failureOfResult(encodedResult));
-    return yield* Schema.decodeUnknownEffect(Schema.Json)(encodedResult);
-  }).pipe(
-    // What a tool of the presented toolkit failed with, as its handler or its parameters, is a
-    // result the model reads, as a failure of the tool is when the model calls it directly.
-    Effect.mapError(failureOfError),
-  );
-
-/** Whether `presented` has a tool named `name`, with the name as the type of one. */
-const isNameOf = <Tools extends Record<string, Tool.Any>>(
-  presented: Toolkit.WithHandler<Tools>,
-  name: string,
-): name is Extract<keyof Tools, string> => Object.hasOwn(presented.tools, name);
-
-const failure = (code: string, message: string): Failure => ({
-  code,
-  message,
-  retryable: false,
-});
-
-/** What the model reads of a failed result of a tool: its own `Failure`, or else its text. */
-const failureOfResult = (encoded: unknown): Failure =>
-  Option.getOrElse(Schema.decodeUnknownOption(Failure)(encoded), () =>
-    failure("CallFailed", typeof encoded === "string" ? encoded : (JSON.stringify(encoded) ?? "")),
-  );
-
-const failureOfError = (error: unknown): Failure =>
-  Option.getOrElse(Schema.decodeUnknownOption(Failure)(error), () =>
-    failure("CallFailed", messageOf(error) ?? "The tool failed"),
-  );
-
-const messageOf = (error: unknown) => {
-  if (typeof error === "string") return error;
-  return typeof error === "object" && error !== null && "message" in error
-    ? String(error.message)
-    : undefined;
-};
 
 /** What a search reads of a tool. */
 const entryOf = (tool: Tool.Any): Entry => {
@@ -183,10 +133,7 @@ const entryOf = (tool: Tool.Any): Entry => {
     found: {
       name: tool.name,
       ...(description === undefined ? {} : { description }),
-      inputSchema: Option.getOrElse(
-        Schema.decodeUnknownOption(Schema.JsonObject)(Tool.getJsonSchema(tool)),
-        () => ({ type: "object" }),
-      ),
+      inputSchema: Presentation.inputSchemaOf(tool),
     },
     nameWords: wordsOf(tool.name),
     descriptionWords: wordsOf(description ?? ""),
