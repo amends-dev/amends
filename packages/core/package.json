@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@amends/connection": "workspace:*",
+    "@amends/connection-v2": "workspace:*",
     "@amends/environment": "workspace:*",
     "@amends/harness": "workspace:*",
     "@amends/sandbox": "workspace:*",
