@@ -99,6 +99,11 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   integrations the [local host](../hosts/local/README.md) installs of every kind. They authenticate
   with an API key or nothing, and nothing uses them yet: turns, agents, and environments still use
   the old connections. A check's result is not stored.
+- [Agents v2](../packages/core/README.md#agents-v2), which are to replace agents, are created,
+  configured, and renamed in core over connections v2, and both storage adapters keep them; nothing
+  serves them over HTTP or shows them in the apps yet, and they run no turns. An agent on `Auto`
+  stores that choice, but nothing yet chooses a harness for it: its readiness only says whether a
+  connection gives one it could run on.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
   instructions, model access, and a starting environment, over HTTP and on the
   [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a

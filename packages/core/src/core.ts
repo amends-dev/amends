@@ -1,6 +1,8 @@
 import { AgentService } from "./agent/service.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentV2Permissions } from "./agent-v2/permissions.ts";
+import { AgentV2Projection } from "./agent-v2/projection.ts";
+import { AgentV2Service } from "./agent-v2/service.ts";
 import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
@@ -105,6 +107,7 @@ export const projections = [
   ConnectionV2Projection.definition,
   EnvironmentProjection.definition,
   AgentProjection.definition,
+  AgentV2Projection.definition,
   TurnProjection.definition,
 ] as const;
 
@@ -230,6 +233,7 @@ const operations = Layer.mergeAll(
   ConnectionV2Service.layer,
   EnvironmentService.layer,
   AgentService.layer.pipe(Layer.provide(MemberService.layer)),
+  AgentV2Service.layer,
   TurnService.layer,
 ).pipe(
   Layer.provide(

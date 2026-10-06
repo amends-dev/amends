@@ -3,6 +3,7 @@
  * files call the suites it runs.
  */
 export { agents } from "./agents.ts";
+export { agentsV2 } from "./agents-v2.ts";
 export { assignments } from "./assignments.ts";
 export { authorization } from "./authorization.ts";
 export { builtinRoles } from "./builtin-roles.ts";

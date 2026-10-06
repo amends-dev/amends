@@ -110,6 +110,12 @@ one for each connection: the JSON of its encoded form, sealed as above and bound
 and connection, and replaced in place when its key is. Grant scopes gained
 `target_connection_v2_id` for `ConnectionV2` targets; the development baseline was regenerated.
 
+`agents_v2` holds the records of agents v2, one row per agent with a unique membership per
+workspace. Each part of its setup is its connection's id as a column: a null
+`harness_connection_id` is `Auto`, a null `model_effort` the model's default, and a null
+`sandbox_connection_id` no sandbox. Adding it regenerated the development baseline; recreate
+disposable PostgreSQL databases.
+
 `environments` holds environment records: a sandbox's columns are all set or all null, its
 variables and setup commands are JSON, and grant scopes gained `target_environment_id` for
 environment targets. Adding them replaced the development baseline; recreate disposable PostgreSQL

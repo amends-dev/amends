@@ -1,5 +1,6 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
+import { AgentV2Store } from "@amends/core/agent-v2";
 import { AgentStore } from "@amends/core/agent";
 import { AgentJobs, TurnJobs, TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
@@ -323,6 +324,15 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           set: unexpected,
           get: unexpected,
           remove: unexpected,
+        }),
+      ),
+      Context.add(
+        AgentV2Store.Service,
+        AgentV2Store.Service.of({
+          get: unexpected,
+          list: unexpected(),
+          insert: unexpected,
+          update: unexpected,
         }),
       ),
       // Signals no test here observes: published into nothing, and no subscriber ever hears one.

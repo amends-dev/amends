@@ -859,6 +859,33 @@ export const agents = pgTable(
   ],
 );
 
+/**
+ * Agents v2, each one workspace membership, which names it and holds its role. Its harness is a
+ * connection's, or chosen among the workspace's when `harness_connection_id` is null; its model is
+ * a connection's, by the provider's id, with an effort when one is set; and its sandbox a
+ * connection's, or none.
+ */
+export const agentsV2 = pgTable(
+  "agents_v2",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    memberId: text("member_id").notNull(),
+    instructions: text("instructions").notNull(),
+    harnessConnectionId: text("harness_connection_id"),
+    modelConnectionId: text("model_connection_id").notNull(),
+    modelId: text("model_id").notNull(),
+    modelEffort: text("model_effort"),
+    sandboxConnectionId: text("sandbox_connection_id"),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    uniqueIndex("agents_v2_by_member").on(t.workspaceId, t.memberId),
+  ],
+);
+
 export const turnStatuses = [
   "queued",
   "running",

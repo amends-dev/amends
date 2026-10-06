@@ -7,6 +7,7 @@ import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer, Option } from "effect";
 import type { Redacted } from "effect";
 import { Agents } from "./agents.ts";
+import { AgentsV2 } from "./agents-v2.ts";
 import { TurnRecords } from "./turn-records.ts";
 import { Assignments } from "./assignments.ts";
 import { Groups } from "./groups.ts";
@@ -67,6 +68,7 @@ const layerStores = Layer.mergeAll(
   ConnectionV2Credentials.layer,
   Environments.layer,
   Agents.layer,
+  AgentsV2.layer,
   TurnRecords.layer,
   PostgresSignalHub.layer,
 );

@@ -121,6 +121,18 @@ export const connectionsV2 = (harness: Harness) => {
                 provides: ["harnesses"],
                 requiresSandbox: true,
               },
+              {
+                id: "test-in-process",
+                auth: ["none"],
+                provides: ["harnesses"],
+                requiresSandbox: false,
+              },
+              {
+                id: "test-sandboxes",
+                auth: ["none"],
+                provides: ["sandboxes"],
+                requiresSandbox: false,
+              },
             ]);
             expect(integrations[0]).toMatchObject({
               name: "Test models",

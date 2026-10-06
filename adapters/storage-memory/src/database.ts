@@ -48,6 +48,7 @@ export const projections = [
   "connectionsV2",
   "environments",
   "agents",
+  "agentsV2",
   "turns",
   "checkpoints",
   "liveProjections",

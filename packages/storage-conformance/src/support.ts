@@ -45,6 +45,7 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
+import { AgentV2Store } from "@amends/core/agent-v2";
 import { Integration, Integrations, type ModelCatalog } from "@amends/connection-v2";
 import { AgentStore } from "@amends/core/agent";
 import { AgentJobs, AgentWork, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
@@ -152,8 +153,8 @@ export const testModel: ModelCatalog.Model = {
 /**
  * The integrations the suites' hosts install: models at an endpoint a connection gives, reached
  * with a key or none, which list `testModel` and offer any other, and whose check accepts only
- * `goodKey`; tools that take no settings or key; and a harness whose agent works only in a sandbox,
- * which no suite runs.
+ * `goodKey`; tools that take no settings or key; a harness whose agent works only in a sandbox, and
+ * one whose agent works in the host's process; and sandboxes. No suite runs a harness or a sandbox.
  */
 export const testIntegrations = [
   Integration.make({
@@ -195,6 +196,20 @@ export const testIntegrations = [
     name: "Test harness",
     auth: ["none"],
     harnesses: { requiresSandbox: true, harness: () => Effect.die("No suite runs a harness") },
+    check: () => Effect.succeed({ status: "healthy" }),
+  }),
+  Integration.make({
+    id: "test-in-process",
+    name: "Test in process",
+    auth: ["none"],
+    harnesses: { requiresSandbox: false, harness: () => Effect.die("No suite runs a harness") },
+    check: () => Effect.succeed({ status: "healthy" }),
+  }),
+  Integration.make({
+    id: "test-sandboxes",
+    name: "Test sandboxes",
+    auth: ["none"],
+    sandboxes: () => Effect.die("No suite makes a sandbox"),
     check: () => Effect.succeed({ status: "healthy" }),
   }),
 ];
@@ -296,6 +311,7 @@ export const bind = (
   connectionV2Credentials: Context.get(context, ConnectionV2CredentialStore.Service),
   environments: Context.get(context, EnvironmentStore.Service),
   agents: Context.get(context, AgentStore.Service),
+  agentsV2: Context.get(context, AgentV2Store.Service),
   turns: Context.get(context, TurnStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
