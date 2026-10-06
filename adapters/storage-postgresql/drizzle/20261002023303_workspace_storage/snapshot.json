@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "5e70b49a-1b84-47b6-b66d-bbf3e050d908",
+  "id": "60b50914-5f83-40b3-8e79-076b91443dba",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -469,6 +469,19 @@
       "generated": null,
       "identity": null,
       "name": "target_connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "assignments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "target_connection_v2_id",
       "entityType": "columns",
       "schema": "public",
       "table": "assignments"
@@ -5115,7 +5128,7 @@
       "table": "assignments"
     },
     {
-      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Environment' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_environment_id\" IS NOT NULL)))",
+      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'ConnectionV2' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NOT NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Environment' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NOT NULL)))",
       "name": "assignments_scope_agrees",
       "entityType": "checks",
       "schema": "public",

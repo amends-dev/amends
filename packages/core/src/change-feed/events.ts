@@ -9,6 +9,9 @@ import { GroupFacts } from "../group/facts.ts";
 import type { ConnectionId } from "../connection/id.ts";
 import { ConnectionFacts } from "../connection/facts.ts";
 import { ConnectionPermissions } from "../connection/permissions.ts";
+import type { ConnectionV2 } from "../connection-v2/connection.ts";
+import { ConnectionV2Facts } from "../connection-v2/facts.ts";
+import { ConnectionV2Permissions } from "../connection-v2/permissions.ts";
 import { EnvironmentFacts } from "../environment/facts.ts";
 import type { EnvironmentId } from "../environment/id.ts";
 import { EnvironmentPermissions } from "../environment/permissions.ts";
@@ -155,6 +158,12 @@ const readAccessRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id)
   Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId });
 const readConnectionRequirement = (connectionId: ConnectionId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(ConnectionPermissions.Read, { _tag: "Connection", workspaceId, connectionId });
+const readConnectionV2Requirement = (connectionId: ConnectionV2.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(ConnectionV2Permissions.Read, {
+    _tag: "ConnectionV2",
+    workspaceId,
+    connectionId,
+  });
 const readEnvironmentRequirement = (environmentId: EnvironmentId.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(EnvironmentPermissions.Read, {
     _tag: "Environment",
@@ -250,6 +259,26 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(ConnectionFacts.Removed, {
     requirement: ({ connectionId }, workspaceId) =>
       readConnectionRequirement(connectionId, workspaceId),
+  }),
+  // Connections v2 reach those who may read them; no fact carries a key.
+  registerFact(ConnectionV2Facts.Created, {
+    requirement: ({ id }, workspaceId) => readConnectionV2Requirement(id, workspaceId),
+  }),
+  registerFact(ConnectionV2Facts.Renamed, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionV2Requirement(connectionId, workspaceId),
+  }),
+  registerFact(ConnectionV2Facts.Configured, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionV2Requirement(connectionId, workspaceId),
+  }),
+  registerFact(ConnectionV2Facts.KeyReplaced, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionV2Requirement(connectionId, workspaceId),
+  }),
+  registerFact(ConnectionV2Facts.Removed, {
+    requirement: ({ connectionId }, workspaceId) =>
+      readConnectionV2Requirement(connectionId, workspaceId),
   }),
   registerFact(EnvironmentFacts.Created, {
     requirement: ({ id }, workspaceId) => readEnvironmentRequirement(id, workspaceId),

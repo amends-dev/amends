@@ -19,6 +19,7 @@
     "./request": "./src/request/index.ts",
     "./signal": "./src/signal/index.ts",
     "./connection": "./src/connection/index.ts",
+    "./connection-v2": "./src/connection-v2/index.ts",
     "./environment": "./src/environment/index.ts",
     "./turn": "./src/turn/index.ts"
   },

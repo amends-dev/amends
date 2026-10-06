@@ -7,7 +7,7 @@
  *
  * This feature is built beside `connection/`, which it is to replace, and shares nothing with it.
  */
-import { Connection } from "@amends/connection-v2";
+import { Connection, Integration } from "@amends/connection-v2";
 import { Schema } from "effect";
 import { Text } from "../text/text.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -160,6 +160,34 @@ export const view = (record: Record, readiness: Readiness, manageable: boolean):
   manageable,
   createdBy: record.createdBy,
   createdAt: record.createdAt,
+});
+
+/**
+ * An integration its host installs, as readers see it when they connect to it: what it is, how a
+ * connection authenticates, what it gives, and the form of its settings. Every member may see it.
+ */
+export const IntegrationView = Schema.Struct({
+  id: Schema.NonEmptyString,
+  name: Schema.String,
+
+  /** Where the system's documentation is, as for how to get a key. */
+  docs: Schema.optionalKey(Schema.String),
+
+  /** How a connection can authenticate, in the order to offer them. */
+  auth: Schema.NonEmptyArray(Connection.AuthMethod),
+  provides: Schema.Array(Integration.Capability),
+  settings: Integration.SettingsForm,
+});
+export interface IntegrationView extends Schema.Schema.Type<typeof IntegrationView> {}
+
+/** An integration as readers see it. */
+export const integrationView = (integration: Integration.Integration): IntegrationView => ({
+  id: integration.id,
+  name: integration.name,
+  ...(integration.docs === undefined ? {} : { docs: integration.docs }),
+  auth: integration.auth,
+  provides: integration.provides,
+  settings: integration.settings,
 });
 
 export * as ConnectionV2 from "./connection.ts";

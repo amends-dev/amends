@@ -47,6 +47,7 @@ export const targetKinds = [
   "Thread",
   "Group",
   "Connection",
+  "ConnectionV2",
   "Environment",
 ] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
@@ -67,6 +68,7 @@ const scopeColumns = {
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
   targetConnectionId: text("target_connection_id"),
+  targetConnectionV2Id: text("target_connection_v2_id"),
   targetEnvironmentId: text("target_environment_id"),
 };
 /** The column holding each kind of target's ID; a workspace target needs none. */
@@ -75,6 +77,7 @@ const targetIds = {
   Thread: "targetThreadId",
   Group: "targetGroupId",
   Connection: "targetConnectionId",
+  ConnectionV2: "targetConnectionV2Id",
   Environment: "targetEnvironmentId",
 } as const;
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
