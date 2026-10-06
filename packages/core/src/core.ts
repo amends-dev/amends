@@ -1,5 +1,6 @@
 import { AgentService } from "./agent/service.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
+import { AgentV2Permissions } from "./agent-v2/permissions.ts";
 import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
@@ -146,6 +147,9 @@ export const permissions = [
   ConnectionV2Permissions.Read,
   ConnectionV2Permissions.Manage,
   ConnectionV2Permissions.Use,
+  AgentV2Permissions.Create,
+  AgentV2Permissions.Read,
+  AgentV2Permissions.Configure,
 ];
 
 /**

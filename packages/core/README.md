@@ -209,6 +209,18 @@ projection store and `ConnectionV2CredentialStore` keeps credentials outside the
 `Unavailable` on a host that keeps none (`CredentialsUnavailable`); both are host bindings. The
 gateway supplies the host's integrations as `Integrations`.
 
+## Agents v2
+
+`@amends/core/agent-v2` holds the agents that replace those of `agent/`, built beside them and
+sharing nothing with them. An agent is a workspace member that works: `AgentV2.Record` keeps its
+instructions; its `harness`, the harnesses of one of the workspace's connections v2 or `Auto`, for
+amends to choose among them; its `model`, one a connection offers, by id, with an `effort`; and its
+`sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
+membership's. `AgentV2Facts.Created` records an agent in the commit that adds its membership, and
+`Configured` replaces how it is set up as a whole. `agent-v2.create` works on the workspace;
+`agent-v2.read` and `agent-v2.configure` on the agent's membership, a `Member` target. Members read
+agents; administrators and the owner create and configure them.
+
 ## Environments
 
 `@amends/core/environment` holds workspace environments: where and how agents run, as a harness and

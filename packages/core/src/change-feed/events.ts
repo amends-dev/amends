@@ -2,6 +2,8 @@ import { Data, Effect, Option, Schema } from "effect";
 import { AgentFacts } from "../agent/facts.ts";
 import { TurnFacts } from "../turn/facts.ts";
 import { AgentPermissions } from "../agent/permissions.ts";
+import { AgentV2Facts } from "../agent-v2/facts.ts";
+import { AgentV2Permissions } from "../agent-v2/permissions.ts";
 import { AssignmentFacts } from "../authorization/assignment/facts.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
@@ -172,6 +174,8 @@ const readEnvironmentRequirement = (environmentId: EnvironmentId.Id, workspaceId
   });
 const readAgentRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AgentPermissions.Read, { _tag: "Member", workspaceId, memberId });
+const readAgentV2Requirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(AgentV2Permissions.Read, { _tag: "Member", workspaceId, memberId });
 const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
@@ -301,6 +305,13 @@ const registry: ReadonlyArray<Registered> = [
   }),
   registerFact(AgentFacts.Configured, {
     requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
+  }),
+  // Agents v2 likewise; their names and departures come with membership facts.
+  registerFact(AgentV2Facts.Created, {
+    requirement: ({ memberId }, workspaceId) => readAgentV2Requirement(memberId, workspaceId),
+  }),
+  registerFact(AgentV2Facts.Configured, {
+    requirement: ({ memberId }, workspaceId) => readAgentV2Requirement(memberId, workspaceId),
   }),
   // Turns reach those who may read their thread: what the agent is doing there, and how it ended.
   registerFact(TurnFacts.Created, {

@@ -395,6 +395,7 @@
         "@amends/connection-v2": "workspace:*",
         "@amends/environment": "workspace:*",
         "@amends/harness": "workspace:*",
+        "@amends/harness-v2": "workspace:*",
         "@amends/sandbox": "workspace:*",
         "effect": "catalog:",
       },
