@@ -60,6 +60,7 @@
       },
       "devDependencies": {
         "@amends/sandbox-local-v2": "workspace:*",
+        "@amends/toolkit": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",

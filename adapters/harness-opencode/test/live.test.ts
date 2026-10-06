@@ -1,4 +1,4 @@
-import { ModelCatalog } from "@amends/connection-v2";
+import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection-v2";
 import {
   type Bridge,
   GenerateResult,
@@ -8,6 +8,7 @@ import {
 } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
+import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
 import { Network, type Sandbox, type Template } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
@@ -38,6 +39,9 @@ import { freePort, makeSandbox } from "./fixtures.ts";
  * machine's home, under `~/.amends/opencode`, once for each version. Their model is the catalog's
  * free one of opencode's own provider, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names
  * another of the catalog's, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
+ * Hosts also set opencode up from a workspace's connections, to OpenRouter, whose free model it runs
+ * on with the key in `OPENROUTER_API_KEY`, as `bun --env-file=hosts/local/.env` gives it, to the
+ * agent, and to sandboxes.
  */
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
 const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "opencode/fledge-alpha-free";
@@ -522,5 +526,126 @@ describeHosts(
   "opencode as hosts run it on Daytona, through its bridge",
   enabled && process.env.AMENDS_TEST_DAYTONA === "1" && process.env.DAYTONA_API_KEY !== undefined,
   daytonaSandboxes,
+  300_000,
+);
+
+const openRouterKey = process.env.OPENROUTER_API_KEY;
+const openRouterModel = "nvidia/nemotron-3-super-120b-a12b:free";
+
+/** A connection as a workspace stores it. */
+const connectionTo = (
+  integration: string,
+  name: string,
+  auth: Connection.AuthMethod,
+): Connection.Connection => ({
+  id: Connection.ConnectionId.make(`${integration}-1`),
+  integration,
+  name,
+  settings: {},
+  auth,
+});
+
+const openRouter = connectionTo("openrouter", "OpenRouter", "apiKey");
+const agent = connectionTo("opencode-agent", "opencode", "none");
+
+/** A connection to sandboxes, its credential, and how opencode works in them. */
+interface SandboxConnection {
+  readonly connection: Connection.Connection;
+  readonly credential: Connection.Credential | undefined;
+  readonly sandboxes: Sandboxes;
+}
+
+/**
+ * What hosts do with opencode set up from connections, in a sandbox of `sandbox`'s, which is
+ * destroyed when the scope closes.
+ */
+const describeConnections = (
+  title: string,
+  enabled: boolean,
+  sandbox: SandboxConnection,
+  timeout: number,
+) =>
+  describe.skipIf(!enabled)(title, () => {
+    it.live(
+      "runs a turn on a model connection, in a sandbox of a sandbox connection",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const port = yield* sandbox.sandboxes.freePort;
+          const env = yield* sandbox.sandboxes.env;
+          const integrations = yield* Integrations.make([
+            ...(yield* ModelIntegrations.catalogProviders),
+            yield* LocalSandboxProvider.integration({
+              directory: yield* fs.makeTempDirectoryScoped(),
+            }),
+            yield* DaytonaSandboxProvider.integration,
+            yield* OpencodeAgent.integration({
+              port,
+              token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
+              config,
+              ...(env === undefined ? {} : { env }),
+            }),
+          ]);
+
+          const model = yield* (yield* integrations.find(openRouter.integration)).modelEndpoint(
+            openRouter,
+            { apiKey: Redacted.make(openRouterKey ?? "") },
+            { model: openRouterModel },
+          );
+          const harness = yield* (yield* integrations.find(agent.integration)).harness(
+            agent,
+            undefined,
+            { model },
+          );
+          const provider = yield* (yield* integrations.find(
+            sandbox.connection.integration,
+          )).sandboxProvider(sandbox.connection, sandbox.credential);
+          const created = yield* Effect.acquireRelease(
+            provider.create(
+              harness.template === undefined
+                ? { ports: harness.ports }
+                : { template: harness.template, ports: harness.ports },
+            ),
+            (made) => Effect.ignore(made.destroy),
+          );
+          const session = yield* harness.startSession({ sandbox: created, id });
+
+          const result = yield* session.generate({
+            prompt:
+              "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
+          });
+
+          expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
+            expect.objectContaining({ name: "bash", providerExecuted: true }),
+          );
+          expect(result.text).toContain("live-opencode");
+        }).pipe(Effect.provide(Layer.merge(HostLayer, FetchHttpClient.layer))),
+      timeout,
+    );
+  });
+
+describeConnections(
+  "opencode set up from connections, in this machine's sandboxes",
+  enabled && openRouterKey !== undefined,
+  {
+    connection: connectionTo("local", "This machine", "none"),
+    credential: undefined,
+    sandboxes: localSandboxes,
+  },
+  timeout,
+);
+
+// Daytona's sandboxes cost money, so opencode is set up there only with `AMENDS_TEST_DAYTONA=1` too.
+describeConnections(
+  "opencode set up from connections, in Daytona's sandboxes",
+  enabled &&
+    openRouterKey !== undefined &&
+    process.env.AMENDS_TEST_DAYTONA === "1" &&
+    process.env.DAYTONA_API_KEY !== undefined,
+  {
+    connection: connectionTo("daytona", "Our organization", "apiKey"),
+    credential: { apiKey: Redacted.make(process.env.DAYTONA_API_KEY ?? "") },
+    sandboxes: daytonaSandboxes,
+  },
   300_000,
 );

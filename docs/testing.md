@@ -216,6 +216,10 @@ version; the template's own live test installs them afresh in a temporary home d
 keeps opencode's configuration and data in temporary directories, apart from this machine's
 opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on
 Daytona, in sandboxes started from the snapshot of the template's version once Daytona has made it.
+With `OPENROUTER_API_KEY` too, from the `.env` as `bun --env-file=hosts/local/.env` gives it, hosts
+also set opencode up as they would from a workspace's connections, to OpenRouter, whose free model
+it runs on, to the agent, and to this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1`,
+Daytona's.
 
 The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
 `adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports, and
@@ -233,7 +237,9 @@ OpenAPI document. Their live tests reach real model providers and run only with
 `AMENDS_TEST_MODELS=1`: amends's agent runs turns on a free OpenRouter model, with
 `OPENROUTER_API_KEY` from the `.env` as `bun --env-file=hosts/local/.env` gives it, and checks of
 connections find the keys Anthropic, OpenAI, OpenRouter, and DeepSeek refuse, and OpenRouter's own.
-None of them costs anything.
+The agent is also set up as a host would set it up from a workspace's connections, to OpenRouter, to
+the agent, to an MCP server on this machine whose tool a turn calls, and to this machine's
+sandboxes, in one of which a turn runs a command. None of them costs anything.
 
 ## Storage conformance
 

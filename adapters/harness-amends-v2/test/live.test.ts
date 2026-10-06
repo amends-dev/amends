@@ -1,9 +1,18 @@
-import { ModelCatalog } from "@amends/connection-v2";
+import {
+  Connection,
+  Integrations,
+  ModelCatalog,
+  ModelIntegrations,
+  ToolIntegrations,
+} from "@amends/connection-v2";
 import { Agent, Harness, type ModelEndpoint } from "@amends/harness-v2";
+import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
+import { Assembly } from "@amends/toolkit";
+import { BunHttpServer, BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer, Redacted, Schema } from "effect";
-import { AiError, LanguageModel, Tool, Toolkit } from "effect/ai";
-import { FetchHttpClient } from "effect/http";
+import { Effect, FileSystem, Layer, Logger, Path, Redacted, Schema } from "effect";
+import { AiError, LanguageModel, McpProtocol, McpServer, Tool, Toolkit } from "effect/ai";
+import { FetchHttpClient, HttpRouter } from "effect/http";
 import * as AmendsAgent from "../src/AmendsAgent.ts";
 import * as Models from "../src/Models.ts";
 
@@ -12,7 +21,9 @@ import * as Models from "../src/Models.ts";
  * turn runs on one of OpenRouter's free models, which costs nothing, with the key in
  * `OPENROUTER_API_KEY`, as `bun --env-file=hosts/local/.env` gives it; `AMENDS_TEST_MODELS_MODEL`
  * names another of OpenRouter's models. Anthropic and OpenAI are reached with a key they refuse,
- * which shows that a request found their API, without spending anything.
+ * which shows that a request found their API, without spending anything. The agent is also set up as
+ * a host sets it up from a workspace's connections: to OpenRouter, to the agent, to an MCP server on
+ * this machine, and to this machine's sandboxes.
  */
 const enabled = process.env.AMENDS_TEST_MODELS === "1";
 const openRouterKey = process.env.OPENROUTER_API_KEY ?? "";
@@ -123,6 +134,146 @@ describe.skipIf(!enabled)("a model reached from the catalog", () => {
         expect(yield* refusesKey(anthropic)).toBe(true);
         expect(yield* refusesKey(openai)).toBe(true);
       }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+});
+
+const ConnectionsLayer = Layer.mergeAll(
+  BunServices.layer,
+  Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer)),
+  ModelCatalog.layer,
+);
+
+const id = Agent.SessionId.make("live");
+
+/** A connection as a workspace stores it. */
+const connectionTo = (
+  integration: string,
+  name: string,
+  auth: Connection.AuthMethod,
+  settings: Connection.Connection["settings"] = {},
+): Connection.Connection => ({
+  id: Connection.ConnectionId.make(`${integration}-1`),
+  integration,
+  name,
+  settings,
+  auth,
+});
+
+const openRouter = connectionTo("openrouter", "OpenRouter", "apiKey");
+const agent = connectionTo("amends", "amends", "none");
+const thisMachine = connectionTo("local", "This machine", "none");
+
+/** The integrations a host installs, with a directory for the local sandboxes until the scope closes. */
+const installIntegrations = Effect.gen(function* () {
+  const fs = yield* FileSystem.FileSystem;
+  return yield* Integrations.make([
+    ...(yield* ModelIntegrations.catalogProviders),
+    yield* ToolIntegrations.mcp,
+    yield* LocalSandboxProvider.integration({ directory: yield* fs.makeTempDirectoryScoped() }),
+    yield* AmendsAgent.integration(),
+  ]);
+});
+
+/** The harness of amends's agent on OpenRouter's free model, as a host makes it of connections. */
+const makeHarness = (integrations: Integrations.Integrations["Service"]) =>
+  Effect.gen(function* () {
+    const model = yield* (yield* integrations.find(openRouter.integration)).modelEndpoint(
+      openRouter,
+      { apiKey: Redacted.make(openRouterKey) },
+      { model: openRouterModel },
+    );
+    return yield* (yield* integrations.find(agent.integration)).harness(agent, undefined, {
+      model,
+    });
+  });
+
+/** An MCP server on this machine that gives `look_up_codeword`, at the URL it returns. */
+const serveCodewords = Effect.gen(function* () {
+  const app = yield* HttpRouter.toHttpEffect(
+    McpServer.toolkit(Codewords).pipe(
+      Layer.provide(Codewords.toLayer({ look_up_codeword: () => Effect.succeed("TIDEPOOL-42") })),
+      Layer.provide(
+        McpServer.layerHttp({
+          name: "codewords",
+          version: "1.0.0",
+          path: "/mcp",
+          protocols: [McpProtocol.v2025_11_25],
+        }),
+      ),
+      Layer.provide(Logger.layer([])),
+    ),
+  );
+  const server = yield* BunHttpServer.make({ hostname: "127.0.0.1", port: 0 });
+  yield* server.serve(app);
+  if (server.address._tag === "UnixPathAddress") {
+    return yield* Effect.die("The MCP server listens on no port");
+  }
+  return `http://127.0.0.1:${server.address.port}/mcp`;
+});
+
+describe.skipIf(!enabled)("amends's agent set up from connections", () => {
+  it.live(
+    "answers a turn on a model connection, calling a tool of an MCP connection",
+    () =>
+      Effect.gen(function* () {
+        const integrations = yield* installIntegrations;
+        const codewords = connectionTo("mcp", "codewords", "none", { url: yield* serveCodewords });
+        const harness = yield* makeHarness(integrations);
+        const source = yield* (yield* integrations.find(codewords.integration)).toolSource(
+          codewords,
+          undefined,
+        );
+        const toolkit = yield* Assembly.toolkit(
+          [{ source, definitions: yield* source.discover }],
+          () => "allow",
+        );
+        const session = yield* harness.startSession({ id });
+
+        const result = yield* session.generate({
+          prompt:
+            "Use the codewords__look_up_codeword tool for the topic `harbor`, then tell me the codeword.",
+          toolkit,
+        });
+
+        expect(result.toolCalls.map((call) => call.name)).toContain("codewords__look_up_codeword");
+        expect(result.text).toContain("TIDEPOOL-42");
+      }).pipe(Effect.provide(ConnectionsLayer)),
+    timeout,
+  );
+
+  it.live(
+    "works in a sandbox of a sandbox connection, running a command there",
+    () =>
+      Effect.gen(function* () {
+        const path = yield* Path.Path;
+        const integrations = yield* installIntegrations;
+        const harness = yield* makeHarness(integrations);
+        const provider = yield* (yield* integrations.find(thisMachine.integration)).sandboxProvider(
+          thisMachine,
+          undefined,
+        );
+        const sandbox = yield* Effect.acquireRelease(
+          provider.create(
+            harness.template === undefined
+              ? { ports: harness.ports }
+              : { template: harness.template, ports: harness.ports },
+          ),
+          (created) => Effect.ignore(created.destroy),
+        );
+        const session = yield* harness.startSession({ sandbox, id });
+
+        const result = yield* session.generate({
+          prompt: "Run `echo amends-live > proof.txt` with your bash tool, then reply with: done",
+        });
+
+        expect(result.toolCalls.map((call) => call.name)).toContain("bash");
+        expect(
+          yield* sandbox.fileSystem.readFileString(
+            path.join(sandbox.workingDirectory, id, "proof.txt"),
+          ),
+        ).toBe("amends-live\n");
+      }).pipe(Effect.provide(ConnectionsLayer)),
     timeout,
   );
 });

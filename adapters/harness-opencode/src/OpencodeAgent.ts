@@ -60,7 +60,8 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options)
 /**
  * The integration of opencode, for a host to install with what the agent takes besides its models.
  * It bundles the bridge program once, when it is made. A connection to it gives no settings and no
- * credential, and reaches nothing, so it is always healthy.
+ * credential, and reaches nothing, so it is always healthy. Its id is `opencode-agent`, as
+ * `opencode` is the id of OpenCode Zen, a provider of models in the catalog.
  */
 export const integration = Effect.fn("OpencodeAgent.integration")(function* (
   options: Omit<Options, keyof Agent.Options>,
@@ -68,7 +69,7 @@ export const integration = Effect.fn("OpencodeAgent.integration")(function* (
   const installation = yield* Template.make();
   const context = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
   return Integration.make({
-    id: "opencode",
+    id: "opencode-agent",
     name: "opencode",
     docs: "https://opencode.ai/docs",
     settings: Schema.Struct({}),

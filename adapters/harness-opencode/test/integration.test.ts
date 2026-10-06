@@ -1,16 +1,17 @@
-import { Connection } from "@amends/connection-v2";
+import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection-v2";
 import type { ModelEndpoint } from "@amends/harness-v2";
 import { Network } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Effect, Layer, Redacted } from "effect";
+import { FetchHttpClient } from "effect/http";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 
 const port = Network.Port.make(4096);
 
 const connection: Connection.Connection = {
   id: Connection.ConnectionId.make("conn-1"),
-  integration: "opencode",
+  integration: "opencode-agent",
   name: "opencode",
   settings: {},
   auth: "none",
@@ -62,7 +63,7 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
           }),
         );
 
-        expect(error.integration).toBe("opencode");
+        expect(error.integration).toBe("opencode-agent");
         expect(error.reason).toBeInstanceOf(Connection.UnsupportedError);
         expect(error.reason).toMatchObject({
           _tag: "UnsupportedError",
@@ -70,6 +71,20 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
             "opencode presents one key for each provider, and the endpoints for anthropic have different keys",
         });
       }),
+    );
+
+    it.effect(
+      "is installed beside the catalog's providers of models, whose ids it does not take",
+      () =>
+        Effect.gen(function* () {
+          const integrations = yield* Integrations.make([
+            ...(yield* ModelIntegrations.catalogProviders),
+            yield* makeIntegration,
+          ]);
+
+          expect((yield* integrations.find("opencode-agent")).provides).toEqual(["harnesses"]);
+          expect((yield* integrations.find("opencode")).provides).toEqual(["models"]);
+        }).pipe(Effect.provide(Layer.merge(ModelCatalog.layer, FetchHttpClient.layer))),
     );
   },
 );

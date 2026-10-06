@@ -32,7 +32,8 @@ agent takes besides its models: the `port`, the `token` function, and opencode's
 It bundles the bridge once, when it is made, and needs what `make` does. A connection to it gives no
 settings and no credential, and is always healthy, as it reaches nothing; its harness runs on the
 endpoints it is given, which connections to model providers give, and refuses endpoints that
-opencode cannot serve together with `UnsupportedError`.
+opencode cannot serve together with `UnsupportedError`. Its id is `opencode-agent`, as `opencode` is
+the id of OpenCode Zen, a provider of models in the catalog.
 
 ## In the sandbox
 
@@ -97,6 +98,7 @@ gone, refusing a wrong token, and continuing on another host. `test/template.tes
 with its commands answered as a sandbox would answer them. `test/live.test.ts`, and the template's
 live test, which installs Bun and opencode in a temporary home, run only with
 `AMENDS_TEST_OPENCODE=1`; one of them has real opencode send turns on endpoints of each protocol
-to a fake of their APIs on a local port. The hosts' tests run on Daytona too with
+to a fake of their APIs on a local port, and with `OPENROUTER_API_KEY` too, hosts set opencode up
+from connections to OpenRouter, the agent, and sandboxes. The hosts' tests run on Daytona too with
 `AMENDS_TEST_DAYTONA=1`;
 [Testing](../../docs/testing.md) says what they run.
