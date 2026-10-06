@@ -13,7 +13,9 @@
     "update-models": "bun run scripts/update-models.ts"
   },
   "dependencies": {
-    "@amends/harness-v2": "workspace:*"
+    "@amends/harness-v2": "workspace:*",
+    "@amends/sandbox-v2": "workspace:*",
+    "@amends/toolkit": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

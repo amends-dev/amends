@@ -225,6 +225,14 @@ policies Daytona enforces, create real sandboxes and cost money, so they run onl
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
 `.env`; they take about a minute.
 
+`packages/connection-v2` and `adapters/harness-amends-v2` run everywhere against fakes: a client
+that answers as each model API does, an MCP server in the test's process, and an HTTP API with an
+OpenAPI document. Their live tests reach real model providers and run only with
+`AMENDS_TEST_MODELS=1`: amends's agent runs turns on a free OpenRouter model, with
+`OPENROUTER_API_KEY` from the `.env` as `bun --env-file=hosts/local/.env` gives it, and checks of
+connections find the keys Anthropic, OpenAI, OpenRouter, and DeepSeek refuse, and OpenRouter's own.
+None of them costs anything.
+
 ## Storage conformance
 
 The [conformance suites](../packages/storage-conformance/README.md) specify storage

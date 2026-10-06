@@ -364,6 +364,8 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/harness-v2": "workspace:*",
+        "@amends/sandbox-v2": "workspace:*",
+        "@amends/toolkit": "workspace:*",
       },
       "devDependencies": {
         "@effect/vitest": "catalog:",
