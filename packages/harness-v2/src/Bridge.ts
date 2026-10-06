@@ -11,8 +11,9 @@
  * not finish, as one it ran when it died, it continues when a host starts it again, by prompting
  * the agent with `Continue.` in the conversation that holds the turn, as AI SDK's harness does.
  *
- * An agent's adapter implements `Bridge.Agent` to run behind a bridge, `BridgeServer.serve` serves
- * it in the sandbox, and `BridgeClient.make` is the `Agent.Agent` hosts use to reach it.
+ * An agent's adapter implements `Bridge.Driver`, which drives the agent behind a bridge, and
+ * `BridgeServer.serve` serves the driver in the sandbox. The adapter's `Agent.Agent`, which hosts
+ * run, reaches it with `BridgeClient.startSession`.
  * `Rpcs` is the protocol between them, over a WebSocket whose host presents the token as
  * `Authorization: Bearer <token>` when it connects. A host replaces a bridge that speaks an older
  * version of it with its own, and refuses one that speaks a newer.
@@ -21,7 +22,7 @@ import { Network, Sandbox } from "@amends/sandbox-v2";
 import { type Effect, Schema, type Scope, type Stream } from "effect";
 import { Prompt } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
-import { type AgentSession as HostAgentSession, SessionId } from "./Agent.ts";
+import { type AgentSession, SessionId } from "./Agent.ts";
 import { HarnessError } from "./HarnessError.ts";
 import { StreamPart } from "./StreamPart.ts";
 
@@ -75,10 +76,10 @@ export interface StartOptions {
 }
 
 /**
- * A session of an agent behind a bridge. The bridge runs one turn of it at a time, keeps its
- * turns' parts, and ends it by closing its scope.
+ * A session a driver started. The bridge runs one turn of it at a time, keeps its turns' parts,
+ * and ends it by closing its scope.
  */
-export interface AgentSession {
+export interface DriverSession {
   /**
    * Whether the session started in the conversation the agent kept for it, which `agentState`
    * names, rather than from `history`, as it does when it lost that conversation or had none. The
@@ -89,11 +90,11 @@ export interface AgentSession {
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
   readonly prompt: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
-  readonly submitToolResult: HostAgentSession["submitToolResult"];
+  readonly submitToolResult: AgentSession["submitToolResult"];
 
-  readonly approve: HostAgentSession["approve"];
+  readonly approve: AgentSession["approve"];
 
-  readonly compact: HostAgentSession["compact"];
+  readonly compact: AgentSession["compact"];
 
   /** What `start` takes as `agentState` to start the session again, as a restarted bridge does. */
   readonly state: Effect.Effect<Schema.Json, HarnessError>;
@@ -102,15 +103,22 @@ export interface AgentSession {
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
 
-export interface Agent {
-  /** Names the agent, such as `opencode`, as its `Agent.Agent` for hosts does. */
+/**
+ * What an adapter implements to run its agent behind a bridge: it drives the agent in the sandbox,
+ * starting its sessions and running their turns, while the bridge keeps the turns, so that a
+ * driver needs neither to suspend nor to continue one.
+ */
+export interface Driver {
+  /** Names the agent it drives, such as `opencode`, as the agent's `Agent.Agent` for hosts does. */
   readonly id: string;
 
   /**
    * Starts a session: a new one, or one started again from its `state`. The session runs until its
    * scope closes, when a host stops or destroys it, or the bridge exits.
    */
-  readonly start: (options: StartOptions) => Effect.Effect<AgentSession, HarnessError, Scope.Scope>;
+  readonly start: (
+    options: StartOptions,
+  ) => Effect.Effect<DriverSession, HarnessError, Scope.Scope>;
 }
 
 /**

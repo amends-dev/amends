@@ -18,7 +18,7 @@ import { type Agent, BridgeClient, Harness, HarnessError } from "@amends/harness
 import type { Network, Sandbox } from "@amends/sandbox-v2";
 import { type Crypto, Effect, type Redacted, Schema } from "effect";
 import type { Socket } from "effect/socket";
-import type { Options as AgentOptions } from "./bridge/Agent.ts";
+import type { Options as DriverOptions } from "./bridge/Driver.ts";
 import * as Models from "./Models.ts";
 import * as Template from "./Template.ts";
 
@@ -90,9 +90,18 @@ export const integration = Effect.fn("OpencodeAgent.integration")(function* (
 const modelsOf = (options: Agent.Options) =>
   Models.fromEndpoints({ model: options.model, models: options.models ?? {} });
 
-/** The agent, installed in its sandboxes as `installation` says, running on `models`. */
-const agentOf = (installation: Template.Installation, models: Models.Models, options: Options) =>
-  BridgeClient.make({
+/**
+ * The agent, installed in its sandboxes as `installation` says, running on `models`. Each session
+ * reaches opencode through the bridge in its sandbox, with the `WebSocketConstructor` the agent is
+ * made with.
+ */
+const agentOf = Effect.fnUntraced(function* (
+  installation: Template.Installation,
+  models: Models.Models,
+  options: Options,
+) {
+  const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
+  const bridge: BridgeClient.Options = {
     id: "opencode",
     ...installation,
     port: options.port,
@@ -102,5 +111,15 @@ const agentOf = (installation: Template.Installation, models: Models.Models, opt
       models: models.models,
       config: { ...options.config, providers: models.providers },
       env: options.env ?? {},
-    } satisfies AgentOptions,
-  });
+    } satisfies DriverOptions,
+  };
+  const agent: Agent.Agent = {
+    id: "opencode",
+    requiresSandbox: true,
+    template: installation.template,
+    ports: [options.port],
+    start: (startOptions) =>
+      Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
+  };
+  return agent;
+});

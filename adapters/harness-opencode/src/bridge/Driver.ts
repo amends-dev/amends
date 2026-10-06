@@ -1,6 +1,6 @@
 /**
- * opencode as the bridge runs it in its sandbox. One opencode server, which the agent starts when
- * the first session starts, serves every session there, each an opencode session in the session's
+ * opencode's driver, which runs opencode for the bridge in its sandbox. One opencode server, which
+ * the driver starts when the first session starts, serves every session there, each an opencode session in the session's
  * directory. A turn is a prompt to it, whose parts `Turn` translates from the events opencode
  * records for the turn, as they happen. A session that starts with a conversation from another
  * agent has it written into opencode's record by `History`, tool calls included, before its first
@@ -60,7 +60,7 @@ export const Options = Schema.Struct({
 
 export interface Options extends Schema.Schema.Type<typeof Options> {}
 
-export interface Agent extends Bridge.Agent {
+export interface Driver extends Bridge.Driver {
   /**
    * Completes when opencode's server exits before the bridge stops it, for the bridge to exit with
    * it.
@@ -79,10 +79,10 @@ const State = Schema.Struct({
 const StateJson = Schema.toCodecJson(State);
 
 /**
- * The agent, which starts opencode's server with `options` when the first session starts. The
- * server runs in the scope the agent is made in.
+ * The driver, which starts opencode's server with `options` when the first session starts. The
+ * server runs in the scope the driver is made in.
  */
-export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required<Options>) {
+export const make = Effect.fn("OpencodeDriver.make")(function* (options: Required<Options>) {
   const services = yield* Effect.context<
     | ChildProcessSpawner.ChildProcessSpawner
     | HttpClient.HttpClient
@@ -90,7 +90,7 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required
     | FileSystem.FileSystem
     | Path.Path
   >();
-  const agentScope = yield* Effect.scope;
+  const driverScope = yield* Effect.scope;
   const serverExited = yield* Deferred.make<void>();
   const running = yield* Ref.make<Server.Server | undefined>(undefined);
   /** Held while the server starts, so that sessions starting together start one. */
@@ -102,7 +102,7 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required
     Effect.gen(function* () {
       const current = yield* Ref.get(running);
       if (current !== undefined) return current;
-      const serverScope = yield* Scope.fork(agentScope);
+      const serverScope = yield* Scope.fork(driverScope);
       const server = yield* Server.start({
         command: options.command,
         config: options.config,
@@ -120,16 +120,16 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required
     }),
   ).pipe(Effect.provide(services));
 
-  const agent: Agent = {
+  const driver: Driver = {
     id: "opencode",
     serverExited: Deferred.await(serverExited),
     start: (startOptions) =>
       Effect.flatMap(startedServer, (server) => startSession(server, options, startOptions)),
   };
-  return agent;
+  return driver;
 });
 
-const startSession = Effect.fn("OpencodeAgent.start")(function* (
+const startSession = Effect.fn("OpencodeDriver.start")(function* (
   server: Server.Server,
   options: Pick<Options, "model" | "models">,
   startOptions: Bridge.StartOptions,
@@ -225,7 +225,7 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
       }),
     );
 
-  const session: Bridge.AgentSession = {
+  const session: Bridge.DriverSession = {
     keptConversation: kept !== undefined,
 
     prompt: runTurn,

@@ -1,10 +1,17 @@
-import { BridgeClient, Harness } from "@amends/harness-v2";
+import { Harness } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
 import { type Network, Template } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Redacted, Schedule } from "effect";
-import { freePort, installStandIn, isRunning, makeSandbox, startsIn } from "./fixtures.ts";
+import {
+  freePort,
+  installStandIn,
+  isRunning,
+  makeBridgedAgent,
+  makeSandbox,
+  startsIn,
+} from "./fixtures.ts";
 
 /**
  * The bridge client launches opencode's bridge program, `main.ts`, in a sandbox on this machine, as
@@ -21,7 +28,7 @@ const makeHarness = (
   env: Readonly<Record<string, string>> = {},
 ) =>
   Effect.map(
-    BridgeClient.make({
+    makeBridgedAgent({
       id: "opencode",
       template: { name: Template.Name.make("opencode"), identity: "none", prepare: Effect.void },
       port,

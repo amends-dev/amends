@@ -19,7 +19,7 @@ import * as Bridge from "../src/Bridge.ts";
 import * as BridgeServer from "../src/BridgeServer.ts";
 import { HarnessError, UnavailableError } from "../src/HarnessError.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
-import { makeFakeBridgeAgent, makeMemoryFileSystem, reply } from "./fakes.ts";
+import { makeFakeDriver, makeMemoryFileSystem, reply } from "./fakes.ts";
 
 const session = SessionId.make("session-1");
 const firstTurn = Bridge.TurnId.make("turn-1");
@@ -37,18 +37,18 @@ const numbered = (parts: ReadonlyArray<StreamPart>, from = 1) =>
   parts.map((part, index) => ({ seq: from + index, part }));
 
 /**
- * Starts a bridge for `agent` that keeps its turns in `fileSystem` and runs until `scope` closes,
+ * Starts a bridge for `driver` that keeps its turns in `fileSystem` and runs until `scope` closes,
  * returning a host's client of it. `exit` is what the bridge does when a host asks it to exit.
  */
 const startBridge = (
-  agent: Bridge.Agent,
+  driver: Bridge.Driver,
   fileSystem: FileSystem.FileSystem,
   scope: Scope.Scope,
   exit: Effect.Effect<unknown> = Effect.void,
 ) =>
   Effect.gen(function* () {
     const handlers = yield* Layer.buildWithScope(
-      BridgeServer.layerHandlers(agent, { stateDirectory: "/state", exit }).pipe(
+      BridgeServer.layerHandlers(driver, { stateDirectory: "/state", exit }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(FileSystem.FileSystem, fileSystem), Path.layer)),
       ),
       scope,
@@ -56,15 +56,15 @@ const startBridge = (
     return yield* RpcTest.makeClient(Bridge.Rpcs).pipe(Effect.provideContext(handlers));
   });
 
-/** A bridge over a fake agent whose turns stream what the test offers to `parts`, until it ends. */
+/** A bridge over a fake driver whose turns stream what the test offers to `parts`, until it ends. */
 const setUp = Effect.gen(function* () {
   const parts = yield* Queue.unbounded<StreamPart, HarnessError | Cause.Done>();
-  const fake = yield* makeFakeBridgeAgent(() => Stream.fromQueue(parts));
+  const fake = yield* makeFakeDriver(() => Stream.fromQueue(parts));
   const { fileSystem, files } = yield* makeMemoryFileSystem;
   const bridgeScope = yield* Scope.make();
   const exitAsked = yield* Deferred.make<void>();
   const client = yield* startBridge(
-    fake.agent,
+    fake.driver,
     fileSystem,
     bridgeScope,
     Deferred.succeed(exitAsked, undefined),
@@ -207,7 +207,7 @@ describe("BridgeServer", () => {
         yield* Scope.close(bridgeScope, Exit.void);
         expect(fake.ended).toEqual([session]);
 
-        const restarted = yield* startBridge(fake.agent, fileSystem, yield* Scope.make());
+        const restarted = yield* startBridge(fake.driver, fileSystem, yield* Scope.make());
         const { hasUnfinishedTurn } = yield* restarted.StartSession({
           ...startOptions,
           agentState,
@@ -243,7 +243,7 @@ describe("BridgeServer", () => {
         const file = `/state/${session}/${firstTurn}.jsonl`;
         files.set(file, (files.get(file) ?? "").replace(/[^\n]*\n$/, ""));
 
-        const restarted = yield* startBridge(fake.agent, fileSystem, yield* Scope.make());
+        const restarted = yield* startBridge(fake.driver, fileSystem, yield* Scope.make());
         const { hasUnfinishedTurn } = yield* restarted.StartSession({
           ...startOptions,
           agentState,
@@ -274,7 +274,7 @@ describe("BridgeServer", () => {
         .pipe(Stream.take(1), Stream.runDrain);
       yield* Scope.close(bridgeScope, Exit.void);
 
-      const restarted = yield* startBridge(fake.agent, fileSystem, yield* Scope.make());
+      const restarted = yield* startBridge(fake.driver, fileSystem, yield* Scope.make());
       const { hasUnfinishedTurn } = yield* restarted.StartSession({
         ...startOptions,
         unfinishedTurn: firstTurn,

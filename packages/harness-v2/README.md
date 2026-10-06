@@ -76,9 +76,10 @@ bridge that speaks an older version to `Exit`, aborting its turns, and launches 
 place; it refuses a bridge that speaks a newer one. Every version keeps `Hello` and `Exit` as they
 are.
 
-- `Bridge.Agent` is what an adapter implements to run behind a bridge. It starts sessions and runs
-  their turns, but needs neither to suspend nor to continue one: the bridge keeps the turns.
-- `BridgeServer.serve` serves an agent over the HTTP server a bridge program provides, until a host
+- `Bridge.Driver` is what an adapter implements to drive its agent behind a bridge. It starts the
+  agent's sessions and runs their turns, but needs neither to suspend nor to continue one: the
+  bridge keeps the turns.
+- `BridgeServer.serve` serves a driver over the HTTP server a bridge program provides, until a host
   asks the bridge to exit, with the token and state directory from the `Bridge.LaunchOptions` that
   `BridgeServer.readLaunchOptions` reads from standard input. Each turn's parts go to a file in the state directory as well as to
   memory, and a session keeps only its latest turn. A bridge started again serves a turn that had
@@ -86,8 +87,10 @@ are.
   it continues when a host starts it again: the turn keeps the steps it finished, and the bridge
   prompts the agent with `Continue.`, as AI SDK's harness does, if the agent kept the conversation
   that holds the turn. Otherwise the host runs the turn again from its prompt.
-- `BridgeClient.make` is the `Agent.Agent` hosts run. A session connects to the bridge at the
-  sandbox's endpoint for the port, and launches it with the adapter's command when none answers,
+- `BridgeClient.startSession` starts the sessions of the adapter's `Agent.Agent`, which hosts run:
+  the agent requires a sandbox, lists the bridge's port among its `ports`, and calls it from
+  `start`, with what `BridgeClient.Options` says of its bridge. A session connects to the bridge at
+  the sandbox's endpoint for the port, and launches it with the adapter's command when none answers,
   giving it the launch options on standard input. It runs the template first, which installs only
   what the sandbox lacks, so that a sandbox prepared with another version of it launches this one. The token comes from the host's `token`
   function, derived from the sandbox's id with a secret every host shares, so that any host
@@ -102,7 +105,8 @@ are.
   whose bridge cannot answer, as when its sandbox is gone, lets go with the state it last gave.
 
 opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
-program, a template that installs it, and a `make` over `BridgeClient`.
+program, a template that installs it, and an agent whose sessions `BridgeClient.startSession`
+starts.
 
 ## Host tools through a relay
 
@@ -146,7 +150,7 @@ not close idle connections: Bun's does after ten seconds, unless it is made with
 
 `test/harness.test.ts` and `test/session.test.ts` run sessions over fake agents from
 `test/fakes.ts`, and `test/bridge-server.test.ts` runs the bridge's handlers without a transport,
-over a fake `Bridge.Agent` and a file system in memory. `test/relay.test.ts` runs the relay without
+over a fake `Bridge.Driver` and a file system in memory. `test/relay.test.ts` runs the relay without
 a transport, with the test clock for its progress and its time limit; its HTTP server is tested in
 the opencode adapter. The bridge over a real WebSocket, launched
 in a local sandbox, is tested in the opencode adapter. Run them with `bun run test packages/harness-v2`.

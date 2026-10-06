@@ -1,7 +1,9 @@
+import { type Agent, BridgeClient } from "@amends/harness-v2";
 import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
 import { Network, type Template } from "@amends/sandbox-v2";
 import { BunHttpServer } from "@effect/platform-bun";
-import { Effect, FileSystem, Path, Schema } from "effect";
+import { type Crypto, Effect, FileSystem, Path, Schema } from "effect";
+import type { Socket } from "effect/socket";
 import { SessionEvent } from "../src/bridge/SessionEvent.ts";
 
 /**
@@ -20,6 +22,23 @@ export const makeSandbox = (port: Network.Port, template?: Template.Template) =>
     yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
     return sandbox;
   });
+
+/**
+ * An agent reached through the bridge that `bridge` describes, as opencode's agent reaches its own,
+ * for tests that launch a bridge program of their choosing.
+ */
+export const makeBridgedAgent = (bridge: BridgeClient.Options) =>
+  Effect.map(
+    Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>(),
+    (services): Agent.Agent => ({
+      id: bridge.id,
+      requiresSandbox: true,
+      template: bridge.template,
+      ports: [bridge.port],
+      start: (startOptions) =>
+        Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
+    }),
+  );
 
 /**
  * The stand-in for `opencode serve` in `fake-opencode-server.js`, installed as a command that runs

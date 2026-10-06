@@ -197,13 +197,12 @@ const textOf = (message: Prompt.UserMessage) =>
   message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
 
 /**
- * An agent behind a bridge whose turns stream what `script` gives for the prompt's text, recording
- * what the bridge asks of it. A session's state names it and how many sessions the agent started,
- * so tests can tell which start a state came from, and a session started from a state keeps its
- * conversation.
+ * A driver whose turns stream what `script` gives for the prompt's text, recording what the bridge
+ * asks of it. A session's state names it and how many sessions the driver started, so tests can
+ * tell which start a state came from, and a session started from a state keeps its conversation.
  */
-export interface FakeBridgeAgent {
-  readonly agent: Bridge.Agent;
+export interface FakeDriver {
+  readonly driver: Bridge.Driver;
 
   /** What each `start` was given, in order. */
   readonly starts: ReadonlyArray<Bridge.StartOptions>;
@@ -224,7 +223,7 @@ export interface FakeBridgeAgent {
   readonly destroyed: ReadonlyArray<SessionId>;
 }
 
-export const makeFakeBridgeAgent = (
+export const makeFakeDriver = (
   script: (prompt: string) => Stream.Stream<StreamPart, HarnessError>,
 ) =>
   Effect.sync(() => {
@@ -235,14 +234,14 @@ export const makeFakeBridgeAgent = (
     const ended: Array<SessionId> = [];
     const destroyed: Array<SessionId> = [];
 
-    const agent: Bridge.Agent = {
+    const driver: Bridge.Driver = {
       id: "fake",
       start: (options) =>
         Effect.gen(function* () {
           starts.push(options);
           yield* Effect.addFinalizer(() => Effect.sync(() => ended.push(options.id)));
           const startNumber = starts.length;
-          const session: Bridge.AgentSession = {
+          const session: Bridge.DriverSession = {
             keptConversation: options.agentState !== undefined,
             prompt: (turn) =>
               Stream.suspend(() => {
@@ -271,7 +270,7 @@ export const makeFakeBridgeAgent = (
         }),
     };
 
-    const fake: FakeBridgeAgent = { agent, starts, turns, turnEnds, submitted, ended, destroyed };
+    const fake: FakeDriver = { driver, starts, turns, turnEnds, submitted, ended, destroyed };
     return fake;
   });
 

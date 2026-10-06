@@ -1,4 +1,4 @@
-import { Bridge, BridgeClient, Harness, type StreamPart } from "@amends/harness-v2";
+import { Bridge, Harness, type StreamPart } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
 import { type Network, type Sandbox, Template } from "@amends/sandbox-v2";
 import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
@@ -19,7 +19,7 @@ import {
 import { HttpRouter } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
-import { freePort, isRunning, makeProxy, makeSandbox } from "./fixtures.ts";
+import { freePort, isRunning, makeBridgedAgent, makeProxy, makeSandbox } from "./fixtures.ts";
 
 /**
  * The bridge client launches `fake-bridge.ts`, a bridge over a stand-in agent, in a sandbox on this
@@ -69,7 +69,7 @@ const makeHarness = (
   { secret = "the hosts' secret", version = "1" }: { secret?: string; version?: string } = {},
 ) =>
   Effect.map(
-    BridgeClient.make({
+    makeBridgedAgent({
       id: "fake",
       template: templateOf(version),
       port,

@@ -51,7 +51,7 @@ A session launches the bridge, when none answers, with `sh -c 'exec "$HOME/…/b
 giving it its launch options on standard input. It runs the template first, so that a sandbox a
 host of another version prepared gets this version's bridge program, and Bun and opencode if their
 versions changed. `src/bridge/main.ts` is the program: it makes
-the agent in `src/bridge/Agent.ts` from the agent options and serves it on the port with
+the driver in `src/bridge/Driver.ts` from the agent options and serves it on the port with
 `BunBridge.serve`. Bun's server never finishes stopping once a WebSocket has been open, so
 `BunBridge` runs it in a scope of its own, which it gives a second to close.
 
@@ -88,11 +88,11 @@ opencode, and destroying a session deletes it there.
 `test/turn.test.ts` and `test/history.test.ts` translate events without a server, and
 `test/models.test.ts` checks the configuration `Models` makes of endpoints, and
 `test/integration.test.ts` the harnesses the integration gives.
-`test/agent.test.ts` runs the agent against a fake of opencode's server from `test/fakes.ts`.
+`test/driver.test.ts` runs the driver against a fake of opencode's server from `test/fakes.ts`.
 `test/server.test.ts` and `test/main.test.ts` start real processes: the server, and the bridge
 program launched by `BridgeClient`, with `test/fake-opencode-server.js` standing in for
 `opencode serve`. `test/bridge.test.ts` has `BridgeClient` launch `test/fake-bridge.ts`, a bridge
-over a stand-in agent, in a local sandbox, and reach it over a WebSocket: launching, reconnecting,
+over a stand-in driver, in a local sandbox, and reach it over a WebSocket: launching, reconnecting,
 launching it again after it dies, continuing a turn it lost then, letting go when the sandbox is
 gone, refusing a wrong token, and continuing on another host. `test/template.test.ts` runs the template
 with its commands answered as a sandbox would answer them. `test/live.test.ts`, and the template's

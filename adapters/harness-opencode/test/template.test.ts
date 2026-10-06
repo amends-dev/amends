@@ -1,4 +1,4 @@
-import { BridgeClient, Harness } from "@amends/harness-v2";
+import { Harness } from "@amends/harness-v2";
 import { SessionId } from "@amends/harness-v2/Agent";
 import { Sandbox } from "@amends/sandbox-v2";
 import { BunServices, BunSocket } from "@effect/platform-bun";
@@ -7,7 +7,7 @@ import { Effect, FileSystem, Layer, Path, Redacted } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as Template from "../src/Template.ts";
 import { makeScriptedCommands } from "./fakes.ts";
-import { freePort, makeSandbox } from "./fixtures.ts";
+import { freePort, makeBridgedAgent, makeSandbox } from "./fixtures.ts";
 
 /**
  * `make` bundles the bridge program with the Bun running the tests. The template it gives runs on
@@ -208,7 +208,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
           "opencode",
         ]);
         const harness = Harness.make(
-          yield* BridgeClient.make({
+          yield* makeBridgedAgent({
             id: "opencode",
             template: installation.template,
             port,
