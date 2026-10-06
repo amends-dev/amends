@@ -189,7 +189,7 @@ describe("Integration.make", () => {
       yield* everything.toolSource(connection(), { apiKey: key });
       const health = yield* everything.check(connection(), { apiKey: key });
 
-      expect(harness.agent).toBe("everything");
+      expect(harness.agent.id).toBe("everything");
       expect(madeWith).toEqual([{ model: chatEndpoint }]);
       expect(endpoint).toMatchObject({ model: "m", url: "https://eu.everything.example/v1" });
       expect(endpoint.apiKey).toBe(key);

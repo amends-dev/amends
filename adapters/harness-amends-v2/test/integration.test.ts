@@ -51,7 +51,7 @@ layer(BunServices.layer)("AmendsAgent.integration", (it) => {
       const second = yield* session.generate({ prompt: "hi", model: "quick" });
 
       expect(integration.provides).toEqual(["harnesses"]);
-      expect(harness.agent).toBe("amends");
+      expect(harness.agent.id).toBe("amends");
       expect([first.text, second.text]).toEqual(["by default", "fast"]);
       expect(yield* integration.check(connection, undefined)).toEqual({ status: "healthy" });
     }),

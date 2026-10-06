@@ -294,7 +294,7 @@ describe("Harness", () => {
       const refused = yield* Effect.flip(harness.startSession({ sandbox, id }));
       yield* harness.startSession({ sandbox: Sandbox.of({ ...sandbox, ports: [port] }), id });
 
-      expect(harness.ports).toEqual([port]);
+      expect(harness.agent.ports).toEqual([port]);
       expect(refused.reason._tag).toBe("UnsupportedError");
       expect(refused.message).toBe(
         "opencode: opencode listens on ports 4096, which the sandbox was not created with",
@@ -310,8 +310,8 @@ describe("Harness", () => {
       });
       const unlimited = yield* makeFakeAgent("codex", answersAs("codex"));
 
-      expect(Harness.make(limited.agent).maxToolNameLength).toBe(59);
-      expect(Harness.make(unlimited.agent).maxToolNameLength).toBeUndefined();
+      expect(Harness.make(limited.agent).agent.maxToolNameLength).toBe(59);
+      expect(Harness.make(unlimited.agent).agent.maxToolNameLength).toBeUndefined();
     }),
   );
 
@@ -321,7 +321,7 @@ describe("Harness", () => {
 
       const harness = yield* Effect.provide(Harness.Harness, Harness.layer(codex.agent));
 
-      expect(harness.agent).toBe("codex");
+      expect(harness.agent.id).toBe("codex");
     }),
   );
 });

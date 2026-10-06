@@ -43,11 +43,11 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
         });
 
         expect(integration.provides).toEqual(["harnesses"]);
-        expect(harness.agent).toBe("opencode");
-        expect(harness.requiresSandbox).toBe(true);
-        expect(harness.ports).toEqual([port]);
-        expect(harness.template?.name).toBe("opencode");
-        expect(another.template).toBe(harness.template);
+        expect(harness.agent.id).toBe("opencode");
+        expect(harness.agent.requiresSandbox).toBe(true);
+        expect(harness.agent.ports).toEqual([port]);
+        expect(harness.agent.template?.name).toBe("opencode");
+        expect(another.agent.template).toBe(harness.agent.template);
         expect(yield* integration.check(connection, undefined)).toEqual({ status: "healthy" });
       }),
     );

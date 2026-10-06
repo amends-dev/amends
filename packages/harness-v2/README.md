@@ -16,11 +16,13 @@ stream aborts the turn. `suspendTurn`, `detach`, and `stop` return the agent's o
 which `startSession` takes back.
 
 `Harness.make` turns an agent into the `Harness` service, as `LanguageModel.make` turns a provider
-into a language model, and `Harness.layer` provides it. `startSession` starts a session: a new one,
-named by its `id`, or one that goes on from what it last saved, given as `resumeFrom`, on this agent
-or another. The caller creates the sandbox, from the harness's `template` and with its `ports`, and
-owns it: a harness never stops or destroys one. Each session works in its own directory there, named
-by its id, so that its files stay in place when it moves from one agent to another.
+into a language model, and `Harness.layer` provides it. Its `agent` is the agent it runs, as the
+adapter describes it, without `startSession`: only the harness starts the agent's sessions.
+`startSession` starts a session: a new one, named by its `id`, or one that goes on from what it last
+saved, given as `resumeFrom`, on this agent or another. The caller creates the sandbox, from the
+agent's `template` and with its `ports`, and owns it: a harness never stops or destroys one. Each
+session works in its own directory there, named by its id, so that its files stay in place when it
+moves from one agent to another.
 
 ## Models
 
