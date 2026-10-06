@@ -152,7 +152,7 @@ the name that source knows it by. Tools that would still have one name fail the 
 `NameClash`, which holds every clash. Building contacts none of the sources.
 
 An agent that adds to the tool names it is given has fewer than 64 characters to spare. The
-`maxNameLength` option, at least 16, cuts names to what the agent takes, as a harness's
+`maxNameLength` option, at least 16, cuts names to what the agent takes, as an agent's
 `maxToolNameLength` says: `Assembly.toolkit(members, decide, { maxNameLength })`.
 
 ## Search

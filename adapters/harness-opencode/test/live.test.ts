@@ -172,7 +172,7 @@ const makeLiveHosts = (sandboxes: Sandboxes) =>
     );
     const harness = yield* makeHarness;
     const nextHarness = yield* makeHarness;
-    const sandbox = yield* sandboxes.create(port, harness.template);
+    const sandbox = yield* sandboxes.create(port, harness.agent.template);
     return { sandbox, harness, nextHarness };
   });
 
@@ -607,9 +607,9 @@ const describeConnections = (
           )).sandboxProvider(sandbox.connection, sandbox.credential);
           const created = yield* Effect.acquireRelease(
             provider.create(
-              harness.template === undefined
-                ? { ports: harness.ports }
-                : { template: harness.template, ports: harness.ports },
+              harness.agent.template === undefined
+                ? { ports: harness.agent.ports }
+                : { template: harness.agent.template, ports: harness.agent.ports },
             ),
             (made) => Effect.ignore(made.destroy),
           );

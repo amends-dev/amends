@@ -25,7 +25,7 @@ models.dev does not list runs without tools.
 
 `make` bundles the bridge program with `Bun.build`, so the host runs on Bun, with the adapter's
 sources. It needs `Crypto` and a `Socket.WebSocketConstructor` that sends headers, as Bun's and
-Node's do. The caller creates each sandbox with the harness's `template` and `ports`.
+Node's do. The caller creates each sandbox with the `template` and `ports` of the harness's `agent`.
 
 `OpencodeAgent.integration` is the integration of opencode, for a host to install with what the
 agent takes besides its models: the `port`, the `token` function, and opencode's `config` and `env`.

@@ -3,12 +3,13 @@
  * ran before, so callers do not depend on which agent works for them. `make` builds one from an
  * agent's adapter, as `LanguageModel.make` builds a language model from a provider's.
  *
- * The caller creates the sandbox a session works in, from the harness's `template`, and owns it: a
- * harness never stops or destroys a sandbox. Each session works in its own directory there, named
- * by its id, so that its files stay in place when the session moves from one agent to another. A
- * session needs no sandbox when its agent does not require one, such as for a plain conversation.
+ * The caller creates the sandbox a session works in, from the `template` of the harness's `agent`,
+ * and owns it: a harness never stops or destroys a sandbox. Each session works in its own directory
+ * there, named by its id, so that its files stay in place when the session moves from one agent to
+ * another. A session needs no sandbox when its agent does not require one, such as for a plain
+ * conversation.
  */
-import { type Network, Sandbox, type Template } from "@amends/sandbox-v2";
+import { Sandbox } from "@amends/sandbox-v2";
 import { Context, Effect, FileSystem, Layer, Path } from "effect";
 import { Prompt } from "effect/ai";
 import type { Agent, SessionId, Workspace } from "./Agent.ts";
@@ -19,7 +20,7 @@ import type * as Session from "./Session.ts";
 /** What a session starts from: the `id` of a new session, or what an earlier one returned. */
 export type StartSessionOptions = {
   /**
-   * The sandbox the agent works in, created from the harness's `template`. Required when the agent
+   * The sandbox the agent works in, created from the agent's `template`. Required when the agent
    * `requiresSandbox`. A sandbox other than the one a resumed session last ran in has the
    * conversation but not the files the session made.
    */
@@ -40,26 +41,13 @@ export type StartSessionOptions = {
 export class Harness extends Context.Service<
   Harness,
   {
-    /** The agent the harness runs, such as `opencode`. */
-    readonly agent: string;
-
-    /** Installs the agent in a sandbox. Absent for an agent that runs in the host's process. */
-    readonly template?: Template.Template;
-
-    /** Whether every session needs a sandbox. Starting one without fails with `UnsupportedError`. */
-    readonly requiresSandbox: boolean;
-
     /**
-     * The ports the agent listens on in its sandbox, which the sandbox must be created with.
-     * Starting a session in a sandbox without them fails with `UnsupportedError`.
+     * The agent the harness runs, as its adapter describes it: its id, the sandbox it works in, and
+     * the names of tools it takes. Only the harness starts its sessions. Starting one fails with
+     * `UnsupportedError` without a sandbox when the agent `requiresSandbox`, or in a sandbox
+     * created without the agent's `ports`.
      */
-    readonly ports: ReadonlyArray<Network.Port>;
-
-    /**
-     * The longest name of a host tool the agent takes, when it takes fewer than the 64 characters
-     * that model APIs allow. A host names its tools to fit, with `Assembly.toolkit`'s `maxNameLength`.
-     */
-    readonly maxToolNameLength?: number;
+    readonly agent: Omit<Agent, "startSession">;
 
     /**
      * Starts a session: a new one, or one that goes on where `resumeFrom` left it. The agent that
@@ -104,11 +92,7 @@ export const make = (agent: Agent): Harness["Service"] => {
   );
 
   return Harness.of({
-    agent: agent.id,
-    template: agent.template,
-    requiresSandbox: agent.requiresSandbox,
-    ports: agent.ports ?? [],
-    maxToolNameLength: agent.maxToolNameLength,
+    agent,
 
     startSession: Effect.fn("Harness.startSession")(function* (options) {
       const { sandbox, resumeFrom } = options;

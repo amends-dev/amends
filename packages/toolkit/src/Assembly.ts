@@ -61,7 +61,7 @@ const shortestNameLength = 16;
 export interface Options {
   /**
    * The longest name a tool may have, for an agent that adds to the names it is given and so takes
-   * fewer than the model APIs' 64 characters, such as a harness's `maxToolNameLength`. At least 16.
+   * fewer than the model APIs' 64 characters, such as an agent's `maxToolNameLength`. At least 16.
    */
   readonly maxNameLength?: number;
 }

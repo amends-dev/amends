@@ -186,7 +186,8 @@ export interface Agent {
 
   /**
    * The longest name of a host tool the agent takes, for an agent that adds to the names it is given
-   * and so leaves a model API's 64 characters too few. A host names its tools to fit.
+   * and so leaves a model API's 64 characters too few. A host names its tools to fit, with
+   * `Assembly.toolkit`'s `maxNameLength`.
    */
   readonly maxToolNameLength?: number;
 
