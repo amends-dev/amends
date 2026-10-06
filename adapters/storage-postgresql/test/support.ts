@@ -19,6 +19,7 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
+import { Integrations } from "@amends/connection-v2";
 import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
 import { AgentJobs, TurnJobs } from "@amends/core/turn";
@@ -94,6 +95,7 @@ export const core = (bound: Bound) =>
         BunCrypto.layer,
         ConnectionCatalog.layer([]),
         EnvironmentCatalog.layer(),
+        Layer.effect(Integrations.Integrations, Integrations.make([])),
       ),
     ),
   );

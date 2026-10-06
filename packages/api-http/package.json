@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@amends/connection": "workspace:*",
+    "@amends/connection-v2": "workspace:*",
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",
     "@amends/harness": "workspace:*",

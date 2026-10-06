@@ -151,6 +151,7 @@
       "name": "@amends/storage-memory",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "effect": "catalog:",
@@ -165,6 +166,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/cluster": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@effect/sql-pg": "catalog:",
@@ -309,14 +311,20 @@
         "@amends/cluster": "workspace:*",
         "@amends/connection-anthropic": "workspace:*",
         "@amends/connection-openai-compatible": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness-acp": "workspace:*",
         "@amends/harness-amends": "workspace:*",
+        "@amends/harness-amends-v2": "workspace:*",
+        "@amends/harness-opencode": "workspace:*",
         "@amends/harness-server": "workspace:*",
         "@amends/sandbox-daytona": "workspace:*",
+        "@amends/sandbox-daytona-v2": "workspace:*",
         "@amends/sandbox-local": "workspace:*",
+        "@amends/sandbox-local-v2": "workspace:*",
+        "@amends/sandbox-v2": "workspace:*",
         "@amends/server-http": "workspace:*",
         "@amends/storage-postgresql": "workspace:*",
         "@effect/platform-bun": "catalog:",
@@ -333,6 +341,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/connection": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@amends/harness": "workspace:*",
@@ -383,6 +392,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/connection": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/environment": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -407,6 +417,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/connection": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -490,6 +501,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/connection": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",

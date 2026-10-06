@@ -224,7 +224,11 @@ carry a second line, a third for a reason, and a status at their end (`ready` wi
 `caution`), may be shown but disabled, can sit under a `heading`, and the list can end with an
 action, such as creating a missing account. `Combobox` takes free text with suggestions, shaped
 like a Select: typing narrows them, choosing one enters its value, and text matching none can be
-kept as entered, such as a model ID. `TextArea` is the Input's look for several lines. `Menu` wraps
+kept as entered, such as a model ID. `TextArea` is the Input's look for several lines.
+`FormFields` draws a form described as data, such as an integration's settings, into the form
+around it: text in an Input of its format's type, a number with its bounds, yes or no as two
+choices, and options in a Select that offers "Not set" for a field the form does not require. Each
+says what it refuses from the `FormIssue` its caller found: its shape, length, or size. `Menu` wraps
 Kobalte's dropdown menu for filters, sorting, and pickers; it attaches inside the nearest dialog
 or Theme so it keeps the mode. The mocks show menus closed only, so their surface follows the member dropdown.
 `MemberPicker` chooses several people by name: chosen people become removable chips and leave
@@ -337,6 +341,18 @@ they name the codes client returns (`ConnectionsError`) and own the wording, and
 toasts. `ConfigureConnection` and `ConnectionKey` take `returnTo` for creating a connection on
 the way to another form, such as a sandbox account while adding an environment. **Screens / Connections** walks adding a connection and its key, a host without key
 storage, an unavailable provider, a read-only member, search, and a stale rename.
+`ConnectionsV2Pane`, `ConnectionV2List`, and `ConnectionV2Pane` are Connections v2, built beside
+Connections over the integrations a host installs, with no mocks yet: the list has All, Models,
+Tools, Sandboxes, and Harnesses tabs, and a connection's page checks whether it works (Working, Key
+refused, Settings don’t work, or Couldn’t reach it), then holds its name, its integration's
+settings through `FormFields`, its key, which is only replaced, its details with the integration's
+documentation, and removal. A connection whose integration is gone lists its saved settings and
+offers only removal. `ChooseIntegration` searches the integrations by name, `ConfigureConnectionV2`
+takes the name, settings, way of authenticating, and key in one step, and `ReplaceKeyV2` and
+`ConfirmRemoveConnectionV2` are its other modals. The rail offers Connections v2 beside
+Connections while both exist. **Screens / Connections v2** walks adding and checking a connection,
+a refused key and a refused setup, a gone integration, a host without key storage, a read-only
+member, search, and a stale rename.
 `EnvironmentsPane` and `EnvironmentList` are Environments from the Lunacy "Environments" frames:
 All and Needs setup, and each environment's harness and sandbox, as columns when the pane has room
 and under the name when narrow or on phones, with a mark on the tile of one that cannot run; each

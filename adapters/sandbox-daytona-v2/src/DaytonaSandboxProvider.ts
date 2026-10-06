@@ -317,8 +317,14 @@ export const integration = Effect.map(Crypto.Crypto, (crypto) =>
     name: "Daytona",
     docs: "https://www.daytona.io/docs",
     settings: Schema.Struct({
-      apiUrl: Schema.optionalKey(Schema.NonEmptyString),
-      target: Schema.optionalKey(Schema.NonEmptyString),
+      apiUrl: Schema.optionalKey(Schema.NonEmptyString).annotate({
+        title: "API URL",
+        description: "Daytona's API, when it is not that of Daytona's own cloud.",
+      }),
+      target: Schema.optionalKey(Schema.NonEmptyString).annotate({
+        title: "Target",
+        description: "The region to create sandboxes in, rather than the organization's.",
+      }),
     }),
     auth: ["apiKey"],
     sandboxes: ({ settings, apiKey }) =>

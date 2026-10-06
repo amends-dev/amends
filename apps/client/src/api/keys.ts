@@ -12,6 +12,7 @@ export type WorkspaceResource =
   | "inbox"
   | "permissions"
   | "connections"
+  | "connections-v2"
   | "environments"
   | "agents"
   | "active-turns";
@@ -25,6 +26,7 @@ export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "inbox",
   "permissions",
   "connections",
+  "connections-v2",
   "environments",
   "agents",
   "active-turns",

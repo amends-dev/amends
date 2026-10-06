@@ -353,4 +353,36 @@ describe("the built-in integrations", () => {
       expect(installed.all.length).toBe(catalog.length + 3);
     }).pipe(Effect.provide(Layer.merge(ModelCatalog.layer, Layer.empty))),
   );
+
+  it.effect(
+    "ask for their settings by title, and for a provider's by the names its URLs give them",
+    () =>
+      Effect.gen(function* () {
+        const [catalog, ...others] = yield* Effect.all([
+          ModelIntegrations.catalogProviders,
+          ModelIntegrations.openAiCompatible,
+          ToolIntegrations.mcp,
+          ToolIntegrations.openApi,
+        ]).pipe(Effect.provideService(HttpClient.HttpClient, answering(200, [])));
+        const formOf = (id: string) =>
+          catalog.find((integration) => integration.id === id)?.settings;
+
+        for (const integration of others) {
+          for (const field of Object.values(integration.settings.properties)) {
+            expect(field.title, integration.id).toBeTruthy();
+          }
+        }
+        expect(others.map(({ settings }) => settings.required)).toEqual([
+          ["url"],
+          ["url"],
+          ["documentUrl"],
+        ]);
+        expect(formOf("cloudflare-workers-ai")).toEqual({
+          type: "object",
+          properties: { CLOUDFLARE_ACCOUNT_ID: { type: "string", minLength: 1 } },
+          required: ["CLOUDFLARE_ACCOUNT_ID"],
+        });
+        expect(formOf("anthropic")).toEqual({ type: "object", properties: {} });
+      }).pipe(Effect.provide(ModelCatalog.layer)),
+  );
 });

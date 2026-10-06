@@ -45,6 +45,7 @@ export const projections = [
   "threadMessages",
   "threadActivities",
   "connections",
+  "connectionsV2",
   "environments",
   "agents",
   "turns",
@@ -74,6 +75,8 @@ export interface Space {
   readonly notificationsSeen: Map<string, number>;
   /** Connections' credentials, outside the journal and its read models, which rebuilds keep. */
   readonly credentials: Map<string, string>;
+  /** Each connection's credential by connection ID, outside the journal, which rebuilds keep. */
+  readonly connectionV2Credentials: Map<string, string>;
 }
 
 export interface Interface {
@@ -111,6 +114,7 @@ export const empty = (): Space => ({
   groupTimes: new Map(),
   notificationsSeen: new Map(),
   credentials: new Map(),
+  connectionV2Credentials: new Map(),
 });
 
 /** An isolated snapshot: every map is copied, and the values they hold never change. */
@@ -125,6 +129,7 @@ export const copy = (space: Space): Space => ({
   groupTimes: new Map(space.groupTimes),
   notificationsSeen: new Map(space.notificationsSeen),
   credentials: new Map(space.credentials),
+  connectionV2Credentials: new Map(space.connectionV2Credentials),
 });
 
 /** Committed state of one workspace, without creating any. */

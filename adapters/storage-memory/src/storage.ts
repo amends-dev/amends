@@ -7,6 +7,8 @@ import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
+import { ConnectionV2Credentials } from "./connection-v2-credentials.ts";
+import { ConnectionsV2 } from "./connections-v2.ts";
 import { Environments } from "./environments.ts";
 import { MemoryConnection } from "./connection.ts";
 import { GroupFollows } from "./group-follows.ts";
@@ -51,6 +53,8 @@ const layerStores = Layer.mergeAll(
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,
+  ConnectionsV2.layer,
+  ConnectionV2Credentials.layer,
   Environments.layer,
   Agents.layer,
   TurnRecords.layer,

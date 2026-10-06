@@ -47,6 +47,7 @@ export const targetKinds = [
   "Thread",
   "Group",
   "Connection",
+  "ConnectionV2",
   "Environment",
 ] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
@@ -67,6 +68,7 @@ const scopeColumns = {
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
   targetConnectionId: text("target_connection_id"),
+  targetConnectionV2Id: text("target_connection_v2_id"),
   targetEnvironmentId: text("target_environment_id"),
 };
 /** The column holding each kind of target's ID; a workspace target needs none. */
@@ -75,6 +77,7 @@ const targetIds = {
   Thread: "targetThreadId",
   Group: "targetGroupId",
   Connection: "targetConnectionId",
+  ConnectionV2: "targetConnectionV2Id",
   Environment: "targetEnvironmentId",
 } as const;
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
@@ -764,6 +767,41 @@ export const connectionCredentials = pgTable(
     sealed: text("sealed").notNull(),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/**
+ * Workspaces' connections to the integrations their host installs. An integration declares its own
+ * settings, so they are stored as JSON, like a thread activity's kind-specific details; a
+ * connection's credential is kept in connection_v2_credentials.
+ */
+export const connectionsV2 = pgTable(
+  "connections_v2",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    integration: text("integration").notNull(),
+    name: text("name").notNull(),
+    settings: jsonb("settings").$type<Record<string, string | number | boolean>>().notNull(),
+    auth: text("auth", { enum: ["apiKey", "none"] }).notNull(),
+    status: text("status", { enum: memberStatuses }).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/**
+ * Each connection's credential, outside the journal and its read models: rebuilding projections
+ * keeps them. Each is sealed with the host's credential key, bound to its workspace and connection.
+ */
+export const connectionV2Credentials = pgTable(
+  "connection_v2_credentials",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    connectionId: text("connection_id").notNull(),
+    sealed: text("sealed").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.connectionId] })],
 );
 
 /**

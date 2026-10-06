@@ -42,6 +42,13 @@ export {
   type ConnectionsView,
 } from "./connections/views.ts";
 export {
+  useConnectionV2List,
+  useConnectionsV2,
+  type ConnectionV2ListEntry,
+  type ConnectionsV2Done,
+  type ConnectionsV2View,
+} from "./connections-v2/views.ts";
+export {
   useEnvironmentList,
   useEnvironments,
   type EnvironmentsDone,

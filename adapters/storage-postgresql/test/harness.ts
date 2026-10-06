@@ -23,6 +23,7 @@ const projections = [
   "thread_messages",
   "thread_activities",
   "connections",
+  "connections_v2",
   "environments",
   "agents",
   "turns",

@@ -38,6 +38,7 @@ type Reported =
   | Failure<Client["threads"][keyof Client["threads"]]>
   | Failure<Client["notifications"][keyof Client["notifications"]]>
   | Failure<Client["connections"][keyof Client["connections"]]>
+  | Failure<Client["connectionsV2"][keyof Client["connectionsV2"]]>
   | Failure<Client["environments"][keyof Client["environments"]]>
   | Failure<Client["agents"][keyof Client["agents"]]>
   | Failure<Client["turns"][keyof Client["turns"]]>
@@ -81,6 +82,12 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ConnectionService.NotFound": "gone",
   "ConnectionService.InvalidSettings": "invalid",
   "ConnectionService.UnsupportedAuthentication": "invalid",
+  // Connections v2 the same way; `connectionsV2Failure` tells the integration's refusals apart.
+  "ConnectionV2Service.Changed": "changed",
+  "ConnectionV2Service.UnknownIntegration": "changed",
+  "ConnectionV2Service.NotFound": "gone",
+  "ConnectionV2Service.InvalidConnection": "invalid",
+  "ConnectionV2Service.Keyless": "invalid",
   // Environments: renamed meanwhile, or naming a harness or provider this host no longer has;
   // `environmentProblems` tells the refusals apart.
   "EnvironmentService.Changed": "changed",
@@ -107,6 +114,7 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "Api.TooManyStreams": "failed",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionService.CredentialsUnavailable": "failed",
+  "ConnectionV2Service.CredentialsUnavailable": "failed",
   "GroupFollowService.AgentRequired": "denied",
   "ReadStateService.HumanRequired": "denied",
   "ThreadService.HumanAuthorRequired": "denied",

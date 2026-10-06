@@ -7,6 +7,7 @@ export type WorkspacePage =
   | "agents"
   | "environments"
   | "connections"
+  | "connections-v2"
   | "settings";
 export const paths = {
   settingsSection: (id: string, section: SettingsTab) =>
@@ -32,6 +33,9 @@ export const paths = {
   /** A connection's page. */
   connection: (id: string, connectionId: string) =>
     `/workspaces/${encodeURIComponent(id)}/connections/${encodeURIComponent(connectionId)}`,
+  /** A connection's page in Connections v2. */
+  connectionV2: (id: string, connectionId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/connections-v2/${encodeURIComponent(connectionId)}`,
   /** A first message to some people who have no direct group together yet. */
   directDraft: (id: string, memberIds: ReadonlyArray<string>) =>
     `/workspaces/${encodeURIComponent(id)}/direct?to=${memberIds.map(encodeURIComponent).join(",")}`,

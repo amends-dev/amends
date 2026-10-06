@@ -38,6 +38,7 @@ import formsMeta, {
   CardsAndDetailedSelect,
   Fields,
   Notices,
+  SettingsFields,
   SuggestionsAndStatuses,
 } from "../src/components/forms.stories.tsx";
 import agentsMeta, {
@@ -106,6 +107,28 @@ import connectionsMeta, {
   RenamedMeanwhile,
   ReplaceApiKey,
 } from "../src/screens/connections/connections.stories.tsx";
+import connectionsV2Meta, {
+  AddConnectionFlow as AddConnectionV2Flow,
+  AllConnections as AllConnectionsV2,
+  ChooseIntegration,
+  ChooseToolIntegration,
+  ConfigureMcpServer,
+  ConfigureWithoutAuthentication as ConfigureV2WithoutAuthentication,
+  ConnectionPage as ConnectionV2Page,
+  EmptyConnections as EmptyConnectionsV2,
+  IntegrationNotInstalled,
+  KeyRefused,
+  KeyStorageUnavailable,
+  LoadFailed as ConnectionsV2LoadFailed,
+  Loading as ConnectionsV2Loading,
+  NoMatchingConnections as NoMatchingConnectionsV2,
+  ReadOnly as ConnectionsV2ReadOnly,
+  RemoveConnection as RemoveConnectionV2,
+  RenamedMeanwhile as RenamedMeanwhileV2,
+  ReplaceKey as ReplaceKeyV2,
+  SetupRefused,
+  ToolConnections,
+} from "../src/screens/connections-v2/connections-v2.stories.tsx";
 import createMeta, { CreateAndOpen, OpenForm } from "../src/screens/group/create.stories.tsx";
 import directoryMeta, {
   Discover,
@@ -326,6 +349,9 @@ describe("form components", () => {
   it("suggests models, keeps any entered one, and shows each option's status", async () => {
     await stories.story(SuggestionsAndStatuses).run();
   });
+  it("draws fields from their description and says what each refuses", async () => {
+    await stories.story(SettingsFields).run();
+  });
 });
 
 describe("environments screen", () => {
@@ -478,6 +504,65 @@ describe("connections screen", () => {
   it("keeps a draft name when the connection was renamed meanwhile", async () => {
     viewport(1600);
     await stories.story(RenamedMeanwhile).run();
+  });
+});
+
+describe("connections v2 screen", () => {
+  const stories = definePreview(preview).meta(connectionsV2Meta);
+  it("renders the list, a connection's page, the dialogs, and states", async () => {
+    viewport(1600);
+    for (const story of [
+      ConnectionV2Page,
+      ChooseToolIntegration,
+      ConfigureMcpServer,
+      ConfigureV2WithoutAuthentication,
+      ReplaceKeyV2,
+      RemoveConnectionV2,
+      EmptyConnectionsV2,
+      ConnectionsV2Loading,
+      ConnectionsV2LoadFailed,
+    ]) {
+      await stories.story(story).run();
+      cleanup();
+    }
+  });
+  it("lists every kind in the sidebar, and a connection whose integration is gone only in the list", async () => {
+    viewport(1600);
+    await stories.story(AllConnectionsV2).run();
+    cleanup();
+    await stories.story(ToolConnections).run();
+  });
+  it("adds a connection with its key in one step, then checks it", async () => {
+    viewport(1600);
+    await stories.story(AddConnectionV2Flow).run();
+  });
+  it("narrows the integrations by a search", async () => {
+    viewport(1600);
+    await stories.story(ChooseIntegration).run();
+  });
+  it("says what a check found, and why an integration refuses a setup", async () => {
+    viewport(1600);
+    await stories.story(KeyRefused).run();
+    cleanup();
+    await stories.story(SetupRefused).run();
+  });
+  it("offers only removal for a connection whose integration is gone", async () => {
+    viewport(1600);
+    await stories.story(IntegrationNotInstalled).run();
+  });
+  it("keeps the draft when the host keeps no keys", async () => {
+    viewport(1600);
+    await stories.story(KeyStorageUnavailable).run();
+  });
+  it("shows members connections without any action", async () => {
+    viewport(1600);
+    await stories.story(ConnectionsV2ReadOnly).run();
+  });
+  it("offers to clear a search that finds nothing, and keeps a draft name renamed meanwhile", async () => {
+    viewport(1600);
+    await stories.story(NoMatchingConnectionsV2).run();
+    cleanup();
+    await stories.story(RenamedMeanwhileV2).run();
   });
 });
 

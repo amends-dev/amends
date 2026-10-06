@@ -1,21 +1,28 @@
+import { createHmac, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AnthropicConnection } from "@amends/connection-anthropic";
+import { ModelCatalog, ModelIntegrations, ToolIntegrations } from "@amends/connection-v2";
 import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
 import { Environment } from "@amends/environment";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { OpenCodeHarness } from "@amends/harness-acp";
 import { AmendsHarness } from "@amends/harness-amends";
+import { AmendsAgent, Models } from "@amends/harness-amends-v2";
+import { OpencodeAgent } from "@amends/harness-opencode";
 import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
 import { LocalSandbox } from "@amends/sandbox-local";
+import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
+import { Network } from "@amends/sandbox-v2";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
   layer as postgres,
 } from "@amends/storage-postgresql";
-import { BunClusterSocket, BunCrypto, BunServices } from "@effect/platform-bun";
-import { Duration, Effect, Layer, Option, type Redacted } from "effect";
+import { BunClusterSocket, BunCrypto, BunServices, BunSocket } from "@effect/platform-bun";
+import { Duration, Effect, Layer, Option, Redacted } from "effect";
 import {
   type MessageStorage,
   RunnerAddress,
@@ -59,7 +66,8 @@ export interface Options {
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
   /**
    * The directory local sandboxes live in, beside the harness server builds this host uploads
-   * into them; `amends-sandboxes` in the system's temporary directory by default.
+   * into them, and the sandboxes of each connection to this machine in `connections`;
+   * `amends-sandboxes` in the system's temporary directory by default.
    */
   readonly sandboxDirectory?: string | undefined;
 }
@@ -81,6 +89,45 @@ export const installed = {
   harnesses: [AmendsHarness.harness.declaration, OpenCodeHarness.declaration],
   sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
 };
+
+/**
+ * The integrations this host installs, which workspaces connect to: each model provider in the
+ * catalog and any OpenAI-compatible API, for models; MCP servers and HTTP APIs, for tools;
+ * sandboxes as directories under `directory`, for development, and on Daytona; and amends's agent
+ * and opencode, as harnesses.
+ *
+ * @category constructors
+ */
+export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
+  function* (directory: string) {
+    // TODO: Derive bridge tokens from a secret every host shares, and give the bridges in this
+    // machine's sandboxes ports of their own, once turns start opencode sessions: these tokens are
+    // this process's own, and local sandboxes share this machine's ports.
+    const bridgeSecret = randomBytes(32);
+    return [
+      ...(yield* ModelIntegrations.catalogProviders),
+      yield* ModelIntegrations.openAiCompatible,
+      yield* ToolIntegrations.mcp,
+      yield* ToolIntegrations.openApi,
+      yield* LocalSandboxProvider.integration({ directory }),
+      yield* DaytonaSandboxProvider.integration,
+      yield* AmendsAgent.integration(),
+      yield* OpencodeAgent.integration({
+        port: Network.Port.make(4096),
+        token: (sandboxId) =>
+          Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),
+      }),
+    ];
+  },
+  Effect.provide(
+    Layer.mergeAll(
+      BunServices.layer,
+      BunSocket.layerWebSocketConstructor,
+      ModelCatalog.layer,
+      Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer)),
+    ),
+  ),
+);
 
 /**
  * The environments this host runs: amends's harness in process, sandboxes as directories under
@@ -148,8 +195,14 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
  *
  * @category layers
  */
-export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer =>
-  Layer.mergeAll(
+export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer => {
+  const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes");
+  const gateway = Layer.unwrap(
+    Effect.map(makeIntegrations(join(sandboxDirectory, "connections")), (integrations) =>
+      Gateway.layer({ ...installed, integrations }),
+    ),
+  );
+  return Layer.mergeAll(
     AgentJob.layerWorker,
     JobPruning.layer({
       prune: PostgresClusterStorage.prune,
@@ -157,13 +210,11 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     }),
     TurnJob.layerWorker.pipe(
       Layer.provide(TurnRunner.layer(turnRunnerOptions)),
-      Layer.provide(
-        layerEnvironments(options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes")),
-      ),
+      Layer.provide(layerEnvironments(sandboxDirectory)),
     ),
   ).pipe(
     Layer.provideMerge(
-      Gateway.layer(installed).pipe(
+      gateway.pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
         Layer.provide(AgentJob.layerRequests),
         Layer.provide(TurnJob.layerRequests),
@@ -172,5 +223,6 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     Layer.provide(BunCrypto.layer),
     Layer.provide(layerDatabase(url, options)),
   );
+};
 
 export * as LocalHost from "./host.ts";

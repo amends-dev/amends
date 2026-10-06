@@ -224,7 +224,6 @@ export const integration = Effect.fn("LocalSandboxProvider.integration")(functio
   return Integration.make({
     id: "local",
     name: "This machine",
-    settings: Schema.Struct({}),
     auth: ["none"],
     sandboxes: providerOf,
     check: (access) =>

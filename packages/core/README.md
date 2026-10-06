@@ -178,6 +178,34 @@ journal and its read models, writes within commits, and reports `Unavailable` on
 none, which operations surface as `CredentialsUnavailable`. Both are required host bindings, and
 `ConnectionCatalog.Service` is supplied by the gateway from the host's registered declarations.
 
+## Connections v2
+
+`@amends/core/connection-v2` holds the connections that replace those above, built beside them
+and sharing nothing with them: a workspace's link to one integration its host installs, as
+[connection-v2](../connection-v2/README.md) declares integrations. `ConnectionV2Service` lists the
+host's `integrations`, each as `ConnectionV2.IntegrationView` (its auth methods, what it gives, and
+the form of its settings), which every member may see; lists and reads the connections the actor
+may read, as `ConnectionV2.View`; and creates, renames, configures, replaces the key of, checks,
+and removes them. A view is the record without its key, `manageable`, and its readiness: `Ready`,
+`Invalid` with the integration's description when it no longer takes the connection's settings or
+auth method, or `Uninstalled` when the host no longer installs it.
+
+Creating takes the key with the connection, when it authenticates with one and only then, and the
+integration validates its settings and auth method first (`UnknownIntegration`,
+`InvalidConnection`). The key goes to `ConnectionV2CredentialStore`, one credential for each
+connection, in the commit that records the connection; replacing it overwrites it, and removal
+deletes it and keeps the record, so a retried create finds the connection and answers `NotFound`.
+No fact, change-feed event, or view carries a key. `check` reads the key and asks the integration
+to check the connection with its system, returning `Health`; it holds no commit open while the
+system answers.
+
+`connection-v2.create` works on the workspace; `connection-v2.read` and `connection-v2.manage` on
+each connection, a `ConnectionV2` target. Members read connections; administrators and the owner
+create and manage them, and checking is managing, since it sends the key. `ConnectionV2Store` is a
+projection store and `ConnectionV2CredentialStore` keeps credentials outside the journal, reporting
+`Unavailable` on a host that keeps none (`CredentialsUnavailable`); both are host bindings. The
+gateway supplies the host's integrations as `Integrations`.
+
 ## Environments
 
 `@amends/core/environment` holds workspace environments: where and how agents run, as a harness and

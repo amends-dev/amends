@@ -44,6 +44,17 @@ amends's own [harness](../../packages/harness-amends/README.md), in process or i
 [local](../../adapters/sandbox-local/README.md) and Daytona sandbox providers, all as
 `LocalHost.installed` declares them.
 
+For [connections v2](../../packages/core/README.md#connections-v2), `LocalHost.makeIntegrations`
+installs the [integrations](../../packages/connection-v2/README.md) workspaces connect to: every
+model provider in the catalog and any OpenAI-compatible API; MCP servers and HTTP APIs as tools; the
+[local](../../adapters/sandbox-local-v2) sandbox provider, keeping each connection's
+sandboxes under `connections` in the sandbox directory, and
+[Daytona](../../adapters/sandbox-daytona-v2/README.md); and amends's
+[agent](../../adapters/harness-amends-v2) and
+[opencode](../../adapters/harness-opencode/README.md) as harnesses. Their keys are sealed with the
+same `AMENDS_CREDENTIAL_KEY`. Nothing runs a turn on them yet, so opencode's bridge tokens come
+from a secret of this process's own.
+
 The pool size is the most connections the host opens. Four are the host's own: one listens for
 notifications, two run jobs, and one holds the runner address. A busy workspace's
 writers wait for each other in memory rather than each holding a connection, and its reads use at

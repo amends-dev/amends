@@ -40,7 +40,9 @@ const agent: Agent.Agent = {
 const everything = Integration.make({
   id: "everything",
   name: "Everything",
-  settings: Schema.Struct({ region: Schema.NonEmptyString }),
+  settings: Schema.Struct({
+    region: Schema.NonEmptyString.annotate({ title: "Region", description: "Where it runs." }),
+  }),
   auth: ["apiKey", "none"],
   harnesses: (access, options) =>
     Effect.gen(function* () {
@@ -73,11 +75,10 @@ const everything = Integration.make({
     Effect.sync(() => given.push(access)).pipe(Effect.as({ status: "healthy" as const })),
 });
 
-/** An integration that gives only models, with no settings, and authenticates only with a key. */
+/** An integration that gives only models, takes no settings, and authenticates only with a key. */
 const modelsOnly = Integration.make({
   id: "models-only",
   name: "Models only",
-  settings: Schema.Struct({}),
   auth: ["apiKey"],
   models: {
     listed: [],
@@ -115,6 +116,60 @@ describe("Integration.make", () => {
     expect(everything.provides).toEqual(["harnesses", "models", "sandboxes", "tools"]);
     expect(modelsOnly.provides).toEqual(["models"]);
   });
+
+  it("describes the settings a connection gives as a form", () => {
+    expect(everything.settings).toEqual({
+      type: "object",
+      properties: {
+        region: { type: "string", title: "Region", description: "Where it runs.", minLength: 1 },
+      },
+      required: ["region"],
+    });
+    expect(modelsOnly.settings).toEqual({ type: "object", properties: {} });
+  });
+
+  it("throws for settings that make no form", () => {
+    const declaring = (settings: Schema.Decoder<unknown>) => () =>
+      Integration.make({
+        id: "formless",
+        name: "Formless",
+        settings,
+        auth: ["none"],
+        check: () => Effect.succeed({ status: "healthy" }),
+      });
+
+    expect(declaring(Schema.Struct({ nested: Schema.Struct({ a: Schema.String }) }))).toThrow(
+      "The settings of Formless do not make a form",
+    );
+    // An empty struct takes any value, as no settings would not.
+    expect(declaring(Schema.Struct({}))).toThrow("The settings of Formless do not make a form");
+  });
+
+  it.effect("validates a connection without its key, running nothing", () =>
+    Effect.gen(function* () {
+      given.length = 0;
+      yield* everything.validate(connection());
+      yield* modelsOnly.validate(connection({ integration: "models-only", settings: {} }));
+      const refusals = [
+        yield* reasonOf(modelsOnly.validate(connection({ auth: "none", settings: {} }))),
+        yield* reasonOf(everything.validate(connection({ settings: {} }))),
+        yield* reasonOf(everything.validate(connection({ settings: { region: "eu", zone: "a" } }))),
+        yield* reasonOf(modelsOnly.validate(connection({ settings: { region: "eu" } }))),
+      ];
+
+      expect(refusals.map(({ integration, tag }) => [integration, tag])).toEqual([
+        ["models-only", "InvalidConnectionError"],
+        ["everything", "InvalidConnectionError"],
+        ["everything", "InvalidConnectionError"],
+        ["models-only", "InvalidConnectionError"],
+      ]);
+      expect(refusals[0]?.description).toBe("Models only takes no authentication by none");
+      expect(refusals[2]?.description).toContain(
+        "The settings of Mine do not match what Everything takes",
+      );
+      expect(given).toHaveLength(0);
+    }),
+  );
 
   it.effect("gives each operation the connection's settings decoded, and its key", () =>
     Effect.gen(function* () {
@@ -171,6 +226,12 @@ describe("Integration.make", () => {
           everything.check(connection({ settings: { region: "" } }), { apiKey: key }),
         ),
         yield* reasonOf(everything.check(connection({ settings: {} }), { apiKey: key })),
+        yield* reasonOf(
+          everything.check(connection({ settings: { region: "eu", zone: "a" } }), { apiKey: key }),
+        ),
+        yield* reasonOf(
+          modelsOnly.check(connection({ settings: { region: "eu" } }), { apiKey: key }),
+        ),
       ];
 
       expect(refusals.map(({ integration, tag }) => [integration, tag])).toEqual([
@@ -178,6 +239,8 @@ describe("Integration.make", () => {
         ["everything", "InvalidConnectionError"],
         ["everything", "InvalidConnectionError"],
         ["everything", "InvalidConnectionError"],
+        ["everything", "InvalidConnectionError"],
+        ["models-only", "InvalidConnectionError"],
       ]);
       expect(refusals[0]?.description).toBe("Models only takes no authentication by none");
       expect(refusals[1]?.description).toBe("The connection Mine has no API key");

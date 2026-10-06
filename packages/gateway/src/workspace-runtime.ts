@@ -6,6 +6,7 @@ import { EnvironmentCatalog } from "@amends/core/environment";
 import type { HarnessImplementation } from "@amends/harness";
 import type { SandboxImplementation } from "@amends/sandbox";
 import type { ConnectionImplementation } from "@amends/connection";
+import { type Integration, Integrations } from "@amends/connection-v2";
 import { Journal } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import {
@@ -38,6 +39,11 @@ export interface Options {
    */
   readonly harnesses?: ReadonlyArray<HarnessImplementation.Declaration> | undefined;
   readonly sandboxes?: ReadonlyArray<SandboxImplementation.Declaration> | undefined;
+  /**
+   * The integrations this host installs, which every workspace's connections link to. Their ids
+   * must be distinct. Defaults to none.
+   */
+  readonly integrations?: ReadonlyArray<Integration.Integration> | undefined;
   /**
    * How long a workspace stays prepared after its last lease closes. A later request prepares it
    * again from storage. Defaults to five minutes.
@@ -81,6 +87,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
     harnesses: options.harnesses,
     sandboxes: options.sandboxes,
   });
+  const integrations = yield* Integrations.make(options.integrations ?? []);
 
   const prepareWorkspace = Effect.fn("WorkspaceRuntime.prepareWorkspace")(function* (
     workspaceId: Workspace.Id,
@@ -95,6 +102,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeed(TurnJobs.Service, turnJobs),
           Layer.succeed(ConnectionCatalog.Service, connectionCatalog),
           Layer.succeed(EnvironmentCatalog.Service, environmentCatalog),
+          Layer.succeed(Integrations.Integrations, integrations),
         ),
       ),
       Layer.orDie,

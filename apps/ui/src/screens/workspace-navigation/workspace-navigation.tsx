@@ -7,6 +7,7 @@ import {
   IconMarkEnvironments,
   IconMarkHome,
   IconMarkMail,
+  IconMarkMarketplace,
   IconMarkNew,
   IconMarkSearch,
   IconMarkSettings,
@@ -26,13 +27,14 @@ import { Rail } from "../../patterns/rail/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Sidebar } from "../../patterns/sidebar/index.ts";
 
-export type Destination = "home" | "agents" | "environments" | "connections";
+export type Destination = "home" | "agents" | "environments" | "connections" | "connections-v2";
 
 const destinations = [
   { id: "home", label: "Home", icon: IconMarkHome },
   { id: "agents", label: "Agents", icon: IconMarkAgents },
   { id: "environments", label: "Environments", icon: IconMarkEnvironments },
   { id: "connections", label: "Connections", icon: IconMarkConnections },
+  { id: "connections-v2", label: "Connections v2", icon: IconMarkMarketplace },
 ] as const;
 
 export interface NavigationLink {
@@ -98,7 +100,7 @@ export interface WorkspaceNavigationProps {
     readonly menu?: AccountMenu;
   };
   readonly homeHref: string;
-  /** The rail's destinations. Default all four. */
+  /** The rail's destinations. Default all of them. */
   readonly destinations?: readonly Destination[];
   /** The current destination, if the page is one. */
   readonly destination?: Destination;

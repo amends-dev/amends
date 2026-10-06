@@ -9,11 +9,15 @@
  * settings decoded and its key, as `Access`. Each operation of the integration it makes takes a
  * connection and its credential as they are stored, and fails with `ConnectionError` for a
  * connection the integration does not take, or for what it does not give.
+ *
+ * An integration describes its settings as a form a person fills in, `SettingsForm`, which is how
+ * MCP asks a person for input, so that settings can be asked for without code for each integration.
  */
 import type { Agent, Harness, ModelEndpoint } from "@amends/harness-v2";
 import type { SandboxProvider } from "@amends/sandbox-v2";
 import type { ToolSource } from "@amends/toolkit";
 import { type Array, Effect, type Redacted, type Result, Schema, type Scope } from "effect";
+import { McpSchema } from "effect/ai";
 import {
   type AuthMethod,
   type Connection,
@@ -30,6 +34,20 @@ import type * as ModelCatalog from "./ModelCatalog.ts";
 export const Capability = Schema.Literals(["harnesses", "models", "sandboxes", "tools"]);
 
 export type Capability = typeof Capability.Type;
+
+/**
+ * The settings a connection gives, as a form a person fills in: an object of text, number,
+ * yes-or-no, and choice fields, each with a title and a description, which is how MCP asks a person
+ * for input.
+ */
+export const SettingsForm = McpSchema.ElicitRequestFormParams.fields.requestedSchema;
+
+export type SettingsForm = typeof SettingsForm.Type;
+
+/** The settings of an integration that takes none: an object with no keys. */
+const noSettings = Schema.Record(Schema.String, Schema.Never);
+
+export type NoSettings = typeof noSettings.Type;
 
 /**
  * A connection as an integration's code is given it: with its settings decoded, and its key, which
@@ -64,8 +82,12 @@ export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   /** Where the system's documentation is. */
   readonly docs?: string;
 
-  /** The settings a connection gives, besides its credential, such as a URL. */
-  readonly settings: Schema.Decoder<Settings>;
+  /**
+   * The settings a connection gives, besides its credential, such as a URL: no more and no fewer.
+   * They make a form, of fields whose `title` and `description` annotations the form shows. Left
+   * out, a connection gives none. An empty struct is not none, as it takes any value.
+   */
+  readonly settings?: Schema.Decoder<Settings>;
 
   /** The ways a connection can authenticate, in the order to offer them. */
   readonly auth: Array.NonEmptyReadonlyArray<Auth>;
@@ -115,11 +137,21 @@ export interface Integration {
   readonly docs: string | undefined;
   readonly auth: Array.NonEmptyReadonlyArray<AuthMethod>;
 
+  /** The settings a connection gives, as the form a person fills in to give them. */
+  readonly settings: SettingsForm;
+
   /** What a connection to the integration gives. */
   readonly provides: ReadonlyArray<Capability>;
 
   /** The catalog's models a connection offers, none for an integration that gives no models. */
   readonly models: ReadonlyArray<ModelCatalog.Model>;
+
+  /**
+   * Fails for `connection` when the integration does not take it, by its settings or by how it
+   * authenticates, and runs nothing. Its credential is apart from it, so whether it has the key it
+   * needs is not checked.
+   */
+  readonly validate: (connection: Connection) => Effect.Effect<void, ConnectionError>;
 
   /** The harness of `connection`, running its agent on the models `options` gives. */
   readonly harness: (
@@ -154,26 +186,29 @@ export interface Integration {
   ) => Effect.Effect<Health, ConnectionError>;
 }
 
-/** The integration that `options` declares. */
-export const make = <Settings, Auth extends AuthMethod>(
+/**
+ * The integration that `options` declares. It throws for settings that do not make a form, which
+ * the integration's code must change.
+ */
+export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod>(
   options: Options<Settings, Auth>,
 ): Integration => {
   const auth: Array.NonEmptyReadonlyArray<AuthMethod> = options.auth;
+  // An integration that leaves its settings out has the settings `NoSettings` describes.
+  const settings = (options.settings ?? noSettings) as Schema.Decoder<Settings>;
   const fail = (reason: ConnectionErrorReason, cause?: unknown) =>
     new ConnectionError({ integration: options.id, reason, cause });
 
-  /** `connection` as the integration's code takes it, failing for one the integration does not. */
-  const accessOf = (connection: Connection, credential: Credential | undefined) =>
+  /** The connection's settings decoded, failing for a connection the integration does not take. */
+  const settingsOf = (connection: Connection) =>
     Effect.gen(function* () {
       if (!auth.includes(connection.auth)) {
         const description = `${options.name} takes no authentication by ${connection.auth}`;
         return yield* fail(new InvalidConnectionError({ description }));
       }
-      if (connection.auth === "apiKey" && credential === undefined) {
-        const description = `The connection ${connection.name} has no API key`;
-        return yield* fail(new InvalidConnectionError({ description }));
-      }
-      const settings = yield* Schema.decodeEffect(options.settings)(connection.settings).pipe(
+      return yield* Schema.decodeEffect(settings)(connection.settings, {
+        onExcessProperty: "error",
+      }).pipe(
         Effect.mapError((cause) =>
           fail(
             new InvalidConnectionError({
@@ -183,10 +218,20 @@ export const make = <Settings, Auth extends AuthMethod>(
           ),
         ),
       );
+    });
+
+  /** `connection` as the integration's code takes it, failing for one the integration does not. */
+  const accessOf = (connection: Connection, credential: Credential | undefined) =>
+    Effect.gen(function* () {
+      const decoded = yield* settingsOf(connection);
+      if (connection.auth === "apiKey" && credential === undefined) {
+        const description = `The connection ${connection.name} has no API key`;
+        return yield* fail(new InvalidConnectionError({ description }));
+      }
       // A connection that authenticates with a key has one, as checked above.
       const access = {
         connection,
-        settings,
+        settings: decoded,
         apiKey: connection.auth === "apiKey" ? credential?.apiKey : undefined,
       } as Access<Settings, Auth>;
       return access;
@@ -200,6 +245,7 @@ export const make = <Settings, Auth extends AuthMethod>(
     name: options.name,
     docs: options.docs,
     auth,
+    settings: settingsFormOf(options.name, settings),
     provides: [
       ...(options.harnesses === undefined ? [] : ["harnesses" as const]),
       ...(options.models === undefined ? [] : ["models" as const]),
@@ -207,6 +253,8 @@ export const make = <Settings, Auth extends AuthMethod>(
       ...(options.tools === undefined ? [] : ["tools" as const]),
     ],
     models: options.models?.listed ?? [],
+
+    validate: (connection) => Effect.asVoid(settingsOf(connection)),
 
     harness: (connection, credential, agentOptions) => {
       const { harnesses } = options;
@@ -249,4 +297,16 @@ export const make = <Settings, Auth extends AuthMethod>(
     check: (connection, credential) =>
       Effect.flatMap(accessOf(connection, credential), options.check),
   };
+};
+
+/**
+ * The form of the settings an integration named `name` takes, from their JSON Schema. It throws for
+ * settings that do not make a form, such as a nested object.
+ */
+const settingsFormOf = (name: string, settings: Schema.Decoder<unknown>): SettingsForm => {
+  const { schema } = Schema.toJsonSchemaDocument(settings);
+  // The JSON Schema of an object with no keys lists no properties, which a form must.
+  const form = Schema.decodeUnknownExit(SettingsForm)({ properties: {}, ...schema });
+  if (form._tag === "Success") return form.value;
+  throw new Error(`The settings of ${name} do not make a form: ${String(form.cause)}`);
 };

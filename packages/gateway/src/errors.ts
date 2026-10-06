@@ -22,6 +22,7 @@ import {
 } from "@amends/core/workspace";
 import { ReadStateService } from "@amends/core/read-state";
 import { ConnectionService } from "@amends/core/connection";
+import { ConnectionV2Service } from "@amends/core/connection-v2";
 import { AgentService } from "@amends/core/agent";
 import { Turn, TurnService } from "@amends/core/turn";
 import { EnvironmentService } from "@amends/core/environment";
@@ -134,6 +135,12 @@ export const PublicError = Schema.Union([
   ConnectionService.InvalidSettings,
   ConnectionService.UnsupportedAuthentication,
   ConnectionService.CredentialsUnavailable,
+  ConnectionV2Service.NotFound,
+  ConnectionV2Service.Changed,
+  ConnectionV2Service.UnknownIntegration,
+  ConnectionV2Service.InvalidConnection,
+  ConnectionV2Service.Keyless,
+  ConnectionV2Service.CredentialsUnavailable,
   EnvironmentService.NotFound,
   EnvironmentService.Changed,
   EnvironmentService.UnknownHarness,

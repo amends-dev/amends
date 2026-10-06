@@ -44,13 +44,15 @@ import {
   ConnectionStore,
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
+import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
+import { Integration, Integrations } from "@amends/connection-v2";
 import { AgentStore } from "@amends/core/agent";
 import { AgentJobs, AgentWork, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
 import { Gateway, WorkspaceStorage } from "@amends/gateway";
-import { Clock, Context, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Clock, Context, DateTime, Effect, Layer, Option, Redacted, Result, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 
 export const alice = Identity.Reference.cases.Human.make({ id: Identity.HumanId.make("alice") });
@@ -131,11 +133,55 @@ export const environmentCatalog = EnvironmentCatalog.make({
   harnesses: testHarnesses,
   sandboxes: testSandboxes,
 });
+/** The key the test models integration's check accepts; any other it refuses. */
+export const goodKey = "sk-good";
+
+/**
+ * The integrations the suites' hosts install: models at an endpoint a connection gives, reached
+ * with a key or none, whose check accepts only `goodKey`; and tools that take no settings or key.
+ */
+export const testIntegrations = [
+  Integration.make({
+    id: "test-models",
+    name: "Test models",
+    docs: "https://models.example/docs",
+    settings: Schema.Struct({
+      endpoint: Schema.NonEmptyString.annotate({ title: "Endpoint" }),
+      region: Schema.optionalKey(Schema.NonEmptyString),
+    }),
+    auth: ["apiKey", "none"],
+    models: {
+      listed: [],
+      endpoint: ({ settings }, { model }) =>
+        Result.succeed({
+          provider: "test-models",
+          model,
+          protocol: "openai-chat",
+          url: settings.endpoint,
+        }),
+    },
+    check: ({ apiKey }) =>
+      Effect.succeed(
+        apiKey !== undefined && Redacted.value(apiKey) === goodKey
+          ? { status: "healthy" as const }
+          : { status: "unauthorized" as const, description: "The key was refused" },
+      ),
+  }),
+  Integration.make({
+    id: "test-tools",
+    name: "Test tools",
+    auth: ["none"],
+    tools: () => Effect.die("No suite calls a tool"),
+    check: () => Effect.succeed({ status: "healthy" }),
+  }),
+];
+
 /** What the suites' gateways install. */
 export const installed = {
   connections: [testImplementation, testSandboxAccount],
   harnesses: testHarnesses,
   sandboxes: testSandboxes,
+  integrations: testIntegrations,
 };
 
 /** The agent work each workspace's commits asked for and no suite has run yet, in order. */
@@ -201,6 +247,7 @@ export const bind = (
     | TurnJobs.Service
     | ConnectionCatalog.Service
     | EnvironmentCatalog.Service
+    | Integrations.Integrations
   >,
 ) => ({
   context,
@@ -222,6 +269,8 @@ export const bind = (
   readStates: Context.get(context, ReadStateStore.Service),
   connections: Context.get(context, ConnectionStore.Service),
   credentials: Context.get(context, ConnectionCredentialStore.Service),
+  connectionsV2: Context.get(context, ConnectionV2Store.Service),
+  connectionV2Credentials: Context.get(context, ConnectionV2CredentialStore.Service),
   environments: Context.get(context, EnvironmentStore.Service),
   agents: Context.get(context, AgentStore.Service),
   turns: Context.get(context, TurnStore.Service),
@@ -246,23 +295,26 @@ export const listOldestFirst = (
  * does the agent work its commits asked for, and runs the turn it expects, as a host's jobs would.
  */
 const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>) =>
-  bind(
-    context.pipe(
-      Context.add(AgentJobs.Service, recordedAgentJobs),
-      Context.add(TurnJobs.Service, TurnJobs.noRunner),
-      Context.add(ConnectionCatalog.Service, catalog),
-      Context.add(EnvironmentCatalog.Service, environmentCatalog),
+  Effect.map(Integrations.make(testIntegrations), (integrations) =>
+    bind(
+      context.pipe(
+        Context.add(AgentJobs.Service, recordedAgentJobs),
+        Context.add(TurnJobs.Service, TurnJobs.noRunner),
+        Context.add(ConnectionCatalog.Service, catalog),
+        Context.add(EnvironmentCatalog.Service, environmentCatalog),
+        Context.add(Integrations.Integrations, integrations),
+      ),
     ),
   );
 
 /** One workspace's stores and signals on a host. */
 export const forWorkspace = (host: Context.Context<Host>, id: Workspace.Id) =>
-  Effect.map(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), withHostServices);
+  Effect.flatMap(Context.get(host, WorkspaceStorage.Service).forWorkspace(id), withHostServices);
 
 /** One workspace's stores and signals on the host in context, as a gateway's caller has it. */
 export const boundTo = (id: Workspace.Id) =>
   Effect.flatMap(WorkspaceStorage.Service, (workspaceStorage) =>
-    Effect.map(workspaceStorage.forWorkspace(id), withHostServices),
+    Effect.flatMap(workspaceStorage.forWorkspace(id), withHostServices),
   );
 
 /**
@@ -293,9 +345,9 @@ export const make = (harness: Harness) => {
     Core.layer.pipe(
       Layer.provideMerge(Layer.mergeAll(Layer.succeedContext(bound.context), harness.crypto)),
     );
-  /** A gateway over a host. */
-  const gateway = (host: Context.Context<Host>) =>
-    Gateway.layer(installed).pipe(
+  /** A gateway over a host, which installs what the suites' hosts do, or what `options` say. */
+  const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
+    Gateway.layer(options).pipe(
       Layer.provideMerge(
         Layer.mergeAll(
           Layer.succeedContext(host),

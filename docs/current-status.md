@@ -94,6 +94,11 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   nothing checks a key with its provider. Agents check `connection.use` when configured, but
   only turns resolve a credential for use, as they run; no toolkit consumes connections yet. Credentials are sealed with one host
   key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
+- [Connections v2](../packages/core/README.md#connections-v2), which are to replace them, are set up
+  over HTTP and on the [Connections v2 page](connections-v2.md), beside Connections, from the
+  integrations the [local host](../hosts/local/README.md) installs of every kind. They authenticate
+  with an API key or nothing, and nothing uses them yet: turns, agents, and environments still use
+  the old connections. A check's result is not stored.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
   instructions, model access, and a starting environment, over HTTP and on the
   [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
@@ -235,7 +240,8 @@ placeholder until tasks exist.
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. Search is Jump to, over what the app already
-reads: pages, groups, conversations, people, agents, environments, and connections, by name.
+reads: pages, groups, conversations, people, agents, environments, connections, and connections v2,
+by name.
 Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
 tabs, reactions, and task references have no backend and are not shown.
 

@@ -1,5 +1,6 @@
 import { Record, Schema } from "effect";
 import { ConnectionId } from "../connection/id.ts";
+import { ConnectionV2 } from "../connection-v2/connection.ts";
 import { EnvironmentId } from "../environment/id.ts";
 import { ThreadId } from "../thread/id.ts";
 import { GroupId } from "../group/id.ts";
@@ -13,6 +14,7 @@ export const Reference = Schema.TaggedUnion({
   Thread: { workspaceId: Workspace.Id, threadId: ThreadId.Id },
   Group: { workspaceId: Workspace.Id, groupId: GroupId.Id },
   Connection: { workspaceId: Workspace.Id, connectionId: ConnectionId.Id },
+  ConnectionV2: { workspaceId: Workspace.Id, connectionId: ConnectionV2.Id },
   Environment: { workspaceId: Workspace.Id, environmentId: EnvironmentId.Id },
 });
 export type Reference = typeof Reference.Type;

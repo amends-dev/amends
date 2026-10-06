@@ -14,6 +14,7 @@ import {
   useAgentList,
   useAgentStates,
   useConnectionList,
+  useConnectionV2List,
   useEnvironmentList,
   useThreadTurnControls,
   useTurnActivity,
@@ -33,6 +34,12 @@ import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
 import { agentStatus } from "@amends/ui/screens/agents";
 import { connectionStatus, type ConnectionCapability } from "@amends/ui/screens/connections";
+import {
+  capabilityLabels,
+  capabilityNouns,
+  connectionV2Status,
+  type IntegrationCapability,
+} from "@amends/ui/screens/connections-v2";
 import { environmentStatus } from "@amends/ui/screens/environments";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
@@ -50,6 +57,7 @@ import {
   IconMarkConnections,
   IconMarkEnvironments,
   IconMarkMail,
+  IconMarkMarketplace,
   IconMarkSettings,
   IconMessage,
   IconUsers,
@@ -136,9 +144,11 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         ? "environments"
         : at("connections")
           ? "connections"
-          : at("settings")
-            ? undefined
-            : "home";
+          : at("connections-v2")
+            ? "connections-v2"
+            : at("settings")
+              ? undefined
+              : "home";
   const groupId = () => conversation()?.params.groupId;
   // A thread opens beside its group's stream, or beside the inbox it was opened from.
   const panel = createMemo(
@@ -235,7 +245,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
               },
             }}
             homeHref={href(path("home"))}
-            destinations={["home", "agents", "environments", "connections"]}
+            destinations={["home", "agents", "environments", "connections", "connections-v2"]}
             destination={destination()}
             destinationHref={(target) => href(path(target))}
             settings={{ href: href(path("settings")), current: at("settings") }}
@@ -325,6 +335,9 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
               </Match>
               <Match when={destination() === "connections"}>
                 <ConnectionsSidebar workspaceId={workspaceId} />
+              </Match>
+              <Match when={destination() === "connections-v2"}>
+                <ConnectionsV2Sidebar workspaceId={workspaceId} />
               </Match>
             </Switch>
           </WorkspaceNavigation>
@@ -426,6 +439,7 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
   const agents = useAgentList(workspaceId);
   const environments = useEnvironmentList(workspaceId);
   const connections = useConnectionList(workspaceId);
+  const connectionsV2 = useConnectionV2List(workspaceId);
   const page = (target: WorkspacePage) => paths.workspacePage(workspaceId, target);
   const places = createMemo((): readonly Place[] => {
     const humans = new Set(people().flatMap((person) => (person.agent ? [] : [person.id])));
@@ -465,6 +479,13 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
         section: "Go to",
         icon: IconMarkConnections,
         path: page("connections"),
+      },
+      {
+        id: "page:connections-v2",
+        label: "Connections v2",
+        section: "Go to",
+        icon: IconMarkMarketplace,
+        path: page("connections-v2"),
       },
       {
         id: "page:settings",
@@ -538,6 +559,13 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
         section: "Connections",
         icon: IconMarkConnections,
         path: paths.connection(workspaceId, connection.id),
+      })),
+      ...connectionsV2.connections().map((connection) => ({
+        id: `connection-v2:${connection.id}`,
+        label: connection.name,
+        section: "Connections v2",
+        icon: IconMarkConnections,
+        path: paths.connectionV2(workspaceId, connection.id),
       })),
     ];
   });
@@ -690,6 +718,56 @@ function ConnectionsSidebar(props: { readonly workspaceId: string }) {
           ? [section(undefined, "Unavailable")]
           : []),
       ]}
+    />
+  );
+}
+
+/**
+ * The Connections v2 sidebar: the connections that give models, tools, sandboxes, and harnesses,
+ * each marked when its integration refuses its setup. A connection whose integration this host no
+ * longer installs gives none of them, so it shows only in the full list. A section's title and
+ * Browse open the list of that capability; its + opens Add connection over the current page for
+ * it, by `?add=`.
+ */
+function ConnectionsV2Sidebar(props: { readonly workspaceId: string }) {
+  const navigate = useNavigate();
+  const [search, setSearch] = useSearchParams<{ add?: string; tab?: string }>();
+  const list = useConnectionV2List(props.workspaceId);
+  const open = useMatch(() => "/workspaces/:workspaceId/connections-v2/:connectionId");
+  const browsing = useMatch(() => "/workspaces/:workspaceId/connections-v2");
+  const base = paths.workspacePage(props.workspaceId, "connections-v2");
+  const section = (capability: IntegrationCapability): NavigationSection => ({
+    id: capability,
+    title: capabilityLabels[capability],
+    href: href(`${base}?tab=${capability}`),
+    current: browsing() !== undefined && search.tab === capability,
+    browse: {
+      label: `Browse ${capabilityLabels[capability].toLowerCase()}`,
+      onBrowse: () => navigate(`${base}?tab=${capability}`),
+    },
+    create: list.canCreate()
+      ? {
+          label: `Add ${capabilityNouns[capability]} connection`,
+          onCreate: () => setSearch({ add: capability }),
+        }
+      : undefined,
+    entries: list
+      .connections()
+      .filter((connection) => connection.provides.includes(capability))
+      .map((connection) => ({
+        id: connection.id,
+        name: connection.name,
+        href: href(paths.connectionV2(props.workspaceId, connection.id)),
+        current: open()?.params.connectionId === connection.id,
+        icon: IconMarkConnections,
+        status: connectionV2Status(connection),
+      })),
+    loading: list.loading(),
+    empty: "None yet",
+  });
+  return (
+    <DestinationSidebar
+      sections={(["models", "tools", "sandboxes", "harnesses"] as const).map(section)}
     />
   );
 }
