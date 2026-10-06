@@ -203,6 +203,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
     "workspace/one/active-turns",
     "workspace/one/agents",
     "workspace/one/connections",
+    "workspace/one/connections-v2",
     "workspace/one/environments",
     "workspace/one/groups",
     "workspace/one/inbox",

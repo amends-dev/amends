@@ -17,7 +17,8 @@ src/
                   useChanges, refreshResult, the directory read
   session/        the browser session store; DirectoryProvider, useDirectory, useWorkspace
   live/           the change feed: its stream (api.ts), provider, status, and wake detection
-  workspaces/  conversations/  agents/  connections/  environments/  settings/  turns/
+  workspaces/  conversations/  agents/  connections/  connections-v2/  environments/
+  settings/  turns/
                   one folder per feature: api.ts holds its reads and operations over the HTTP
                   contract; the other files are the hooks its screens connect to
   appearance/     AppearanceProvider, independent of the session
@@ -61,7 +62,7 @@ A hook exposes such an action as `save: () => void save()`. Unmounting interrupt
 operation; the server may still complete it.
 
 `useChanges({ write, reload, failed, done, outdated })` runs the changes of a page whose changes
-count as done only once their result shows: agents, connections, environments, and settings. It
+count as done only once their result shows: agents, connections, connections v2, environments, and settings. It
 runs one change at a time, then `reload`s what the page shows. A failure stays with the change it
 belongs to. A stale one (`changed`, `denied`, or `gone`) makes changes wait for `refresh()`, as
 does a change whose result could not be read back (`refresh-failed`); the refresh that shows it
