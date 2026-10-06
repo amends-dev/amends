@@ -56,6 +56,8 @@ drawings, generation, and visual review in the UI workshop.
   [Workspace shell](workspace-shell.md) covers nested routes, account controls, and appearance.
   [Workspace settings](workspace-settings.md) covers workspace, member, and invitation management.
   [Connections](connections.md) covers adding connections, their keys, and their setup states.
+  [Connections v2](connections-v2.md) covers connecting to a host's integrations, built beside
+  them, and checking a connection.
   [Environments](environments.md) covers adding environments, their sandbox settings, and the
   account detour.
   [Agents](agents.md) covers adding and configuring agents, fitting environments, and the

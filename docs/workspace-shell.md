@@ -6,8 +6,9 @@ Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace lay
 panel. Every destination uses them the same way, as the Lunacy "Agents / Light mode / v02 ·
 Navigation" frames lay out:
 
-- **Rail** picks a destination: Home, Agents, Environments, and Connections, then Settings and the
-  reader's avatar, which opens the account menu. The current destination is marked
+- **Rail** picks a destination: Home, Agents, Environments, Connections, and Connections v2, which is
+  built beside Connections to replace it, then Settings and the reader's avatar, which opens the
+  account menu. The current destination is marked
   `aria-current="true"`, whichever of its pages shows.
 - **Sidebar** lists the destination's items. Its header, the workspace switcher, stays the same
   everywhere; below it, each section's title and Browse open the full list in the main content, and
@@ -42,6 +43,10 @@ The destinations' sidebars:
   that kind, `?kind=`) and + (`?add=model-access` or `?add=sandboxes`), which offers only that
   kind's providers. Connections whose provider this host no longer installs follow under
   Unavailable. See [connections](connections.md).
+- **Connections v2**: Models, Tools, Sandboxes, and Harnesses, each connection under what its
+  integration gives, each section with its own Browse (`?tab=`) and + (`?add=`), which offers only
+  that kind's integrations. A connection whose integration this host no longer installs shows only
+  in the list. See [connections v2](connections-v2.md).
 - **Settings**: Workspace and Members, each its own page. See
   [workspace settings](workspace-settings.md).
 

@@ -1477,6 +1477,117 @@ it("offers adding connections only to those who may", async () => {
   expect(screen.queryByRole("button", { name: /Add connection/ })).not.toBeInTheDocument();
 });
 
+/** A host installing an MCP integration, answering Connections v2's reads, writes, and checks. */
+function connectionsV2Host() {
+  const mcp = {
+    id: "mcp",
+    name: "MCP server",
+    auth: ["apiKey", "none"],
+    provides: ["tools"],
+    settings: {
+      type: "object",
+      properties: {
+        url: { type: "string", title: "Server URL", minLength: 1 },
+        keyHeader: { type: "string", title: "Key header", minLength: 1 },
+      },
+      required: ["url"],
+    },
+  };
+  let created: Record<string, unknown> | undefined;
+  const writes: Array<{ method: string; path: string; body: unknown }> = [];
+  const view = () => ({
+    id: "c1",
+    integration: "mcp",
+    name: created?.["name"],
+    settings: created?.["settings"],
+    auth: created?.["auth"],
+    readiness: { _tag: "Ready" },
+    manageable: true,
+    createdBy: "owner-one",
+    createdAt: at,
+  });
+  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/connections-v2/integrations") return response([mcp]);
+    if (path === "/workspaces/one/connections-v2" && request.method === "GET")
+      return response(created === undefined ? [] : [view()]);
+    if (path === "/workspaces/one/connections-v2" && request.method === "POST") {
+      created = (await request.json()) as Record<string, unknown>;
+      writes.push({ method: "POST", path, body: created });
+      return response(view(), 201);
+    }
+    if (path === "/workspaces/one/connections-v2/c1/check") {
+      writes.push({ method: "POST", path, body: undefined });
+      return response({ status: "unauthorized", description: "The server refused the key." });
+    }
+    return response({
+      memberships: [
+        {
+          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 1,
+        },
+      ],
+      invitations: [],
+    });
+  });
+  return { fetch, writes };
+}
+/** Adds an MCP server with its key from the empty page, which opens its page and checks it. */
+async function addMcpServerWithKey() {
+  const page = await screen.findByRole("heading", { name: "No connections yet" });
+  fireEvent.click(within(page.parentElement!).getByRole("button", { name: "Add connection" }));
+  const chooser = await screen.findByRole("dialog", { name: "Add connection" });
+  fireEvent.click(within(chooser).getByRole("button", { name: /MCP server/ }));
+  const configure = await screen.findByRole("dialog", { name: "Configure connection" });
+  fireEvent.input(within(configure).getByRole("textbox", { name: "Server URL" }), {
+    target: { value: "https://tools.example.com/mcp" },
+  });
+  fireEvent.input(within(configure).getByLabelText("API key", { selector: "input" }), {
+    target: { value: "sk-tools" },
+  });
+  fireEvent.click(within(configure).getByRole("button", { name: "Create connection" }));
+  await within(screen.getByLabelText("Notifications")).findByText("MCP server created");
+  await screen.findByRole("heading", { name: "MCP server" });
+  // Creating it checks it, and the page says what the check found.
+  await within(screen.getByRole("main")).findByText("Key refused");
+  expect(screen.getByText("The server refused the key.")).toBeInTheDocument();
+}
+const connectionV2Writes = [
+  {
+    method: "POST",
+    path: "/workspaces/one/connections-v2",
+    body: {
+      integration: "mcp",
+      name: "MCP server",
+      settings: { url: "https://tools.example.com/mcp" },
+      auth: "apiKey",
+      apiKey: "sk-tools",
+    },
+  },
+  { method: "POST", path: "/workspaces/one/connections-v2/c1/check", body: undefined },
+];
+
+it("adds a connection with its key from Connections v2, opening its page and checking it", async () => {
+  const host = connectionsV2Host();
+  const history = mount(
+    "/workspaces/one/connections-v2",
+    memoryStore(session("alice")).store,
+    host.fetch,
+    undefined,
+    { permissions: ["connection-v2.create"] },
+  );
+  await addMcpServerWithKey();
+  expect(history.get()).toBe("/workspaces/one/connections-v2/c1");
+  expect(host.writes).toEqual(connectionV2Writes);
+});
+
 /** A host listing two agents, one of whose model connection is gone, for the Agents pages. */
 function agentsHost() {
   const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" };
