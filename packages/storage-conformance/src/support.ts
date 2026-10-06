@@ -152,6 +152,7 @@ export const testIntegrations = [
     auth: ["apiKey", "none"],
     models: {
       listed: [],
+      unlisted: true,
       endpoint: ({ settings }, { model }) =>
         Result.succeed({
           provider: "test-models",

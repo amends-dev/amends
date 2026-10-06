@@ -43,8 +43,9 @@ export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
     auth: ["apiKey", "none"],
     models: {
       listed: [],
+      unlisted: true,
       endpoint: ({ connection, settings, apiKey }, options) =>
-        Result.map(ensureOffered(options, undefined), (): ModelEndpoint.ModelEndpoint => ({
+        Result.succeed({
           // The connection's own id, which no other provider has, so that an agent that knows
           // providers by name, as opencode does, takes the API for a provider of its own.
           provider: connection.id,
@@ -52,7 +53,7 @@ export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
           protocol: "openai-chat",
           url: settings.url.replace(/\/+$/, ""),
           ...withOptions(apiKey, options),
-        })),
+        }),
     },
     check: ({ settings, apiKey }) => {
       const url = `${settings.url.replace(/\/+$/, "")}/models`;
@@ -75,19 +76,21 @@ const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient
     auth: ["apiKey"],
     models: {
       listed: provider.models,
+      unlisted: false,
       endpoint: ({ settings, apiKey }, options) => {
+        // A connection offers only the models it lists, so an endpoint is asked only for one of them.
         const model = provider.models.find((listed) => listed.id === options.model);
         if (model === undefined) {
           const description = `The catalog has no model ${options.model} of ${provider.name}`;
           return Result.fail(new UnsupportedError({ description }));
         }
-        return Result.map(ensureOffered(options, model), (): ModelEndpoint.ModelEndpoint => ({
+        return Result.succeed({
           provider: provider.id,
           model: model.id,
           protocol: model.protocol,
           url: urlWith(model.url, settings),
           ...withOptions(apiKey, options),
-        }));
+        });
       },
     },
     check: ({ settings, apiKey }) => {
@@ -117,36 +120,6 @@ const modelToCheckWith = (provider: ModelCatalog.Provider) =>
         latest === undefined || model.released > latest.released ? model : latest,
       undefined,
     ) ?? provider.models[0];
-
-/**
- * Fails when `model` does not offer what `options` ask of it, and for an output limit that is not a
- * number of tokens. A model the catalog does not list, as `undefined`, offers any effort and limit.
- */
-const ensureOffered = (
-  options: Integration.EndpointOptions,
-  model: ModelCatalog.Model | undefined,
-): Result.Result<void, UnsupportedError> => {
-  const { effort, maxOutputTokens } = options;
-  const unsupported = (description: string) => Result.fail(new UnsupportedError({ description }));
-  if (
-    maxOutputTokens !== undefined &&
-    !(Number.isInteger(maxOutputTokens) && maxOutputTokens > 0)
-  ) {
-    return unsupported(
-      `An output limit is a whole number of tokens above 0, not ${maxOutputTokens}`,
-    );
-  }
-  if (model === undefined) return Result.void;
-  if (effort !== undefined && !(model.reasoning?.efforts ?? []).includes(effort)) {
-    return unsupported(`${model.name} takes no effort ${effort}`);
-  }
-  if (maxOutputTokens !== undefined && maxOutputTokens > model.limits.output) {
-    return unsupported(
-      `${model.name} writes at most ${model.limits.output} tokens in a response, not ${maxOutputTokens}`,
-    );
-  }
-  return Result.void;
-};
 
 /** The parts of an endpoint that come from the connection's key and the agent's options. */
 const withOptions = (

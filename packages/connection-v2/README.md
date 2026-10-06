@@ -13,7 +13,11 @@ when it takes none; the `auth` methods a connection can authenticate by, `apiKey
 OAuth comes; what a connection gives, of `harnesses` that run agents, `models` an agent runs on,
 `sandboxes` it works in, and `tools` it calls; and a `check`. The code of an integration is given a
 connection with its settings decoded and its key, which it always has when a connection to it
-authenticates only with a key.
+authenticates only with a key. An integration that gives harnesses says whether their agent
+`requiresSandbox`, so that an agent can be set up to run on it before any harness is made. One that
+gives models lists the catalog's models a connection offers, and says whether it also offers
+`unlisted` models, by any id, which take any effort and output limit as nothing more is known of
+them.
 
 An integration describes its settings as a form a person fills in, `SettingsForm`: the JSON Schema
 of an object of text, number, yes-or-no, and choice fields, which is how MCP asks a person for
@@ -25,9 +29,13 @@ A **connection** is a workspace's link to one integration: its id, the integrati
 settings as JSON, and the auth method it uses. Its **credential**, the API key, is kept apart, so that
 a connection can be shown and stored without it. An integration's operations take the two as they are
 stored: `validate` refuses a connection by its settings, which are those of the form and no others,
-or by its auth method, running nothing and without its credential; `harness` gives a harness that runs its agent on the models it is given, as `Agent.Options`,
-`modelEndpoint` how an agent reaches a model, `sandboxProvider` a sandbox provider that works until
-its scope closes, `toolSource` a tool source, and `check` its `Health`. They fail with
+or by its auth method, running nothing and without its credential; `validateModel` refuses it as
+`validate` does, and refuses a model it does not offer, or an effort or output limit the model does
+not take, likewise; `harness` gives a harness that runs its agent on the models it is given, as
+`Agent.Options`, and dies when the harness says otherwise of the sandbox its agent needs;
+`modelEndpoint` how an agent reaches a model, which it refuses as `validateModel` does;
+`sandboxProvider` a sandbox provider that works until its scope closes, `toolSource` a tool source,
+and `check` its `Health`. They fail with
 `ConnectionError`, which names the integration and holds a reason: `NotFoundError`,
 `InvalidConnectionError` for settings, an auth method, or a missing key the integration does not
 take, `UnsupportedError` for what it does not give, and `UnavailableError`, which may pass.
@@ -47,11 +55,12 @@ its limits, modalities, tool support, reasoning controls, and cost. It is `src/s
 catalog keeps changes shape; `ModelCatalog.layer` reads it.
 
 `ModelIntegrations.catalogProviders` is an integration for each provider in the catalog. A
-connection authenticates with an API key and gives the settings the provider's URLs name, such as a
-Cloudflare account's id. Its endpoint for a model is where the catalog says the model is served, with
-the effort and output limit an agent asks for, which the model must offer.
-`ModelIntegrations.openAiCompatible` reaches any model of an API that serves Chat Completions at the
-URL a connection gives, with a key or none, as a provider of the connection's own.
+connection authenticates with an API key, gives the settings the provider's URLs name, such as a
+Cloudflare account's id, and offers the provider's models in the catalog and no others. Its endpoint
+for a model is where the catalog says the model is served, with the effort and output limit an agent
+asks for, which the model must offer. `ModelIntegrations.openAiCompatible` offers any model of an API
+that serves Chat Completions at the URL a connection gives, unlisted, with a key or none, as a
+provider of the connection's own.
 
 Checking a connection to a provider asks it for a response to a request it must refuse, as it has no
 messages, naming the model it released last of those it released fully. A provider that reads the

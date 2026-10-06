@@ -98,11 +98,14 @@ export const integration = Effect.fn("AmendsAgent.integration")(function* (
     id: "amends",
     name: "amends",
     auth: ["none"],
-    harnesses: (_access, agentOptions) =>
-      make({ ...options, ...agentOptions }).pipe(
-        Effect.map(Harness.make),
-        Effect.provideService(Models.LanguageModels, languageModels),
-      ),
+    harnesses: {
+      requiresSandbox: false,
+      harness: (_access, agentOptions) =>
+        make({ ...options, ...agentOptions }).pipe(
+          Effect.map(Harness.make),
+          Effect.provideService(Models.LanguageModels, languageModels),
+        ),
+    },
     check: () => Effect.succeed({ status: "healthy" }),
   });
 });

@@ -6,6 +6,7 @@ import { Effect, Exit, Redacted, Result, Schema } from "effect";
 import * as Connection from "../src/Connection.ts";
 import * as Integration from "../src/Integration.ts";
 import * as Integrations from "../src/Integrations.ts";
+import type * as ModelCatalog from "../src/ModelCatalog.ts";
 
 const key = Redacted.make("secret-key");
 
@@ -35,7 +36,7 @@ const agent: Agent.Agent = {
 
 /**
  * An integration that gives everything, and remembers what it is given. Its harness runs only on
- * models served over Chat Completions.
+ * models served over Chat Completions, and it offers any model, unlisted.
  */
 const everything = Integration.make({
   id: "everything",
@@ -44,20 +45,24 @@ const everything = Integration.make({
     region: Schema.NonEmptyString.annotate({ title: "Region", description: "Where it runs." }),
   }),
   auth: ["apiKey", "none"],
-  harnesses: (access, options) =>
-    Effect.gen(function* () {
-      given.push(access);
-      madeWith.push(options);
-      const { protocol } = options.model;
-      if (protocol !== "openai-chat") {
-        return yield* new Connection.UnsupportedError({
-          description: `Everything runs no model over ${protocol}`,
-        });
-      }
-      return Harness.make(agent);
-    }),
+  harnesses: {
+    requiresSandbox: false,
+    harness: (access, options) =>
+      Effect.gen(function* () {
+        given.push(access);
+        madeWith.push(options);
+        const { protocol } = options.model;
+        if (protocol !== "openai-chat") {
+          return yield* new Connection.UnsupportedError({
+            description: `Everything runs no model over ${protocol}`,
+          });
+        }
+        return Harness.make(agent);
+      }),
+  },
   models: {
     listed: [],
+    unlisted: true,
     endpoint: (access, options) => {
       given.push(access);
       return Result.succeed({
@@ -75,15 +80,44 @@ const everything = Integration.make({
     Effect.sync(() => given.push(access)).pipe(Effect.as({ status: "healthy" as const })),
 });
 
-/** An integration that gives only models, takes no settings, and authenticates only with a key. */
+/** A model the catalog lists, which reasons with a low or high effort and writes up to 8,000 tokens. */
+const modelOne: ModelCatalog.Model = {
+  id: "model-one",
+  name: "Model One",
+  protocol: "openai-chat",
+  url: "https://models.example/v1",
+  released: "2026-01",
+  limits: { context: 100_000, output: 8_000 },
+  modalities: { input: ["text"], output: ["text"] },
+  tools: true,
+  reasoning: { toggle: false, efforts: ["low", "high"] },
+};
+
+/**
+ * An integration that gives only models, takes no settings, and authenticates only with a key. It
+ * offers only `modelOne`, which its endpoint still refuses.
+ */
 const modelsOnly = Integration.make({
   id: "models-only",
   name: "Models only",
   auth: ["apiKey"],
   models: {
-    listed: [],
+    listed: [modelOne],
+    unlisted: false,
     endpoint: () => Result.fail(new Connection.UnsupportedError({ description: "No model" })),
   },
+  check: () => Effect.succeed({ status: "healthy" }),
+});
+
+/** An agent that works only in a sandbox, which is never started. */
+const sandboxed: Agent.Agent = { ...agent, id: "sandboxed", requiresSandbox: true };
+
+/** An integration whose agent works only in a sandbox, as its harnesses say. */
+const sandboxedOnly = Integration.make({
+  id: "sandboxed-only",
+  name: "Sandboxed only",
+  auth: ["none"],
+  harnesses: { requiresSandbox: true, harness: () => Effect.succeed(Harness.make(sandboxed)) },
   check: () => Effect.succeed({ status: "healthy" }),
 });
 
@@ -115,7 +149,43 @@ describe("Integration.make", () => {
   it("says what a connection to the integration gives", () => {
     expect(everything.provides).toEqual(["harnesses", "models", "sandboxes", "tools"]);
     expect(modelsOnly.provides).toEqual(["models"]);
+    expect(everything.models).toEqual({ listed: [], unlisted: true });
+    expect(modelsOnly.models).toEqual({ listed: [modelOne], unlisted: false });
+    expect(sandboxedOnly.models).toEqual({ listed: [], unlisted: false });
   });
+
+  it("says whether the agent of the harnesses a connection gives works only in a sandbox", () => {
+    expect(sandboxedOnly.requiresSandbox).toBe(true);
+    expect(everything.requiresSandbox).toBe(false);
+    expect(modelsOnly.requiresSandbox).toBe(false);
+  });
+
+  it.effect("dies when a harness it makes says otherwise of its agent's sandbox", () =>
+    Effect.gen(function* () {
+      const contradicted = Integration.make({
+        id: "contradicted",
+        name: "Contradicted",
+        auth: ["none"],
+        harnesses: { requiresSandbox: true, harness: () => Effect.succeed(Harness.make(agent)) },
+        check: () => Effect.succeed({ status: "healthy" }),
+      });
+      const made = yield* sandboxedOnly.harness(
+        connection({ integration: "sandboxed-only", auth: "none", settings: {} }),
+        undefined,
+        { model: chatEndpoint },
+      );
+      const exit = yield* Effect.exit(
+        contradicted.harness(
+          connection({ integration: "contradicted", auth: "none", settings: {} }),
+          undefined,
+          { model: chatEndpoint },
+        ),
+      );
+
+      expect(made.agent.requiresSandbox).toBe(true);
+      expect(Exit.hasDies(exit)).toBe(true);
+    }),
+  );
 
   it("describes the settings a connection gives as a form", () => {
     expect(everything.settings).toEqual({
@@ -168,6 +238,103 @@ describe("Integration.make", () => {
         "The settings of Mine do not match what Everything takes",
       );
       expect(given).toHaveLength(0);
+    }),
+  );
+
+  it.effect("validates a model as a connection offers it, without its key, running nothing", () =>
+    Effect.gen(function* () {
+      given.length = 0;
+      const ofModelsOnly = connection({ integration: "models-only", settings: {} });
+      yield* modelsOnly.validateModel(ofModelsOnly, {
+        model: "model-one",
+        effort: "high",
+        maxOutputTokens: 8_000,
+      });
+      yield* everything.validateModel(connection(), {
+        model: "anything",
+        effort: "max",
+        maxOutputTokens: 1_000_000,
+      });
+      const refusals = [
+        yield* reasonOf(modelsOnly.validateModel(ofModelsOnly, { model: "model-two" })),
+        yield* reasonOf(
+          modelsOnly.validateModel(ofModelsOnly, { model: "model-one", effort: "medium" }),
+        ),
+        yield* reasonOf(
+          modelsOnly.validateModel(ofModelsOnly, { model: "model-one", maxOutputTokens: 9_000 }),
+        ),
+        yield* reasonOf(everything.validateModel(connection(), { model: "m", maxOutputTokens: 0 })),
+        yield* reasonOf(
+          everything.validateModel(connection(), { model: "m", maxOutputTokens: 1.5 }),
+        ),
+        yield* reasonOf(modelsOnly.validateModel(connection({ auth: "none" }), { model: "m" })),
+        yield* reasonOf(sandboxedOnly.validateModel(connection(), { model: "m" })),
+      ];
+
+      expect(refusals).toEqual([
+        {
+          integration: "models-only",
+          tag: "UnsupportedError",
+          description: "Models only offers no model model-two",
+        },
+        {
+          integration: "models-only",
+          tag: "UnsupportedError",
+          description: "Model One takes no effort medium",
+        },
+        {
+          integration: "models-only",
+          tag: "UnsupportedError",
+          description: "Model One writes at most 8000 tokens in a response, not 9000",
+        },
+        {
+          integration: "everything",
+          tag: "UnsupportedError",
+          description: "An output limit is a whole number of tokens above 0, not 0",
+        },
+        {
+          integration: "everything",
+          tag: "UnsupportedError",
+          description: "An output limit is a whole number of tokens above 0, not 1.5",
+        },
+        {
+          integration: "models-only",
+          tag: "InvalidConnectionError",
+          description: "Models only takes no authentication by none",
+        },
+        {
+          integration: "sandboxed-only",
+          tag: "UnsupportedError",
+          description: "Sandboxed only gives no models",
+        },
+      ]);
+      expect(given).toHaveLength(0);
+    }),
+  );
+
+  it.effect("gives an endpoint only for a model the connection offers as it is asked for", () =>
+    Effect.gen(function* () {
+      const ofModelsOnly = connection({ integration: "models-only", settings: {} });
+      const refusals = [
+        yield* reasonOf(modelsOnly.modelEndpoint(ofModelsOnly, { apiKey: key }, { model: "m" })),
+        yield* reasonOf(
+          modelsOnly.modelEndpoint(
+            ofModelsOnly,
+            { apiKey: key },
+            { model: "model-one", effort: "medium" },
+          ),
+        ),
+        yield* reasonOf(
+          modelsOnly.modelEndpoint(ofModelsOnly, { apiKey: key }, { model: "model-one" }),
+        ),
+      ];
+
+      expect(refusals.map(({ description }) => description)).toEqual([
+        "Models only offers no model m",
+        "Model One takes no effort medium",
+        // The model is offered, so the integration's endpoint is asked, and refuses it itself.
+        "No model",
+      ]);
     }),
   );
 
@@ -262,7 +429,7 @@ describe("Integration.make", () => {
           modelsOnly.harness(connection(settled), { apiKey: key }, { model: chatEndpoint }),
         ),
         yield* reasonOf(
-          modelsOnly.modelEndpoint(connection(settled), { apiKey: key }, { model: "m" }),
+          modelsOnly.modelEndpoint(connection(settled), { apiKey: key }, { model: "model-one" }),
         ),
         yield* reasonOf(
           everything.harness(

@@ -43,6 +43,7 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
         });
 
         expect(integration.provides).toEqual(["harnesses"]);
+        expect(integration.requiresSandbox).toBe(true);
         expect(harness.agent.id).toBe("opencode");
         expect(harness.agent.requiresSandbox).toBe(true);
         expect(harness.agent.ports).toEqual([port]);
