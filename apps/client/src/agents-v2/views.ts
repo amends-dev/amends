@@ -105,6 +105,47 @@ const inputOf = (draft: SetupDraft): SetupInput | undefined =>
 const sameSetup = (left: SetupDraft, right: SetupDraft) =>
   JSON.stringify(inputOf(left)) === JSON.stringify(inputOf(right));
 
+type SetupKey = keyof SetupDraft;
+
+/** The draft field that chooses each part's connection. */
+const connectionKey = {
+  harness: "harness",
+  model: "modelConnectionId",
+  sandbox: "sandboxId",
+} as const satisfies Record<SetupPart, SetupKey>;
+
+/** The draft fields whose edit may resolve an issue. */
+const resolvingKeys = (issue: AgentV2Issue): readonly SetupKey[] => {
+  switch (issue.kind) {
+    case "sandbox-required":
+      return ["harness", "sandboxId"];
+    case "no-harness":
+      return ["harness"];
+    case "invalid":
+      return issue.part === "model"
+        ? ["modelConnectionId", "model", "effort"]
+        : [connectionKey[issue.part]];
+    case "removed":
+    case "uninstalled":
+      return [connectionKey[issue.part]];
+  }
+};
+
+type Problem = Omit<AgentsV2Failure, "action" | "error">;
+
+/**
+ * What a refused setup still shows once the reader has edited `edited`: an issue stops showing as
+ * a field that may resolve it changes, and a refusal with none left is set aside.
+ */
+const remainingProblem = (problem: Problem, edited: ReadonlySet<SetupKey>): Problem | undefined => {
+  if (problem.part !== undefined && edited.has(connectionKey[problem.part])) return undefined;
+  if (problem.issues === undefined || problem.issues.length === 0) return problem;
+  const issues = problem.issues.filter(
+    (issue) => !resolvingKeys(issue).some((key) => edited.has(key)),
+  );
+  return issues.length === 0 ? undefined : { ...problem, issues };
+};
+
 const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | undefined =>
   AsyncResult.isFailure(read) && !read.waiting ? read.cause : undefined;
 
@@ -310,7 +351,12 @@ export function useAgentsV2(
     },
     outdated: () => loaded() && read?.failure() !== undefined,
   });
-  const send = changes.send;
+  // The setup fields edited since the last change was sent; the issues they may resolve stop showing.
+  const [edited, setEdited] = createSignal<ReadonlySet<SetupKey>>(new Set());
+  const send: typeof changes.send = (change, details) => {
+    setEdited(new Set<SetupKey>());
+    changes.send(change, details);
+  };
 
   // A new agent: its name, its role, and its setup. Retrying the same request reuses its request
   // key, so an attempt whose response was lost is not created twice; changing it makes a new one.
@@ -365,26 +411,32 @@ export function useAgentsV2(
   /** The setup fields over a draft, which `edit` changes. */
   const fieldsOf = (
     draft: SetupDraft,
-    edit: (change: Partial<SetupDraft>) => void,
-  ): Omit<SetupFieldsProps, "problems" | "disabled"> => ({
-    instructions: draft.instructions,
-    onInstructionsChange: (instructions) => edit({ instructions }),
-    harness: draft.harness,
-    onHarnessChange: (harness) => edit({ harness }),
-    harnesses: harnessOptions(draft.harness),
-    modelConnections: optionsFor("model", draft.modelConnectionId),
-    modelConnectionId: draft.modelConnectionId,
-    onModelConnectionChange: (modelConnectionId) =>
-      edit({ modelConnectionId, model: "", effort: undefined }),
-    models: models(draft.modelConnectionId),
-    model: draft.model,
-    onModelChange: (model) => edit({ model }),
-    effort: draft.effort,
-    onEffortChange: (effort) => edit({ effort }),
-    sandboxes: optionsFor("sandbox", draft.sandboxId),
-    sandboxId: draft.sandboxId,
-    onSandboxChange: (sandboxId) => edit({ sandboxId }),
-  });
+    apply: (change: Partial<SetupDraft>) => void,
+  ): Omit<SetupFieldsProps, "problems" | "disabled"> => {
+    const edit = (change: Partial<SetupDraft>) => {
+      setEdited((previous) => new Set([...previous, ...(Object.keys(change) as SetupKey[])]));
+      apply(change);
+    };
+    return {
+      instructions: draft.instructions,
+      onInstructionsChange: (instructions) => edit({ instructions }),
+      harness: draft.harness,
+      onHarnessChange: (harness) => edit({ harness }),
+      harnesses: harnessOptions(draft.harness),
+      modelConnections: optionsFor("model", draft.modelConnectionId),
+      modelConnectionId: draft.modelConnectionId,
+      onModelConnectionChange: (modelConnectionId) =>
+        edit({ modelConnectionId, model: "", effort: undefined }),
+      models: models(draft.modelConnectionId),
+      model: draft.model,
+      onModelChange: (model) => edit({ model }),
+      effort: draft.effort,
+      onEffortChange: (effort) => edit({ effort }),
+      sandboxes: optionsFor("sandbox", draft.sandboxId),
+      sandboxId: draft.sandboxId,
+      onSandboxChange: (sandboxId) => edit({ sandboxId }),
+    };
+  };
   return {
     /** Why nothing shows yet; undefined once the agents have loaded. */
     status: (): "loading" | "failed" | "unavailable" | undefined => {
@@ -408,7 +460,9 @@ export function useAgentsV2(
       const failure = changes.failure();
       if (!failure) return undefined;
       const [problem] = failure.problems;
-      return Object.assign({ action: failure.action, error: failure.error }, problem);
+      const remaining = problem && remainingProblem(problem, edited());
+      if (problem && !remaining) return undefined;
+      return Object.assign({ action: failure.action, error: failure.error }, remaining);
     },
     /** What the reader sees is out of date: changes wait for a refresh. */
     stale: changes.stale,

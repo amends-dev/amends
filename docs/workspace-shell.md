@@ -6,9 +6,9 @@ Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace lay
 panel. Every destination uses them the same way, as the Lunacy "Agents / Light mode / v02 ·
 Navigation" frames lay out:
 
-- **Rail** picks a destination: Home, Agents, Environments, Connections, and Connections v2, which is
-  built beside Connections to replace it, then Settings and the reader's avatar, which opens the
-  account menu. The current destination is marked
+- **Rail** picks a destination: Home, Agents, Agents v2, Environments, Connections, and Connections
+  v2, the v2 destinations built beside those they are to replace, then Settings and the reader's
+  avatar, which opens the account menu. The current destination is marked
   `aria-current="true"`, whichever of its pages shows.
 - **Sidebar** lists the destination's items. Its header, the workspace switcher, stays the same
   everywhere; below it, each section's title and Browse open the full list in the main content, and
@@ -35,6 +35,8 @@ The destinations' sidebars:
   people's rows gain theirs with presence, which is not implemented yet.
 - **Agents**: each agent by name with its avatar and status patch, and the logo while one of its
   turns is queued or running; + is Add agent (`?add=agent`). See [agents](agents.md).
+- **Agents v2**: each agent by name with its avatar and status patch; + is Add agent
+  (`?add=agent`). See [agents v2](agents-v2.md).
 - **Environments**: each environment, marked at the row's end when it needs setup or is
   unavailable; + is Add environment
   (`?add=environment`). One section: every environment serves the same use, and the sandbox is a

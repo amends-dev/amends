@@ -1675,6 +1675,109 @@ it("lists agents in the sidebar, opens each as its page with tabs, and adds from
   expect(history.get()).toBe("/workspaces/one/agents/a1/configuration?add=agent");
 });
 
+/** A host with two agents v2, one whose sandbox connection was removed, and their connections. */
+function agentsV2Host() {
+  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" };
+  const agent = (id: string, name: string, sandbox: string | null) => ({
+    id,
+    memberId: `member-${id}`,
+    name,
+    instructions: "Help the team.",
+    harness: { _tag: "Connection", connectionId: "h1" },
+    model: { connectionId: "m1", id: "local-model" },
+    sandbox: sandbox === null ? null : { connectionId: sandbox },
+    readiness:
+      sandbox === null
+        ? { _tag: "Ready" }
+        : { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "sandbox" }] },
+    configurable: true,
+    createdBy: "owner-one",
+    createdAt: "2026-10-06T12:00:00.000Z",
+  });
+  const integration = (id: string, name: string, provides: string) => ({
+    id,
+    name,
+    auth: ["none"],
+    provides: [provides],
+    requiresSandbox: false,
+    settings: { type: "object", properties: {} },
+  });
+  const connection = (id: string, name: string, integrationId: string) => ({
+    id,
+    name,
+    integration: integrationId,
+    settings: {},
+    auth: "none",
+    readiness: { _tag: "Ready" },
+    manageable: true,
+    createdBy: "owner-one",
+    createdAt: "2026-10-06T12:00:00.000Z",
+  });
+  return vi.fn<typeof globalThis.fetch>(async (input, init) => {
+    const request = new Request(input, init);
+    const path = new URL(request.url).pathname;
+    if (path === "/workspaces/one/agents-v2")
+      return response([agent("a1", "Atlas", null), agent("a2", "Review helper", "gone")]);
+    if (path === "/workspaces/one/connections-v2/integrations")
+      return response([
+        integration("amends", "amends", "harnesses"),
+        integration("openai-compatible", "OpenAI-compatible API", "models"),
+      ]);
+    if (path === "/workspaces/one/connections-v2")
+      return response([
+        connection("h1", "Amends harness", "amends"),
+        connection("m1", "Local models", "openai-compatible"),
+      ]);
+    if (path === "/workspaces/one/connections-v2/m1/models")
+      return response({ listed: [], unlisted: true });
+    if (path === "/workspaces/one/settings")
+      return response({
+        workspace,
+        canRename: true,
+        canReadInvitations: true,
+        canInvite: true,
+        roles: [],
+      });
+    return response({
+      memberships: [
+        {
+          workspace,
+          member: {
+            id: "owner-one",
+            workspaceId: "one",
+            identity: { _tag: "Human", id: "alice" },
+            status: "active",
+          },
+          people: 1,
+        },
+      ],
+      invitations: [],
+    });
+  });
+}
+it("lists agents v2 in the sidebar, opens one with its setup, and adds from the sidebar", async () => {
+  const history = mount(
+    "/workspaces/one/agents-v2",
+    memoryStore(session("alice")).store,
+    agentsV2Host(),
+    undefined,
+    { permissions: ["agent-v2.create"] },
+  );
+  const sidebar = within(await screen.findByRole("navigation", { name: "Workspace" }));
+  await sidebar.findByRole("link", { name: /Atlas/ });
+  expect(sidebar.getByRole("link", { name: "Agents v2" })).toHaveAttribute("aria-current", "page");
+  expect(sidebar.getByRole("link", { name: /Review helper, Needs setup$/ })).toBeInTheDocument();
+  fireEvent.click(sidebar.getByRole("link", { name: /Review helper/ }));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/agents-v2/a2"));
+  const main = within(screen.getByRole("main"));
+  await main.findByText("Its sandbox connection was removed.");
+  expect(main.getByRole("button", { name: /^Harness/ })).toHaveTextContent("Amends harness");
+  expect(main.getByRole("button", { name: /^Sandbox/ })).toHaveTextContent("Removed connection");
+  fireEvent.click(sidebar.getByRole("button", { name: "Add agent" }));
+  await screen.findByRole("dialog", { name: "Add agent" });
+  expect(history.get()).toBe("/workspaces/one/agents-v2/a2?add=agent");
+});
+
 /** A host with Amends and Daytona installed, answering the Environments page and its detour. */
 function environmentsHost() {
   const daytonaConnection = {

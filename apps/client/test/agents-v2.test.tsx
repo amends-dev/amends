@@ -404,6 +404,48 @@ it("says which connection the host refused and why a setup couldn't run, keeping
   expect(f.view.create.name()).toBe("Scout");
 });
 
+it("stops showing what the host refused as the fields that may resolve it change", async () => {
+  const f = fixture();
+  await waitFor(() => expect(f.view.roles()).toHaveLength(2));
+  f.view.create.begin();
+  f.view.create.setName("Scout");
+  f.view.create.fields().onModelConnectionChange("openrouter");
+  f.view.create.fields().onModelChange("sonnet");
+  const refused = [
+    { _tag: "SandboxRequired" },
+    { _tag: "Invalid", part: "model", description: "OpenRouter offers no model sonnet." },
+  ];
+  f.server.answers.push(json({ _tag: "AgentV2Service.Incomplete", issues: refused }, 422));
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()?.issues).toHaveLength(2));
+
+  // Instructions resolve nothing; a sandbox resolves its issue alone.
+  f.view.create.fields().onInstructionsChange("Scout ahead.");
+  expect(f.view.failure()?.issues).toHaveLength(2);
+  f.view.create.fields().onSandboxChange("machine");
+  expect(f.view.failure()).toEqual({
+    action: "create",
+    error: "incomplete",
+    issues: [{ kind: "invalid", part: "model", description: "OpenRouter offers no model sonnet." }],
+  });
+  f.view.create.fields().onModelChange("claude-opus-5-5");
+  expect(f.view.failure()).toBeUndefined();
+
+  // A connection the host refused stops showing once another is chosen, until the next save.
+  f.server.answers.push(
+    json(
+      { _tag: "AgentV2Service.ConnectionUnavailable", part: "model", connectionId: "openrouter" },
+      422,
+    ),
+  );
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()?.error).toBe("unavailable"));
+  f.view.create.fields().onSandboxChange(undefined);
+  expect(f.view.failure()?.part).toBe("model");
+  f.view.create.fields().onModelConnectionChange("vertex");
+  expect(f.view.failure()).toBeUndefined();
+});
+
 it("saves a setup as a whole once it differs, and discards edits", async () => {
   const f = fixture();
   await waitFor(() => expect(f.view.agent("reviewer")).toBeDefined());

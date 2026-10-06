@@ -100,9 +100,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   with an API key or nothing. Agents v2 name them, but nothing runs on them yet: turns, agents, and
   environments still use the old connections. A check's result is not stored.
 - [Agents v2](../packages/core/README.md#agents-v2), which are to replace agents, are created,
-  configured, and renamed over connections v2, in core and
-  [over HTTP](../packages/api-http/README.md#agents-v2); the apps do not show them yet, and they run
-  no turns. An agent on `Auto`
+  configured, renamed, and removed over connections v2, in core,
+  [over HTTP](../packages/api-http/README.md#agents-v2), and on the
+  [Agents v2 page](agents-v2.md), beside Agents; they run no turns. An agent on `Auto`
   stores that choice, but nothing yet chooses a harness for it: its readiness only says whether a
   connection gives one it could run on.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
@@ -246,8 +246,8 @@ placeholder until tasks exist.
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. Search is Jump to, over what the app already
-reads: pages, groups, conversations, people, agents, environments, connections, and connections v2,
-by name.
+reads: pages, groups, conversations, people, agents, agents v2, environments, connections, and
+connections v2, by name.
 Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
 tabs, reactions, and task references have no backend and are not shown.
 
