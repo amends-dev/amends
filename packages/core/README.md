@@ -217,7 +217,8 @@ instructions; its `harness`, the harnesses of one of the workspace's connections
 amends to choose among them; its `model`, one a connection offers, by id, with an `effort`; and its
 `sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
 membership's. `AgentV2Facts.Created` records an agent in the commit that adds its membership, and
-`Configured` replaces how it is set up as a whole. `agent-v2.create` works on the workspace;
+`Configured` replaces how it is set up as a whole; `AgentV2Projection` keeps them in
+`AgentV2Store`, a projection store. `agent-v2.create` works on the workspace;
 `agent-v2.read` and `agent-v2.configure` on the agent's membership, a `Member` target. Members read
 agents; administrators and the owner create and configure them.
 
