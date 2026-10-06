@@ -11,7 +11,7 @@
  * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
  * tools, or a request to compact, which fail with `UnsupportedError`.
  */
-import { BridgeClient, HarnessError, type ModelEndpoint } from "@amends/harness-v2";
+import { type Agent, BridgeClient, HarnessError } from "@amends/harness-v2";
 import type { Network, Sandbox } from "@amends/sandbox-v2";
 import { Effect, type Redacted, type Schema } from "effect";
 import type { Options as AgentOptions } from "./bridge/Agent.ts";
@@ -20,13 +20,7 @@ import * as Template from "./Template.ts";
 
 // TODO: Keep the endpoints' keys out of the sandbox, giving opencode stand-ins that the sandbox
 // replaces with the keys in the requests that leave it, once a sandbox provider can.
-export interface Options {
-  /** The model a turn runs on when it names none. */
-  readonly model: ModelEndpoint.ModelEndpoint;
-
-  /** The models a turn can name, by name. A turn that names another fails with `UnsupportedError`. */
-  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>>;
-
+export interface Options extends Agent.Options {
   /** The port the bridge listens on in its sandbox, which the sandbox must be created with. */
   readonly port: Network.Port;
 

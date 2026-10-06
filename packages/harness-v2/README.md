@@ -27,10 +27,13 @@ A `ModelEndpoint` is how an agent reaches a model: its provider and the provider
 models.dev names them, the protocol it is served through (Anthropic's Messages API, OpenAI's
 Responses API, or Chat Completions), the base URL that the protocol's paths follow, the key a
 request presents, and how hard it reasons and how much it may write. A host makes an endpoint for
-each model an agent may use, as from the catalog in [`@amends/connection-v2`](../connection-v2), and
-an agent runs on one by default and on others that a turn names. amends's own agent takes Effect AI
-language models, which `Models.languageModel` in its adapter makes of endpoints; opencode's adapter
-takes the endpoints and configures opencode with them.
+each model an agent may use, as from the catalog in [`@amends/connection-v2`](../connection-v2).
+
+Every agent is made with `Agent.Options`: the endpoint a turn runs on when it names none, and the
+endpoints a turn can name, by name. An adapter's own options extend them with what only its agent
+takes, such as the port opencode's bridge listens on. amends's own agent makes an Effect AI language
+model of each endpoint with `Models.LanguageModels`, which `Models.layer` provides over the host's
+`HttpClient`; opencode's adapter configures opencode with them.
 
 ## Sessions
 

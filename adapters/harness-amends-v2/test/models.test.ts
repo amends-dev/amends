@@ -57,6 +57,13 @@ const answers: Record<ModelEndpoint.Protocol, object> = {
   },
 };
 
+/** The language model `Models.layer` makes of `endpoint`, sending its requests through `client`. */
+const languageModelOf = (endpoint: ModelEndpoint.ModelEndpoint, client: HttpClient.HttpClient) =>
+  Effect.flatMap(Models.LanguageModels, (languageModels) => languageModels.make(endpoint)).pipe(
+    Effect.provide(Models.layer),
+    Effect.provideService(HttpClient.HttpClient, client),
+  );
+
 /**
  * Asks the model `endpoint` reaches to say hi, through a provider that answers as the endpoint's
  * protocol does, and returns what the model answered and the request the provider received.
@@ -78,9 +85,7 @@ const askThrough = (endpoint: ModelEndpoint.ModelEndpoint) =>
         );
       }),
     );
-    const model = yield* Models.languageModel(endpoint).pipe(
-      Effect.provideService(HttpClient.HttpClient, client),
-    );
+    const model = yield* languageModelOf(endpoint, client);
     const response = yield* LanguageModel.generateText({ prompt: "Say hi" }).pipe(
       Effect.provideService(LanguageModel.LanguageModel, model),
     );
@@ -89,7 +94,7 @@ const askThrough = (endpoint: ModelEndpoint.ModelEndpoint) =>
 
 const key = Redacted.make("secret-key");
 
-describe("Models.languageModel", () => {
+describe("Models.layer", () => {
   it.effect("reaches Anthropic's Messages API at the path that follows the endpoint's URL", () =>
     Effect.gen(function* () {
       const { text, received } = yield* askThrough({
@@ -232,12 +237,15 @@ describe("Models.languageModel", () => {
             );
           }),
         );
-        const model = yield* Models.languageModel({
-          provider: "openrouter",
-          model: "model",
-          protocol: "openai-chat",
-          url: "https://openrouter.ai/api/v1",
-        }).pipe(Effect.provideService(HttpClient.HttpClient, client));
+        const model = yield* languageModelOf(
+          {
+            provider: "openrouter",
+            model: "model",
+            protocol: "openai-chat",
+            url: "https://openrouter.ai/api/v1",
+          },
+          client,
+        );
 
         const whole = yield* LanguageModel.generateText({ prompt: "Say hi" }).pipe(
           Effect.provideService(LanguageModel.LanguageModel, model),

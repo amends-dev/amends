@@ -7,9 +7,9 @@ outside the sandbox.
 
 ## Running it
 
-`OpencodeAgent.make` gives the agent a harness runs. Its options are the `model` endpoint a turn
-runs on when it names none and the `models` a turn can name, by name; the `port` the bridge listens
-on, which has no default; and the host's `token` function, which derives each sandbox's bridge token
+`OpencodeAgent.make` gives the agent a harness runs. Its options are `Agent.Options`, the `model`
+endpoint a turn runs on when it names none and the `models` a turn can name, by name, with the `port`
+the bridge listens on, which has no default; and the host's `token` function, which derives each sandbox's bridge token
 from its id with a secret every host shares, such as an HMAC. opencode's `config`, as opencode 1.18
 writes its `opencode.json`, whose `providers` the models' replace, and its `env` take effect when
 the bridge starts opencode's server; a server already running keeps the ones it started with.

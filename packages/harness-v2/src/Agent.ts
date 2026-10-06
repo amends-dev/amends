@@ -11,12 +11,25 @@
  * runs one turn of a session at a time, so an agent never sees a turn start while another runs.
  * A session outlives the process that started it: the agent keeps running after `detach` or
  * `suspend`, and `start` picks the session up again from what those returned.
+ *
+ * Every agent is made with `Options`, the models it runs on, which its adapter extends with what
+ * only that agent takes.
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox-v2";
 import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
+import type { ModelEndpoint } from "./ModelEndpoint.ts";
 import type { StreamPart } from "./StreamPart.ts";
+
+/**
+ * What every agent is made with: the model a turn runs on when it names none, and the models a turn
+ * can name, by name. A turn that names another fails with `UnsupportedError`.
+ */
+export interface Options {
+  readonly model: ModelEndpoint;
+  readonly models?: Readonly<Record<string, ModelEndpoint>>;
+}
 
 /**
  * Names a session, as `Sandbox.isName` checks, so that it can name the session's directory in the

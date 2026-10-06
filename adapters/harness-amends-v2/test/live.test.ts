@@ -20,7 +20,10 @@ const openRouterModel =
   process.env.AMENDS_TEST_MODELS_MODEL ?? "nvidia/nemotron-3-super-120b-a12b:free";
 
 const timeout = 120_000;
-const LiveLayer = Layer.merge(FetchHttpClient.layer, ModelCatalog.layer);
+const LiveLayer = Layer.merge(
+  Models.layer.pipe(Layer.provideMerge(FetchHttpClient.layer)),
+  ModelCatalog.layer,
+);
 
 /** An endpoint for the catalog's model `modelId` of `providerId`, as a host would make it. */
 const endpointFor = (providerId: string, modelId: string, apiKey: string) =>
@@ -49,7 +52,8 @@ const Codewords = Toolkit.make(LookUpCodeword);
 /** Whether a request with `endpoint`'s key failed for the key, which only the API itself says. */
 const refusesKey = (endpoint: ModelEndpoint.ModelEndpoint) =>
   Effect.gen(function* () {
-    const model = yield* Models.languageModel(endpoint);
+    const languageModels = yield* Models.LanguageModels;
+    const model = yield* languageModels.make(endpoint);
     const error = yield* Effect.flip(
       LanguageModel.generateText({ prompt: "Say hi" }).pipe(
         Effect.provideService(LanguageModel.LanguageModel, model),
@@ -64,8 +68,9 @@ describe.skipIf(!enabled)("a model reached from the catalog", () => {
     () =>
       Effect.gen(function* () {
         const endpoint = yield* endpointFor("openrouter", openRouterModel, openRouterKey);
-        const model = yield* Models.languageModel(endpoint);
-        const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
+        const session = yield* Harness.make(
+          yield* AmendsAgent.make({ model: endpoint }),
+        ).startSession({
           id: Agent.SessionId.make("live"),
         });
         const toolkit = yield* Effect.provide(
@@ -92,8 +97,9 @@ describe.skipIf(!enabled)("a model reached from the catalog", () => {
     () =>
       Effect.gen(function* () {
         const endpoint = yield* endpointFor("openrouter", openRouterModel, openRouterKey);
-        const model = yield* Models.languageModel(endpoint);
-        const session = yield* Harness.make(yield* AmendsAgent.make({ model })).startSession({
+        const session = yield* Harness.make(
+          yield* AmendsAgent.make({ model: endpoint }),
+        ).startSession({
           id: Agent.SessionId.make("live"),
         });
 

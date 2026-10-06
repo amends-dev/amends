@@ -1,7 +1,10 @@
 /**
  * The models amends's agent runs on, made from model endpoints: an Effect AI client for the
  * endpoint's protocol, at its URL and with its key, and the endpoint's model on that client, set
- * to the endpoint's effort and output limit. Requests go out through the `HttpClient` provided.
+ * to the endpoint's effort and output limit.
+ *
+ * The agent makes them with `LanguageModels`, which `layer` provides over the host's `HttpClient`,
+ * that the requests go out through. A test provides models of its own in its place.
  */
 import type { ModelEndpoint } from "@amends/harness-v2";
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
@@ -10,12 +13,32 @@ import {
   OpenAiClient as ChatClient,
   OpenAiLanguageModel as ChatLanguageModel,
 } from "@effect/ai-openai-compat";
-import { Effect, Stream } from "effect";
+import { Context, Effect, Layer, Stream } from "effect";
 import type { LanguageModel } from "effect/ai";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
-/** The language model `endpoint` reaches. */
-export const languageModel = (
+export class LanguageModels extends Context.Service<
+  LanguageModels,
+  {
+    /** The language model `endpoint` reaches. */
+    readonly make: (
+      endpoint: ModelEndpoint.ModelEndpoint,
+    ) => Effect.Effect<LanguageModel.LanguageModel>;
+  }
+>()("@amends/harness-amends-v2/Models/LanguageModels") {}
+
+/** Makes language models whose requests go out through the host's `HttpClient`. */
+export const layer = Layer.effect(
+  LanguageModels,
+  Effect.map(HttpClient.HttpClient, (client) =>
+    LanguageModels.of({
+      make: (endpoint) =>
+        languageModel(endpoint).pipe(Effect.provideService(HttpClient.HttpClient, client)),
+    }),
+  ),
+);
+
+const languageModel = (
   endpoint: ModelEndpoint.ModelEndpoint,
 ): Effect.Effect<LanguageModel.LanguageModel, never, HttpClient.HttpClient> => {
   // A URL is the one the protocol's paths follow, with or without a slash at its end.

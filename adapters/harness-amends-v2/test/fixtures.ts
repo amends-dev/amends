@@ -1,6 +1,9 @@
+import type { ModelEndpoint } from "@amends/harness-v2";
 import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
 import { Effect, FileSystem, Stream } from "effect";
 import { type AiError, LanguageModel, type Response } from "effect/ai";
+import * as AmendsAgent from "../src/AmendsAgent.ts";
+import * as Models from "../src/Models.ts";
 
 /** A new sandbox on this machine, removed with its directory when the test's scope closes. */
 export const makeSandbox = Effect.gen(function* () {
@@ -45,6 +48,51 @@ export const makeScriptedModel = (script: Script) =>
     const scripted: ScriptedModel = { model, requests };
     return scripted;
   });
+
+/** The endpoint that stands for the scripted model `id`, which reaches nothing. */
+const endpointOf = (id: string): ModelEndpoint.ModelEndpoint => ({
+  provider: "scripted",
+  model: id,
+  protocol: "openai-chat",
+  url: "http://scripted.invalid/v1",
+});
+
+/**
+ * amends's agent on scripted models: `model` by default, and `models` that a turn names. It is made
+ * with endpoints that stand for them, which `Models.LanguageModels` turns into the models.
+ */
+export const makeAgent = (
+  options: Omit<AmendsAgent.Options, "model" | "models"> & {
+    readonly model: LanguageModel.LanguageModel;
+    readonly models?: Readonly<Record<string, LanguageModel.LanguageModel>>;
+  },
+) => {
+  const { model, models = {}, ...rest } = options;
+  const byId = new Map([
+    ["default", model],
+    ...Object.entries(models).map(([name, named]) => [`named-${name}`, named] as const),
+  ]);
+  return AmendsAgent.make({
+    ...rest,
+    model: endpointOf("default"),
+    models: Object.fromEntries(
+      Object.keys(models).map((name) => [name, endpointOf(`named-${name}`)]),
+    ),
+  }).pipe(
+    Effect.provideService(
+      Models.LanguageModels,
+      Models.LanguageModels.of({
+        make: (endpoint) =>
+          Effect.suspend(() => {
+            const scripted = byId.get(endpoint.model);
+            return scripted === undefined
+              ? Effect.die(`No scripted model stands for ${endpoint.model}`)
+              : Effect.succeed(scripted);
+          }),
+      }),
+    ),
+  );
+};
 
 /** A streamed response as one whole response: its text, and how it finished. */
 const wholeResponseOf = (
