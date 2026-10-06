@@ -39,7 +39,7 @@ const program = Effect.gen(function* () {
 
   const driver: Bridge.Driver = {
     id: "fake",
-    start: (options) =>
+    startSession: (options) =>
       Effect.gen(function* () {
         const turns = yield* Ref.make(
           Option.match(Schema.decodeUnknownOption(State)(options.agentState), {
@@ -49,7 +49,7 @@ const program = Effect.gen(function* () {
         );
         const session: Bridge.DriverSession = {
           keptConversation: options.agentState !== undefined,
-          prompt: (turn) => {
+          promptTurn: (turn) => {
             const text = turn.prompt.content
               .flatMap((part) => (part.type === "text" ? [part.text] : []))
               .join("");

@@ -68,7 +68,7 @@ export interface Driver extends Bridge.Driver {
   readonly serverExited: Effect.Effect<void>;
 }
 
-/** What `state` returns, for `start` to take back. */
+/** What `state` returns, for `startSession` to take back. */
 const State = Schema.Struct({
   sessionID: Schema.String,
 
@@ -123,16 +123,16 @@ export const make = Effect.fn("OpencodeDriver.make")(function* (options: Require
   const driver: Driver = {
     id: "opencode",
     serverExited: Deferred.await(serverExited),
-    start: (startOptions) =>
+    startSession: (startOptions) =>
       Effect.flatMap(startedServer, (server) => startSession(server, options, startOptions)),
   };
   return driver;
 });
 
-const startSession = Effect.fn("OpencodeDriver.start")(function* (
+const startSession = Effect.fn("OpencodeDriver.startSession")(function* (
   server: Server.Server,
   options: Pick<Options, "model" | "models">,
-  startOptions: Bridge.StartOptions,
+  startOptions: Bridge.StartSessionOptions,
 ) {
   // opencode may have lost the session, as when the sandbox lost its data, and then starts one
   // from the conversation.
@@ -228,7 +228,7 @@ const startSession = Effect.fn("OpencodeDriver.start")(function* (
   const session: Bridge.DriverSession = {
     keptConversation: kept !== undefined,
 
-    prompt: runTurn,
+    promptTurn: runTurn,
 
     // TODO: Give opencode the host's tools through `HostToolRelay`, as an MCP server in the bridge,
     // once its session API shows MCP tools to the model, which 1.18.23 does not: the runner behind
@@ -369,7 +369,7 @@ const isSameModel = (one: ModelRef, other: ModelRef) =>
 const textOf = (message: Prompt.UserMessage) =>
   message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
 
-/** The state `start` was given, if any, as the state `state` returned. */
+/** The state `startSession` was given, if any, as the state `state` returned. */
 const readState = (json: Schema.Json | undefined) =>
   Schema.decodeEffect(Schema.UndefinedOr(StateJson))(json).pipe(
     Effect.mapError((cause) =>

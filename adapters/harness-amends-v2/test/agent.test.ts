@@ -372,9 +372,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const state = yield* throughJson(yield* session.detach);
 
       const later = yield* makeScriptedModel(() => answer("still here"));
-      const resumed = yield* Harness.make(yield* makeAgent({ model: later.model })).resumeSession({
+      const resumed = yield* Harness.make(yield* makeAgent({ model: later.model })).startSession({
         sandbox,
-        state,
+        resumeFrom: state,
       });
       yield* resumed.generate({ prompt: "again" });
 
@@ -401,8 +401,8 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         agentState: { thread: "codex's own" },
       };
 
-      const session = yield* Harness.make(yield* makeAgent({ model })).resumeSession({
-        state,
+      const session = yield* Harness.make(yield* makeAgent({ model })).startSession({
+        resumeFrom: state,
       });
       yield* session.generate({ prompt: "again" });
 
@@ -421,7 +421,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       };
 
       const error = yield* Effect.flip(
-        Harness.make(yield* makeAgent({ model })).resumeSession({ state }),
+        Harness.make(yield* makeAgent({ model })).startSession({ resumeFrom: state }),
       );
 
       expect(error.reason._tag).toBe("InvalidOutputError");
@@ -450,11 +450,11 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       );
       yield* Deferred.await(tookFirstStep);
       yield* Deferred.await(secondStep);
-      const state = yield* throughJson(yield* session.suspend);
+      const state = yield* throughJson(yield* session.suspendTurn);
       yield* Fiber.join(reading);
 
-      const resumed = yield* harness.resumeSession({ sandbox, state });
-      const continued = yield* Stream.runCollect(resumed.continue({}));
+      const resumed = yield* harness.startSession({ sandbox, resumeFrom: state });
+      const continued = yield* Stream.runCollect(resumed.continueStream({}));
 
       // The first step ran once; only the step in flight ran again.
       expect(requests.map((request) => toolResultsOf(request).length)).toEqual([0, 1, 1]);
@@ -502,12 +502,12 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         );
         yield* Deferred.await(tookFirstStep);
         yield* Deferred.await(thirdStep);
-        const state = yield* throughJson(yield* session.suspend);
+        const state = yield* throughJson(yield* session.suspendTurn);
         yield* Deferred.succeed(suspended, undefined);
         yield* Fiber.join(reading);
 
-        const resumed = yield* harness.resumeSession({ sandbox, state });
-        yield* Stream.runCollect(resumed.continue({}));
+        const resumed = yield* harness.startSession({ sandbox, resumeFrom: state });
+        yield* Stream.runCollect(resumed.continueStream({}));
 
         // The session had the first step only, so the second ran again.
         expect(state.unfinishedTurn?.steps).toHaveLength(1);
@@ -550,9 +550,9 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const parts = yield* Fiber.join(reading);
 
       const later = yield* makeScriptedModel(() => answer("done"));
-      const resumed = yield* Harness.make(yield* makeAgent({ model: later.model })).resumeSession({
+      const resumed = yield* Harness.make(yield* makeAgent({ model: later.model })).startSession({
         sandbox,
-        state,
+        resumeFrom: state,
       });
       yield* resumed.generate({ prompt: "what did you do" });
 
@@ -571,13 +571,13 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           : callTool("add-1", "Add", { a: 2, b: 3 });
       });
       const agent = yield* makeAgent({ model });
-      const agentSession = yield* agent.start({ id, history: Prompt.empty });
+      const agentSession = yield* agent.startSession({ id, history: Prompt.empty });
       const resultOf = (sum: number) =>
         agentSession.submitToolResult({ id: "add-1", name: "Add", result: sum, isFailure: false });
 
       yield* resultOf(99);
       const parts = yield* agentSession
-        .prompt({
+        .promptTurn({
           prompt: Prompt.makeMessage("user", {
             content: [Prompt.makePart("text", { text: "add 2 and 3" })],
           }),

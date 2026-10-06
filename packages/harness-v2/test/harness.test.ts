@@ -86,7 +86,7 @@ const suspendSlowTurn = (harness: Harness.Harness["Service"], running: Deferred.
       (part) => part.type === "text-delta" && part.id === "answer",
     );
     yield* Deferred.succeed(running, undefined);
-    const state = yield* session.suspend;
+    const state = yield* session.suspendTurn;
     yield* Fiber.join(slow);
     const json = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState));
     return yield* Schema.decodeEffect(json)(yield* Schema.encodeEffect(json)(state));
@@ -127,7 +127,7 @@ describe("Harness", () => {
       yield* session.generate({ prompt: "hello" });
       const state = yield* session.detach;
 
-      yield* harness.resumeSession({ sandbox, state });
+      yield* harness.startSession({ sandbox, resumeFrom: state });
 
       expect(codex.starts[1]?.agentState).toEqual({ agent: "codex" });
       expect(textsOf(codex.starts[1]?.history ?? state.history)).toEqual([
@@ -145,9 +145,9 @@ describe("Harness", () => {
       const onCodex = yield* Harness.make(codex.agent).startSession({ sandbox, id });
       yield* onCodex.generate({ prompt: "hello" });
 
-      const onOpencode = yield* Harness.make(opencode.agent).resumeSession({
+      const onOpencode = yield* Harness.make(opencode.agent).startSession({
         sandbox,
-        state: yield* onCodex.detach,
+        resumeFrom: yield* onCodex.detach,
       });
       yield* onOpencode.generate({ prompt: "again" });
       const state = yield* onOpencode.detach;
@@ -177,9 +177,9 @@ describe("Harness", () => {
         const state = yield* suspendSlowTurn(harness, running);
         const { sandbox } = yield* makeFakeSandbox;
 
-        const session = yield* harness.resumeSession({ sandbox, state });
+        const session = yield* harness.startSession({ sandbox, resumeFrom: state });
         const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
-        const result = yield* Stream.runCollect(session.continue({}));
+        const result = yield* Stream.runCollect(session.continueStream({}));
 
         expect(state.unfinishedTurn?.steps.map((step) => step.content)).toMatchObject([
           readingMessages,
@@ -205,8 +205,11 @@ describe("Harness", () => {
       const state = yield* suspendSlowTurn(Harness.make(codex.agent), running);
       const { sandbox } = yield* makeFakeSandbox;
 
-      const session = yield* Harness.make(opencode.agent).resumeSession({ sandbox, state });
-      const result = yield* Stream.runCollect(session.continue({}));
+      const session = yield* Harness.make(opencode.agent).startSession({
+        sandbox,
+        resumeFrom: state,
+      });
+      const result = yield* Stream.runCollect(session.continueStream({}));
 
       expect(opencode.starts[0]?.unfinishedTurn).toBeUndefined();
       expect(result).toEqual(reply("opencode answers slow"));
@@ -226,8 +229,8 @@ describe("Harness", () => {
         const state = yield* suspendSlowTurn(harness, running);
         const { sandbox } = yield* makeFakeSandbox;
 
-        const session = yield* harness.resumeSession({ sandbox, state });
-        const result = yield* Stream.runCollect(session.continue({}));
+        const session = yield* harness.startSession({ sandbox, resumeFrom: state });
+        const result = yield* Stream.runCollect(session.continueStream({}));
 
         expect(codex.continued).toEqual([]);
         expect(codex.turns).toHaveLength(2);
@@ -266,9 +269,9 @@ describe("Harness", () => {
       const harness = Harness.make(codex.agent);
 
       const refusedStart = yield* Effect.flip(harness.startSession({ id }));
-      const refusedResume = yield* Effect.flip(harness.resumeSession({ state }));
+      const refusedResume = yield* Effect.flip(harness.startSession({ resumeFrom: state }));
       const { sandbox } = yield* makeFakeSandbox;
-      const onCodex = yield* harness.resumeSession({ sandbox, state });
+      const onCodex = yield* harness.startSession({ sandbox, resumeFrom: state });
       const result = yield* onCodex.generate({ prompt: "again" });
 
       expect(refusedStart.reason._tag).toBe("UnsupportedError");

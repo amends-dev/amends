@@ -3,7 +3,13 @@ import { Sandbox, SandboxId } from "@amends/sandbox-v2/Sandbox";
 import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import { ChildProcessSpawner } from "effect/process";
-import type { Agent, AgentSession, SessionId, StartOptions, TurnOptions } from "../src/Agent.ts";
+import type {
+  Agent,
+  AgentSession,
+  SessionId,
+  StartSessionOptions,
+  TurnOptions,
+} from "../src/Agent.ts";
 import type * as Bridge from "../src/Bridge.ts";
 import type { HarnessError } from "../src/HarnessError.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
@@ -20,8 +26,8 @@ export type Script = (
 export interface FakeAgent {
   readonly agent: Agent;
 
-  /** What each `start` was given, in order. */
-  readonly starts: ReadonlyArray<StartOptions>;
+  /** What each `startSession` was given, in order. */
+  readonly starts: ReadonlyArray<StartSessionOptions>;
 
   /** What each turn the agent ran from its prompt was given, in order. */
   readonly turns: ReadonlyArray<TurnOptions>;
@@ -46,7 +52,10 @@ export interface FakeAgentOptions {
   /** The longest name of a host tool the agent takes. No limit by default. */
   readonly maxToolNameLength?: number;
 
-  /** Whether the agent loses the turns `suspend` cuts short, as opencode does in another sandbox. */
+  /**
+   * Whether the agent loses the turns `suspendTurn` cuts short, as opencode does in another
+   * sandbox.
+   */
   readonly losesUnfinishedTurns?: boolean;
 
   /**
@@ -58,13 +67,13 @@ export interface FakeAgentOptions {
 
 /**
  * An agent whose turns follow `script`, recording what the harness asks of it. Its own state, which
- * `suspend`, `detach`, and `stop` return, names the agent, so tests can tell whose state reached
- * `start`. Like an agent whose turn keeps running, `continue` follows the script for the turn again
- * after the steps the harness has.
+ * `suspendTurn`, `detach`, and `stop` return, names the agent, so tests can tell whose state
+ * reached `startSession`. Like an agent whose turn keeps running, `continueTurn` follows the script
+ * for the turn again after the steps the harness has.
  */
 export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOptions = {}) =>
   Effect.gen(function* () {
-    const starts: Array<StartOptions> = [];
+    const starts: Array<StartSessionOptions> = [];
     const turns: Array<TurnOptions> = [];
     const continued: Array<number> = [];
     const submitted: Array<unknown> = [];
@@ -76,7 +85,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
       requiresSandbox: options.requiresSandbox ?? true,
       ports: options.ports,
       maxToolNameLength: options.maxToolNameLength,
-      start: (startOptions) =>
+      startSession: (startOptions) =>
         Effect.gen(function* () {
           starts.push(startOptions);
           /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
@@ -90,12 +99,12 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
           const session: AgentSession = {
             hasUnfinishedTurn:
               startOptions.unfinishedTurn !== undefined && options.losesUnfinishedTurns !== true,
-            prompt: (turn) =>
+            promptTurn: (turn) =>
               Stream.suspend(() => {
                 turns.push(turn);
                 return follow(turn);
               }),
-            continue: (turn, finishedSteps) =>
+            continueTurn: (turn, finishedSteps) =>
               Stream.suspend(() => {
                 continued.push(finishedSteps);
                 return follow(turn).pipe(afterSteps(finishedSteps));
@@ -107,7 +116,10 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
               ),
             approve: (response) => Effect.sync(() => void approvals.push(response)),
             compact: () => Effect.void,
-            suspend: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id, turn: true })),
+            suspendTurn: Effect.andThen(
+              beforeLettingGo,
+              Effect.as(close, { agent: id, turn: true }),
+            ),
             detach: Effect.andThen(beforeLettingGo, Effect.succeed({ agent: id })),
             stop: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id })),
             destroy: Effect.andThen(beforeLettingGo, Effect.asVoid(close)),
@@ -204,8 +216,8 @@ const textOf = (message: Prompt.UserMessage) =>
 export interface FakeDriver {
   readonly driver: Bridge.Driver;
 
-  /** What each `start` was given, in order. */
-  readonly starts: ReadonlyArray<Bridge.StartOptions>;
+  /** What each `startSession` was given, in order. */
+  readonly starts: ReadonlyArray<Bridge.StartSessionOptions>;
 
   /** What each turn was given, in order. */
   readonly turns: ReadonlyArray<Bridge.TurnOptions>;
@@ -227,7 +239,7 @@ export const makeFakeDriver = (
   script: (prompt: string) => Stream.Stream<StreamPart, HarnessError>,
 ) =>
   Effect.sync(() => {
-    const starts: Array<Bridge.StartOptions> = [];
+    const starts: Array<Bridge.StartSessionOptions> = [];
     const turns: Array<Bridge.TurnOptions> = [];
     const turnEnds: Array<"finished" | "failed" | "interrupted"> = [];
     const submitted: Array<unknown> = [];
@@ -236,14 +248,14 @@ export const makeFakeDriver = (
 
     const driver: Bridge.Driver = {
       id: "fake",
-      start: (options) =>
+      startSession: (options) =>
         Effect.gen(function* () {
           starts.push(options);
           yield* Effect.addFinalizer(() => Effect.sync(() => ended.push(options.id)));
           const startNumber = starts.length;
           const session: Bridge.DriverSession = {
             keptConversation: options.agentState !== undefined,
-            prompt: (turn) =>
+            promptTurn: (turn) =>
               Stream.suspend(() => {
                 turns.push(turn);
                 return script(textOf(turn.prompt)).pipe(

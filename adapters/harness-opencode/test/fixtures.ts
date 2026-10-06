@@ -35,7 +35,7 @@ export const makeBridgedAgent = (bridge: BridgeClient.Options) =>
       requiresSandbox: true,
       template: bridge.template,
       ports: [bridge.port],
-      start: (startOptions) =>
+      startSession: (startOptions) =>
         Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
     }),
   );

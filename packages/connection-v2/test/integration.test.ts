@@ -30,7 +30,7 @@ const source: ToolSource.ToolSource = {
 const agent: Agent.Agent = {
   id: "everything",
   requiresSandbox: false,
-  start: () => Effect.die("unused"),
+  startSession: () => Effect.die("unused"),
 };
 
 /**

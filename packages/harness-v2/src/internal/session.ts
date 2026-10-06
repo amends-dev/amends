@@ -97,7 +97,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   const resumeTurn = Effect.flatten(
     Ref.modify(state, (current): [Effect.Effect<UnfinishedTurn, HarnessError>, State] => {
       const { status } = current;
-      const reason = refusal(current, "continue");
+      const reason = refusal(current, "continueStream");
       // `refusal` lets the session continue only an unfinished turn.
       if (reason !== undefined || status._tag !== "Unfinished") {
         return [Effect.fail(harnessError(reason ?? new NoTurnError({}))), current];
@@ -137,10 +137,10 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
 
   /**
    * Streams the parts of the running turn that `agentTurn` streams, with the results of the host's
-   * tools it calls. A part is delivered only while the session runs the turn, so once `suspend` or
-   * `stop` let go of it, the session holds every part the caller has. The stream of a turn `stop`
-   * or `destroy` aborted ends with an error, and a stream that ends otherwise without the turn's
-   * `finish` ends the turn as far as it got.
+   * tools it calls. A part is delivered only while the session runs the turn, so once `suspendTurn`
+   * or `stop` let go of it, the session holds every part the caller has. The stream of a turn
+   * `stop` or `destroy` aborted ends with an error, and a stream that ends otherwise without the
+   * turn's `finish` ends the turn as far as it got.
    */
   const runTurn = <Tools extends Record<string, Tool.Any>>(
     agentTurn: Stream.Stream<StreamPart, HarnessError>,
@@ -314,14 +314,14 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   /** Runs a new turn with the caller's prompt, once the session can start one. */
   const promptTurn = <Tools extends Record<string, Tool.Any>>(
     options: StreamOptions<Tools>,
-    responseFormat: Parameters<AgentSession["prompt"]>[0]["responseFormat"],
+    responseFormat: Parameters<AgentSession["promptTurn"]>[0]["responseFormat"],
   ) => {
     const prompt = userMessageOf(options.prompt);
     return Stream.unwrap(
       Effect.as(
         startTurn(prompt),
         runTurn(
-          agentSession.prompt({ ...turnOptionsOf(options), prompt, responseFormat }),
+          agentSession.promptTurn({ ...turnOptionsOf(options), prompt, responseFormat }),
           options.toolkit,
         ),
       ),
@@ -343,7 +343,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     lettingGo: undefined,
   }));
 
-  /** What `suspend`, `detach`, and `stop` return. */
+  /** What `suspendTurn`, `detach`, and `stop` return. */
   const savedState = (
     history: Prompt.Prompt,
     agentState: Schema.Json | undefined,
@@ -423,7 +423,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       return new GenerateObjectResult(value, parts);
     }),
 
-    continue: (continueOptions) =>
+    continueStream: (continueOptions) =>
       Stream.unwrap(
         Effect.map(resumeTurn, (turn) => {
           const turnOptions = {
@@ -432,8 +432,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
             responseFormat: { type: "text" } as const,
           };
           const agentTurn = agentSession.hasUnfinishedTurn
-            ? agentSession.continue(turnOptions, turn.steps.length)
-            : agentSession.prompt(turnOptions);
+            ? agentSession.continueTurn(turnOptions, turn.steps.length)
+            : agentSession.promptTurn(turnOptions);
           return runTurn(agentTurn, continueOptions.toolkit);
         }),
       ),
@@ -443,8 +443,11 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     compact: (instructions) =>
       Effect.andThen(checkStatus("compact"), agentSession.compact(instructions)),
 
-    suspend: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* letGo("suspend", agentSession.suspend);
+    suspendTurn: Effect.gen(function* () {
+      const [agentState, { status, history }] = yield* letGo(
+        "suspendTurn",
+        agentSession.suspendTurn,
+      );
       // A turn that finished while the agent let go of it is in the conversation already.
       const unfinishedTurn =
         status._tag === "Running"
@@ -491,7 +494,10 @@ interface State {
   readonly lettingGo: LetGo | undefined;
 }
 
-/** Where a session is: between turns, holding a turn `suspend` cut short, running a turn, or let go of. */
+/**
+ * Where a session is: between turns, holding a turn `suspendTurn` cut short, running a turn, or let
+ * go of.
+ */
 type Status = Data.TaggedEnum<{
   Idle: {};
   Unfinished: { readonly turn: UnfinishedTurn };
@@ -519,7 +525,10 @@ const abortedEnding: ReadonlyArray<StreamPart> = [
 interface RunningTurn {
   readonly prompt: Prompt.UserMessage;
 
-  /** The steps the turn finished, each as the messages that record it, with those before `suspend`. */
+  /**
+   * The steps the turn finished, each as the messages that record it, with those before
+   * `suspendTurn`.
+   */
   readonly steps: ReadonlyArray<Prompt.Prompt>;
 
   /** The parts delivered of the step the turn is taking. */
@@ -548,9 +557,9 @@ const deliver = (state: State, part: StreamPart): [boolean, State] => {
 };
 
 /** The operations that let go of a session. */
-type LetGo = "suspend" | "detach" | "stop" | "destroy";
+type LetGo = "suspendTurn" | "detach" | "stop" | "destroy";
 
-type Operation = "stream" | "continue" | "approve" | "compact" | LetGo;
+type Operation = "stream" | "continueStream" | "approve" | "compact" | LetGo;
 
 /** Why `operation` cannot run in a session in `state`, or nothing when it can. */
 const refusal = (
@@ -569,16 +578,16 @@ const refusal = (
     case "stream":
       if (status._tag === "Unfinished") {
         return new TurnInProgressError({
-          description: "The session has an unfinished turn, which `continue` finishes",
+          description: "The session has an unfinished turn, which `continueStream` finishes",
         });
       }
       return status._tag === "Running" ? new TurnInProgressError({}) : undefined;
-    case "continue":
+    case "continueStream":
       if (status._tag === "Running") return new TurnInProgressError({});
       return status._tag === "Unfinished"
         ? undefined
         : new NoTurnError({ description: "The session has no unfinished turn" });
-    case "suspend":
+    case "suspendTurn":
       return status._tag === "Running"
         ? undefined
         : new NoTurnError({ description: "The session is not running a turn" });
@@ -610,8 +619,9 @@ const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
 });
 
 /**
- * The conversation with a turn that ended without its `finish`, other than by `suspend`, as far as
- * the session delivered it. A turn that delivered nothing, such as one the agent refused, is left out.
+ * The conversation with a turn that ended without its `finish`, other than by `suspendTurn`, as far
+ * as the session delivered it. A turn that delivered nothing, such as one the agent refused, is
+ * left out.
  */
 const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
   turn.steps.length === 0 && turn.stepParts.length === 0

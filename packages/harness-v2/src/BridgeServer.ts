@@ -219,9 +219,9 @@ const makeHandlers = Effect.fnUntraced(function* (
     });
 
   /** Starts a session in a scope of its own, which closes again if the driver fails to start it. */
-  const startSession = Effect.fnUntraced(function* (options: Bridge.StartOptions) {
+  const startSession = Effect.fnUntraced(function* (options: Bridge.StartSessionOptions) {
     const scope = yield* Scope.fork(bridgeScope);
-    const driverSession = yield* driver.start(options).pipe(
+    const driverSession = yield* driver.startSession(options).pipe(
       Scope.provide(scope),
       Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
     );
@@ -248,7 +248,7 @@ const makeHandlers = Effect.fnUntraced(function* (
     options: Bridge.TurnOptions,
     file: string,
   ) =>
-    driverSession.prompt(options).pipe(
+    driverSession.promptTurn(options).pipe(
       Stream.runForEach((part) => {
         const numbered: Bridge.NumberedPart = { seq: turn.parts.length + 1, part };
         return appendLine(file, numbered).pipe(

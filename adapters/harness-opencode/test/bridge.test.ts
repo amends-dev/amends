@@ -269,12 +269,12 @@ describe("BridgeClient", () => {
         const session = yield* harness.startSession({ sandbox, id });
         const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
 
-        const state = yield* session.suspend;
+        const state = yield* session.suspendTurn;
         yield* Fiber.join(reading);
         yield* release(sandbox);
         const otherHarness = yield* makeHarness(port);
-        const resumed = yield* otherHarness.resumeSession({ sandbox, state });
-        const parts = yield* Stream.runCollect(resumed.continue({}));
+        const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+        const parts = yield* Stream.runCollect(resumed.continueStream({}));
 
         expect(parts).toEqual(answer("later"));
       }).pipe(Effect.provide(TestLayer)),
@@ -288,12 +288,12 @@ describe("BridgeClient", () => {
           const session = yield* harness.startSession({ sandbox, id });
           const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
 
-          const state = yield* session.suspend;
+          const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
           yield* killBridge(sandbox);
           const otherHarness = yield* makeHarness(port);
-          const resumed = yield* otherHarness.resumeSession({ sandbox, state });
-          const parts = yield* Stream.runCollect(resumed.continue({}));
+          const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+          const parts = yield* Stream.runCollect(resumed.continueStream({}));
           const { history } = yield* resumed.detach;
 
           // The agent continues the turn rather than run its prompt again, which would wait forever.

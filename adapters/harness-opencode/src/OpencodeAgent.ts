@@ -118,7 +118,7 @@ const agentOf = Effect.fnUntraced(function* (
     requiresSandbox: true,
     template: installation.template,
     ports: [options.port],
-    start: (startOptions) =>
+    startSession: (startOptions) =>
       Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
   };
   return agent;

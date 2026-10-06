@@ -190,7 +190,7 @@ const runTurn = (
   options?: Partial<Bridge.TurnOptions>,
 ) =>
   Effect.map(
-    Stream.runCollect(session.prompt(turnOptions(text, options))),
+    Stream.runCollect(session.promptTurn(turnOptions(text, options))),
     (parts: ReadonlyArray<StreamPart.StreamPart>) => new GenerateResult.GenerateResult(parts),
   );
 
@@ -285,7 +285,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
             },
           },
         });
-        const session = yield* driver.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         const answered = yield* runTurn(session, "Say pong.");
         const refused = [
@@ -317,7 +317,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const { driver, directory } = yield* makeLiveDriver();
-        const session = yield* driver.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(
           session,
@@ -375,7 +375,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
           },
           { role: "assistant", content: [{ type: "text", text: "Noted." }] },
         ]);
-        const session = yield* driver.start({ id, directory, history });
+        const session = yield* driver.startSession({ id, directory, history });
 
         const result = yield* runTurn(
           session,
@@ -397,7 +397,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
           model,
           models: { missing: { ...model, model: "no-such-model" } },
         });
-        const session = yield* driver.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(session, "Say hi.", { model: "missing" });
 
@@ -411,12 +411,17 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const { driver, directory } = yield* makeLiveDriver();
-        const session = yield* driver.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
         const agentState = yield* session.state;
 
         yield* session.destroy;
         // opencode no longer has the session, so the driver starts another.
-        const again = yield* driver.start({ id, directory, history: Prompt.empty, agentState });
+        const again = yield* driver.startSession({
+          id,
+          directory,
+          history: Prompt.empty,
+          agentState,
+        });
 
         const before = yield* Schema.decodeUnknownEffect(OpencodeState)(agentState);
         const after = yield* Schema.decodeUnknownEffect(OpencodeState)(yield* again.state);
@@ -430,10 +435,10 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const { driver, directory } = yield* makeLiveDriver();
-        const session = yield* driver.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         yield* session
-          .prompt(turnOptions("Run `sleep 300` with your bash tool, then say done."))
+          .promptTurn(turnOptions("Run `sleep 300` with your bash tool, then say done."))
           .pipe(
             Stream.takeUntil((part) => part.type === "tool-call"),
             Stream.runDrain,
@@ -494,10 +499,10 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
               Effect.forkChild,
             );
           yield* Deferred.await(calledTool);
-          const state = yield* session.suspend;
+          const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
-          const resumed = yield* nextHarness.resumeSession({ sandbox, state });
-          const after = yield* Stream.runCollect(resumed.continue({}));
+          const resumed = yield* nextHarness.startSession({ sandbox, resumeFrom: state });
+          const after = yield* Stream.runCollect(resumed.continueStream({}));
           const history = (yield* resumed.detach).history.content;
 
           // The session had no step of the turn finished, so the step with the call comes again.

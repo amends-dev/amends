@@ -6,7 +6,7 @@
  *
  * The bridge runs each turn itself, so that a turn goes on when a host's connection drops or the
  * host lets go, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
- * so that a host reads them from any number: again after its connection drops, or to `continue` a
+ * so that a host reads them from any number: again after its connection drops, or to continue a
  * turn that another host suspended. The agent behind it needs to do neither. A turn the bridge did
  * not finish, as one it ran when it died, it continues when a host starts it again, by prompting
  * the agent with `Continue.` in the conversation that holds the turn, as AI SDK's harness does.
@@ -59,10 +59,10 @@ export const TurnOptions = Schema.Struct({
 
 export interface TurnOptions extends Schema.Schema.Type<typeof TurnOptions> {}
 
-export interface StartOptions {
+export interface StartSessionOptions {
   readonly id: SessionId;
 
-  /** The absolute directory the session works in. It exists before `start`. */
+  /** The absolute directory the session works in. It exists before `startSession`. */
   readonly directory: string;
 
   /**
@@ -88,7 +88,7 @@ export interface DriverSession {
   readonly keptConversation: boolean;
 
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
-  readonly prompt: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
+  readonly promptTurn: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
   readonly submitToolResult: AgentSession["submitToolResult"];
 
@@ -96,7 +96,10 @@ export interface DriverSession {
 
   readonly compact: AgentSession["compact"];
 
-  /** What `start` takes as `agentState` to start the session again, as a restarted bridge does. */
+  /**
+   * What `startSession` takes as `agentState` to start the session again, as a restarted bridge
+   * does.
+   */
   readonly state: Effect.Effect<Schema.Json, HarnessError>;
 
   /** Deletes what the agent keeps of the session. Its scope closes afterwards. */
@@ -116,8 +119,8 @@ export interface Driver {
    * Starts a session: a new one, or one started again from its `state`. The session runs until its
    * scope closes, when a host stops or destroys it, or the bridge exits.
    */
-  readonly start: (
-    options: StartOptions,
+  readonly startSession: (
+    options: StartSessionOptions,
   ) => Effect.Effect<DriverSession, HarnessError, Scope.Scope>;
 }
 

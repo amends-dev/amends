@@ -9,17 +9,18 @@ the sandboxes agents work in.
 ## Agents and harnesses
 
 An agent's adapter implements `Agent.Agent`: its id, the `template` that installs it in a sandbox,
-the `ports` it listens on there, whether it `requiresSandbox`, and `start`, which starts or takes
-up an `AgentSession`. An agent session streams each turn as `StreamPart`s until its `finish` part,
-and interrupting the stream aborts the turn. `suspend`, `detach`, and `stop` return the agent's own
-state as JSON, which `start` takes back.
+the `ports` it listens on there, whether it `requiresSandbox`, and `startSession`, which starts an
+`AgentSession`, a new one or one picked up from what an earlier one returned. An agent session runs
+each turn with `promptTurn`, streaming `StreamPart`s until its `finish` part, and interrupting the
+stream aborts the turn. `suspendTurn`, `detach`, and `stop` return the agent's own state as JSON,
+which `startSession` takes back.
 
 `Harness.make` turns an agent into the `Harness` service, as `LanguageModel.make` turns a provider
-into a language model, and `Harness.layer` provides it. `startSession` starts a session and
-`resumeSession` picks one up from what it last saved, on this agent or another. The caller creates
-the sandbox, from the harness's `template` and with its `ports`, and owns it: a harness never stops
-or destroys one. Each session works in its own directory there, named by its id, so that its files
-stay in place when it moves from one agent to another.
+into a language model, and `Harness.layer` provides it. `startSession` starts a session: a new one,
+named by its `id`, or one that goes on from what it last saved, given as `resumeFrom`, on this agent
+or another. The caller creates the sandbox, from the harness's `template` and with its `ports`, and
+owns it: a harness never stops or destroys one. Each session works in its own directory there, named
+by its id, so that its files stay in place when it moves from one agent to another.
 
 ## Models
 
@@ -47,14 +48,14 @@ result, until `approve` allows the call or refuses it, which answers the agent `
 `approve` also passes on the requests an agent makes for its own tools, and `compact` asks the
 agent to summarize the conversation so far.
 
-`suspend`, `detach`, and `stop` return a `SessionState` for the caller to store, as JSON with
+`suspendTurn`, `detach`, and `stop` return a `SessionState` for the caller to store, as JSON with
 `Schema.toCodecJson(Session.SessionState)`. It records the conversation as Effect AI `Prompt`
-messages, each step's tool calls and results included, beside the agent's own state. The agent
-that last ran the session resumes from its own state; any other loads the conversation. `suspend`
-ends the running turn's stream while the agent goes on with it, and `continue` finishes it after
-`resumeSession`, from the step that was in flight; another agent runs it again from its prompt.
-`detach` lets go between turns, `stop` stops the agent to start it again later, and `destroy`
-stops it for good.
+messages, each step's tool calls and results included, beside the agent's own state. The agent that
+last ran the session resumes from its own state; any other loads the conversation. `suspendTurn`
+ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
+once `startSession` resumes the session, from the step that was in flight; another agent runs it
+again from its prompt. `detach` lets go between turns, `stop` stops the agent to start it again
+later, and `destroy` stops it for good.
 
 `StreamPart` holds the parts an Effect AI provider streams, in their encoded form, and three that
 only agents produce: `finish-step`, `file-change`, and `compaction`. Tool calls and results keep
@@ -70,7 +71,7 @@ sandbox exposes of the agent. One bridge runs for an agent in each sandbox and s
 session in it, on the agent's port, to hosts that present its token as `Authorization: Bearer`. It
 runs each turn itself, so that a turn goes on when a host's connection drops or the host lets go,
 and numbers and keeps the turn's parts, so that a host reads them from any number: after
-reconnecting, or to `continue` a turn another host suspended. `Bridge.Rpcs` is the protocol, over a
+reconnecting, or to continue a turn another host suspended. `Bridge.Rpcs` is the protocol, over a
 WebSocket, at the version `Bridge.protocolVersion` names, which `Hello` answers. A host asks a
 bridge that speaks an older version to `Exit`, aborting its turns, and launches its own in its
 place; it refuses a bridge that speaks a newer one. Every version keeps `Hello` and `Exit` as they
@@ -89,20 +90,21 @@ are.
   that holds the turn. Otherwise the host runs the turn again from its prompt.
 - `BridgeClient.startSession` starts the sessions of the adapter's `Agent.Agent`, which hosts run:
   the agent requires a sandbox, lists the bridge's port among its `ports`, and calls it from
-  `start`, with what `BridgeClient.Options` says of its bridge. A session connects to the bridge at
-  the sandbox's endpoint for the port, and launches it with the adapter's command when none answers,
-  giving it the launch options on standard input. It runs the template first, which installs only
-  what the sandbox lacks, so that a sandbox prepared with another version of it launches this one. The token comes from the host's `token`
-  function, derived from the sandbox's id with a secret every host shares, so that any host
-  connects to a bridge any of them launched. Each connection starts the session in the bridge from
-  the state the bridge last gave, so that a bridge that died and was launched again has it again.
-  `continue` starts the turn again, which the bridge continues if it did not finish it, but a turn
-  the bridge loses while a stream reads it fails with `NoTurnError`. A connection that drops is not opened again: requests
-  it dropped are sent again over another, for up to 30 seconds, except a tool's result, an
-  approval, and a request to compact, which the bridge must not receive twice. A turn is
-  `StartTurn`, under an id the host picks, and `ReadTurn`, which reads on from the last part read.
-  A session closes its connection when it lets go, or once it has gone unused for a minute. One
-  whose bridge cannot answer, as when its sandbox is gone, lets go with the state it last gave.
+  `startSession`, with what `BridgeClient.Options` says of its bridge. A session connects to the
+  bridge at the sandbox's endpoint for the port, and launches it with the adapter's command when
+  none answers, giving it the launch options on standard input. It runs the template first, which
+  installs only what the sandbox lacks, so that a sandbox prepared with another version of it
+  launches this one. The token comes from the host's `token` function, derived from the sandbox's id
+  with a secret every host shares, so that any host connects to a bridge any of them launched. Each
+  connection starts the session in the bridge from the state the bridge last gave, so that a bridge
+  that died and was launched again has it again. `continueTurn` starts the turn again, which the
+  bridge continues if it did not finish it, but a turn the bridge loses while a stream reads it
+  fails with `NoTurnError`. A connection that drops is not opened again: requests it dropped are
+  sent again over another, for up to 30 seconds, except a tool's result, an approval, and a request
+  to compact, which the bridge must not receive twice. A turn is `StartTurn`, under an id the host
+  picks, and `ReadTurn`, which reads on from the last part read. A session closes its connection
+  when it lets go, or once it has gone unused for a minute. One whose bridge cannot answer, as when
+  its sandbox is gone, lets go with the state it last gave.
 
 opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
 program, a template that installs it, and an agent whose sessions `BridgeClient.startSession`

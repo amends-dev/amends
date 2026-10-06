@@ -53,7 +53,10 @@ export class NotFoundError extends withDefaults(
   { message: "The agent has no such session", isRetryable: false },
 ) {}
 
-/** The session was let go of: `Harness.resumeSession` picks it up again from what that returned. */
+/**
+ * The session was let go of: `Harness.startSession` picks it up again from what that returned, as
+ * `resumeFrom`.
+ */
 export class SessionClosedError extends withDefaults(
   Schema.TaggedError<SessionClosedError>("@amends/harness-v2/HarnessError/SessionClosedError")(
     "SessionClosedError",

@@ -12,10 +12,10 @@
  *
  * A turn is two requests: `StartTurn`, under an id the host picks, and `ReadTurn`, which reads the
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge
- * whoever reads it, so `suspend` only stops reading, and `continue` starts the turn again, which
- * the bridge continues if it did not finish it, as when it died, and reads it again from its start,
- * after the steps the harness has. A session whose bridge cannot answer, as when its sandbox is
- * gone, lets go with the state the bridge last gave.
+ * whoever reads it, so `suspendTurn` only stops reading, and `continueTurn` starts the turn again,
+ * which the bridge continues if it did not finish it, as when it died, and reads it again from its
+ * start, after the steps the harness has. A session whose bridge cannot answer, as when its sandbox
+ * is gone, lets go with the state the bridge last gave.
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox-v2";
 import {
@@ -81,12 +81,12 @@ export interface Options {
   readonly agentOptions: Schema.Json;
 }
 
-/** What `suspend`, `detach`, and `stop` return, for `start` to take back. */
+/** What `suspendTurn`, `detach`, and `stop` return, for `startSession` to take back. */
 const State = Schema.Struct({
   /** What the agent behind the bridge gave as the session's state. */
   agentState: Schema.Json,
 
-  /** The turn `suspend` cut short. */
+  /** The turn `suspendTurn` cut short. */
   unfinishedTurn: Schema.optionalKey(Bridge.TurnId),
 });
 
@@ -101,13 +101,13 @@ interface Answer extends Schema.Schema.Type<typeof Bridge.Hello.successSchema> {
 }
 
 /**
- * Starts a session, as `Agent.start` does, of the agent behind the bridge that `options` describes,
- * in the sandbox of the session's workspace. It connects with the `WebSocketConstructor` provided,
- * which must send headers when it opens a connection, as Bun's and Node's do.
+ * Starts a session, as `Agent.startSession` does, of the agent behind the bridge that `options`
+ * describes, in the sandbox of the session's workspace. It connects with the `WebSocketConstructor`
+ * provided, which must send headers when it opens a connection, as Bun's and Node's do.
  */
 export const startSession = Effect.fn("BridgeClient.startSession")(function* (
   options: Options,
-  startOptions: Agent.StartOptions,
+  startOptions: Agent.StartSessionOptions,
 ) {
   const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
     new HarnessError({ agent: options.id, reason, cause });
@@ -133,7 +133,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
     ),
   );
 
-  /** The turn running, or the one `suspend` cut short, for `continue` to read. */
+  /** The turn running, or the one `suspendTurn` cut short, for `continueTurn` to read. */
   const running = yield* Ref.make(saved?.unfinishedTurn);
   /**
    * The session's state as the bridge last gave it, which a bridge that restarted starts the
@@ -282,7 +282,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
           ),
         );
         // TODO: Continue a turn the bridge lost while the stream read it, as when it died, as
-        // `continue` does after `suspend`, rather than fail the stream with `NoTurnError`.
+        // `continueTurn` does after `suspendTurn`, rather than fail the stream with `NoTurnError`.
         return readAfterLast.pipe(
           Stream.tap(({ seq }) => Ref.set(lastSeq, seq)),
           Stream.tapError(forgetDropped),
@@ -318,7 +318,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
   const agentSession: Agent.AgentSession = {
     hasUnfinishedTurn,
 
-    prompt: (turnOptions) =>
+    promptTurn: (turnOptions) =>
       Stream.unwrap(
         Effect.gen(function* () {
           const id = Bridge.TurnId.make(yield* Effect.orDie(crypto.randomUUIDv4));
@@ -328,7 +328,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
       ),
 
     // The bridge continues the turn if it did not finish it, and has it already otherwise.
-    continue: (turnOptions, finishedSteps) =>
+    continueTurn: (turnOptions, finishedSteps) =>
       Stream.unwrap(
         Effect.gen(function* () {
           const unfinished = yield* Ref.get(running);
@@ -362,7 +362,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
 
     compact: (instructions) => sendOnce((client) => client.Compact({ session, instructions })),
 
-    suspend: Effect.flatMap(close, (turn) =>
+    suspendTurn: Effect.flatMap(close, (turn) =>
       letGo((client) => client.ReadState({ session }), turn),
     ),
 

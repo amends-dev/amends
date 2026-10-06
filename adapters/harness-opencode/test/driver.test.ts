@@ -54,7 +54,7 @@ const startSession = (
 ) =>
   Effect.gen(function* () {
     const made = yield* makeDriver(runTurn, options);
-    const session = yield* made.driver.start({ id, directory, history: Prompt.empty });
+    const session = yield* made.driver.startSession({ id, directory, history: Prompt.empty });
     return { ...made, session };
   });
 
@@ -74,7 +74,7 @@ const runTurn = (
   session: Bridge.DriverSession,
   text: string,
   options?: Partial<Bridge.TurnOptions>,
-) => Stream.runCollect(session.prompt(turnOptions(text, options)));
+) => Stream.runCollect(session.promptTurn(turnOptions(text, options)));
 
 const textOf = (parts: ReadonlyArray<StreamPart.StreamPart>) =>
   new GenerateResult.GenerateResult(parts).text;
@@ -174,8 +174,12 @@ layer(TestLayer)("OpencodeDriver", (it) => {
       const { processes, driver } = yield* makeDriver(answer("hello"));
       const before = processes.spawned.length;
 
-      yield* driver.start({ id, directory, history: Prompt.empty });
-      yield* driver.start({ id: SessionId.make("session-two"), directory, history: Prompt.empty });
+      yield* driver.startSession({ id, directory, history: Prompt.empty });
+      yield* driver.startSession({
+        id: SessionId.make("session-two"),
+        directory,
+        history: Prompt.empty,
+      });
 
       expect(before).toBe(0);
       expect(processes.spawned).toHaveLength(1);
@@ -186,8 +190,10 @@ layer(TestLayer)("OpencodeDriver", (it) => {
     Effect.gen(function* () {
       const { processes, driver } = yield* makeDriver(answer("hello"), { failingStarts: 1 });
 
-      const failed = yield* Effect.flip(driver.start({ id, directory, history: Prompt.empty }));
-      const session = yield* driver.start({ id, directory, history: Prompt.empty });
+      const failed = yield* Effect.flip(
+        driver.startSession({ id, directory, history: Prompt.empty }),
+      );
+      const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
       expect(failed.reason._tag).toBe("UnavailableError");
       expect(textOf(yield* runTurn(session, "Say hello."))).toBe("hello");
@@ -198,7 +204,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
   it.effect("reports when opencode's server exits by itself", () =>
     Effect.gen(function* () {
       const { processes, driver } = yield* makeDriver(answer("hello"));
-      yield* driver.start({ id, directory, history: Prompt.empty });
+      yield* driver.startSession({ id, directory, history: Prompt.empty });
       const exited = yield* Effect.forkChild(driver.serverExited);
 
       yield* processes.exit;
@@ -323,7 +329,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
         Effect.andThen(callBash(turn), Effect.never),
       );
 
-      const read = yield* session.prompt(turnOptions("Build it.")).pipe(
+      const read = yield* session.promptTurn(turnOptions("Build it.")).pipe(
         Stream.takeUntil((part) => part.type === "tool-call"),
         Stream.runCollect,
       );
@@ -341,7 +347,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
         { role: "assistant", content: [{ type: "text", text: "Noted." }] },
       ]);
 
-      yield* driver.start({ id, directory, history });
+      yield* driver.startSession({ id, directory, history });
 
       const [opencodeSession] = (yield* fake.sessions).values();
       expect(opencodeSession?.events.map((event) => event.type)).toEqual([
@@ -366,7 +372,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
           { role: "assistant", content: [{ type: "text", text: "hello" }] },
         ]);
 
-        const again = yield* driver.start({
+        const again = yield* driver.startSession({
           id,
           directory,
           history,
@@ -375,7 +381,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
         const state = yield* again.state;
         const kept = [...(yield* fake.sessions).keys()];
         for (const sessionID of kept) fake.forget(sessionID);
-        yield* driver.start({ id, directory, history, agentState: state });
+        yield* driver.startSession({ id, directory, history, agentState: state });
 
         const sessions = yield* fake.sessions;
         expect(kept).toHaveLength(1);
