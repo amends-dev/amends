@@ -96,7 +96,6 @@ export const integration = Effect.fn("AmendsAgent.integration")(function* (
   return Integration.make({
     id: "amends",
     name: "amends",
-    settings: Schema.Struct({}),
     auth: ["none"],
     harnesses: (_access, agentOptions) =>
       make({ ...options, ...agentOptions }).pipe(

@@ -35,8 +35,10 @@ export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
     id: "openai-compatible",
     name: "OpenAI-compatible API",
     settings: Schema.Struct({
-      /** The base URL of the API, which `/chat/completions` follows. */
-      url: Schema.NonEmptyString,
+      url: Schema.NonEmptyString.annotate({
+        title: "Base URL",
+        description: "The base URL of the API, which /chat/completions follows.",
+      }),
     }),
     auth: ["apiKey", "none"],
     models: {
@@ -64,9 +66,12 @@ const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient
     id: provider.id,
     name: provider.name,
     docs: provider.docs,
-    settings: Schema.Struct(
-      Object.fromEntries(provider.settings.map((name) => [name, Schema.NonEmptyString])),
-    ),
+    settings:
+      provider.settings.length === 0
+        ? undefined
+        : Schema.Struct(
+            Object.fromEntries(provider.settings.map((name) => [name, Schema.NonEmptyString])),
+          ),
     auth: ["apiKey"],
     models: {
       listed: provider.models,

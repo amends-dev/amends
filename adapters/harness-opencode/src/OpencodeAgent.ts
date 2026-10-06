@@ -72,7 +72,6 @@ export const integration = Effect.fn("OpencodeAgent.integration")(function* (
     id: "opencode-agent",
     name: "opencode",
     docs: "https://opencode.ai/docs",
-    settings: Schema.Struct({}),
     auth: ["none"],
     harnesses: (_access, agentOptions) =>
       Effect.fromResult(modelsOf(agentOptions)).pipe(

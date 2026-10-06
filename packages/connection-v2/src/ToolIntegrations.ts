@@ -20,8 +20,11 @@ import {
 } from "./Connection.ts";
 import * as Integration from "./Integration.ts";
 
-/** The header a connection's key goes in, as it is, when not in `Authorization` as a bearer token. */
-const keyHeader = Schema.optionalKey(Schema.NonEmptyString);
+const keyHeader = Schema.optionalKey(Schema.NonEmptyString).annotate({
+  title: "Key header",
+  description:
+    "The header the API key goes in, as it is. Without one, it goes in Authorization as a bearer token.",
+});
 
 /** The integration of MCP servers, which reaches them over the host's client. */
 export const mcp = Effect.map(HttpClient.HttpClient, (client) => {
@@ -39,7 +42,13 @@ export const mcp = Effect.map(HttpClient.HttpClient, (client) => {
     id: "mcp",
     name: "MCP server",
     docs: "https://modelcontextprotocol.io",
-    settings: Schema.Struct({ url: Schema.NonEmptyString, keyHeader }),
+    settings: Schema.Struct({
+      url: Schema.NonEmptyString.annotate({
+        title: "Server URL",
+        description: "Where the MCP server answers over Streamable HTTP.",
+      }),
+      keyHeader,
+    }),
     auth: ["apiKey", "none"],
     tools: sourceOf,
     check: (access) =>
@@ -110,11 +119,15 @@ export const openApi = Effect.map(HttpClient.HttpClient, (client) => {
     name: "HTTP API",
     docs: "https://spec.openapis.org/oas/latest.html",
     settings: Schema.Struct({
-      /** Where the API's OpenAPI document is, as JSON. */
-      documentUrl: Schema.NonEmptyString,
-
-      /** Where the API's requests go, when not to the first server its document names. */
-      baseUrl: Schema.optionalKey(Schema.NonEmptyString),
+      documentUrl: Schema.NonEmptyString.annotate({
+        title: "Document URL",
+        description: "Where the API's OpenAPI document is, as JSON.",
+      }),
+      baseUrl: Schema.optionalKey(Schema.NonEmptyString).annotate({
+        title: "Base URL",
+        description:
+          "Where the API's requests go, when not to the first server its document names.",
+      }),
       keyHeader,
     }),
     auth: ["apiKey", "none"],

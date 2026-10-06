@@ -8,17 +8,24 @@ What amends connects to, and what it knows of the models it can run. It is being
 ## Integrations, connections, and credentials
 
 An **integration** is a kind of system amends connects to, declared in code with `Integration.make`:
-its `settings`, a schema of what a connection to it gives besides a secret, such as a URL; the
-`auth` methods a connection can authenticate by, `apiKey` or `none` until OAuth comes; what a
-connection gives, of `harnesses` that run agents, `models` an agent runs on, `sandboxes` it works
-in, and `tools` it calls; and a `check`. The code of an integration is given a connection with its
-settings decoded and its key, which it always has when a connection to it authenticates only with a
-key.
+its `settings`, a schema of what a connection to it gives besides a secret, such as a URL, left out
+when it takes none; the `auth` methods a connection can authenticate by, `apiKey` or `none` until
+OAuth comes; what a connection gives, of `harnesses` that run agents, `models` an agent runs on,
+`sandboxes` it works in, and `tools` it calls; and a `check`. The code of an integration is given a
+connection with its settings decoded and its key, which it always has when a connection to it
+authenticates only with a key.
+
+An integration describes its settings as a form a person fills in, `SettingsForm`: the JSON Schema
+of an object of text, number, yes-or-no, and choice fields, which is how MCP asks a person for
+input. The form comes from the settings schema, with each field's `title` and `description`
+annotations, so settings are asked for without code for each integration; `make` throws for settings
+that make no form, such as a nested object or an empty struct, which takes any value.
 
 A **connection** is a workspace's link to one integration: its id, the integration's id, a name, its
 settings as JSON, and the auth method it uses. Its **credential**, the API key, is kept apart, so that
 a connection can be shown and stored without it. An integration's operations take the two as they are
-stored: `harness` gives a harness that runs its agent on the models it is given, as `Agent.Options`,
+stored: `validate` refuses a connection by its settings, which are those of the form and no others,
+or by its auth method, running nothing and without its credential; `harness` gives a harness that runs its agent on the models it is given, as `Agent.Options`,
 `modelEndpoint` how an agent reaches a model, `sandboxProvider` a sandbox provider that works until
 its scope closes, `toolSource` a tool source, and `check` its `Health`. They fail with
 `ConnectionError`, which names the integration and holds a reason: `NotFoundError`,
