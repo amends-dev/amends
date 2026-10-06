@@ -11,6 +11,9 @@ import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
+import { ConnectionV2Service } from "./connection-v2/service.ts";
+import { ConnectionV2Permissions } from "./connection-v2/permissions.ts";
+import { ConnectionV2Projection } from "./connection-v2/projection.ts";
 import { EnvironmentService } from "./environment/service.ts";
 import { EnvironmentPermissions } from "./environment/permissions.ts";
 import { EnvironmentProjection } from "./environment/projection.ts";
@@ -97,6 +100,7 @@ export const projections = [
   ThreadActivityProjection.definition,
   NotificationProjection.definition,
   ConnectionProjection.definition,
+  ConnectionV2Projection.definition,
   EnvironmentProjection.definition,
   AgentProjection.definition,
   TurnProjection.definition,
@@ -137,6 +141,9 @@ export const permissions = [
   AgentPermissions.Create,
   AgentPermissions.Read,
   AgentPermissions.Configure,
+  ConnectionV2Permissions.Create,
+  ConnectionV2Permissions.Read,
+  ConnectionV2Permissions.Manage,
 ];
 
 /**
@@ -213,6 +220,7 @@ const operations = Layer.mergeAll(
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
   ConnectionService.layer,
+  ConnectionV2Service.layer,
   EnvironmentService.layer,
   AgentService.layer.pipe(Layer.provide(MemberService.layer)),
   TurnService.layer,

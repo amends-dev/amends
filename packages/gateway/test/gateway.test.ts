@@ -1,4 +1,5 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
+import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
 import { AgentStore } from "@amends/core/agent";
 import { AgentJobs, TurnJobs, TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
@@ -307,6 +308,23 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       ),
     )
     .pipe(
+      Context.add(
+        ConnectionV2Store.Service,
+        ConnectionV2Store.Service.of({
+          get: unexpected,
+          listActive: unexpected(),
+          insert: unexpected,
+          update: unexpected,
+        }),
+      ),
+      Context.add(
+        ConnectionV2CredentialStore.Service,
+        ConnectionV2CredentialStore.Service.of({
+          set: unexpected,
+          get: unexpected,
+          remove: unexpected,
+        }),
+      ),
       // Signals no test here observes: published into nothing, and no subscriber ever hears one.
       Context.add(
         SignalHub.Service,

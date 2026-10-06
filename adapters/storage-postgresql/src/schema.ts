@@ -770,6 +770,41 @@ export const connectionCredentials = pgTable(
 );
 
 /**
+ * Workspaces' connections to the integrations their host installs. An integration declares its own
+ * settings, so they are stored as JSON, like a thread activity's kind-specific details; a
+ * connection's credential is kept in connection_v2_credentials.
+ */
+export const connectionsV2 = pgTable(
+  "connections_v2",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    integration: text("integration").notNull(),
+    name: text("name").notNull(),
+    settings: jsonb("settings").$type<Record<string, string | number | boolean>>().notNull(),
+    auth: text("auth", { enum: ["apiKey", "none"] }).notNull(),
+    status: text("status", { enum: memberStatuses }).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/**
+ * Each connection's credential, outside the journal and its read models: rebuilding projections
+ * keeps them. Each is sealed with the host's credential key, bound to its workspace and connection.
+ */
+export const connectionV2Credentials = pgTable(
+  "connection_v2_credentials",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    connectionId: text("connection_id").notNull(),
+    sealed: text("sealed").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.connectionId] })],
+);
+
+/**
  * Where and how agents run: a harness, and optionally a sandbox. A sandbox's columns are all set or
  * all null; its variables and setup commands are stored as JSON, since both are lists of values.
  */

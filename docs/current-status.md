@@ -94,6 +94,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   nothing checks a key with its provider. Agents check `connection.use` when configured, but
   only turns resolve a credential for use, as they run; no toolkit consumes connections yet. Credentials are sealed with one host
   key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
+- [Connections v2](../packages/core/README.md#connections-v2), which are to replace them, are in core,
+  storage, and the gateway only: no host installs integrations yet, and nothing reaches them over
+  HTTP or in the apps. They authenticate with an API key or nothing, and nothing uses them yet.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
   instructions, model access, and a starting environment, over HTTP and on the
   [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a

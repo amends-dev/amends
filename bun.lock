@@ -151,6 +151,7 @@
       "name": "@amends/storage-memory",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "effect": "catalog:",
@@ -165,6 +166,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/cluster": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "@effect/sql-pg": "catalog:",
@@ -408,6 +410,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/connection": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -491,6 +494,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/connection": "workspace:*",
+        "@amends/connection-v2": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/environment": "workspace:*",
         "@amends/gateway": "workspace:*",

@@ -104,6 +104,12 @@ workspace, credential, and connection as additional data, so a sealed value open
 credential it was stored as. Grant scopes gained `target_connection_id` for connection targets.
 Adding these replaced the development baseline; recreate disposable PostgreSQL databases.
 
+`connections_v2` holds the records of connections v2, with an integration's settings as JSON since
+each integration declares its own. `connection_v2_credentials` holds each connection's credential,
+one for each connection: the JSON of its encoded form, sealed as above and bound to its workspace
+and connection, and replaced in place when its key is. Grant scopes gained
+`target_connection_v2_id` for `ConnectionV2` targets; the development baseline was regenerated.
+
 `environments` holds environment records: a sandbox's columns are all set or all null, its
 variables and setup commands are JSON, and grant scopes gained `target_environment_id` for
 environment targets. Adding them replaced the development baseline; recreate disposable PostgreSQL

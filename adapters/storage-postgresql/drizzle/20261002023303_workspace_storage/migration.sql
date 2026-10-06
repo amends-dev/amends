@@ -67,6 +67,13 @@ CREATE TABLE "connection_credentials" (
 	CONSTRAINT "connection_credentials_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
+CREATE TABLE "connection_v2_credentials" (
+	"workspace_id" text,
+	"connection_id" text,
+	"sealed" text NOT NULL,
+	CONSTRAINT "connection_v2_credentials_pkey" PRIMARY KEY("workspace_id","connection_id")
+);
+--> statement-breakpoint
 CREATE TABLE "connections" (
 	"workspace_id" text,
 	"id" text,
@@ -80,6 +87,19 @@ CREATE TABLE "connections" (
 	"created_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "connections_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "connections_credential_needs_api_key" CHECK ("authentication" = 'ApiKey' OR "credential_id" IS NULL)
+);
+--> statement-breakpoint
+CREATE TABLE "connections_v2" (
+	"workspace_id" text,
+	"id" text,
+	"integration" text NOT NULL,
+	"name" text NOT NULL,
+	"settings" jsonb NOT NULL,
+	"auth" text NOT NULL,
+	"status" text NOT NULL,
+	"created_by" text NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "connections_v2_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "environments" (
