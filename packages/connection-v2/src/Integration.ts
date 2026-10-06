@@ -31,13 +31,18 @@ export const Capability = Schema.Literals(["harnesses", "models", "sandboxes", "
 
 export type Capability = typeof Capability.Type;
 
-/** A connection as an integration's code is given it: with its settings decoded, and its key. */
-export interface Access<Settings> {
+/**
+ * A connection as an integration's code is given it: with its settings decoded, and its key, which
+ * the code of an integration that a connection authenticates with only by a key is always given.
+ */
+export interface Access<Settings, Auth extends AuthMethod = AuthMethod> {
   readonly connection: Connection;
   readonly settings: Settings;
 
   /** The connection's API key, when it authenticates with one. */
-  readonly apiKey: Redacted.Redacted<string> | undefined;
+  readonly apiKey: "none" extends Auth
+    ? Redacted.Redacted<string> | undefined
+    : Redacted.Redacted<string>;
 }
 
 /** The model an agent is to run on through a connection, and how it is to run. */
@@ -49,7 +54,7 @@ export interface EndpointOptions {
   readonly maxOutputTokens?: number;
 }
 
-export interface Options<Settings> {
+export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   /** Names the integration, as connections name it, such as `anthropic` or `mcp`. */
   readonly id: string;
 
@@ -63,14 +68,14 @@ export interface Options<Settings> {
   readonly settings: Schema.Decoder<Settings>;
 
   /** The ways a connection can authenticate, in the order to offer them. */
-  readonly auth: Array.NonEmptyReadonlyArray<AuthMethod>;
+  readonly auth: Array.NonEmptyReadonlyArray<Auth>;
 
   /**
    * The harness of a connection, running its agent on the models it is given, or why it cannot run
    * on them.
    */
   readonly harnesses?: (
-    access: Access<Settings>,
+    access: Access<Settings, Auth>,
     options: Agent.Options,
   ) => Effect.Effect<Harness.Harness["Service"], ConnectionErrorReason>;
 
@@ -81,14 +86,14 @@ export interface Options<Settings> {
 
     /** How an agent reaches a model through a connection, or why the connection cannot give it. */
     readonly endpoint: (
-      access: Access<Settings>,
+      access: Access<Settings, Auth>,
       options: EndpointOptions,
     ) => Result.Result<ModelEndpoint.ModelEndpoint, UnsupportedError>;
   };
 
   /** The sandbox provider of a connection, which works until the scope closes. */
   readonly sandboxes?: (
-    access: Access<Settings>,
+    access: Access<Settings, Auth>,
   ) => Effect.Effect<
     SandboxProvider.SandboxProvider["Service"],
     ConnectionErrorReason,
@@ -97,11 +102,11 @@ export interface Options<Settings> {
 
   /** The tool source of a connection. */
   readonly tools?: (
-    access: Access<Settings>,
+    access: Access<Settings, Auth>,
   ) => Effect.Effect<ToolSource.ToolSource, ConnectionErrorReason>;
 
   /** Checks a connection, as by asking the system for something only a working connection gets. */
-  readonly check: (access: Access<Settings>) => Effect.Effect<Health>;
+  readonly check: (access: Access<Settings, Auth>) => Effect.Effect<Health>;
 }
 
 export interface Integration {
@@ -150,14 +155,17 @@ export interface Integration {
 }
 
 /** The integration that `options` declares. */
-export const make = <Settings>(options: Options<Settings>): Integration => {
+export const make = <Settings, Auth extends AuthMethod>(
+  options: Options<Settings, Auth>,
+): Integration => {
+  const auth: Array.NonEmptyReadonlyArray<AuthMethod> = options.auth;
   const fail = (reason: ConnectionErrorReason, cause?: unknown) =>
     new ConnectionError({ integration: options.id, reason, cause });
 
   /** `connection` as the integration's code takes it, failing for one the integration does not. */
   const accessOf = (connection: Connection, credential: Credential | undefined) =>
     Effect.gen(function* () {
-      if (!options.auth.includes(connection.auth)) {
+      if (!auth.includes(connection.auth)) {
         const description = `${options.name} takes no authentication by ${connection.auth}`;
         return yield* fail(new InvalidConnectionError({ description }));
       }
@@ -175,11 +183,12 @@ export const make = <Settings>(options: Options<Settings>): Integration => {
           ),
         ),
       );
-      const access: Access<Settings> = {
+      // A connection that authenticates with a key has one, as checked above.
+      const access = {
         connection,
         settings,
         apiKey: connection.auth === "apiKey" ? credential?.apiKey : undefined,
-      };
+      } as Access<Settings, Auth>;
       return access;
     });
 
@@ -190,7 +199,7 @@ export const make = <Settings>(options: Options<Settings>): Integration => {
     id: options.id,
     name: options.name,
     docs: options.docs,
-    auth: options.auth,
+    auth,
     provides: [
       ...(options.harnesses === undefined ? [] : ["harnesses" as const]),
       ...(options.models === undefined ? [] : ["models" as const]),

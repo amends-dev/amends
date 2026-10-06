@@ -223,7 +223,9 @@ The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
 policies Daytona enforces, create real sandboxes and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
-`.env`; they take about a minute.
+`.env`; they take about a minute. Each provider's integration is tested everywhere, Daytona's
+against a fake of Daytona's API in the test's process; with `AMENDS_TEST_DAYTONA=1`, its tests also
+check a real organization's key and create a sandbox through a connection.
 
 `packages/connection-v2` and `adapters/harness-amends-v2` run everywhere against fakes: a client
 that answers as each model API does, an MCP server in the test's process, and an HTTP API with an

@@ -12,7 +12,8 @@ its `settings`, a schema of what a connection to it gives besides a secret, such
 `auth` methods a connection can authenticate by, `apiKey` or `none` until OAuth comes; what a
 connection gives, of `harnesses` that run agents, `models` an agent runs on, `sandboxes` it works
 in, and `tools` it calls; and a `check`. The code of an integration is given a connection with its
-settings decoded and its key.
+settings decoded and its key, which it always has when a connection to it authenticates only with a
+key.
 
 A **connection** is a workspace's link to one integration: its id, the integration's id, a name, its
 settings as JSON, and the auth method it uses. Its **credential**, the API key, is kept apart, so that
@@ -25,9 +26,10 @@ its scope closes, `toolSource` a tool source, and `check` its `Health`. They fai
 take, `UnsupportedError` for what it does not give, and `UnavailableError`, which may pass.
 
 `Integrations` holds those a host installs, for a connection to find its own by id: the built-in
-ones it chooses, and those of the harnesses and sandbox providers it runs. What only the host
-decides, such as where a local sandbox keeps its files, it gives an integration when it installs it;
-a connection's settings are what a workspace gives.
+ones it chooses, and those of the sandbox providers it runs, which their adapters declare, such as
+`DaytonaSandboxProvider.integration`. What only the host decides, such as where a local sandbox
+keeps its files, it gives an integration when it installs it; a connection's settings are what a
+workspace gives.
 
 ## Models
 

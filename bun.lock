@@ -105,6 +105,7 @@
       "name": "@amends/sandbox-daytona-v2",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/sandbox-v2": "workspace:*",
         "@daytona/sdk": "0.220.0",
       },
@@ -133,6 +134,7 @@
       "name": "@amends/sandbox-local-v2",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/sandbox-v2": "workspace:*",
       },
       "devDependencies": {
