@@ -7,6 +7,7 @@ export type WorkspacePage =
   | "agents"
   | "environments"
   | "connections"
+  | "connections-v2"
   | "settings";
 export const paths = {
   settingsSection: (id: string, section: SettingsTab) =>

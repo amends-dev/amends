@@ -6,6 +6,7 @@ import { Button } from "./button/index.ts";
 import { Choice } from "./choice/index.ts";
 import { Combobox } from "./combobox/index.ts";
 import { Field } from "./field/index.ts";
+import { FormFields, type FormField, type FormIssue } from "./form-fields/index.ts";
 import { Input, SearchField } from "./input/index.ts";
 import { Menu } from "./menu/index.ts";
 import { MemberPicker } from "./member-picker/index.ts";
@@ -120,6 +121,111 @@ export const Fields = {
     await expect(canvas.getByRole("button", { name: "Remove Yumi" })).toBeVisible();
     await userEvent.type(picker, "{Backspace}");
     await expect(canvas.queryByRole("button", { name: "Remove Yumi" })).toBeNull();
+  },
+} satisfies Story;
+
+const settingsFields: readonly FormField[] = [
+  {
+    key: "url",
+    label: "Server URL",
+    description: "Where the MCP server answers over Streamable HTTP.",
+    required: true,
+    kind: "text",
+    format: "uri",
+  },
+  {
+    key: "keyHeader",
+    label: "Key header",
+    description: "The header the API key goes in. Without one, it goes in Authorization.",
+    required: false,
+    kind: "text",
+    maxLength: 64,
+  },
+  {
+    key: "contextWindow",
+    label: "Context window",
+    required: false,
+    kind: "number",
+    integer: true,
+    minimum: 1,
+  },
+  {
+    key: "region",
+    label: "Region",
+    required: false,
+    kind: "choice",
+    options: [
+      { value: "us", label: "United States" },
+      { value: "eu", label: "Europe" },
+    ],
+  },
+  { key: "streaming", label: "Stream responses", required: true, kind: "boolean" },
+];
+
+/** What the story's fields refuse, as the app's client would tell it. */
+const settingsIssue = (field: FormField, value: string): FormIssue | undefined => {
+  if (value.trim() === "") return undefined;
+  if (field.kind === "text" && field.format === "uri" && !URL.canParse(value)) return "format";
+  if (field.kind === "text" && field.maxLength !== undefined && value.length > field.maxLength)
+    return "length";
+  if (field.kind === "number" && field.integer && !/^-?\d+$/.test(value)) return "format";
+  if (field.kind === "number" && field.minimum !== undefined && Number(value) < field.minimum)
+    return "range";
+  return undefined;
+};
+
+function SettingsExample() {
+  const [values, setValues] = createSignal<Readonly<Record<string, string>>>({
+    url: "https://tools.example.com/mcp",
+    streaming: "true",
+  });
+  const field = (key: string) => settingsFields.find((candidate) => candidate.key === key);
+  return (
+    <div class={s.stack}>
+      <FormFields
+        fields={settingsFields}
+        value={(key) => values()[key] ?? ""}
+        onChange={(key, value) => setValues({ ...values(), [key]: value })}
+        issue={(key) => {
+          const described = field(key);
+          return described && settingsIssue(described, values()[key] ?? "");
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * A form's fields described as data, such as an integration's settings: text of a format, a
+ * number with bounds, one of a few options, and yes or no, each saying what it refuses.
+ */
+export const SettingsFields = {
+  render: () => (
+    <div class={s.page}>
+      <section class={s.section}>
+        <h2 class={s.heading}>Fields from a description</h2>
+        <SettingsExample />
+      </section>
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const url = canvas.getByRole("textbox", { name: "Server URL" });
+    await expect(url).toHaveAccessibleDescription(
+      "Where the MCP server answers over Streamable HTTP.",
+    );
+    await userEvent.clear(url);
+    await userEvent.type(url, "tools.example.com");
+    await expect(url).toHaveAttribute("aria-invalid", "true");
+    await expect(
+      canvas.getByText("Enter a full address, such as https://example.com."),
+    ).toBeVisible();
+    const window = canvas.getByRole("spinbutton", { name: "Context window · Optional" });
+    await userEvent.type(window, "0");
+    await expect(canvas.getByText("Enter a whole number of at least 1.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("radio", { name: "No" }));
+    await expect(canvas.getByRole("radio", { name: "No" })).toBeChecked();
+    await expect(canvas.getByText("Not set")).toBeVisible();
   },
 } satisfies Story;
 
