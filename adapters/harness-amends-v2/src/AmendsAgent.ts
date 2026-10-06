@@ -6,8 +6,9 @@
  * only the host's tools.
  *
  * Its own state is its conversation, tool calls and results included, so a session it resumes goes
- * on as it left off. A turn does not outlive the process running it: `continue` goes on from the
- * steps of a turn `suspend` cut short that the session has, and runs the step in flight again.
+ * on as it left off. A turn does not outlive the process running it: `continueTurn` goes on from
+ * the steps of a turn `suspendTurn` cut short that the session has, and runs the step in flight
+ * again.
  *
  * `integration` gives the agent to connections, for a host to install.
  */
@@ -40,18 +41,18 @@ export interface Options extends Agent.Options {
   readonly commandTimeout?: Duration.Duration;
 }
 
-/** What `suspend`, `detach`, and `stop` return, for `start` to take back. */
+/** What `suspendTurn`, `detach`, and `stop` return, for `startSession` to take back. */
 const State = Schema.Struct({
   /** The finished turns, with their tool calls and results. */
   conversation: Prompt.Prompt,
 
-  /** The steps of the turn `suspend` cut short, each as the messages that record it. */
+  /** The steps of the turn `suspendTurn` cut short, each as the messages that record it. */
   unfinishedTurn: Schema.optionalKey(Schema.Array(Prompt.Prompt)),
 });
 
 const StateJson = Schema.toCodecJson(State);
 
-/** What `start` takes back, if anything: a state the agent returned. */
+/** What `startSession` takes back, if anything: a state the agent returned. */
 const SavedState = Schema.UndefinedOr(StateJson);
 
 /** The agent, which makes the language model of each of its endpoints with `Models.LanguageModels`. */
@@ -79,7 +80,7 @@ export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
   const agent: Agent.Agent = {
     id: "amends",
     requiresSandbox: false,
-    start: (startOptions) => startSession(options, modelFor, startOptions),
+    startSession: (startOptions) => startSession(options, modelFor, startOptions),
   };
   return agent;
 });
@@ -106,12 +107,12 @@ export const integration = Effect.fn("AmendsAgent.integration")(function* (
   });
 });
 
-const startSession = Effect.fn("AmendsAgent.start")(function* (
+const startSession = Effect.fn("AmendsAgent.startSession")(function* (
   options: Options,
   modelFor: (
     name: string | undefined,
   ) => Effect.Effect<LanguageModel.LanguageModel, HarnessError.HarnessError>,
-  startOptions: Agent.StartOptions,
+  startOptions: Agent.StartSessionOptions,
 ) {
   const { workspace } = startOptions;
   const maxSteps = options.maxSteps ?? Number.POSITIVE_INFINITY;
@@ -121,14 +122,14 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     (resumed ?? suspended)?.conversation ?? startOptions.history,
   );
   /**
-   * The running turn, or the one `suspend` cut short. A turn joins the conversation once the
+   * The running turn, or the one `suspendTurn` cut short. A turn joins the conversation once the
    * session takes its `finish`, so that a turn which finished before the session had all of it can
    * still be continued, or as far as it got when its stream ends early.
    */
   const turn = yield* Ref.make<Turn | undefined>(undefined);
-  /** Held while a turn runs, so that `suspend` and `stop` read the turn once it has stopped. */
+  /** Held while a turn runs, so that `suspendTurn` and `stop` read the turn once it has stopped. */
   const turnPermit = yield* Semaphore.make(1);
-  /** Whether `suspend` let go of the session, keeping the running turn for `continue`. */
+  /** Whether `suspendTurn` let go of the session, keeping the running turn for `continueTurn`. */
   const keepsTurn = yield* Ref.make(false);
   /** Done once the session is suspended, stopped, or destroyed, stopping the running turn. */
   const closed = yield* Deferred.make<void>();
@@ -225,8 +226,8 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
     yield* LanguageModel.streamText({ prompt, toolkit }).pipe(
       Stream.runForEach((part) => {
         parts.push(part);
-        // A step is recorded before its `finish-step` goes out, so that `continue` can go on after
-        // any step the session has. Effect AI streams `finish` after the step's tool results.
+        // A step is recorded before its `finish-step` goes out, so that `continueTurn` can go on
+        // after any step the session has. Effect AI streams `finish` after the step's tool results.
         const record =
           part.type === "finish" ? recordStep(Prompt.fromResponseParts(parts)) : Effect.void;
         return Effect.andThen(record, Effect.flatMap(streamPartsOf(part, isOwnTool), emit));
@@ -321,7 +322,10 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const onceStopped = <A, E>(effect: Effect.Effect<A, E>) =>
     Semaphore.withPermit(turnPermit, effect);
 
-  /** What the agent returns for `start` to take back, with the steps of a turn `suspend` cut short. */
+  /**
+   * What the agent returns for `startSession` to take back, with the steps of a turn `suspendTurn`
+   * cut short.
+   */
   const saveState = (unfinishedTurn?: ReadonlyArray<Prompt.Prompt>) =>
     Effect.flatMap(Ref.get(conversation), (current) =>
       Schema.encodeEffect(StateJson)({
@@ -335,9 +339,9 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
   const session: Agent.AgentSession = {
     hasUnfinishedTurn: suspended?.unfinishedTurn !== undefined,
 
-    prompt: (turnOptions) => runTurn(turnOptions, []),
+    promptTurn: (turnOptions) => runTurn(turnOptions, []),
 
-    continue: (turnOptions, finishedSteps) =>
+    continueTurn: (turnOptions, finishedSteps) =>
       runTurn(turnOptions, suspended?.unfinishedTurn?.slice(0, finishedSteps) ?? []),
 
     submitToolResult: ({ id, result, isFailure }) =>
@@ -361,7 +365,7 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
         ),
       ),
 
-    suspend: Effect.andThen(
+    suspendTurn: Effect.andThen(
       Effect.andThen(Ref.set(keepsTurn, true), close),
       onceStopped(Effect.flatMap(Ref.get(turn), (unfinished) => saveState(unfinished?.steps))),
     ),

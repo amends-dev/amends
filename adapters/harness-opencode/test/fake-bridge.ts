@@ -1,4 +1,4 @@
-// A bridge over a stand-in agent, served as opencode's bridge program serves its agent, which
+// A bridge over a stand-in driver, served as opencode's bridge program serves its driver, which
 // `bridge.test.ts` has the bridge client launch, as the command that runs a bridge. A turn follows
 // its prompt: `reply <text>` answers `text`, `wait <text>` starts to answer `text` and finishes
 // once the session's directory has a file named `release`, and any other prompt, such as the
@@ -37,9 +37,9 @@ const program = Effect.gen(function* () {
     { flag: "a" },
   );
 
-  const agent: Bridge.Agent = {
+  const driver: Bridge.Driver = {
     id: "fake",
-    start: (options) =>
+    startSession: (options) =>
       Effect.gen(function* () {
         const turns = yield* Ref.make(
           Option.match(Schema.decodeUnknownOption(State)(options.agentState), {
@@ -47,9 +47,9 @@ const program = Effect.gen(function* () {
             onSome: (state) => state.turns,
           }),
         );
-        const session: Bridge.AgentSession = {
+        const session: Bridge.DriverSession = {
           keptConversation: options.agentState !== undefined,
-          prompt: (turn) => {
+          promptTurn: (turn) => {
             const text = turn.prompt.content
               .flatMap((part) => (part.type === "text" ? [part.text] : []))
               .join("");
@@ -88,7 +88,7 @@ const program = Effect.gen(function* () {
       }),
   };
 
-  return yield* BunBridge.serve(agent, launch);
+  return yield* BunBridge.serve(driver, launch);
 });
 
 BunRuntime.runMain(program.pipe(Effect.scoped, Effect.provide(BunServices.layer)));

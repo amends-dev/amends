@@ -1,5 +1,5 @@
 /**
- * The bridge's side of `Bridge.Rpcs`, which runs in the sandbox and serves an agent's sessions to
+ * The bridge's side of `Bridge.Rpcs`, which runs in the sandbox and serves a driver's sessions to
  * hosts. `serve` serves them over a WebSocket at `/`, refusing a host that does not present the
  * bridge's token, until a host asks the bridge to exit, and `layerHandlers` is the same bridge
  * without a transport. `readLaunchOptions` reads what the host that launched the bridge gave it.
@@ -57,12 +57,12 @@ export interface Options {
 }
 
 /**
- * Serves `agent`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, until a host
+ * Serves `driver`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, until a host
  * asks the bridge to exit. The sessions end, aborting their turns, when the scope closes.
  */
-export const serve = Effect.fnUntraced(function* (agent: Bridge.Agent, options: Options) {
+export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options: Options) {
   const exitAsked = yield* Deferred.make<void>();
-  const handlers = layerHandlers(agent, {
+  const handlers = layerHandlers(driver, {
     stateDirectory: options.stateDirectory,
     exit: Deferred.succeed(exitAsked, undefined),
   });
@@ -79,13 +79,13 @@ export const serve = Effect.fnUntraced(function* (agent: Bridge.Agent, options: 
 });
 
 /**
- * Handles `Bridge.Rpcs` for `agent`'s sessions, over whichever transport serves them. `exit` ends
+ * Handles `Bridge.Rpcs` for `driver`'s sessions, over whichever transport serves them. `exit` ends
  * the bridge when a host asks it to.
  */
 export const layerHandlers = (
-  agent: Bridge.Agent,
+  driver: Bridge.Driver,
   options: { readonly stateDirectory: string; readonly exit: Effect.Effect<unknown> },
-) => Bridge.Rpcs.toLayer(makeHandlers(agent, options));
+) => Bridge.Rpcs.toLayer(makeHandlers(driver, options));
 
 /**
  * What the host that launched the bridge gave it on standard input, as one line of JSON. The bridge
@@ -134,7 +134,7 @@ interface Turn {
 
 /** A session the bridge started. Its turn and fiber change only while the bridge's lock is held. */
 interface StartedSession {
-  readonly agentSession: Bridge.AgentSession;
+  readonly driverSession: Bridge.DriverSession;
 
   /** Closes when the session ends, interrupting its turn. */
   readonly scope: Scope.Closeable;
@@ -166,7 +166,7 @@ const continuePrompt = Prompt.makeMessage("user", {
 });
 
 const makeHandlers = Effect.fnUntraced(function* (
-  agent: Bridge.Agent,
+  driver: Bridge.Driver,
   {
     stateDirectory,
     exit,
@@ -184,7 +184,7 @@ const makeHandlers = Effect.fnUntraced(function* (
   const lock = yield* Semaphore.make(1);
 
   const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
-    new HarnessError({ agent: agent.id, reason, cause });
+    new HarnessError({ agent: driver.id, reason, cause });
 
   /** The error for a failure of the bridge itself, such as one writing a turn's file. */
   const bridgeFailure = (cause: unknown) =>
@@ -218,14 +218,14 @@ const makeHandlers = Effect.fnUntraced(function* (
         : Effect.succeed(started);
     });
 
-  /** Starts a session in a scope of its own, which closes again if the agent fails to start it. */
-  const startSession = Effect.fnUntraced(function* (options: Bridge.StartOptions) {
+  /** Starts a session in a scope of its own, which closes again if the driver fails to start it. */
+  const startSession = Effect.fnUntraced(function* (options: Bridge.StartSessionOptions) {
     const scope = yield* Scope.fork(bridgeScope);
-    const agentSession = yield* agent.start(options).pipe(
+    const driverSession = yield* driver.startSession(options).pipe(
       Scope.provide(scope),
       Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
     );
-    const started: StartedSession = { agentSession, scope, turn: undefined, fiber: undefined };
+    const started: StartedSession = { driverSession, scope, turn: undefined, fiber: undefined };
     sessions.set(options.id, started);
     return started;
   });
@@ -243,12 +243,12 @@ const makeHandlers = Effect.fnUntraced(function* (
 
   /** Runs `turn` to its end, keeping each part as it streams, then how the turn ended. */
   const runTurn = (
-    agentSession: Bridge.AgentSession,
+    driverSession: Bridge.DriverSession,
     turn: Turn,
     options: Bridge.TurnOptions,
     file: string,
   ) =>
-    agentSession.prompt(options).pipe(
+    driverSession.promptTurn(options).pipe(
       Stream.runForEach((part) => {
         const numbered: Bridge.NumberedPart = { seq: turn.parts.length + 1, part };
         return appendLine(file, numbered).pipe(
@@ -304,13 +304,13 @@ const makeHandlers = Effect.fnUntraced(function* (
     if (previous === undefined) return TurnStart.New();
     const { end } = yield* SubscriptionRef.get(previous.progress);
     if (end?._tag !== "Aborted") return TurnStart.Started({ turn: previous });
-    return started.agentSession.keptConversation
+    return started.driverSession.keptConversation
       ? TurnStart.Continue({ parts: finishedStepsOf(previous.parts) })
       : TurnStart.New();
   });
 
   return Bridge.Rpcs.of({
-    Hello: () => Effect.succeed({ agent: agent.id, protocolVersion: Bridge.protocolVersion }),
+    Hello: () => Effect.succeed({ agent: driver.id, protocolVersion: Bridge.protocolVersion }),
 
     Exit: () => Effect.asVoid(exit),
 
@@ -321,7 +321,7 @@ const makeHandlers = Effect.fnUntraced(function* (
           const started =
             sessions.get(session) ??
             (yield* startSession({ id: session, directory, history, agentState }));
-          const state = yield* started.agentSession.state;
+          const state = yield* started.driverSession.state;
           if (unfinishedTurn === undefined) return { hasUnfinishedTurn: false, agentState: state };
           const turnStart = yield* turnStartOf(session, started, unfinishedTurn);
           // A bridge started again has a turn that ended before it exited only in the turn's file.
@@ -361,7 +361,7 @@ const makeHandlers = Effect.fnUntraced(function* (
           const turnOptions =
             turnStart._tag === "Continue" ? { ...options, prompt: continuePrompt } : options;
           const fiber = yield* Effect.forkIn(
-            runTurn(started.agentSession, turn, turnOptions, file),
+            runTurn(started.driverSession, turn, turnOptions, file),
             started.scope,
           );
           started.turn = turn;
@@ -393,20 +393,22 @@ const makeHandlers = Effect.fnUntraced(function* (
       ),
 
     SubmitToolResult: ({ session, result }) =>
-      Effect.flatMap(startedSession(session), ({ agentSession }) =>
-        agentSession.submitToolResult(result),
+      Effect.flatMap(startedSession(session), ({ driverSession }) =>
+        driverSession.submitToolResult(result),
       ),
 
     Approve: ({ session, response }) =>
-      Effect.flatMap(startedSession(session), ({ agentSession }) => agentSession.approve(response)),
+      Effect.flatMap(startedSession(session), ({ driverSession }) =>
+        driverSession.approve(response),
+      ),
 
     Compact: ({ session, instructions }) =>
-      Effect.flatMap(startedSession(session), ({ agentSession }) =>
-        agentSession.compact(instructions),
+      Effect.flatMap(startedSession(session), ({ driverSession }) =>
+        driverSession.compact(instructions),
       ),
 
     ReadState: ({ session }) =>
-      Effect.flatMap(startedSession(session), ({ agentSession }) => agentSession.state),
+      Effect.flatMap(startedSession(session), ({ driverSession }) => driverSession.state),
 
     StopSession: ({ session }) =>
       Semaphore.withPermit(
@@ -414,7 +416,7 @@ const makeHandlers = Effect.fnUntraced(function* (
         Effect.gen(function* () {
           const started = yield* startedSession(session);
           yield* abortTurn(started);
-          const state = yield* started.agentSession.state;
+          const state = yield* started.driverSession.state;
           yield* endSession(session, started);
           return state;
         }),
@@ -426,7 +428,7 @@ const makeHandlers = Effect.fnUntraced(function* (
         Effect.gen(function* () {
           const started = yield* startedSession(session);
           yield* abortTurn(started);
-          yield* started.agentSession.destroy;
+          yield* started.driverSession.destroy;
           yield* endSession(session, started);
           yield* fs
             .remove(sessionDirectory(session), { recursive: true, force: true })

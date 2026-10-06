@@ -10,7 +10,7 @@
  * `StreamPart`s until its `finish` part, and interrupting the stream aborts the turn. The harness
  * runs one turn of a session at a time, so an agent never sees a turn start while another runs.
  * A session outlives the process that started it: the agent keeps running after `detach` or
- * `suspend`, and `start` picks the session up again from what those returned.
+ * `suspendTurn`, and `startSession` picks the session up again from what those returned.
  *
  * Every agent is made with `Options`, the models it runs on, which its adapter extends with what
  * only that agent takes.
@@ -44,13 +44,13 @@ export interface Workspace {
   /** The sandbox, prepared with the agent's `template`. The agent never stops or destroys it. */
   readonly sandbox: Sandbox.Sandbox["Service"];
 
-  /** The absolute directory in the sandbox for this session. It exists before `start`. */
+  /** The absolute directory in the sandbox for this session. It exists before `startSession`. */
   readonly directory: string;
 }
 
 // TODO: Add a permission mode for the agent's own tools, and which of them it may use, once an
 // agent asks for approval before using its own tools.
-export interface StartOptions {
+export interface StartSessionOptions {
   readonly id: SessionId;
 
   /** Where the agent works. Absent only for an agent that does not require a sandbox. */
@@ -69,8 +69,9 @@ export interface StartOptions {
   readonly agentState?: Schema.Json;
 
   /**
-   * What this agent's `suspend` returned when the session's last turn was cut short on this agent.
-   * The session starts ready for `continue` instead of a new turn, if the agent still has the turn.
+   * What this agent's `suspendTurn` returned when the session's last turn was cut short on this
+   * agent. The session starts ready for `continueTurn` instead of a new turn, if the agent still
+   * has the turn.
    */
   readonly unfinishedTurn?: Schema.Json;
 }
@@ -103,22 +104,23 @@ export interface TurnOptions {
 // input while they work.
 export interface AgentSession {
   /**
-   * Whether the session started with the turn `suspend` cut short, for `continue` to finish. An
-   * agent given an `unfinishedTurn` it no longer has, such as opencode in a sandbox other than the
-   * one the turn ran in, has none, and the harness runs the turn again from its prompt.
+   * Whether the session started with the turn `suspendTurn` cut short, for `continueTurn` to
+   * finish. An agent given an `unfinishedTurn` it no longer has, such as opencode in a sandbox
+   * other than the one the turn ran in, has none, and the harness runs the turn again from its
+   * prompt.
    */
   readonly hasUnfinishedTurn: boolean;
 
   /** Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn. */
-  readonly prompt: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
+  readonly promptTurn: (options: TurnOptions) => Stream.Stream<StreamPart, HarnessError>;
 
   /**
-   * Streams the turn `suspend` cut short from the step after its first `finishedSteps`, which the
-   * harness already has, given the settings the turn started with again. The step that was in
+   * Streams the turn `suspendTurn` cut short from the step after its first `finishedSteps`, which
+   * the harness already has, given the settings the turn started with again. The step that was in
    * flight starts over: an agent whose turn kept running streams its parts again as they were, and
    * one whose turn could not outlive its process runs the step again.
    */
-  readonly continue: (
+  readonly continueTurn: (
     options: TurnOptions,
     finishedSteps: number,
   ) => Stream.Stream<StreamPart, HarnessError>;
@@ -145,26 +147,26 @@ export interface AgentSession {
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns what
-   * `start` takes as `unfinishedTurn` to continue the turn after any step whose `finish-step` it
-   * delivered.
+   * `startSession` takes as `unfinishedTurn` to continue the turn after any step whose
+   * `finish-step` it delivered.
    */
-  readonly suspend: Effect.Effect<Schema.Json, HarnessError>;
+  readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
-   * Lets go of the session between turns while the agent keeps running, returning what `start`
-   * takes as `agentState`.
+   * Lets go of the session between turns while the agent keeps running, returning what
+   * `startSession` takes as `agentState`.
    */
   readonly detach: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
-   * Stops the agent, returning what `start` takes as `agentState` to start it again with its
+   * Stops the agent, returning what `startSession` takes as `agentState` to start it again with its
    * conversation.
    */
   readonly stop: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
    * Stops the agent for good, deleting what it keeps of the session. It also destroys a session
-   * `suspend`, `detach`, or `stop` let go of, and destroying it again succeeds.
+   * `suspendTurn`, `detach`, or `stop` let go of, and destroying it again succeeds.
    */
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
@@ -189,5 +191,7 @@ export interface Agent {
   readonly maxToolNameLength?: number;
 
   /** Starts a session: a new one, or one picked up again from what an earlier session returned. */
-  readonly start: (options: StartOptions) => Effect.Effect<AgentSession, HarnessError>;
+  readonly startSession: (
+    options: StartSessionOptions,
+  ) => Effect.Effect<AgentSession, HarnessError>;
 }

@@ -286,7 +286,7 @@ describe("Session", () => {
       );
 
       const slow = yield* readUntil(session.stream({ prompt: "slow" }), () => true);
-      const state = yield* session.suspend;
+      const state = yield* session.suspendTurn;
       const parts = yield* Fiber.join(slow);
       const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
 
@@ -341,7 +341,7 @@ describe("Session", () => {
           Effect.forkChild,
         );
         yield* Deferred.await(started);
-        const state = yield* session.suspend;
+        const state = yield* session.suspendTurn;
         yield* Fiber.join(reading);
 
         expect(state.unfinishedTurn).toBeUndefined();

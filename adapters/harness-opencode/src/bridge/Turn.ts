@@ -1,6 +1,6 @@
 /**
  * Translates the events of an opencode turn into the parts a harness streams for it, one event at
- * a time, from what the turn has done so far. The translation is pure: the agent feeds it the
+ * a time, from what the turn has done so far. The translation is pure: the driver feeds it the
  * turn's events in order, from the first after the turn's prompt.
  *
  * opencode records text, reasoning, and tool input whole when they end, so each streams as one
@@ -39,7 +39,7 @@ export const initial: Turn = {
 // TODO: Report the files a step changed as `file-change` parts, once opencode says how each changed.
 // TODO: Give a tool's result what the tool reported beside what the model read (`structured`), once
 // a caller needs it.
-// TODO: Translate a prompt that steers the running turn, once the agent sends messages mid-turn.
+// TODO: Translate a prompt that steers the running turn, once the driver sends messages mid-turn.
 /**
  * Translates the turn's next event into the parts it streams and the turn after it. Fails with
  * `InvalidOutputError` for the result of a call the turn did not make.

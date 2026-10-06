@@ -3,14 +3,14 @@
  * `Harness.startSession` starts one over an agent session, and the session adds the host's tools,
  * whole-turn results, and the record of the conversation that `SessionState` keeps.
  *
- * `SessionState` is what `suspend`, `detach`, and `stop` return for the caller to store. It records
- * the conversation as Effect AI `Prompt` messages, so that `Harness.resumeSession` can pick the
- * session up on any agent: the agent that last ran it resumes from its own state, and any other
- * loads the conversation, and runs an unfinished turn again from its prompt.
+ * `SessionState` is what `suspendTurn`, `detach`, and `stop` return for the caller to store. It
+ * records the conversation as Effect AI `Prompt` messages, so that `Harness.startSession` can
+ * resume the session from it on any agent: the agent that last ran it resumes from its own state,
+ * and any other loads the conversation, and runs an unfinished turn again from its prompt.
  *
- * `suspend`, `detach`, `stop`, and `destroy` let go of the session. Each takes hold of it before it
- * asks the agent, so that no turn starts meanwhile, and one that fails leaves the session open, to
- * be tried again.
+ * `suspendTurn`, `detach`, `stop`, and `destroy` let go of the session. Each takes hold of it
+ * before it asks the agent, so that no turn starts meanwhile, and one that fails leaves the session
+ * open, to be tried again.
  */
 import { type Effect, Schema, type Stream } from "effect";
 import type { AiError, Toolkit } from "effect/ai";
@@ -20,17 +20,21 @@ import type { GenerateObjectResult, GenerateResult } from "./GenerateResult.ts";
 import type { HarnessError } from "./HarnessError.ts";
 import type { StreamPart } from "./StreamPart.ts";
 
-/** A turn that `suspend` cut short, kept so that the session can finish it later. */
+/** A turn that `suspendTurn` cut short, kept so that the session can finish it later. */
 export const UnfinishedTurn = Schema.Struct({
   prompt: Prompt.UserMessage,
 
   /**
-   * The steps the turn finished before `suspend`, each as the messages that record it. The agent
-   * that cut the turn short continues it after them; any other runs the turn again without them.
+   * The steps the turn finished before `suspendTurn`, each as the messages that record it. The
+   * agent that cut the turn short continues it after them; any other runs the turn again without
+   * them.
    */
   steps: Schema.Array(Prompt.Prompt),
 
-  /** What the agent's `suspend` returned. Without it, the next agent runs the turn again from `prompt`. */
+  /**
+   * What the agent's `suspendTurn` returned. Without it, the next agent runs the turn again from
+   * `prompt`.
+   */
   agentState: Schema.optionalKey(Schema.Json),
 });
 
@@ -60,7 +64,7 @@ export const SessionState = Schema.Struct({
 export interface SessionState extends Schema.Schema.Type<typeof SessionState> {}
 
 // TODO: Add `continueGenerate`, which finishes an unfinished turn and returns it whole, and let
-// `continue` finish a turn that answers in JSON, once a caller continues such turns.
+// `continueStream` finish a turn that answers in JSON, once a caller continues such turns.
 export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
   /** What the turn asks: text, or a user message that can also carry files. */
   readonly prompt: string | Prompt.UserMessage;
@@ -147,12 +151,12 @@ export interface Session {
   >;
 
   /**
-   * Streams the unfinished turn the session was started with, like `stream`, from the step that
-   * was in flight when `suspend` cut it short. That step starts over, so the parts of it delivered
-   * before `suspend` are replaced by the ones `continue` streams. An agent that does not have the
-   * turn, such as another agent, runs it again from its prompt.
+   * Streams the unfinished turn the session was started with, like `stream`, from the step that was
+   * in flight when `suspendTurn` cut it short. That step starts over, so the parts of it delivered
+   * before `suspendTurn` are replaced by the ones `continueStream` streams. An agent that does not
+   * have the turn, such as another agent, runs it again from its prompt.
    */
-  readonly continue: <Tools extends Record<string, Tool.Any> = {}>(
+  readonly continueStream: <Tools extends Record<string, Tool.Any> = {}>(
     options: ContinueOptions<Tools>,
   ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
 
@@ -168,9 +172,10 @@ export interface Session {
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns the
-   * session with the turn unfinished, for `continue` to finish after `Harness.resumeSession`.
+   * session with the turn unfinished, for `continueStream` to finish once
+   * `Harness.startSession` resumes it.
    */
-  readonly suspend: Effect.Effect<SessionState, HarnessError>;
+  readonly suspendTurn: Effect.Effect<SessionState, HarnessError>;
 
   /** Lets go of the session between turns while the agent keeps running. */
   readonly detach: Effect.Effect<SessionState, HarnessError>;

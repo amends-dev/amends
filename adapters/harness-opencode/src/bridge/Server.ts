@@ -1,5 +1,5 @@
 /**
- * opencode's server, which the bridge starts in its sandbox, and the requests the agent makes of it.
+ * opencode's server, which the bridge starts in its sandbox, and the requests the driver makes of it.
  * One server serves every session in the sandbox, each in its own directory. `start` runs the server
  * until the scope closes, listening only on 127.0.0.1, at a port the server picks, behind a password
  * that `start` makes and gives the server in its environment. The bridge is the server's only client
@@ -11,7 +11,7 @@
  * directory a session works in, applies over it.
  *
  * opencode's tools run with the server's environment, so the agent can read the password; it keeps
- * out everything else on the machine. A failed request fails with the `HarnessError` the agent
+ * out everything else on the machine. A failed request fails with the `HarnessError` the driver
  * reports.
  */
 import { HarnessError } from "@amends/harness-v2";

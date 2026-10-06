@@ -228,7 +228,7 @@ export const eventsOf = (
   return Result.succeed(events);
 };
 
-// TODO: Write a user message's files into its prompt, once the agent sends files with a prompt.
+// TODO: Write a user message's files into its prompt, once the driver sends files with a prompt.
 // TODO: Carry a reasoning part's provider options, such as its signature, once the model that reads
 // them can be the one that wrote them.
 /** Why opencode cannot record `conversation`, or nothing when it can. */

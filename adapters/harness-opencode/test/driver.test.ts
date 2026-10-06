@@ -7,7 +7,7 @@ import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
-import * as OpencodeAgent from "../src/bridge/Agent.ts";
+import * as OpencodeDriver from "../src/bridge/Driver.ts";
 import {
   type FakeOpencodeOptions,
   type FakeTurn,
@@ -20,12 +20,12 @@ const id = SessionId.make("session-one");
 const directory = "/work/session-one";
 
 /**
- * The opencode agent as a bridge runs it, whose server is a fake opencode that runs each turn with
- * `runTurn`. The agent starts the server as it would opencode's, through a process spawner whose
+ * opencode's driver as a bridge runs it, whose server is a fake opencode that runs each turn with
+ * `runTurn`. The driver starts the server as it would opencode's, through a process spawner whose
  * servers announce the fake's address; the first `failingStarts` of them fail to start. Its models
  * are of opencode's own provider, the fake's only one, except `elsewhere`.
  */
-const makeAgent = (
+const makeDriver = (
   runTurn: (turn: FakeTurn) => Effect.Effect<void>,
   options: FakeOpencodeOptions & { readonly failingStarts?: number } = {},
 ) =>
@@ -34,7 +34,7 @@ const makeAgent = (
     const processes = yield* makeFakeServerProcesses(`http://127.0.0.1:${fake.port}`, {
       failing: options.failingStarts,
     });
-    const agent = yield* OpencodeAgent.make({
+    const driver = yield* OpencodeDriver.make({
       model: { providerID: "opencode", id: "default-model" },
       models: {
         other: { providerID: "opencode", id: "other-model" },
@@ -45,7 +45,7 @@ const makeAgent = (
       config: {},
       env: {},
     }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, processes.spawner));
-    return { fake, processes, agent };
+    return { fake, processes, driver };
   });
 
 const startSession = (
@@ -53,8 +53,8 @@ const startSession = (
   options?: FakeOpencodeOptions,
 ) =>
   Effect.gen(function* () {
-    const made = yield* makeAgent(runTurn, options);
-    const session = yield* made.agent.start({ id, directory, history: Prompt.empty });
+    const made = yield* makeDriver(runTurn, options);
+    const session = yield* made.driver.startSession({ id, directory, history: Prompt.empty });
     return { ...made, session };
   });
 
@@ -71,10 +71,10 @@ const turnOptions = (
 
 /** Runs a turn asking `text` to its end. */
 const runTurn = (
-  session: Bridge.AgentSession,
+  session: Bridge.DriverSession,
   text: string,
   options?: Partial<Bridge.TurnOptions>,
-) => Stream.runCollect(session.prompt(turnOptions(text, options)));
+) => Stream.runCollect(session.promptTurn(turnOptions(text, options)));
 
 const textOf = (parts: ReadonlyArray<StreamPart.StreamPart>) =>
   new GenerateResult.GenerateResult(parts).text;
@@ -128,7 +128,7 @@ const callBash = (turn: FakeTurn) =>
 
 const TestLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer);
 
-layer(TestLayer)("OpencodeAgent", (it) => {
+layer(TestLayer)("OpencodeDriver", (it) => {
   it.effect("runs a turn in the session's directory, streaming what opencode records", () =>
     Effect.gen(function* () {
       const { fake, session } = yield* startSession(answer("hello"));
@@ -171,11 +171,15 @@ layer(TestLayer)("OpencodeAgent", (it) => {
 
   it.effect("starts opencode's server once, when the first session starts", () =>
     Effect.gen(function* () {
-      const { processes, agent } = yield* makeAgent(answer("hello"));
+      const { processes, driver } = yield* makeDriver(answer("hello"));
       const before = processes.spawned.length;
 
-      yield* agent.start({ id, directory, history: Prompt.empty });
-      yield* agent.start({ id: SessionId.make("session-two"), directory, history: Prompt.empty });
+      yield* driver.startSession({ id, directory, history: Prompt.empty });
+      yield* driver.startSession({
+        id: SessionId.make("session-two"),
+        directory,
+        history: Prompt.empty,
+      });
 
       expect(before).toBe(0);
       expect(processes.spawned).toHaveLength(1);
@@ -184,10 +188,12 @@ layer(TestLayer)("OpencodeAgent", (it) => {
 
   it.effect("starts opencode's server again for the next session when it failed to start", () =>
     Effect.gen(function* () {
-      const { processes, agent } = yield* makeAgent(answer("hello"), { failingStarts: 1 });
+      const { processes, driver } = yield* makeDriver(answer("hello"), { failingStarts: 1 });
 
-      const failed = yield* Effect.flip(agent.start({ id, directory, history: Prompt.empty }));
-      const session = yield* agent.start({ id, directory, history: Prompt.empty });
+      const failed = yield* Effect.flip(
+        driver.startSession({ id, directory, history: Prompt.empty }),
+      );
+      const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
       expect(failed.reason._tag).toBe("UnavailableError");
       expect(textOf(yield* runTurn(session, "Say hello."))).toBe("hello");
@@ -197,9 +203,9 @@ layer(TestLayer)("OpencodeAgent", (it) => {
 
   it.effect("reports when opencode's server exits by itself", () =>
     Effect.gen(function* () {
-      const { processes, agent } = yield* makeAgent(answer("hello"));
-      yield* agent.start({ id, directory, history: Prompt.empty });
-      const exited = yield* Effect.forkChild(agent.serverExited);
+      const { processes, driver } = yield* makeDriver(answer("hello"));
+      yield* driver.startSession({ id, directory, history: Prompt.empty });
+      const exited = yield* Effect.forkChild(driver.serverExited);
 
       yield* processes.exit;
 
@@ -294,7 +300,7 @@ layer(TestLayer)("OpencodeAgent", (it) => {
     Effect.gen(function* () {
       const { fake, session } = yield* startSession(answer("hello"));
 
-      // The agent asks opencode over HTTP between its waits, so the clock moves on a little at a
+      // The driver asks opencode over HTTP between its waits, so the clock moves on a little at a
       // time until it gives up.
       const refused = yield* Effect.raceFirst(
         Effect.flip(runTurn(session, "Say hello.", { model: "elsewhere" })),
@@ -323,7 +329,7 @@ layer(TestLayer)("OpencodeAgent", (it) => {
         Effect.andThen(callBash(turn), Effect.never),
       );
 
-      const read = yield* session.prompt(turnOptions("Build it.")).pipe(
+      const read = yield* session.promptTurn(turnOptions("Build it.")).pipe(
         Stream.takeUntil((part) => part.type === "tool-call"),
         Stream.runCollect,
       );
@@ -335,13 +341,13 @@ layer(TestLayer)("OpencodeAgent", (it) => {
 
   it.effect("writes another agent's conversation into a new opencode session", () =>
     Effect.gen(function* () {
-      const { fake, agent } = yield* makeAgent(answer("unused"));
+      const { fake, driver } = yield* makeDriver(answer("unused"));
       const history = Prompt.make([
         { role: "user", content: "Remember the codename BLUE-MARLIN-9." },
         { role: "assistant", content: [{ type: "text", text: "Noted." }] },
       ]);
 
-      yield* agent.start({ id, directory, history });
+      yield* driver.startSession({ id, directory, history });
 
       const [opencodeSession] = (yield* fake.sessions).values();
       expect(opencodeSession?.events.map((event) => event.type)).toEqual([
@@ -359,14 +365,14 @@ layer(TestLayer)("OpencodeAgent", (it) => {
     "picks its own opencode session up again from its state, or writes the conversation into a new one when opencode lost it",
     () =>
       Effect.gen(function* () {
-        const { fake, agent, session } = yield* startSession(answer("hello"));
+        const { fake, driver, session } = yield* startSession(answer("hello"));
         yield* runTurn(session, "Say hello.");
         const history = Prompt.make([
           { role: "user", content: "Say hello." },
           { role: "assistant", content: [{ type: "text", text: "hello" }] },
         ]);
 
-        const again = yield* agent.start({
+        const again = yield* driver.startSession({
           id,
           directory,
           history,
@@ -375,7 +381,7 @@ layer(TestLayer)("OpencodeAgent", (it) => {
         const state = yield* again.state;
         const kept = [...(yield* fake.sessions).keys()];
         for (const sessionID of kept) fake.forget(sessionID);
-        yield* agent.start({ id, directory, history, agentState: state });
+        yield* driver.startSession({ id, directory, history, agentState: state });
 
         const sessions = yield* fake.sessions;
         expect(kept).toHaveLength(1);
@@ -401,9 +407,9 @@ layer(TestLayer)("OpencodeAgent", (it) => {
   );
 });
 
-// The agent checks once a second whether opencode still runs a turn that recorded no end, so this
+// The driver checks once a second whether opencode still runs a turn that recorded no end, so this
 // test runs on the live clock, which the shared layer's tests do not offer.
-it.live("OpencodeAgent fails a turn opencode stopped without recording its end", () =>
+it.live("OpencodeDriver fails a turn opencode stopped without recording its end", () =>
   Effect.gen(function* () {
     const { session } = yield* startSession(() => Effect.void);
 

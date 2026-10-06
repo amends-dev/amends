@@ -16,26 +16,26 @@ import { HarnessError, UnknownError, UnsupportedError } from "./HarnessError.ts"
 import { makeSession } from "./internal/session.ts";
 import type * as Session from "./Session.ts";
 
-export interface StartSessionOptions {
+/** What a session starts from: the `id` of a new session, or what an earlier one returned. */
+export type StartSessionOptions = {
   /**
    * The sandbox the agent works in, created from the harness's `template`. Required when the agent
-   * `requiresSandbox`.
+   * `requiresSandbox`. A sandbox other than the one a resumed session last ran in has the
+   * conversation but not the files the session made.
    */
   readonly sandbox?: Sandbox.Sandbox["Service"];
-
-  readonly id: SessionId;
-}
-
-export interface ResumeSessionOptions {
-  /**
-   * The sandbox the agent works in, required when the agent `requiresSandbox`. A sandbox other than
-   * the one the session last ran in has the conversation but not the files the session made.
-   */
-  readonly sandbox?: Sandbox.Sandbox["Service"];
-
-  /** What `suspend`, `detach`, or `stop` returned, on this harness's agent or any other. */
-  readonly state: Session.SessionState;
-}
+} & (
+  | {
+      /** Names a new session. */
+      readonly id: SessionId;
+      readonly resumeFrom?: never;
+    }
+  | {
+      /** What `suspendTurn`, `detach`, or `stop` returned, on this harness's agent or any other. */
+      readonly resumeFrom: Session.SessionState;
+      readonly id?: never;
+    }
+);
 
 export class Harness extends Context.Service<
   Harness,
@@ -61,17 +61,13 @@ export class Harness extends Context.Service<
      */
     readonly maxToolNameLength?: number;
 
-    /** Starts a new session. */
+    /**
+     * Starts a session: a new one, or one that goes on where `resumeFrom` left it. The agent that
+     * last ran the session resumes from its own state. Any other agent loads the conversation
+     * instead, and runs an unfinished turn again.
+     */
     readonly startSession: (
       options: StartSessionOptions,
-    ) => Effect.Effect<Session.Session, HarnessError>;
-
-    /**
-     * Picks up a session where `state` left it. The agent that last ran the session resumes from its
-     * own state. Any other agent loads the conversation instead, and runs an unfinished turn again.
-     */
-    readonly resumeSession: (
-      options: ResumeSessionOptions,
     ) => Effect.Effect<Session.Session, HarnessError>;
   }
 >()("@amends/harness-v2/Harness") {}
@@ -114,38 +110,28 @@ export const make = (agent: Agent): Harness["Service"] => {
     ports: agent.ports ?? [],
     maxToolNameLength: agent.maxToolNameLength,
 
-    startSession: Effect.fn("Harness.startSession")(function* ({ sandbox, id }) {
+    startSession: Effect.fn("Harness.startSession")(function* (options) {
+      const { sandbox, resumeFrom } = options;
+      const id = options.resumeFrom === undefined ? options.id : options.resumeFrom.id;
       yield* checkSandbox(sandbox);
       const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, id);
-      const agentSession = yield* agent.start({ id, workspace, history: Prompt.empty });
+      const history = resumeFrom?.history ?? Prompt.empty;
+      // An agent's own state means something only to the agent that wrote it. Any other agent
+      // starts from the conversation, and the session runs an unfinished turn again on it.
+      const own = resumeFrom !== undefined && resumeFrom.agent === agent.id;
+      const agentSession = yield* agent.startSession({
+        id,
+        workspace,
+        history,
+        agentState: own ? resumeFrom.agentState : undefined,
+        unfinishedTurn: own ? resumeFrom.unfinishedTurn?.agentState : undefined,
+      });
       return yield* makeSession({
         id,
         agent: agent.id,
         agentSession,
-        history: Prompt.empty,
-        unfinishedTurn: undefined,
-      });
-    }),
-
-    resumeSession: Effect.fn("Harness.resumeSession")(function* ({ sandbox, state }) {
-      yield* checkSandbox(sandbox);
-      const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, state.id);
-      // An agent's own state means something only to the agent that wrote it. Any other agent
-      // starts from the conversation, and the session runs an unfinished turn again on it.
-      const own = state.agent === agent.id;
-      const agentSession = yield* agent.start({
-        id: state.id,
-        workspace,
-        history: state.history,
-        agentState: own ? state.agentState : undefined,
-        unfinishedTurn: own ? state.unfinishedTurn?.agentState : undefined,
-      });
-      return yield* makeSession({
-        id: state.id,
-        agent: agent.id,
-        agentSession,
-        history: state.history,
-        unfinishedTurn: state.unfinishedTurn,
+        history,
+        unfinishedTurn: resumeFrom?.unfinishedTurn,
       });
     }),
   });

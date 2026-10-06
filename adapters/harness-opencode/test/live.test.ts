@@ -27,15 +27,15 @@ import {
 } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
-import * as BridgeAgent from "../src/bridge/Agent.ts";
+import * as OpencodeDriver from "../src/bridge/Driver.ts";
 import * as Models from "../src/Models.ts";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import { freePort, makeSandbox } from "./fixtures.ts";
 
 /**
  * These tests run real opencode, whose turns a model answers over the network, so they take a
- * minute and run only with `AMENDS_TEST_OPENCODE=1`. The agent as the bridge runs it runs opencode
- * 1.18.23 on the `PATH`; the agent as hosts run it runs the opencode its template installs in this
+ * minute and run only with `AMENDS_TEST_OPENCODE=1`. opencode's driver, as the bridge runs it, runs
+ * opencode 1.18.23 on the `PATH`; the agent as hosts run it runs the opencode its template installs in this
  * machine's home, under `~/.amends/opencode`, once for each version. Their model is the catalog's
  * free one of opencode's own provider, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names
  * another of the catalog's, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
@@ -91,24 +91,24 @@ const makeOpencodeEnv = Effect.gen(function* () {
 });
 
 /**
- * The opencode agent as a bridge runs it, on this machine, on `endpoints` or the model the tests
+ * opencode's driver as a bridge runs it, on this machine, on `endpoints` or the model the tests
  * run on, and a directory for its session. opencode's server stops when the scope closes.
  */
-const makeLiveAgent = (endpoints?: Parameters<typeof Models.fromEndpoints>[0]) =>
+const makeLiveDriver = (endpoints?: Parameters<typeof Models.fromEndpoints>[0]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* fs.makeTempDirectoryScoped();
     const models = Result.getOrThrow(
       Models.fromEndpoints(endpoints ?? { model: yield* makeEndpoint, models: {} }),
     );
-    const agent = yield* BridgeAgent.make({
+    const driver = yield* OpencodeDriver.make({
       model: models.model,
       models: models.models,
       command: "opencode",
       config: { ...config, providers: models.providers },
       env: yield* makeOpencodeEnv,
     });
-    return { agent, directory };
+    return { driver, directory };
   });
 
 /** The sandboxes hosts run opencode in, the port its bridge listens on there, and opencode's environment. */
@@ -185,12 +185,12 @@ const turnOptions = (text: string, options: Partial<Bridge.TurnOptions> = {}) =>
 
 /** Runs a turn asking `text` to its end, returning it whole. */
 const runTurn = (
-  session: Bridge.AgentSession,
+  session: Bridge.DriverSession,
   text: string,
   options?: Partial<Bridge.TurnOptions>,
 ) =>
   Effect.map(
-    Stream.runCollect(session.prompt(turnOptions(text, options))),
+    Stream.runCollect(session.promptTurn(turnOptions(text, options))),
     (parts: ReadonlyArray<StreamPart.StreamPart>) => new GenerateResult.GenerateResult(parts),
   );
 
@@ -256,7 +256,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
       Effect.gen(function* () {
         const api = yield* makeFakeModelApi;
         // Models that opencode knows from models.dev, at the fake's URL.
-        const { agent, directory } = yield* makeLiveAgent({
+        const { driver, directory } = yield* makeLiveDriver({
           model: {
             provider: "openrouter",
             model: "openai/gpt-oss-120b",
@@ -285,7 +285,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
             },
           },
         });
-        const session = yield* agent.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         const answered = yield* runTurn(session, "Say pong.");
         const refused = [
@@ -316,8 +316,8 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "runs a turn in which opencode runs a command with its own tool",
     () =>
       Effect.gen(function* () {
-        const { agent, directory } = yield* makeLiveAgent();
-        const session = yield* agent.start({ id, directory, history: Prompt.empty });
+        const { driver, directory } = yield* makeLiveDriver();
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(
           session,
@@ -342,7 +342,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "answers from another agent's conversation, the results of its tools included",
     () =>
       Effect.gen(function* () {
-        const { agent, directory } = yield* makeLiveAgent();
+        const { driver, directory } = yield* makeLiveDriver();
         const history = Prompt.make([
           {
             role: "user",
@@ -375,7 +375,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
           },
           { role: "assistant", content: [{ type: "text", text: "Noted." }] },
         ]);
-        const session = yield* agent.start({ id, directory, history });
+        const session = yield* driver.startSession({ id, directory, history });
 
         const result = yield* runTurn(
           session,
@@ -393,11 +393,11 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const model = yield* makeEndpoint;
-        const { agent, directory } = yield* makeLiveAgent({
+        const { driver, directory } = yield* makeLiveDriver({
           model,
           models: { missing: { ...model, model: "no-such-model" } },
         });
-        const session = yield* agent.start({ id, directory, history: Prompt.empty });
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(session, "Say hi.", { model: "missing" });
 
@@ -410,13 +410,18 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "deletes the session in opencode when it is destroyed",
     () =>
       Effect.gen(function* () {
-        const { agent, directory } = yield* makeLiveAgent();
-        const session = yield* agent.start({ id, directory, history: Prompt.empty });
+        const { driver, directory } = yield* makeLiveDriver();
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
         const agentState = yield* session.state;
 
         yield* session.destroy;
-        // opencode no longer has the session, so the agent starts another.
-        const again = yield* agent.start({ id, directory, history: Prompt.empty, agentState });
+        // opencode no longer has the session, so the driver starts another.
+        const again = yield* driver.startSession({
+          id,
+          directory,
+          history: Prompt.empty,
+          agentState,
+        });
 
         const before = yield* Schema.decodeUnknownEffect(OpencodeState)(agentState);
         const after = yield* Schema.decodeUnknownEffect(OpencodeState)(yield* again.state);
@@ -429,11 +434,11 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "stops the turn in opencode when its stream ends before the turn does",
     () =>
       Effect.gen(function* () {
-        const { agent, directory } = yield* makeLiveAgent();
-        const session = yield* agent.start({ id, directory, history: Prompt.empty });
+        const { driver, directory } = yield* makeLiveDriver();
+        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
 
         yield* session
-          .prompt(turnOptions("Run `sleep 300` with your bash tool, then say done."))
+          .promptTurn(turnOptions("Run `sleep 300` with your bash tool, then say done."))
           .pipe(
             Stream.takeUntil((part) => part.type === "tool-call"),
             Stream.runDrain,
@@ -494,10 +499,10 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
               Effect.forkChild,
             );
           yield* Deferred.await(calledTool);
-          const state = yield* session.suspend;
+          const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
-          const resumed = yield* nextHarness.resumeSession({ sandbox, state });
-          const after = yield* Stream.runCollect(resumed.continue({}));
+          const resumed = yield* nextHarness.startSession({ sandbox, resumeFrom: state });
+          const after = yield* Stream.runCollect(resumed.continueStream({}));
           const history = (yield* resumed.detach).history.content;
 
           // The session had no step of the turn finished, so the step with the call comes again.
