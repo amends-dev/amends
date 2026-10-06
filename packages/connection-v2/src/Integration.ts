@@ -1,15 +1,16 @@
 /**
- * An integration is a kind of system amends connects to, such as Anthropic's API, Daytona, or an MCP
- * server, declared in code: the settings a connection to it gives, the ways a connection can
- * authenticate, what a connection gives amends, and how a connection is checked. A connection gives
- * any of three things: models an agent runs on, sandboxes it works in, and tools it calls.
+ * An integration is a kind of system amends connects to, such as opencode, Anthropic's API, Daytona,
+ * or an MCP server, declared in code: the settings a connection to it gives, the ways a connection
+ * can authenticate, what a connection gives amends, and how a connection is checked. A connection
+ * gives any of four things: harnesses, which run agents, models an agent runs on, sandboxes it works
+ * in, and tools it calls.
  *
  * `make` declares an integration from what it does with a connection, given the connection's
  * settings decoded and its key, as `Access`. Each operation of the integration it makes takes a
  * connection and its credential as they are stored, and fails with `ConnectionError` for a
  * connection the integration does not take, or for what it does not give.
  */
-import type { ModelEndpoint } from "@amends/harness-v2";
+import type { Agent, Harness, ModelEndpoint } from "@amends/harness-v2";
 import type { SandboxProvider } from "@amends/sandbox-v2";
 import type { ToolSource } from "@amends/toolkit";
 import { type Array, Effect, type Redacted, type Result, Schema, type Scope } from "effect";
@@ -26,7 +27,7 @@ import {
 import type * as ModelCatalog from "./ModelCatalog.ts";
 
 /** What a connection gives amends. */
-export const Capability = Schema.Literals(["models", "sandboxes", "tools"]);
+export const Capability = Schema.Literals(["harnesses", "models", "sandboxes", "tools"]);
 
 export type Capability = typeof Capability.Type;
 
@@ -63,6 +64,15 @@ export interface Options<Settings> {
 
   /** The ways a connection can authenticate, in the order to offer them. */
   readonly auth: Array.NonEmptyReadonlyArray<AuthMethod>;
+
+  /**
+   * The harness of a connection, running its agent on the models it is given, or why it cannot run
+   * on them.
+   */
+  readonly harnesses?: (
+    access: Access<Settings>,
+    options: Agent.Options,
+  ) => Effect.Effect<Harness.Harness["Service"], ConnectionErrorReason>;
 
   /** The models a connection gives an agent. */
   readonly models?: {
@@ -105,6 +115,13 @@ export interface Integration {
 
   /** The catalog's models a connection offers, none for an integration that gives no models. */
   readonly models: ReadonlyArray<ModelCatalog.Model>;
+
+  /** The harness of `connection`, running its agent on the models `options` gives. */
+  readonly harness: (
+    connection: Connection,
+    credential: Credential | undefined,
+    options: Agent.Options,
+  ) => Effect.Effect<Harness.Harness["Service"], ConnectionError>;
 
   /** How an agent reaches a model through `connection`. */
   readonly modelEndpoint: (
@@ -175,11 +192,22 @@ export const make = <Settings>(options: Options<Settings>): Integration => {
     docs: options.docs,
     auth: options.auth,
     provides: [
+      ...(options.harnesses === undefined ? [] : ["harnesses" as const]),
       ...(options.models === undefined ? [] : ["models" as const]),
       ...(options.sandboxes === undefined ? [] : ["sandboxes" as const]),
       ...(options.tools === undefined ? [] : ["tools" as const]),
     ],
     models: options.models?.listed ?? [],
+
+    harness: (connection, credential, agentOptions) => {
+      const { harnesses } = options;
+      if (harnesses === undefined) return notProvided("harnesses");
+      return accessOf(connection, credential).pipe(
+        Effect.flatMap((access) =>
+          Effect.mapError(harnesses(access, agentOptions), (reason) => fail(reason)),
+        ),
+      );
+    },
 
     modelEndpoint: (connection, credential, endpointOptions) => {
       const { models } = options;

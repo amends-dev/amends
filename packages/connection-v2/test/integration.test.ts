@@ -1,3 +1,4 @@
+import { type Agent, Harness, type ModelEndpoint } from "@amends/harness-v2";
 import { SandboxProvider } from "@amends/sandbox-v2";
 import type { ToolSource } from "@amends/toolkit";
 import { describe, expect, it } from "@effect/vitest";
@@ -11,6 +12,9 @@ const key = Redacted.make("secret-key");
 /** What the integration's code was given, for each operation it ran. */
 const given: Array<Integration.Access<{ readonly region: string }>> = [];
 
+/** The options each harness the integration made was given. */
+const madeWith: Array<Agent.Options> = [];
+
 const provider = SandboxProvider.SandboxProvider.of({
   create: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
@@ -22,12 +26,34 @@ const source: ToolSource.ToolSource = {
   call: () => Effect.die("unused"),
 };
 
-/** An integration that gives everything, and remembers what it is given. */
+/** An agent that is never started. */
+const agent: Agent.Agent = {
+  id: "everything",
+  requiresSandbox: false,
+  start: () => Effect.die("unused"),
+};
+
+/**
+ * An integration that gives everything, and remembers what it is given. Its harness runs only on
+ * models served over Chat Completions.
+ */
 const everything = Integration.make({
   id: "everything",
   name: "Everything",
   settings: Schema.Struct({ region: Schema.NonEmptyString }),
   auth: ["apiKey", "none"],
+  harnesses: (access, options) =>
+    Effect.gen(function* () {
+      given.push(access);
+      madeWith.push(options);
+      const { protocol } = options.model;
+      if (protocol !== "openai-chat") {
+        return yield* new Connection.UnsupportedError({
+          description: `Everything runs no model over ${protocol}`,
+        });
+      }
+      return Harness.make(agent);
+    }),
   models: {
     listed: [],
     endpoint: (access, options) => {
@@ -60,6 +86,14 @@ const modelsOnly = Integration.make({
   check: () => Effect.succeed({ status: "healthy" }),
 });
 
+/** An endpoint served over Chat Completions, which the harness of `everything` runs on. */
+const chatEndpoint = {
+  provider: "everything",
+  model: "m",
+  protocol: "openai-chat",
+  url: "https://eu.everything.example/v1",
+} satisfies ModelEndpoint.ModelEndpoint;
+
 const connection = (fields: Partial<Connection.Connection> = {}): Connection.Connection => ({
   id: Connection.ConnectionId.make("conn-1"),
   integration: "everything",
@@ -78,13 +112,19 @@ const reasonOf = <A, R>(effect: Effect.Effect<A, Connection.ConnectionError, R>)
 
 describe("Integration.make", () => {
   it("says what a connection to the integration gives", () => {
-    expect(everything.provides).toEqual(["models", "sandboxes", "tools"]);
+    expect(everything.provides).toEqual(["harnesses", "models", "sandboxes", "tools"]);
     expect(modelsOnly.provides).toEqual(["models"]);
   });
 
   it.effect("gives each operation the connection's settings decoded, and its key", () =>
     Effect.gen(function* () {
       given.length = 0;
+      madeWith.length = 0;
+      const harness = yield* everything.harness(
+        connection(),
+        { apiKey: key },
+        { model: chatEndpoint },
+      );
       const endpoint = yield* everything.modelEndpoint(
         connection(),
         { apiKey: key },
@@ -94,10 +134,12 @@ describe("Integration.make", () => {
       yield* everything.toolSource(connection(), { apiKey: key });
       const health = yield* everything.check(connection(), { apiKey: key });
 
+      expect(harness.agent).toBe("everything");
+      expect(madeWith).toEqual([{ model: chatEndpoint }]);
       expect(endpoint).toMatchObject({ model: "m", url: "https://eu.everything.example/v1" });
       expect(endpoint.apiKey).toBe(key);
       expect(health).toEqual({ status: "healthy" });
-      expect(given).toHaveLength(4);
+      expect(given).toHaveLength(5);
       for (const access of given) {
         expect(access.settings).toEqual({ region: "eu" });
         expect(access.apiKey).toBe(key);
@@ -154,7 +196,17 @@ describe("Integration.make", () => {
         ),
         yield* reasonOf(modelsOnly.toolSource(connection(settled), { apiKey: key })),
         yield* reasonOf(
+          modelsOnly.harness(connection(settled), { apiKey: key }, { model: chatEndpoint }),
+        ),
+        yield* reasonOf(
           modelsOnly.modelEndpoint(connection(settled), { apiKey: key }, { model: "m" }),
+        ),
+        yield* reasonOf(
+          everything.harness(
+            connection(),
+            { apiKey: key },
+            { model: { ...chatEndpoint, protocol: "anthropic-messages" } },
+          ),
         ),
       ];
 
@@ -169,7 +221,17 @@ describe("Integration.make", () => {
           tag: "UnsupportedError",
           description: "Models only gives no tools",
         },
+        {
+          integration: "models-only",
+          tag: "UnsupportedError",
+          description: "Models only gives no harnesses",
+        },
         { integration: "models-only", tag: "UnsupportedError", description: "No model" },
+        {
+          integration: "everything",
+          tag: "UnsupportedError",
+          description: "Everything runs no model over anthropic-messages",
+        },
       ]);
     }),
   );
