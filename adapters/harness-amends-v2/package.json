@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends/connection-v2": "workspace:*",
     "@amends/harness-v2": "workspace:*",
     "@amends/sandbox-v2": "workspace:*",
     "@effect/ai-anthropic": "catalog:",
@@ -19,7 +20,6 @@
     "@effect/ai-openai-compat": "catalog:"
   },
   "devDependencies": {
-    "@amends/connection-v2": "workspace:*",
     "@amends/sandbox-local-v2": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@effect/vitest": "catalog:",

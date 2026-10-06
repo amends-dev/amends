@@ -8,8 +8,11 @@
  * Its own state is its conversation, tool calls and results included, so a session it resumes goes
  * on as it left off. A turn does not outlive the process running it: `continue` goes on from the
  * steps of a turn `suspend` cut short that the session has, and runs the step in flight again.
+ *
+ * `integration` gives the agent to connections, for a host to install.
  */
-import { type Agent, HarnessError, type StreamPart } from "@amends/harness-v2";
+import { Integration } from "@amends/connection-v2";
+import { type Agent, Harness, HarnessError, type StreamPart } from "@amends/harness-v2";
 import {
   Deferred,
   type Duration,
@@ -79,6 +82,29 @@ export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
     start: (startOptions) => startSession(options, modelFor, startOptions),
   };
   return agent;
+});
+
+/**
+ * The integration of amends's agent, for a host to install with what the agent takes besides its
+ * models. A connection to it gives no settings and no credential, and reaches nothing, so it is
+ * always healthy.
+ */
+export const integration = Effect.fn("AmendsAgent.integration")(function* (
+  options: Omit<Options, keyof Agent.Options> = {},
+) {
+  const languageModels = yield* Models.LanguageModels;
+  return Integration.make({
+    id: "amends",
+    name: "amends",
+    settings: Schema.Struct({}),
+    auth: ["none"],
+    harnesses: (_access, agentOptions) =>
+      make({ ...options, ...agentOptions }).pipe(
+        Effect.map(Harness.make),
+        Effect.provideService(Models.LanguageModels, languageModels),
+      ),
+    check: () => Effect.succeed({ status: "healthy" }),
+  });
 });
 
 const startSession = Effect.fn("AmendsAgent.start")(function* (

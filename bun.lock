@@ -51,6 +51,7 @@
       "name": "@amends/harness-amends-v2",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/harness-v2": "workspace:*",
         "@amends/sandbox-v2": "workspace:*",
         "@effect/ai-anthropic": "catalog:",
@@ -58,7 +59,6 @@
         "@effect/ai-openai-compat": "catalog:",
       },
       "devDependencies": {
-        "@amends/connection-v2": "workspace:*",
         "@amends/sandbox-local-v2": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
@@ -72,12 +72,12 @@
       "name": "@amends/harness-opencode",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/connection-v2": "workspace:*",
         "@amends/harness-v2": "workspace:*",
         "@amends/sandbox-v2": "workspace:*",
         "@effect/platform-bun": "catalog:",
       },
       "devDependencies": {
-        "@amends/connection-v2": "workspace:*",
         "@amends/sandbox-daytona-v2": "workspace:*",
         "@amends/sandbox-local-v2": "workspace:*",
         "@effect/vitest": "catalog:",

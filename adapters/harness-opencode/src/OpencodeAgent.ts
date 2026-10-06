@@ -10,10 +10,14 @@
  *
  * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
  * tools, or a request to compact, which fail with `UnsupportedError`.
+ *
+ * `integration` gives the agent to connections, for a host to install.
  */
-import { type Agent, BridgeClient, HarnessError } from "@amends/harness-v2";
+import { Connection, Integration } from "@amends/connection-v2";
+import { type Agent, BridgeClient, Harness, HarnessError } from "@amends/harness-v2";
 import type { Network, Sandbox } from "@amends/sandbox-v2";
-import { Effect, type Redacted, type Schema } from "effect";
+import { type Crypto, Effect, type Redacted, Schema } from "effect";
+import type { Socket } from "effect/socket";
 import type { Options as AgentOptions } from "./bridge/Agent.ts";
 import * as Models from "./Models.ts";
 import * as Template from "./Template.ts";
@@ -47,11 +51,48 @@ export interface Options extends Agent.Options {
  * opencode cannot serve together fail with `UnsupportedError`.
  */
 export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
-  const models = yield* Effect.fromResult(
-    Models.fromEndpoints({ model: options.model, models: options.models ?? {} }),
-  ).pipe(Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode", reason })));
+  const models = yield* Effect.fromResult(modelsOf(options)).pipe(
+    Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode", reason })),
+  );
+  return yield* agentOf(yield* Template.make(), models, options);
+});
+
+/**
+ * The integration of opencode, for a host to install with what the agent takes besides its models.
+ * It bundles the bridge program once, when it is made. A connection to it gives no settings and no
+ * credential, and reaches nothing, so it is always healthy.
+ */
+export const integration = Effect.fn("OpencodeAgent.integration")(function* (
+  options: Omit<Options, keyof Agent.Options>,
+) {
   const installation = yield* Template.make();
-  return yield* BridgeClient.make({
+  const context = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
+  return Integration.make({
+    id: "opencode",
+    name: "opencode",
+    docs: "https://opencode.ai/docs",
+    settings: Schema.Struct({}),
+    auth: ["none"],
+    harnesses: (_access, agentOptions) =>
+      Effect.fromResult(modelsOf(agentOptions)).pipe(
+        Effect.mapError(
+          (reason) => new Connection.UnsupportedError({ description: reason.message }),
+        ),
+        Effect.flatMap((models) => agentOf(installation, models, { ...options, ...agentOptions })),
+        Effect.map(Harness.make),
+        Effect.provideContext(context),
+      ),
+    check: () => Effect.succeed({ status: "healthy" }),
+  });
+});
+
+/** The models opencode runs on for the endpoints `options` gives. */
+const modelsOf = (options: Agent.Options) =>
+  Models.fromEndpoints({ model: options.model, models: options.models ?? {} });
+
+/** The agent, installed in its sandboxes as `installation` says, running on `models`. */
+const agentOf = (installation: Template.Installation, models: Models.Models, options: Options) =>
+  BridgeClient.make({
     id: "opencode",
     ...installation,
     port: options.port,
@@ -63,4 +104,3 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options)
       env: options.env ?? {},
     } satisfies AgentOptions,
   });
-});

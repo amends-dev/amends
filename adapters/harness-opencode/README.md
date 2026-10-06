@@ -27,6 +27,13 @@ models.dev does not list runs without tools.
 sources. It needs `Crypto` and a `Socket.WebSocketConstructor` that sends headers, as Bun's and
 Node's do. The caller creates each sandbox with the harness's `template` and `ports`.
 
+`OpencodeAgent.integration` is the integration of opencode, for a host to install with what the
+agent takes besides its models: the `port`, the `token` function, and opencode's `config` and `env`.
+It bundles the bridge once, when it is made, and needs what `make` does. A connection to it gives no
+settings and no credential, and is always healthy, as it reaches nothing; its harness runs on the
+endpoints it is given, which connections to model providers give, and refuses endpoints that
+opencode cannot serve together with `UnsupportedError`.
+
 ## In the sandbox
 
 The template installs Bun 1.3.14 and opencode 1.18.23 in the sandbox's home, under
@@ -78,7 +85,8 @@ opencode, and destroying a session deletes it there.
 ## Testing
 
 `test/turn.test.ts` and `test/history.test.ts` translate events without a server, and
-`test/models.test.ts` checks the configuration `Models` makes of endpoints.
+`test/models.test.ts` checks the configuration `Models` makes of endpoints, and
+`test/integration.test.ts` the harnesses the integration gives.
 `test/agent.test.ts` runs the agent against a fake of opencode's server from `test/fakes.ts`.
 `test/server.test.ts` and `test/main.test.ts` start real processes: the server, and the bridge
 program launched by `BridgeClient`, with `test/fake-opencode-server.js` standing in for

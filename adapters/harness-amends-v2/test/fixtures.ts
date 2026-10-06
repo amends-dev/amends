@@ -50,12 +50,24 @@ export const makeScriptedModel = (script: Script) =>
   });
 
 /** The endpoint that stands for the scripted model `id`, which reaches nothing. */
-const endpointOf = (id: string): ModelEndpoint.ModelEndpoint => ({
+export const endpointOf = (id: string): ModelEndpoint.ModelEndpoint => ({
   provider: "scripted",
   model: id,
   protocol: "openai-chat",
   url: "http://scripted.invalid/v1",
 });
+
+/** Makes the model of `models` that the endpoint of its id, as `endpointOf` gives, stands for. */
+export const scriptedLanguageModels = (models: ReadonlyMap<string, LanguageModel.LanguageModel>) =>
+  Models.LanguageModels.of({
+    make: (endpoint) =>
+      Effect.suspend(() => {
+        const scripted = models.get(endpoint.model);
+        return scripted === undefined
+          ? Effect.die(`No scripted model stands for ${endpoint.model}`)
+          : Effect.succeed(scripted);
+      }),
+  });
 
 /**
  * amends's agent on scripted models: `model` by default, and `models` that a turn names. It is made
@@ -78,20 +90,7 @@ export const makeAgent = (
     models: Object.fromEntries(
       Object.keys(models).map((name) => [name, endpointOf(`named-${name}`)]),
     ),
-  }).pipe(
-    Effect.provideService(
-      Models.LanguageModels,
-      Models.LanguageModels.of({
-        make: (endpoint) =>
-          Effect.suspend(() => {
-            const scripted = byId.get(endpoint.model);
-            return scripted === undefined
-              ? Effect.die(`No scripted model stands for ${endpoint.model}`)
-              : Effect.succeed(scripted);
-          }),
-      }),
-    ),
-  );
+  }).pipe(Effect.provideService(Models.LanguageModels, scriptedLanguageModels(byId)));
 };
 
 /** A streamed response as one whole response: its text, and how it finished. */

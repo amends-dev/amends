@@ -26,10 +26,10 @@ its scope closes, `toolSource` a tool source, and `check` its `Health`. They fai
 take, `UnsupportedError` for what it does not give, and `UnavailableError`, which may pass.
 
 `Integrations` holds those a host installs, for a connection to find its own by id: the built-in
-ones it chooses, and those of the sandbox providers it runs, which their adapters declare, such as
-`DaytonaSandboxProvider.integration`. What only the host decides, such as where a local sandbox
-keeps its files, it gives an integration when it installs it; a connection's settings are what a
-workspace gives.
+ones it chooses, and those of the harnesses and sandbox providers it runs, which their adapters
+declare, such as `OpencodeAgent.integration` and `DaytonaSandboxProvider.integration`. What only the
+host decides, such as where a local sandbox keeps its files, it gives an integration when it
+installs it; a connection's settings are what a workspace gives.
 
 ## Models
 
