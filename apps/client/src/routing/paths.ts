@@ -5,6 +5,7 @@ export type WorkspacePage =
   | "triage"
   | "tasks"
   | "agents"
+  | "agents-v2"
   | "environments"
   | "connections"
   | "connections-v2"

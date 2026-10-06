@@ -353,6 +353,21 @@ takes the name, settings, way of authenticating, and key in one step, and `Repla
 Connections while both exist. **Screens / Connections v2** walks adding and checking a connection,
 a refused key and a refused setup, a gone integration, a host without key storage, a read-only
 member, search, and a stale rename.
+`AgentsV2Pane`, `AgentV2List`, and `AgentV2Pane` are Agents v2, built beside Agents over
+connections v2, with no mocks of their own: they follow the Agents frames' navigation and the
+Connections v2 page. The list has All and Needs setup, and each agent's harness, with its sandbox,
+and model as columns, or under the name on phones, with its state as a patch on its avatar. The
+agent's page reads in one column: a notice listing why it can't run, its name, its setup saved as a
+whole, its details, and removal. `SetupFields` is the setup both it and `AddAgentV2` ask for: the
+instructions, the harness or Auto, the model connection, the model, which the connection's list
+suggests and which may be any other when it takes models it doesn't list, the effort the chosen
+model takes, and the sandbox, warning when the harness works only in one. A connection the agent
+names that is removed or not installed stays chosen and shows as Unavailable, and what the host
+refuses shows beside the field it concerns. `ConfirmRemoveAgentV2` confirms removal, which ends
+the agent's membership. The rail offers Agents v2 beside Agents while both exist. **Screens /
+Agents v2** walks adding an agent, the roles the reader may give, a removed sandbox and a harness
+that needs one, listed models and efforts, models that load or fail, a refused connection, Auto
+with no harness, removal, a read-only member, search, and a stale rename.
 `EnvironmentsPane` and `EnvironmentList` are Environments from the Lunacy "Environments" frames:
 All and Needs setup, and each environment's harness and sandbox, as columns when the pane has room
 and under the name when narrow or on phones, with a mark on the tile of one that cannot run; each

@@ -54,6 +54,7 @@
     "./patterns/sidebar": "./src/patterns/sidebar/index.ts",
     "./screens/account": "./src/screens/account/index.ts",
     "./screens/agents": "./src/screens/agents/index.ts",
+    "./screens/agents-v2": "./src/screens/agents-v2/index.ts",
     "./screens/connections": "./src/screens/connections/index.ts",
     "./screens/connections-v2": "./src/screens/connections-v2/index.ts",
     "./screens/direct": "./src/screens/direct/index.ts",
