@@ -16,7 +16,7 @@ change: writes replace them, and every read decodes a fresh record. Journal entr
 on the way in and out, so callers never share bytes with storage.
 
 Stores check what the PostgreSQL adapter enforces with keys and unique indexes: reused IDs, one
-active membership per identity, one direct group per member set, one active follow per admission,
+active membership per identity, one agent v2 per membership, one direct group per member set, one active follow per admission,
 one active participation per participant, and contiguous thread sequences. Like PostgreSQL, they
 take references to other read models as recorded, so each rebuilds alone. Lists order IDs by their UTF-8 bytes, matching binary collation.
 Commit and entry IDs come from a counter in each storage.

@@ -25,6 +25,7 @@ import { GroupsPage } from "./pages/groups.tsx";
 import { DirectPage } from "./pages/direct.tsx";
 import { WorkspaceIndex, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
 import { AgentsPage } from "./pages/agents.tsx";
+import { AgentsV2Page } from "./pages/agents-v2.tsx";
 import { ConnectionsPage } from "./pages/connections.tsx";
 import { ConnectionsV2Page } from "./pages/connections-v2.tsx";
 import { EnvironmentsPage } from "./pages/environments.tsx";
@@ -123,6 +124,7 @@ export function ApplicationRoutes() {
             matchFilters={{ tab: ["configuration"] }}
             component={AgentsPage}
           />
+          <Route path={["/agents-v2", "/agents-v2/:agentId"]} component={AgentsV2Page} />
           <Route
             path={[
               "/environments",

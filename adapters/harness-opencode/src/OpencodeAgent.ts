@@ -73,15 +73,20 @@ export const integration = Effect.fn("OpencodeAgent.integration")(function* (
     name: "opencode",
     docs: "https://opencode.ai/docs",
     auth: ["none"],
-    harnesses: (_access, agentOptions) =>
-      Effect.fromResult(modelsOf(agentOptions)).pipe(
-        Effect.mapError(
-          (reason) => new Connection.UnsupportedError({ description: reason.message }),
+    harnesses: {
+      requiresSandbox: true,
+      harness: (_access, agentOptions) =>
+        Effect.fromResult(modelsOf(agentOptions)).pipe(
+          Effect.mapError(
+            (reason) => new Connection.UnsupportedError({ description: reason.message }),
+          ),
+          Effect.flatMap((models) =>
+            agentOf(installation, models, { ...options, ...agentOptions }),
+          ),
+          Effect.map(Harness.make),
+          Effect.provideContext(context),
         ),
-        Effect.flatMap((models) => agentOf(installation, models, { ...options, ...agentOptions })),
-        Effect.map(Harness.make),
-        Effect.provideContext(context),
-      ),
+    },
     check: () => Effect.succeed({ status: "healthy" }),
   });
 });

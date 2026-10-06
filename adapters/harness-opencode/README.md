@@ -29,10 +29,10 @@ Node's do. The caller creates each sandbox with the `template` and `ports` of th
 
 `OpencodeAgent.integration` is the integration of opencode, for a host to install with what the
 agent takes besides its models: the `port`, the `token` function, and opencode's `config` and `env`.
-It bundles the bridge once, when it is made, and needs what `make` does. A connection to it gives no
-settings and no credential, and is always healthy, as it reaches nothing; its harness runs on the
-endpoints it is given, which connections to model providers give, and refuses endpoints that
-opencode cannot serve together with `UnsupportedError`. Its id is `opencode-agent`, as `opencode` is
+It bundles the bridge once, when it is made, and needs what `make` does, and says that opencode
+requires a sandbox. A connection to it gives no settings and no credential, and is always healthy,
+as it reaches nothing; its harness runs on the endpoints it is given, which connections to model
+providers give, and refuses endpoints that opencode cannot serve together with `UnsupportedError`. Its id is `opencode-agent`, as `opencode` is
 the id of OpenCode Zen, a provider of models in the catalog.
 
 ## In the sandbox

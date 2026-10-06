@@ -1,5 +1,8 @@
 import { AgentService } from "./agent/service.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
+import { AgentV2Permissions } from "./agent-v2/permissions.ts";
+import { AgentV2Projection } from "./agent-v2/projection.ts";
+import { AgentV2Service } from "./agent-v2/service.ts";
 import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
@@ -72,6 +75,7 @@ import { NotificationProjection } from "./notification/projection.ts";
 import { InvitationService } from "./workspace/invitation/service.ts";
 import { InvitationPermissions } from "./workspace/invitation/permissions.ts";
 import { InvitationProjection } from "./workspace/invitation/projection.ts";
+import { MemberCommand } from "./workspace/member/command.ts";
 import { MemberService } from "./workspace/member/service.ts";
 import { MemberPermissions } from "./workspace/member/permissions.ts";
 import { MemberProjection } from "./workspace/member/projection.ts";
@@ -103,6 +107,7 @@ export const projections = [
   ConnectionV2Projection.definition,
   EnvironmentProjection.definition,
   AgentProjection.definition,
+  AgentV2Projection.definition,
   TurnProjection.definition,
 ] as const;
 
@@ -144,6 +149,10 @@ export const permissions = [
   ConnectionV2Permissions.Create,
   ConnectionV2Permissions.Read,
   ConnectionV2Permissions.Manage,
+  ConnectionV2Permissions.Use,
+  AgentV2Permissions.Create,
+  AgentV2Permissions.Read,
+  AgentV2Permissions.Configure,
 ];
 
 /**
@@ -189,6 +198,7 @@ const turnCommand = TurnCommand.layer.pipe(
 );
 const turnQuery = TurnQuery.layer;
 const readStateCommand = ReadStateCommand.layer;
+const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
@@ -223,12 +233,14 @@ const operations = Layer.mergeAll(
   ConnectionV2Service.layer,
   EnvironmentService.layer,
   AgentService.layer.pipe(Layer.provide(MemberService.layer)),
+  AgentV2Service.layer,
   TurnService.layer,
 ).pipe(
   Layer.provide(
     Layer.mergeAll(
       Delegation.layer,
       AssignmentCommand.layer,
+      memberCommand,
       groupQuery,
       EnvironmentQuery.layer,
       groupCommand,

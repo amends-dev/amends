@@ -62,6 +62,8 @@ drawings, generation, and visual review in the UI workshop.
   account detour.
   [Agents](agents.md) covers adding and configuring agents, fitting environments, and the
   model-connection detour.
+  [Agents v2](agents-v2.md) covers agents on connections v2, built beside them: their harness,
+  model, and sandbox, and why one can't run.
   [Turns](turns.md) covers agents' turns in threads, where agents are at work, and turn logs.
   [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
   [Harnesses in sandboxes](sandbox-harnesses.md) plans running agents' harnesses inside sandboxes,

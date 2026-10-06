@@ -12,6 +12,21 @@ CREATE TABLE "agents" (
 	CONSTRAINT "agents_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
+CREATE TABLE "agents_v2" (
+	"workspace_id" text,
+	"id" text,
+	"member_id" text NOT NULL,
+	"instructions" text NOT NULL,
+	"harness_connection_id" text,
+	"model_connection_id" text NOT NULL,
+	"model_id" text NOT NULL,
+	"model_effort" text,
+	"sandbox_connection_id" text,
+	"created_by" text NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "agents_v2_pkey" PRIMARY KEY("workspace_id","id")
+);
+--> statement-breakpoint
 CREATE TABLE "assignments" (
 	"workspace_id" text,
 	"id" text,
@@ -402,6 +417,7 @@ CREATE TABLE "workspaces" (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX "agents_by_member" ON "agents" ("workspace_id","member_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "agents_v2_by_member" ON "agents_v2" ("workspace_id","member_id");--> statement-breakpoint
 CREATE INDEX "assignments_by_member" ON "assignments" ("workspace_id","member_id","status");--> statement-breakpoint
 CREATE INDEX "assignments_by_role" ON "assignments" ("workspace_id","role_id","status");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_group_follow" ON "group_follows" ("workspace_id","group_membership_id") WHERE "status" = 'active';--> statement-breakpoint

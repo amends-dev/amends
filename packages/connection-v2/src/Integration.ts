@@ -92,21 +92,39 @@ export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   /** The ways a connection can authenticate, in the order to offer them. */
   readonly auth: Array.NonEmptyReadonlyArray<Auth>;
 
-  /**
-   * The harness of a connection, running its agent on the models it is given, or why it cannot run
-   * on them.
-   */
-  readonly harnesses?: (
-    access: Access<Settings, Auth>,
-    options: Agent.Options,
-  ) => Effect.Effect<Harness.Harness["Service"], ConnectionErrorReason>;
+  /** The harnesses a connection gives, which run its agent. */
+  readonly harnesses?: {
+    /**
+     * Whether the agent works only in a sandbox, as the `requiresSandbox` of each harness says, so
+     * that an agent can be set up to run on it before any harness is made.
+     */
+    readonly requiresSandbox: boolean;
+
+    /**
+     * The harness of a connection, running its agent on the models it is given, or why it cannot
+     * run on them.
+     */
+    readonly harness: (
+      access: Access<Settings, Auth>,
+      options: Agent.Options,
+    ) => Effect.Effect<Harness.Harness["Service"], ConnectionErrorReason>;
+  };
 
   /** The models a connection gives an agent. */
   readonly models?: {
     /** The catalog's models a connection offers, for an agent to be given one. */
     readonly listed: ReadonlyArray<ModelCatalog.Model>;
 
-    /** How an agent reaches a model through a connection, or why the connection cannot give it. */
+    /**
+     * Whether a connection also offers models that are not listed, by any id, as an API of the
+     * connection's own does. Nothing more is known of them, so they take any effort and limit.
+     */
+    readonly unlisted: boolean;
+
+    /**
+     * How an agent reaches a model the connection offers, with an effort and limit the model takes,
+     * or why the connection cannot give it after all.
+     */
     readonly endpoint: (
       access: Access<Settings, Auth>,
       options: EndpointOptions,
@@ -143,8 +161,20 @@ export interface Integration {
   /** What a connection to the integration gives. */
   readonly provides: ReadonlyArray<Capability>;
 
-  /** The catalog's models a connection offers, none for an integration that gives no models. */
-  readonly models: ReadonlyArray<ModelCatalog.Model>;
+  /**
+   * Whether the agent of the harnesses a connection gives works only in a sandbox. False for an
+   * integration that gives no harnesses.
+   */
+  readonly requiresSandbox: boolean;
+
+  /**
+   * The models a connection offers: the catalog's models it lists, and whether it also offers
+   * models it does not list, by any id. None for an integration that gives no models.
+   */
+  readonly models: {
+    readonly listed: ReadonlyArray<ModelCatalog.Model>;
+    readonly unlisted: boolean;
+  };
 
   /**
    * Fails for `connection` when the integration does not take it, by its settings or by how it
@@ -152,6 +182,16 @@ export interface Integration {
    * needs is not checked.
    */
   readonly validate: (connection: Connection) => Effect.Effect<void, ConnectionError>;
+
+  /**
+   * Fails, as `validate` does, for `connection`, and when it does not offer the model as `options`
+   * ask for it: a model it does not offer, or an effort or output limit the model does not take.
+   * Like `validate`, it runs nothing and needs no credential.
+   */
+  readonly validateModel: (
+    connection: Connection,
+    options: EndpointOptions,
+  ) => Effect.Effect<void, ConnectionError>;
 
   /** The harness of `connection`, running its agent on the models `options` gives. */
   readonly harness: (
@@ -240,6 +280,19 @@ export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod
   const notProvided = (what: string) =>
     Effect.fail(fail(new UnsupportedError({ description: `${options.name} gives no ${what}` })));
 
+  const models = {
+    listed: options.models?.listed ?? [],
+    unlisted: options.models?.unlisted ?? false,
+  };
+
+  /** Fails when a connection does not offer the model as `endpointOptions` ask for it. */
+  const ensureOffered = (endpointOptions: EndpointOptions) => {
+    const description = offerRefusal(options.name, models, endpointOptions);
+    return description === undefined
+      ? Effect.void
+      : Effect.fail(fail(new UnsupportedError({ description })));
+  };
+
   return {
     id: options.id,
     name: options.name,
@@ -252,26 +305,43 @@ export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod
       ...(options.sandboxes === undefined ? [] : ["sandboxes" as const]),
       ...(options.tools === undefined ? [] : ["tools" as const]),
     ],
-    models: options.models?.listed ?? [],
+    requiresSandbox: options.harnesses?.requiresSandbox ?? false,
+    models,
 
     validate: (connection) => Effect.asVoid(settingsOf(connection)),
+
+    validateModel: (connection, endpointOptions) => {
+      if (options.models === undefined) return notProvided("models");
+      return Effect.andThen(settingsOf(connection), ensureOffered(endpointOptions));
+    },
 
     harness: (connection, credential, agentOptions) => {
       const { harnesses } = options;
       if (harnesses === undefined) return notProvided("harnesses");
       return accessOf(connection, credential).pipe(
         Effect.flatMap((access) =>
-          Effect.mapError(harnesses(access, agentOptions), (reason) => fail(reason)),
+          Effect.mapError(harnesses.harness(access, agentOptions), (reason) => fail(reason)),
+        ),
+        // Agents are set up by what the integration says of its agent, before any harness is made.
+        Effect.tap((harness) =>
+          harness.agent.requiresSandbox === harnesses.requiresSandbox
+            ? Effect.void
+            : Effect.die(
+                new Error(
+                  `${options.name} says that its agent ${harnesses.requiresSandbox ? "works only in a sandbox" : "works without a sandbox"}, and the harness it made says otherwise`,
+                ),
+              ),
         ),
       );
     },
 
     modelEndpoint: (connection, credential, endpointOptions) => {
-      const { models } = options;
-      if (models === undefined) return notProvided("models");
+      const declared = options.models;
+      if (declared === undefined) return notProvided("models");
       return accessOf(connection, credential).pipe(
+        Effect.tap(ensureOffered(endpointOptions)),
         Effect.flatMap((access) =>
-          Effect.fromResult(models.endpoint(access, endpointOptions)).pipe(
+          Effect.fromResult(declared.endpoint(access, endpointOptions)).pipe(
             Effect.mapError((reason) => fail(reason)),
           ),
         ),
@@ -297,6 +367,36 @@ export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod
     check: (connection, credential) =>
       Effect.flatMap(accessOf(connection, credential), options.check),
   };
+};
+
+/**
+ * Why a connection to the integration named `name` does not offer the model as `options` ask for
+ * it, or nothing when it does: a model it neither lists nor offers unlisted, an output limit that is
+ * not a whole number of tokens, or an effort or a limit that the listed model does not take. A model
+ * offered unlisted takes any effort and limit, as nothing more is known of it.
+ */
+const offerRefusal = (
+  name: string,
+  models: Integration["models"],
+  options: EndpointOptions,
+): string | undefined => {
+  const { effort, maxOutputTokens } = options;
+  const model = models.listed.find((listed) => listed.id === options.model);
+  if (model === undefined && !models.unlisted) return `${name} offers no model ${options.model}`;
+  if (
+    maxOutputTokens !== undefined &&
+    !(Number.isInteger(maxOutputTokens) && maxOutputTokens > 0)
+  ) {
+    return `An output limit is a whole number of tokens above 0, not ${maxOutputTokens}`;
+  }
+  if (model === undefined) return undefined;
+  if (effort !== undefined && !(model.reasoning?.efforts ?? []).includes(effort)) {
+    return `${model.name} takes no effort ${effort}`;
+  }
+  if (maxOutputTokens !== undefined && maxOutputTokens > model.limits.output) {
+    return `${model.name} writes at most ${model.limits.output} tokens in a response, not ${maxOutputTokens}`;
+  }
+  return undefined;
 };
 
 /**

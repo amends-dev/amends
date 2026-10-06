@@ -3,6 +3,7 @@ import {
   IconList,
   IconMarkAgents,
   IconMarkChannel,
+  IconMarkCommand,
   IconMarkConnections,
   IconMarkEnvironments,
   IconMarkHome,
@@ -27,11 +28,18 @@ import { Rail } from "../../patterns/rail/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Sidebar } from "../../patterns/sidebar/index.ts";
 
-export type Destination = "home" | "agents" | "environments" | "connections" | "connections-v2";
+export type Destination =
+  | "home"
+  | "agents"
+  | "agents-v2"
+  | "environments"
+  | "connections"
+  | "connections-v2";
 
 const destinations = [
   { id: "home", label: "Home", icon: IconMarkHome },
   { id: "agents", label: "Agents", icon: IconMarkAgents },
+  { id: "agents-v2", label: "Agents v2", icon: IconMarkCommand },
   { id: "environments", label: "Environments", icon: IconMarkEnvironments },
   { id: "connections", label: "Connections", icon: IconMarkConnections },
   { id: "connections-v2", label: "Connections v2", icon: IconMarkMarketplace },

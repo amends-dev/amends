@@ -13,6 +13,7 @@ import { ChangeFeedHandlers } from "./change-feed.ts";
 import { ConnectionsHandlers } from "./connections.ts";
 import { ConnectionsV2Handlers } from "./connections-v2.ts";
 import { AgentsHandlers } from "./agents.ts";
+import { AgentsV2Handlers } from "./agents-v2.ts";
 import { EnvironmentsHandlers } from "./environments.ts";
 import { GroupsHandlers } from "./groups.ts";
 import { ThreadsHandlers } from "./threads.ts";
@@ -37,6 +38,7 @@ export const layerHandlers = Layer.mergeAll(
   ConnectionsV2Handlers.layer,
   EnvironmentsHandlers.layer,
   AgentsHandlers.layer,
+  AgentsV2Handlers.layer,
   TurnsHandlers.layer,
   ChangeFeedHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));

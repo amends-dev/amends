@@ -129,6 +129,30 @@ import connectionsV2Meta, {
   SetupRefused,
   ToolConnections,
 } from "../src/screens/connections-v2/connections-v2.stories.tsx";
+import agentsV2Meta, {
+  AddAgentFlow as AddAgentV2Flow,
+  AgentPage as AgentV2Page,
+  AllAgents as AllAgentsV2,
+  AutoWithoutHarness,
+  ConnectionUnavailable as AgentV2ConnectionUnavailable,
+  EmptyAgents as EmptyAgentsV2,
+  HarnessNeedsSandbox,
+  IntegrationNotInstalled as AgentV2IntegrationNotInstalled,
+  ListedModels,
+  LoadFailed as AgentsV2LoadFailed,
+  Loading as AgentsV2Loading,
+  ModelWithoutEffort,
+  ModelsFailed,
+  ModelsLoading,
+  NeedsSetup as AgentsV2NeedsSetup,
+  NoMatchingAgents as NoMatchingAgentsV2,
+  ReadOnly as AgentsV2ReadOnly,
+  RemoveAgent as RemoveAgentV2,
+  RenamedMeanwhile as AgentV2RenamedMeanwhile,
+  RoleOptions as AgentV2RoleOptions,
+  SandboxRemoved,
+  Unavailable as AgentsV2Unavailable,
+} from "../src/screens/agents-v2/agents-v2.stories.tsx";
 import createMeta, { CreateAndOpen, OpenForm } from "../src/screens/group/create.stories.tsx";
 import directoryMeta, {
   Discover,
@@ -563,6 +587,67 @@ describe("connections v2 screen", () => {
     await stories.story(NoMatchingConnectionsV2).run();
     cleanup();
     await stories.story(RenamedMeanwhileV2).run();
+  });
+});
+
+describe("agents v2 screen", () => {
+  const stories = definePreview(preview).meta(agentsV2Meta);
+  it("renders the list, an agent's page, the dialogs, and states", async () => {
+    viewport(1600);
+    for (const story of [
+      AgentV2Page,
+      AgentV2IntegrationNotInstalled,
+      AutoWithoutHarness,
+      EmptyAgentsV2,
+      AgentsV2Loading,
+      AgentsV2LoadFailed,
+      AgentsV2Unavailable,
+    ]) {
+      await stories.story(story).run();
+      cleanup();
+    }
+  });
+  it("lists every agent with its harness and model, and those that need setup", async () => {
+    viewport(1600);
+    await stories.story(AllAgentsV2).run();
+    cleanup();
+    await stories.story(AgentsV2NeedsSetup).run();
+  });
+  it("adds an agent, offering only the roles the reader may give", async () => {
+    viewport(1600);
+    await stories.story(AddAgentV2Flow).run();
+    cleanup();
+    await stories.story(AgentV2RoleOptions).run();
+  });
+  it("says why an agent can't run, and saves a setup that can", async () => {
+    viewport(1600);
+    await stories.story(SandboxRemoved).run();
+    cleanup();
+    await stories.story(HarnessNeedsSandbox).run();
+  });
+  it("suggests a connection's models and the efforts each takes", async () => {
+    viewport(1600);
+    await stories.story(ListedModels).run();
+    cleanup();
+    await stories.story(ModelWithoutEffort).run();
+    cleanup();
+    await stories.story(ModelsLoading).run();
+    cleanup();
+    await stories.story(ModelsFailed).run();
+  });
+  it("keeps the draft when the host refuses a connection, and removes an agent", async () => {
+    viewport(1600);
+    await stories.story(AgentV2ConnectionUnavailable).run();
+    cleanup();
+    await stories.story(RemoveAgentV2).run();
+  });
+  it("shows members agents without any action, and keeps a draft name renamed meanwhile", async () => {
+    viewport(1600);
+    await stories.story(AgentsV2ReadOnly).run();
+    cleanup();
+    await stories.story(NoMatchingAgentsV2).run();
+    cleanup();
+    await stories.story(AgentV2RenamedMeanwhile).run();
   });
 });
 

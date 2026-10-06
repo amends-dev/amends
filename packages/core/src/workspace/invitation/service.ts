@@ -4,13 +4,8 @@ import type { PlatformError } from "effect";
 
 import { Authorization } from "../../authorization/authorization.ts";
 import { Delegation } from "../../authorization/delegation.ts";
-import { AssignmentCommand } from "../../authorization/assignment/command.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Target } from "../../authorization/target.ts";
-import { Group } from "../../group/group.ts";
-import { GroupMembershipFacts } from "../../group/membership/facts.ts";
-import { GroupMembership } from "../../group/membership/membership.ts";
-import { GroupStore } from "../../group/store.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Identity } from "../../identity/identity.ts";
 import { Journal } from "../../journal/journal.ts";
@@ -23,7 +18,7 @@ import { InvitationFacts } from "./facts.ts";
 import { InvitationPermissions } from "./permissions.ts";
 import { InvitationStore } from "./store.ts";
 import { Member } from "../member/member.ts";
-import { MemberFacts } from "../member/facts.ts";
+import { MemberCommand } from "../member/command.ts";
 import { MemberStore } from "../member/store.ts";
 import { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
 export { AlreadyMember, InvalidExpiry, NotFound, NotRecipient, Unavailable } from "./errors.ts";
@@ -36,7 +31,7 @@ export type Error =
   | PlatformError.PlatformError
   | InvitationStore.Failure
   | MemberStore.Failure
-  | GroupStore.Failure
+  | MemberCommand.Error
   | NotFound
   | NotRecipient
   | AlreadyMember
@@ -76,20 +71,18 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
   never,
   | InvitationStore.Service
   | MemberStore.Service
-  | GroupStore.Service
   | Authorization.Service
   | Delegation.Service
-  | AssignmentCommand.Service
+  | MemberCommand.Service
   | Journal.Service
   | Crypto.Crypto
   | Store.Service
 > {
   const invitationStore = yield* InvitationStore.Service;
   const memberStore = yield* MemberStore.Service;
-  const groupStore = yield* GroupStore.Service;
   const authorization = yield* Authorization.Service;
   const delegation = yield* Delegation.Service;
-  const assignmentCommand = yield* AssignmentCommand.Service;
+  const memberCommand = yield* MemberCommand.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -196,29 +189,19 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         identity: inviter.value.identity,
       }),
     );
-    const member: Member.Record = {
-      id: Member.Id.make(yield* crypto.randomUUIDv4),
-      workspaceId,
-      identity: Identity.Reference.cases.Human.make({ id: recipient }),
-      ...(name === undefined ? {} : { name }),
-      status: "active",
-    };
+    const identity = Identity.MemberReference.cases.Human.make({ id: recipient });
     const provenance = yield* Publication.make(
       workspaceId,
-      {
-        _tag: "Identity",
-        identity: member.identity,
-      },
+      { _tag: "Identity", identity },
       acceptedAt,
     ).pipe(Effect.provideService(Crypto.Crypto, crypto));
     return yield* Effect.gen(function* () {
-      yield* journal.publish(MemberFacts.Added, {
-        memberId: member.id,
-        workspaceId,
-        identity: member.identity,
-        ...(name === undefined ? {} : { name }),
+      const member = yield* memberCommand.add({
+        identity,
+        name,
+        roleId: details.roleId,
+        joinedAt: acceptedAt,
       });
-      yield* assignmentCommand.assignRole(member.id, details.roleId);
       yield* journal.publish(InvitationFacts.Accepted, {
         _tag: "Accepted",
         workspaceId,
@@ -226,17 +209,6 @@ export const make = Effect.fn("InvitationService.make")(function* (): Effect.fn.
         memberId: member.id,
         acceptedAt,
       });
-      // Every member joins the workspace's general group as they join it; a workspace created
-      // before general groups existed has none.
-      if (Option.isSome(yield* groupStore.get(Group.GeneralId)))
-        yield* journal.publish(GroupMembershipFacts.Added, {
-          id: GroupMembership.Id.make(yield* crypto.randomUUIDv4),
-          workspaceId,
-          groupId: Group.GeneralId,
-          memberId: member.id,
-          admittedAt: acceptedAt,
-          status: "active",
-        });
       return member;
     }).pipe(Effect.provideService(Publication.Service, provenance));
   }, journal.commit);

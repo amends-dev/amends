@@ -49,6 +49,13 @@ export {
   type ConnectionsV2View,
 } from "./connections-v2/views.ts";
 export {
+  useAgentV2List,
+  useAgentsV2,
+  type AgentV2ListEntry,
+  type AgentsV2Done,
+  type AgentsV2View,
+} from "./agents-v2/views.ts";
+export {
   useEnvironmentList,
   useEnvironments,
   type EnvironmentsDone,

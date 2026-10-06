@@ -183,10 +183,12 @@ none, which operations surface as `CredentialsUnavailable`. Both are required ho
 `@amends/core/connection-v2` holds the connections that replace those above, built beside them
 and sharing nothing with them: a workspace's link to one integration its host installs, as
 [connection-v2](../connection-v2/README.md) declares integrations. `ConnectionV2Service` lists the
-host's `integrations`, each as `ConnectionV2.IntegrationView` (its auth methods, what it gives, and
-the form of its settings), which every member may see; lists and reads the connections the actor
-may read, as `ConnectionV2.View`; and creates, renames, configures, replaces the key of, checks,
-and removes them. A view is the record without its key, `manageable`, and its readiness: `Ready`,
+host's `integrations`, each as `ConnectionV2.IntegrationView` (its auth methods, what it gives,
+whether the agent of its harnesses `requiresSandbox`, and the form of its settings), which every
+member may see; lists and reads the connections the actor may read, as `ConnectionV2.View`, and the
+`models` each offers an agent, as `ConnectionV2.Models` (the catalog's models its integration
+lists, and whether it offers others by any id); and creates, renames, configures, replaces the key
+of, checks, and removes them. A view is the record without its key, `manageable`, and its readiness: `Ready`,
 `Invalid` with the integration's description when it no longer takes the connection's settings or
 auth method, or `Uninstalled` when the host no longer installs it.
 
@@ -199,12 +201,41 @@ No fact, change-feed event, or view carries a key. `check` reads the key and ask
 to check the connection with its system, returning `Health`; it holds no commit open while the
 system answers.
 
-`connection-v2.create` works on the workspace; `connection-v2.read` and `connection-v2.manage` on
-each connection, a `ConnectionV2` target. Members read connections; administrators and the owner
-create and manage them, and checking is managing, since it sends the key. `ConnectionV2Store` is a
+`connection-v2.create` works on the workspace; `connection-v2.read`, `connection-v2.manage`, and
+`connection-v2.use` on each connection, a `ConnectionV2` target. Members read and use connections;
+administrators and the owner create and manage them, and checking is managing, since it sends the
+key. Using a connection is giving it to what runs on it, as to an agent. `ConnectionV2Store` is a
 projection store and `ConnectionV2CredentialStore` keeps credentials outside the journal, reporting
 `Unavailable` on a host that keeps none (`CredentialsUnavailable`); both are host bindings. The
 gateway supplies the host's integrations as `Integrations`.
+
+## Agents v2
+
+`@amends/core/agent-v2` holds the agents that replace those of `agent/`, built beside them and
+sharing nothing with them. An agent is a workspace member that works: `AgentV2.Record` keeps its
+instructions; its `harness`, the harnesses of one of the workspace's connections v2 or `Auto`, for
+amends to choose among them; its `model`, one a connection offers, by id, with an `effort`; and its
+`sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
+membership's. `AgentV2Facts.Created` records an agent in the commit that adds its membership, and
+`Configured` replaces how it is set up as a whole; `AgentV2Projection` keeps them in
+`AgentV2Store`, a projection store.
+
+`AgentV2Service` lists and reads the agents the actor may read, as `AgentV2.View`, and creates,
+configures, and renames them. Creating adds the agent's membership with `MemberCommand.add`, with a
+role the actor must be able to grant. Its role is then changed, and it is removed, as any member's
+is, by `AssignmentService` and `MemberService`. Creating and configuring refuse a connection the
+actor may not read and use, or that is not active (`ConnectionUnavailable`, naming the part), and a
+setup that cannot run (`Incomplete`), except that an agent on `Auto` may wait for a connection that
+gives a harness. A view carries the agent's readiness, as `AgentV2Readiness` finds it against the
+workspace's connections and the host's integrations whoever reads it: `Ready`, or `Incomplete` with
+issues naming the part whose connection was `Removed`, whose integration is `Uninstalled`, or that
+does not give the part as the agent takes it (`Invalid`, as the integration describes it, such as a
+model it no longer offers); `SandboxRequired` when its harness's agent works only in a sandbox and it
+has none; and `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
+
+`agent-v2.create` works on the workspace; `agent-v2.read` and `agent-v2.configure` on the agent's
+membership, a `Member` target. Members read agents; administrators and the owner create and
+configure them.
 
 ## Environments
 
@@ -583,7 +614,9 @@ permissions the acting member's current grants cover, which needs active members
 clients can offer just the actions the member may take. `Delegation` supplies the shared
 rules used by assignments, invitations, and member removal. `AssignmentCommand.assignRole` and
 `revokeAssignment` record a workspace role's assignment and its end, for assignment changes,
-ownership transfer, accepted invitations, new agents, and workspace creation alike. Role definition editing
+ownership transfer, accepted invitations, new agents, and workspace creation alike.
+`MemberCommand.add` adds a member as accepting an invitation does: the membership, its role across
+the workspace, and its admission to the general group, which every member joins. Role definition editing
 and custom roles remain separate work. See [workspace workflows](../../docs/workspace-workflows.md#initialization-and-permissions)
 for the implemented bundles and current invitation restrictions.
 

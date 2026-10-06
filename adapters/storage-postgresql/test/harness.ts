@@ -26,6 +26,7 @@ const projections = [
   "connections_v2",
   "environments",
   "agents",
+  "agents_v2",
   "turns",
   "checkpoints",
   "live_projections",

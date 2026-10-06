@@ -2,6 +2,7 @@ import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer } from "effect";
 import { Agents } from "./agents.ts";
+import { AgentsV2 } from "./agents-v2.ts";
 import { Assignments } from "./assignments.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
@@ -57,6 +58,7 @@ const layerStores = Layer.mergeAll(
   ConnectionV2Credentials.layer,
   Environments.layer,
   Agents.layer,
+  AgentsV2.layer,
   TurnRecords.layer,
   MemorySignalHub.layer,
 );

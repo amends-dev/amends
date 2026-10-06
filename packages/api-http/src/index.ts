@@ -1,4 +1,5 @@
 export { AgentsGroup } from "./agents.ts";
+export { AgentsV2Group } from "./agents-v2.ts";
 export { Api } from "./api.ts";
 export { ChangeFeedGroup } from "./change-feed.ts";
 export { ConnectionsGroup } from "./connections.ts";
@@ -36,6 +37,7 @@ export { ConnectionV2 } from "@amends/core/connection-v2";
 export { ConnectionImplementation } from "@amends/connection";
 export { Environment, EnvironmentCompatibility } from "@amends/core/environment";
 export { Agent } from "@amends/core/agent";
+export { AgentV2 } from "@amends/core/agent-v2";
 export { Turn } from "@amends/core/turn";
 export { HarnessImplementation } from "@amends/harness";
 export { SandboxImplementation } from "@amends/sandbox";

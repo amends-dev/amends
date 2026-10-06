@@ -10,6 +10,7 @@ export { InvitationPermissions } from "./invitation/permissions.ts";
 export { InvitationStore } from "./invitation/store.ts";
 export { Member } from "./member/member.ts";
 export { MemberService } from "./member/service.ts";
+export { MemberCommand } from "./member/command.ts";
 export { MemberFacts } from "./member/facts.ts";
 export { MemberPermissions } from "./member/permissions.ts";
 export { MemberProjection } from "./member/projection.ts";

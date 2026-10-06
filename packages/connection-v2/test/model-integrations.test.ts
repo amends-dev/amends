@@ -97,11 +97,12 @@ layer(ModelCatalog.layer)("ModelIntegrations", (it) => {
         auth: ["apiKey"],
         provides: ["models"],
       });
-      expect(anthropic.models.map((model) => model.id)).toContain("claude-opus-5-5");
+      expect(anthropic.models.listed.map((model) => model.id)).toContain("claude-opus-5-5");
+      expect(anthropic.models.unlisted).toBe(false);
       expect(compatible).toMatchObject({
         auth: ["apiKey", "none"],
         provides: ["models"],
-        models: [],
+        models: { listed: [], unlisted: true },
       });
     }),
   );
@@ -145,16 +146,32 @@ layer(ModelCatalog.layer)("ModelIntegrations", (it) => {
 
   it.effect("refuses a model, an effort, or an output limit that the catalog does not offer", () =>
     Effect.gen(function* () {
-      const refusals = yield* Effect.all([
-        refusalOf(endpointOf("anthropic", { model: "claude-nine" })),
-        refusalOf(endpointOf("anthropic", { model: "claude-opus-5-5", effort: "minimal" })),
-        refusalOf(endpointOf("anthropic", { model: "claude-opus-5-5", maxOutputTokens: 200_000 })),
-        refusalOf(endpointOf("anthropic", { model: "claude-opus-5-5", maxOutputTokens: 0 })),
-        refusalOf(endpointOf("anthropic", { model: "claude-opus-5-5", maxOutputTokens: 1.5 })),
-      ]);
+      const asked: ReadonlyArray<Integration.EndpointOptions> = [
+        { model: "claude-nine" },
+        { model: "claude-opus-5-5", effort: "minimal" },
+        { model: "claude-opus-5-5", maxOutputTokens: 200_000 },
+        { model: "claude-opus-5-5", maxOutputTokens: 0 },
+        { model: "claude-opus-5-5", maxOutputTokens: 1.5 },
+      ];
+      const { integrations } = yield* integrationsAnswering(200);
+      const anthropic = yield* integrations.find("anthropic");
 
+      const refusals = yield* Effect.forEach(asked, (options) =>
+        refusalOf(endpointOf("anthropic", options)),
+      );
+      // Validating the model refuses the same, from a connection that has no key at hand.
+      const validated = yield* Effect.forEach(asked, (options) =>
+        refusalOf(anthropic.validateModel(connectionTo("anthropic"), options)),
+      );
+      yield* anthropic.validateModel(connectionTo("anthropic"), {
+        model: "claude-opus-5-5",
+        effort: "max",
+        maxOutputTokens: 64_000,
+      });
+
+      expect(validated).toEqual(refusals);
       expect(refusals).toEqual([
-        "UnsupportedError: The catalog has no model claude-nine of Anthropic",
+        "UnsupportedError: Anthropic offers no model claude-nine",
         "UnsupportedError: Claude Opus 5.5 takes no effort minimal",
         "UnsupportedError: Claude Opus 5.5 writes at most 128000 tokens in a response, not 200000",
         "UnsupportedError: An output limit is a whole number of tokens above 0, not 0",
@@ -225,7 +242,7 @@ layer(ModelCatalog.layer)("ModelIntegrations", (it) => {
       }
       const anthropicModel = (request: Sent | undefined) =>
         (request?.body as { readonly model?: string } | undefined)?.model;
-      const named = (yield* integrations.find("anthropic")).models.find(
+      const named = (yield* integrations.find("anthropic")).models.listed.find(
         (model) => model.id === anthropicModel(anthropic),
       );
       expect(named?.status).toBeUndefined();

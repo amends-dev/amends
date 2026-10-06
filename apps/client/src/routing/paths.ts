@@ -5,6 +5,7 @@ export type WorkspacePage =
   | "triage"
   | "tasks"
   | "agents"
+  | "agents-v2"
   | "environments"
   | "connections"
   | "connections-v2"
@@ -27,6 +28,9 @@ export const paths = {
   /** An agent's page: its Overview, or its Configuration. */
   agent: (id: string, agentId: string, tab?: "configuration") =>
     `/workspaces/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentId)}${tab ? `/${tab}` : ""}`,
+  /** An agent's page in Agents v2. */
+  agentV2: (id: string, agentId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/agents-v2/${encodeURIComponent(agentId)}`,
   /** An environment's page: its Overview, or its Sandbox settings. */
   environment: (id: string, environmentId: string, tab?: "sandbox") =>
     `/workspaces/${encodeURIComponent(id)}/environments/${encodeURIComponent(environmentId)}${tab ? `/${tab}` : ""}`,

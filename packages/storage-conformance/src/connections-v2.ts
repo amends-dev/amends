@@ -20,6 +20,7 @@ import {
   journalLog,
   request,
   Support,
+  testModel,
 } from "./support.ts";
 
 const as = <A, E>(
@@ -99,9 +100,39 @@ export const connectionsV2 = (harness: Harness) => {
               bob,
               (connectionV2Service) => connectionV2Service.integrations,
             );
-            expect(integrations.map(({ id, auth, provides }) => ({ id, auth, provides }))).toEqual([
-              { id: "test-models", auth: ["apiKey", "none"], provides: ["models"] },
-              { id: "test-tools", auth: ["none"], provides: ["tools"] },
+            expect(
+              integrations.map(({ id, auth, provides, requiresSandbox }) => ({
+                id,
+                auth,
+                provides,
+                requiresSandbox,
+              })),
+            ).toEqual([
+              {
+                id: "test-models",
+                auth: ["apiKey", "none"],
+                provides: ["models"],
+                requiresSandbox: false,
+              },
+              { id: "test-tools", auth: ["none"], provides: ["tools"], requiresSandbox: false },
+              {
+                id: "test-harness",
+                auth: ["none"],
+                provides: ["harnesses"],
+                requiresSandbox: true,
+              },
+              {
+                id: "test-in-process",
+                auth: ["none"],
+                provides: ["harnesses"],
+                requiresSandbox: false,
+              },
+              {
+                id: "test-sandboxes",
+                auth: ["none"],
+                provides: ["sandboxes"],
+                requiresSandbox: false,
+              },
             ]);
             expect(integrations[0]).toMatchObject({
               name: "Test models",
@@ -185,6 +216,40 @@ export const connectionsV2 = (harness: Harness) => {
           ),
         ),
       60_000,
+    );
+
+    it.effect("gives the models a connection offers to whoever may read it", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* workspaceWithMember;
+            const offering = yield* as(workspace.id, alice, (connectionV2Service) =>
+              connectionV2Service.create(models),
+            );
+            const offeringNone = yield* as(workspace.id, alice, (connectionV2Service) =>
+              connectionV2Service.create(tools),
+            );
+            const modelsOf = (connectionId: ConnectionV2.Id) =>
+              as(workspace.id, bob, (connectionV2Service) =>
+                connectionV2Service.models(connectionId),
+              );
+
+            expect(yield* modelsOf(offering.id)).toEqual({ listed: [testModel], unlisted: true });
+            expect(yield* modelsOf(offeringNone.id)).toEqual({ listed: [], unlisted: false });
+            const missing = ConnectionV2.Id.make("missing");
+            expect(yield* Effect.flip(modelsOf(missing))).toEqual(
+              new ConnectionV2Service.NotFound({ connectionId: missing }),
+            );
+            yield* as(workspace.id, alice, (connectionV2Service) =>
+              connectionV2Service.remove(offering.id),
+            );
+            expect(yield* Effect.flip(modelsOf(offering.id))).toEqual(
+              new ConnectionV2Service.NotFound({ connectionId: offering.id }),
+            );
+          }),
+        ),
+      ),
     );
 
     it.effect("checks a connection with its system, using the key it has now", () =>
@@ -489,6 +554,19 @@ export const connectionsV2 = (harness: Harness) => {
                   ),
                 ),
               ).toBeInstanceOf(ConnectionV2Service.InvalidConnection);
+              // The models of a connection are its integration's, whatever its settings.
+              expect(
+                yield* as(workspace.id, alice, (connectionV2Service) =>
+                  connectionV2Service.models(keyed.id),
+                ),
+              ).toEqual({ listed: [], unlisted: false });
+              expect(
+                yield* Effect.flip(
+                  as(workspace.id, alice, (connectionV2Service) =>
+                    connectionV2Service.models(keyless.id),
+                  ),
+                ),
+              ).toEqual(new ConnectionV2Service.UnknownIntegration({ integration: "test-tools" }));
             }).pipe(Effect.provide(gateway(host, { ...installed, integrations: [changedModels] })));
           }),
         ),

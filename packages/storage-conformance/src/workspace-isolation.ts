@@ -1,6 +1,8 @@
 import { Agent } from "@amends/core/agent";
+import { AgentV2 } from "@amends/core/agent-v2";
 import { BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
 import { Connection } from "@amends/core/connection";
+import { ConnectionV2 } from "@amends/core/connection-v2";
 import { Environment } from "@amends/core/environment";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
@@ -147,6 +149,21 @@ export const workspaceIsolation = (harness: Harness) => {
                   createdAt: now,
                 }),
                 kept: (on) => on.agents.get(Agent.Id.make("foreign-agent")),
+              },
+              {
+                store: "AgentV2Store",
+                write: bound.agentsV2.insert({
+                  id: AgentV2.Id.make("foreign-agent-v2"),
+                  workspaceId: otherWorkspaceId,
+                  memberId: Member.Id.make("foreign-agent-v2-member"),
+                  instructions: "",
+                  harness: { _tag: "Auto" },
+                  model: { connectionId: ConnectionV2.Id.make("foreign-connection"), id: "model" },
+                  sandbox: null,
+                  createdBy: memberId,
+                  createdAt: now,
+                }),
+                kept: (on) => on.agentsV2.get(AgentV2.Id.make("foreign-agent-v2")),
               },
               {
                 store: "TurnStore",

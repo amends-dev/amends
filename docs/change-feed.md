@@ -11,8 +11,8 @@ and cache invalidation; apps mount it once per workspace view; features show its
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,
    each workspace's `settings`, `ownership`, `members`, `invitations`, `groups`,
-   `public-groups`, `inbox`, `permissions`, `connections`, `connections-v2`, `environments`, and
-   `agents`, and one key
+   `public-groups`, `inbox`, `permissions`, `connections`, `connections-v2`, `environments`,
+   `agents`, and `agents-v2`, and one key
    per group stream, group roster, thread timeline, thread participants, and turn within their
    collections, and `active-turns` for the workspace. A turn's log is not a read: an open log
    follows it by its own stream (see the [turn guide](turns.md)).
@@ -37,7 +37,10 @@ and cache invalidation; apps mount it once per workspace view; features show its
    decide who may manage them. Every `environment.*` fact refreshes the environments and the installed
    harnesses and providers, which share theirs. The agents follow every `agent.*` fact, and the
    connection, environment, membership, and grant facts their readiness, names, and access
-   follow; an agent's environment choices refresh with them. Every `turn.*` fact names its turn, so
+   follow; an agent's environment choices refresh with them. Agents v2 follow every `agent-v2.*`
+   fact, and the `connection-v2.*` facts, but a replaced key, and the membership and grant facts
+   their readiness, names, and access follow; a connection's models refresh with connections v2.
+   Every `turn.*` fact names its turn, so
    it refreshes that turn and the active turns; a thread's turns show in its timeline, which the
    turn activity recorded there refreshes. Group membership and grant changes refresh the active
    turns. A commit that

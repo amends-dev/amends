@@ -41,6 +41,7 @@ type Reported =
   | Failure<Client["connectionsV2"][keyof Client["connectionsV2"]]>
   | Failure<Client["environments"][keyof Client["environments"]]>
   | Failure<Client["agents"][keyof Client["agents"]]>
+  | Failure<Client["agentsV2"][keyof Client["agentsV2"]]>
   | Failure<Client["turns"][keyof Client["turns"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
@@ -103,6 +104,11 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "AgentService.ConnectionUnavailable": "invalid",
   "AgentService.EnvironmentUnavailable": "invalid",
   "AgentService.Incompatible": "invalid",
+  // Agents v2 the same way; `agentsV2Failure` tells a refused setup apart.
+  "AgentV2Service.Changed": "changed",
+  "AgentV2Service.NotFound": "gone",
+  "AgentV2Service.ConnectionUnavailable": "invalid",
+  "AgentV2Service.Incomplete": "invalid",
   // Turns: one that finished or moved on meanwhile, or that left the reader's reach;
   // `turnProblems` tells the refusals apart.
   "TurnService.NotActive": "changed",

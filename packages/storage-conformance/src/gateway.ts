@@ -1,4 +1,5 @@
 import { ConnectionPermissions } from "@amends/core/connection";
+import { AgentV2Permissions } from "@amends/core/agent-v2";
 import { ConnectionV2Permissions } from "@amends/core/connection-v2";
 import { EnvironmentPermissions } from "@amends/core/environment";
 import { AgentPermissions } from "@amends/core/agent";
@@ -128,6 +129,8 @@ export const gateway = (harness: Harness) => {
                     EnvironmentPermissions.Use.name,
                     AgentPermissions.Read.name,
                     ConnectionV2Permissions.Read.name,
+                    ConnectionV2Permissions.Use.name,
+                    AgentV2Permissions.Read.name,
                   ],
                 }),
               );
@@ -174,6 +177,10 @@ export const gateway = (harness: Harness) => {
                       ConnectionV2Permissions.Create.name,
                       ConnectionV2Permissions.Read.name,
                       ConnectionV2Permissions.Manage.name,
+                      ConnectionV2Permissions.Use.name,
+                      AgentV2Permissions.Create.name,
+                      AgentV2Permissions.Read.name,
+                      AgentV2Permissions.Configure.name,
                     ],
                   }),
                 );

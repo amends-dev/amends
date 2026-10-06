@@ -59,13 +59,14 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections-v2",
     "environments",
     "agents",
+    "agents-v2",
     directoryKey,
   ],
   // An agent is a member: its name, and whether it is still in the workspace, show with it.
-  "workspace.member.added": ["members", "ownership", "agents", directoryKey],
-  "workspace.member.removed": ["members", "ownership", "agents", directoryKey],
+  "workspace.member.added": ["members", "ownership", "agents", "agents-v2", directoryKey],
+  "workspace.member.removed": ["members", "ownership", "agents", "agents-v2", directoryKey],
   // A member's name shows wherever members are named, and in the directory's memberships.
-  "workspace.member.renamed": ["members", "agents", directoryKey],
+  "workspace.member.renamed": ["members", "agents", "agents-v2", directoryKey],
   "workspace.invitation.issued": ["invitations"],
   "workspace.invitation.revoked": ["invitations"],
   "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],
@@ -84,6 +85,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections-v2",
     "environments",
     "agents",
+    "agents-v2",
     "active-turns",
   ],
   "workspace.assignment.created": [
@@ -97,6 +99,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections-v2",
     "environments",
     "agents",
+    "agents-v2",
     "active-turns",
   ],
   "workspace.assignment.revoked": [
@@ -110,6 +113,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "connections-v2",
     "environments",
     "agents",
+    "agents-v2",
     "active-turns",
   ],
   // A public group's creation reaches everyone who might join it.
@@ -132,11 +136,12 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "connection.credential-set": ["connections", "environments", "agents"],
   "connection.credential-cleared": ["connections", "environments", "agents"],
   "connection.removed": ["connections", "environments", "agents"],
-  // Connections v2: their names, settings, and readiness. Replacing a key changes none of them.
-  "connection-v2.created": ["connections-v2"],
-  "connection-v2.renamed": ["connections-v2"],
-  "connection-v2.configured": ["connections-v2"],
-  "connection-v2.removed": ["connections-v2"],
+  // Connections v2: their names, settings, and readiness, which agents v2 name and follow.
+  // Replacing a key changes none of them.
+  "connection-v2.created": ["connections-v2", "agents-v2"],
+  "connection-v2.renamed": ["connections-v2", "agents-v2"],
+  "connection-v2.configured": ["connections-v2", "agents-v2"],
+  "connection-v2.removed": ["connections-v2", "agents-v2"],
   // Environments: their names, harness, sandbox settings, and readiness, which agents follow.
   "environment.created": ["environments", "agents"],
   "environment.renamed": ["environments", "agents"],
@@ -145,6 +150,9 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   // Agents: their configuration and readiness.
   "agent.created": ["agents"],
   "agent.configured": ["agents"],
+  // Agents v2: how each is set up, and so its readiness.
+  "agent-v2.created": ["agents-v2"],
+  "agent-v2.configured": ["agents-v2"],
   // Where agents are at work: a turn starting, changing state, or ending.
   ...Object.fromEntries(
     [

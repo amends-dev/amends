@@ -42,6 +42,7 @@ const search = {
   docs: "https://search.example.com/docs",
   auth: ["apiKey", "none"],
   provides: ["tools"],
+  requiresSandbox: false,
   settings: {
     type: "object",
     properties: {
@@ -65,6 +66,7 @@ const amends = {
   name: "amends",
   auth: ["none"],
   provides: ["harnesses"],
+  requiresSandbox: false,
   settings: { type: "object", properties: {} },
 };
 interface Stored {
