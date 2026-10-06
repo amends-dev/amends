@@ -20,6 +20,8 @@ import {
   Deferred,
   Effect,
   Exit,
+  type FileSystem,
+  type Path,
   Ref,
   Schedule,
   Schema,
@@ -32,16 +34,16 @@ import type { HttpClient } from "effect/http";
 import type { ChildProcessSpawner } from "effect/process";
 import * as History from "./History.ts";
 import * as Server from "./Server.ts";
-import type { ModelRef, SessionEvent } from "./SessionEvent.ts";
+import { ModelRef, type SessionEvent } from "./SessionEvent.ts";
 import * as Turn from "./Turn.ts";
 
 /** What the host gives the bridge for opencode, as its agent options. */
 export const Options = Schema.Struct({
-  /**
-   * The model a turn runs on when it names none, as opencode names models: `provider/model`, such
-   * as `anthropic/claude-sonnet-4-5`. A turn names another the same way.
-   */
-  model: Schema.String,
+  /** The model a turn runs on when it names none. */
+  model: ModelRef,
+
+  /** The models a turn can name, by name. A turn that names another fails with `UnsupportedError`. */
+  models: Schema.Record(Schema.String, ModelRef),
 
   /**
    * The command that runs opencode in the sandbox, when it is not the opencode the template installs
@@ -49,10 +51,10 @@ export const Options = Schema.Struct({
    */
   command: Schema.optionalKey(Schema.String),
 
-  /** opencode's configuration, as its `opencode.json` takes it. */
+  /** opencode's configuration, as its `opencode.json` takes it, with the providers of the models. */
   config: Schema.Record(Schema.String, Schema.Json),
 
-  /** Environment variables opencode runs with, such as a model provider's API key. */
+  /** Environment variables opencode runs with. */
   env: Schema.Record(Schema.String, Schema.String),
 });
 
@@ -70,8 +72,8 @@ export interface Agent extends Bridge.Agent {
 const State = Schema.Struct({
   sessionID: Schema.String,
 
-  /** The model the session runs its turns on, as the options name models. */
-  model: Schema.String,
+  /** The model the session runs its turns on. */
+  model: ModelRef,
 });
 
 const StateJson = Schema.toCodecJson(State);
@@ -82,7 +84,11 @@ const StateJson = Schema.toCodecJson(State);
  */
 export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required<Options>) {
   const services = yield* Effect.context<
-    ChildProcessSpawner.ChildProcessSpawner | HttpClient.HttpClient | Crypto.Crypto
+    | ChildProcessSpawner.ChildProcessSpawner
+    | HttpClient.HttpClient
+    | Crypto.Crypto
+    | FileSystem.FileSystem
+    | Path.Path
   >();
   const agentScope = yield* Effect.scope;
   const serverExited = yield* Deferred.make<void>();
@@ -118,14 +124,14 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Required
     id: "opencode",
     serverExited: Deferred.await(serverExited),
     start: (startOptions) =>
-      Effect.flatMap(startedServer, (server) => startSession(server, options.model, startOptions)),
+      Effect.flatMap(startedServer, (server) => startSession(server, options, startOptions)),
   };
   return agent;
 });
 
 const startSession = Effect.fn("OpencodeAgent.start")(function* (
   server: Server.Server,
-  defaultModel: string,
+  options: Pick<Options, "model" | "models">,
   startOptions: Bridge.StartOptions,
 ) {
   // opencode may have lost the session, as when the sandbox lost its data, and then starts one
@@ -135,7 +141,7 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     saved !== undefined && (yield* server.hasSession(saved.sessionID)) ? saved : undefined;
   const state =
     kept ??
-    (yield* createSession(server, startOptions.directory, defaultModel, startOptions.history));
+    (yield* createSession(server, startOptions.directory, options.model, startOptions.history));
   const { sessionID } = state;
 
   /** The model the session runs its turns on, switched when a turn names another. */
@@ -170,11 +176,10 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
     if (unsupported !== undefined) {
       return yield* harnessError(new HarnessError.UnsupportedError({ description: unsupported }));
     }
-    const model = turnOptions.model ?? defaultModel;
-    const modelRef = yield* modelRefFor(model);
-    yield* awaitProvider(modelRef);
-    if (model !== (yield* Ref.get(sessionModel))) {
-      yield* server.switchModel(sessionID, modelRef);
+    const model = yield* modelNamed(options, turnOptions.model);
+    yield* awaitProvider(model);
+    if (!isSameModel(model, yield* Ref.get(sessionModel))) {
+      yield* server.switchModel(sessionID, model);
       yield* Ref.set(sessionModel, model);
     }
     return yield* server.prompt(sessionID, textOf(turnOptions.prompt));
@@ -273,11 +278,10 @@ const startSession = Effect.fn("OpencodeAgent.start")(function* (
 const createSession = Effect.fnUntraced(function* (
   server: Server.Server,
   directory: string,
-  model: string,
+  model: ModelRef,
   history: Prompt.Prompt,
 ) {
-  const modelRef = yield* modelRefFor(model);
-  const sessionID = yield* server.createSession({ directory, model: modelRef });
+  const sessionID = yield* server.createSession({ directory, model });
   if (history.content.length > 0) {
     const now = yield* Clock.currentTimeMillis;
     yield* Effect.fromResult(History.eventsOf(history, { sessionID, now })).pipe(
@@ -350,16 +354,17 @@ const unsupportedIn = (turnOptions: Bridge.TurnOptions): string | undefined => {
   return undefined;
 };
 
-/** The model `model` names as opencode names it, `provider/model`, failing for another name. */
-const modelRefFor = (model: string) => {
-  const slash = model.indexOf("/");
-  if (slash <= 0 || slash === model.length - 1) {
-    const description = `opencode names models provider/model, which ${model} is not`;
-    return Effect.fail(harnessError(new HarnessError.UnsupportedError({ description })));
-  }
-  const modelRef: ModelRef = { providerID: model.slice(0, slash), id: model.slice(slash + 1) };
-  return Effect.succeed(modelRef);
+/** The model a turn that names `name` runs on, failing for a name the options do not give. */
+const modelNamed = (options: Pick<Options, "model" | "models">, name: string | undefined) => {
+  if (name === undefined) return Effect.succeed(options.model);
+  const model = Object.hasOwn(options.models, name) ? options.models[name] : undefined;
+  if (model !== undefined) return Effect.succeed(model);
+  const description = `The opencode agent has no model named ${name}`;
+  return Effect.fail(harnessError(new HarnessError.UnsupportedError({ description })));
 };
+
+const isSameModel = (one: ModelRef, other: ModelRef) =>
+  one.providerID === other.providerID && one.id === other.id && one.variant === other.variant;
 
 const textOf = (message: Prompt.UserMessage) =>
   message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");

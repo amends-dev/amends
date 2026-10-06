@@ -7,12 +7,21 @@ outside the sandbox.
 
 ## Running it
 
-`OpencodeAgent.make` gives the agent a harness runs. Its options are the model a turn runs on
-when it names none, as opencode names models (`provider/model`); the `port` the bridge listens on,
-which has no default; and the host's `token` function, which derives each sandbox's bridge token
-from its id with a secret every host shares, such as an HMAC. opencode's `config`, as its
-`opencode.json` takes it, and its `env`, such as a model provider's API key, take effect when the
-bridge starts opencode's server; a server already running keeps the ones it started with.
+`OpencodeAgent.make` gives the agent a harness runs. Its options are the `model` endpoint a turn
+runs on when it names none and the `models` a turn can name, by name; the `port` the bridge listens
+on, which has no default; and the host's `token` function, which derives each sandbox's bridge token
+from its id with a secret every host shares, such as an HMAC. opencode's `config`, as opencode 1.18
+writes its `opencode.json`, whose `providers` the models' replace, and its `env` take effect when
+the bridge starts opencode's server; a server already running keeps the ones it started with.
+
+`Models` configures opencode for the endpoints. Each endpoint names its provider and model as
+opencode finds them in models.dev, which tells opencode the rest of the model, such as whether it
+calls tools; the configuration serves the model through the endpoint's protocol, at its URL, with
+its output limit, and under its key, and asks for the endpoint's effort in a variant of the model,
+which the turn's model names. opencode presents one key for each provider and serves a model one
+way, so endpoints that differ there fail `make` with `UnsupportedError`. The keys reach opencode in
+its configuration in the sandbox, where the commands opencode runs can read them. A model that
+models.dev does not list runs without tools.
 
 `make` bundles the bridge program with `Bun.build`, so the host runs on Bun, with the adapter's
 sources. It needs `Crypto` and a `Socket.WebSocketConstructor` that sends headers, as Bun's and
@@ -40,13 +49,16 @@ the agent in `src/bridge/Agent.ts` from the agent options and serves it on the p
 
 When the first session starts, the bridge starts opencode's server, `opencode serve`, on
 `127.0.0.1` at a port the server picks, behind a password it makes for that start and gives the
-server only in its environment. One server serves every session in the sandbox, each in its own
+server only in its environment. The server reads its configuration from a directory the bridge
+makes for it, which only the sandbox's user can read and which the bridge removes when the server
+stops, in place of the configuration under the sandbox user's home; a project's own configuration,
+in a session's directory, applies over it. A server that has not stopped 3 seconds after the bridge
+asks it to is killed. One server serves every session in the sandbox, each in its own
 directory. A server that fails to start is started again by the next session; one that exits by
 itself takes the bridge with it, and the next session launches both again. A bridge that dies, as
 when it is killed, leaves its server running, still on the turn the bridge ran, beside the server
-the next bridge starts. opencode keeps its
-configuration and data where it would for any user of the sandbox, under its home, unless `env`
-moves them, as with `XDG_DATA_HOME`.
+the next bridge starts, and its configuration stays with it. opencode keeps its data where it
+would for any user of the sandbox, under its home, unless `env` moves it, as with `XDG_DATA_HOME`.
 
 ## Sessions and turns
 
@@ -56,8 +68,8 @@ another agent, starts a new opencode session from the conversation: `History` wr
 conversation as the events opencode records, tool calls included, and replays them into it. Only a
 session whose opencode session was kept continues there a turn the bridge did not finish.
 
-A turn is a prompt to the session, on the model the turn names, which switches the session's model,
-once opencode has loaded that model's provider. `Turn` translates the events opencode records for
+A turn is a prompt to the session, on the model the turn names, which switches the session's model
+or its variant, once opencode has loaded that model's provider. `Turn` translates the events opencode records for
 the turn into the harness's stream parts, as they happen. opencode records text, reasoning, and a
 tool's input whole when they end, so each streams as one delta, and every tool runs inside opencode,
 so its calls and results are `providerExecuted`. A turn the bridge aborts is interrupted in
@@ -65,7 +77,8 @@ opencode, and destroying a session deletes it there.
 
 ## Testing
 
-`test/turn.test.ts` and `test/history.test.ts` translate events without a server.
+`test/turn.test.ts` and `test/history.test.ts` translate events without a server, and
+`test/models.test.ts` checks the configuration `Models` makes of endpoints.
 `test/agent.test.ts` runs the agent against a fake of opencode's server from `test/fakes.ts`.
 `test/server.test.ts` and `test/main.test.ts` start real processes: the server, and the bridge
 program launched by `BridgeClient`, with `test/fake-opencode-server.js` standing in for
@@ -75,5 +88,7 @@ launching it again after it dies, continuing a turn it lost then, letting go whe
 gone, refusing a wrong token, and continuing on another host. `test/template.test.ts` runs the template
 with its commands answered as a sandbox would answer them. `test/live.test.ts`, and the template's
 live test, which installs Bun and opencode in a temporary home, run only with
-`AMENDS_TEST_OPENCODE=1`, and the hosts' tests run on Daytona too with `AMENDS_TEST_DAYTONA=1`;
+`AMENDS_TEST_OPENCODE=1`; one of them has real opencode send turns on endpoints of each protocol
+to a fake of their APIs on a local port. The hosts' tests run on Daytona too with
+`AMENDS_TEST_DAYTONA=1`;
 [Testing](../../docs/testing.md) says what they run.

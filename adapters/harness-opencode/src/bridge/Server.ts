@@ -5,6 +5,11 @@
  * that `start` makes and gives the server in its environment. The bridge is the server's only client
  * and lives exactly as long as it, so the password is kept nowhere else.
  *
+ * opencode reads the configuration `start` is given from a directory that `start` makes for it and
+ * removes when the scope closes, in place of the global configuration of the sandbox's user, which
+ * opencode would read from under the home directory. A project's own configuration, in the
+ * directory a session works in, applies over it.
+ *
  * opencode's tools run with the server's environment, so the agent can read the password; it keeps
  * out everything else on the machine. A failed request fails with the `HarnessError` the agent
  * reports.
@@ -14,8 +19,10 @@ import {
   Crypto,
   Deferred,
   Effect,
+  FileSystem,
   flow,
   Option,
+  Path,
   type PlatformError,
   Record,
   Redacted,
@@ -39,7 +46,7 @@ export interface ServerOptions {
   /** opencode's configuration, as its `opencode.json` takes it. */
   readonly config: { readonly [key: string]: Schema.Json };
 
-  /** Environment variables opencode runs with, such as a model provider's API key. */
+  /** Environment variables opencode runs with. */
   readonly env: Record.ReadonlyRecord<string, string>;
 }
 
@@ -119,24 +126,39 @@ export interface Server {
 // TODO: Stop a server left running by a bridge that died, as one killed does. In a process group of
 // its own, the server outlives the bridge and goes on with the turn the bridge ran, while the next
 // bridge's server continues the same session. AI SDK's harness leaves its server running so too.
+// Its configuration, with the models' keys, stays in its directory with it.
 /** Starts the server, which runs until the scope closes, and waits until it listens. */
 export const start = Effect.fn("Server.start")(
   function* (options: ServerOptions) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const httpClient = yield* HttpClient.HttpClient;
     const crypto = yield* Crypto.Crypto;
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
     const password = Redacted.make(Hex.encode(yield* crypto.randomBytes(32)));
+    // opencode's session API reads its configuration from files alone, as here from the directory
+    // `OPENCODE_CONFIG_DIR` names. The configuration holds the models' keys, so only the sandbox's
+    // user can read it, as only they can read the directory.
+    const configDirectory = yield* fs.makeTempDirectoryScoped({ prefix: "opencode-config-" });
+    yield* fs.writeFileString(
+      path.join(configDirectory, "opencode.json"),
+      JSON.stringify(options.config),
+      { mode: 0o600 },
+    );
     const process = yield* spawner.spawn(
       ChildProcess.make(options.command, ["serve", "--hostname=127.0.0.1", "--port=0"], {
         extendEnv: true,
         env: {
           ...options.env,
-          OPENCODE_CONFIG_CONTENT: JSON.stringify(options.config),
+          OPENCODE_CONFIG_DIR: configDirectory,
           OPENCODE_SERVER_PASSWORD: Redacted.value(password),
         },
         stdin: "ignore",
         stdout: "pipe",
         stderr: "inherit",
+        // opencode's server does not always stop when it is asked to, so one that has not stopped
+        // soon after is killed.
+        forceKillAfter: "3 seconds",
       }),
     );
     const url = yield* awaitListening(process);

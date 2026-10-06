@@ -16,7 +16,6 @@ import { freePort, makeSandbox } from "./fixtures.ts";
  * `AMENDS_TEST_OPENCODE=1`.
  */
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
-const model = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "opencode/fledge-alpha-free";
 
 const homeLookup = ["sh", "-c", 'printf %s "$HOME"'];
 
@@ -217,7 +216,8 @@ describe.skipIf(!enabled)("Template on this machine", () => {
             args: installation.args,
             token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
             agentOptions: {
-              model,
+              model: { providerID: "opencode", id: "fledge-alpha-free" },
+              models: {},
               command: path.join(installed, "opencode"),
               config: {},
               env: {},

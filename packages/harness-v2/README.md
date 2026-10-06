@@ -21,6 +21,17 @@ the sandbox, from the harness's `template` and with its `ports`, and owns it: a 
 or destroys one. Each session works in its own directory there, named by its id, so that its files
 stay in place when it moves from one agent to another.
 
+## Models
+
+A `ModelEndpoint` is how an agent reaches a model: its provider and the provider's id for it, as
+models.dev names them, the protocol it is served through (Anthropic's Messages API, OpenAI's
+Responses API, or Chat Completions), the base URL that the protocol's paths follow, the key a
+request presents, and how hard it reasons and how much it may write. A host makes an endpoint for
+each model an agent may use, as from the catalog in [`@amends/connection-v2`](../connection-v2), and
+an agent runs on one by default and on others that a turn names. amends's own agent takes Effect AI
+language models, which `Models.languageModel` in its adapter makes of endpoints; opencode's adapter
+takes the endpoints and configures opencode with them.
+
 ## Sessions
 
 A `Session.Session` is what callers hold. `stream` runs a turn, `generate` returns it whole as a

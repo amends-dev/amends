@@ -206,9 +206,11 @@ a host launches, run everywhere too, against a stand-in for `opencode serve` in
 `test/fake-opencode-server.js`, which the tests install as an executable that runs on the Bun
 running them. The template's tests run everywhere with its commands answered as a sandbox would
 answer them. Its live tests run real opencode, whose turns a free model of opencode's own provider
-answers over the network; they take about a minute, so they run only with
-`AMENDS_TEST_OPENCODE=1`, and `AMENDS_TEST_OPENCODE_MODEL` names another model. The agent as the
-bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
+answers over the network, on an endpoint made from the model catalog; they take about a minute, so
+they run only with `AMENDS_TEST_OPENCODE=1`. `AMENDS_TEST_OPENCODE_MODEL` names another of the
+catalog's models, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it. One of
+them has opencode send turns on endpoints of each protocol to a fake of their APIs on a local port,
+to check what opencode sends. The agent as the bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
 opencode its template installs in this machine's home, under `~/.amends/opencode`, once for each
 version; the template's own live test installs them afresh in a temporary home directory. Each
 keeps opencode's configuration and data in temporary directories, apart from this machine's

@@ -47,7 +47,7 @@ export const startsIn = (directory: string) =>
     return starts
       .trim()
       .split("\n")
-      .map((line): { readonly pid: number } => JSON.parse(line));
+      .map((line): { readonly pid: number; readonly configDirectory: string } => JSON.parse(line));
   });
 
 /**

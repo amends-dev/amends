@@ -1,11 +1,11 @@
 // A stand-in for `opencode serve`, which tests install as the command that runs opencode. It
-// starts as opencode does, with `serve --hostname=… --port=0` and the server's password and
-// configuration in its environment, listens on a port it picks, and announces it on its output as
-// opencode does. Behind the password, it answers opencode's health check and creates sessions. It
+// starts as opencode does, with `serve --hostname=… --port=0`, the server's password in its
+// environment, and its configuration in the directory its environment names, listens on a port it
+// picks, and announces it on its output as opencode does. Behind the password, it answers opencode's health check and creates sessions. It
 // adds a line to `starts.jsonl` beside itself for each start. Given `FAKE_OPENCODE_EXIT`, it exits
 // with that code before it listens, as a server that fails does, and given
 // `FAKE_OPENCODE_EXIT_AFTER`, it exits that many milliseconds after it listens.
-import { appendFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 
 const argument = (name) =>
   process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(`--${name}=`.length);
@@ -18,7 +18,8 @@ appendFileSync(
   `${import.meta.dir}/starts.jsonl`,
   `${JSON.stringify({
     args: process.argv.slice(2),
-    config: JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? "null"),
+    configDirectory: process.env.OPENCODE_CONFIG_DIR,
+    config: JSON.parse(readFileSync(`${process.env.OPENCODE_CONFIG_DIR}/opencode.json`, "utf8")),
     greeting: process.env.GREETING,
     pid: process.pid,
   })}\n`,
