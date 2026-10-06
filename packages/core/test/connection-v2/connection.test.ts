@@ -44,9 +44,7 @@ describe("a new connection", () => {
   });
 
   it("takes a key without surrounding space, which no error shows", () => {
-    const tooLong = Schema.decodeUnknownExit(ConnectionV2.ApiKey)(
-      Redacted.make(`sk-${"x".repeat(8192)}`),
-    );
+    const tooLong = Schema.decodeExit(ConnectionV2.ApiKey)(Redacted.make(`sk-${"x".repeat(8192)}`));
 
     expect(accepts(ConnectionV2.ApiKey, Redacted.make("sk-key"))).toBe(true);
     for (const refused of ["", " sk-key", "sk-key\n", "a\u0000b"]) {
