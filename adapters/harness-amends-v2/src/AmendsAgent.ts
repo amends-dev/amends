@@ -8,8 +8,11 @@
  * Its own state is its conversation, tool calls and results included, so a session it resumes goes
  * on as it left off. A turn does not outlive the process running it: `continue` goes on from the
  * steps of a turn `suspend` cut short that the session has, and runs the step in flight again.
+ *
+ * `integration` gives the agent to connections, for a host to install.
  */
-import { type Agent, HarnessError, type StreamPart } from "@amends/harness-v2";
+import { Integration } from "@amends/connection-v2";
+import { type Agent, Harness, HarnessError, type StreamPart } from "@amends/harness-v2";
 import {
   Deferred,
   type Duration,
@@ -24,17 +27,12 @@ import {
   Stream,
 } from "effect";
 import { AiError, LanguageModel, Prompt, Response, Tool, Toolkit } from "effect/ai";
+import * as Models from "./Models.ts";
 import * as Tools from "./Tools.ts";
 
 // TODO: Add instructions of the agent's own, telling the model where it works and how it works
 // there, once the tools' descriptions are not enough.
-export interface Options {
-  /** The model a turn runs on when it names none. */
-  readonly model: LanguageModel.LanguageModel;
-
-  /** The models a turn can name, by name. A turn that names another fails with `UnsupportedError`. */
-  readonly models?: Readonly<Record<string, LanguageModel.LanguageModel>>;
-
+export interface Options extends Agent.Options {
   /** The most steps a turn takes, ending it even while the model calls tools. Unlimited by default. */
   readonly maxSteps?: number;
 
@@ -56,16 +54,64 @@ const StateJson = Schema.toCodecJson(State);
 /** What `start` takes back, if anything: a state the agent returned. */
 const SavedState = Schema.UndefinedOr(StateJson);
 
-/** The agent. It needs no services of its own: a turn runs on the models the options give it. */
-export const make = (options: Options): Effect.Effect<Agent.Agent> =>
-  Effect.succeed({
+/** The agent, which makes the language model of each of its endpoints with `Models.LanguageModels`. */
+export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
+  const languageModels = yield* Models.LanguageModels;
+  const model = yield* languageModels.make(options.model);
+  const models = new Map(
+    yield* Effect.forEach(Object.entries(options.models ?? {}), ([name, endpoint]) =>
+      Effect.map(languageModels.make(endpoint), (languageModel) => [name, languageModel] as const),
+    ),
+  );
+
+  /** The model a turn names, or the agent's default. */
+  const modelFor = (name: string | undefined) => {
+    const named = name === undefined ? model : models.get(name);
+    return named === undefined
+      ? Effect.fail(
+          harnessError(
+            new HarnessError.UnsupportedError({ description: `amends has no model named ${name}` }),
+          ),
+        )
+      : Effect.succeed(named);
+  };
+
+  const agent: Agent.Agent = {
     id: "amends",
     requiresSandbox: false,
-    start: (startOptions) => startSession(options, startOptions),
+    start: (startOptions) => startSession(options, modelFor, startOptions),
+  };
+  return agent;
+});
+
+/**
+ * The integration of amends's agent, for a host to install with what the agent takes besides its
+ * models. A connection to it gives no settings and no credential, and reaches nothing, so it is
+ * always healthy.
+ */
+export const integration = Effect.fn("AmendsAgent.integration")(function* (
+  options: Omit<Options, keyof Agent.Options> = {},
+) {
+  const languageModels = yield* Models.LanguageModels;
+  return Integration.make({
+    id: "amends",
+    name: "amends",
+    settings: Schema.Struct({}),
+    auth: ["none"],
+    harnesses: (_access, agentOptions) =>
+      make({ ...options, ...agentOptions }).pipe(
+        Effect.map(Harness.make),
+        Effect.provideService(Models.LanguageModels, languageModels),
+      ),
+    check: () => Effect.succeed({ status: "healthy" }),
   });
+});
 
 const startSession = Effect.fn("AmendsAgent.start")(function* (
   options: Options,
+  modelFor: (
+    name: string | undefined,
+  ) => Effect.Effect<LanguageModel.LanguageModel, HarnessError.HarnessError>,
   startOptions: Agent.StartOptions,
 ) {
   const { workspace } = startOptions;
@@ -92,22 +138,6 @@ const startSession = Effect.fn("AmendsAgent.start")(function* (
    * stand-in takes them. A turn starts with none, dropping any for calls no stand-in answered.
    */
   const hostResults = new Map<string, Deferred.Deferred<unknown, unknown>>();
-
-  /** The model a turn names, or the agent's default. */
-  const modelFor = (name: string | undefined) => {
-    if (name === undefined) return Effect.succeed(options.model);
-    const model =
-      options.models !== undefined && Object.hasOwn(options.models, name)
-        ? options.models[name]
-        : undefined;
-    return model === undefined
-      ? Effect.fail(
-          harnessError(
-            new HarnessError.UnsupportedError({ description: `amends has no model named ${name}` }),
-          ),
-        )
-      : Effect.succeed(model);
-  };
 
   /** Where the host's result for the call `id` waits, until the call's stand-in takes it. */
   const hostResultOf = (id: string) =>

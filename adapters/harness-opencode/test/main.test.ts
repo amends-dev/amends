@@ -12,7 +12,7 @@ import { freePort, installStandIn, isRunning, makeSandbox, startsIn } from "./fi
  */
 const TestLayer = Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor);
 
-const config = { model: "opencode/default-model" };
+const config = { autoupdate: false };
 
 /** A harness over opencode's bridge program on `port`, which runs opencode as `command`. */
 const makeHarness = (
@@ -28,7 +28,13 @@ const makeHarness = (
       command: process.execPath,
       args: [`${import.meta.dirname}/../src/bridge/main.ts`],
       token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
-      agentOptions: { model: config.model, command, config, env: { GREETING: "hello", ...env } },
+      agentOptions: {
+        model: { providerID: "opencode", id: "default-model" },
+        models: {},
+        command,
+        config,
+        env: { GREETING: "hello", ...env },
+      },
     }),
     Harness.make,
   );

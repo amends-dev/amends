@@ -107,10 +107,26 @@ snapshot, it deletes those of the template's other versions that no sandbox has 
 day, so a version that hosts still start sandboxes from, as while they are upgraded one by one,
 stays.
 
+## Connections
+
+`DaytonaSandboxProvider.integration` is the integration of Daytona, for a host to install; it needs
+`Crypto`. A connection to it is an organization: it authenticates with the organization's API key,
+and its settings may give `apiUrl` and `target`, as the provider's options do. A connection that
+gives neither gets what Daytona's SDK reads from the host's environment, `DAYTONA_API_URL` and
+`DAYTONA_TARGET`, or else Daytona's own cloud and the organization's region. Its sandboxes start
+from Daytona's default snapshot and never stop on their own.
+
+Checking a connection asks Daytona for one of the organization's sandboxes, which it lists only for
+a valid key, and creates nothing. A key Daytona refuses makes the connection unauthorized; an API
+that does not know the request, misconfigured; and one that does not answer, fails, or answers that
+it cannot now, unavailable.
+
 ## Testing
 
 `test/snapshots.test.ts` runs everywhere: what to do about a snapshot in each state, which other
-versions to delete, and how versions are named. The rest create real sandboxes and cost money, so
+versions to delete, and how versions are named. So does `test/integration.test.ts`, against a fake
+of Daytona's API in the test's process, except for checking a real organization's key and creating a
+sandbox through a connection. The rest create real sandboxes and cost money, so
 they run only with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`. `test/conformance.test.ts` runs
 the suites `@amends/sandbox-v2/conformance` exports, and deletes the snapshots of their templates
 when it ends. `test/daytona.test.ts` checks what the provider asks of Daytona: that sandboxes do

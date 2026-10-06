@@ -1,0 +1,27 @@
+{
+  "name": "@amends/connection-v2",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.tools.json",
+    "update-models": "bun run scripts/update-models.ts"
+  },
+  "dependencies": {
+    "@amends/harness-v2": "workspace:*",
+    "@amends/sandbox-v2": "workspace:*",
+    "@amends/toolkit": "workspace:*"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}

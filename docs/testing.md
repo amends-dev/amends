@@ -206,14 +206,20 @@ a host launches, run everywhere too, against a stand-in for `opencode serve` in
 `test/fake-opencode-server.js`, which the tests install as an executable that runs on the Bun
 running them. The template's tests run everywhere with its commands answered as a sandbox would
 answer them. Its live tests run real opencode, whose turns a free model of opencode's own provider
-answers over the network; they take about a minute, so they run only with
-`AMENDS_TEST_OPENCODE=1`, and `AMENDS_TEST_OPENCODE_MODEL` names another model. The agent as the
-bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
+answers over the network, on an endpoint made from the model catalog; they take about a minute, so
+they run only with `AMENDS_TEST_OPENCODE=1`. `AMENDS_TEST_OPENCODE_MODEL` names another of the
+catalog's models, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it. One of
+them has opencode send turns on endpoints of each protocol to a fake of their APIs on a local port,
+to check what opencode sends. The agent as the bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
 opencode its template installs in this machine's home, under `~/.amends/opencode`, once for each
 version; the template's own live test installs them afresh in a temporary home directory. Each
 keeps opencode's configuration and data in temporary directories, apart from this machine's
 opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on
 Daytona, in sandboxes started from the snapshot of the template's version once Daytona has made it.
+With `OPENROUTER_API_KEY` too, from the `.env` as `bun --env-file=hosts/local/.env` gives it, hosts
+also set opencode up as they would from a workspace's connections, to OpenRouter, whose free model
+it runs on, to the agent, and to this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1`,
+Daytona's.
 
 The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
 `adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports, and
@@ -221,7 +227,19 @@ The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
 policies Daytona enforces, create real sandboxes and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
-`.env`; they take about a minute.
+`.env`; they take about a minute. Each provider's integration is tested everywhere, Daytona's
+against a fake of Daytona's API in the test's process; with `AMENDS_TEST_DAYTONA=1`, its tests also
+check a real organization's key and create a sandbox through a connection.
+
+`packages/connection-v2` and `adapters/harness-amends-v2` run everywhere against fakes: a client
+that answers as each model API does, an MCP server in the test's process, and an HTTP API with an
+OpenAPI document. Their live tests reach real model providers and run only with
+`AMENDS_TEST_MODELS=1`: amends's agent runs turns on a free OpenRouter model, with
+`OPENROUTER_API_KEY` from the `.env` as `bun --env-file=hosts/local/.env` gives it, and checks of
+connections find the keys Anthropic, OpenAI, OpenRouter, and DeepSeek refuse, and OpenRouter's own.
+The agent is also set up as a host would set it up from a workspace's connections, to OpenRouter, to
+the agent, to an MCP server on this machine whose tool a turn calls, and to this machine's
+sandboxes, in one of which a turn runs a command. None of them costs anything.
 
 ## Storage conformance
 

@@ -1,0 +1,229 @@
+/**
+ * The integrations of model providers: one for each provider the model catalog lists, which gives
+ * the provider's models in the catalog, and `openai-compatible`, which gives any model of an API
+ * that serves the Chat Completions protocol at a URL the connection gives, such as a model server
+ * on a company's network.
+ *
+ * A connection to a catalog provider authenticates with an API key, and gives the settings that the
+ * provider's URLs name, such as the id of a Cloudflare account. The endpoint of one of its models is
+ * where the catalog says the model is served, with the effort and output limit an agent asks for,
+ * which the model must offer.
+ *
+ * Checking a connection to a catalog provider asks for a response to a request the provider must
+ * refuse, as it has no messages: a provider that reads the key first refuses the key, or else says
+ * the request is incomplete, which costs nothing. A few providers look at the request before the
+ * key, so a wrong key there shows only when a turn runs. Checking a connection to an
+ * OpenAI-compatible API asks it which models it has.
+ */
+import type { ModelEndpoint } from "@amends/harness-v2";
+import { Effect, Redacted, Result, Schema } from "effect";
+import { HttpClient, HttpClientRequest, type HttpClientResponse } from "effect/http";
+import { type Health, UnsupportedError } from "./Connection.ts";
+import * as Integration from "./Integration.ts";
+import * as ModelCatalog from "./ModelCatalog.ts";
+
+/** The integrations of the catalog's providers, which check connections over the host's client. */
+export const catalogProviders = Effect.gen(function* () {
+  const catalog = yield* ModelCatalog.ModelCatalog;
+  const client = yield* HttpClient.HttpClient;
+  return (yield* catalog.providers).map((provider) => providerIntegration(provider, client));
+});
+
+/** The integration of an OpenAI-compatible API, which checks connections over the host's client. */
+export const openAiCompatible = Effect.map(HttpClient.HttpClient, (client) =>
+  Integration.make({
+    id: "openai-compatible",
+    name: "OpenAI-compatible API",
+    settings: Schema.Struct({
+      /** The base URL of the API, which `/chat/completions` follows. */
+      url: Schema.NonEmptyString,
+    }),
+    auth: ["apiKey", "none"],
+    models: {
+      listed: [],
+      endpoint: ({ connection, settings, apiKey }, options) =>
+        Result.map(ensureOffered(options, undefined), (): ModelEndpoint.ModelEndpoint => ({
+          // The connection's own id, which no other provider has, so that an agent that knows
+          // providers by name, as opencode does, takes the API for a provider of its own.
+          provider: connection.id,
+          model: options.model,
+          protocol: "openai-chat",
+          url: settings.url.replace(/\/+$/, ""),
+          ...withOptions(apiKey, options),
+        })),
+    },
+    check: ({ settings, apiKey }) => {
+      const url = `${settings.url.replace(/\/+$/, "")}/models`;
+      return checkWith(client, url, HttpClientRequest.get(url).pipe(withBearer(apiKey)));
+    },
+  }),
+);
+
+const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient.HttpClient) =>
+  Integration.make({
+    id: provider.id,
+    name: provider.name,
+    docs: provider.docs,
+    settings: Schema.Struct(
+      Object.fromEntries(provider.settings.map((name) => [name, Schema.NonEmptyString])),
+    ),
+    auth: ["apiKey"],
+    models: {
+      listed: provider.models,
+      endpoint: ({ settings, apiKey }, options) => {
+        const model = provider.models.find((listed) => listed.id === options.model);
+        if (model === undefined) {
+          const description = `The catalog has no model ${options.model} of ${provider.name}`;
+          return Result.fail(new UnsupportedError({ description }));
+        }
+        return Result.map(ensureOffered(options, model), (): ModelEndpoint.ModelEndpoint => ({
+          provider: provider.id,
+          model: model.id,
+          protocol: model.protocol,
+          url: urlWith(model.url, settings),
+          ...withOptions(apiKey, options),
+        }));
+      },
+    },
+    check: ({ settings, apiKey }) => {
+      const model = modelToCheckWith(provider);
+      if (model === undefined) return Effect.succeed({ status: "healthy" });
+      const request = requestToRefuse(
+        model.protocol,
+        urlWith(model.url, settings),
+        model.id,
+        apiKey,
+      );
+      return checkWith(client, request.url, request);
+    },
+  });
+
+/**
+ * The model a check names, which the provider's key reaches as it does any other: the one released
+ * last of those the provider has fully released, as a provider may answer for a model it does not
+ * serve to everyone, or no longer serves, as for an address it has not. The catalog keeps no
+ * provider without models.
+ */
+const modelToCheckWith = (provider: ModelCatalog.Provider) =>
+  provider.models
+    .filter((model) => model.status === undefined)
+    .reduce<ModelCatalog.Model | undefined>(
+      (latest, model) =>
+        latest === undefined || model.released > latest.released ? model : latest,
+      undefined,
+    ) ?? provider.models[0];
+
+/**
+ * Fails when `model` does not offer what `options` ask of it, and for an output limit that is not a
+ * number of tokens. A model the catalog does not list, as `undefined`, offers any effort and limit.
+ */
+const ensureOffered = (
+  options: Integration.EndpointOptions,
+  model: ModelCatalog.Model | undefined,
+): Result.Result<void, UnsupportedError> => {
+  const { effort, maxOutputTokens } = options;
+  const unsupported = (description: string) => Result.fail(new UnsupportedError({ description }));
+  if (
+    maxOutputTokens !== undefined &&
+    !(Number.isInteger(maxOutputTokens) && maxOutputTokens > 0)
+  ) {
+    return unsupported(
+      `An output limit is a whole number of tokens above 0, not ${maxOutputTokens}`,
+    );
+  }
+  if (model === undefined) return Result.void;
+  if (effort !== undefined && !(model.reasoning?.efforts ?? []).includes(effort)) {
+    return unsupported(`${model.name} takes no effort ${effort}`);
+  }
+  if (maxOutputTokens !== undefined && maxOutputTokens > model.limits.output) {
+    return unsupported(
+      `${model.name} writes at most ${model.limits.output} tokens in a response, not ${maxOutputTokens}`,
+    );
+  }
+  return Result.void;
+};
+
+/** The parts of an endpoint that come from the connection's key and the agent's options. */
+const withOptions = (
+  apiKey: Redacted.Redacted<string> | undefined,
+  options: Integration.EndpointOptions,
+) => ({
+  ...(apiKey === undefined ? {} : { apiKey }),
+  ...(options.effort === undefined ? {} : { effort: options.effort }),
+  ...(options.maxOutputTokens === undefined ? {} : { maxOutputTokens: options.maxOutputTokens }),
+});
+
+/** `url` with the settings it names, between braces, as the catalog writes them. */
+const urlWith = (url: string, settings: { readonly [name: string]: string }) =>
+  url.replaceAll(/\{(\w+)\}/g, (_, name: string) => settings[name] ?? "").replace(/\/+$/, "");
+
+/**
+ * A request for a response that has no messages, which the provider of `protocol` at `url` must
+ * refuse, for the model `model`, with the key as the protocol presents it.
+ */
+const requestToRefuse = (
+  protocol: ModelEndpoint.Protocol,
+  url: string,
+  model: string,
+  apiKey: Redacted.Redacted<string> | undefined,
+) => {
+  switch (protocol) {
+    case "anthropic-messages":
+      return HttpClientRequest.post(`${url}/messages`).pipe(
+        HttpClientRequest.setHeader("anthropic-version", "2023-06-01"),
+        apiKey === undefined
+          ? (request) => request
+          : HttpClientRequest.setHeader("x-api-key", Redacted.value(apiKey)),
+        HttpClientRequest.bodyJsonUnsafe({ model, max_tokens: 1, messages: [] }),
+      );
+    case "openai-responses":
+      // The API takes an output limit of 16 tokens at least, so it refuses this one.
+      return HttpClientRequest.post(`${url}/responses`).pipe(
+        withBearer(apiKey),
+        HttpClientRequest.bodyJsonUnsafe({ model, input: [], max_output_tokens: 1 }),
+      );
+    case "openai-chat":
+      return HttpClientRequest.post(`${url}/chat/completions`).pipe(
+        withBearer(apiKey),
+        HttpClientRequest.bodyJsonUnsafe({ model, messages: [] }),
+      );
+  }
+};
+
+const withBearer =
+  (apiKey: Redacted.Redacted<string> | undefined) =>
+  (request: HttpClientRequest.HttpClientRequest) =>
+    apiKey === undefined ? request : HttpClientRequest.bearerToken(request, Redacted.value(apiKey));
+
+/** Sends `request`, and says what its answer, or its failing to be answered, says of the connection. */
+const checkWith = (
+  client: HttpClient.HttpClient,
+  url: string,
+  request: HttpClientRequest.HttpClientRequest,
+): Effect.Effect<Health> =>
+  client.execute(request).pipe(
+    Effect.map((response: HttpClientResponse.HttpClientResponse) => healthOf(response.status, url)),
+    Effect.timeout("15 seconds"),
+    Effect.orElseSucceed((): Health => ({
+      status: "unavailable",
+      description: `Nothing answered at ${url}`,
+    })),
+  );
+
+/**
+ * What an answer of `status` from `url` says of the connection: refusing the key, not knowing the
+ * request, or being unable to answer it now. Any other answer, as one that says the request is
+ * incomplete, comes once the key is taken.
+ */
+export const healthOf = (status: number, url: string): Health => {
+  if (status === 401 || status === 403) {
+    return { status: "unauthorized", description: `${url} refused the key (${status})` };
+  }
+  if (status === 408 || status === 429 || status >= 500) {
+    return { status: "unavailable", description: `${url} could not answer now (${status})` };
+  }
+  if (status === 404 || status === 405) {
+    return { status: "misconfigured", description: `${url} serves no such request (${status})` };
+  }
+  return { status: "healthy" };
+};

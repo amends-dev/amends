@@ -22,7 +22,8 @@ const directory = "/work/session-one";
 /**
  * The opencode agent as a bridge runs it, whose server is a fake opencode that runs each turn with
  * `runTurn`. The agent starts the server as it would opencode's, through a process spawner whose
- * servers announce the fake's address; the first `failingStarts` of them fail to start.
+ * servers announce the fake's address; the first `failingStarts` of them fail to start. Its models
+ * are of opencode's own provider, the fake's only one, except `elsewhere`.
  */
 const makeAgent = (
   runTurn: (turn: FakeTurn) => Effect.Effect<void>,
@@ -34,7 +35,12 @@ const makeAgent = (
       failing: options.failingStarts,
     });
     const agent = yield* OpencodeAgent.make({
-      model: "opencode/default-model",
+      model: { providerID: "opencode", id: "default-model" },
+      models: {
+        other: { providerID: "opencode", id: "other-model" },
+        deep: { providerID: "opencode", id: "default-model", variant: "amends-high" },
+        elsewhere: { providerID: "elsewhere", id: "model" },
+      },
       command: "opencode",
       config: {},
       env: {},
@@ -204,19 +210,21 @@ layer(TestLayer)("OpencodeAgent", (it) => {
   it.effect("switches the session's model when a turn names another, and back", () =>
     Effect.gen(function* () {
       const { fake, session } = yield* startSession((turn) =>
-        answer(`${turn.model?.providerID}/${turn.model?.id}`)(turn),
+        answer(`${turn.model?.providerID}/${turn.model?.id}:${turn.model?.variant ?? "-"}`)(turn),
       );
 
-      const named = yield* runTurn(session, "Which?", { model: "opencode/other-model" });
-      const again = yield* runTurn(session, "Which?", { model: "opencode/other-model" });
+      const named = yield* runTurn(session, "Which?", { model: "other" });
+      const again = yield* runTurn(session, "Which?", { model: "other" });
+      const variant = yield* runTurn(session, "Which?", { model: "deep" });
       const unnamed = yield* runTurn(session, "Which?");
 
-      expect([named, again, unnamed].map(textOf)).toEqual([
-        "opencode/other-model",
-        "opencode/other-model",
-        "opencode/default-model",
+      expect([named, again, variant, unnamed].map(textOf)).toEqual([
+        "opencode/other-model:-",
+        "opencode/other-model:-",
+        "opencode/default-model:amends-high",
+        "opencode/default-model:-",
       ]);
-      expect(fake.requests.filter((request) => request.endsWith("/model"))).toHaveLength(2);
+      expect(fake.requests.filter((request) => request.endsWith("/model"))).toHaveLength(3);
     }),
   );
 
@@ -230,13 +238,17 @@ layer(TestLayer)("OpencodeAgent", (it) => {
         { responseFormat: { type: "json", objectName: "output", schema: {} } },
         { tools: [{ name: "Echo", parameters: { type: "object" } }] },
         { prompt: Prompt.makeMessage("user", { content: [file] }) },
-        { model: "default-model" },
+        { model: "opencode/default-model" },
+        { model: "constructor" },
       ];
       const refusals = yield* Effect.forEach(refused, (options) =>
         Effect.flip(runTurn(session, "Hi.", options)),
       );
 
-      expect(refusals.map((error) => error.reason._tag)).toEqual(Array(5).fill("UnsupportedError"));
+      expect(refusals.map((error) => error.reason._tag)).toEqual(Array(6).fill("UnsupportedError"));
+      expect(refusals.at(-1)?.reason).toMatchObject({
+        description: "The opencode agent has no model named constructor",
+      });
       expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
     }),
   );
@@ -285,7 +297,7 @@ layer(TestLayer)("OpencodeAgent", (it) => {
       // The agent asks opencode over HTTP between its waits, so the clock moves on a little at a
       // time until it gives up.
       const refused = yield* Effect.raceFirst(
-        Effect.flip(runTurn(session, "Say hello.", { model: "elsewhere/model" })),
+        Effect.flip(runTurn(session, "Say hello.", { model: "elsewhere" })),
         Effect.forever(
           Effect.andThen(
             TestClock.adjust("200 millis"),

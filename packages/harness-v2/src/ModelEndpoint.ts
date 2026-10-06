@@ -1,0 +1,54 @@
+/**
+ * A model endpoint is how an agent reaches a model: the API the model is served through, where that
+ * API is, the key a request presents, and how hard the model works. A host makes an endpoint for each
+ * model an agent may use, from what it knows of the model and of the account it uses it under, and an
+ * agent's adapter turns endpoints into what its agent takes: amends's own agent makes an Effect AI
+ * language model of each, and an agent in a sandbox is configured with them.
+ */
+import { Schema } from "effect";
+
+/**
+ * The API a model is served through: Anthropic's Messages API, OpenAI's Responses API, or the Chat
+ * Completions API that OpenAI defined and most providers serve.
+ */
+export const Protocol = Schema.Literals(["anthropic-messages", "openai-responses", "openai-chat"]);
+
+export type Protocol = typeof Protocol.Type;
+
+/** How hard a model reasons before it answers, from least to most, as providers name the levels. */
+export const Effort = Schema.Literals(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
+export type Effort = typeof Effort.Type;
+
+// TODO: Add headers that a provider asks a request to carry besides its key, once a provider that
+// an endpoint is made for needs them.
+export const ModelEndpoint = Schema.Struct({
+  /**
+   * Names the model's provider, such as `anthropic`, as models.dev names providers. An agent that
+   * knows providers by name, as opencode does, finds the provider by it.
+   */
+  provider: Schema.NonEmptyString,
+
+  /** The provider's id for the model, which requests name it by. */
+  model: Schema.NonEmptyString,
+
+  protocol: Protocol,
+
+  /**
+   * The base URL of the API, which the protocol's paths follow, as AI SDK takes it: such as
+   * `https://api.anthropic.com/v1` for `/messages`, or `https://api.openai.com/v1` for
+   * `/responses` and `/chat/completions`.
+   */
+  url: Schema.String,
+
+  /** The key a request presents, as the protocol presents keys. Absent for an API that takes none. */
+  apiKey: Schema.optionalKey(Schema.Redacted(Schema.String)),
+
+  /** How hard the model reasons. Absent for the provider's default. */
+  effort: Schema.optionalKey(Effort),
+
+  /** The most tokens the model writes in a response. Absent for the provider's default. */
+  maxOutputTokens: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
+});
+
+export interface ModelEndpoint extends Schema.Schema.Type<typeof ModelEndpoint> {}

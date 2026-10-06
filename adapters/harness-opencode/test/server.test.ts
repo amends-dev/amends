@@ -1,6 +1,6 @@
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Layer } from "effect";
+import { Effect, FileSystem, Layer, Path } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as Server from "../src/bridge/Server.ts";
 import { installStandIn, isRunning, startsIn } from "./fixtures.ts";
@@ -38,8 +38,26 @@ describe("Server", () => {
     }).pipe(Effect.provide(TestLayer)),
   );
 
-  it.live("stops the server when the scope closes", () =>
+  it.live("gives opencode its configuration in a directory only the sandbox's user can read", () =>
     Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const { command, directory } = yield* installStandIn;
+
+      yield* Server.start(optionsFor(command));
+      const [started] = yield* startsIn(directory);
+      const configDirectory = started?.configDirectory ?? "";
+
+      expect((yield* fs.stat(configDirectory)).mode & 0o777).toBe(0o700);
+      expect((yield* fs.stat(path.join(configDirectory, "opencode.json"))).mode & 0o777).toBe(
+        0o600,
+      );
+    }).pipe(Effect.provide(TestLayer)),
+  );
+
+  it.live("stops the server and removes its configuration when the scope closes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
       const { command, directory } = yield* installStandIn;
 
       yield* Effect.scoped(Server.start(optionsFor(command)));
@@ -47,6 +65,7 @@ describe("Server", () => {
 
       expect(started).toBeDefined();
       expect(yield* isRunning(started?.pid ?? 0)).toBe(false);
+      expect(yield* fs.exists(started?.configDirectory ?? "")).toBe(false);
     }).pipe(Effect.provide(TestLayer)),
   );
 
