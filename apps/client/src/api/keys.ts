@@ -15,6 +15,7 @@ export type WorkspaceResource =
   | "connections-v2"
   | "environments"
   | "agents"
+  | "agents-v2"
   | "active-turns";
 export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "settings",
@@ -29,6 +30,7 @@ export const workspaceResources: ReadonlyArray<WorkspaceResource> = [
   "connections-v2",
   "environments",
   "agents",
+  "agents-v2",
   "active-turns",
 ];
 /** Everything the signed-in identity can reach, across workspaces. */
