@@ -63,7 +63,7 @@ export const make = Effect.fn("ConnectionV2Credentials.make")(function* () {
         .open(found.value.sealed, bindingOf(connectionId))
         .pipe(
           Effect.flatMap(decodeCredential),
-          Effect.map(Option.some),
+          Effect.asSome,
           Effect.mapError(storeFailure(ConnectionV2CredentialStore, "get")),
         );
     }),

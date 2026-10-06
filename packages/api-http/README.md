@@ -76,12 +76,14 @@ so a client can import the complete contract without loading server code.
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
 - `connections`: access to external systems, such as model providers; see
   [Connections](#connections).
+- `connectionsV2`: the connections that replace them, to the integrations this host installs; see
+  [Connections v2](#connections-v2).
 - `environments`: where and how agents run; see [Environments](#environments).
 - `agents` and `turns`: agents, and their turns on threads; see [Agents](#agents) and
   [Turns](#turns).
 
 `POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
-`POST …/environments`, both thread
+`POST …/connections-v2`, `POST …/environments`, both thread
 starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
 same key returns the first attempt's result, whatever the retry's body. Clients generating the
 typed client pass it in `headers`.
@@ -265,6 +267,35 @@ one does. An implementation this host lacks is 422 `UnknownImplementation`, sett
 declare or a required or malformed value are 422 `InvalidSettings`, and a way of authenticating it
 does not take, or a key for a connection that takes none, is 422 `UnsupportedAuthentication`. A
 host without a credential key answers a key with 503 `CredentialsUnavailable`.
+
+### Connections v2
+
+Paths sit under `/workspaces/:workspaceId/connections-v2` and require active membership. Every
+member may read connections and the integrations this host installs; the built-in administrator
+tier adds, changes, checks, and removes them. The
+[core section](../core/README.md#connections-v2) describes the rules.
+
+| Endpoint                                      | Operation                                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/connections-v2/integrations`           | The installed integrations: name, docs, ways of authenticating, what each provides, and its settings form.                |
+| `GET …/connections-v2`                        | The connections, by name.                                                                                                 |
+| `POST …/connections-v2`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it. |
+| `GET …/connections-v2/:connectionId`          | One connection.                                                                                                           |
+| `POST …/connections-v2/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionV2Service.Changed`.            |
+| `PUT …/connections-v2/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                 |
+| `PUT …/connections-v2/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                        |
+| `POST …/connections-v2/:connectionId/check`   | Ask its system whether it works as set up, answering `Connection.Health`; stores nothing.                                 |
+| `DELETE …/connections-v2/:connectionId`       | Remove it and delete its key; 204.                                                                                        |
+
+An integration's settings form is an MCP elicitation form schema, a flat object of strings,
+numbers, and booleans with titles and descriptions, for a client to render. A connection reads as
+`ConnectionV2.View`: its settings and way of authenticating but never its key, its readiness
+(`Ready`, `Invalid` with what the integration refused, or `Uninstalled`), and `manageable`, whether
+the caller may change it. A connection the caller may not read answers 404 as a missing one does,
+as does a retried create whose connection was removed since. An integration this host lacks is 422
+`ConnectionV2Service.UnknownIntegration`; settings or a way of authenticating it does not take are
+422 `InvalidConnection`; a key for a connection that authenticates with nothing is 422 `Keyless`. A
+host without a credential key answers a key with 503 `ConnectionV2Service.CredentialsUnavailable`.
 
 ### Environments
 

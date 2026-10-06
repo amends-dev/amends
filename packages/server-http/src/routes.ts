@@ -11,6 +11,7 @@ import { SessionHandlers } from "./session.ts";
 import { WorkspacesHandlers } from "./workspaces.ts";
 import { ChangeFeedHandlers } from "./change-feed.ts";
 import { ConnectionsHandlers } from "./connections.ts";
+import { ConnectionsV2Handlers } from "./connections-v2.ts";
 import { AgentsHandlers } from "./agents.ts";
 import { EnvironmentsHandlers } from "./environments.ts";
 import { GroupsHandlers } from "./groups.ts";
@@ -33,6 +34,7 @@ export const layerHandlers = Layer.mergeAll(
   ThreadsHandlers.layer,
   NotificationsHandlers.layer,
   ConnectionsHandlers.layer,
+  ConnectionsV2Handlers.layer,
   EnvironmentsHandlers.layer,
   AgentsHandlers.layer,
   TurnsHandlers.layer,

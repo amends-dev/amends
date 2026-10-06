@@ -15,6 +15,7 @@ import { GroupService, GroupFollowService, GroupMembershipService } from "@amend
 import { AgentService } from "@amends/core/agent";
 import { TurnService } from "@amends/core/turn";
 import { ConnectionService } from "@amends/core/connection";
+import { ConnectionV2Service } from "@amends/core/connection-v2";
 import { EnvironmentService } from "@amends/core/environment";
 import { NotificationService } from "@amends/core/notification";
 import { ReadStateService } from "@amends/core/read-state";
@@ -182,6 +183,25 @@ export const UnsupportedAuthentication = ConnectionService.UnsupportedAuthentica
 );
 /** This host cannot store credentials now. */
 export const CredentialsUnavailable = ConnectionService.CredentialsUnavailable.pipe(
+  HttpApiSchema.status(503),
+);
+
+/** A connection the caller may not read answers as missing, as does one removed since a create. */
+export const ConnectionV2NotFound = ConnectionV2Service.NotFound.pipe(HttpApiSchema.status(404));
+/** A connection renamed since the caller last saw its name refuses another name with 409. */
+export const ConnectionV2Changed = ConnectionV2Service.Changed.pipe(HttpApiSchema.status(409));
+/** The integration is not installed on this host. */
+export const UnknownIntegration = ConnectionV2Service.UnknownIntegration.pipe(
+  HttpApiSchema.status(422),
+);
+/** The integration does not take the connection's settings or auth method, as it describes. */
+export const InvalidConnection = ConnectionV2Service.InvalidConnection.pipe(
+  HttpApiSchema.status(422),
+);
+/** The connection authenticates with nothing, so it takes no key. */
+export const Keyless = ConnectionV2Service.Keyless.pipe(HttpApiSchema.status(422));
+/** This host keeps no credentials, so no key can be stored or read. */
+export const ConnectionV2CredentialsUnavailable = ConnectionV2Service.CredentialsUnavailable.pipe(
   HttpApiSchema.status(503),
 );
 
