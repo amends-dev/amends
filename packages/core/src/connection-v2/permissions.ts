@@ -1,8 +1,5 @@
 import { Permission } from "../authorization/permission.ts";
 
-// TODO: Add a permission to use a connection, as by giving it to an agent, once something uses
-// connections.
-
 /** Adding a connection gives the workspace access to an external system. */
 export const Create = Permission.make("connection-v2.create", {
   targetKind: "Workspace",
@@ -22,6 +19,15 @@ export const Read = Permission.make("connection-v2.read", {
 export const Manage = Permission.make("connection-v2.manage", {
   targetKind: "ConnectionV2",
   builtinTier: "administrator",
+});
+
+/**
+ * Giving a connection to what runs on it, as to an agent, which then reaches the connection's system
+ * with its key.
+ */
+export const Use = Permission.make("connection-v2.use", {
+  targetKind: "ConnectionV2",
+  builtinTier: "member",
 });
 
 export * as ConnectionV2Permissions from "./permissions.ts";

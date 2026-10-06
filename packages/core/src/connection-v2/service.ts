@@ -47,6 +47,7 @@ export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
 export type ReplaceKeyError = Error | Keyless | KeyError;
 export type RemoveError = Error | ConnectionV2CredentialStore.Failure;
 export type CheckError = ReadError | UnknownIntegration | InvalidConnection | KeyError;
+export type ModelsError = ReadError | UnknownIntegration;
 
 export interface Interface {
   /**
@@ -63,6 +64,14 @@ export interface Interface {
   readonly get: (
     connectionId: ConnectionV2.Id,
   ) => Effect.Effect<ConnectionV2.View, ReadError, Actor.Service>;
+  /**
+   * The models the connection offers an agent, to set an agent up with one: those its integration
+   * lists, and whether it also offers others by any id. A connection whose integration this host no
+   * longer installs offers nothing, and fails with UnknownIntegration.
+   */
+  readonly models: (
+    connectionId: ConnectionV2.Id,
+  ) => Effect.Effect<ConnectionV2.Models, ModelsError, Actor.Service>;
   /**
    * Connect the workspace to an installed integration, with settings and a way of authenticating
    * the integration takes, and its key when it authenticates with one, stored in the same commit.
@@ -218,6 +227,12 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
     return yield* viewForActor(yield* requirePermittedConnection(id, ConnectionV2Permissions.Read));
   });
 
+  const models = Effect.fn("ConnectionV2Service.models")(function* (connectionId: ConnectionV2.Id) {
+    const id = yield* Schema.decodeEffect(ConnectionV2.Id)(connectionId);
+    const record = yield* requirePermittedConnection(id, ConnectionV2Permissions.Read);
+    return (yield* requireIntegration(record.integration)).models;
+  });
+
   const create = Effect.fn("ConnectionV2Service.create")(
     function* (input: ConnectionV2.CreateInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(ConnectionV2.CreateInput))(input);
@@ -363,6 +378,7 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
     integrations: listIntegrations,
     list,
     get,
+    models,
     create,
     rename,
     configure,

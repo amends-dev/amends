@@ -45,7 +45,7 @@ import {
 } from "@amends/core/connection";
 import { ConnectionImplementation } from "@amends/connection";
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
-import { Integration, Integrations } from "@amends/connection-v2";
+import { Integration, Integrations, type ModelCatalog } from "@amends/connection-v2";
 import { AgentStore } from "@amends/core/agent";
 import { AgentJobs, AgentWork, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
@@ -136,9 +136,24 @@ export const environmentCatalog = EnvironmentCatalog.make({
 /** The key the test models integration's check accepts; any other it refuses. */
 export const goodKey = "sk-good";
 
+/** The model test models lists, which reasons with a low or high effort. */
+export const testModel: ModelCatalog.Model = {
+  id: "test-model",
+  name: "Test model",
+  protocol: "openai-chat",
+  url: "https://models.example/v1",
+  released: "2026-01",
+  limits: { context: 100_000, output: 8_000 },
+  modalities: { input: ["text"], output: ["text"] },
+  tools: true,
+  reasoning: { toggle: false, efforts: ["low", "high"] },
+};
+
 /**
  * The integrations the suites' hosts install: models at an endpoint a connection gives, reached
- * with a key or none, whose check accepts only `goodKey`; and tools that take no settings or key.
+ * with a key or none, which list `testModel` and offer any other, and whose check accepts only
+ * `goodKey`; tools that take no settings or key; and a harness whose agent works only in a sandbox,
+ * which no suite runs.
  */
 export const testIntegrations = [
   Integration.make({
@@ -151,7 +166,7 @@ export const testIntegrations = [
     }),
     auth: ["apiKey", "none"],
     models: {
-      listed: [],
+      listed: [testModel],
       unlisted: true,
       endpoint: ({ settings }, { model }) =>
         Result.succeed({
@@ -173,6 +188,13 @@ export const testIntegrations = [
     name: "Test tools",
     auth: ["none"],
     tools: () => Effect.die("No suite calls a tool"),
+    check: () => Effect.succeed({ status: "healthy" }),
+  }),
+  Integration.make({
+    id: "test-harness",
+    name: "Test harness",
+    auth: ["none"],
+    harnesses: { requiresSandbox: true, harness: () => Effect.die("No suite runs a harness") },
     check: () => Effect.succeed({ status: "healthy" }),
   }),
 ];

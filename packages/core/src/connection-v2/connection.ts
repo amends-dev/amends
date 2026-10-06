@@ -7,7 +7,7 @@
  *
  * This feature is built beside `connection/`, which it is to replace, and shares nothing with it.
  */
-import { Connection, Integration } from "@amends/connection-v2";
+import { Connection, Integration, ModelCatalog } from "@amends/connection-v2";
 import { Schema } from "effect";
 import { Text } from "../text/text.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -176,6 +176,9 @@ export const IntegrationView = Schema.Struct({
   /** How a connection can authenticate, in the order to offer them. */
   auth: Schema.NonEmptyArray(Connection.AuthMethod),
   provides: Schema.Array(Integration.Capability),
+
+  /** Whether the agent of the harnesses a connection gives works only in a sandbox. */
+  requiresSandbox: Schema.Boolean,
   settings: Integration.SettingsForm,
 });
 export interface IntegrationView extends Schema.Schema.Type<typeof IntegrationView> {}
@@ -187,7 +190,19 @@ export const integrationView = (integration: Integration.Integration): Integrati
   ...(integration.docs === undefined ? {} : { docs: integration.docs }),
   auth: integration.auth,
   provides: integration.provides,
+  requiresSandbox: integration.requiresSandbox,
   settings: integration.settings,
 });
+
+/**
+ * The models a connection offers an agent: the catalog's models its integration lists, and whether
+ * it also offers models it does not list, by any id, as an API of the connection's own does. A
+ * connection whose integration gives no models offers none.
+ */
+export const Models = Schema.Struct({
+  listed: Schema.Array(ModelCatalog.Model),
+  unlisted: Schema.Boolean,
+});
+export interface Models extends Schema.Schema.Type<typeof Models> {}
 
 export * as ConnectionV2 from "./connection.ts";

@@ -275,17 +275,17 @@ member may read connections and the integrations this host installs; the built-i
 tier adds, changes, checks, and removes them. The
 [core section](../core/README.md#connections-v2) describes the rules.
 
-| Endpoint                                      | Operation                                                                                                                 |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/connections-v2/integrations`           | The installed integrations: name, docs, ways of authenticating, what each provides, and its settings form.                |
-| `GET …/connections-v2`                        | The connections, by name.                                                                                                 |
-| `POST …/connections-v2`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it. |
-| `GET …/connections-v2/:connectionId`          | One connection.                                                                                                           |
-| `POST …/connections-v2/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionV2Service.Changed`.            |
-| `PUT …/connections-v2/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                 |
-| `PUT …/connections-v2/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                        |
-| `POST …/connections-v2/:connectionId/check`   | Ask its system whether it works as set up, answering `Connection.Health`; stores nothing.                                 |
-| `DELETE …/connections-v2/:connectionId`       | Remove it and delete its key; 204.                                                                                        |
+| Endpoint                                      | Operation                                                                                                                                     |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/connections-v2/integrations`           | The installed integrations: name, docs, ways of authenticating, what each provides, whether its agent needs a sandbox, and its settings form. |
+| `GET …/connections-v2`                        | The connections, by name.                                                                                                                     |
+| `POST …/connections-v2`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it.                     |
+| `GET …/connections-v2/:connectionId`          | One connection.                                                                                                                               |
+| `POST …/connections-v2/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionV2Service.Changed`.                                |
+| `PUT …/connections-v2/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                                     |
+| `PUT …/connections-v2/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                                            |
+| `POST …/connections-v2/:connectionId/check`   | Ask its system whether it works as set up, answering `Connection.Health`; stores nothing.                                                     |
+| `DELETE …/connections-v2/:connectionId`       | Remove it and delete its key; 204.                                                                                                            |
 
 An integration's settings form is an MCP elicitation form schema, a flat object of strings,
 numbers, and booleans with titles and descriptions, for a client to render. A connection reads as

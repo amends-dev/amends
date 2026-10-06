@@ -128,6 +128,7 @@ export const gateway = (harness: Harness) => {
                     EnvironmentPermissions.Use.name,
                     AgentPermissions.Read.name,
                     ConnectionV2Permissions.Read.name,
+                    ConnectionV2Permissions.Use.name,
                   ],
                 }),
               );
@@ -174,6 +175,7 @@ export const gateway = (harness: Harness) => {
                       ConnectionV2Permissions.Create.name,
                       ConnectionV2Permissions.Read.name,
                       ConnectionV2Permissions.Manage.name,
+                      ConnectionV2Permissions.Use.name,
                     ],
                   }),
                 );

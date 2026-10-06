@@ -72,6 +72,7 @@ import { NotificationProjection } from "./notification/projection.ts";
 import { InvitationService } from "./workspace/invitation/service.ts";
 import { InvitationPermissions } from "./workspace/invitation/permissions.ts";
 import { InvitationProjection } from "./workspace/invitation/projection.ts";
+import { MemberCommand } from "./workspace/member/command.ts";
 import { MemberService } from "./workspace/member/service.ts";
 import { MemberPermissions } from "./workspace/member/permissions.ts";
 import { MemberProjection } from "./workspace/member/projection.ts";
@@ -144,6 +145,7 @@ export const permissions = [
   ConnectionV2Permissions.Create,
   ConnectionV2Permissions.Read,
   ConnectionV2Permissions.Manage,
+  ConnectionV2Permissions.Use,
 ];
 
 /**
@@ -189,6 +191,7 @@ const turnCommand = TurnCommand.layer.pipe(
 );
 const turnQuery = TurnQuery.layer;
 const readStateCommand = ReadStateCommand.layer;
+const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
 /**
  * One journal follower per workspace runtime, shared by its change-feed subscribers and by those
  * following a turn's log, who stop when their access changes.
@@ -229,6 +232,7 @@ const operations = Layer.mergeAll(
     Layer.mergeAll(
       Delegation.layer,
       AssignmentCommand.layer,
+      memberCommand,
       groupQuery,
       EnvironmentQuery.layer,
       groupCommand,

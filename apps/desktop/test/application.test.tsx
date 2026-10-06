@@ -807,6 +807,7 @@ function connectionsV2Host() {
     name: "MCP server",
     auth: ["apiKey", "none"],
     provides: ["tools"],
+    requiresSandbox: false,
     settings: {
       type: "object",
       properties: {

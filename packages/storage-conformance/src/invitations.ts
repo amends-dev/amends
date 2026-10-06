@@ -54,6 +54,7 @@ export const invitations = (harness: Harness) => {
                     Member.Name.make("Bob"),
                   );
                   expect(joined.name).toBe("Bob");
+                  expect(yield* bound.members.get(joined.id)).toEqual(Option.some(joined));
                   const renamed = yield* Operations.renameMember(
                     workspace.id,
                     bob,
@@ -158,7 +159,7 @@ export const invitations = (harness: Harness) => {
                   ).toMatchObject({ _tag: "Authorization.Denied" });
                   const before = yield* bound.store.read(Log.Id.make("journal"), { limit: 20 });
                   expect(before).toHaveLength(3);
-                  // The member, their role, the acceptance, and their admission to general.
+                  // The member, their role, their admission to general, and the acceptance.
                   expect(before[2]?.entries).toHaveLength(4);
                   yield* Operations.acceptInvitation(workspace.id, bob.id, invitation.details.id);
                   expect(yield* bound.store.read(Log.Id.make("journal"), { limit: 20 })).toEqual(
