@@ -49,6 +49,11 @@ export class ConnectionsV2Group extends HttpApiGroup.make("connectionsV2")
       success: view,
       error: [...ApiErrors.member, ApiErrors.ConnectionV2NotFound],
     }),
+    HttpApiEndpoint.get("models", "/:connectionId/models", {
+      params: connection,
+      success: ConnectionV2.Models.annotate({ identifier: "ConnectionV2Models" }),
+      error: [...ApiErrors.member, ApiErrors.ConnectionV2NotFound, ApiErrors.UnknownIntegration],
+    }),
     HttpApiEndpoint.post("rename", "/:connectionId/rename", {
       params: connection,
       payload: Schema.Struct({

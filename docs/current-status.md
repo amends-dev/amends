@@ -97,11 +97,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - [Connections v2](../packages/core/README.md#connections-v2), which are to replace them, are set up
   over HTTP and on the [Connections v2 page](connections-v2.md), beside Connections, from the
   integrations the [local host](../hosts/local/README.md) installs of every kind. They authenticate
-  with an API key or nothing, and nothing uses them yet: turns, agents, and environments still use
-  the old connections. A check's result is not stored.
+  with an API key or nothing. Agents v2 name them, but nothing runs on them yet: turns, agents, and
+  environments still use the old connections. A check's result is not stored.
 - [Agents v2](../packages/core/README.md#agents-v2), which are to replace agents, are created,
-  configured, and renamed in core over connections v2, and both storage adapters keep them; nothing
-  serves them over HTTP or shows them in the apps yet, and they run no turns. An agent on `Auto`
+  configured, and renamed over connections v2, in core and
+  [over HTTP](../packages/api-http/README.md#agents-v2); the apps do not show them yet, and they run
+  no turns. An agent on `Auto`
   stores that choice, but nothing yet chooses a harness for it: its readiness only says whether a
   connection gives one it could run on.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with

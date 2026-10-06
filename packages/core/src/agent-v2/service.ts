@@ -29,13 +29,13 @@ import { AgentV2Readiness } from "./readiness.ts";
 import { AgentV2Store } from "./store.ts";
 export { Changed, ConnectionUnavailable, Incomplete, NotFound } from "./errors.ts";
 
-export type ReadError =
+export type ListError =
   | Authorization.Error
   | AgentV2Store.Failure
   | MemberStore.Failure
-  | ConnectionV2Store.Failure
-  | Schema.SchemaError
-  | NotFound;
+  | ConnectionV2Store.Failure;
+/** Reading one agent, which can be missing. */
+export type ReadError = ListError | Schema.SchemaError | NotFound;
 /** What every change can meet besides reading. */
 export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
 /** A setup naming a connection the actor may not give an agent, or one that cannot run. */
@@ -51,7 +51,7 @@ export type RenameError = Error | Changed;
  */
 export interface Interface {
   /** The workspace's agents the actor may read, by name; those whose membership ended are gone. */
-  readonly list: Effect.Effect<ReadonlyArray<AgentV2.View>, ReadError, Actor.Service>;
+  readonly list: Effect.Effect<ReadonlyArray<AgentV2.View>, ListError, Actor.Service>;
   readonly get: (agentId: AgentV2.Id) => Effect.Effect<AgentV2.View, ReadError, Actor.Service>;
   /**
    * Add an agent: a membership, with its name and the role it starts with, which the actor must be

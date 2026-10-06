@@ -81,9 +81,10 @@ so a client can import the complete contract without loading server code.
 - `environments`: where and how agents run; see [Environments](#environments).
 - `agents` and `turns`: agents, and their turns on threads; see [Agents](#agents) and
   [Turns](#turns).
+- `agentsV2`: the agents that replace them, on connections v2; see [Agents v2](#agents-v2).
 
 `POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
-`POST …/connections-v2`, `POST …/environments`, both thread
+`POST …/connections-v2`, `POST …/environments`, `POST …/agents-v2`, both thread
 starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
 same key returns the first attempt's result, whatever the retry's body. Clients generating the
 typed client pass it in `headers`.
@@ -281,6 +282,7 @@ tier adds, changes, checks, and removes them. The
 | `GET …/connections-v2`                        | The connections, by name.                                                                                                                     |
 | `POST …/connections-v2`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it.                     |
 | `GET …/connections-v2/:connectionId`          | One connection.                                                                                                                               |
+| `GET …/connections-v2/:connectionId/models`   | The models its integration offers, as `{ listed, unlisted }`: those it lists from the catalog, and whether it takes a model it does not list. |
 | `POST …/connections-v2/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionV2Service.Changed`.                                |
 | `PUT …/connections-v2/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                                     |
 | `PUT …/connections-v2/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                                            |
@@ -346,6 +348,31 @@ environment that cannot run the model access is 422 `Incompatible` with its reas
 pending, such as a connection without its key, is saved and shows in the readiness. The initial
 role follows the delegation rules: 409 `Delegation.OwnerProtected` for Owner, and 403
 `Delegation.Denied` for Administrator unless the caller owns the workspace.
+
+### Agents v2
+
+Paths sit under `/workspaces/:workspaceId/agents-v2` and require active membership. Every member
+may read agents; the built-in administrator tier adds, configures, and renames them. An agent's role
+and removal are its membership's, through `assignments` and `DELETE …/members/:memberId`. The
+[core section](../core/README.md#agents-v2) describes the rules.
+
+| Endpoint                                 | Operation                                                                                                             |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `GET …/agents-v2`                        | The agents the caller may read, by name.                                                                              |
+| `POST …/agents-v2`                       | Add one from `{ name, roleId, instructions, harness, model, sandbox }`; 201 with it.                                  |
+| `GET …/agents-v2/:agentId`               | One agent.                                                                                                            |
+| `PUT …/agents-v2/:agentId/configuration` | Replace `{ instructions, harness, model, sandbox }` as a whole.                                                       |
+| `POST …/agents-v2/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentV2Service.Changed`. |
+
+`harness` is `{ _tag: "Connection", connectionId }` or `{ _tag: "Auto" }`; `model` is
+`{ connectionId, id, effort? }`, a model `GET …/connections-v2/:connectionId/models` offers; and
+`sandbox` is `{ connectionId }` or `null`. An agent reads as `AgentV2.View`: how it is set up, its
+membership's `memberId` and name, `configurable` for the caller, and its readiness, `Ready` or
+`Incomplete` with its issues. One the caller may not read, or whose membership ended, answers 404,
+as does a retried create whose agent was removed since. A connection that is missing or removed, or
+that the caller may not read and use, is 422 `AgentV2Service.ConnectionUnavailable` naming the part;
+a setup that could not run is 422 `AgentV2Service.Incomplete` with its issues, except that an agent
+on `Auto` may wait for a harness. The initial role follows the delegation rules, as for agents.
 
 ### Turns
 

@@ -9,6 +9,7 @@ export { ChangeFeedHandlers } from "./change-feed.ts";
 export { ConnectionsHandlers } from "./connections.ts";
 export { ConnectionsV2Handlers } from "./connections-v2.ts";
 export { AgentsHandlers } from "./agents.ts";
+export { AgentsV2Handlers } from "./agents-v2.ts";
 export { EnvironmentsHandlers } from "./environments.ts";
 export { Draining } from "./draining.ts";
 export { SessionHandlers } from "./session.ts";

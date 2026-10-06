@@ -44,6 +44,10 @@ export const layer = HttpApiBuilder.group(
         asMember(params.workspaceId, (connectionV2Service) =>
           connectionV2Service.get(params.connectionId),
         ),
+      models: ({ params }) =>
+        asMember(params.workspaceId, (connectionV2Service) =>
+          connectionV2Service.models(params.connectionId),
+        ),
       rename: ({ params, payload }) =>
         asMember(params.workspaceId, (connectionV2Service) =>
           connectionV2Service.rename({
