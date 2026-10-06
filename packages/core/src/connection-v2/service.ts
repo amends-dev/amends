@@ -124,15 +124,6 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
   const connectionTarget = (connectionId: ConnectionV2.Id) =>
     ({ _tag: "ConnectionV2", workspaceId, connectionId }) as const;
 
-  /** The connection as its integration takes it. */
-  const connectionOf = (record: ConnectionV2.Record): Connection.Connection => ({
-    id: record.id,
-    integration: record.integration,
-    name: record.name,
-    settings: record.settings,
-    auth: record.auth,
-  });
-
   const requireIntegration = (integration: string) =>
     Effect.mapError(integrations.find(integration), () => new UnknownIntegration({ integration }));
 
@@ -144,7 +135,9 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
   const readinessOf = Effect.fnUntraced(function* (record: ConnectionV2.Record) {
     const integration = yield* Effect.option(integrations.find(record.integration));
     if (Option.isNone(integration)) return uninstalled;
-    const validated = yield* Effect.result(integration.value.validate(connectionOf(record)));
+    const validated = yield* Effect.result(
+      integration.value.validate(ConnectionV2.connectionOf(record)),
+    );
     if (Result.isSuccess(validated)) return ready;
     const invalid: ConnectionV2.Readiness = {
       _tag: "Invalid",
@@ -267,7 +260,10 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
         createdAt: yield* DateTime.now,
       };
       const integration = yield* requireIntegration(created.integration);
-      yield* Effect.mapError(integration.validate(connectionOf(created)), toInvalidConnection);
+      yield* Effect.mapError(
+        integration.validate(ConnectionV2.connectionOf(created)),
+        toInvalidConnection,
+      );
       if (request.apiKey !== undefined) yield* setKey(connectionId, request.apiKey);
       yield* journal.publish(ConnectionV2Facts.Created, created);
       return yield* viewForActor(created);
@@ -308,7 +304,10 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
       );
       const configured = ConnectionV2.change(record, { settings: request.settings });
       const integration = yield* requireIntegration(record.integration);
-      yield* Effect.mapError(integration.validate(connectionOf(configured)), toInvalidConnection);
+      yield* Effect.mapError(
+        integration.validate(ConnectionV2.connectionOf(configured)),
+        toInvalidConnection,
+      );
       yield* journal.publish(ConnectionV2Facts.Configured, {
         workspaceId,
         connectionId: record.id,
@@ -357,7 +356,7 @@ export const make = Effect.fn("ConnectionV2Service.make")(function* () {
           )
         : undefined;
     return yield* Effect.mapError(
-      integration.check(connectionOf(record), credential),
+      integration.check(ConnectionV2.connectionOf(record), credential),
       toInvalidConnection,
     );
   });

@@ -149,19 +149,10 @@ export const Readiness = Schema.TaggedUnion({
 });
 export type Readiness = typeof Readiness.Type;
 
-/** What a reader may see and do of an agent's membership. */
-export interface Access {
-  /** The role it holds across the workspace, when the reader may see its access and it holds one. */
-  readonly role: { readonly id: Role.Id; readonly name: string } | null;
-
-  /** Whether the reader may rename it and change how it is set up. */
-  readonly configurable: boolean;
-
-  /** Whether the reader may remove it from the workspace. */
-  readonly removable: boolean;
-}
-
-/** An agent as its readers see it. */
+/**
+ * An agent as its readers see it. Its role and its removal are its membership's, which members'
+ * operations read and change.
+ */
 export const View = Schema.Struct({
   id: Id,
   memberId: MemberId.Id,
@@ -173,20 +164,20 @@ export const View = Schema.Struct({
   model: Model,
   sandbox: Schema.NullOr(Sandbox),
   readiness: Readiness,
-  role: Schema.NullOr(Schema.Struct({ id: Role.Id, name: Schema.NonEmptyString })),
+
+  /** Whether the reader may rename it and change how it is set up. */
   configurable: Schema.Boolean,
-  removable: Schema.Boolean,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
-/** An agent named `name` as a reader with `access` sees it, as ready as `readiness` says. */
+/** An agent named `name`, as ready as `readiness` says, as a reader sees it. */
 export const view = (
   record: Record,
   name: Member.Name,
   readiness: Readiness,
-  access: Access,
+  configurable: boolean,
 ): View => ({
   id: record.id,
   memberId: record.memberId,
@@ -196,9 +187,7 @@ export const view = (
   model: record.model,
   sandbox: record.sandbox,
   readiness,
-  role: access.role,
-  configurable: access.configurable,
-  removable: access.removable,
+  configurable,
   createdBy: record.createdBy,
   createdAt: record.createdAt,
 });

@@ -149,6 +149,15 @@ export const View = Schema.Struct({
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
+/** The connection as its integration takes it. */
+export const connectionOf = (record: Record): Connection.Connection => ({
+  id: record.id,
+  integration: record.integration,
+  name: record.name,
+  settings: record.settings,
+  auth: record.auth,
+});
+
 /** A connection as its readers see it, as ready as its integration finds it. */
 export const view = (record: Record, readiness: Readiness, manageable: boolean): View => ({
   id: record.id,

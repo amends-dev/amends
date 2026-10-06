@@ -218,9 +218,24 @@ amends to choose among them; its `model`, one a connection offers, by id, with a
 `sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
 membership's. `AgentV2Facts.Created` records an agent in the commit that adds its membership, and
 `Configured` replaces how it is set up as a whole; `AgentV2Projection` keeps them in
-`AgentV2Store`, a projection store. `agent-v2.create` works on the workspace;
-`agent-v2.read` and `agent-v2.configure` on the agent's membership, a `Member` target. Members read
-agents; administrators and the owner create and configure them.
+`AgentV2Store`, a projection store.
+
+`AgentV2Service` lists and reads the agents the actor may read, as `AgentV2.View`, and creates,
+configures, and renames them. Creating adds the agent's membership with `MemberCommand.add`, with a
+role the actor must be able to grant. Its role is then changed, and it is removed, as any member's
+is, by `AssignmentService` and `MemberService`. Creating and configuring refuse a connection the
+actor may not read and use, or that is not active (`ConnectionUnavailable`, naming the part), and a
+setup that cannot run (`Incomplete`), except that an agent on `Auto` may wait for a connection that
+gives a harness. A view carries the agent's readiness, as `AgentV2Readiness` finds it against the
+workspace's connections and the host's integrations whoever reads it: `Ready`, or `Incomplete` with
+issues naming the part whose connection was `Removed`, whose integration is `Uninstalled`, or that
+does not give the part as the agent takes it (`Invalid`, as the integration describes it, such as a
+model it no longer offers); `SandboxRequired` when its harness's agent works only in a sandbox and it
+has none; and `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
+
+`agent-v2.create` works on the workspace; `agent-v2.read` and `agent-v2.configure` on the agent's
+membership, a `Member` target. Members read agents; administrators and the owner create and
+configure them.
 
 ## Environments
 
