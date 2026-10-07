@@ -10,290 +10,328 @@ export default meta;
 type Story = StoryObj;
 
 const body = (element: HTMLElement) => within(element.ownerDocument.body);
-const mainPane = (element: HTMLElement) => within(within(element).getByRole("main"));
+const list = (element: HTMLElement) =>
+  within(within(element).getByRole("list", { name: "Agents" }));
+const main = (element: HTMLElement) => within(within(element).getByRole("main"));
 const sidebar = (element: HTMLElement) =>
   within(within(element).getByRole("navigation", { name: "Workspace" }));
+const addDialog = async (element: HTMLElement) =>
+  within(await body(element).findByRole("dialog", { name: "Add agent" }));
+/** Opens a Select by its label and chooses the option `option` names. */
+const choose = async (
+  element: HTMLElement,
+  scope: ReturnType<typeof within>,
+  label: string,
+  option: RegExp | string,
+) => {
+  await userEvent.click(scope.getByRole("button", { name: new RegExp(`^${label}`) }));
+  await userEvent.click(await body(element).findByRole("option", { name: option }));
+};
 
-/**
- * The Lunacy "Agents v02 / 01 / Browse agents" frame: the list in the main content, and the
- * agents in the sidebar, where Browse is current.
- */
+/** Every agent, in the sidebar and the list, with the harness each runs on and its model. */
 export const AllAgents = {
   render: () => <AgentsWorkspace />,
   play: async ({ canvasElement }) => {
     const nav = sidebar(canvasElement);
-    await expect(nav.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
-    await expect(nav.getByRole("link", { name: "Review helper, Needs setup" })).toBeVisible();
-    await userEvent.click(nav.getByRole("link", { name: /Atlas/ }));
-    await expect(mainPane(canvasElement).getByRole("heading", { name: "Atlas" })).toBeVisible();
-    await expect(nav.getByRole("link", { name: /Atlas/ })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByText("Agents")).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Add agent" })).toBeVisible();
+    await expect(nav.getAllByRole("link", { name: /Reviewer|Planner|Researcher/ })).toHaveLength(3);
+    const rows = list(canvasElement);
+    await expect(rows.getAllByRole("link")).toHaveLength(5);
+    const researcher = rows.getByRole("link", { name: /Researcher/ });
+    await expect(researcher).toHaveTextContent("Auto");
+    await expect(researcher).toHaveTextContent("Local models");
+    await expect(rows.getByRole("link", { name: /Tester.*Needs setup/ })).toBeVisible();
   },
 } satisfies Story;
 
-/** The v01 "02 / Needs setup" list: only the agents that need setup. */
+/** The agents that can't run as they are set up. */
 export const NeedsSetup = {
   render: () => <AgentsWorkspace tab="needs-setup" />,
   play: async ({ canvasElement }) => {
-    const list = within(
-      mainPane(canvasElement).getByRole("list", { name: "Agents that need setup" }),
-    );
-    await expect(list.getAllByRole("link")).toHaveLength(1);
+    const rows = list(canvasElement);
+    await expect(rows.getAllByRole("link")).toHaveLength(2);
+    await expect(rows.getByRole("link", { name: /Archivist/ })).toBeVisible();
   },
 } satisfies Story;
 
-/** The Lunacy "Agents v02 / 04 / Agent needs setup" frame: its connection needs its key. */
-export const AgentNeedsSetup = {
-  render: () => <AgentsWorkspace selected="review-helper" />,
+/** An agent in a sandbox, on opencode, with its model's effort. */
+export const AgentPage = {
+  render: () => <AgentsWorkspace selected="reviewer" />,
   play: async ({ canvasElement }) => {
-    const main = mainPane(canvasElement);
-    await expect(
-      main.getByText("Anthropic · Backup needs an API key before this agent is ready."),
-    ).toBeVisible();
-    await expect(main.getByRole("button", { name: "Open connection" })).toBeVisible();
+    const page = main(canvasElement);
+    await expect(page.queryByText("This agent can’t run as it is set up")).toBeNull();
+    await expect(page.getByRole("combobox", { name: "Model" })).toHaveValue("claude-opus-5-5");
+    await expect(page.getByRole("button", { name: /^Harness/ })).toHaveTextContent("opencode");
+    await expect(page.getByRole("button", { name: /^Sandbox/ })).toHaveTextContent("Daytona");
+    await expect(page.getByRole("button", { name: /^Effort/ })).toHaveTextContent("High");
+    await expect(page.getByRole("button", { name: "Save setup" })).toBeDisabled();
   },
 } satisfies Story;
 
-/**
- * The Lunacy "Agents v02 / 02 / Agent overview" frame: one column, its turns in progress opening
- * their logs beside the page.
- */
-export const Overview = {
-  render: () => <AgentsWorkspace selected="atlas" />,
+/** Agents at work say where, their most pressing turn first; an idle agent's activity is blank. */
+export const AgentsAtWork = {
+  render: () => <AgentsWorkspace />,
   play: async ({ canvasElement }) => {
-    const main = mainPane(canvasElement);
-    await expect(main.getByRole("link", { name: "Overview" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-    await expect(
-      main.getByRole("button", { name: "Queued in #design: open its log" }),
-    ).toBeVisible();
-    await userEvent.click(main.getByRole("link", { name: "Edit configuration" }));
-    await expect(await main.findByRole("textbox", { name: "Instructions" })).toBeVisible();
-  },
-} satisfies Story;
-
-/** The Lunacy "Agents v02 / 03 / Agent configuration" frame. */
-export const Configuration = {
-  render: () => <AgentsWorkspace selected="atlas" agentTab="configuration" />,
-} satisfies Story;
-
-/** A member who may only look: the same values without inputs, and no Add or Remove. */
-export const MemberReadOnly = {
-  render: () => <AgentsWorkspace selected="atlas" readOnly />,
-  play: async ({ canvasElement }) => {
-    await expect(sidebar(canvasElement).queryByRole("button", { name: "Add agent" })).toBeNull();
-    const main = mainPane(canvasElement);
-    await expect(
-      main.getByText("You can view this agent. Ask an administrator to make changes."),
-    ).toBeVisible();
-    await expect(main.queryByRole("button", { name: "Remove agent" })).toBeNull();
-    await userEvent.click(main.getByRole("link", { name: "Configuration" }));
-    await expect(await main.findByText("You can view this configuration.")).toBeVisible();
-    await expect(main.queryByRole("textbox")).toBeNull();
-  },
-} satisfies Story;
-
-/** The Lunacy "Agents v02 / 05" frame: + in the sidebar opens Add agent from any page. */
-export const AddFromSidebar = {
-  render: () => <AgentsWorkspace selected="atlas" />,
-  play: async ({ canvasElement }) => {
-    await userEvent.click(sidebar(canvasElement).getByRole("button", { name: "Add agent" }));
-    await expect(
-      await body(canvasElement).findByRole("dialog", { name: "Add agent" }),
-    ).toBeVisible();
-  },
-} satisfies Story;
-
-/** The Lunacy "07 / No agents yet" frame. */
-export const NoAgentsYet = { render: () => <AgentsWorkspace noAgents /> } satisfies Story;
-
-/** The Lunacy "08 / No model connection" frame. */
-export const NoModelConnection = {
-  render: () => <AgentsWorkspace noAgents noConnections />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    await expect(canvas.getByText("Connect a model first")).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: "Create model connection" }));
-    await expect(
-      await body(canvasElement).findByRole("dialog", { name: "Create model connection" }),
-    ).toBeVisible();
-  },
-} satisfies Story;
-
-/** The Lunacy "09 / Add agent" frame. */
-export const AddAgentDialog = {
-  name: "Add agent",
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} />,
-} satisfies Story;
-
-/** The Lunacy "10 / Owner role options": Member by default, Administrator for the owner. */
-export const OwnerRoleOptions = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} />,
-  play: async ({ canvasElement }) => {
-    const dialog = within(await body(canvasElement).findByRole("dialog", { name: "Add agent" }));
-    await userEvent.click(dialog.getByRole("button", { name: /Workspace role/ }));
-    await expect(
-      await body(canvasElement).findByRole("option", { name: "Administrator" }),
-    ).toBeVisible();
-  },
-} satisfies Story;
-
-/** An administrator who is not the owner gives new agents Member only. */
-export const AdministratorRole = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} administrator />,
-  play: async ({ canvasElement }) => {
-    const dialog = within(await body(canvasElement).findByRole("dialog", { name: "Add agent" }));
-    await expect(dialog.getByRole("textbox", { name: "Workspace role" })).toHaveValue("Member");
-  },
-} satisfies Story;
-
-/** The Lunacy "11 / Model connection options" frame. */
-export const ModelConnectionOptions = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} />,
-  play: async ({ canvasElement }) => {
-    const dialog = within(await body(canvasElement).findByRole("dialog", { name: "Add agent" }));
-    await userEvent.click(dialog.getByRole("button", { name: /Model connection/ }));
-    await expect(
-      await body(canvasElement).findByRole("option", { name: /Anthropic · Backup/ }),
-    ).toHaveTextContent("Needs API key");
-    await expect(
-      body(canvasElement).getByRole("button", { name: "Create model connection" }),
-    ).toBeVisible();
-  },
-} satisfies Story;
-
-/** The Lunacy "12 / Model suggestions" and "13 / Custom model identifier" frames. */
-export const ModelSuggestions = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} />,
-  play: async ({ canvasElement }) => {
-    const page = body(canvasElement);
-    const dialog = within(await page.findByRole("dialog", { name: "Add agent" }));
-    await userEvent.click(dialog.getByRole("button", { name: "Show suggestions" }));
-    await expect(await page.findByRole("option", { name: /Claude Opus 5.5/ })).toBeVisible();
-    const model = dialog.getByRole("combobox", { name: "Model" });
-    await userEvent.clear(model);
-    await userEvent.type(model, "my-model-alias");
-    await expect(await page.findByRole("option", { name: /Use “my-model-alias”/ })).toBeVisible();
-  },
-} satisfies Story;
-
-/** The Lunacy "14 / Compatible environments" frame. */
-export const CompatibleEnvironments = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} />,
-  play: async ({ canvasElement }) => {
-    const page = body(canvasElement);
-    const dialog = within(await page.findByRole("dialog", { name: "Add agent" }));
-    await userEvent.click(dialog.getByRole("button", { name: /Environment/ }));
-    await expect(await page.findByRole("option", { name: /Review sandbox/ })).toHaveTextContent(
-      "Daytona account needs its API key.",
+    const rows = list(canvasElement);
+    const reviewer = rows.getByRole("link", { name: /Reviewer/ });
+    await expect(reviewer).toHaveTextContent("Working");
+    await expect(reviewer).toHaveTextContent("#general + 1 more");
+    await expect(rows.getByRole("link", { name: /Planner/ })).toHaveTextContent("Stopping");
+    await expect(rows.getByRole("link", { name: /Researcher/ })).not.toHaveTextContent(
+      /Working|Queued|Stopping/,
     );
   },
 } satisfies Story;
 
-/** The Lunacy "15 / Create while setup is pending" frame. */
-export const CreateWhileSetupIsPending = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout", connectionId: "backup" }} />,
+/** An agent's page lists each of its turns in progress, each opening its log. */
+export const AgentAtWork = {
+  render: () => <AgentsWorkspace selected="reviewer" />,
   play: async ({ canvasElement }) => {
-    const dialog = within(await body(canvasElement).findByRole("dialog", { name: "Add agent" }));
+    const page = main(canvasElement);
     await expect(
-      dialog.getByText("You can create this agent now and add the key later."),
+      page.getByRole("link", { name: "Working in #general: open its log" }),
     ).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Create agent" })).toBeEnabled();
+    await expect(page.getByRole("link", { name: "Queued in #design: open its log" })).toBeVisible();
   },
 } satisfies Story;
 
-/**
- * The Lunacy "16" to "19" frames: creating a model connection from the draft, adding its key, and
- * returning with it chosen.
- */
-export const ConnectionDetour = {
-  render: () => <AgentsWorkspace dialog="add" add={{ name: "Scout" }} />,
+/** An agent with no turn in progress is idle. */
+export const AgentIdle = {
+  render: () => <AgentsWorkspace selected="researcher" />,
   play: async ({ canvasElement }) => {
-    const page = body(canvasElement);
-    let dialog = within(await page.findByRole("dialog", { name: "Add agent" }));
-    await userEvent.click(dialog.getByRole("button", { name: /Model connection/ }));
-    await userEvent.click(await page.findByRole("button", { name: "Create model connection" }));
-    const choose = within(await page.findByRole("dialog", { name: "Create model connection" }));
-    await expect(choose.getByText("For Scout")).toBeVisible();
-    await userEvent.click(choose.getByRole("button", { name: /Anthropic/ }));
-    const configure = within(
-      await page.findByRole("dialog", { name: "Configure model connection" }),
+    await expect(main(canvasElement).getByText("Idle")).toBeVisible();
+  },
+} satisfies Story;
+
+/** An agent whose sandbox connection was removed says so, and runs again in another sandbox. */
+export const SandboxRemoved = {
+  render: () => <AgentsWorkspace selected="tester" />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    await expect(page.getByText("This agent can’t run as it is set up")).toBeVisible();
+    await expect(page.getByText("Its sandbox connection was removed.")).toBeVisible();
+    await choose(canvasElement, page, "Sandbox", /Daytona/);
+    await userEvent.click(page.getByRole("button", { name: "Save setup" }));
+    await expect(await body(canvasElement).findByText("Setup saved")).toBeVisible();
+    await waitFor(() =>
+      expect(page.queryByText("This agent can’t run as it is set up")).toBeNull(),
     );
-    await expect(configure.getByText("Anthropic · For Scout · 1 of 2")).toBeVisible();
-    await userEvent.click(configure.getByRole("button", { name: "Create & continue" }));
-    const key = within(await page.findByRole("dialog", { name: "Add API key" }));
-    await expect(key.getByText("Return to Scout with this connection selected.")).toBeVisible();
-    await userEvent.type(key.getByLabelText("API key"), "sk-ant-key");
-    await userEvent.click(key.getByRole("button", { name: "Save key & return" }));
-    dialog = within(await page.findByRole("dialog", { name: "Add agent" }));
-    await expect(dialog.getByRole("textbox", { name: "Name" })).toHaveValue("Scout");
-    await expect(dialog.getByRole("button", { name: /Model connection/ })).toHaveTextContent(
-      "Anthropic · Agents",
-    );
-    await userEvent.click(dialog.getByRole("button", { name: "Create agent" }));
-    await waitFor(() => expect(page.queryByRole("dialog", { name: "Add agent" })).toBeNull());
+  },
+} satisfies Story;
+
+/** A model connection whose integration this host no longer installs. */
+export const IntegrationNotInstalled = {
+  render: () => <AgentsWorkspace selected="archivist" />,
+  play: async ({ canvasElement }) => {
     await expect(
-      within(within(canvasElement).getByRole("main")).getByRole("heading", { name: "Scout" }),
-    ).toBeVisible();
-    await expect(sidebar(canvasElement).getByRole("link", { name: /Scout/ })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
-  },
-} satisfies Story;
-
-/** The Lunacy "Remove Atlas?" modal. */
-export const RemoveAgent = {
-  render: () => <AgentsWorkspace selected="atlas" dialog="remove" />,
-} satisfies Story;
-
-/** The Lunacy "20" to "25" phone frames show these at 390px. */
-export const ConfigureAndSave = {
-  render: () => <AgentsWorkspace selected="nora" agentTab="configuration" />,
-  play: async ({ canvasElement }) => {
-    const panel = mainPane(canvasElement);
-    const save = panel.getByRole("button", { name: "Save configuration" });
-    await expect(save).toBeDisabled();
-    await userEvent.type(panel.getByRole("textbox", { name: "Instructions" }), " Be brief.");
-    await waitFor(() => expect(save).toBeEnabled());
-    await userEvent.click(save);
-    await expect(await within(canvasElement).findByText("Configuration saved")).toBeVisible();
-  },
-} satisfies Story;
-
-/** The connection went away meanwhile: the save is refused at the field, the draft kept. */
-export const ConnectionNoLongerAvailable = {
-  render: () => <AgentsWorkspace selected="atlas" agentTab="configuration" connectionGone />,
-  play: async ({ canvasElement }) => {
-    const panel = mainPane(canvasElement);
-    await userEvent.type(panel.getByRole("textbox", { name: "Instructions" }), " Be brief.");
-    await userEvent.click(panel.getByRole("button", { name: "Save configuration" }));
-    await expect(
-      await panel.findByText(
-        "This model connection is no longer available to you. Choose another connection.",
+      main(canvasElement).getByText(
+        "Its model connection’s integration isn’t installed on this host.",
       ),
     ).toBeVisible();
-    await expect(
-      (panel.getByRole("textbox", { name: "Instructions" }) as HTMLTextAreaElement).value,
-    ).toContain("Be brief.");
   },
 } satisfies Story;
 
-/** A saved reasoning level the harness no longer takes, with the way back to its default. */
-export const UnsupportedReasoning = {
-  render: () => <AgentsWorkspace selected="atlas" agentTab="configuration" staleReasoning />,
+/** Moving an agent onto a harness that works only in a sandbox asks for one before saving. */
+export const HarnessNeedsSandbox = {
+  render: () => <AgentsWorkspace selected="planner" />,
   play: async ({ canvasElement }) => {
-    const panel = mainPane(canvasElement);
-    await expect(panel.getByText("Saved reasoning: high")).toBeVisible();
-    await userEvent.click(panel.getByRole("button", { name: "Use default reasoning" }));
-    await waitFor(() =>
-      expect(panel.getByRole("button", { name: "Save configuration" })).toBeEnabled(),
-    );
+    const page = main(canvasElement);
+    await choose(canvasElement, page, "Harness", /opencode/);
+    await expect(page.getByText("opencode works only in a sandbox. Choose one.")).toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Save setup" }));
+    await expect(
+      await page.findByText(
+        "This setup can’t be saved as it is. Change what’s marked, then try again.",
+      ),
+    ).toBeVisible();
+    await choose(canvasElement, page, "Sandbox", /This machine/);
+    await expect(page.queryByText("opencode works only in a sandbox. Choose one.")).toBeNull();
+    await userEvent.click(page.getByRole("button", { name: "Save setup" }));
+    await expect(await body(canvasElement).findByText("Setup saved")).toBeVisible();
   },
 } satisfies Story;
 
-/** Loading keeps the header and shows quiet rows, never an empty list. */
+/** A connection that lists its models suggests them, and refuses one it doesn't list. */
+export const ListedModels = {
+  render: () => <AgentsWorkspace selected="planner" />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    const model = page.getByRole("combobox", { name: "Model" });
+    await userEvent.clear(model);
+    await userEvent.type(model, "claude");
+    await expect(
+      await body(canvasElement).findByRole("option", { name: /Claude Sonnet 5.5/ }),
+    ).toBeVisible();
+    await userEvent.type(model, "-haiku{Escape}");
+    await expect(page.getByText("This connection offers only the models it lists.")).toBeVisible();
+  },
+} satisfies Story;
+
+/** A model that doesn't reason takes no effort. */
+export const ModelWithoutEffort = {
+  render: () => <AgentsWorkspace selected="planner" />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    const model = page.getByRole("combobox", { name: "Model" });
+    await userEvent.clear(model);
+    await userEvent.type(model, "deepseek-v4{Escape}");
+    await waitFor(() => expect(page.queryByRole("button", { name: /^Effort/ })).toBeNull());
+  },
+} satisfies Story;
+
+/** While a connection's models load, and when they can't be read, any model's ID can be entered. */
+export const ModelsLoading = {
+  render: () => <AgentsWorkspace selected="planner" modelsStatus="loading" />,
+  play: async ({ canvasElement }) => {
+    await expect(main(canvasElement).getByText("Loading this connection’s models…")).toBeVisible();
+  },
+} satisfies Story;
+
+export const ModelsFailed = {
+  render: () => <AgentsWorkspace selected="planner" modelsStatus="failed" />,
+  play: async ({ canvasElement }) => {
+    await expect(
+      main(canvasElement).getByText(
+        "Its models couldn’t be loaded. You can still enter a model’s ID.",
+      ),
+    ).toBeVisible();
+  },
+} satisfies Story;
+
+/** Adding an agent: its name and role, then its setup, created together. */
+export const AddAgentFlow = {
+  render: () => <AgentsWorkspace />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    await userEvent.click(page.getByRole("button", { name: /Add agent/ }));
+    const dialog = await addDialog(canvasElement);
+    const create = dialog.getByRole("button", { name: "Create agent" });
+    await expect(create).toBeDisabled();
+    await userEvent.type(dialog.getByRole("textbox", { name: "Agent name" }), "Scout");
+    await expect(dialog.getByRole("button", { name: /^Role/ })).toHaveTextContent("Member");
+    await expect(dialog.getByRole("button", { name: /^Harness/ })).toHaveTextContent("Auto");
+    await choose(canvasElement, dialog, "Model connection", /Local models/);
+    await userEvent.type(dialog.getByRole("combobox", { name: "Model" }), "qwen3-coder-30b");
+    await expect(dialog.getByText("Enter the ID of any model it serves.")).toBeVisible();
+    await userEvent.click(create);
+    await expect(await body(canvasElement).findByText("Scout created")).toBeVisible();
+    await expect(await main(canvasElement).findByRole("heading", { name: /Scout/ })).toBeVisible();
+  },
+} satisfies Story;
+
+/** Only the owner gives an agent the Administrator role. */
+export const RoleOptions = {
+  render: () => <AgentsWorkspace dialog="add" draft={{ name: "Scout" }} />,
+  play: async ({ canvasElement }) => {
+    const dialog = await addDialog(canvasElement);
+    await userEvent.click(dialog.getByRole("button", { name: /^Role/ }));
+    await expect(
+      await body(canvasElement).findByRole("option", { name: /Administrator/ }),
+    ).toHaveTextContent("Only the owner can give this role");
+  },
+} satisfies Story;
+
+/** A connection no longer the reader's to use is refused beside its field; the draft stays. */
+export const ConnectionUnavailable = {
+  render: () => (
+    <AgentsWorkspace
+      dialog="add"
+      draft={{ name: "Scout", modelConnectionId: "openrouter", model: "gpt-5-1" }}
+      refuseCreate={{ action: "create", error: "unavailable", part: "model" }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const dialog = await addDialog(canvasElement);
+    await userEvent.click(dialog.getByRole("button", { name: "Create agent" }));
+    await expect(
+      await dialog.findByText("This connection is no longer available to you. Choose another."),
+    ).toBeVisible();
+    await expect(dialog.getByRole("textbox", { name: "Agent name" })).toHaveValue("Scout");
+  },
+} satisfies Story;
+
+/** On Auto with no harness it can run on, an agent can still be added, and waits for one. */
+export const AutoWithoutHarness = {
+  render: () => (
+    <AgentsWorkspace
+      dialog="add"
+      withoutHarnesses
+      draft={{ name: "Scout", modelConnectionId: "local-models", model: "qwen3-coder-30b" }}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const dialog = await addDialog(canvasElement);
+    await expect(
+      dialog.getByText("No connection gives a harness yet. On Auto, the agent waits for one."),
+    ).toBeVisible();
+    await userEvent.click(dialog.getByRole("button", { name: "Create agent" }));
+    await expect(await body(canvasElement).findByText("Scout created")).toBeVisible();
+    const page = main(canvasElement);
+    await expect(
+      await page.findByText("No connection gives a harness it can run on."),
+    ).toBeVisible();
+  },
+} satisfies Story;
+
+export const RemoveAgent = {
+  render: () => <AgentsWorkspace selected="planner" dialog="remove" />,
+  play: async ({ canvasElement }) => {
+    const dialog = within(
+      await body(canvasElement).findByRole("dialog", { name: "Remove agent?" }),
+    );
+    await userEvent.click(dialog.getByRole("button", { name: "Remove agent" }));
+    await expect(await body(canvasElement).findByText("Planner removed")).toBeVisible();
+  },
+} satisfies Story;
+
+/** A rename made elsewhere meanwhile conflicts until the reader refreshes. */
+export const RenamedMeanwhile = {
+  render: () => <AgentsWorkspace selected="planner" conflict="rename" />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    const name = page.getByRole("textbox", { name: "Agent name" });
+    await userEvent.clear(name);
+    await userEvent.type(name, "Planner · Studio");
+    await userEvent.click(page.getByRole("button", { name: "Save name" }));
+    await expect(
+      await page.findByText(
+        "This agent was renamed meanwhile. Refresh to review it, then save again.",
+      ),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Refresh" })).toBeVisible();
+  },
+} satisfies Story;
+
+/** A member reads agents and their setup, without adding, saving, or removing. */
+export const ReadOnly = {
+  render: () => <AgentsWorkspace selected="reviewer" readOnly />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    await expect(page.getByRole("textbox", { name: "Agent name" })).toBeDisabled();
+    for (const name of ["Save name", "Save setup", "Remove agent"])
+      await expect(page.queryByRole("button", { name })).toBeNull();
+    await expect(sidebar(canvasElement).queryByRole("button", { name: "Add agent" })).toBeNull();
+  },
+} satisfies Story;
+
+export const NoMatchingAgents = {
+  render: () => <AgentsWorkspace />,
+  play: async ({ canvasElement }) => {
+    const canvas = main(canvasElement);
+    await userEvent.type(canvas.getByRole("searchbox"), "nobody");
+    await expect(canvas.getByText("No agents match “nobody”.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Clear search" }));
+    await expect(list(canvasElement).getAllByRole("link")).toHaveLength(5);
+  },
+} satisfies Story;
+
+export const EmptyAgents = { render: () => <AgentsWorkspace empty /> } satisfies Story;
+
 export const Loading = { render: () => <AgentsWorkspace status="loading" /> } satisfies Story;
 
 export const LoadFailed = { render: () => <AgentsWorkspace status="failed" /> } satisfies Story;
+
+export const Unavailable = {
+  render: () => <AgentsWorkspace status="unavailable" />,
+} satisfies Story;

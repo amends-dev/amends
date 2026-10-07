@@ -50,8 +50,8 @@ export const Value = Schema.TaggedUnion({
   /**
    * More of a response an agent's turn is writing, before it completes: `text` continues the
    * response's part at `offset` characters. It reaches those following the turn's log, not the
-   * workspace's change feed. A reader that missed earlier text waits for the completed response
-   * in the turn's log, which replaces the draft.
+   * workspace's change feed. A reader that missed earlier text waits for a draft from the part's
+   * start, or for the completed response in the turn's log, which replaces the draft.
    */
   TurnDraft: {
     workspaceId: WorkspaceId.Id,

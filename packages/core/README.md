@@ -14,21 +14,22 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                                        |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.    |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
-| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.        |
-| `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
-| `agent`         | Agents' configuration: instructions, model access, and environment, over an agent's workspace membership.        |
-| `turn`          | Agents' attempts on threads: accepting work, each attempt's log, execution steps, and cancellation.              |
-| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.         |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
-| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
-| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
-| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.            |
+| Domain          | Ownership                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.           |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                     |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                           |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                         |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.               |
+| `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage.        |
+| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on. |
+| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                              |
+| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.  |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                   |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                          |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                   |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                   |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -148,45 +149,12 @@ without thread activity. Workspace-member removal uses it for every admission. S
 
 ## Connections
 
-`@amends/core/connection` holds workspace connections: access to an external system through an
-implementation the host installed, described by the [connection contract](../connection/README.md).
-`ConnectionService` lists and reads the connections the actor may read, and creates, renames,
-configures, sets and clears the credential of, and removes them; `implementations` lists the
-declarations this host installed, which every member may see. Reads return `Connection.View`:
-the record without its credential, whether one is set, whether this host installed the
-implementation, its capabilities, readiness for each capability, and `manageable`, whether the
-actor holds `connection.manage` on it. Readiness is `Ready`, or
-`Incomplete` with the required settings and credential it lacks; it is computed on read, from the
-record and the host's `ConnectionCatalog`.
-
-`connection.create` works on the workspace; `connection.read`, `connection.manage`, and
-`connection.use` on each connection, a `Connection` target, so one can be shared narrowly. Members
-read and use connections; administrators and the owner also create and manage them. Configuring an
-agent checks `connection.use` on its model connection. A connection someone may not read is
-`NotFound` to them.
-
-Creating validates the implementation (`UnknownImplementation`), its settings against the
-declaration (`InvalidSettings`), and the authentication method (`UnsupportedAuthentication`), and
-takes no secret, since a request receipt records its input in the journal. `setCredential` takes
-the secret, as `Connection.Secret`, redacted: it stores the secret in `ConnectionCredentialStore`
-and records only its reference, deleting a replaced one, in the same commit. Removal deletes the
-credential and keeps the record for history. No fact, change-feed event, or read carries a secret,
-and replay restores references, not secrets.
-
-`ConnectionStore` is a projection store; `ConnectionCredentialStore` holds secrets outside the
-journal and its read models, writes within commits, and reports `Unavailable` on a host that keeps
-none, which operations surface as `CredentialsUnavailable`. Both are required host bindings, and
-`ConnectionCatalog.Service` is supplied by the gateway from the host's registered declarations.
-
-## Connections v2
-
-`@amends/core/connection-v2` holds the connections that replace those above, built beside them
-and sharing nothing with them: a workspace's link to one integration its host installs, as
-[connection-v2](../connection-v2/README.md) declares integrations. `ConnectionV2Service` lists the
-host's `integrations`, each as `ConnectionV2.IntegrationView` (its auth methods, what it gives,
+`@amends/core/connection` holds a workspace's connections, each its link to one integration its
+host installs, as [connection](../connection/README.md) declares integrations. `ConnectionService` lists the
+host's `integrations`, each as `Connection.IntegrationView` (its auth methods, what it gives,
 whether the agent of its harnesses `requiresSandbox`, and the form of its settings), which every
-member may see; lists and reads the connections the actor may read, as `ConnectionV2.View`, and the
-`models` each offers an agent, as `ConnectionV2.Models` (the catalog's models its integration
+member may see; lists and reads the connections the actor may read, as `Connection.View`, and the
+`models` each offers an agent, as `Connection.Models` (the catalog's models its integration
 lists, and whether it offers others by any id); and creates, renames, configures, replaces the key
 of, checks, and removes them. A view is the record without its key, `manageable`, and its readiness: `Ready`,
 `Invalid` with the integration's description when it no longer takes the connection's settings or
@@ -194,270 +162,165 @@ auth method, or `Uninstalled` when the host no longer installs it.
 
 Creating takes the key with the connection, when it authenticates with one and only then, and the
 integration validates its settings and auth method first (`UnknownIntegration`,
-`InvalidConnection`). The key goes to `ConnectionV2CredentialStore`, one credential for each
+`InvalidConnection`). The key goes to `ConnectionCredentialStore`, one credential for each
 connection, in the commit that records the connection; replacing it overwrites it, and removal
 deletes it and keeps the record, so a retried create finds the connection and answers `NotFound`.
 No fact, change-feed event, or view carries a key. `check` reads the key and asks the integration
 to check the connection with its system, returning `Health`; it holds no commit open while the
 system answers.
 
-`connection-v2.create` works on the workspace; `connection-v2.read`, `connection-v2.manage`, and
-`connection-v2.use` on each connection, a `ConnectionV2` target. Members read and use connections;
+`connection.create` works on the workspace; `connection.read`, `connection.manage`, and
+`connection.use` on each connection, a `Connection` target. Members read and use connections;
 administrators and the owner create and manage them, and checking is managing, since it sends the
-key. Using a connection is giving it to what runs on it, as to an agent. `ConnectionV2Store` is a
-projection store and `ConnectionV2CredentialStore` keeps credentials outside the journal, reporting
+key. Using a connection is giving it to what runs on it, as to an agent. `ConnectionStore` is a
+projection store and `ConnectionCredentialStore` keeps credentials outside the journal, reporting
 `Unavailable` on a host that keeps none (`CredentialsUnavailable`); both are host bindings. The
 gateway supplies the host's integrations as `Integrations`.
 
-## Agents v2
+## Agents
 
-`@amends/core/agent-v2` holds the agents that replace those of `agent/`, built beside them and
-sharing nothing with them. An agent is a workspace member that works: `AgentV2.Record` keeps its
-instructions; its `harness`, the harnesses of one of the workspace's connections v2 or `Auto`, for
+`@amends/core/agent` holds a workspace's agents. An agent is a workspace member that works: `Agent.Record` keeps its
+instructions; its `harness`, the harnesses of one of the workspace's connections or `Auto`, for
 amends to choose among them; its `model`, one a connection offers, by id, with an `effort`; and its
 `sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
-membership's. `AgentV2Facts.Created` records an agent in the commit that adds its membership, and
-`Configured` replaces how it is set up as a whole; `AgentV2Projection` keeps them in
-`AgentV2Store`, a projection store.
+membership's. `AgentFacts.Created` records an agent in the commit that adds its membership, and
+`Configured` replaces how it is set up as a whole; `AgentProjection` keeps them in
+`AgentStore`, a projection store.
 
-`AgentV2Service` lists and reads the agents the actor may read, as `AgentV2.View`, and creates,
+`AgentService` lists and reads the agents the actor may read, as `Agent.View`, and creates,
 configures, and renames them. Creating adds the agent's membership with `MemberCommand.add`, with a
 role the actor must be able to grant. Its role is then changed, and it is removed, as any member's
 is, by `AssignmentService` and `MemberService`. Creating and configuring refuse a connection the
 actor may not read and use, or that is not active (`ConnectionUnavailable`, naming the part), and a
 setup that cannot run (`Incomplete`), except that an agent on `Auto` may wait for a connection that
-gives a harness. A view carries the agent's readiness, as `AgentV2Readiness` finds it against the
+gives a harness. A view carries the agent's readiness, as `AgentReadiness` finds it against the
 workspace's connections and the host's integrations whoever reads it: `Ready`, or `Incomplete` with
 issues naming the part whose connection was `Removed`, whose integration is `Uninstalled`, or that
 does not give the part as the agent takes it (`Invalid`, as the integration describes it, such as a
 model it no longer offers); `SandboxRequired` when its harness's agent works only in a sandbox and it
 has none; and `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
 
-`agent-v2.create` works on the workspace; `agent-v2.read` and `agent-v2.configure` on the agent's
+`AgentQuery` is what turns read of the agent they run, trusting their caller. `select` gives the
+`Agent.Selection` a turn runs on: the agent's model and sandbox, and its harness, which on `Auto`
+is that of the agent's last turn in the conversation while it can still run on it, and otherwise
+the oldest connection whose harness it can run on. `buildRunnable` gives the agent ready to run on
+a selection, as data (`AgentQuery.Runnable`): its instructions now, and the connections of the
+selection's harness, model, and sandbox, if it has one, each with the key it holds, beside the model
+as its integration's endpoint takes it. Whoever runs the agent builds its harness and sandbox from
+these with the integrations its host installs, so core runs nothing of an agent. Both fail with
+`Incomplete` when the agent cannot run, and `buildRunnable` also when a connection of the selection
+no longer gives its part or has no key.
+
+`agent.create` works on the workspace; `agent.read` and `agent.configure` on the agent's
 membership, a `Member` target. Members read agents; administrators and the owner create and
-configure them.
-
-## Environments
-
-`@amends/core/environment` holds workspace environments: where and how agents run, as a harness and
-an optional sandbox, described by the [harness](../harness/README.md#declarations) and
-[sandbox](../sandbox/README.md#declarations) declarations a host installs in its
-`EnvironmentCatalog`. A sandbox names its provider, where the harness runs (`in-process`, where the
-sandbox is only where its tools act, or `in-sandbox`), the account connection it runs under when
-its provider has one, a template, non-secret variables, setup commands run in order, and a
-retention, `stop` or `destroy`. Model access, instructions, and toolkits belong to agents, and
-credentials to connections.
-
-`EnvironmentService` lists the installed `implementations`, which every member may see, and
-lists, reads, creates, renames, configures, and removes environments. Creating checks the harness
-(`UnknownHarness`), that it can run where asked (`UnsupportedPlacement`), the provider
-(`UnknownSandboxProvider`), and the sandbox settings (`InvalidSandbox`, with issue codes): an
-account connection exactly when the provider runs under one, which the actor may read and use and
-which declares the sandbox capability for this provider, and a template only when the provider
-takes one. The harness, provider, and placement are fixed once created; `configure` replaces the
-rest of the sandbox settings. Reads return `Environment.View` with `manageable` and readiness,
-`Ready` or `Incomplete` with issue codes, from the catalog and the account connection's own
-readiness; nothing contacts the provider. `EnvironmentQuery.assessReadiness` is that one
-assessment, which agents read too when they report whether they can run.
-
-Every workspace starts with `Environment.InProcessId`, amends's own harness in process without a
-sandbox, recorded at initialization with no creator. It is an ordinary environment afterwards.
-`environment.create` works on the workspace, and `environment.read`, `environment.manage`, and
-`environment.use` on each environment, an `Environment` target; members read and use environments,
-and administrators and the owner also create and manage them, raising the built-in roles to
-revision 3. Configuring an agent checks `environment.use` on the environment it starts in.
-
-`EnvironmentCompatibility.check(environment, harness, selection)` is the one answer to whether an
-environment can run a model selection: the environment must be ready, the connection must provide
-model inference and be ready, a harness that speaks provider interfaces must speak the
-connection's, and a requested reasoning level must be one the harness takes. It does not check the
-model against those a connection suggests. Agent setup and environment choices call it; turn setup
-and transfers are meant to share it.
-
-## Agents
-
-`@amends/core/agent` holds agents' configuration. An agent is a workspace member whose identity is
-`Identity.MemberReference` `Agent`: its membership holds its name, status, roles, and group
-admissions, as any member's does, and `Agent.Record` holds what makes it behave, its instructions,
-its model access (a connection, a model identifier, and a reasoning level or null), and the
-environment it starts in. Credentials stay with the connection, and where and how it runs with the
-environment.
-
-`AgentService.create` adds the membership with its name, a workspace-scoped assignment of the
-initial role, admission to the general group, and the agent's record, in one commit. It requires
-`agent.create` on the workspace, and the role goes through `Delegation.requireGrant`, so only the
-owner gives an agent Administrator and nobody gives it Owner. The actor must be able to read and
-use the connection and the environment (`ConnectionUnavailable`, `EnvironmentUnavailable`), and
-`EnvironmentCompatibility.check` must pass except for setup still pending: an environment or
-connection that is not yet ready is saved and shows as the agent's readiness, while one without
-model inference, a harness that does not speak the connection's interface, or a reasoning level it
-does not take is refused (`Incompatible`, with the reasons). `configure` replaces the instructions,
-model access, and environment under the same checks, `rename` renames the membership with the
-name it expects (`Changed`), and `remove` removes the membership through `MemberService.remove`,
-with its delegation rules; the record remains for history. `environmentChoices` answers the check
-for each environment the actor may read and use, for choosing where an agent starts.
-
-Reads return `Agent.View`: the record with its membership's name, the workspace role it holds when
-the reader may read its access, `configurable`, `removable` (configuring it and removing members,
-within the delegation rules), and `usable` for the reader, and readiness, `Ready` or `Incomplete` with issues: the environment or connection is
-gone, or a compatibility reason. Readiness is computed whoever reads it, from the stores and the
-host's catalogs. An agent whose membership ended is `NotFound`. `agent.create` works on the
-workspace; `agent.read`, `agent.configure`, and `agent.use` on the agent's membership, a `Member`
-target. Members read and use agents, and administrators and the owner also create and configure
-them, raising the built-in roles to revision 4. Nothing checks `agent.use` outside thread
-recipients and cancelling a turn; see [turns](#turns) for how agents take work.
+configure them. `agent.use`, which `AgentPermissions.Use` declares, keeps the name it had
+before agents, since it means the same: directing an agent, as asking it for work in a thread,
+and stopping or retrying its [turns](#turns), requires.
 
 ## Turns
 
-`@amends/core/turn` holds agents' attempts on threads. A `Turn.Record` is one agent's attempt on
-one thread: `queued` until execution takes it, `running`, `cancelling` once asked to stop, then
-`completed`, `failed`, or `cancelled`, never reopening. An agent has at most one active turn per
-thread, which the stores enforce. Its input is tracked by timeline position: after
-`inputAfterSequence` is the attempt's to handle, and through `acceptedThroughSequence` it has
-accepted; how far the harness has taken that input in is its agent's log's to say. It records where
-its entries begin in its agent's log for the thread (`logAfter`) and the latest checkpoint there
-when it was created (`historyFrom`), both fixed at creation since the log reads only forward from
-a position, the turn it retries (`retryOf`), the model access and environment it ran with when
-execution starts, the replies it published, and why it failed or was asked to stop. While a turn
-works, its row changes only with its status and the input it accepts; its progress lives in the
-log.
+`@amends/core/turn` holds agents' turns in threads. A `Turn.Record` is one harness turn of one
+agent in one thread: `queued` until its job starts it, `running`, `cancelling` once asked to stop,
+then `completed`, `failed`, or `cancelled`, never reopening. An agent has at most one active turn
+per thread, which the stores enforce, and work that arrives while it is active waits for the next.
+A turn records the participation it works for, the timeline position through which it accepted
+work (`acceptedThroughSequence`), where its entries begin in the participation's session log
+(`logAfter`, the log's latest position when the turn was created, kept out of `Turn.View`), the
+turn it retries and who asked (`retry`), the `Agent.Selection` it started on, the reply it
+posted, and why it failed or was asked to stop.
 
-Agents handle their own notifications as people do theirs. `AgentWork.acceptWork`, which the
-agent's [job](#jobs) runs, acts as the agent: its pending work notifications on a thread join the
-active turn there, or start a new one, and the same commit settles them as `Accepted` with the
-turn's ID. Work waits while a turn there is still stopping, while the
-active turn belongs to a participation that ended, so an agent that left and came back is not
-handed work by the turn being stopped as departed, and while the agent cannot open the thread.
-A new turn's input starts where the agent's latest turn in the same participation stopped taking
-input in, as that turn's entries say, so what a cancelled or
-failed turn accepted but never took in is the next turn's to handle; its entries follow what the
-agent's log holds when it is created, and its history starts from that log's latest checkpoint:
-the latest turn's own, or the one that turn started from. Each run reads the agent's pending work
-a page at a time and passes over work that must wait; the end of the turn it waits for asks for
-another run. `AgentWork.stopDepartedTurns` stops a member's turns in threads it no longer takes
-part in: a queued one at once, a running one by asking. It checks the member's own active turns,
-so an agent that left the workspace has its turns stopped too.
+Agents handle their own notifications as people do theirs. Each agent in each thread has a turn
+[job](#jobs), which runs the agent and writes the participation's session log. What it asks of the
+workspace is `TurnExecution`: commands and queries over data, which hold nothing in memory, so a
+job could call them from another process. Each change is its own commit, attributed to the agent:
 
-Each agent has one log for each participation in a thread, apart from the journal, `TurnLog`,
-and every entry names the turn that wrote it: its `Started` with the selection and the agent's
-instructions it keeps, each `Attempt` at a harness session or a summary, the input execution
-`Submitted` as a batch with the position it covers, each `Harness` event (a response block by
-block, its finish, tool starts and results), each running `Environment` a run acquired, with where
-its files came from, each harness `Session` started, by the ID it was given before it started,
-`Interrupted` stops with their reason and problem, input `Requested` of a turn itself such as a
-retry, the thread's `History` before the first turn, `Checkpoint`s that replace what came before
-them, and its `Ended` with the outcome, the replies, and why it failed or was stopped
-([core model](../../docs/core-model.md#agreed-an-agents-memory-in-a-thread-is-one-log-of-its-turns)).
-Only one turn writes there at a time, so a turn's entries sit together after its `logAfter`, read
-by `TurnLog.readTurnEntries`. `TurnLog.reader` is the one reading of a turn's entries, taking them as they
-come, and `TurnLog.read` reads them at once: its harness events, how far input is taken in, its
-transcript and the view it leaves, the replies it owes, input asked of it, the items its readers
-see, what it started with, how it ended, the running environment it last acquired, the session it
-last started with the number of harness events recorded since, its latest
-checkpoint's position, and its attempts since it
-last got further (a response finished, a tool call completed, or a checkpoint), with the latest
-interruption and whether the last attempt died without recording one, and how often its context
-proved full since its last finished response, as its harness reported or its provider refused,
-and whether a checkpoint is owed for it. `TurnLog.buildContext` reads the
-log for a turn from its latest checkpoint: earlier turns as the view each left, without reasoning,
-followed by a note from `TurnLog.noteAuthor` when a turn that started failed or was stopped by
-request, then the turn's own work. The log has begun once a turn recorded the thread's history,
-started, or recorded a checkpoint; a turn that ended before it started does not begin it. `TurnExecution` is what a
-host's runner drives, each step its own commit attributed to the turn's agent: `start` a queued
-turn with its selection and the agent's instructions now, which for a participation's first turn
-records the thread's history in the log first, record each attempt (`recordAttempt`), a checkpoint (`recordCheckpoint`), submitted
-batches (`recordSubmission`), whose first record stands and is what execution hands the harness, the
-running environment a run acquired (`recordEnvironment`), which, when it is a new sandbox in place
-of one a run before acquired, asks the turn to tell the agent its earlier files are gone, the
-session a run starts
-(`recordSession`), and what the harness reports
-(`recordEvents`), where input the harness says it took in must be a batch as recorded, and `close` it. Closing requires
-all accepted input taken in and no work still waiting for the agent on the thread, both checked in
-the closing commit; otherwise it reports `InputPending`. It then publishes every answer the turn
-owes, in order, each as the agent's own message to the thread's current participants, verbatim,
-naming the turn that posted it (`turnId` on the message):
-each finished response with text and no tool calls that more input followed, and the last. It
-checks the agent may still open and post in the thread, and records completion with the messages.
-A turn can complete without a reply. `fail` and `confirmStopped` end a turn and publish nothing. Every way
-a turn ends, including a queued turn stopped by a reader or because its agent left, goes through
-`TurnCommand.endTurn`, which in the ending commit publishes the turn's fact, records `turn.ended` in its
-thread's timeline, and appends `Ended` to its agent's log. `prepare` assembles what a run needs from
-the stores: the agent's instructions and the model access and environment the turn started with
-or, before it starts, the agent's current ones, the running environment to acquire again (`reacquire`), the model connection's settings and key, and the
-connection's the environment's sandbox runs under (`sandboxConnection`), each failing the turn
-when it is gone or its key is missing or unreadable here, the history and
-transcript read from the log, input asked of the turn and the thread's accepted input not yet taken
-in, all of it however long the backlog, as one batch named for what it covers, so a run that hands
-it over again names it the same, the session a run left to attach to, the turn's own entries, and
-its attempts since it last got further. Before the first turn of a participation starts, its history is every thread message
-before its input (the agent's own as responses), which starting records in the log in entries of a
-bounded size. A message longer than 40,000 characters is given in pieces. `prepare` also gives the
-waiting input piece by piece with where each came from, the size of the input asked of the turn,
-and what a provider last measured since the latest checkpoint, so the runner, which knows the
-model, can tell with `TurnLog.proposeCompaction` whether a checkpoint must come first: in tokens against a
-budget, the newest exchanges within what it keeps, cut at an input or a response and never between
-two pieces of one waiting message, with the turn's own input kept verbatim when the cut falls
-inside its work, and everything kept without reasoning. The runner records it with a summary of
-the rest before working; `recordCheckpoint` records it in the log, from which the turn's and the next
-turn's history start, and when the summary covered waiting input, the position it reaches, which
-counts that input as taken in. It reports instead that the turn finished, is stopping, or can't run, as
-when its connection has no key. `get` reads the turn, for a run to watch. `showDraft` shows the turn's
-readers more of a response before it completes, as a `TurnDraft` signal.
+- `accept` gives the agent's active turn in the thread or, while it has none, accepts its pending
+  work notifications there into a new turn, settling them as `Accepted` with the turn's ID; none
+  while no work waits. Work waits while the agent cannot open the thread.
+- `start` readies the turn. A turn asked to stop, or whose participation ended, ends as it stands,
+  and so does one with nothing to say. Otherwise the turn starts on what
+  [`AgentQuery`](#agents) selects, kept when it runs again, and fails with the reason when the
+  agent cannot run on it. `start` answers `Idle`, or `Ready` with the turn, the agent's `Runnable`,
+  its prompt and how many messages it tells, and what the participation's session resumes from
+  (`SessionStateStore.Resume`), or none when it starts anew. The prompt (`TurnPrompt.promptOf`) is
+  the others' messages since the agent was last prompted there, through what the turn accepted,
+  each named by its author, and, for a retry, who asked. A running turn, as a run cut short leaves
+  it, is ready again as it was.
+- `joinedConversation` is the conversation the agent joined: the thread's messages before it took
+  part (`TurnPrompt.conversationOf`: others' as the user's, each named, the agent's own as its
+  answers), which a new session log starts with.
+- `showDraft` shows readers more of the step being written, as a `TurnDraft` signal.
+- `close` posts the reply its job gives, the text of the turn's last step
+  (`SessionLog.answerOf`), as the agent's own message to the thread's current participants, naming
+  the turn (`turnId` on the message), saves what the session resumes from, and completes the turn,
+  in one commit. A reply of only space posts nothing, and one the agent may no longer post, as it
+  can no longer open or post in the thread, fails the turn. A turn asked to stop meanwhile stops
+  instead.
+- `fail` and `confirmStopped` end a turn and post nothing.
 
-`TurnService.watchLog` follows a turn's log for a reader who may read its thread, as a stream
-of `Turn.LogMessage`s. It tails the agent's log with `Log.tail`, from the turn's `logAfter`, taking
-the turn's entries into one `TurnLog.reader` until its `Ended` entry or another turn's, the reading
-`log` returns: `Opened` carries the items as they stand, `Changed` the items each new batch adds or
-changes, by index, and `Ended` follows the turn's end, which its log records in the commit that
-ends it, after everything it wrote. It passes on the turn's `TurnDraft` signals as `Drafted`, first
-what the response being written holds so far: a draft carries only what follows the text before
-it, so `TurnQuery` holds each turn's drafts in memory as they reach the process, forgetting a
-turn's ten minutes after its last, and a reader who starts following mid-response begins with
-them. The drafts subscription registers before the turn and its log are read, so nothing published
-in between is missed. Each batch checks that the reader still may read the thread, and so does
-each commit that changes the reader's groups or grants, or a role's permissions, which it follows
-through `ChangeFeedSource` as the change feed does; its subscription registers before the turn is
-read too. Drafts are not checked one by one: following ends once the commit that took the
-reader's access is delivered, so a reader who lost it sees at most the drafts sent while that
+Each of these keeps what a session the turn started resumes from in `SessionStateStore`: per
+participation, the harness's agent that ran it last and what that agent returned of its own, how
+far the agent has been prompted, and the selection its last turn ran on, so the agent's next turn in
+the thread resumes on the same harness. The conversation is not there: the session log holds it. Every way a
+turn ends, including a queued turn stopped by a reader, goes through `TurnCommand.endTurn`, which
+in the ending commit publishes the turn's fact and records `turn.ended` in its thread's timeline.
+
+Each participation has a session log, the record of the agent's conversation in the thread, apart
+from the journal and every commit, so a host may keep it in a store of its own
+(`SessionLogStore`: `head`, `append` after the position the writer read to, which a log past it
+refuses with `Conflict`, `read` past a position, and `waitForAppend`). Its entries
+(`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming its turn,
+`Prompted` with the prompt's texts and how many messages it took in, each `Step`, and
+`Interrupted` when a run stopped short and ran again. The turn's job writes them: what was joined
+when the log is new, the prompt once the turn is ready, and each step it finishes, its parts added
+up (`StreamPart.Step`). `SessionLog.historyOf` rebuilds the
+conversation the harness resumes with: what was joined, then each turn's prompt and the steps of
+its latest run, each as `Session.messagesOfStep` records it. How a turn ended is its record's to
+say, not the log's: what the log holds of a turn is written before the commit that ends it.
+`SessionLog.reader` reads a turn's entries as the items readers see (`Turn.LogItem`): the prompt,
+each step that wrote text, verbatim, which is the reply once the turn posts it, and interruptions,
+never reasoning or tool calls.
+
+`TurnService.watchLog` follows a turn's entries in its session log for a reader who may read its
+thread, as a stream of `Turn.LogMessage`s. It reads the log from the turn's `logAfter`, taking the
+turn's entries into one `SessionLog.reader`, and waits for each append: `Opened` carries the items
+as they stand, `Changed` the items each append adds or changes, by index, and `Ended` follows the
+commit that ends the turn, which it follows through `ChangeFeedSource`, once it has read the rest
+of the log and marked the reply the turn's record names. It passes on the turn's `TurnDraft`
+signals as `Drafted`. Drafts are not kept: a draft continues its part at an offset, so a reader who
+starts following mid-step sees the step from the next draft that starts at its part's beginning, or
+once the step is logged. The drafts and commits subscriptions register before the turn and its
+log are read, so nothing published in between is missed. Each append checks that the reader still
+may read the thread, and so does each commit that changes the reader's groups or grants, or a
+role's permissions. Drafts are not checked one by one: following ends once the commit that took
+the reader's access is delivered, so a reader who lost it sees at most the drafts sent while that
 delivery was on its way. A stream that cannot go on fails with `Turn.LogUnavailable`.
 
 A turn's changes also show in its thread's timeline, recorded as thread activity in the commits
-that make them (the `TurnActivity` kinds, which `TurnCommand.recordActivity` records): `turn.created` where the agent took on the work, or where a retry
-asked again (naming the turn it retries), `turn.started`, `turn.stopping` once a working turn is
-asked to stop or its agent stops taking part, and `turn.ended` with its outcome, the replies it
-posted, and why it failed or was stopped. Each carries what its item shows, so `TurnTimeline`
-resolves it without reading anything more. It informs no one and is not new activity; the replies
-are. A client folds a turn's items into one row at its `turn.created` position.
+that make them (the `TurnActivity` kinds, which `TurnCommand.recordActivity` records):
+`turn.created` where the agent took on the work, or where a retry asked again (naming the turn it
+retries), `turn.started`, `turn.stopping` once a running turn is asked to stop, and `turn.ended`
+with its outcome, the reply it posted, and why it failed or was stopped. Each carries what its
+item shows, so `TurnTimeline` resolves it without reading anything more. It informs no one and is
+not new activity; the replies are. A client folds a turn's items into one row at its
+`turn.created` position.
 
-The commit that creates or retries a turn asks `TurnJobs` to run it, through a journal
-reaction to `TurnFacts.Created` and `TurnFacts.Retried`, so the request commits or rolls back with
-the turn. The host supplies
-`TurnJobs`, and `TurnJobs.layerNoRunner` accepts requests and runs nothing; [cluster](../cluster/README.md) runs harnesses
-and environments. [Message to reply](../../docs/agent-message-flow.md) follows the whole path,
-from a person's message through the agent's job, acceptance, and the turn's job to the reply.
-
-`TurnService` lets a reader who may read a thread `get` and `listByThread` its turns, as
-`Turn.View`s: the record, with whether the reader may stop it (`stoppable`) or retry it
-(`retryable`) now. Every turn read requires what the thread's timeline does: the group's audience
-and `thread.read` on the thread. A thread outside the reader's audience is `ThreadNotFound`, and
-one they may not read is `Authorization.Denied`. `listActive` gives the workspace's active turns
-in threads the reader may read, among at most `limit` active turns, and
-`log` a turn with its log as its readers see it (`Turn.LogView`): each batch of input taken in,
-each response's text from its text blocks completed so far, with the blocks it holds and whether
-the turn owes it as a reply, and interruptions, with when each was recorded, never reasoning or a
-harness's own data. When they may also direct
-its agent (`agent.use`), `cancel` stops an active turn: a queued turn at once, a running one once
-execution confirms it. `retry` runs a failed or stopped turn again as a new queued turn, recorded
-as `TurnFacts.Retried`, for the same agent, participation, and input, continuing after the turn it
-retries in the agent's log: its input starts after what that turn took in, its history from the
-latest checkpoint there, with who asked recorded as its new input, and it runs with the agent's
-current configuration. Only the agent's latest turn on
-the thread can be retried, while no other is active and the agent still takes part there;
-otherwise it is `NotRetryable` with the reason (`active`, `completed`, `superseded`, or
-`departed`). A retry is created after the turn it retries, even on a clock that has not moved, and
-takes its ID from the turn it retries, so repeating it returns the turn it created. Turn facts reach the thread's
-readers through the change feed; the timeline shows an agent's reply as its message, and no turn
-activity of its own yet.
+`TurnService` lets a reader who may read a thread `get` its turns, as `Turn.View`s: the record,
+with whether the reader may stop it (`stoppable`) or retry it (`retryable`) now. Every turn read
+requires what the thread's timeline does: the group's audience and `thread.read` on the thread. A
+turn in a thread outside the reader's audience is `NotFound`, and one in a thread they may not
+read is `Authorization.Denied`. `listActive` gives the workspace's active turns in threads the
+reader may read, among at most `limit` active turns. When they may also direct its agent
+(`agent.use`), `cancel` stops an active turn: a queued turn at once, a running one once its job
+confirms it. `retry` runs a failed or stopped turn again as a new queued turn, recorded as
+`TurnFacts.Retried`, for the same agent, participation, and accepted work, prompted again from
+where the agent was last prompted, with who asked, on the agent's setup as selected then. Only
+the agent's latest turn on the thread can be retried, while no other is active and the agent still
+takes part there; otherwise it is `NotRetryable` with the reason (`active`, `completed`,
+`superseded`, or `departed`). A retry is created after the turn it retries, even on a clock that
+has not moved, and takes its ID from the turn it retries, so repeating it returns the turn it
+created. Turn facts reach the thread's readers through the change feed; the timeline shows an
+agent's reply as its message.
 
 ## Read state
 
@@ -481,7 +344,7 @@ gateway. External authors use `Performer.Reference.Identity` with a Contact;
 `Performer.Reference.Member` always carries a member identity. Attribution does
 not grant authority, and a contact identity does not select an external reply destination.
 
-`Target.Reference` supports Workspace, Member, Group, and Thread. Group targets carry
+`Target.Reference` supports Workspace, Member, Group, Thread, and Connection. Group targets carry
 `workspaceId` and `Group.Id`; thread targets carry `workspaceId` and `ThreadId.Id`, exported from
 `@amends/core/thread`. Exact target scopes compare the workspace, kind, and ID; a workspace scope
 covers targets in that workspace. Group and thread actions also require current group membership,
@@ -604,10 +467,11 @@ records the names and permissions that differ, then the revision. It leaves a wo
 same or a later revision alone, so an older host never reverts it. The gateway runs it when it
 boots a workspace. A recorded permission the catalog does not declare, retired or added by a newer
 host, grants nothing, since no requirement can name it, and its holder's other grants stand;
-`Delegation` still loads the roles that record it. Bundle revision 1 is the current bundles:
-Member takes part in conversations and creates, renames, joins, and manages the groups it belongs
-to; Administrator adds people management, invitations, role changes, and `group.moderate` for
-public groups; Owner adds workspace rename and ownership transfer. No role reaches a group from
+`Delegation` still loads the roles that record it. Bundle revision 7 is the current bundles:
+Member takes part in conversations, creates, renames, joins, and manages the groups it belongs to,
+directs agents, reads agents and connections, and uses connections; Administrator adds people
+management, invitations, role changes, `group.moderate` for public groups, and creating and
+configuring agents and connections; Owner adds workspace rename and ownership transfer. No role reaches a group from
 outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentService` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so
@@ -769,20 +633,19 @@ be stored fails the commit, and neither replay nor a retried publication that re
 original event asks again. Each request names the workspace of the fact that asked for it, and an
 agent's job names the agent by its membership.
 
-- A **turn job** (`TurnJobs`) runs a turn, step by step through `TurnExecution`. Creating or
-  retrying a turn requests it.
-- An **agent job** (`AgentJobs`) does an agent's work through `AgentWork`. Activity that asks the
-  agent for work, and the end of one of its turns, request `acceptWork`; the end of its
-  participation in a thread, and its leaving or removal from a group, request
-  `stopDepartedTurns`. Those departure facts name a member who may be a person, whose job finds no
-  turns to stop.
+- A **turn job** (`TurnJobs`), one for each agent in each thread, runs the agent's work there,
+  one [turn](#turns) at a time, asking the workspace through `TurnExecution`, and stops its turn
+  when asked. Activity
+  that asks the agent for work, and a turn's end or retry, request a run; a request to stop a
+  turn, and the end of the agent's participation in the thread or its leaving the thread's group,
+  request a stop.
 
-`TurnJobs.Service` and `AgentJobs.Service` are host services, shared by every workspace, which
-deliver each request to whatever runs those jobs; `layerNoRunner` accepts requests and runs
-nothing. What jobs call, `TurnExecution` and `AgentWork`, is part of `Core.layer` as
-`Core.JobServices`, apart from `Core.Operations`, since no actor calls it: it acts as the agent
-or the product. A host's jobs reach it through the gateway's `inWorkspace`, as
-[cluster](../cluster/README.md) does.
+`TurnJobs.Service` is a host service, shared by every workspace, which delivers each request to
+whatever runs turn jobs; `TurnJobs.layerNoRunner` accepts requests and runs nothing. What the job
+calls, `TurnExecution`, is part of `Core.layer`, and `Core.JobServices` names it with the
+`SessionLogStore` the job writes, apart from `Core.Operations`, since no actor calls them: they act
+as the agent. A host's jobs reach them through the gateway's `inWorkspace`.
+[Cluster](../cluster/README.md)'s `TurnJob` runs turn jobs, as the local host does.
 
 ## Module dependencies and exports
 

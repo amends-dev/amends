@@ -30,16 +30,10 @@ export const layer = HttpApiBuilder.group(
         gateway.asMember(workspaceId, principal, Effect.flatMap(TurnService.Service, operation)),
       );
     return handlers.handleAll({
-      listByThread: ({ params, query }) =>
-        asMember(params.workspaceId, (turnService) =>
-          turnService.listByThread(params.threadId, query.limit),
-        ),
       listActive: ({ params, query }) =>
         asMember(params.workspaceId, (turnService) => turnService.listActive(query.limit)),
       get: ({ params }) =>
         asMember(params.workspaceId, (turnService) => turnService.get(params.turnId)),
-      log: ({ params }) =>
-        asMember(params.workspaceId, (turnService) => turnService.log(params.turnId)),
       watchLog: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           streams.hold(params.workspaceId, principal).pipe(

@@ -7,16 +7,6 @@ import { ThreadParticipationActivity } from "../thread/participation/activity.ts
 import { TurnFacts } from "../turn/facts.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
-/** A turn's acceptance settles the notifications it took, in the same commit. */
-const settleAccepted = Effect.fnUntraced(function* (payload: {
-  readonly turnId: Parameters<NotificationStore.Interface["accept"]>[1];
-  readonly notificationIds: ReadonlyArray<Notification.Id>;
-  readonly acceptedAt: Parameters<NotificationStore.Interface["accept"]>[2];
-}) {
-  const notificationStore = yield* NotificationStore.Service;
-  yield* notificationStore.accept(payload.notificationIds, payload.turnId, payload.acceptedAt);
-});
-
 /**
  * Activity generates notifications, and an unfollow's ending settles an agent's pending input
  * from that participation; leaving a group settles what a member had pending from it; human Seen
@@ -63,17 +53,9 @@ export const definition = Projection.make("notifications", { version: 3 })
   .on(
     TurnFacts.Created,
     Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
-      yield* settleAccepted({
-        turnId: payload.id,
-        notificationIds: payload.notificationIds,
-        acceptedAt: payload.createdAt,
-      });
-    }),
-  )
-  .on(
-    TurnFacts.InputAccepted,
-    Effect.fn("NotificationProjection.inputAccepted")(function* ({ payload }) {
-      yield* settleAccepted(payload);
+      // A turn's acceptance settles the notifications it took, in the same commit.
+      const notificationStore = yield* NotificationStore.Service;
+      yield* notificationStore.accept(payload.notificationIds, payload.id, payload.createdAt);
     }),
   );
 export * as NotificationProjection from "./projection.ts";

@@ -3,8 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -12,11 +14,14 @@
   "dependencies": {
     "@amends/connection": "workspace:*",
     "@amends/sandbox": "workspace:*",
-    "@daytona/sdk": "0.218.0",
-    "effect": "catalog:"
+    "@daytona/sdk": "0.220.0"
   },
   "devDependencies": {
-    "@amends/sandbox-conformance": "workspace:*",
-    "@effect/platform-bun": "catalog:"
+    "@effect/platform-bun": "catalog:",
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
   }
 }

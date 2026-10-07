@@ -1,129 +1,147 @@
 import { Show } from "solid-js";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
-import {
-  StatusMark,
-  type Status,
-  type StatusMarkKind,
-} from "../../components/status-mark/index.ts";
-import type { EnvironmentIssue } from "../environments/wording.tsx";
+import type { Status } from "../../components/status-mark/index.ts";
 import * as s from "./agents.css.ts";
 
+/** How hard a model reasons, from least to most; an agent without one takes the model's default. */
+export type Effort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+/** The part of an agent's setup that one of the workspace's connections gives. */
+export type SetupPart = "harness" | "model" | "sandbox";
+
 /**
- * Why an agent cannot run as saved: its model connection needs its key or is gone, its
- * environment is gone or needs setup, or the environment cannot run the model access at all.
+ * Why an agent can't run as it is set up: the connection for a part was removed, its integration
+ * is not installed on this host, or it doesn't give the part as the agent takes it, as its
+ * integration says; its harness works only in a sandbox and it has none; or, on Auto, no connection
+ * gives a harness it can run on.
  */
 export type AgentIssue =
-  | "connection-not-ready"
-  | "connection-unavailable"
-  | "environment-unavailable"
-  | "environment-not-ready"
-  | "no-model-inference"
-  | "interface-unsupported"
-  | "reasoning-unsupported";
-/** The reasons an environment cannot run a model access at all; the others are setup. */
-export type AgentBlocker = Extract<
-  AgentIssue,
-  "no-model-inference" | "interface-unsupported" | "reasoning-unsupported"
->;
+  | { readonly kind: "removed"; readonly part: SetupPart }
+  | { readonly kind: "uninstalled"; readonly part: SetupPart }
+  | { readonly kind: "invalid"; readonly part: SetupPart; readonly description: string }
+  | { readonly kind: "sandbox-required" }
+  | { readonly kind: "no-harness" };
 
-/** An agent, as the list and its details show it. */
+/** One of the workspace's connections, as an agent's setup names it. */
+export interface SetupConnection {
+  readonly id: string;
+  /** Its name, while it is not removed. */
+  readonly name?: string;
+}
+
+/** An agent, as the list, the sidebar, and its page show it. */
 export interface AgentSummary {
   readonly id: string;
+  /** Its membership, which names it and gives it its role. */
+  readonly memberId: string;
   readonly name: string;
-  /** The role its membership holds, by name, when the reader may read its access. */
-  readonly role: string | undefined;
   readonly instructions: string;
-  /** Its model connection, by name when the reader may still read it. */
-  readonly connection: { readonly id: string; readonly name: string | undefined };
-  readonly model: string;
-  readonly reasoning: string | undefined;
-  /** The environment it starts in, by name and runtime when the reader may still read it. */
-  readonly environment: {
+  /** The harness connection it runs on, or Auto, for amends to choose one as it works. */
+  readonly harness: { readonly kind: "auto" } | (SetupConnection & { readonly kind: "connection" });
+  /** The model it runs on, by the id its provider gives it, through a connection. */
+  readonly model: {
+    readonly connection: SetupConnection;
     readonly id: string;
-    readonly name: string | undefined;
-    readonly runtime: string | undefined;
+    /** The model's name, when its connection lists it. */
+    readonly name?: string;
+    readonly effort?: Effort;
   };
-  /** What keeps it from running now; empty when it is ready. */
+  /** Where it works, or nowhere, when it answers from its model alone. */
+  readonly sandbox?: SetupConnection;
+  /** Why it can't run as it is set up; empty when it can. */
   readonly issues: readonly AgentIssue[];
+  /** The reader may rename it and change how it is set up. */
   readonly configurable: boolean;
-  readonly removable: boolean;
   /** Who added it, by name. */
-  readonly createdBy: string | undefined;
+  readonly createdBy: string;
   readonly createdAt: Date;
-  /**
-   * Where it is at work now, apart from its setup: its most pressing turn state, and each thread
-   * it works on, such as "#general". Unset while it is idle.
-   */
-  readonly activity?: {
-    readonly state: "queued" | "working" | "stopping";
-    readonly places: readonly string[];
-  };
+  /** Where it is at work now, apart from its setup; unset while it is idle. */
+  readonly activity?: AgentActivity;
 }
 
-/** Where an agent is at work: its most pressing turn state, and each thread, such as "#general". */
-export type AgentActivity = NonNullable<AgentSummary["activity"]>;
+/** Where an agent is at work: its most pressing turn state, and each place, such as "#general". */
+export interface AgentActivity {
+  readonly state: "queued" | "working" | "stopping";
+  readonly places: readonly string[];
+}
 
-/** An agent's current activity in a few words: "Working · 2" and "#general + 1 more". */
-export const activityWords = (activity: NonNullable<AgentSummary["activity"]>) => {
-  const count = activity.places.length;
-  const state = { queued: "Queued", working: "Working", stopping: "Stopping" }[activity.state];
-  const [first] = activity.places;
-  return {
-    status: count > 1 ? `${state} · ${count}` : state,
-    where: first === undefined ? "" : count > 1 ? `${first} + ${count - 1} more` : first,
-  };
-};
+/** One of an agent's turns in progress, as its page lists it. */
+export interface AgentTurn {
+  readonly id: string;
+  readonly state: "queued" | "working" | "stopping";
+  /** Where it works, such as "#general". */
+  readonly place: string;
+  /** Where its log opens, beside its thread. */
+  readonly href: string;
+}
 
-/** A connection that provides model access, as the connection field offers it. */
-export interface ModelConnectionOption {
+const turnStates = { queued: "Queued", working: "Working", stopping: "Stopping" } as const;
+
+/** A turn's state in a word, such as "Working". */
+export const turnStateWord = (state: AgentTurn["state"]) => turnStates[state];
+
+/** Where an agent is at work, as a line: "#general", or "#general + 1 more". */
+export const placesLine = (places: readonly string[]) =>
+  places.length > 1 ? `${places[0]} + ${places.length - 1} more` : (places[0] ?? "");
+
+/** A connection that gives harnesses, as the harness choice offers it. */
+export interface HarnessOption {
   readonly id: string;
   readonly name: string;
-  /** Its key is saved. */
-  readonly ready: boolean;
-  /** The models its provider suggests. */
-  readonly models: ReadonlyArray<{ readonly id: string; readonly name: string }>;
+  /** Its integration's name, such as "opencode". */
+  readonly integrationName: string;
+  /** Its agent works only in a sandbox. */
+  readonly requiresSandbox: boolean;
+  /** Why it can't be chosen, for the one an agent names that is removed or not installed. */
+  readonly unavailable?: string;
 }
 
-/** How an environment fits the chosen model access. */
-export type EnvironmentFit =
-  | { readonly kind: "works" }
+/** A connection that gives models or sandboxes, as their choices offer it. */
+export interface ConnectionOption {
+  readonly id: string;
+  readonly name: string;
+  readonly integrationName: string;
+  /** Why it can't be chosen, for the one an agent names that is removed or not installed. */
+  readonly unavailable?: string;
+}
+
+/** A model a connection lists, with the efforts it takes; none when it doesn't reason. */
+export interface ModelOption {
+  readonly id: string;
+  readonly name: string;
+  readonly efforts: readonly Effort[];
+}
+
+/**
+ * The models a connection offers: those it lists, and whether it takes a model it doesn't list,
+ * which takes any effort. Loading while they are read, and failed when they couldn't be.
+ */
+export type ModelChoices =
+  | { readonly status: "loading" }
+  | { readonly status: "failed" }
   | {
-      readonly kind: "needs-setup";
-      readonly issues: readonly EnvironmentIssue[];
-      /** The model connection still needs its key. */
-      readonly connection: boolean;
-    }
-  | { readonly kind: "cant-run"; readonly reasons: readonly AgentBlocker[] };
+      readonly status: "loaded";
+      readonly listed: readonly ModelOption[];
+      readonly unlisted: boolean;
+    };
 
-/** An environment an agent can start in. */
-export interface AgentEnvironmentOption {
-  readonly id: string;
-  readonly name: string;
-  /** "Amends · Daytona", or "Amends · No sandbox". */
-  readonly runtime: string;
-  /** Its harness, by name. */
-  readonly harness: string;
-  /** Its sandbox provider, by name. */
-  readonly provider: string | undefined;
-  /** The reasoning levels its harness takes. */
-  readonly reasoningLevels: readonly string[];
-  /** Undefined while the fit is checked. */
-  readonly fit: EnvironmentFit | undefined;
-}
-
-/** A role an agent can start with. */
+/** A role an agent may start with, and whether the reader may give it. */
 export interface AgentRoleOption {
   readonly id: string;
   readonly name: string;
+  readonly assignable: boolean;
 }
 
 /** A change made to agents. */
 export type AgentsAction = "create" | "rename" | "configure" | "remove";
+
 /**
- * Why a change or read failed: `changed`, `denied`, and `gone` mean what the reader sees is out
- * of date; `refresh-failed` that a change completed but its result could not be loaded; and
- * `outdated` that a live refresh failed.
+ * Why a change or read failed: `changed`, `denied`, and `gone` mean what the reader sees is out of
+ * date; `unavailable` that a connection the setup names is gone or not the reader's to use, at
+ * `part`; `incomplete` that the agent couldn't run as set up, for `issues`; `role-denied` that the
+ * reader may not give the role; `refresh-failed` that a change completed but its result could not
+ * be loaded; and `outdated` that a live refresh failed.
  */
 export type AgentsError =
   | "changed"
@@ -131,167 +149,149 @@ export type AgentsError =
   | "gone"
   | "invalid"
   | "failed"
+  | "unavailable"
+  | "incomplete"
+  | "role-denied"
   | "refresh-failed"
   | "outdated";
-/** A change's failure, or a refresh's, with the action it belongs to and what the server refused. */
+
+/** A change's failure, or a refresh's, with the action it belongs to. */
 export interface AgentsFailure {
   readonly action: AgentsAction | "refresh";
   readonly error: AgentsError;
-  readonly problems: readonly AgentProblem[];
+  /** The part whose connection is unavailable, for `unavailable`. */
+  readonly part?: SetupPart;
+  /** Why the setup couldn't run, for `incomplete`. */
+  readonly issues?: readonly AgentIssue[];
 }
-/** What the server refused, worded at the field it concerns. */
-export type AgentProblem =
-  | { readonly kind: "connection-unavailable" }
-  | { readonly kind: "environment-unavailable" }
-  | { readonly kind: "incompatible"; readonly reasons: readonly AgentIssue[] }
-  | { readonly kind: "role-denied" };
 
-export const blocker = (issue: AgentIssue): issue is AgentBlocker =>
-  issue === "no-model-inference" ||
-  issue === "interface-unsupported" ||
-  issue === "reasoning-unsupported";
+export const effortLabels = {
+  none: "None",
+  minimal: "Minimal",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  xhigh: "Extra high",
+  max: "Max",
+} as const satisfies Record<Effort, string>;
 
-/** "Ready", "Needs setup", or "Can’t run" when anything stops it outright. */
-export const setupLabel = (issues: readonly AgentIssue[]) =>
-  issues.length === 0 ? "Ready" : issues.some(blocker) ? "Can’t run" : "Needs setup";
+/** Every effort, least first, as a model offered unlisted takes any of them. */
+export const efforts: readonly Effort[] = [
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+];
 
-/** What each issue means in a sentence without names, for a hover or a profile card. */
-const issueSummaries = {
-  "connection-not-ready": "Its model connection needs an API key.",
-  "connection-unavailable": "Its model connection is no longer available.",
-  "environment-unavailable": "Its environment is no longer available.",
-  "environment-not-ready": "Its environment needs setup.",
-  "no-model-inference": "Its connection doesn’t provide model access.",
-  "interface-unsupported": "Its harness doesn’t support the model provider.",
-  "reasoning-unsupported": "Its harness doesn’t support the saved reasoning level.",
-} as const satisfies Record<AgentIssue, string>;
+/** What an issue means for the agent, in a sentence. */
+export function issueMessage(issue: AgentIssue): string {
+  switch (issue.kind) {
+    case "removed":
+      return `Its ${issue.part} connection was removed.`;
+    case "uninstalled":
+      return `Its ${issue.part} connection’s integration isn’t installed on this host.`;
+    case "invalid":
+      return issue.description.endsWith(".") ? issue.description : `${issue.description}.`;
+    case "sandbox-required":
+      return "Its harness works only in a sandbox, and it has none.";
+    case "no-harness":
+      return "No connection gives a harness it can run on.";
+  }
+}
 
 /**
- * An agent's state as one status: what keeps it from running, else where it is at work, else
- * ready. The mark stays the setup's while it works; the logo shows the work where there is room.
+ * A field of an agent's setup: the model's part has two, its connection and the model it offers,
+ * so a connection that is gone shows at the first and a model it doesn't take at the second.
  */
-export function agentStatus(issues: readonly AgentIssue[], activity?: AgentActivity): Status {
-  const first = issues.find(blocker) ?? issues[0];
+export type SetupField = "harness" | "model-connection" | "model" | "sandbox";
+
+/** The setup field an issue belongs beside. */
+export function issueField(issue: AgentIssue): SetupField {
+  switch (issue.kind) {
+    case "sandbox-required":
+      return "sandbox";
+    case "no-harness":
+      return "harness";
+    case "invalid":
+      return issue.part;
+    case "removed":
+    case "uninstalled":
+      return issue.part === "model" ? "model-connection" : issue.part;
+  }
+}
+
+/**
+ * An agent's state: Needs setup when it can't run, with its first issue on hover; else where it is
+ * at work, such as "Working in #general", with the logo moving where the words show. Undefined
+ * while it is ready and idle, which shows nothing.
+ */
+export function agentStatus(
+  issues: readonly AgentIssue[],
+  activity?: AgentActivity,
+): Status | undefined {
+  const [first] = issues;
   if (first !== undefined)
-    return {
-      mark: blocker(first) ? "blocked" : "attention",
-      label: setupLabel(issues),
-      detail: issueSummaries[first],
-    };
-  if (activity === undefined) return { mark: "available", label: "Ready" };
-  const { where } = activityWords(activity);
-  const state = { queued: "Queued", working: "Working", stopping: "Stopping" }[activity.state];
+    return { mark: "attention", label: "Needs setup", detail: issueMessage(first) };
+  if (activity === undefined) return undefined;
   return {
     mark: "available",
-    label: where === "" ? state : `${state} in ${where}`,
+    label: `${turnStateWord(activity.state)} in ${placesLine(activity.places)}`,
     activity: activity.state,
   };
 }
 
-/** "Anthropic · Team · claude-sonnet-5": the connection and the model. */
-export const modelLine = (agent: AgentSummary) =>
-  `${agent.connection.name ?? "Unavailable connection"} · ${agent.model}`;
+/** The harness it runs on, as a line: "Auto", or the connection's name. */
+export const harnessLine = (harness: AgentSummary["harness"]) =>
+  harness.kind === "auto" ? "Auto" : (harness.name ?? "Removed connection");
 
-/** What one issue means for this agent. */
-export function issueMessage(issue: AgentIssue, agent: AgentSummary) {
-  switch (issue) {
-    case "connection-not-ready":
-      return agent.connection.name
-        ? `${agent.connection.name} needs an API key before this agent is ready.`
-        : "The model connection needs its API key.";
-    case "connection-unavailable":
-      return "The model connection is no longer available. Choose another connection.";
-    case "environment-unavailable":
-      return "The environment is no longer available. Choose another environment.";
-    case "environment-not-ready":
-      return "This environment needs setup before the agent can use it.";
-    case "no-model-inference":
-      return "This connection doesn’t provide model access. Choose a model connection.";
-    case "interface-unsupported":
-      return "This environment’s harness doesn’t support the connection’s model provider.";
-    case "reasoning-unsupported":
-      return "This harness doesn’t support the saved reasoning level. Use a supported level or clear it.";
-  }
-}
+/** The model it runs on, as a line: "Claude Opus 5.5 · OpenRouter", with its effort when set. */
+export const modelLine = (model: AgentSummary["model"]) =>
+  [
+    model.name ?? model.id,
+    model.connection.name ?? "Removed connection",
+    ...(model.effort === undefined ? [] : [`${effortLabels[model.effort]} effort`]),
+  ].join(" · ");
 
-/** Why an environment cannot run the model access, beside the option or the field. */
-export const blockerMessages = {
-  "no-model-inference": "This connection doesn’t provide model access.",
-  "interface-unsupported": "The harness doesn’t support this connection’s model provider.",
-  "reasoning-unsupported": "The harness doesn’t support this reasoning level.",
-} as const satisfies Record<AgentBlocker, string>;
-
-/** What an environment still needs before an agent can use it. */
-export function setupMessages(
-  fit: EnvironmentFit & { readonly kind: "needs-setup" },
-  provider?: string,
-) {
-  const account = provider ? `${provider} account` : "The sandbox account";
-  return [
-    ...fit.issues.map((issue) => {
-      switch (issue) {
-        case "harness-unavailable":
-          return "Its harness isn’t installed on this server.";
-        case "sandbox-unavailable":
-          return `${provider ?? "Its sandbox provider"} isn’t installed on this server.`;
-        case "connection-unavailable":
-          return `${account} is no longer available.`;
-        case "connection-incomplete":
-          return `${account} needs its API key.`;
-      }
-    }),
-    ...(fit.connection ? ["The model connection needs its API key."] : []),
-  ];
-}
-
-/** A problem the server refused, worded for its field. */
-export function problemMessage(problem: AgentProblem) {
-  switch (problem.kind) {
-    case "connection-unavailable":
-      return "This model connection is no longer available to you. Choose another connection.";
-    case "environment-unavailable":
-      return "This environment is no longer available to you. Choose another environment.";
-    case "role-denied":
-      return "Only the workspace owner can give an agent the Administrator role. Choose Member or ask the owner.";
-    case "incompatible":
-      return problem.reasons
-        .filter(blocker)
-        .map((reason) => blockerMessages[reason])
-        .join(" ");
-  }
-}
+/** Where it works, as a line: the sandbox connection's name, or "No sandbox". */
+export const sandboxLine = (sandbox: AgentSummary["sandbox"]) =>
+  sandbox === undefined ? "No sandbox" : (sandbox.name ?? "Removed connection");
 
 const changed: { readonly [Action in AgentsAction]: string } = {
-  create: "The connections or environments changed. Refresh, then try again.",
-  rename: "This agent was renamed meanwhile. Refresh to review its name, then save again.",
+  create: "The workspace changed meanwhile. Refresh, then try again.",
+  rename: "This agent was renamed meanwhile. Refresh to review it, then save again.",
   configure: "This agent changed meanwhile. Refresh to review it, then save again.",
   remove: "This agent changed meanwhile. Refresh to review it.",
 };
 const invalid: { readonly [Action in AgentsAction]: string } = {
-  create: "Check the name and configuration, then try again.",
+  create: "Check the name, instructions, and model, then try again.",
   rename: "Use 1 to 80 characters, with no invisible ones.",
-  configure: "Check the configuration, then save again.",
+  configure: "Check the instructions and model, then save again.",
   remove: "That change isn’t possible.",
 };
 const failed: { readonly [Action in AgentsAction]: string } = {
   create:
     "The agent couldn’t be created. Try again when the host is available; it won’t be created twice.",
   rename: "The name couldn’t be saved. Try again when the host is available.",
-  configure: "The configuration couldn’t be saved. Try again when the host is available.",
+  configure: "The setup couldn’t be saved. Try again when the host is available.",
   remove: "The agent couldn’t be removed. Try again when the host is available.",
 };
 
 /** What went wrong, for the place the change was made; `refresh` covers reads. */
-export function agentsMessage(action: AgentsAction | "refresh", error: AgentsError) {
+export function agentsMessage(failure: AgentsFailure): string {
+  const { action, error } = failure;
   if (error === "outdated") return "The latest agents could not be loaded. Refresh to try again.";
   if (error === "refresh-failed")
     return action === "create"
       ? "The agent was created, but the latest agents could not be loaded. Refresh to see it."
       : "Saved, but the latest agents could not be loaded. Refresh to continue.";
+  if (error === "unavailable" || error === "incomplete")
+    return "This setup can’t be saved as it is. Change what’s marked, then try again.";
+  if (error === "role-denied") return "You can’t give that role. Choose another.";
   if (error === "denied")
-    return action === "remove"
-      ? "You can’t remove this agent. Only the workspace owner removes an agent with more than the Member role."
-      : "You no longer have permission to do this. Refresh to review your access.";
+    return "You no longer have permission to do this. Refresh to review your access.";
   if (action === "refresh")
     return error === "changed" || error === "gone"
       ? "Agents changed meanwhile. Refresh to see the latest."
@@ -305,8 +305,31 @@ export function agentsMessage(action: AgentsAction | "refresh", error: AgentsErr
   return failed[action];
 }
 
+/**
+ * What the host refused in a setup, at the field each belongs beside: a connection no longer the
+ * reader's to use, or what would keep the agent from running.
+ */
+export function setupProblems(
+  failure: AgentsFailure | undefined,
+): Partial<Record<SetupField, string>> {
+  if (failure?.error === "unavailable" && failure.part !== undefined)
+    return {
+      [failure.part === "model" ? "model-connection" : failure.part]:
+        "This connection is no longer available to you. Choose another.",
+    };
+  if (failure?.error !== "incomplete") return {};
+  const problems: Partial<Record<SetupField, string>> = {};
+  for (const issue of failure.issues ?? []) problems[issueField(issue)] ??= issueMessage(issue);
+  return problems;
+}
+
 /** Whether the reader must reload before changing anything more. */
-export const needsRefresh = (error: AgentsError) => error !== "invalid" && error !== "failed";
+export const needsRefresh = (error: AgentsError) =>
+  error === "changed" ||
+  error === "denied" ||
+  error === "gone" ||
+  error === "refresh-failed" ||
+  error === "outdated";
 
 /** A change that completed, for a confirming toast. */
 export function agentsToast(action: AgentsAction, subject?: string) {
@@ -316,15 +339,14 @@ export function agentsToast(action: AgentsAction, subject?: string) {
     case "rename":
       return "Name saved";
     case "configure":
-      return "Configuration saved";
+      return "Setup saved";
     case "remove":
       return subject ? `${subject} removed` : "Agent removed";
   }
 }
 
 export interface AgentsAlertProps {
-  readonly action: AgentsAction | "refresh";
-  readonly error: AgentsError;
+  readonly failure: AgentsFailure;
   /** Reloads the agents; offered when what the reader sees is out of date. */
   readonly onRefresh?: () => void;
   readonly refreshing?: boolean;
@@ -334,8 +356,8 @@ export interface AgentsAlertProps {
 export function AgentsAlert(props: AgentsAlertProps) {
   return (
     <div class={s.alert}>
-      <Field.Alert>{agentsMessage(props.action, props.error)}</Field.Alert>
-      <Show when={props.onRefresh && needsRefresh(props.error)}>
+      <Field.Alert>{agentsMessage(props.failure)}</Field.Alert>
+      <Show when={props.onRefresh && needsRefresh(props.failure.error)}>
         <Button
           variant="quiet"
           class={s.alertAction}
@@ -346,15 +368,5 @@ export function AgentsAlert(props: AgentsAlertProps) {
         </Button>
       </Show>
     </div>
-  );
-}
-
-/** A state beside its field: its mark and its words, such as "Needs setup". */
-export function StatusLabel(props: { readonly label: string; readonly mark: StatusMarkKind }) {
-  return (
-    <span class={s.readiness} data-mark={props.mark}>
-      <StatusMark mark={props.mark} size={9} />
-      {props.label}
-    </span>
   );
 }

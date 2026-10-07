@@ -5,13 +5,24 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./conformance": "./src/conformance/index.ts",
+    "./*": "./src/*.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@amends/connection": "workspace:*",
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
     "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "@effect/vitest": "catalog:",
+    "effect": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@effect/vitest": {
+      "optional": true
+    }
   }
 }

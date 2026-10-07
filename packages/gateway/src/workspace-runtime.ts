@@ -1,12 +1,7 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
-import { AgentJobs, TurnJobs } from "@amends/core/turn";
-import { ConnectionCatalog } from "@amends/core/connection";
-import { EnvironmentCatalog } from "@amends/core/environment";
-import type { HarnessImplementation } from "@amends/harness";
-import type { SandboxImplementation } from "@amends/sandbox";
-import type { ConnectionImplementation } from "@amends/connection";
-import { type Integration, Integrations } from "@amends/connection-v2";
+import { TurnJobs } from "@amends/core/turn";
+import { type Integration, Integrations } from "@amends/connection";
 import { Journal } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import {
@@ -28,17 +23,6 @@ import { WorkspaceStorage } from "./storage.ts";
 export type Services = Layer.Success<typeof Core.layer> | Core.HostServices;
 
 export interface Options {
-  /**
-   * The connection implementations this host installed, as they declare themselves; every
-   * workspace checks its connections against them. Defaults to none.
-   */
-  readonly connections?: ReadonlyArray<ConnectionImplementation.Declaration> | undefined;
-  /**
-   * The harnesses and sandbox providers this host installed, as they declare themselves; every
-   * workspace checks its environments against them. Each defaults to none.
-   */
-  readonly harnesses?: ReadonlyArray<HarnessImplementation.Declaration> | undefined;
-  readonly sandboxes?: ReadonlyArray<SandboxImplementation.Declaration> | undefined;
   /**
    * The integrations this host installs, which every workspace's connections link to. Their ids
    * must be distinct. Defaults to none.
@@ -78,15 +62,9 @@ export interface Interface {
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
-  const agentJobs = yield* AgentJobs.Service;
   const turnJobs = yield* TurnJobs.Service;
   const crypto = yield* Crypto.Crypto;
   const hostContext = yield* Effect.context<never>();
-  const connectionCatalog = ConnectionCatalog.make(options.connections ?? []);
-  const environmentCatalog = EnvironmentCatalog.make({
-    harnesses: options.harnesses,
-    sandboxes: options.sandboxes,
-  });
   const integrations = yield* Integrations.make(options.integrations ?? []);
 
   const prepareWorkspace = Effect.fn("WorkspaceRuntime.prepareWorkspace")(function* (
@@ -98,10 +76,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
         Layer.mergeAll(
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
-          Layer.succeed(AgentJobs.Service, agentJobs),
           Layer.succeed(TurnJobs.Service, turnJobs),
-          Layer.succeed(ConnectionCatalog.Service, connectionCatalog),
-          Layer.succeed(EnvironmentCatalog.Service, environmentCatalog),
           Layer.succeed(Integrations.Integrations, integrations),
         ),
       ),

@@ -26,8 +26,8 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * Every failure the workspace, member, access, invitation, conversation, connection,
- * environment, agent, and turn endpoints report.
+ * Every failure the workspace, member, access, invitation, conversation, connection, agent, and
+ * turn endpoints report.
  */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
@@ -38,10 +38,7 @@ type Reported =
   | Failure<Client["threads"][keyof Client["threads"]]>
   | Failure<Client["notifications"][keyof Client["notifications"]]>
   | Failure<Client["connections"][keyof Client["connections"]]>
-  | Failure<Client["connectionsV2"][keyof Client["connectionsV2"]]>
-  | Failure<Client["environments"][keyof Client["environments"]]>
   | Failure<Client["agents"][keyof Client["agents"]]>
-  | Failure<Client["agentsV2"][keyof Client["agentsV2"]]>
   | Failure<Client["turns"][keyof Client["turns"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
@@ -77,50 +74,29 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ReadStateService.BeyondTimeline": "changed",
   "ThreadParticipationService.AlreadyEnded": "changed",
   "NotificationService.AlreadyHandled": "changed",
-  // Connections: renamed meanwhile, or the provider it names was removed from this host.
+  // Connections: renamed meanwhile, or naming an integration this host no longer has;
+  // `connectionsFailure` tells the integration's refusals apart.
   "ConnectionService.Changed": "changed",
-  "ConnectionService.UnknownImplementation": "changed",
+  "ConnectionService.UnknownIntegration": "changed",
   "ConnectionService.NotFound": "gone",
-  "ConnectionService.InvalidSettings": "invalid",
-  "ConnectionService.UnsupportedAuthentication": "invalid",
-  // Connections v2 the same way; `connectionsV2Failure` tells the integration's refusals apart.
-  "ConnectionV2Service.Changed": "changed",
-  "ConnectionV2Service.UnknownIntegration": "changed",
-  "ConnectionV2Service.NotFound": "gone",
-  "ConnectionV2Service.InvalidConnection": "invalid",
-  "ConnectionV2Service.Keyless": "invalid",
-  // Environments: renamed meanwhile, or naming a harness or provider this host no longer has;
-  // `environmentProblems` tells the refusals apart.
-  "EnvironmentService.Changed": "changed",
-  "EnvironmentService.UnknownHarness": "changed",
-  "EnvironmentService.UnknownSandboxProvider": "changed",
-  "EnvironmentService.NotFound": "gone",
-  "EnvironmentService.UnsupportedPlacement": "invalid",
-  "EnvironmentService.InvalidSandbox": "invalid",
-  // Agents: renamed meanwhile, or gone; a connection or environment no longer usable, or one
-  // that cannot run the model, is refused with the draft kept, and `agentProblems` names it.
+  "ConnectionService.InvalidConnection": "invalid",
+  "ConnectionService.Keyless": "invalid",
+  // Agents: renamed meanwhile, or gone; a connection no longer usable, or a setup that cannot
+  // run, is refused with the draft kept, and `agentsFailure` tells them apart.
   "AgentService.Changed": "changed",
   "AgentService.NotFound": "gone",
   "AgentService.ConnectionUnavailable": "invalid",
-  "AgentService.EnvironmentUnavailable": "invalid",
-  "AgentService.Incompatible": "invalid",
-  // Agents v2 the same way; `agentsV2Failure` tells a refused setup apart.
-  "AgentV2Service.Changed": "changed",
-  "AgentV2Service.NotFound": "gone",
-  "AgentV2Service.ConnectionUnavailable": "invalid",
-  "AgentV2Service.Incomplete": "invalid",
+  "AgentService.Incomplete": "invalid",
   // Turns: one that finished or moved on meanwhile, or that left the reader's reach;
   // `turnProblems` tells the refusals apart.
   "TurnService.NotActive": "changed",
   "TurnService.NotRetryable": "changed",
   "TurnService.NotFound": "gone",
-  "TurnService.ThreadNotFound": "gone",
   // Following a turn's log stopped short, or too many streams are open: following again may work.
   "Turn.LogUnavailable": "failed",
   "Api.TooManyStreams": "failed",
   // The host keeps no credentials; `credentialsUnavailable` tells it apart from other failures.
   "ConnectionService.CredentialsUnavailable": "failed",
-  "ConnectionV2Service.CredentialsUnavailable": "failed",
   "GroupFollowService.AgentRequired": "denied",
   "ReadStateService.HumanRequired": "denied",
   "ThreadService.HumanAuthorRequired": "denied",

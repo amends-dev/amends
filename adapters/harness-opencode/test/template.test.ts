@@ -1,6 +1,6 @@
-import { Harness } from "@amends/harness-v2";
-import { SessionId } from "@amends/harness-v2/Agent";
-import { Sandbox } from "@amends/sandbox-v2";
+import { Harness } from "@amends/harness";
+import { SessionId } from "@amends/harness/Agent";
+import { Sandbox } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Path, Redacted } from "effect";

@@ -1,1 +1,1 @@
-export { LocalSandbox } from "./local-sandbox.ts";
+export * as LocalSandboxProvider from "./LocalSandboxProvider.ts";

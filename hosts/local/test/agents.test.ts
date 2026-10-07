@@ -1,6 +1,7 @@
-import { Api, Authentication, ConnectionImplementation, Environment } from "@amends/api-http";
+import { Api, Authentication } from "@amends/api-http";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Identity } from "@amends/core/identity";
+import { Request } from "@amends/core/request";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";
@@ -19,8 +20,9 @@ const asToken = (token: string) =>
     next(HttpClientRequest.bearerToken(request, token)),
   );
 const client = (token: string) => HttpApiClient.make(Api).pipe(Effect.provide(asToken(token)));
-/** The real routes, gateway, and PostgreSQL storage behind a Bun test server. */
-const server = (url: string, credentialKey: Redacted.Redacted<string> | undefined) =>
+const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
+/** The real routes, gateway, integrations, and PostgreSQL storage behind a Bun test server. */
+const server = (url: string) =>
   HttpRouter.serve(LocalServer.layerRoutes, { disableLogger: true, disableListenLog: true }).pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -30,7 +32,7 @@ const server = (url: string, credentialKey: Redacted.Redacted<string> | undefine
     ),
     Layer.provideMerge(BunHttpServer.layerTest),
   );
-const credentialKey = Redacted.make(Base64.encode(crypto.getRandomValues(new Uint8Array(32))));
+
 /** Alice owns a workspace that Bob joined as a member. */
 const workspaceWithBob = Effect.gen(function* () {
   const asAlice = yield* client(alice);
@@ -51,123 +53,185 @@ const workspaceWithBob = Effect.gen(function* () {
   });
   return { asAlice, asBob, workspaceId: workspace.id };
 });
+
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
-  it.live("agents are added as members, configured, and removed over HTTP", () =>
+  it.live("a connection's models are read over HTTP, as its integration offers them", () =>
     withDatabase((url) =>
       Effect.gen(function* () {
         const { asAlice, asBob, workspaceId } = yield* workspaceWithBob;
-        // Each model provider suggests models; the agent names one, or any other.
-        const implementations = yield* asAlice.connections.implementations({
-          params: { workspaceId },
-        });
-        const anthropic = implementations.find(({ id }) => id === "anthropic");
-        expect(anthropic?.capabilities.modelInference?.models?.map(({ id }) => id)).toContain(
-          "claude-sonnet-5",
-        );
-        const models = yield* asAlice.connections.create({
-          params: { workspaceId },
-          headers: {},
-          payload: {
-            name: "Anthropic",
-            implementationId: ConnectionImplementation.Id.make("anthropic"),
-            settings: {},
-            authentication: "ApiKey",
-          },
-        });
-        const model = { connectionId: models.id, model: "claude-sonnet-5", reasoning: null };
-
-        // The in-process environment can run it once the key is set.
-        expect(
-          yield* asAlice.agents.environmentChoices({
+        const connect = (integration: string, apiKey?: string) =>
+          asAlice.connections.create({
             params: { workspaceId },
-            query: { connectionId: models.id, model: "claude-sonnet-5" },
-          }),
-        ).toEqual([
-          {
-            environmentId: Environment.InProcessId,
-            compatibility: { _tag: "Incompatible", reasons: [{ _tag: "ConnectionNotReady" }] },
-          },
-        ]);
+            headers: {},
+            payload:
+              apiKey === undefined
+                ? { integration, name: integration, settings: {}, auth: "none" }
+                : {
+                    integration,
+                    name: integration,
+                    settings: {},
+                    auth: "apiKey",
+                    apiKey: Redacted.make(apiKey),
+                  },
+          });
+        const anthropic = yield* connect("anthropic", "sk-ant-agents-test");
+        const harness = yield* connect("amends");
+
+        // A catalog provider lists its models and offers no other; a harness offers none.
+        const offered = yield* asBob.connections.models({
+          params: { workspaceId, connectionId: anthropic.id },
+        });
+        expect(offered.unlisted).toBe(false);
+        expect(offered.listed.length).toBeGreaterThan(0);
+        expect(offered.listed.every((model) => model.id.length > 0)).toBe(true);
+        expect(
+          yield* asBob.connections.models({ params: { workspaceId, connectionId: harness.id } }),
+        ).toEqual({ listed: [], unlisted: false });
+
+        yield* asAlice.connections.remove({
+          params: { workspaceId, connectionId: anthropic.id },
+        });
+        expect(
+          yield* asBob.connections
+            .models({ params: { workspaceId, connectionId: anthropic.id } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "ConnectionService.NotFound" });
+      }).pipe(Effect.scoped, Effect.provide(server(url))),
+    ),
+  );
+
+  it.live("agents are created, configured, renamed, and removed over HTTP", () =>
+    withDatabase((url) =>
+      Effect.gen(function* () {
+        const { asAlice, asBob, workspaceId } = yield* workspaceWithBob;
+        const connect = (integration: string, settings: Record<string, string> = {}) =>
+          asAlice.connections.create({
+            params: { workspaceId },
+            headers: {},
+            payload: { integration, name: integration, settings, auth: "none" },
+          });
+        const amends = yield* connect("amends");
+        const opencode = yield* connect("opencode-agent");
+        const local = yield* connect("local");
+        // An OpenAI-compatible endpoint offers whatever model it is asked for; nothing listens here.
+        const models = yield* connect("openai-compatible", { url: "http://127.0.0.1:1/v1" });
+
+        const payload = {
+          name: "Reviewer",
+          roleId: BuiltinRoles.MemberId,
+          instructions: "Review each change.",
+          harness: { _tag: "Connection", connectionId: amends.id },
+          model: { connectionId: models.id, id: "local-model" },
+          sandbox: null,
+        } as const;
+        const headers = { "idempotency-key": Request.Key.make("create-reviewer") };
         const created = yield* asAlice.agents.create({
           params: { workspaceId },
-          headers: {},
-          payload: {
-            name: "Reviewer",
-            instructions: "Review each change for correctness.",
-            model,
-            environmentId: Environment.InProcessId,
-            roleId: BuiltinRoles.MemberId,
-          },
+          headers,
+          payload,
         });
         expect(created).toMatchObject({
           name: "Reviewer",
-          configurable: true,
-          usable: true,
-          readiness: { _tag: "Incomplete", issues: [{ _tag: "ConnectionNotReady" }] },
-        });
-        yield* asAlice.connections.setCredential({
-          params: { workspaceId, connectionId: models.id },
-          payload: { secret: Redacted.make("sk-ant-test") },
-        });
-        const params = { workspaceId, agentId: created.id };
-        expect(yield* asBob.agents.get({ params })).toMatchObject({
+          instructions: "Review each change.",
+          harness: { _tag: "Connection", connectionId: amends.id },
+          model: { connectionId: models.id, id: "local-model" },
+          sandbox: null,
           readiness: { _tag: "Ready" },
-          configurable: false,
-          usable: true,
+          configurable: true,
         });
-        // The agent is a member of the workspace, named as it was created.
+        // A retried create answers with the agent it made.
         expect(
-          (yield* asBob.members.list({ params: { workspaceId } })).find(
-            ({ id }) => id === created.memberId,
-          ),
+          (yield* asAlice.agents.create({ params: { workspaceId }, headers, payload })).id,
+        ).toBe(created.id);
+        const params = { workspaceId, agentId: created.id };
+
+        // The agent is a member of the workspace, under its name.
+        expect(
+          yield* asBob.members.get({ params: { workspaceId, memberId: created.memberId } }),
         ).toMatchObject({ identity: { _tag: "Agent", id: created.id }, name: "Reviewer" });
 
-        // Members read agents; administrators change them.
+        // Members read agents but only administrators add or change them.
+        expect(yield* asBob.agents.list({ params: { workspaceId } })).toMatchObject([
+          { id: created.id, configurable: false },
+        ]);
         expect(
           yield* asBob.agents
-            .rename({ params, payload: { name: "Mine", expectedName: "Reviewer" } })
+            .create({ params: { workspaceId }, headers: {}, payload })
             .pipe(Effect.flip),
         ).toMatchObject({ _tag: "Authorization.Denied" });
+
+        // A setup that could not run, or names a connection that gives nothing, is refused.
+        const inOpencode = {
+          ...payload,
+          harness: { _tag: "Connection", connectionId: opencode.id },
+        } as const;
         expect(
           yield* asAlice.agents
-            .configure({
-              params,
-              payload: {
-                instructions: "Review.",
-                model: Object.assign({}, model, { reasoning: "high" }),
-                environmentId: Environment.InProcessId,
-              },
+            .create({ params: { workspaceId }, headers: {}, payload: inOpencode })
+            .pipe(Effect.flip),
+        ).toMatchObject({
+          _tag: "AgentService.Incomplete",
+          issues: [{ _tag: "SandboxRequired" }],
+        });
+        expect(
+          yield* asAlice.agents
+            .create({
+              params: { workspaceId },
+              headers: {},
+              payload: { ...payload, model: { connectionId: local.id, id: "local-model" } },
             })
             .pipe(Effect.flip),
         ).toMatchObject({
-          _tag: "AgentService.Incompatible",
-          reasons: [{ _tag: "ReasoningUnsupported", reasoning: "high" }],
+          _tag: "AgentService.Incomplete",
+          issues: [{ _tag: "Invalid", part: "model", description: "This machine gives no models" }],
         });
+
+        // In a sandbox, opencode can run it.
         const configured = yield* asAlice.agents.configure({
           params,
           payload: {
-            instructions: "Review, then summarize.",
-            model: Object.assign({}, model, { model: "claude-opus-5-5" }),
-            environmentId: Environment.InProcessId,
+            instructions: "Review each change, then test it.",
+            harness: inOpencode.harness,
+            model: { connectionId: models.id, id: "local-model", effort: "high" },
+            sandbox: { connectionId: local.id },
           },
         });
         expect(configured).toMatchObject({
-          instructions: "Review, then summarize.",
-          model: { model: "claude-opus-5-5" },
+          instructions: "Review each change, then test it.",
+          harness: { _tag: "Connection", connectionId: opencode.id },
+          model: { effort: "high" },
+          sandbox: { connectionId: local.id },
+          readiness: { _tag: "Ready" },
         });
+
+        // Removing the sandbox's connection leaves the agent unable to run.
+        yield* asAlice.connections.remove({ params: { workspaceId, connectionId: local.id } });
+        expect(yield* asBob.agents.get({ params })).toMatchObject({
+          readiness: {
+            _tag: "Incomplete",
+            issues: [{ _tag: "Removed", part: "sandbox" }],
+          },
+        });
+
+        const renamed = yield* asAlice.agents.rename({
+          params,
+          payload: { name: "Tester", expectedName: "Reviewer" },
+        });
+        expect(renamed.name).toBe("Tester");
         expect(
-          (yield* asAlice.agents.rename({
-            params,
-            payload: { name: "Critic", expectedName: "Reviewer" },
-          })).name,
-        ).toBe("Critic");
-        yield* asAlice.agents.remove({ params });
+          yield* asAlice.agents
+            .rename({ params, payload: { name: "Other", expectedName: "Reviewer" } })
+            .pipe(Effect.flip),
+        ).toMatchObject({ _tag: "AgentService.Changed" });
+
+        // An agent leaves as any member does.
+        yield* asAlice.members.remove({ params: { workspaceId, memberId: created.memberId } });
         expect(yield* asBob.agents.get({ params }).pipe(Effect.flip)).toMatchObject({
           _tag: "AgentService.NotFound",
         });
         expect(yield* asAlice.agents.list({ params: { workspaceId } })).toEqual([]);
-      }).pipe(Effect.scoped, Effect.provide(server(url, credentialKey))),
+      }).pipe(Effect.scoped, Effect.provide(server(url))),
     ),
   );
 });

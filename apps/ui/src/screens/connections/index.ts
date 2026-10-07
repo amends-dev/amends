@@ -1,14 +1,12 @@
 export {
-  ChooseProvider,
+  ChooseIntegration,
   ConfigureConnection,
   ConfirmRemoveConnection,
-  ConfirmRemoveKey,
-  ConnectionKey,
-  type ChooseProviderProps,
+  ReplaceKeyV2,
+  type ChooseIntegrationProps,
   type ConfigureConnectionProps,
   type ConfirmRemoveConnectionProps,
-  type ConfirmRemoveKeyProps,
-  type ConnectionKeyProps,
+  type ReplaceKeyV2Props,
 } from "./add-connection.tsx";
 export { ConnectionPane, type ConnectionPaneProps } from "./connection-pane.tsx";
 export {
@@ -19,17 +17,18 @@ export {
   type ConnectionsTab,
 } from "./connections-pane.tsx";
 export {
+  capabilityLabels,
+  capabilityNouns,
   connectionStatus,
   connectionsMessage,
   connectionsToast,
-  type ConnectionCapability,
-  type ConnectionMethod,
-  type ConnectionProviderOption,
-  type ConnectionSettingField,
-  type ConnectionSetup,
+  type AuthMethod,
+  type ConnectionHealth,
+  type ConnectionReadiness,
   type ConnectionSummary,
   type ConnectionsAction,
   type ConnectionsError,
   type ConnectionsFailure,
-  type SettingIssue,
+  type IntegrationCapability,
+  type IntegrationOption,
 } from "./wording.tsx";

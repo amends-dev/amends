@@ -2,7 +2,7 @@ import { Duration } from "effect";
 
 /**
  * How long a job waits before it runs again after `failures` failed runs: doubling from two
- * seconds, up to five minutes. Agent and turn jobs both ask for their next run this way.
+ * seconds, up to five minutes.
  */
 export const delay = (failures: number) =>
   Duration.seconds(Math.min(300, 2 ** Math.min(failures, 9)));

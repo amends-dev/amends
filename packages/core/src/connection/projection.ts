@@ -6,18 +6,16 @@ import { ConnectionStore } from "./store.ts";
 
 /** Apply a change to the stored connection it names, which must exist in this workspace. */
 const change = Effect.fnUntraced(function* (
-  payload: {
-    readonly workspaceId: Connection.Record["workspaceId"];
-    readonly connectionId: Connection.Id;
-  },
+  connectionId: Connection.Id,
   apply: (record: Connection.Record) => Connection.Record,
 ) {
   const connectionStore = yield* ConnectionStore.Service;
-  const found = yield* connectionStore.get(payload.connectionId);
+  const found = yield* connectionStore.get(connectionId);
   if (Option.isNone(found)) return yield* Effect.die("A changed connection is missing");
   yield* connectionStore.update(apply(found.value));
 });
 
+/** Connections' records; replacing a key changes none. */
 export const definition = Projection.make("connections", { version: 1 })
   .on(
     ConnectionFacts.Created,
@@ -27,25 +25,15 @@ export const definition = Projection.make("connections", { version: 1 })
     }),
   )
   .on(ConnectionFacts.Renamed, ({ payload }) =>
-    change(payload, (record) => Connection.change(record, { name: payload.name })),
+    change(payload.connectionId, (record) => Connection.change(record, { name: payload.name })),
   )
   .on(ConnectionFacts.Configured, ({ payload }) =>
-    change(payload, (record) => Connection.change(record, { settings: payload.settings })),
-  )
-  .on(ConnectionFacts.CredentialSet, ({ payload }) =>
-    change(payload, (record) =>
-      Connection.change(record, {
-        authentication: { _tag: "ApiKey", credentialId: payload.credentialId },
-      }),
-    ),
-  )
-  .on(ConnectionFacts.CredentialCleared, ({ payload }) =>
-    change(payload, (record) =>
-      Connection.change(record, { authentication: { _tag: "ApiKey", credentialId: null } }),
+    change(payload.connectionId, (record) =>
+      Connection.change(record, { settings: payload.settings }),
     ),
   )
   .on(ConnectionFacts.Removed, ({ payload }) =>
-    change(payload, (record) => Connection.change(record, { status: "removed" })),
+    change(payload.connectionId, (record) => Connection.change(record, { status: "removed" })),
   );
 
 export * as ConnectionProjection from "./projection.ts";

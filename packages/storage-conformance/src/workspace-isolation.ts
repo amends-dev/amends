@@ -1,9 +1,6 @@
 import { Agent } from "@amends/core/agent";
-import { AgentV2 } from "@amends/core/agent-v2";
 import { BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
 import { Connection } from "@amends/core/connection";
-import { ConnectionV2 } from "@amends/core/connection-v2";
-import { Environment } from "@amends/core/environment";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
 import {
@@ -20,14 +17,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";
 import { Store } from "@amends/core/journal";
-import {
-  type Bound,
-  forWorkspace,
-  otherWorkspaceId,
-  Support,
-  testImplementation,
-  workspaceId,
-} from "./support.ts";
+import { type Bound, forWorkspace, otherWorkspaceId, Support, workspaceId } from "./support.ts";
 
 /** One store's write of a record that names another workspace, and how to look for it after. */
 interface Attempt {
@@ -57,13 +47,10 @@ export const workspaceIsolation = (harness: Harness) => {
             const elsewhere = { workspaceId: otherWorkspaceId };
             const now = yield* DateTime.now;
             const memberId = workspace.ownerMemberId;
-            const [environment] = yield* bound.environments.list;
             const [assignment] = yield* bound.assignments.listActiveByMember(memberId);
             const role = yield* bound.roles.get(BuiltinRoles.MemberId);
-            if (environment === undefined || assignment === undefined || Option.isNone(role))
-              return yield* Effect.die(
-                "An initialized workspace has its environment, owner, and roles",
-              );
+            if (assignment === undefined || Option.isNone(role))
+              return yield* Effect.die("An initialized workspace has its owner and roles");
             const threadId = Thread.Id.make("foreign-thread");
             const messageId = ThreadMessage.Id.make("foreign-message");
 
@@ -113,24 +100,15 @@ export const workspaceIsolation = (harness: Harness) => {
                 write: bound.connections.insert({
                   id: Connection.Id.make("foreign-connection"),
                   workspaceId: otherWorkspaceId,
+                  integration: "test-models",
                   name: "Foreign",
-                  implementationId: testImplementation.id,
                   settings: {},
-                  authentication: { _tag: "None" },
+                  auth: "none",
                   status: "active",
                   createdBy: memberId,
                   createdAt: now,
                 }),
                 kept: (on) => on.connections.get(Connection.Id.make("foreign-connection")),
-              },
-              {
-                store: "EnvironmentStore",
-                write: bound.environments.insert(
-                  Object.assign({}, environment, elsewhere, {
-                    id: Environment.Id.make("foreign-environment"),
-                  }),
-                ),
-                kept: (on) => on.environments.get(Environment.Id.make("foreign-environment")),
               },
               {
                 store: "AgentStore",
@@ -139,31 +117,13 @@ export const workspaceIsolation = (harness: Harness) => {
                   workspaceId: otherWorkspaceId,
                   memberId: Member.Id.make("foreign-agent-member"),
                   instructions: "",
-                  model: {
-                    connectionId: Connection.Id.make("foreign-connection"),
-                    model: "model",
-                    reasoning: null,
-                  },
-                  environmentId: environment.id,
-                  createdBy: memberId,
-                  createdAt: now,
-                }),
-                kept: (on) => on.agents.get(Agent.Id.make("foreign-agent")),
-              },
-              {
-                store: "AgentV2Store",
-                write: bound.agentsV2.insert({
-                  id: AgentV2.Id.make("foreign-agent-v2"),
-                  workspaceId: otherWorkspaceId,
-                  memberId: Member.Id.make("foreign-agent-v2-member"),
-                  instructions: "",
                   harness: { _tag: "Auto" },
-                  model: { connectionId: ConnectionV2.Id.make("foreign-connection"), id: "model" },
+                  model: { connectionId: Connection.Id.make("foreign-connection"), id: "model" },
                   sandbox: null,
                   createdBy: memberId,
                   createdAt: now,
                 }),
-                kept: (on) => on.agentsV2.get(AgentV2.Id.make("foreign-agent-v2")),
+                kept: (on) => on.agents.get(Agent.Id.make("foreign-agent")),
               },
               {
                 store: "TurnStore",
@@ -175,12 +135,10 @@ export const workspaceIsolation = (harness: Harness) => {
                   agentId: Identity.AgentId.make("foreign-agent"),
                   memberId: Member.Id.make("foreign-agent-member"),
                   participationId: ThreadParticipation.Id.make("foreign-participation"),
-                  logAfter: null,
-                  historyFrom: null,
-                  retryOf: null,
+                  retry: null,
                   status: "queued",
-                  inputAfterSequence: 0,
                   acceptedThroughSequence: 1,
+                  logAfter: 0,
                   selection: null,
                   messageIds: [],
                   failure: null,

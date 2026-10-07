@@ -6,23 +6,32 @@ import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { SearchField } from "../../components/input/index.ts";
 import { markTone, type Status } from "../../components/status-mark/index.ts";
+import { Tabs } from "../../components/tabs/index.ts";
 import { Tooltip } from "../../components/tooltip/index.ts";
 import { TurnActivity } from "../../components/turn-status/index.ts";
-import { Tabs } from "../../components/tabs/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
   AgentsAlert,
   agentStatus,
+  harnessLine,
   modelLine,
-  activityWords,
+  placesLine,
+  sandboxLine,
+  turnStateWord,
   type AgentSummary,
   type AgentsFailure,
 } from "./wording.tsx";
 import * as s from "./agents.css.ts";
 
+/** All agents, or those that need setup before they can run. */
 export type AgentsTab = "all" | "needs-setup";
+
+const tabs: ReadonlyArray<{ readonly id: AgentsTab; readonly label: string }> = [
+  { id: "all", label: "All" },
+  { id: "needs-setup", label: "Needs setup" },
+];
 
 export interface AgentsPaneProps {
   /** Under the title on phones. */
@@ -32,7 +41,7 @@ export interface AgentsPaneProps {
   /** Switches tabs in place of following their links. */
   readonly onTabChange?: (tab: AgentsTab) => void;
   /** Agents in each tab, once they have loaded. */
-  readonly counts?: { readonly all: number; readonly needsSetup: number };
+  readonly counts?: Readonly<Record<AgentsTab, number>>;
   /** Shows Add agent, for a reader who may add one. */
   readonly onAdd?: () => void;
   /** In place of the list, while agents load or when they cannot. */
@@ -42,15 +51,10 @@ export interface AgentsPaneProps {
   readonly children: JSX.Element;
 }
 
-const tabs = [
-  { id: "all", label: "All" },
-  { id: "needs-setup", label: "Needs setup" },
-] as const;
-
-/** The workspace's agents in the main content, All first, then those that need setup. */
+/** The workspace's agents in the main content: All, then those that need setup. */
 export function AgentsPane(props: AgentsPaneProps) {
   return (
-    <Pane.Root class={s.pane}>
+    <Pane.Root>
       <Pane.Header>
         <Shell.NavigationToggle />
         <Pane.Title icon={IconMarkAgents} context={props.workspaceName}>
@@ -73,13 +77,7 @@ export function AgentsPane(props: AgentsPaneProps) {
                 <Tabs.Tab
                   href={props.tabHref(tab.id)}
                   current={props.tab === tab.id}
-                  count={
-                    props.counts === undefined
-                      ? undefined
-                      : tab.id === "all"
-                        ? props.counts.all
-                        : props.counts.needsSetup
-                  }
+                  count={props.counts?.[tab.id]}
                   onClick={(event: MouseEvent) => {
                     if (!props.onTabChange) return;
                     event.preventDefault();
@@ -103,8 +101,11 @@ export function AgentsPane(props: AgentsPaneProps) {
               <For each={[0, 1, 2]}>
                 {() => (
                   <li class={s.placeholder}>
-                    <span class={s.placeholderTile} />
-                    <span class={s.placeholderLine} />
+                    <span class={s.placeholderAvatar} />
+                    <span class={s.placeholderLines}>
+                      <span class={s.placeholderLine} />
+                      <span class={s.placeholderShort} />
+                    </span>
                   </li>
                 )}
               </For>
@@ -138,33 +139,10 @@ export function AgentsPane(props: AgentsPaneProps) {
   );
 }
 
-export interface AgentListProps {
-  readonly tab: AgentsTab;
-  readonly query: string;
-  readonly onQueryChange: (query: string) => void;
-  /** The tab's agents after the search. */
-  readonly agents: readonly AgentSummary[];
-  /** Agents in the workspace, whatever the tab and search. */
-  readonly total: number;
-  /** No model connection exists yet, so agents need one before the first is added. */
-  readonly noModelConnection?: boolean;
-  /** Each agent's page. */
-  readonly agentHref: (id: string) => string;
-  /** Starts adding an agent, for a reader who may. */
-  readonly onAdd?: () => void;
-  /** Starts creating a model connection, for a reader who may add agents. */
-  readonly onCreateConnection?: () => void;
-  /** A read or change that failed, outside any dialog. */
-  readonly failure?: Pick<AgentsFailure, "action" | "error">;
-  readonly onRefresh?: () => void;
-  readonly refreshing?: boolean;
-}
-
-/** One letter on a lilac tile, as agents appear across the workspace. */
+/** An agent's avatar, with its state as a patch on the corner and the state's words on hover. */
 export function AgentAvatar(props: {
   readonly name: string;
   readonly size: 32 | 40;
-  /** A patch on its corner, with its words on hover; the text beside it names the state. */
   readonly status?: Status;
   readonly class?: string;
 }) {
@@ -195,11 +173,29 @@ export function AgentAvatar(props: {
   );
 }
 
+export interface AgentListProps {
+  readonly tab: AgentsTab;
+  readonly query: string;
+  readonly onQueryChange: (query: string) => void;
+  /** The tab's agents after the search. */
+  readonly agents: readonly AgentSummary[];
+  /** Agents in the workspace, whatever the tab and search. */
+  readonly total: number;
+  /** Each agent's page. */
+  readonly agentHref: (id: string) => string;
+  /** Starts adding an agent, for a reader who may. */
+  readonly onAdd?: () => void;
+  /** A read or change that failed, outside any dialog. */
+  readonly failure?: AgentsFailure;
+  readonly onRefresh?: () => void;
+  readonly refreshing?: boolean;
+}
+
 /**
- * The agent list: search, then each agent with its state as a patch on its avatar, its model,
- * environment, and where it is at work, each row opening the agent's page. With room it shows
- * the model, environment, and activity as columns; in a narrow pane or on phones, under the name.
- * An idle agent's activity is blank. Place it in AgentsPane.
+ * The agent list: search, then each agent with its state as a patch on its avatar, the harness it
+ * runs on and where, its model, and where it is at work, each row opening the agent's page. With
+ * room these are columns, the activity blank while the agent is idle; on phones they sit under the
+ * name. With no agents yet it offers adding one. Place it in AgentsPane.
  */
 export function AgentList(props: AgentListProps) {
   const search = () => props.query.trim();
@@ -207,8 +203,7 @@ export function AgentList(props: AgentListProps) {
     <Show when={props.failure}>
       {(failure) => (
         <AgentsAlert
-          action={failure().action}
-          error={failure().error}
+          failure={failure()}
           onRefresh={props.onRefresh}
           refreshing={props.refreshing}
         />
@@ -221,46 +216,23 @@ export function AgentList(props: AgentListProps) {
       fallback={
         <Pane.Body>
           {alert()}
-          <Show
-            when={props.noModelConnection && props.onCreateConnection}
-            fallback={
-              <EmptyState
-                art="sew-in"
-                title="No agents yet"
-                lines={
-                  props.onAdd
-                    ? [
-                        "Create an agent with instructions, a model,",
-                        "and an environment to start in.",
-                      ]
-                    : ["An administrator can add agents to your workspace."]
-                }
-              >
-                <Show when={props.onAdd}>
-                  {(add) => (
-                    <Button variant="primary" onClick={() => add()()}>
-                      Add agent
-                    </Button>
-                  )}
-                </Show>
-              </EmptyState>
-            }
+          <EmptyState
+            art="sew-in"
+            title="No agents yet"
+            lines={[
+              props.onAdd
+                ? "Add an agent: a member that works on a harness and a model your connections give."
+                : "An administrator can add agents to your workspace.",
+            ]}
           >
-            {(create) => (
-              <EmptyState
-                art="reach"
-                title="Connect a model first"
-                lines={[
-                  "Agents need a model connection.",
-                  "Connect a model provider, then create your first agent.",
-                ]}
-              >
-                <Button variant="primary" onClick={() => create()()}>
-                  Create model connection
+            <Show when={props.onAdd}>
+              {(add) => (
+                <Button variant="primary" onClick={() => add()()}>
+                  Add agent
                 </Button>
-              </EmptyState>
-            )}
-          </Show>
+              )}
+            </Show>
+          </EmptyState>
         </Pane.Body>
       }
     >
@@ -274,9 +246,9 @@ export function AgentList(props: AgentListProps) {
       </Pane.Toolbar>
       <div class={s.headings} aria-hidden="true">
         <span class={s.headingAgent}>Agent</span>
-        <span class={s.wideColumn}>Model</span>
-        <span class={s.wideColumn}>Environment</span>
-        <span class={s.wideColumn}>Activity</span>
+        <span>Harness</span>
+        <span>Model</span>
+        <span>Activity</span>
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
@@ -287,7 +259,11 @@ export function AgentList(props: AgentListProps) {
             fallback={
               <div class={s.empty}>
                 <p class={s.emptyText}>
-                  {search() ? `No agents match “${search()}”.` : "All agents are ready."}
+                  {search()
+                    ? `No agents match “${search()}”.`
+                    : props.tab === "needs-setup"
+                      ? "Every agent can run as it is set up."
+                      : "No agents yet."}
                 </p>
                 <Show when={search()}>
                   <Button variant="quiet" onClick={() => props.onQueryChange("")}>
@@ -297,10 +273,7 @@ export function AgentList(props: AgentListProps) {
               </div>
             }
           >
-            <ul
-              class={s.list}
-              aria-label={props.tab === "needs-setup" ? "Agents that need setup" : "Agents"}
-            >
+            <ul class={s.list} aria-label="Agents">
               <Keyed each={props.agents} by={(agent) => agent.id}>
                 {(agent) => {
                   const status = () => agentStatus(agent().issues, agent().activity);
@@ -311,41 +284,48 @@ export function AgentList(props: AgentListProps) {
                           name={agent().name}
                           size={32}
                           status={status()}
-                          class={s.avatar}
+                          class={s.rowAvatar}
                         />
                         <span class={s.rowText}>
                           <span class={s.rowName}>
                             {agent().name}
-                            <span class={s.visuallyHidden}>, {status().label}</span>
+                            <Show when={status()}>
+                              {(status) => <span class={s.visuallyHidden}>, {status().label}</span>}
+                            </Show>
                           </span>
-                          <span class={s.rowLine}>{modelLine(agent())}</span>
-                          <span class={s.rowLine}>
-                            {agent().environment.name ?? "Unavailable environment"}
+                          <span class={s.rowUnder}>
+                            {`${harnessLine(agent().harness)} · ${modelLine(agent().model)}`}
                           </span>
                           <Show when={agent().activity}>
                             {(activity) => (
-                              <span class={s.rowLine}>
+                              <span class={s.rowUnder}>
                                 <TurnActivity state={activity().state}>
-                                  {`${activityWords(activity()).status} · ${activityWords(activity()).where}`}
+                                  {`${turnStateWord(activity().state)} · ${placesLine(activity().places)}`}
                                 </TurnActivity>
                               </span>
                             )}
                           </Show>
                         </span>
-                        <span class={s.rowColumn}>{modelLine(agent())}</span>
                         <span class={s.rowColumn}>
-                          {agent().environment.name ?? "Unavailable environment"}
+                          <span class={s.rowValue}>{harnessLine(agent().harness)}</span>
+                          <span class={s.rowDetail}>{sandboxLine(agent().sandbox)}</span>
                         </span>
-                        <span class={s.rowActivity}>
+                        <span class={s.rowColumn}>
+                          <span class={s.rowValue}>{agent().model.name ?? agent().model.id}</span>
+                          <span class={s.rowDetail}>
+                            {agent().model.connection.name ?? "Removed connection"}
+                          </span>
+                        </span>
+                        <span class={s.rowColumn}>
                           <Show when={agent().activity}>
                             {(activity) => (
                               <>
-                                <TurnActivity state={activity().state}>
-                                  {activityWords(activity()).status}
-                                </TurnActivity>
-                                <span class={s.activityWhere}>
-                                  {activityWords(activity()).where}
+                                <span class={s.rowValue}>
+                                  <TurnActivity state={activity().state}>
+                                    {turnStateWord(activity().state)}
+                                  </TurnActivity>
                                 </span>
+                                <span class={s.rowDetail}>{placesLine(activity().places)}</span>
                               </>
                             )}
                           </Show>

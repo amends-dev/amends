@@ -6,28 +6,46 @@ import { Binding } from "./binding.ts";
 import { storeConflict, storeError, storeFailure } from "./errors.ts";
 import { agents } from "./schema.ts";
 
-const validateRecord = Schema.decodeEffect(Schema.toType(Agent.Record));
-const decodeRows = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ ...Agent.Record.fields, createdAt: Schema.DateTimeUtcFromDate })),
-);
 type Row = typeof agents.$inferSelect;
-const toRecord = ({ connectionId, model, reasoning, ...common }: Row) => ({
-  ...common,
-  model: { connectionId, model, reasoning },
+
+const validateRecord = Schema.decodeEffect(Schema.toType(Agent.Record));
+const decodeRecord = Schema.decodeUnknownEffect(
+  Schema.Struct({ ...Agent.Record.fields, createdAt: Schema.DateTimeUtcFromDate }),
+);
+
+/** The record a row stores, before its fields are checked. */
+const recordOf = (row: Row) => ({
+  id: row.id,
+  workspaceId: row.workspaceId,
+  memberId: row.memberId,
+  instructions: row.instructions,
+  harness:
+    row.harnessConnectionId === null
+      ? { _tag: "Auto" }
+      : { _tag: "Connection", connectionId: row.harnessConnectionId },
+  model: {
+    connectionId: row.modelConnectionId,
+    id: row.modelId,
+    ...(row.modelEffort === null ? {} : { effort: row.modelEffort }),
+  },
+  sandbox: row.sandboxConnectionId === null ? null : { connectionId: row.sandboxConnectionId },
+  createdBy: row.createdBy,
+  createdAt: row.createdAt,
 });
-const decode = (rows: ReadonlyArray<Row>) =>
-  decodeRows(rows.map(toRecord)).pipe(
-    Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
-  );
-const toRow = ({ model, ...record }: Agent.Record): typeof agents.$inferInsert => ({
+
+const decodeRows = (rows: ReadonlyArray<Row>) =>
+  Effect.forEach(rows, (row) => decodeRecord(recordOf(row)));
+
+const toRow = (record: Agent.Record): typeof agents.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   memberId: record.memberId,
   instructions: record.instructions,
-  connectionId: model.connectionId,
-  model: model.model,
-  reasoning: model.reasoning,
-  environmentId: record.environmentId,
+  harnessConnectionId: record.harness._tag === "Connection" ? record.harness.connectionId : null,
+  modelConnectionId: record.model.connectionId,
+  modelId: record.model.id,
+  modelEffort: record.model.effort ?? null,
+  sandboxConnectionId: record.sandbox?.connectionId ?? null,
   createdBy: record.createdBy,
   createdAt: DateTime.toDate(record.createdAt),
 });
@@ -56,14 +74,14 @@ export const make = Effect.fn("Agents.make")(function* () {
       function* (input) {
         const id = yield* Schema.decodeEffect(Agent.Id)(input);
         return yield* guard(db.select().from(agents).where(inWorkspace(id))).pipe(
-          Effect.flatMap(decode),
+          Effect.flatMap(decodeRows),
           Effect.map(Array.head),
         );
       },
       Effect.mapError(storeFailure(AgentStore, "get")),
     ),
     list: guard(db.select().from(agents).where(eq(agents.workspaceId, workspaceId))).pipe(
-      Effect.flatMap(decode),
+      Effect.flatMap(decodeRows),
       Effect.mapError(storeFailure(AgentStore, "list")),
     ),
     insert: Effect.fn("Agents.insert")(function* (input) {

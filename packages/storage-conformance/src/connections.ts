@@ -1,4 +1,4 @@
-import { ConnectionImplementation } from "@amends/connection";
+import { Integration } from "@amends/connection";
 import { Connection, ConnectionService } from "@amends/core/connection";
 import { Actor, type Identity } from "@amends/core/identity";
 import { Journal, Store } from "@amends/core/journal";
@@ -6,7 +6,7 @@ import { Request } from "@amends/core/request";
 import type { Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
-import { Effect, Option, Redacted } from "effect";
+import { Effect, Option, Redacted, Schema } from "effect";
 import type { Harness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -15,30 +15,43 @@ import {
   boundTo,
   failingLate,
   future,
+  goodKey,
+  installed,
   journalLog,
   request,
   Support,
-  testImplementation,
+  testModel,
 } from "./support.ts";
 
 const as = <A, E>(
   workspaceId: Workspace.Id,
   identity: Identity.MemberReference,
-  use: (service: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
+  use: (connectionService: ConnectionService.Interface) => Effect.Effect<A, E, Actor.Service>,
 ) =>
   Effect.flatMap(Gateway.Service, (gateway) =>
     gateway.asMember(workspaceId, identity, Effect.flatMap(ConnectionService.Service, use)),
   );
 
 const models: Connection.CreateInput = {
+  integration: "test-models",
   name: "Models",
-  implementationId: testImplementation.id,
   settings: { endpoint: "https://models.example" },
-  authentication: "ApiKey",
+  auth: "apiKey",
+  apiKey: Redacted.make(goodKey),
 };
 
-const modelsWith = (changes: Partial<Connection.CreateInput>): Connection.CreateInput =>
-  Object.assign({}, models, changes);
+const tools: Connection.CreateInput = {
+  integration: "test-tools",
+  name: "Tools",
+  settings: {},
+  auth: "none",
+};
+
+/** A new connection like `input`, with `changes`. */
+const changed = (
+  input: Connection.CreateInput,
+  changes: Partial<Connection.CreateInput>,
+): Connection.CreateInput => Object.assign({}, input, changes);
 
 /** A workspace owned by alice, in which bob is an ordinary member. */
 const workspaceWithMember = Effect.gen(function* () {
@@ -48,258 +61,376 @@ const workspaceWithMember = Effect.gen(function* () {
   return workspace;
 });
 
-/** Every recorded journal entry as text, to show what never reached it. */
+/**
+ * Every recorded journal payload as text, a character for each byte, to show what text reached it
+ * and what never did; the text looked for is ASCII.
+ */
 const journalText = (bound: Support.Bound) =>
-  bound.store
-    .read(journalLog, { limit: 200 })
-    .pipe(Effect.map((batches) => JSON.stringify(batches)));
+  bound.store.read(journalLog, { limit: 200 }).pipe(
+    Effect.map((batches) =>
+      batches
+        .flatMap((batch) => batch.entries)
+        .map((entry) => Array.from(entry.payload, (byte) => String.fromCharCode(byte)).join(""))
+        .join("\n"),
+    ),
+  );
 
-const credentialOf = (bound: Support.Bound, connectionId: Connection.Id) =>
-  bound.connections
-    .get(connectionId)
-    .pipe(
-      Effect.map((found) =>
-        Option.flatMap(found, (record) =>
-          Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication) &&
-          record.authentication.credentialId !== null
-            ? Option.some(record.authentication.credentialId)
-            : Option.none(),
-        ),
-      ),
-    );
+/** An operation a test runs as some member, whatever it answers. */
+type Operation = (
+  connectionService: ConnectionService.Interface,
+) => Effect.Effect<unknown, unknown, Actor.Service>;
+
+/** The key stored for a connection, as it is. */
+const keyOf = (bound: Support.Bound, connectionId: Connection.Id) =>
+  Effect.map(bound.connectionCredentials.get(connectionId), (credential) =>
+    Option.map(credential, ({ apiKey }) => Redacted.value(apiKey)),
+  );
 
 export const connections = (harness: Harness) => {
-  const { core, runGateway } = Support.make(harness);
+  const { core, gateway, runGateway } = Support.make(harness);
   describe.skipIf(!harness.available)(`${harness.name}: connections`, () => {
-    it.effect(
-      "creates a connection that members read and only administrators manage",
-      () =>
-        harness.withStorage((storage) =>
-          runGateway(
-            storage,
-            Effect.gen(function* () {
-              const workspace = yield* workspaceWithMember;
-              const created = yield* as(workspace.id, alice, (service) => service.create(models));
-              expect(created).toMatchObject({
-                name: "Models",
-                implementationId: testImplementation.id,
-                settings: { endpoint: "https://models.example" },
-                authentication: { _tag: "ApiKey", configured: false },
-                installed: true,
-                capabilities: { modelInference: { interface: "test-messages" } },
-                manageable: true,
-                readiness: {
-                  modelInference: { _tag: "Incomplete", settings: [], credential: true },
-                },
-              });
-              expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([created]);
-
-              // A member reads the same connection, told they may not manage it.
-              const read = Object.assign({}, created, { manageable: false });
-              expect(yield* as(workspace.id, bob, (service) => service.list)).toEqual([read]);
-              expect(yield* as(workspace.id, bob, (service) => service.get(created.id))).toEqual(
-                read,
-              );
-              for (const denied of [
-                Effect.flip(as(workspace.id, bob, (service) => service.create(models))),
-                Effect.flip(
-                  as(workspace.id, bob, (service) =>
-                    service.rename({
-                      connectionId: created.id,
-                      name: "Mine",
-                      expectedName: "Models",
-                    }),
-                  ),
-                ),
-                Effect.flip(as(workspace.id, bob, (service) => service.remove(created.id))),
-              ])
-                expect(yield* denied).toMatchObject({ _tag: "Authorization.Denied" });
-
-              const renamed = yield* as(workspace.id, alice, (service) =>
-                service.rename({
-                  connectionId: created.id,
-                  name: "Team models",
-                  expectedName: "Models",
-                }),
-              );
-              expect(renamed.name).toBe("Team models");
-              expect(
-                yield* Effect.flip(
-                  as(workspace.id, alice, (service) =>
-                    service.rename({
-                      connectionId: created.id,
-                      name: "Other",
-                      expectedName: "Models",
-                    }),
-                  ),
-                ),
-              ).toEqual(new ConnectionService.Changed({ connectionId: created.id }));
-              const configured = yield* as(workspace.id, alice, (service) =>
-                service.configure({
-                  connectionId: created.id,
-                  settings: { endpoint: "https://eu.models.example", region: "eu" },
-                }),
-              );
-              expect(configured.settings).toEqual({
-                endpoint: "https://eu.models.example",
-                region: "eu",
-              });
-              expect(yield* as(workspace.id, bob, (service) => service.get(created.id))).toEqual(
-                Object.assign({}, configured, { manageable: false }),
-              );
-            }),
-          ),
-        ),
-      60_000,
-    );
-
-    it.effect("checks the implementation, its settings, and how it authenticates", () =>
+    it.effect("lists the integrations the host installs to every member, with their forms", () =>
       harness.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
-            const workspace = yield* Operations.createWorkspace(alice.id);
-            const create = (input: Connection.CreateInput) =>
-              Effect.flip(as(workspace.id, alice, (service) => service.create(input)));
-            expect(
-              yield* create(
-                modelsWith({ implementationId: ConnectionImplementation.Id.make("not-installed") }),
-              ),
-            ).toEqual(
-              new ConnectionService.UnknownImplementation({
-                implementationId: ConnectionImplementation.Id.make("not-installed"),
-              }),
+            const workspace = yield* workspaceWithMember;
+            const integrations = yield* as(
+              workspace.id,
+              bob,
+              (connectionService) => connectionService.integrations,
             );
             expect(
-              yield* create(modelsWith({ settings: { endpoint: "models.example", unknown: "x" } })),
-            ).toEqual(
-              new ConnectionService.InvalidSettings({
-                issues: [
-                  "unknown is not a setting of Test models.",
-                  "Endpoint must be an http or https URL.",
-                ],
-              }),
-            );
-            expect(yield* create(modelsWith({ settings: {} }))).toEqual(
-              new ConnectionService.InvalidSettings({ issues: ["Endpoint is required."] }),
-            );
-            const open = yield* as(workspace.id, alice, (service) =>
-              service.create(modelsWith({ name: "Open", authentication: "None" })),
-            );
-            expect(open.readiness).toEqual({ modelInference: { _tag: "Ready" } });
-            expect(
-              yield* Effect.flip(
-                as(workspace.id, alice, (service) =>
-                  service.setCredential({
-                    connectionId: open.id,
-                    secret: Redacted.make("sk-unused"),
-                  }),
-                ),
-              ),
-            ).toEqual(
-              new ConnectionService.UnsupportedAuthentication({
-                implementationId: testImplementation.id,
-                method: "None",
-              }),
-            );
+              integrations.map(({ id, auth, provides, requiresSandbox }) => ({
+                id,
+                auth,
+                provides,
+                requiresSandbox,
+              })),
+            ).toEqual([
+              {
+                id: "test-models",
+                auth: ["apiKey", "none"],
+                provides: ["models"],
+                requiresSandbox: false,
+              },
+              { id: "test-tools", auth: ["none"], provides: ["tools"], requiresSandbox: false },
+              {
+                id: "test-harness",
+                auth: ["none"],
+                provides: ["harnesses"],
+                requiresSandbox: true,
+              },
+              {
+                id: "test-in-process",
+                auth: ["none"],
+                provides: ["harnesses"],
+                requiresSandbox: false,
+              },
+              {
+                id: "test-sandboxes",
+                auth: ["none"],
+                provides: ["sandboxes"],
+                requiresSandbox: false,
+              },
+            ]);
+            expect(integrations[0]).toMatchObject({
+              name: "Test models",
+              docs: "https://models.example/docs",
+              settings: {
+                type: "object",
+                properties: { endpoint: { type: "string", title: "Endpoint" } },
+                required: ["endpoint"],
+              },
+            });
+            expect(integrations[1]?.settings).toEqual({ type: "object", properties: {} });
           }),
         ),
       ),
     );
 
     it.effect(
-      "keeps credentials out of the journal, replacing, clearing, and deleting them with it",
+      "creates a connection with its key, which members read and only administrators manage",
       () =>
         harness.withStorage((storage) =>
           runGateway(
             storage,
             Effect.gen(function* () {
-              const workspace = yield* Operations.createWorkspace(alice.id);
+              const workspace = yield* workspaceWithMember;
               const bound = yield* boundTo(workspace.id);
-              const created = yield* as(workspace.id, alice, (service) => service.create(models));
-              const set = yield* as(workspace.id, alice, (service) =>
-                service.setCredential({
-                  connectionId: created.id,
-                  secret: Redacted.make("sk-first-secret"),
-                }),
+              const created = yield* as(workspace.id, alice, (connectionService) =>
+                connectionService.create(models),
               );
-              expect(set.authentication).toEqual({ _tag: "ApiKey", configured: true });
-              expect(set.readiness).toEqual({ modelInference: { _tag: "Ready" } });
-              const first = Option.getOrThrow(yield* credentialOf(bound, created.id));
-              const stored = yield* bound.credentials.get(first);
-              expect(Option.map(stored, (credential) => Redacted.value(credential.secret))).toEqual(
-                Option.some("sk-first-secret"),
-              );
-              expect(Option.map(stored, (credential) => credential.connectionId)).toEqual(
-                Option.some(created.id),
-              );
-
-              yield* as(workspace.id, alice, (service) =>
-                service.setCredential({
-                  connectionId: created.id,
-                  secret: Redacted.make("sk-second-secret"),
-                }),
-              );
-              const second = Option.getOrThrow(yield* credentialOf(bound, created.id));
-              expect(second).not.toBe(first);
-              expect(yield* bound.credentials.get(first)).toEqual(Option.none());
-              expect(
-                Option.map(yield* bound.credentials.get(second), (credential) =>
-                  Redacted.value(credential.secret),
-                ),
-              ).toEqual(Option.some("sk-second-secret"));
-
-              const text = yield* journalText(bound);
-              expect(text).not.toContain("sk-first-secret");
-              expect(text).not.toContain("sk-second-secret");
-
-              // Replay rebuilds the connection from facts; its credential is not a read model.
-              const before = yield* bound.connections.get(created.id);
-              yield* storage.discardProjections;
-              yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
-                Effect.provide(core(bound)),
-              );
-              expect(yield* bound.connections.get(created.id)).toEqual(before);
-              expect(Option.isSome(yield* bound.credentials.get(second))).toBe(true);
-
-              const cleared = yield* as(workspace.id, alice, (service) =>
-                service.clearCredential(created.id),
-              );
-              expect(cleared.readiness).toEqual({
-                modelInference: { _tag: "Incomplete", settings: [], credential: true },
+              expect(created).toMatchObject({
+                name: "Models",
+                integration: "test-models",
+                settings: { endpoint: "https://models.example" },
+                auth: "apiKey",
+                readiness: { _tag: "Ready" },
+                manageable: true,
               });
-              expect(yield* bound.credentials.get(second)).toEqual(Option.none());
+              expect(created).not.toHaveProperty("apiKey");
+              expect(
+                yield* as(workspace.id, alice, (connectionService) => connectionService.list),
+              ).toEqual([created]);
 
-              yield* as(workspace.id, alice, (service) =>
-                service.setCredential({
-                  connectionId: created.id,
-                  secret: Redacted.make("sk-third-secret"),
-                }),
-              );
-              const third = Option.getOrThrow(yield* credentialOf(bound, created.id));
-              yield* as(workspace.id, alice, (service) => service.remove(created.id));
-              expect(yield* bound.credentials.get(third)).toEqual(Option.none());
-              expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([]);
+              // A member reads the same connection, told they may not manage it.
+              const read = Object.assign({}, created, { manageable: false });
               expect(
-                yield* Effect.flip(as(workspace.id, alice, (service) => service.get(created.id))),
-              ).toEqual(new ConnectionService.NotFound({ connectionId: created.id }));
+                yield* as(workspace.id, bob, (connectionService) => connectionService.list),
+              ).toEqual([read]);
               expect(
-                Option.map(yield* bound.connections.get(created.id), (record) => record.status),
-              ).toEqual(Option.some("removed"));
+                yield* as(workspace.id, bob, (connectionService) =>
+                  connectionService.get(created.id),
+                ),
+              ).toEqual(read);
+              const operations: ReadonlyArray<Operation> = [
+                (connectionService) => connectionService.create(tools),
+                (connectionService) =>
+                  connectionService.rename({
+                    connectionId: created.id,
+                    name: "Mine",
+                    expectedName: "Models",
+                  }),
+                (connectionService) =>
+                  connectionService.configure({ connectionId: created.id, settings: {} }),
+                (connectionService) =>
+                  connectionService.replaceKey({
+                    connectionId: created.id,
+                    apiKey: Redacted.make("sk-mine"),
+                  }),
+                (connectionService) => connectionService.check(created.id),
+                (connectionService) => connectionService.remove(created.id),
+              ];
+              for (const denied of operations)
+                expect(yield* Effect.flip(as(workspace.id, bob, denied))).toMatchObject({
+                  _tag: "Authorization.Denied",
+                });
+
+              // The key is stored apart, and never reaches the journal its settings reach.
+              expect(yield* keyOf(bound, created.id)).toEqual(Option.some(goodKey));
+              const text = yield* journalText(bound);
+              expect(text).toContain("https://models.example");
+              expect(text).not.toContain(goodKey);
             }),
           ),
         ),
       60_000,
     );
 
-    it.effect("stores a credential with the commit that records it, or not at all", () =>
+    it.effect("gives the models a connection offers to whoever may read it", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* workspaceWithMember;
+            const offering = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(models),
+            );
+            const offeringNone = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(tools),
+            );
+            const modelsOf = (connectionId: Connection.Id) =>
+              as(workspace.id, bob, (connectionService) => connectionService.models(connectionId));
+
+            expect(yield* modelsOf(offering.id)).toEqual({ listed: [testModel], unlisted: true });
+            expect(yield* modelsOf(offeringNone.id)).toEqual({ listed: [], unlisted: false });
+            const missing = Connection.Id.make("missing");
+            expect(yield* Effect.flip(modelsOf(missing))).toEqual(
+              new ConnectionService.NotFound({ connectionId: missing }),
+            );
+            yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.remove(offering.id),
+            );
+            expect(yield* Effect.flip(modelsOf(offering.id))).toEqual(
+              new ConnectionService.NotFound({ connectionId: offering.id }),
+            );
+          }),
+        ),
+      ),
+    );
+
+    it.effect("checks a connection with its system, using the key it has now", () =>
       harness.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
             const workspace = yield* Operations.createWorkspace(alice.id);
             const bound = yield* boundTo(workspace.id);
-            const created = yield* as(workspace.id, alice, (service) => service.create(models));
+            const keyed = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(models),
+            );
+            const keyless = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(tools),
+            );
+            const check = (connectionId: Connection.Id) =>
+              as(workspace.id, alice, (connectionService) => connectionService.check(connectionId));
+            expect(yield* check(keyed.id)).toEqual({ status: "healthy" });
+            expect(yield* check(keyless.id)).toEqual({ status: "healthy" });
+
+            const replaced = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.replaceKey({
+                connectionId: keyed.id,
+                apiKey: Redacted.make("sk-bad"),
+              }),
+            );
+            expect(replaced).toEqual(keyed);
+            expect(yield* keyOf(bound, keyed.id)).toEqual(Option.some("sk-bad"));
+            expect(yield* check(keyed.id)).toEqual({
+              status: "unauthorized",
+              description: "The key was refused",
+            });
+            expect(
+              yield* Effect.flip(
+                as(workspace.id, alice, (connectionService) =>
+                  connectionService.replaceKey({
+                    connectionId: keyless.id,
+                    apiKey: Redacted.make("sk-bad"),
+                  }),
+                ),
+              ),
+            ).toEqual(new ConnectionService.Keyless({ connectionId: keyless.id }));
+            expect(yield* journalText(bound)).not.toContain("sk-bad");
+          }),
+        ),
+      ),
+    );
+
+    it.effect("refuses a connection its integration does not take, and creates nothing", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* Operations.createWorkspace(alice.id);
+            const refused = (input: Connection.CreateInput) =>
+              Effect.flip(
+                as(workspace.id, alice, (connectionService) => connectionService.create(input)),
+              );
+            expect(yield* refused(changed(models, { integration: "not-installed" }))).toEqual(
+              new ConnectionService.UnknownIntegration({ integration: "not-installed" }),
+            );
+            const unaccepted: ReadonlyArray<Connection.CreateInput["settings"]> = [
+              {},
+              { endpoint: "https://models.example", zone: "eu" },
+            ];
+            for (const settings of unaccepted) {
+              const invalid = yield* refused(changed(models, { settings }));
+              expect(invalid).toBeInstanceOf(ConnectionService.InvalidConnection);
+              expect(invalid).toMatchObject({
+                description: expect.stringContaining(
+                  "The settings of Models do not match what Test models takes",
+                ),
+              });
+            }
+            expect(
+              yield* refused(changed(tools, { auth: "apiKey", apiKey: Redacted.make(goodKey) })),
+            ).toEqual(
+              new ConnectionService.InvalidConnection({
+                description: "Test tools takes no authentication by apiKey",
+              }),
+            );
+            // A key for a connection that authenticates with none is not a request at all.
+            expect(
+              yield* refused(changed(tools, { apiKey: Redacted.make(goodKey) })),
+            ).toMatchObject({
+              _tag: "Gateway.InvalidInput",
+            });
+
+            const created = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(models),
+            );
+            const reconfigured = yield* Effect.flip(
+              as(workspace.id, alice, (connectionService) =>
+                connectionService.configure({
+                  connectionId: created.id,
+                  settings: { region: "eu" },
+                }),
+              ),
+            );
+            expect(reconfigured).toBeInstanceOf(ConnectionService.InvalidConnection);
+            expect(
+              yield* as(workspace.id, alice, (connectionService) => connectionService.list),
+            ).toEqual([created]);
+          }),
+        ),
+      ),
+    );
+
+    it.effect("renames, reconfigures, and removes a connection with its key", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* Operations.createWorkspace(alice.id);
+            const bound = yield* boundTo(workspace.id);
+            const created = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(models),
+            );
+            const renamed = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.rename({
+                connectionId: created.id,
+                name: "Team models",
+                expectedName: "Models",
+              }),
+            );
+            expect(renamed.name).toBe("Team models");
+            expect(
+              yield* Effect.flip(
+                as(workspace.id, alice, (connectionService) =>
+                  connectionService.rename({
+                    connectionId: created.id,
+                    name: "Other",
+                    expectedName: "Models",
+                  }),
+                ),
+              ),
+            ).toEqual(new ConnectionService.Changed({ connectionId: created.id }));
+            const configured = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.configure({
+                connectionId: created.id,
+                settings: { endpoint: "https://eu.models.example", region: "eu" },
+              }),
+            );
+            expect(configured.settings).toEqual({
+              endpoint: "https://eu.models.example",
+              region: "eu",
+            });
+            expect(
+              yield* as(workspace.id, alice, (connectionService) =>
+                connectionService.get(created.id),
+              ),
+            ).toEqual(configured);
+
+            yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.remove(created.id),
+            );
+            const gone = new ConnectionService.NotFound({ connectionId: created.id });
+            expect(
+              yield* as(workspace.id, alice, (connectionService) => connectionService.list),
+            ).toEqual([]);
+            const operations: ReadonlyArray<Operation> = [
+              (connectionService) => connectionService.get(created.id),
+              (connectionService) => connectionService.check(created.id),
+              (connectionService) => connectionService.remove(created.id),
+            ];
+            for (const removed of operations)
+              expect(yield* Effect.flip(as(workspace.id, alice, removed))).toEqual(gone);
+            expect(yield* keyOf(bound, created.id)).toEqual(Option.none());
+            expect(
+              Option.map(yield* bound.connections.get(created.id), (record) => record.status),
+            ).toEqual(Option.some("removed"));
+          }),
+        ),
+      ),
+    );
+
+    it.effect("stores a connection's key with the commit that records it, or not at all", () =>
+      harness.withStorage((storage) =>
+        runGateway(
+          storage,
+          Effect.gen(function* () {
+            const workspace = yield* Operations.createWorkspace(alice.id);
+            const bound = yield* boundTo(workspace.id);
             const before = yield* bound.store.read(journalLog, { limit: 200 });
             const footprint = yield* storage.footprint;
             const failure = new Store.Failure({
@@ -309,10 +440,7 @@ export const connections = (harness: Harness) => {
             expect(
               yield* Effect.flip(
                 Effect.flatMap(ConnectionService.Service, (connectionService) =>
-                  connectionService.setCredential({
-                    connectionId: created.id,
-                    secret: Redacted.make("sk-rolled-back"),
-                  }),
+                  connectionService.create(models),
                 ).pipe(
                   Effect.provide(core(failingLate(bound, failure))),
                   Effect.provideService(Actor.Service, {
@@ -325,33 +453,165 @@ export const connections = (harness: Harness) => {
             ).toBe(failure);
             expect(yield* bound.store.read(journalLog, { limit: 200 })).toEqual(before);
             expect(yield* storage.footprint).toBe(footprint);
-            expect(yield* credentialOf(bound, created.id)).toEqual(Option.none());
+            expect(yield* bound.connections.listActive).toEqual([]);
           }),
         ),
       ),
     );
 
-    it.effect("returns the first connection when a create is retried with its key", () =>
+    it.effect(
+      "returns the first connection when a create is retried with its key, until it is removed",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const workspace = yield* Operations.createWorkspace(alice.id);
+              const options = { requestKey: Request.Key.make("create-models") };
+              const create = (input: Connection.CreateInput) =>
+                as(workspace.id, alice, (connectionService) =>
+                  connectionService.create(input, options),
+                );
+              const first = yield* create(models);
+              expect(yield* create(models)).toEqual(first);
+              // The key alone names the request: reused with another body, it returns the first.
+              expect(yield* create(changed(models, { name: "Different" }))).toEqual(first);
+              expect(
+                yield* as(workspace.id, alice, (connectionService) => connectionService.list),
+              ).toEqual([first]);
+
+              yield* as(workspace.id, alice, (connectionService) =>
+                connectionService.remove(first.id),
+              );
+              expect(yield* Effect.flip(create(models))).toEqual(
+                new ConnectionService.NotFound({ connectionId: first.id }),
+              );
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "shows each connection as ready as the integrations its host installs now find it",
+      () =>
+        harness.withStorage((storage) =>
+          Effect.gen(function* () {
+            const { workspace, keyed, keyless } = yield* runGateway(
+              storage,
+              Effect.gen(function* () {
+                const workspace = yield* Operations.createWorkspace(alice.id);
+                const keyed = yield* as(workspace.id, alice, (connectionService) =>
+                  connectionService.create(models),
+                );
+                const keyless = yield* as(workspace.id, alice, (connectionService) =>
+                  connectionService.create(tools),
+                );
+                return { workspace, keyed, keyless };
+              }),
+            );
+            // Another host installs test models with other settings, and no test tools.
+            const changedModels = Integration.make({
+              id: "test-models",
+              name: "Test models",
+              settings: Schema.Struct({ url: Schema.NonEmptyString }),
+              auth: ["apiKey", "none"],
+              check: () => Effect.succeed({ status: "healthy" }),
+            });
+            const host = yield* storage.connect();
+            yield* Effect.gen(function* () {
+              const listed = yield* as(
+                workspace.id,
+                alice,
+                (connectionService) => connectionService.list,
+              );
+              expect(listed.map(({ id, readiness }) => ({ id, readiness }))).toEqual([
+                {
+                  id: keyed.id,
+                  readiness: {
+                    _tag: "Invalid",
+                    description: expect.stringContaining(
+                      "The settings of Models do not match what Test models takes",
+                    ),
+                  },
+                },
+                { id: keyless.id, readiness: { _tag: "Uninstalled" } },
+              ]);
+              expect(
+                yield* Effect.flip(
+                  as(workspace.id, alice, (connectionService) =>
+                    connectionService.check(keyless.id),
+                  ),
+                ),
+              ).toEqual(new ConnectionService.UnknownIntegration({ integration: "test-tools" }));
+              expect(
+                yield* Effect.flip(
+                  as(workspace.id, alice, (connectionService) => connectionService.check(keyed.id)),
+                ),
+              ).toBeInstanceOf(ConnectionService.InvalidConnection);
+              // The models of a connection are its integration's, whatever its settings.
+              expect(
+                yield* as(workspace.id, alice, (connectionService) =>
+                  connectionService.models(keyed.id),
+                ),
+              ).toEqual({ listed: [], unlisted: false });
+              expect(
+                yield* Effect.flip(
+                  as(workspace.id, alice, (connectionService) =>
+                    connectionService.models(keyless.id),
+                  ),
+                ),
+              ).toEqual(new ConnectionService.UnknownIntegration({ integration: "test-tools" }));
+            }).pipe(Effect.provide(gateway(host, { ...installed, integrations: [changedModels] })));
+          }),
+        ),
+      60_000,
+    );
+
+    it.effect("rebuilds connections from the journal, keeping their keys", () =>
       harness.withStorage((storage) =>
         runGateway(
           storage,
           Effect.gen(function* () {
             const workspace = yield* Operations.createWorkspace(alice.id);
-            const options = { requestKey: Request.Key.make("create-models") };
-            const first = yield* as(workspace.id, alice, (service) =>
-              service.create(models, options),
+            const bound = yield* boundTo(workspace.id);
+            const keyed = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(models),
             );
-            const again = yield* as(workspace.id, alice, (service) =>
-              service.create(models, options),
+            const keyless = yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.create(tools),
             );
-            expect(again).toEqual(first);
-            expect(yield* as(workspace.id, alice, (service) => service.list)).toEqual([first]);
-            // The key alone names the request: reused with another body, it returns the first.
-            expect(
-              yield* as(workspace.id, alice, (service) =>
-                service.create(modelsWith({ name: "Different" }), options),
-              ),
-            ).toEqual(first);
+            yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.rename({
+                connectionId: keyed.id,
+                name: "Team models",
+                expectedName: "Models",
+              }),
+            );
+            yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.configure({
+                connectionId: keyed.id,
+                settings: { endpoint: "https://eu.models.example", region: "eu" },
+              }),
+            );
+            yield* as(workspace.id, alice, (connectionService) =>
+              connectionService.remove(keyless.id),
+            );
+            const records = [
+              yield* bound.connections.get(keyed.id),
+              yield* bound.connections.get(keyless.id),
+            ];
+
+            yield* storage.discardProjections;
+            expect(yield* bound.connections.get(keyed.id)).toEqual(Option.none());
+            yield* Effect.flatMap(Journal.Service, (journal) => journal.replay).pipe(
+              Effect.provide(core(bound)),
+            );
+            expect([
+              yield* bound.connections.get(keyed.id),
+              yield* bound.connections.get(keyless.id),
+            ]).toEqual(records);
+            // A key is not a read model: rebuilding keeps it.
+            expect(yield* keyOf(bound, keyed.id)).toEqual(Option.some(goodKey));
           }),
         ),
       ),

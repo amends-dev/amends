@@ -15,9 +15,10 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ConnectionStore.Co
 
 /** Internal projection storage. Reads honor an existing transaction; writes require one. */
 export interface Interface {
+  /** The connection, removed or not. */
   readonly get: (id: Connection.Id) => Effect.Effect<Option.Option<Connection.Record>, Failure>;
-  /** Every connection in the workspace, removed ones included, in no particular order. */
-  readonly list: Effect.Effect<ReadonlyArray<Connection.Record>, Failure>;
+  /** The workspace's connections that are not removed, in no particular order. */
+  readonly listActive: Effect.Effect<ReadonlyArray<Connection.Record>, Failure>;
   /** Reject invalid or foreign records and reused IDs. Never upsert. */
   readonly insert: (
     record: Connection.Record,

@@ -2,15 +2,11 @@ import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer } from "effect";
 import { Agents } from "./agents.ts";
-import { AgentsV2 } from "./agents-v2.ts";
 import { Assignments } from "./assignments.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
-import { ConnectionV2Credentials } from "./connection-v2-credentials.ts";
-import { ConnectionsV2 } from "./connections-v2.ts";
-import { Environments } from "./environments.ts";
 import { MemoryConnection } from "./connection.ts";
 import { GroupFollows } from "./group-follows.ts";
 import { GroupMemberships } from "./group-memberships.ts";
@@ -20,6 +16,8 @@ import { Journal } from "./journal.ts";
 import { Members } from "./members.ts";
 import { Notifications } from "./notifications.ts";
 import { ReadStates } from "./read-states.ts";
+import { SessionLogs } from "./session-logs.ts";
+import { SessionStates } from "./session-states.ts";
 import { MemorySignalHub } from "./signal-hub.ts";
 import { Roles } from "./roles.ts";
 import { ThreadActivities } from "./thread-activities.ts";
@@ -54,12 +52,10 @@ const layerStores = Layer.mergeAll(
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,
-  ConnectionsV2.layer,
-  ConnectionV2Credentials.layer,
-  Environments.layer,
   Agents.layer,
-  AgentsV2.layer,
   TurnRecords.layer,
+  SessionStates.layer,
+  SessionLogs.layer,
   MemorySignalHub.layer,
 );
 

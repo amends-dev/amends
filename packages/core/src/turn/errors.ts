@@ -1,5 +1,4 @@
 import { Schema } from "effect";
-import { ThreadId } from "../thread/id.ts";
 import { Turn } from "./turn.ts";
 
 /** The outcomes turn operations report that a caller can act on; schemas only. */
@@ -20,11 +19,5 @@ export class NotRetryable extends Schema.TaggedError<NotRetryable>()("TurnServic
   turnId: Turn.Id,
   reason: Turn.NotRetryableReason,
 }) {}
-
-/** The thread is missing, or the reader cannot open it. */
-export class ThreadNotFound extends Schema.TaggedError<ThreadNotFound>()(
-  "TurnService.ThreadNotFound",
-  { threadId: ThreadId.Id },
-) {}
 
 export * as TurnErrors from "./errors.ts";

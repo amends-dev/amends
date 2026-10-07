@@ -6,7 +6,7 @@ import { Agent } from "./agent.ts";
 /** Agents are workspace configuration: every member may learn of changes to them. */
 const workspace = () => [Audience.workspace];
 
-/** An agent's configuration, recorded with the membership its creation adds. */
+/** An agent, recorded in the commit that adds its membership. */
 export const Created = Fact.make("agent.created", {
   audience: workspace,
   version: 1,
@@ -15,7 +15,7 @@ export const Created = Fact.make("agent.created", {
   payload: Agent.Record,
 });
 
-/** Its instructions, model access, and starting environment replaced as a whole. */
+/** How it is set up, replaced as a whole. */
 export const Configured = Fact.make("agent.configured", {
   audience: workspace,
   version: 1,

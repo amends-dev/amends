@@ -4,12 +4,7 @@ export {
   type AddAgentProps,
   type ConfirmRemoveAgentProps,
 } from "./add-agent.tsx";
-export {
-  AgentPane,
-  type AgentPaneProps,
-  type AgentTab,
-  type AgentTurnSummary,
-} from "./agent-pane.tsx";
+export { AgentPane, type AgentPaneProps } from "./agent-pane.tsx";
 export {
   AgentAvatar,
   AgentList,
@@ -18,31 +13,27 @@ export {
   type AgentsPaneProps,
   type AgentsTab,
 } from "./agents-pane.tsx";
-export {
-  ConfigurationSummary,
-  InstructionsField,
-  ModelFields,
-  type ConfigurationSummaryProps,
-  type InstructionsFieldProps,
-  type ModelFieldsProps,
-} from "./configuration-fields.tsx";
+export { SetupFields, autoHarness, type SetupFieldsProps } from "./setup-fields.tsx";
 export {
   agentStatus,
   agentsMessage,
   agentsToast,
   issueMessage,
-  problemMessage,
-  setupLabel,
+  setupProblems,
   type AgentActivity,
-  type AgentBlocker,
-  type AgentEnvironmentOption,
   type AgentIssue,
-  type AgentProblem,
   type AgentRoleOption,
   type AgentSummary,
+  type AgentTurn,
   type AgentsAction,
   type AgentsError,
   type AgentsFailure,
-  type EnvironmentFit,
-  type ModelConnectionOption,
+  type ConnectionOption,
+  type Effort,
+  type HarnessOption,
+  type ModelChoices,
+  type ModelOption,
+  type SetupConnection,
+  type SetupField,
+  type SetupPart,
 } from "./wording.tsx";

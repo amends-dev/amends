@@ -1,358 +1,396 @@
-// Workshop harness: Agents with the Lunacy sample agents, model connections, and environments,
-// following the mocks' behavior notes over local state. Not exported.
+// Workshop harness: Agents over local state, with connections shaped like those the local host
+// installs. Not exported.
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
-import {
-  ChooseProvider,
-  ConfigureConnection,
-  ConnectionKey,
-  type ConnectionMethod,
-  type ConnectionProviderOption,
-} from "../connections/index.ts";
 import { navigation } from "../sample.ts";
 import { DestinationSidebar, WorkspaceNavigation } from "../workspace-navigation/index.ts";
 import {
-  agentStatus,
   AddAgent,
   AgentList,
   AgentPane,
   AgentsPane,
   ConfirmRemoveAgent,
+  agentStatus,
   agentsToast,
-  type AgentTab,
-  type AgentEnvironmentOption,
+  autoHarness,
+  type AgentActivity,
   type AgentIssue,
-  type AgentProblem,
+  type AgentRoleOption,
   type AgentSummary,
+  type AgentTurn,
+  type AgentsAction,
+  type AgentsFailure,
   type AgentsTab,
-  type EnvironmentFit,
-  type ModelConnectionOption,
+  type ConnectionOption,
+  type Effort,
+  type HarnessOption,
+  type ModelChoices,
+  type SetupFieldsProps,
 } from "./index.ts";
 
-const claude = [
-  { id: "claude-opus-5-5", name: "Claude Opus 5.5" },
-  { id: "claude-sonnet-5", name: "Claude Sonnet 5" },
-  { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
-];
-const sampleConnections: readonly ModelConnectionOption[] = [
-  { id: "team", name: "Anthropic · Team", ready: true, models: claude },
-  { id: "backup", name: "Anthropic · Backup", ready: false, models: claude },
-  { id: "openrouter", name: "OpenRouter · Shared", ready: true, models: [] },
-];
-const sampleEnvironments = [
-  { id: "in-process", name: "In-process", provider: undefined, pending: false },
-  { id: "local", name: "Local development", provider: "Local directory", pending: false },
-  { id: "remote", name: "Remote development", provider: "Daytona", pending: false },
-  { id: "review", name: "Review sandbox", provider: "Daytona", pending: true },
-] as const;
-const modelProviders: readonly ConnectionProviderOption[] = [
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    description: "Claude models through the Anthropic API.",
-    capability: "model-access",
-    methods: ["api-key"],
-    settings: [
-      {
-        key: "apiUrl",
-        label: "API URL",
-        kind: "url",
-        required: false,
-        description: "Leave empty to use Anthropic’s API.",
-        placeholder: "https://api.anthropic.com",
-      },
-    ],
-  },
-  {
-    id: "openai-compatible",
-    name: "OpenAI-compatible",
-    description: "OpenAI, OpenRouter, or a compatible API.",
-    capability: "model-access",
-    methods: ["api-key", "none"],
-    settings: [
-      {
-        key: "baseUrl",
-        label: "Base URL",
-        kind: "url",
-        required: true,
-        placeholder: "https://api.openai.com/v1",
-      },
-    ],
-  },
+export const sampleHarnesses: readonly HarnessOption[] = [
+  { id: "amends", name: "Amends harness", integrationName: "amends", requiresSandbox: false },
+  { id: "opencode", name: "opencode", integrationName: "opencode", requiresSandbox: true },
 ];
 
-interface Draft {
-  readonly instructions: string;
-  readonly connectionId: string | undefined;
-  readonly model: string;
-  readonly reasoning: string | undefined;
-  readonly environmentId: string | undefined;
+export const sampleModelConnections: readonly ConnectionOption[] = [
+  { id: "openrouter", name: "OpenRouter", integrationName: "OpenRouter" },
+  { id: "local-models", name: "Local models", integrationName: "OpenAI-compatible API" },
+];
+
+export const sampleSandboxes: readonly ConnectionOption[] = [
+  { id: "this-machine", name: "This machine", integrationName: "This machine" },
+  { id: "daytona", name: "Daytona", integrationName: "Daytona" },
+];
+
+/** A connection whose integration this host no longer installs. */
+const uninstalled = { id: "vertex", name: "Vertex" };
+
+/**
+ * The options with the one an agent names when it is removed or not installed, which shows as
+ * unavailable, as the client lists it.
+ */
+function withCurrent<Option extends ConnectionOption>(
+  options: readonly Option[],
+  id: string | undefined,
+  unavailable: (option: ConnectionOption) => Option,
+): readonly Option[] {
+  if (id === undefined || id === autoHarness || options.some((option) => option.id === id))
+    return options;
+  return [
+    ...options,
+    unavailable(
+      id === uninstalled.id
+        ? {
+            ...uninstalled,
+            integrationName: "Vertex AI",
+            unavailable: "Its integration isn’t installed on this host.",
+          }
+        : {
+            id,
+            name: "Removed connection",
+            integrationName: "",
+            unavailable: "This connection was removed.",
+          },
+    ),
+  ];
 }
-interface Sample extends Draft {
+
+const sampleModels: Readonly<Record<string, ModelChoices>> = {
+  openrouter: {
+    status: "loaded",
+    listed: [
+      { id: "claude-opus-5-5", name: "Claude Opus 5.5", efforts: ["low", "medium", "high", "max"] },
+      { id: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", efforts: ["low", "medium", "high"] },
+      { id: "gpt-5-1", name: "GPT-5.1", efforts: ["minimal", "low", "medium", "high"] },
+      { id: "deepseek-v4", name: "DeepSeek V4", efforts: [] },
+    ],
+    unlisted: false,
+  },
+  "local-models": { status: "loaded", listed: [], unlisted: true },
+};
+
+const roles: readonly AgentRoleOption[] = [
+  { id: "builtin:member", name: "Member", assignable: true },
+  { id: "builtin:administrator", name: "Administrator", assignable: false },
+];
+
+/** How an agent is set up, as the fixture keeps it and the form edits it. */
+interface Setup {
+  readonly instructions: string;
+  readonly harness: string;
+  readonly modelConnectionId: string | undefined;
+  readonly model: string;
+  readonly effort?: Effort;
+  readonly sandboxId?: string;
+}
+
+interface Sample extends Setup {
   readonly id: string;
   readonly name: string;
-  readonly role: string;
 }
 
-const instructions =
-  "Help the team investigate issues and deliver small, reviewed changes.\n\nExplain your approach, ask when requirements are unclear, and summarize what changed.";
 const samples: readonly Sample[] = [
   {
-    id: "atlas",
-    name: "Atlas",
-    role: "Member",
-    instructions,
-    connectionId: "team",
-    model: "claude-sonnet-5",
-    reasoning: undefined,
-    environmentId: "remote",
-  },
-  {
-    id: "nora",
-    name: "Nora",
-    role: "Member",
-    instructions,
-    connectionId: "team",
-    model: "claude-haiku-4-5-20251001",
-    reasoning: undefined,
-    environmentId: "in-process",
-  },
-  {
-    id: "review-helper",
-    name: "Review helper",
-    role: "Member",
-    instructions,
-    connectionId: "backup",
-    model: "claude-sonnet-5",
-    reasoning: undefined,
-    environmentId: "remote",
-  },
-  {
-    id: "yumi",
-    name: "Yumi",
-    role: "Member",
-    instructions,
-    connectionId: "team",
+    id: "reviewer",
+    name: "Reviewer",
+    instructions: "Review each change for correctness and clarity, then run its tests.",
+    harness: "opencode",
+    modelConnectionId: "openrouter",
     model: "claude-opus-5-5",
-    reasoning: undefined,
-    environmentId: "local",
+    effort: "high",
+    sandboxId: "daytona",
+  },
+  {
+    id: "planner",
+    name: "Planner",
+    instructions: "Break each request into steps, and say who should take each.",
+    harness: "amends",
+    modelConnectionId: "openrouter",
+    model: "gpt-5-1",
+  },
+  {
+    id: "researcher",
+    name: "Researcher",
+    instructions: "Answer questions about the codebase, citing the files you read.",
+    harness: autoHarness,
+    modelConnectionId: "local-models",
+    model: "qwen3-coder-30b",
+  },
+  {
+    id: "tester",
+    name: "Tester",
+    instructions: "Reproduce each reported bug in a sandbox before anyone fixes it.",
+    harness: "opencode",
+    modelConnectionId: "openrouter",
+    model: "claude-sonnet-5-5",
+    sandboxId: "old-sandbox",
+  },
+  {
+    id: "archivist",
+    name: "Archivist",
+    instructions: "Summarize each closed thread for the record.",
+    harness: "amends",
+    modelConnectionId: "vertex",
+    model: "gemini-3-pro",
   },
 ];
 
-/** Where agents are at work: Atlas waits in one thread, Yumi works in two. */
-const activities: Readonly<Record<string, AgentSummary["activity"]>> = {
-  atlas: { state: "queued", places: ["#design"] },
-  yumi: { state: "working", places: ["#general", "#product"] },
-};
-const turnsOf = (id: string) => {
-  const activity = activities[id];
-  return (activity?.places ?? []).map((where, index) => ({
-    id: `${id}-turn-${index}`,
-    state: activity!.state,
-    where,
-  }));
-};
-
-type Dialog = "add" | "remove" | "choose-provider" | "configure-connection" | "connection-key";
-
-export interface AgentsWorkspaceProps {
-  readonly tab?: AgentsTab;
-  /** The agent whose page shows, in place of the list. */
-  readonly selected?: string;
-  readonly agentTab?: AgentTab;
-  readonly dialog?: Dialog;
-  /** For the add dialog: a name typed, and the connection chosen. */
-  readonly add?: { readonly name?: string; readonly connectionId?: string };
-  readonly status?: "loading" | "failed";
-  /** No agents yet; with `noConnections`, no model connection either. */
-  readonly noAgents?: boolean;
-  readonly noConnections?: boolean;
-  /** A member who may only look. */
-  readonly readOnly?: boolean;
-  /** An administrator who is not the owner, and so gives new agents only Member. */
-  readonly administrator?: boolean;
-  /** The first save of a configuration finds its connection no longer available. */
-  readonly connectionGone?: boolean;
-  /** One saved agent holds a reasoning level its harness does not take. */
-  readonly staleReasoning?: boolean;
+/** What keeps an agent set up as `setup` from running, as core's readiness finds it. */
+function issuesOf(
+  setup: Setup,
+  harnesses: readonly HarnessOption[] = sampleHarnesses,
+): readonly AgentIssue[] {
+  const issues: AgentIssue[] = [];
+  const harness = harnesses.find((option) => option.id === setup.harness);
+  if (setup.harness === autoHarness) {
+    const choosable = harnesses.some(
+      (option) => !option.requiresSandbox || setup.sandboxId !== undefined,
+    );
+    if (!choosable) issues.push({ kind: "no-harness" });
+  } else if (!harness) issues.push({ kind: "removed", part: "harness" });
+  else if (harness.requiresSandbox && setup.sandboxId === undefined)
+    issues.push({ kind: "sandbox-required" });
+  const models = setup.modelConnectionId && sampleModels[setup.modelConnectionId];
+  if (setup.modelConnectionId === uninstalled.id)
+    issues.push({ kind: "uninstalled", part: "model" });
+  else if (!models) issues.push({ kind: "removed", part: "model" });
+  else if (
+    models.status === "loaded" &&
+    !models.unlisted &&
+    !models.listed.some((model) => model.id === setup.model)
+  )
+    issues.push({
+      kind: "invalid",
+      part: "model",
+      description: `OpenRouter offers no model ${setup.model}`,
+    });
+  if (
+    setup.sandboxId !== undefined &&
+    !sampleSandboxes.some((option) => option.id === setup.sandboxId)
+  )
+    issues.push({ kind: "removed", part: "sandbox" });
+  return issues;
 }
 
-/** The Agents rules over local state: adding, the model-connection detour, and toasts. */
+/** Each agent's turns in progress, by its id; the others are idle. */
+const sampleTurns: Readonly<Record<string, readonly AgentTurn[]>> = {
+  reviewer: [
+    { id: "turn-review", state: "working", place: "#general", href: "#turn-review" },
+    { id: "turn-design", state: "queued", place: "#design", href: "#turn-design" },
+  ],
+  planner: [{ id: "turn-plan", state: "stopping", place: "Jamie Morgan", href: "#turn-plan" }],
+};
+
+const urgency = { working: 0, stopping: 1, queued: 2 } as const;
+
+/** Where an agent is at work, as the client finds it from its turns in progress. */
+const activityOf = (turns: readonly AgentTurn[]): AgentActivity | undefined => {
+  const [state] = turns
+    .map((turn) => turn.state)
+    .toSorted((left, right) => urgency[left] - urgency[right]);
+  return state === undefined ? undefined : { state, places: turns.map((turn) => turn.place) };
+};
+
+const connectionName = (id: string | undefined) =>
+  [...sampleHarnesses, ...sampleModelConnections, ...sampleSandboxes, uninstalled].find(
+    (option) => option.id === id,
+  )?.name;
+
+function summaryOf(
+  record: Sample,
+  configurable: boolean,
+  harnesses: readonly HarnessOption[],
+): AgentSummary {
+  const models = record.modelConnectionId ? sampleModels[record.modelConnectionId] : undefined;
+  const listed =
+    models?.status === "loaded"
+      ? models.listed.find((model) => model.id === record.model)
+      : undefined;
+  const activity = activityOf(sampleTurns[record.id] ?? []);
+  return {
+    ...(activity && { activity }),
+    id: record.id,
+    memberId: `member-${record.id}`,
+    name: record.name,
+    instructions: record.instructions,
+    harness:
+      record.harness === autoHarness
+        ? { kind: "auto" }
+        : { kind: "connection", id: record.harness, name: connectionName(record.harness) },
+    model: {
+      connection: {
+        id: record.modelConnectionId ?? "",
+        name: connectionName(record.modelConnectionId),
+      },
+      id: record.model,
+      name: listed?.name,
+      effort: record.effort,
+    },
+    sandbox:
+      record.sandboxId === undefined
+        ? undefined
+        : { id: record.sandboxId, name: connectionName(record.sandboxId) },
+    issues: issuesOf(record, harnesses),
+    configurable,
+    createdBy: "Jamie Morgan",
+    createdAt: new Date(2026, 9, 6),
+  };
+}
+
+const sameSetup = (left: Setup, right: Setup) =>
+  left.instructions.trim() === right.instructions.trim() &&
+  left.harness === right.harness &&
+  left.modelConnectionId === right.modelConnectionId &&
+  left.model.trim() === right.model.trim() &&
+  left.effort === right.effort &&
+  left.sandboxId === right.sandboxId;
+
+const emptySetup: Setup = {
+  instructions: "",
+  harness: autoHarness,
+  modelConnectionId: undefined,
+  model: "",
+};
+
+export interface AgentsWorkspaceProps {
+  /** An agent's page, by id, in place of the list. */
+  readonly selected?: string;
+  readonly tab?: AgentsTab;
+  readonly dialog?: "add" | "remove";
+  /** The workspace has no agents. */
+  readonly empty?: boolean;
+  readonly status?: "loading" | "failed" | "unavailable";
+  /** The reader may read agents but not add or change them. */
+  readonly readOnly?: boolean;
+  /** Every connection's models are still loading, or couldn't be read. */
+  readonly modelsStatus?: "loading" | "failed";
+  /** A draft to start adding from. */
+  readonly draft?: Partial<Setup> & { readonly name?: string };
+  /** No connection gives a harness. */
+  readonly withoutHarnesses?: boolean;
+  /** The host refuses the next create, as this says. */
+  readonly refuseCreate?: AgentsFailure;
+  /** The host finds this change out of date. */
+  readonly conflict?: AgentsAction;
+}
+
+/** Agents in a workspace, over sample connections, with every change applied in place. */
 export function AgentsWorkspace(props: AgentsWorkspaceProps) {
-  const [records, setRecords] = createSignal<readonly Sample[]>(
-    props.noAgents
-      ? []
-      : props.staleReasoning
-        ? samples.map((sample) =>
-            sample.id === "atlas" ? { ...sample, reasoning: "high" } : sample,
-          )
-        : samples,
-  );
-  const [connections, setConnections] = createSignal(props.noConnections ? [] : sampleConnections);
+  const [records, setRecords] = createSignal<readonly Sample[]>(props.empty ? [] : samples);
+  const [selected, setSelected] = createSignal(props.selected);
   const [tab, setTab] = createSignal<AgentsTab>(props.tab ?? "all");
   const [query, setQuery] = createSignal("");
-  const [selected, setSelected] = createSignal(props.selected);
-  const [agentTab, setAgentTab] = createSignal<AgentTab>(props.agentTab ?? "overview");
-  const [dialog, setDialog] = createSignal<Dialog | undefined>(props.dialog);
+  const [dialog, setDialog] = createSignal(props.dialog);
   const [names, setNames] = createSignal<Readonly<Record<string, string>>>({});
-  const [configs, setConfigs] = createSignal<Readonly<Record<string, Draft>>>({});
-  const [problems, setProblems] = createSignal<readonly AgentProblem[]>([]);
-  const [connectionGone, setConnectionGone] = createSignal(props.connectionGone ?? false);
-  const firstConnection = () => connections().find((connection) => connection.ready);
+  const [drafts, setDrafts] = createSignal<Readonly<Record<string, Setup>>>({});
   const [adding, setAdding] = createSignal({
-    name: props.add?.name ?? "",
-    roleId: "member",
-    instructions: "",
-    connectionId: props.add?.connectionId ?? firstConnection()?.id,
-    model:
-      connections().find((connection) => connection.id === (props.add?.connectionId ?? "team"))
-        ?.models[1]?.id ?? "",
-    reasoning: undefined as string | undefined,
-    environmentId: "remote" as string | undefined,
+    name: props.draft?.name ?? "",
+    roleId: "builtin:member",
+    setup: { ...emptySetup, ...props.draft },
   });
-  const [provider, setProvider] = createSignal<ConnectionProviderOption>(modelProviders[0]!);
-  const [connection, setConnection] = createSignal({ name: "Anthropic · Agents", url: "" });
-  const [method, setMethod] = createSignal<ConnectionMethod>("api-key");
-  const [secret, setSecret] = createSignal("");
-  // Where the connection detour returns: the add dialog, or an agent's configuration by ID.
-  const [returnTo, setReturnTo] = createSignal<string>("add");
+  const [failure, setFailure] = createSignal<AgentsFailure>();
+  const [refusal, setRefusal] = createSignal(props.refuseCreate);
+  const [conflict, setConflict] = createSignal(props.conflict);
   const [toasts, setToasts] = createSignal<Array<{ id: number; text: string }>>([]);
   let toastId = 0;
   const toast = (text: string) => setToasts([...toasts(), { id: ++toastId, text }]);
+  const harnesses = props.withoutHarnesses ? [] : sampleHarnesses;
 
-  const connectionOf = (id: string | undefined) =>
-    connections().find((candidate) => candidate.id === id);
-  const fitOf = (
-    draft: Draft,
-    environment: (typeof sampleEnvironments)[number],
-  ): EnvironmentFit => {
-    const ready = connectionOf(draft.connectionId)?.ready ?? true;
-    if (draft.reasoning !== undefined)
-      return { kind: "cant-run", reasons: ["reasoning-unsupported"] };
-    if (environment.pending)
-      return { kind: "needs-setup", issues: ["connection-incomplete"], connection: !ready };
-    return ready ? { kind: "works" } : { kind: "needs-setup", issues: [], connection: true };
-  };
-  const environmentsFor = (draft: Draft): readonly AgentEnvironmentOption[] =>
-    sampleEnvironments.map((environment) => ({
-      id: environment.id,
-      name: environment.name,
-      runtime: `Amends · ${environment.provider ?? "No sandbox"}`,
-      harness: "Amends",
-      provider: environment.provider,
-      reasoningLevels: [],
-      fit: fitOf(draft, environment),
-    }));
-  const issuesOf = (record: Sample): readonly AgentIssue[] => {
-    const issues: AgentIssue[] = [];
-    const chosen = connectionOf(record.connectionId);
-    if (!chosen) issues.push("connection-unavailable");
-    else if (!chosen.ready) issues.push("connection-not-ready");
-    if (sampleEnvironments.find((environment) => environment.id === record.environmentId)?.pending)
-      issues.push("environment-not-ready");
-    if (record.reasoning !== undefined) issues.push("reasoning-unsupported");
-    return issues;
-  };
-  const summaryOf = (record: Sample): AgentSummary => {
-    const environment = sampleEnvironments.find((option) => option.id === record.environmentId);
-    return {
-      id: record.id,
-      name: record.name,
-      role: record.role,
-      instructions: record.instructions,
-      connection: { id: record.connectionId ?? "", name: connectionOf(record.connectionId)?.name },
-      model: record.model,
-      reasoning: record.reasoning,
-      environment: {
-        id: record.environmentId ?? "",
-        name: environment?.name,
-        runtime: environment && `Amends · ${environment.provider ?? "No sandbox"}`,
-      },
-      issues: issuesOf(record),
-      configurable: !props.readOnly,
-      removable: !props.readOnly,
-      createdBy: "Jamie Morgan",
-      createdAt: new Date(2026, 8, 28),
-      activity: activities[record.id],
-    };
-  };
-  const all = createMemo(() => records().map(summaryOf));
+  const all = createMemo(() =>
+    records()
+      .map((record) => summaryOf(record, !props.readOnly, harnesses))
+      .toSorted((left, right) => left.name.localeCompare(right.name)),
+  );
+  const inTab = (agent: AgentSummary, next: AgentsTab) => next === "all" || agent.issues.length > 0;
   const shown = createMemo(() => {
     const words = query().trim().toLowerCase();
     return all().filter(
-      (agent) =>
-        (tab() === "all" || agent.issues.length > 0) &&
-        (!words || agent.name.toLowerCase().includes(words)),
+      (agent) => inTab(agent, tab()) && (!words || agent.name.toLowerCase().includes(words)),
     );
   });
   const current = () => all().find((agent) => agent.id === selected());
-  const record = (id: string) => records().find((entry) => entry.id === id);
-  const configOf = (id: string): Draft => configs()[id] ?? record(id)!;
+  const saved = (id: string) => records().find((record) => record.id === id) ?? samples[0]!;
+  const draftOf = (id: string) => drafts()[id] ?? saved(id);
+  const update = (id: string, change: Partial<Sample>) =>
+    setRecords(
+      records().map((record) => (record.id === id ? Object.assign({}, record, change) : record)),
+    );
 
-  /** Edits to a draft, whichever form holds it. */
-  const editor = (draft: () => Draft, change: (next: Draft) => void) => ({
-    instructions: draft().instructions,
-    onInstructionsChange: (text: string) => change({ ...draft(), instructions: text }),
-    connections: connections(),
-    connectionId: draft().connectionId,
-    onConnectionChange: (connectionId: string) => change({ ...draft(), connectionId }),
-    model: draft().model,
-    onModelChange: (model: string) => change({ ...draft(), model }),
-    environments: environmentsFor(draft()),
-    environmentId: draft().environmentId,
-    onEnvironmentChange: (environmentId: string) => change({ ...draft(), environmentId }),
-    reasoning: draft().reasoning,
-    onReasoningChange: (reasoning: string | undefined) => change({ ...draft(), reasoning }),
+  /** Runs a change, unless this scenario finds it out of date first. */
+  const change = (action: AgentsAction, apply: () => string | undefined) => {
+    if (conflict() === action) {
+      setConflict(undefined);
+      setFailure({ action, error: "changed" });
+      return false;
+    }
+    setFailure(undefined);
+    toast(agentsToast(action, apply()));
+    return true;
+  };
+  const modelsOf = (connectionId: string | undefined): ModelChoices | undefined => {
+    if (connectionId === undefined) return undefined;
+    if (props.modelsStatus) return { status: props.modelsStatus };
+    return sampleModels[connectionId];
+  };
+  /** The setup form's fields over a draft, which `edit` changes. */
+  const setupProps = (
+    setup: Setup,
+    edit: (change: Partial<Setup>) => void,
+  ): Omit<SetupFieldsProps, "problems" | "disabled"> => ({
+    instructions: setup.instructions,
+    onInstructionsChange: (instructions) => edit({ instructions }),
+    harness: setup.harness,
+    onHarnessChange: (harness) => edit({ harness }),
+    harnesses: withCurrent(harnesses, setup.harness, (option) => ({
+      ...option,
+      requiresSandbox: false,
+    })),
+    modelConnections: withCurrent(
+      sampleModelConnections,
+      setup.modelConnectionId,
+      (option) => option,
+    ),
+    modelConnectionId: setup.modelConnectionId,
+    onModelConnectionChange: (modelConnectionId) =>
+      edit({ modelConnectionId, model: "", effort: undefined }),
+    models: modelsOf(setup.modelConnectionId),
+    model: setup.model,
+    onModelChange: (model) => edit({ model }),
+    effort: setup.effort,
+    onEffortChange: (effort) => edit({ effort }),
+    sandboxes: withCurrent(sampleSandboxes, setup.sandboxId, (option) => option),
+    sandboxId: setup.sandboxId,
+    onSandboxChange: (sandboxId) => edit({ sandboxId }),
   });
-  const complete = (draft: Draft) =>
-    connectionOf(draft.connectionId) !== undefined &&
-    draft.model.trim() !== "" &&
-    draft.environmentId !== undefined &&
-    environmentsFor(draft).find((option) => option.id === draft.environmentId)?.fit?.kind !==
-      "cant-run";
-  const saved = (draft: Draft) =>
-    JSON.stringify([
-      draft.instructions.trim(),
-      draft.connectionId,
-      draft.model.trim(),
-      draft.reasoning,
-      draft.environmentId,
-    ]);
-  const startDetour = (from: string) => {
-    setReturnTo(from);
-    setConnection({ name: "Anthropic · Agents", url: "" });
-    setSecret("");
-    setDialog("choose-provider");
+  const nameOf = (id: string) => names()[id] ?? all().find((entry) => entry.id === id)?.name ?? "";
+  const close = () => {
+    setFailure(undefined);
+    setDialog(undefined);
   };
-  const returnName = () =>
-    returnTo() === "add" ? adding().name.trim() || "New agent" : (current()?.name ?? "");
-  const back = () => setDialog(returnTo() === "add" ? "add" : undefined);
-  const finishDetour = (keySaved: boolean) => {
-    const created: ModelConnectionOption = {
-      id: `connection-${connections().length + 1}`,
-      name: connection().name,
-      ready: keySaved || method() === "none",
-      models: provider().id === "anthropic" ? claude : [],
-    };
-    setConnections([...connections(), created]);
-    const target = returnTo();
-    if (target === "add") setAdding({ ...adding(), connectionId: created.id });
-    else setConfigs({ ...configs(), [target]: { ...configOf(target), connectionId: created.id } });
-    back();
-    if (keySaved) toast("API key saved");
-  };
-  const nav = navigation({ groups: [{ id: "general", name: "general" }] });
-  const roles = () =>
-    props.administrator
-      ? [{ id: "member", name: "Member" }]
-      : [
-          { id: "member", name: "Member" },
-          { id: "administrator", name: "Administrator" },
-        ];
   const open = (id: string | undefined) => {
-    setProblems([]);
-    setAgentTab("overview");
+    setFailure(undefined);
     setSelected(id);
   };
   const add = props.readOnly ? undefined : () => setDialog("add");
@@ -360,18 +398,18 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
   onMount(() => {
     const follow = () => {
       const target = window.location.hash.slice(1);
-      if (target === "agents") return open(undefined);
-      if (!target.startsWith("agent-")) return;
-      const rest = target.slice("agent-".length);
-      const tab = rest.endsWith("-configuration") ? "configuration" : "overview";
-      const id = rest.replace(/-(configuration|overview)$/, "");
-      if (!records().some((entry) => entry.id === id)) return;
-      if (id !== selected()) open(id);
-      setAgentTab(tab);
+      if (target.startsWith("agent-")) {
+        const id = target.slice("agent-".length);
+        if (records().some((entry) => entry.id === id) && id !== selected()) open(id);
+      } else if (target === "all" || target === "needs-setup") {
+        setTab(target);
+        open(undefined);
+      }
     };
     window.addEventListener("hashchange", follow);
     onCleanup(() => window.removeEventListener("hashchange", follow));
   });
+  const nav = navigation({ groups: [{ id: "general", name: "general" }] });
   return (
     <Shell.Root>
       <WorkspaceNavigation {...nav} destination="agents">
@@ -380,7 +418,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
             {
               id: "agents",
               title: "Agents",
-              href: "#agents",
+              href: "#all",
               current: !props.status && selected() === undefined,
               browse: { label: "Browse agents", onBrowse: () => open(undefined) },
               create: add && { label: "Add agent", onCreate: add },
@@ -392,7 +430,6 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
                     href: `#agent-${agent.id}`,
                     current: selected() === agent.id,
                     person: { name: agent.name, initials: agent.name.charAt(0), tone: "lilac" },
-                    activity: agent.activity?.state,
                     status: agentStatus(agent.issues, agent.activity),
                   })),
               loading: props.status === "loading",
@@ -418,7 +455,7 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
                   ? undefined
                   : {
                       all: all().length,
-                      needsSetup: all().filter((agent) => agent.issues.length > 0).length,
+                      "needs-setup": all().filter((agent) => inTab(agent, "needs-setup")).length,
                     }
               }
               onAdd={add}
@@ -431,175 +468,136 @@ export function AgentsWorkspace(props: AgentsWorkspaceProps) {
                 onQueryChange={setQuery}
                 agents={shown()}
                 total={all().length}
-                noModelConnection={connections().length === 0}
                 agentHref={(id) => `#agent-${id}`}
                 onAdd={add}
-                onCreateConnection={props.readOnly ? undefined : () => startDetour("add")}
               />
             </AgentsPane>
           }
         >
-          {(agent) => {
-            const id = () => agent().id;
-            const changed = () =>
-              configs()[id()] !== undefined &&
-              saved(configOf(id())) !== saved(record(id())!) &&
-              complete(configOf(id()));
-            return (
-              <AgentPane
-                workspaceName="Mercier & Co"
-                agent={agent()}
-                onBrowse={() => open(undefined)}
-                tab={agentTab()}
-                tabHref={(next) => `#agent-${id()}-${next}`}
-                onTabChange={setAgentTab}
-                name={names()[id()] ?? agent().name}
-                onNameChange={(name) => setNames({ ...names(), [id()]: name })}
-                nameChanged={
-                  names()[id()] !== undefined &&
-                  names()[id()]!.trim() !== "" &&
-                  names()[id()]!.trim() !== agent().name
-                }
-                onSaveName={() => {
-                  const name = names()[id()]!.trim();
-                  setRecords(
-                    records().map((entry) => (entry.id === id() ? { ...entry, name } : entry)),
-                  );
-                  const { [id()]: _saved, ...rest } = names();
+          {(agent) => (
+            <AgentPane
+              workspaceName="Mercier & Co"
+              agent={agent()}
+              turns={sampleTurns[agent().id] ?? []}
+              onBrowse={() => open(undefined)}
+              name={nameOf(agent().id)}
+              onNameChange={(name) => setNames({ ...names(), [agent().id]: name })}
+              nameChanged={
+                names()[agent().id] !== undefined &&
+                names()[agent().id]?.trim() !== "" &&
+                names()[agent().id]?.trim() !== agent().name
+              }
+              onSaveName={() =>
+                change("rename", () => {
+                  update(agent().id, { name: nameOf(agent().id).trim() });
+                  const { [agent().id]: _saved, ...rest } = names();
                   setNames(rest);
-                  toast(agentsToast("rename"));
-                }}
-                connectionReady={connectionOf(agent().connection.id)?.ready}
-                configuration={{
-                  ...editor(
-                    () => configOf(id()),
-                    (next) => setConfigs({ ...configs(), [id()]: next }),
-                  ),
-                  onCreateConnection: () => startDetour(id()),
-                }}
-                configurationChanged={changed()}
-                onSaveConfiguration={() => {
-                  if (connectionGone()) {
-                    setConnectionGone(false);
-                    setProblems([{ kind: "connection-unavailable" }]);
-                    return;
-                  }
-                  setProblems([]);
-                  const next = configOf(id());
-                  setRecords(
-                    records().map((entry) => (entry.id === id() ? { ...entry, ...next } : entry)),
-                  );
-                  const { [id()]: _saved, ...rest } = configs();
-                  setConfigs(rest);
-                  toast(agentsToast("configure"));
-                }}
-                onDiscardConfiguration={() => {
-                  const { [id()]: _saved, ...rest } = configs();
-                  setConfigs(rest);
-                  setProblems([]);
-                  setAgentTab("overview");
-                }}
-                onOpenConnection={() => toast("Opens the connection")}
-                onOpenEnvironment={() => toast("Opens the environment")}
-                turns={turnsOf(id())}
-                onOpenTurn={() => toast("Opens the turn log beside the page")}
-                onRemove={() => setDialog("remove")}
-                failure={
-                  problems().length > 0
-                    ? { action: "configure", error: "invalid", problems: problems() }
-                    : undefined
+                  return undefined;
+                })
+              }
+              setup={setupProps(draftOf(agent().id), (edit) =>
+                setDrafts({
+                  ...drafts(),
+                  [agent().id]: Object.assign({}, draftOf(agent().id), edit),
+                }),
+              )}
+              setupChanged={
+                drafts()[agent().id] !== undefined &&
+                !sameSetup(draftOf(agent().id), saved(agent().id))
+              }
+              onSaveSetup={() => {
+                const draft = draftOf(agent().id);
+                const issues = issuesOf(draft, harnesses).filter(
+                  (issue) => issue.kind !== "no-harness",
+                );
+                if (issues.length > 0) {
+                  setFailure({ action: "configure", error: "incomplete", issues });
+                  return;
                 }
-                onRefresh={() => setProblems([])}
-              />
-            );
-          }}
+                change("configure", () => {
+                  update(agent().id, draft);
+                  const { [agent().id]: _saved, ...rest } = drafts();
+                  setDrafts(rest);
+                  return undefined;
+                });
+              }}
+              onDiscardSetup={() => {
+                setFailure(undefined);
+                const { [agent().id]: _discarded, ...rest } = drafts();
+                setDrafts(rest);
+              }}
+              onRemove={props.readOnly ? undefined : () => setDialog("remove")}
+              failure={failure() && !dialog() ? failure() : undefined}
+              onRefresh={() => setFailure(undefined)}
+            />
+          )}
         </Show>
       </Shell.Main>
       <AddAgent
         open={dialog() === "add"}
-        onClose={() => setDialog(undefined)}
+        onClose={close}
         workspaceName="Mercier & Co"
         name={adding().name}
         onNameChange={(name) => setAdding({ ...adding(), name })}
-        roles={roles()}
+        roles={roles}
         roleId={adding().roleId}
         onRoleChange={(roleId) => setAdding({ ...adding(), roleId })}
-        configuration={{
-          ...editor(adding, (next) => setAdding({ ...adding(), ...next })),
-          onCreateConnection: () => startDetour("add"),
-        }}
-        ready={adding().name.trim() !== "" && complete(adding())}
-        onCreate={() => {
-          const created: Sample = {
-            ...adding(),
-            id: `agent-${records().length + 1}`,
-            name: adding().name.trim(),
-            role: adding().roleId === "administrator" ? "Administrator" : "Member",
-          };
-          setRecords([...records(), created]);
-          setSelected(created.id);
-          setAgentTab("overview");
-          setDialog(undefined);
-          toast(agentsToast("create", created.name));
-        }}
-      />
-      <ChooseProvider
-        open={dialog() === "choose-provider"}
-        onClose={back}
-        workspaceName="Mercier & Co"
-        providers={modelProviders}
-        returnTo={returnName()}
-        onChoose={(providerId) => {
-          const chosen = modelProviders.find((option) => option.id === providerId)!;
-          setProvider(chosen);
-          setMethod(chosen.methods[0]!);
-          setConnection({ name: `${chosen.name} · Agents`, url: "" });
-          setDialog("configure-connection");
-        }}
-      />
-      <ConfigureConnection
-        open={dialog() === "configure-connection"}
-        onClose={back}
-        onBack={() => setDialog("choose-provider")}
-        returnTo={returnName()}
-        returnKind="agent"
-        provider={provider()}
-        name={connection().name}
-        onNameChange={(name) => setConnection({ ...connection(), name })}
-        value={() => connection().url}
-        onValueChange={(_key, url) => setConnection({ ...connection(), url })}
-        method={method()}
-        onMethodChange={setMethod}
-        ready={connection().name.trim() !== ""}
-        onCreate={() =>
-          method() === "api-key" ? setDialog("connection-key") : finishDetour(false)
+        setup={setupProps(adding().setup, (edit) =>
+          setAdding({ ...adding(), setup: Object.assign({}, adding().setup, edit) }),
+        )}
+        ready={
+          adding().name.trim() !== "" &&
+          adding().setup.modelConnectionId !== undefined &&
+          adding().setup.model.trim() !== ""
         }
-      />
-      <ConnectionKey
-        open={dialog() === "connection-key"}
-        onClose={() => finishDetour(false)}
-        name={connection().name}
-        mode="setup"
-        returnTo={returnName()}
-        returnKind="agent"
-        secret={secret()}
-        onSecretChange={setSecret}
-        onSave={() => finishDetour(true)}
+        onCreate={() => {
+          const refused = refusal();
+          if (refused) {
+            setRefusal(undefined);
+            setFailure(refused);
+            return;
+          }
+          const draft = adding();
+          const issues = issuesOf(draft.setup, harnesses).filter(
+            (issue) => issue.kind !== "no-harness",
+          );
+          if (issues.length > 0) {
+            setFailure({ action: "create", error: "incomplete", issues });
+            return;
+          }
+          const id = draft.name.trim().toLowerCase().replaceAll(/\W+/g, "-");
+          const created = change("create", () => {
+            setRecords([...records(), { id, name: draft.name.trim(), ...draft.setup }]);
+            return draft.name.trim();
+          });
+          if (!created) return;
+          close();
+          setAdding({ name: "", roleId: "builtin:member", setup: emptySetup });
+          setSelected(id);
+        }}
+        failure={failure()?.action === "create" ? failure() : undefined}
+        onRefresh={() => setFailure(undefined)}
       />
       <Show when={current()}>
         {(agent) => (
           <ConfirmRemoveAgent
             open={dialog() === "remove"}
-            onClose={() => setDialog(undefined)}
+            onClose={close}
             name={agent().name}
-            workspaceName="Mercier & Co"
             onConfirm={() => {
               const { id, name } = agent();
-              setRecords(records().filter((entry) => entry.id !== id));
-              setSelected(undefined);
-              setDialog(undefined);
-              toast(agentsToast("remove", name));
+              if (
+                change("remove", () => {
+                  setRecords(records().filter((record) => record.id !== id));
+                  return name;
+                })
+              ) {
+                close();
+                setSelected(undefined);
+              }
             }}
+            failure={failure()?.action === "remove" ? failure() : undefined}
+            onRefresh={() => setFailure(undefined)}
           />
         )}
       </Show>

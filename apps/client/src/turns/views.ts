@@ -10,7 +10,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Effect, Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { agentsReads } from "../agents/api.ts";
+import { connectionsReads } from "../connections/api.ts";
 import { timelineRead } from "../conversations/api.ts";
 import { useApiClient } from "../provider.tsx";
 import { writing } from "./drafts.ts";
@@ -258,10 +258,7 @@ export function useTurnLog(
   const feed = () => Option.getOrUndefined(AsyncResult.value(feedResult()));
   const entryOf = useEntries(workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
-  const setup = agentsReads(client, workspaceId);
-  const connections = useRead(setup?.connections);
-  const implementations = useRead(setup?.connectionImplementations);
-  const environments = useRead(setup?.environments);
+  const connections = useRead(connectionsReads(client, workspaceId)?.connections);
   const live = useChangeFeedStatus();
   const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
   const failure = (): WorkspaceFailure | undefined => {
@@ -283,24 +280,25 @@ export function useTurnLog(
   const turn = createMemo(() => {
     const current = entry(),
       selection = read.value()?.selection;
-    if (current === undefined || selection === undefined) return undefined;
+    // Its setup names its connections, so it waits for them.
+    if (current === undefined || selection === undefined || connections.loading()) return undefined;
     const group = groups.group(current.groupId);
-    const connection = connections.value()?.find((item) => item.id === selection?.connectionId);
-    const provider = implementations
-      .value()
-      ?.find((item) => item.id === connection?.implementationId)?.name;
+    /** A connection's name, or "Removed connection" once it is removed. */
+    const nameOf = (connectionId: string) =>
+      connections.value()?.find((item) => item.id === connectionId)?.name ?? "Removed connection";
     return {
       agentId: current.agent.id,
       agent: { name: current.agent.name },
       state: current.state,
       where:
         group?.kind === "direct" ? `Thread with ${group.name}` : `Thread in #${group?.name ?? ""}`,
-      model:
-        selection === null ? undefined : [provider, selection.model].filter(Boolean).join(" · "),
-      environment:
-        selection === null
-          ? undefined
-          : environments.value()?.find((item) => item.id === selection.environmentId)?.name,
+      ...(selection !== null && {
+        setup: {
+          harness: nameOf(selection.harness.connectionId),
+          model: `${nameOf(selection.model.connectionId)} · ${selection.model.id}`,
+          ...(selection.sandbox !== null && { sandbox: nameOf(selection.sandbox.connectionId) }),
+        },
+      }),
       stoppable: current.stoppable,
       retryable: current.retryable,
       replyId: current.replyId,
@@ -379,7 +377,8 @@ export function useTurnLog(
     turn,
     activity,
     draft,
-    loading: () => !lost() && (read.loading() || feed()?.items === undefined),
+    loading: () =>
+      !lost() && (read.loading() || connections.loading() || feed()?.items === undefined),
     failure,
     reconnecting: () => live() !== undefined || followingDown(),
     updatedAt: () => feed()?.updatedAt,
@@ -407,13 +406,19 @@ export interface TurnActivityView {
   /** An agent's active turns, by its member ID. */
   readonly ofAgent: (memberId: string) => ReadonlyArray<ActiveTurn>;
   /**
-   * An agent's current activity, by its member ID: its most pressing state, and where it works,
-   * each thread by its group, as "#general" for a team or the people of a direct group.
+   * Where an agent is at work, by its member ID: its most pressing state, and the place of each
+   * active turn. None while it is idle.
    */
   readonly agentActivity: (memberId: string) => AgentActivity | undefined;
 }
 
 const urgency = { working: 0, stopping: 1, queued: 2 } as const;
+
+/** The active ones of `states`, most urgent first: working, then stopping, then queued. */
+const mostUrgentFirst = (states: ReadonlyArray<TurnState>) =>
+  states
+    .filter((state): state is keyof typeof urgency => state in urgency)
+    .toSorted((left, right) => urgency[left] - urgency[right]);
 
 /** Where agents are at work across the workspace, live while mounted. */
 export function useTurnActivity(workspaceId: string): TurnActivityView {
@@ -434,20 +439,16 @@ export function useTurnActivity(workspaceId: string): TurnActivityView {
     all,
     inThread: (threadId) => all().filter((turn) => turn.threadId === threadId),
     inGroup: (groupId) =>
-      all()
-        .filter((turn) => turn.groupId === groupId)
-        .map((turn) => turn.state as keyof typeof urgency)
-        .filter((state) => state in urgency)
-        .toSorted((left, right) => urgency[left] - urgency[right])[0],
+      mostUrgentFirst(
+        all()
+          .filter((turn) => turn.groupId === groupId)
+          .map((turn) => turn.state),
+      )[0],
     ofAgent: (memberId) => all().filter((turn) => turn.agent.memberId === memberId),
     agentActivity: (memberId) => {
       const turns = all().filter((turn) => turn.agent.memberId === memberId);
-      const [state] = turns
-        .map((turn) => turn.state as keyof typeof urgency)
-        .filter((state) => state in urgency)
-        .toSorted((left, right) => urgency[left] - urgency[right]);
-      if (state === undefined) return undefined;
-      return { state, places: turns.map((turn) => turn.place) };
+      const [state] = mostUrgentFirst(turns.map((turn) => turn.state));
+      return state === undefined ? undefined : { state, places: turns.map((turn) => turn.place) };
     },
   };
 }

@@ -13,11 +13,8 @@ import {
 import { GatewayErrors } from "@amends/gateway/errors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
 import { AgentService } from "@amends/core/agent";
-import { AgentV2Service } from "@amends/core/agent-v2";
 import { TurnService } from "@amends/core/turn";
 import { ConnectionService } from "@amends/core/connection";
-import { ConnectionV2Service } from "@amends/core/connection-v2";
-import { EnvironmentService } from "@amends/core/environment";
 import { NotificationService } from "@amends/core/notification";
 import { ReadStateService } from "@amends/core/read-state";
 import {
@@ -168,91 +165,38 @@ export const readState = [
   ReadStateService.BeyondTimeline.pipe(HttpApiSchema.status(409)),
 ] as const;
 
-/** A connection the caller may not read answers as missing. */
+/** A connection the caller may not read answers as missing, as does one removed since a create. */
 export const ConnectionNotFound = ConnectionService.NotFound.pipe(HttpApiSchema.status(404));
 /** A connection renamed since the caller last saw its name refuses another name with 409. */
 export const ConnectionChanged = ConnectionService.Changed.pipe(HttpApiSchema.status(409));
-/** The implementation is not installed on this host. */
-export const UnknownImplementation = ConnectionService.UnknownImplementation.pipe(
-  HttpApiSchema.status(422),
-);
-/** The settings are not what the implementation declares. */
-export const InvalidSettings = ConnectionService.InvalidSettings.pipe(HttpApiSchema.status(422));
-/** The implementation, or the connection, does not authenticate that way. */
-export const UnsupportedAuthentication = ConnectionService.UnsupportedAuthentication.pipe(
-  HttpApiSchema.status(422),
-);
-/** This host cannot store credentials now. */
-export const CredentialsUnavailable = ConnectionService.CredentialsUnavailable.pipe(
-  HttpApiSchema.status(503),
-);
-
-/** A connection the caller may not read answers as missing, as does one removed since a create. */
-export const ConnectionV2NotFound = ConnectionV2Service.NotFound.pipe(HttpApiSchema.status(404));
-/** A connection renamed since the caller last saw its name refuses another name with 409. */
-export const ConnectionV2Changed = ConnectionV2Service.Changed.pipe(HttpApiSchema.status(409));
 /** The integration is not installed on this host. */
-export const UnknownIntegration = ConnectionV2Service.UnknownIntegration.pipe(
+export const UnknownIntegration = ConnectionService.UnknownIntegration.pipe(
   HttpApiSchema.status(422),
 );
 /** The integration does not take the connection's settings or auth method, as it describes. */
-export const InvalidConnection = ConnectionV2Service.InvalidConnection.pipe(
+export const InvalidConnection = ConnectionService.InvalidConnection.pipe(
   HttpApiSchema.status(422),
 );
 /** The connection authenticates with nothing, so it takes no key. */
-export const Keyless = ConnectionV2Service.Keyless.pipe(HttpApiSchema.status(422));
+export const Keyless = ConnectionService.Keyless.pipe(HttpApiSchema.status(422));
 /** This host keeps no credentials, so no key can be stored or read. */
-export const ConnectionV2CredentialsUnavailable = ConnectionV2Service.CredentialsUnavailable.pipe(
+export const ConnectionCredentialsUnavailable = ConnectionService.CredentialsUnavailable.pipe(
   HttpApiSchema.status(503),
 );
-
-/** An environment the caller may not read answers as missing. */
-export const EnvironmentNotFound = EnvironmentService.NotFound.pipe(HttpApiSchema.status(404));
-/** An environment renamed since the caller last saw its name refuses another name with 409. */
-export const EnvironmentChanged = EnvironmentService.Changed.pipe(HttpApiSchema.status(409));
-/** The harness is not installed on this host. */
-export const UnknownHarness = EnvironmentService.UnknownHarness.pipe(HttpApiSchema.status(422));
-/** The sandbox provider is not installed on this host. */
-export const UnknownSandboxProvider = EnvironmentService.UnknownSandboxProvider.pipe(
-  HttpApiSchema.status(422),
-);
-/** The harness cannot run where the environment asks it to. */
-export const UnsupportedPlacement = EnvironmentService.UnsupportedPlacement.pipe(
-  HttpApiSchema.status(422),
-);
-/** The sandbox settings do not fit the provider, or the environment has no sandbox. */
-export const InvalidSandbox = EnvironmentService.InvalidSandbox.pipe(HttpApiSchema.status(422));
 
 /** An agent the caller may not read, or whose membership ended, answers as missing. */
 export const AgentNotFound = AgentService.NotFound.pipe(HttpApiSchema.status(404));
 /** An agent renamed since the caller last saw its name refuses another name with 409. */
 export const AgentChanged = AgentService.Changed.pipe(HttpApiSchema.status(409));
-/** The agent's connection is gone, or the caller may not read or use it. */
+/** A connection the setup names is missing or removed, or the caller may not read and use it. */
 export const AgentConnectionUnavailable = AgentService.ConnectionUnavailable.pipe(
   HttpApiSchema.status(422),
 );
-/** The agent's environment is gone, or the caller may not read or use it. */
-export const AgentEnvironmentUnavailable = AgentService.EnvironmentUnavailable.pipe(
-  HttpApiSchema.status(422),
-);
-/** The environment cannot run the model access, for the reasons given. */
-export const AgentIncompatible = AgentService.Incompatible.pipe(HttpApiSchema.status(422));
-
-/** An agent the caller may not read, or whose membership ended, answers as missing. */
-export const AgentV2NotFound = AgentV2Service.NotFound.pipe(HttpApiSchema.status(404));
-/** An agent renamed since the caller last saw its name refuses another name with 409. */
-export const AgentV2Changed = AgentV2Service.Changed.pipe(HttpApiSchema.status(409));
-/** A connection the setup names is missing or removed, or the caller may not read and use it. */
-export const AgentV2ConnectionUnavailable = AgentV2Service.ConnectionUnavailable.pipe(
-  HttpApiSchema.status(422),
-);
 /** The agent could not run as it would be set up, for the issues given. */
-export const AgentV2Incomplete = AgentV2Service.Incomplete.pipe(HttpApiSchema.status(422));
+export const AgentIncomplete = AgentService.Incomplete.pipe(HttpApiSchema.status(422));
 
 /** A turn the caller may not read, because its thread is closed to them, answers as missing. */
 export const TurnNotFound = TurnService.NotFound.pipe(HttpApiSchema.status(404));
-/** A thread the caller may not open answers as missing. */
-export const TurnThreadNotFound = TurnService.ThreadNotFound.pipe(HttpApiSchema.status(404));
 /** The turn has already finished, so there is nothing to stop. */
 export const TurnNotActive = TurnService.NotActive.pipe(HttpApiSchema.status(409));
 /** The turn can't run again, for the reason given. */

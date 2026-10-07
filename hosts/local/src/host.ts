@@ -1,21 +1,19 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AnthropicConnection } from "@amends/connection-anthropic";
-import { ModelCatalog, ModelIntegrations, ToolIntegrations } from "@amends/connection-v2";
-import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
-import { AgentJob, JobPruning, TurnJob, TurnRunner } from "@amends/cluster";
-import { Environment } from "@amends/environment";
+import {
+  Integrations,
+  ModelCatalog,
+  ModelIntegrations,
+  ToolIntegrations,
+} from "@amends/connection";
+import { JobPruning, TurnJob } from "@amends/cluster";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
-import { OpenCodeHarness } from "@amends/harness-acp";
-import { AmendsHarness } from "@amends/harness-amends";
-import { AmendsAgent, Models } from "@amends/harness-amends-v2";
+import { AmendsAgent, Models } from "@amends/harness-amends";
 import { OpencodeAgent } from "@amends/harness-opencode";
-import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
-import { LocalSandbox } from "@amends/sandbox-local";
-import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
-import { Network } from "@amends/sandbox-v2";
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+import { LocalSandboxProvider } from "@amends/sandbox-local";
+import { Network } from "@amends/sandbox";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
@@ -32,7 +30,6 @@ import {
 } from "effect/cluster";
 import { FetchHttpClient } from "effect/http";
 import type { SqlClient } from "effect/sql";
-import { LocalHarnessServer } from "./harness-server.ts";
 
 /** Gateway and directory owned by one host lifetime. */
 export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
@@ -65,45 +62,37 @@ export interface Options {
    */
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
   /**
-   * The directory local sandboxes live in, beside the harness server builds this host uploads
-   * into them, and the sandboxes of each connection to this machine in `connections`;
+   * The directory this machine's sandboxes live in, a directory for each connection to it;
    * `amends-sandboxes` in the system's temporary directory by default.
    */
   readonly sandboxDirectory?: string | undefined;
 }
 
-/** The harnesses this host runs agents' turns with: amends's own, in process. */
-const harnesses = [AmendsHarness.harness];
-
 /**
- * What this host installs, as its catalogs declare them: model connections and a Daytona account;
- * amends's harness, in process or in a sandbox, and opencode, in a sandbox; and sandboxes as local
- * directories, for development, and on Daytona.
+ * The secret opencode's bridge tokens are derived from: one made from the credential key, which
+ * every host over the database shares, so that a host reaches a bridge another one launched; or,
+ * without a credential key, this process's own.
  */
-export const installed = {
-  connections: [
-    AnthropicConnection.declaration,
-    OpenAiCompatibleConnection.declaration,
-    DaytonaConnection.declaration,
-  ],
-  harnesses: [AmendsHarness.harness.declaration, OpenCodeHarness.declaration],
-  sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
-};
+const bridgeSecretOf = (credentialKey: Redacted.Redacted<string> | undefined) =>
+  credentialKey === undefined
+    ? randomBytes(32)
+    : createHmac("sha256", Buffer.from(Redacted.value(credentialKey), "base64"))
+        .update("amends/opencode-bridge")
+        .digest();
 
 /**
  * The integrations this host installs, which workspaces connect to: each model provider in the
  * catalog and any OpenAI-compatible API, for models; MCP servers and HTTP APIs, for tools;
  * sandboxes as directories under `directory`, for development, and on Daytona; and amends's agent
- * and opencode, as harnesses.
+ * and opencode, as harnesses. opencode's bridges take tokens derived from `credentialKey`.
  *
  * @category constructors
  */
 export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
-  function* (directory: string) {
-    // TODO: Derive bridge tokens from a secret every host shares, and give the bridges in this
-    // machine's sandboxes ports of their own, once turns start opencode sessions: these tokens are
-    // this process's own, and local sandboxes share this machine's ports.
-    const bridgeSecret = randomBytes(32);
+  function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
+    // TODO: Give the bridges in this machine's sandboxes ports of their own: local sandboxes share
+    // this machine's ports, so a second opencode sandbox here cannot listen on the bridge's.
+    const bridgeSecret = bridgeSecretOf(credentialKey);
     return [
       ...(yield* ModelIntegrations.catalogProviders),
       yield* ModelIntegrations.openAiCompatible,
@@ -128,33 +117,6 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
     ),
   ),
 );
-
-/**
- * The environments this host runs: amends's harness in process, sandboxes as directories under
- * `directory` and on each workspace's Daytona account, and the harness server it builds to run
- * harnesses inside them.
- *
- * @category layers
- */
-export const layerEnvironments = (directory: string) =>
-  Layer.effect(
-    Environment.Service,
-    Effect.gen(function* () {
-      const sandboxes = [
-        yield* LocalSandbox.implementation({ root: directory }),
-        yield* DaytonaSandbox.implementation(),
-      ];
-      const harnessServer = yield* LocalHarnessServer.make({
-        directory: join(directory, "harness-server"),
-      });
-      return yield* Environment.make({ harnesses, sandboxes, harnessServer });
-    }),
-  ).pipe(Layer.provide([BunServices.layer, FetchHttpClient.layer]));
-
-/** The code that runs agents' turns with either model connection. */
-export const turnRunnerOptions: TurnRunner.Options = {
-  models: [AnthropicConnection.modelInference, OpenAiCompatibleConnection.modelInference],
-};
 
 /**
  * The database, and the cluster that runs jobs over the same pool: one SQL client, so a job a
@@ -188,38 +150,34 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 };
 
 /**
- * The gateway and the workspace directory over one PostgreSQL database, through the
- * storage adapter, with agents' jobs and turns' jobs running in this process, and handled job
- * requests pruned after seven days. The HTTP server resolves
- * bearer tokens before entering the gateway.
+ * The gateway and the workspace directory over one PostgreSQL database, through the storage
+ * adapter, with the turn jobs that run agents' turns on the integrations the host installs, and
+ * handled job requests pruned after seven days. The HTTP server resolves bearer tokens before
+ * entering the gateway.
  *
  * @category layers
  */
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer => {
   const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes");
-  const gateway = Layer.unwrap(
-    Effect.map(makeIntegrations(join(sandboxDirectory, "connections")), (integrations) =>
-      Gateway.layer({ ...installed, integrations }),
-    ),
-  );
-  return Layer.mergeAll(
-    AgentJob.layerWorker,
-    JobPruning.layer({
-      prune: PostgresClusterStorage.prune,
-      entityTypes: [AgentJob.entity.type, TurnJob.entity.type],
-    }),
-    TurnJob.layerWorker.pipe(
-      Layer.provide(TurnRunner.layer(turnRunnerOptions)),
-      Layer.provide(layerEnvironments(sandboxDirectory)),
-    ),
-  ).pipe(
-    Layer.provideMerge(
-      gateway.pipe(
+  const jobs = Effect.map(
+    makeIntegrations(sandboxDirectory, options.credentialKey),
+    (integrations) => {
+      const gateway = Gateway.layer({ integrations }).pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
-        Layer.provide(AgentJob.layerRequests),
         Layer.provide(TurnJob.layerRequests),
-      ),
-    ),
+      );
+      return Layer.mergeAll(
+        TurnJob.layerWorker.pipe(
+          Layer.provide(Layer.effect(Integrations.Integrations, Integrations.make(integrations))),
+        ),
+        JobPruning.layer({
+          prune: PostgresClusterStorage.prune,
+          entityTypes: [TurnJob.entity.type],
+        }),
+      ).pipe(Layer.provideMerge(gateway));
+    },
+  );
+  return Layer.unwrap(jobs).pipe(
     Layer.provide(BunCrypto.layer),
     Layer.provide(layerDatabase(url, options)),
   );

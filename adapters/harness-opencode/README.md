@@ -1,6 +1,6 @@
 # opencode harness
 
-opencode as an agent for the [v2 harness](../../packages/harness-v2/README.md). opencode works in
+opencode as an agent for the [harness contract](../../packages/harness/README.md). opencode works in
 the sandbox behind its bridge, which drives opencode's server over the session API that opencode
 1.18 added. Hosts reach the bridge through `BridgeClient`; nothing else of opencode is exposed
 outside the sandbox.

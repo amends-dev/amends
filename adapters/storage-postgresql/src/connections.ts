@@ -12,25 +12,13 @@ const decodeRows = Schema.decodeUnknownEffect(
     Schema.Struct({ ...Connection.Record.fields, createdAt: Schema.DateTimeUtcFromDate }),
   ),
 );
-type Row = typeof connections.$inferSelect;
-const toRecord = ({ authentication, credentialId, ...common }: Row) => ({
-  ...common,
-  authentication: authentication === "ApiKey" ? { _tag: "ApiKey", credentialId } : { _tag: "None" },
-});
-const decode = (rows: ReadonlyArray<Row>) =>
-  decodeRows(rows.map(toRecord)).pipe(
-    Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
-  );
 const toRow = (record: Connection.Record): typeof connections.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
+  integration: record.integration,
   name: record.name,
-  implementationId: record.implementationId,
   settings: record.settings,
-  authentication: record.authentication._tag,
-  credentialId: Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication)
-    ? record.authentication.credentialId
-    : null,
+  auth: record.auth,
   status: record.status,
   createdBy: record.createdBy,
   createdAt: DateTime.toDate(record.createdAt),
@@ -61,15 +49,20 @@ export const make = Effect.fn("Connections.make")(function* () {
       function* (input) {
         const id = yield* Schema.decodeEffect(Connection.Id)(input);
         return yield* guard(db.select().from(connections).where(inWorkspace(id))).pipe(
-          Effect.flatMap(decode),
+          Effect.flatMap(decodeRows),
           Effect.map(Array.head),
         );
       },
       Effect.mapError(storeFailure(ConnectionStore, "get")),
     ),
-    list: guard(db.select().from(connections).where(eq(connections.workspaceId, workspaceId))).pipe(
-      Effect.flatMap(decode),
-      Effect.mapError(storeFailure(ConnectionStore, "list")),
+    listActive: guard(
+      db
+        .select()
+        .from(connections)
+        .where(and(eq(connections.workspaceId, workspaceId), eq(connections.status, "active"))),
+    ).pipe(
+      Effect.flatMap(decodeRows),
+      Effect.mapError(storeFailure(ConnectionStore, "listActive")),
     ),
     insert: Effect.fn("Connections.insert")(function* (input) {
       const record = yield* valid("insert", input);

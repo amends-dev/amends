@@ -3,15 +3,12 @@
  * files call the suites it runs.
  */
 export { agents } from "./agents.ts";
-export { agentsV2 } from "./agents-v2.ts";
 export { assignments } from "./assignments.ts";
 export { authorization } from "./authorization.ts";
 export { builtinRoles } from "./builtin-roles.ts";
 export { changeFeed } from "./change-feed.ts";
 export { connections } from "./connections.ts";
-export { connectionsV2 } from "./connections-v2.ts";
 export { contracts } from "./contracts.ts";
-export { environments } from "./environments.ts";
 export { factMetadata } from "./fact-metadata.ts";
 export { gateway } from "./gateway.ts";
 export { groupFollows } from "./group-follows.ts";
@@ -31,6 +28,7 @@ export { provenance } from "./provenance.ts";
 export { readState } from "./read-state.ts";
 export { reads } from "./reads.ts";
 export { requests } from "./requests.ts";
+export { sessionLogs } from "./session-logs.ts";
 export { signals } from "./signals.ts";
 export { standaloneAppends } from "./standalone-appends.ts";
 export { threadParticipation } from "./thread-participation.ts";

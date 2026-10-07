@@ -7,7 +7,7 @@ import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register agent handlers, capturing the gateway and reading the principal per request.
+ * Register the handlers of agents, capturing the gateway and reading the principal per request.
  *
  * @category layers
  */
@@ -30,21 +30,17 @@ export const layer = HttpApiBuilder.group(
         asMember(params.workspaceId, (agentService) =>
           agentService.create(payload, { requestKey: headers["idempotency-key"] }),
         ),
-      environmentChoices: ({ params, query }) =>
-        asMember(params.workspaceId, (agentService) =>
-          agentService.environmentChoices({
-            model: {
-              connectionId: query.connectionId,
-              model: query.model,
-              reasoning: query.reasoning ?? null,
-            },
-          }),
-        ),
       get: ({ params }) =>
         asMember(params.workspaceId, (agentService) => agentService.get(params.agentId)),
       configure: ({ params, payload }) =>
         asMember(params.workspaceId, (agentService) =>
-          agentService.configure(Object.assign({ agentId: params.agentId }, payload)),
+          agentService.configure({
+            agentId: params.agentId,
+            instructions: payload.instructions,
+            harness: payload.harness,
+            model: payload.model,
+            sandbox: payload.sandbox,
+          }),
         ),
       rename: ({ params, payload }) =>
         asMember(params.workspaceId, (agentService) =>
@@ -54,8 +50,6 @@ export const layer = HttpApiBuilder.group(
             expectedName: payload.expectedName,
           }),
         ),
-      remove: ({ params }) =>
-        asMember(params.workspaceId, (agentService) => agentService.remove(params.agentId)),
     });
   }),
 );

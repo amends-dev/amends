@@ -16,13 +16,15 @@ change: writes replace them, and every read decodes a fresh record. Journal entr
 on the way in and out, so callers never share bytes with storage.
 
 Stores check what the PostgreSQL adapter enforces with keys and unique indexes: reused IDs, one
-active membership per identity, one agent v2 per membership, one direct group per member set, one active follow per admission,
+active membership per identity, one agent per membership, one direct group per member set, one active follow per admission,
 one active participation per participant, and contiguous thread sequences. Like PostgreSQL, they
 take references to other read models as recorded, so each rebuilds alone. Lists order IDs by their UTF-8 bytes, matching binary collation.
 Commit and entry IDs come from a counter in each storage.
-Connections' credentials sit beside the records, outside the projections a rebuild discards, and
-are held as they are: this adapter is for tests, so it seals nothing. Connections v2 keep one
-credential for each connection the same way, as the JSON of its encoded form.
+Connections keep one credential for each connection beside the records, outside the
+projections a rebuild discards, as the JSON of its encoded form: this adapter is for tests, so it
+seals nothing. Each participation's harness session is kept beside them too, as JSON. Session logs
+sit beside the workspaces' state, outside every transaction: an append is kept at once, and wakes
+readers waiting for one as a commit's appends do.
 
 ## Transactions
 

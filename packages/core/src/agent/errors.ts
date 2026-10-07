@@ -1,12 +1,10 @@
 import { Schema } from "effect";
-import { ConnectionId } from "../connection/id.ts";
-import { EnvironmentCompatibility } from "../environment/compatibility.ts";
-import { EnvironmentId } from "../environment/id.ts";
+import { Connection } from "../connection/connection.ts";
 import { Agent } from "./agent.ts";
 
 /** The outcomes `AgentService` reports that a caller can act on; schemas only. */
 
-/** Missing, removed, and unreadable agents share this outcome. */
+/** Missing agents, agents whose membership ended, and agents the actor may not read share this. */
 export class NotFound extends Schema.TaggedError<NotFound>()("AgentService.NotFound", {
   agentId: Agent.Id,
 }) {}
@@ -16,21 +14,18 @@ export class Changed extends Schema.TaggedError<Changed>()("AgentService.Changed
   agentId: Agent.Id,
 }) {}
 
-/** The connection is gone, or the actor may not read or use it. */
+/**
+ * The connection named for a part of the agent's setup is missing or removed, or the actor may not
+ * read and use it, which they cannot tell apart.
+ */
 export class ConnectionUnavailable extends Schema.TaggedError<ConnectionUnavailable>()(
   "AgentService.ConnectionUnavailable",
-  { connectionId: ConnectionId.Id },
+  { part: Agent.Part, connectionId: Connection.Id },
 ) {}
 
-/** The environment is gone, or the actor may not read or use it. */
-export class EnvironmentUnavailable extends Schema.TaggedError<EnvironmentUnavailable>()(
-  "AgentService.EnvironmentUnavailable",
-  { environmentId: EnvironmentId.Id },
-) {}
-
-/** The environment cannot run the model selection, for these reasons. */
-export class Incompatible extends Schema.TaggedError<Incompatible>()("AgentService.Incompatible", {
-  reasons: Schema.NonEmptyArray(EnvironmentCompatibility.Reason),
+/** The agent cannot run as it would be set up, for the issues its readiness would report. */
+export class Incomplete extends Schema.TaggedError<Incomplete>()("AgentService.Incomplete", {
+  issues: Schema.NonEmptyArray(Agent.Issue),
 }) {}
 
 export * as AgentErrors from "./errors.ts";

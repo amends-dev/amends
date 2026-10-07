@@ -5,23 +5,19 @@ contracts over one external system, such as a database. Adapters consume shared
 packages and may install the dependencies their system needs, which is why they
 live outside `packages/`. Hosts compose them; shared packages never depend on them.
 
-`sandbox-local/` and `sandbox-daytona/` implement the [sandbox contract](../packages/sandbox/README.md):
-the first with directories on this machine, the reference provider for tests, and the second over
-Daytona's hosted sandboxes. Both run the [sandbox conformance suites](../packages/sandbox-conformance/README.md).
+`sandbox-local/` and `sandbox-daytona/` implement the
+[sandbox contract](../packages/sandbox): the first with directories on this machine, for
+development, and the second over Daytona's hosted sandboxes. Both run its conformance suites.
 
-`connection-anthropic/` and `connection-openai-compatible/` implement the
-[connection contract](../packages/connection/README.md) for model providers over Effect AI: each
-declares itself for a host's catalog and turns a connection into model access.
-
-`harness-acp/` implements the [harness contract](../packages/harness/README.md) over coding agents
-that speak the Agent Client Protocol, which run in a sandbox and call the model themselves, with a
-module per agent; opencode is the first. It runs the
-[harness conformance suites](../packages/harness/README.md#conformance-suites).
+`harness-amends/` is amends's own agent for the [harness contract](../packages/harness/README.md), a
+loop over an Effect AI `LanguageModel` with the model providers' clients, and `harness-opencode/`
+runs opencode behind its bridge in a sandbox. Each of these four gives the
+[integration](../packages/connection/README.md) a host installs.
 
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
-and one column per record field, except a thread activity's kind-specific details, which
-it stores as JSON; the local host uses it. `storage-memory/` implements
+and one column per record field, except the kind-specific details of a thread activity or a
+session log entry, which it stores as JSON; the local host uses it. `storage-memory/` implements
 them in process memory with no dependencies: it is the reference implementation of
 the storage contracts and no host uses it. Each README covers running and testing.
 The adapters share one shape: one module per store

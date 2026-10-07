@@ -5,21 +5,33 @@ import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { SearchField } from "../../components/input/index.ts";
 import { StatusMark, markTone } from "../../components/status-mark/index.ts";
-import { Tooltip } from "../../components/tooltip/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
+import { Tooltip } from "../../components/tooltip/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import {
   ConnectionsAlert,
+  authLabels,
+  capabilityLabels,
   connectionStatus,
-  methodLabels,
+  integrationLine,
   type ConnectionSummary,
   type ConnectionsFailure,
+  type IntegrationCapability,
 } from "./wording.tsx";
 import * as s from "./connections.css.ts";
 
-export type ConnectionsTab = "all" | "needs-setup";
+/** All connections, or those that give one capability. */
+export type ConnectionsTab = "all" | IntegrationCapability;
+
+const tabs: ReadonlyArray<{ readonly id: ConnectionsTab; readonly label: string }> = [
+  { id: "all", label: "All" },
+  { id: "models", label: capabilityLabels.models },
+  { id: "tools", label: capabilityLabels.tools },
+  { id: "sandboxes", label: capabilityLabels.sandboxes },
+  { id: "harnesses", label: capabilityLabels.harnesses },
+];
 
 export interface ConnectionsPaneProps {
   /** Under the title on phones. */
@@ -29,7 +41,7 @@ export interface ConnectionsPaneProps {
   /** Switches tabs in place of following their links. */
   readonly onTabChange?: (tab: ConnectionsTab) => void;
   /** Connections in each tab, once they have loaded. */
-  readonly counts?: { readonly all: number; readonly needsSetup: number };
+  readonly counts?: Readonly<Record<ConnectionsTab, number>>;
   /** Shows Add connection, for a reader who may add one. */
   readonly onAdd?: () => void;
   /** In place of the list, while connections load or when they cannot. */
@@ -39,12 +51,7 @@ export interface ConnectionsPaneProps {
   readonly children: JSX.Element;
 }
 
-const tabs = [
-  { id: "all", label: "All" },
-  { id: "needs-setup", label: "Needs setup" },
-] as const;
-
-/** The workspace's connections in the main content, All first, then those that need setup. */
+/** The workspace's connections in the main content, All first, then each capability's. */
 export function ConnectionsPane(props: ConnectionsPaneProps) {
   return (
     <Pane.Root>
@@ -70,13 +77,7 @@ export function ConnectionsPane(props: ConnectionsPaneProps) {
                 <Tabs.Tab
                   href={props.tabHref(tab.id)}
                   current={props.tab === tab.id}
-                  count={
-                    props.counts === undefined
-                      ? undefined
-                      : tab.id === "all"
-                        ? props.counts.all
-                        : props.counts.needsSetup
-                  }
+                  count={props.counts?.[tab.id]}
                   onClick={(event: MouseEvent) => {
                     if (!props.onTabChange) return;
                     event.preventDefault();
@@ -146,8 +147,6 @@ export interface ConnectionListProps {
   readonly connections: readonly ConnectionSummary[];
   /** Connections in the workspace, whatever the tab and search. */
   readonly total: number;
-  /** Provider names for the empty state, such as Anthropic. */
-  readonly providers?: readonly string[];
   /** Each connection's page. */
   readonly connectionHref: (id: string) => string;
   /** Starts adding a connection, for a reader who may. */
@@ -158,47 +157,38 @@ export interface ConnectionListProps {
   readonly refreshing?: boolean;
 }
 
-/** "Start with Anthropic or OpenAI-compatible." */
-const startWith = (names: readonly string[]) =>
-  names.length === 0
-    ? undefined
-    : `Start with ${names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names.at(-1)}` : names[0]}.`;
-
 /**
- * The connection list: search, then each connection with its provider, endpoint, and how it
- * authenticates, and a mark on its tile when it cannot be used. With no connections yet it offers
- * adding one. Place it in ConnectionsPane.
+ * The connection list: search, then each connection with its integration and what it gives, how
+ * it authenticates, and a mark on its tile when it cannot be used. With no connections yet it
+ * offers adding one. Place it in ConnectionsPane.
  */
 export function ConnectionList(props: ConnectionListProps) {
   const search = () => props.query.trim();
+  const alert = () => (
+    <Show when={props.failure}>
+      {(failure) => (
+        <ConnectionsAlert
+          failure={failure()}
+          onRefresh={props.onRefresh}
+          refreshing={props.refreshing}
+        />
+      )}
+    </Show>
+  );
   return (
     <Show
       when={props.total > 0}
       fallback={
         <Pane.Body>
-          <Show when={props.failure}>
-            {(failure) => (
-              <ConnectionsAlert
-                action={failure().action}
-                error={failure().error}
-                onRefresh={props.onRefresh}
-                refreshing={props.refreshing}
-              />
-            )}
-          </Show>
+          {alert()}
           <EmptyState
             art="reach"
             title="No connections yet"
-            lines={
+            lines={[
               props.onAdd
-                ? [
-                    "Add a model provider or a sandbox account for your workspace.",
-                    startWith(props.providers ?? []),
-                  ].filter((line) => line !== undefined)
-                : [
-                    "An administrator can add model providers and sandbox accounts for your workspace.",
-                  ]
-            }
+                ? "Connect the models, tools, sandboxes, and harnesses your workspace works with."
+                : "An administrator can connect models, tools, sandboxes, and harnesses for your workspace.",
+            ]}
           >
             <Show when={props.onAdd}>
               {(add) => (
@@ -226,16 +216,7 @@ export function ConnectionList(props: ConnectionListProps) {
       </div>
       <Pane.Body inset="list">
         <div class={s.listing}>
-          <Show when={props.failure}>
-            {(failure) => (
-              <ConnectionsAlert
-                action={failure().action}
-                error={failure().error}
-                onRefresh={props.onRefresh}
-                refreshing={props.refreshing}
-              />
-            )}
-          </Show>
+          {alert()}
           <Show
             when={props.connections.length > 0}
             fallback={
@@ -243,7 +224,7 @@ export function ConnectionList(props: ConnectionListProps) {
                 <p class={s.emptyText}>
                   {search()
                     ? `No connections match “${search()}”.`
-                    : "All connections are configured."}
+                    : `No ${props.tab === "all" ? "" : `${capabilityLabels[props.tab].toLowerCase()} `}connections yet.`}
                 </p>
                 <Show when={search()}>
                   <Button variant="quiet" onClick={() => props.onQueryChange("")}>
@@ -253,19 +234,14 @@ export function ConnectionList(props: ConnectionListProps) {
               </div>
             }
           >
-            <ul
-              class={s.list}
-              aria-label={
-                props.tab === "needs-setup" ? "Connections that need setup" : "Connections"
-              }
-            >
+            <ul class={s.list} aria-label="Connections">
               <Keyed each={props.connections} by={(connection) => connection.id}>
                 {(connection) => {
                   const status = () => connectionStatus(connection());
                   return (
                     <li>
                       <a href={props.connectionHref(connection().id)} class={s.row}>
-                        <span class={s.tile} aria-hidden="true">
+                        <span class={s.rowTile} aria-hidden="true">
                           <IconMarkConnections class={s.tileIcon} />
                           <Show when={status()}>
                             {(status) => (
@@ -287,14 +263,9 @@ export function ConnectionList(props: ConnectionListProps) {
                               {(status) => <span class={s.visuallyHidden}>, {status().label}</span>}
                             </Show>
                           </span>
-                          <span class={s.rowProvider}>
-                            {connection().provider?.name ?? connection().providerId}
-                          </span>
-                          <span class={s.rowEndpoint}>
-                            {connection().endpoint ?? "Default API endpoint"}
-                          </span>
+                          <span class={s.rowIntegration}>{integrationLine(connection())}</span>
                         </span>
-                        <span class={s.rowMethod}>{methodLabels[connection().method]}</span>
+                        <span class={s.rowAuth}>{authLabels[connection().auth]}</span>
                       </a>
                     </li>
                   );

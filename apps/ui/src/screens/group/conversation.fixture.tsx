@@ -127,7 +127,7 @@ export function Conversation(props: ConversationProps) {
       <Shell.Root>
         <WorkspaceNavigation
           {...base}
-          destinations={["home", "environments", "connections"]}
+          destinations={["home", "agents", "connections"]}
           account={{
             ...base.account,
             menu: props.menu

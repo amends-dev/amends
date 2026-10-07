@@ -45,15 +45,14 @@ const agents = ["scout", "atlas", "echo"].map((id) => ({
   memberId: `member-${id}`,
   name: id,
   instructions: "",
-  model: { connectionId: "team", model: "model", reasoning: null },
-  environmentId: "in-process",
+  harness: { _tag: "Auto" },
+  model: { connectionId: "team", id: "model" },
+  sandbox: null,
+  readiness: { _tag: "Ready" },
+  configurable: false,
+  usable: id !== "echo",
   createdBy: "owner",
   createdAt: at(0),
-  role: null,
-  configurable: false,
-  removable: false,
-  usable: id !== "echo",
-  readiness: { _tag: "Ready" },
 }));
 
 const activity = (sequence: number, kind: string, subject: string, details: unknown) => ({
@@ -172,13 +171,9 @@ function fixture(options: { readonly atlasLeft?: boolean } = {}) {
       agentId: "atlas",
       memberId: "member-atlas",
       participationId: "p-member-atlas",
-      logAfter: null,
-      historyFrom: null,
-      retryOf: null,
+      retry: null,
       status,
-      inputAfterSequence: 0,
       acceptedThroughSequence: 1,
-      incorporatedThroughSequence: 0,
       selection: null,
       messageIds: [],
       failure: null,
@@ -342,15 +337,36 @@ function eventStream(request: Request) {
   };
 }
 
+const connection = (id: string, name: string, integration: string) => ({
+  id,
+  name,
+  integration,
+  settings: {},
+  auth: "none",
+  readiness: { _tag: "Ready" },
+  manageable: false,
+  createdBy: "owner",
+  createdAt: at(0),
+});
+const connections = [
+  connection("opencode", "opencode", "opencode"),
+  connection("openrouter", "OpenRouter", "openrouter"),
+];
+
 /**
- * A turn's log followed over its stream, with the turn read beside it. `refuse` answers a
- * subscription in place of opening its stream, by how many came before it.
+ * A turn's log followed over its stream, with the turn read beside it: one that failed as `failure`
+ * says, and started on `selection`, with the workspace's connections read for their names.
+ * `refuse` answers a subscription in place of opening its stream, by how many came before it.
  */
 function followed(
   status: string,
-  failure: string | null = null,
-  refuse: (subscription: number) => Response | undefined = () => undefined,
+  options: {
+    readonly failure?: string;
+    readonly selection?: unknown;
+    readonly refuse?: (subscription: number) => Response | undefined;
+  } = {},
 ) {
+  const { failure = null, selection = null, refuse = () => undefined } = options;
   const turn = {
     id: "atlas-1",
     workspaceId: "one",
@@ -359,14 +375,10 @@ function followed(
     agentId: "atlas",
     memberId: "member-atlas",
     participationId: "p-member-atlas",
-    logAfter: null,
-    historyFrom: null,
-    retryOf: null,
+    retry: null,
     status,
-    inputAfterSequence: 0,
     acceptedThroughSequence: 1,
-    incorporatedThroughSequence: 1,
-    selection: null,
+    selection,
     messageIds: [],
     failure,
     cancelReason: null,
@@ -385,6 +397,7 @@ function followed(
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
     if (path === "/workspaces/one/turns/atlas-1") return json(turn);
+    if (path === "/workspaces/one/connections") return json(connections);
     // The workspace's change feed is live, so that nothing here depends on how long a test takes: a
     // feed that never connected would count as down once `liveGrace` passed.
     if (path === "/workspaces/one/changes") {
@@ -474,6 +487,23 @@ it("follows a turn's log: its items as they change, the reply being written, unt
   expect(f.view.reconnecting()).toBe(false);
 });
 
+it("names the harness, model, and sandbox a turn started on by their connections", async () => {
+  const f = followed("running", {
+    selection: {
+      harness: { connectionId: "opencode" },
+      model: { connectionId: "openrouter", id: "claude-opus-5-5" },
+      sandbox: { connectionId: "removed" },
+    },
+  });
+  await waitFor(() =>
+    expect(f.view.turn()?.setup).toEqual({
+      harness: "opencode",
+      model: "OpenRouter · claude-opus-5-5",
+      sandbox: "Removed connection",
+    }),
+  );
+});
+
 it("follows a turn's log again after it drops, opening with the items as they stand", async () => {
   const f = followed("running");
   const first = await f.connected(0);
@@ -508,9 +538,9 @@ const refusals = {
 };
 for (const [failure, refusal] of Object.entries(refusals))
   it(`shows nothing of a turn it may no longer follow, once refused as ${failure}`, async () => {
-    const f = followed("running", null, (subscription) =>
-      subscription > 0 ? refusal() : undefined,
-    );
+    const f = followed("running", {
+      refuse: (subscription) => (subscription > 0 ? refusal() : undefined),
+    });
     const stream = await f.connected(0);
     stream.send({ _tag: "Opened", items: [{ _tag: "InputTaken", at: at(3), messages: 1 }] });
     stream.send({ _tag: "Drafted", responseId: "r1", part: 0, offset: 0, text: "Deploy the " });
@@ -525,7 +555,7 @@ for (const [failure, refusal] of Object.entries(refusals))
   });
 
 it("tells a failed turn's end once, rather than as an interruption and again as its failure", async () => {
-  const f = followed("failed", "Anthropic is limiting requests.");
+  const f = followed("failed", { failure: "Anthropic is limiting requests." });
   const stream = await f.connected(0);
   stream.send({
     _tag: "Opened",

@@ -1,12 +1,21 @@
-import { afterEach, expect, it, vi } from "@effect/vitest";
+import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { cleanup, render, waitFor } from "@solidjs/testing-library";
 import { Layer, Schema } from "effect";
+import { Connection } from "../src/connections/api.ts";
 import { FetchHttpClient } from "effect/http";
+import {
+  fieldIssue,
+  fieldsOf,
+  settingsComplete,
+  settingsOf,
+  textsOf,
+} from "../src/connections/settings.ts";
 import { affectedKeys } from "../src/live/api.ts";
 import {
   ClientProvider,
   DirectoryProvider,
   Session,
+  useConnectionList,
   useConnections,
   type ConnectionsDone,
   type SessionStore,
@@ -26,93 +35,96 @@ const owner = {
   name: "Alice",
   status: "active",
 };
-const anthropic = {
-  id: "anthropic",
-  name: "Anthropic",
-  description: "Claude models through the Anthropic API.",
-  capabilities: { modelInference: { interface: "anthropic-messages" } },
-  settings: [{ key: "baseUrl", label: "API URL", kind: "url", required: false }],
-  authentication: [{ _tag: "ApiKey", label: "API key" }],
+/** Integrations as the host sends them, each with its settings form. */
+const search = {
+  id: "search",
+  name: "Search server",
+  docs: "https://search.example.com/docs",
+  auth: ["apiKey", "none"],
+  provides: ["tools"],
+  requiresSandbox: false,
+  settings: {
+    type: "object",
+    properties: {
+      url: { type: "string", title: "Server URL", description: "Where it answers.", minLength: 1 },
+      retries: { type: "integer", title: "Retries", minimum: 0, maximum: 5 },
+      verbose: { type: "boolean", title: "Verbose" },
+      region: {
+        type: "string",
+        title: "Region",
+        oneOf: [
+          { const: "us", title: "United States" },
+          { const: "eu", title: "Europe" },
+        ],
+      },
+    },
+    required: ["url"],
+  },
 };
-const compatible = {
-  id: "openai-compatible",
-  name: "OpenAI-compatible",
-  description: "OpenAI, OpenRouter, or a compatible local server.",
-  capabilities: { modelInference: { interface: "openai-chat-completions" } },
-  settings: [{ key: "baseUrl", label: "API URL", kind: "url", required: true }],
-  authentication: [{ _tag: "ApiKey", label: "API key" }, { _tag: "None" }],
+const amends = {
+  id: "amends",
+  name: "amends",
+  auth: ["none"],
+  provides: ["harnesses"],
+  requiresSandbox: false,
+  settings: { type: "object", properties: {} },
 };
 interface Stored {
   id: string;
   name: string;
-  implementationId: string;
-  settings: Record<string, string>;
-  keyed: boolean | undefined;
+  integration: string;
+  settings: Record<string, string | number | boolean>;
+  auth: "apiKey" | "none";
 }
-const viewOf = (connection: Stored) => {
-  const declaration = [anthropic, compatible].find(
-    (each) => each.id === connection.implementationId,
-  );
-  const missing =
-    declaration?.settings.flatMap((setting) =>
-      setting.required && !connection.settings[setting.key] ? [setting.key] : [],
-    ) ?? [];
-  const credential = connection.keyed === false;
-  return {
-    id: connection.id,
-    name: connection.name,
-    implementationId: connection.implementationId,
-    settings: connection.settings,
-    authentication:
-      connection.keyed === undefined
-        ? { _tag: "None" }
-        : { _tag: "ApiKey", configured: connection.keyed },
-    createdBy: "owner",
-    createdAt: "2026-09-28T12:00:00.000Z",
-    installed: declaration !== undefined,
-    capabilities: declaration?.capabilities ?? {},
-    manageable: true,
-    readiness: declaration
-      ? {
-          modelInference:
-            missing.length === 0 && !credential
-              ? { _tag: "Ready" }
-              : { _tag: "Incomplete", settings: missing, credential },
-        }
-      : {},
-  };
-};
+const viewOf = (connection: Stored) => ({
+  ...connection,
+  readiness:
+    connection.integration === "vertex"
+      ? { _tag: "Uninstalled" }
+      : connection.settings["region"] === "mars"
+        ? { _tag: "Invalid", description: "Search server takes no region mars." }
+        : { _tag: "Ready" },
+  manageable: true,
+  createdBy: "owner",
+  createdAt: "2026-10-06T12:00:00.000Z",
+});
 
 function fixture() {
   const server = {
     connections: [
-      { id: "team", name: "Team", implementationId: "anthropic", settings: {}, keyed: true },
       {
-        id: "local",
-        name: "Local",
-        implementationId: "openai-compatible",
-        settings: { baseUrl: "http://127.0.0.1:11434/v1" },
-        keyed: false,
+        id: "docs",
+        name: "Docs search",
+        integration: "search",
+        settings: { url: "https://docs.example.com/mcp", retries: 2, verbose: false },
+        auth: "apiKey",
       },
-      { id: "old", name: "Old", implementationId: "vertex", settings: {}, keyed: true },
+      { id: "agent", name: "Agent", integration: "amends", settings: {}, auth: "none" },
+      {
+        id: "old",
+        name: "Old models",
+        integration: "vertex",
+        settings: { project: "acme" },
+        auth: "apiKey",
+      },
     ] as Stored[],
-    /** Answers to the next writes, in order; then success. */
+    /** Answers to the next writes and checks, in order; then success. */
     answers: [] as Response[],
   };
   const writes: Array<{ method: string; path: string; key: string | null; body: unknown }> = [];
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
+    const base = "/workspaces/one/connections";
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 1 }], invitations: [] });
     if (path === "/workspaces/one/members") return json([owner]);
     if (path === "/workspaces/one/permissions") return json(["connection.create"]);
-    if (path === "/workspaces/one/connections/implementations")
-      return json([anthropic, compatible]);
-    if (path === "/workspaces/one/connections" && request.method === "GET")
-      return json(server.connections.map(viewOf));
-    if (!path.startsWith("/workspaces/one/connections")) return json({}, 404);
-    const body = request.method === "DELETE" ? undefined : await request.json();
+    if (path === `${base}/integrations`) return json([search, amends]);
+    if (path === base && request.method === "GET") return json(server.connections.map(viewOf));
+    if (!path.startsWith(base)) return json({}, 404);
+    const body =
+      request.method === "DELETE" || path.endsWith("/check") ? undefined : await request.json();
     writes.push({
       method: request.method,
       path,
@@ -121,31 +133,26 @@ function fixture() {
     });
     const answer = server.answers.shift();
     if (answer) return answer;
-    const id = path.split("/")[4];
-    const stored = server.connections.find((connection) => connection.id === id);
-    if (path === "/workspaces/one/connections") {
-      const input = body as {
-        name: string;
-        implementationId: string;
-        settings: Record<string, string>;
-        authentication: string;
-      };
+    if (path === base) {
+      const input = body as Omit<Stored, "id">;
       const created: Stored = {
         id: "created",
         name: input.name,
-        implementationId: input.implementationId,
+        integration: input.integration,
         settings: input.settings,
-        keyed: input.authentication === "ApiKey" ? false : undefined,
+        auth: input.auth,
       };
       server.connections.push(created);
       return json(viewOf(created), 201);
     }
+    const id = path.split("/")[4];
+    const stored = server.connections.find((connection) => connection.id === id);
     if (!stored) return json({ _tag: "ConnectionService.NotFound", connectionId: id }, 404);
+    if (path.endsWith("/check")) return json({ status: "healthy" });
     if (path.endsWith("/rename")) stored.name = (body as { name: string }).name;
     if (path.endsWith("/settings"))
-      stored.settings = (body as { settings: Record<string, string> }).settings;
-    if (path.endsWith("/credential")) stored.keyed = request.method === "PUT";
-    if (request.method === "DELETE" && !path.endsWith("/credential")) {
+      stored.settings = (body as { settings: Stored["settings"] }).settings;
+    if (request.method === "DELETE") {
       server.connections = server.connections.filter((connection) => connection !== stored);
       return new Response(null, { status: 204 });
     }
@@ -153,8 +160,10 @@ function fixture() {
   });
   const done: ConnectionsDone[] = [];
   let view!: ReturnType<typeof useConnections>;
+  let list!: ReturnType<typeof useConnectionList>;
   function Consumer() {
     view = useConnections("one", { done: (entry) => done.push(entry) });
+    list = useConnectionList("one");
     return null;
   }
   render(() => (
@@ -174,144 +183,295 @@ function fixture() {
     get view() {
       return view;
     },
+    get list() {
+      return list;
+    },
     server,
     writes,
     done,
   };
 }
 
-it("shapes connections with their providers, setup, and what they still need", async () => {
+describe("settings forms", () => {
+  const form = Schema.decodeSync(Connection.IntegrationView.fields.settings)({
+    type: "object",
+    properties: {
+      url: { type: "string", title: "Server URL", format: "uri", maxLength: 64 },
+      plan: { type: "string", enum: ["free", "team"], enumNames: ["Free", "Team"] },
+      tags: { type: "array", items: { type: "string", enum: ["a", "b"] } },
+      temperature: { type: "number", minimum: 0, maximum: 2 },
+      stream: { type: "boolean", description: "Stream responses." },
+    },
+    required: ["url", "stream"],
+  });
+  const fields = fieldsOf(form);
+
+  it("asks for each setting in the form's order, leaving out lists settings never hold", () => {
+    expect(fields).toEqual([
+      {
+        key: "url",
+        label: "Server URL",
+        required: true,
+        kind: "text",
+        format: "uri",
+        maxLength: 64,
+      },
+      {
+        key: "plan",
+        label: "plan",
+        required: false,
+        kind: "choice",
+        options: [
+          { value: "free", label: "Free" },
+          { value: "team", label: "Team" },
+        ],
+      },
+      {
+        key: "temperature",
+        label: "temperature",
+        required: false,
+        kind: "number",
+        integer: false,
+        minimum: 0,
+        maximum: 2,
+      },
+      {
+        key: "stream",
+        label: "stream",
+        description: "Stream responses.",
+        required: true,
+        kind: "boolean",
+      },
+    ]);
+  });
+
+  it("says what each field refuses, and when the form is complete", () => {
+    const [url, plan, temperature] = fields;
+    expect(fieldIssue(url!, "")).toBeUndefined();
+    expect(fieldIssue(url!, "not a url")).toBe("format");
+    expect(fieldIssue(url!, `https://example.com/${"a".repeat(64)}`)).toBe("length");
+    expect(fieldIssue(plan!, "enterprise")).toBe("format");
+    expect(fieldIssue(temperature!, "warm")).toBe("format");
+    expect(fieldIssue(temperature!, "3")).toBe("range");
+    expect(fieldIssue(temperature!, "0.7")).toBeUndefined();
+    expect(settingsComplete(fields, { url: "https://example.com" })).toBe(false);
+    expect(settingsComplete(fields, { url: "https://example.com", stream: "true" })).toBe(true);
+  });
+
+  it("turns the fields' text into settings and back, leaving out empty ones", () => {
+    const settings = settingsOf(fields, {
+      url: " https://example.com ",
+      plan: "",
+      temperature: "0.5",
+      stream: "false",
+      unknown: "dropped",
+    });
+    expect(settings).toEqual({ url: "https://example.com", temperature: 0.5, stream: false });
+    expect(textsOf(settings)).toEqual({
+      url: "https://example.com",
+      temperature: "0.5",
+      stream: "false",
+    });
+  });
+});
+
+it("refreshes connections on their facts and on access changes, but not on a key replaced", () => {
+  const keys = (name: string) => affectedKeys("one", [{ name }]);
+  expect(keys("connection.created")).toContain("workspace/one/connections");
+  expect(keys("connection.removed")).toContain("workspace/one/connections");
+  expect(keys("workspace.assignment.created")).toContain("workspace/one/connections");
+  expect(keys("connection.key-replaced")).not.toContain("workspace/one/connections");
+});
+
+it("shapes connections with their integrations' fields, readiness, and who created them", async () => {
   const f = fixture();
   expect(f.view.status()).toBe("loading");
   await waitFor(() => expect(f.view.connections()).toHaveLength(3));
   expect(f.view.status()).toBeUndefined();
-  expect(f.view.providers().map((provider) => [provider.id, provider.methods])).toEqual([
-    ["anthropic", ["api-key"]],
-    ["openai-compatible", ["api-key", "none"]],
+  expect(
+    f.view.integrations().map((integration) => integration.fields.map((field) => field.key)),
+  ).toEqual([["url", "retries", "verbose", "region"], []]);
+  expect(f.view.connection("docs")).toMatchObject({
+    integration: {
+      name: "Search server",
+      docs: "https://search.example.com/docs",
+      provides: ["tools"],
+    },
+    settings: { url: "https://docs.example.com/mcp", retries: "2", verbose: "false" },
+    auth: "apiKey",
+    readiness: { state: "ready" },
+  });
+  // An integration this host no longer installs keeps its connection, which only lists what it saved.
+  expect(f.view.connection("old")).toMatchObject({
+    integration: undefined,
+    fields: [],
+    settings: { project: "acme" },
+    readiness: { state: "uninstalled" },
+  });
+  await waitFor(() => expect(f.view.connection("docs")?.createdBy).toBe("Alice"));
+  await waitFor(() => expect(f.list.canCreate()).toBe(true));
+  expect(f.list.connections().map((entry) => [entry.name, entry.provides])).toEqual([
+    ["Docs search", ["tools"]],
+    ["Agent", ["harnesses"]],
+    ["Old models", []],
   ]);
-  const [team, local, old] = f.view.connections();
-  expect(team).toMatchObject({
-    name: "Team",
-    provider: { name: "Anthropic", capability: "model-access" },
-    endpoint: undefined,
-    setup: "configured",
-    method: "api-key",
-    keySaved: true,
-    manageable: true,
-  });
-  expect(local).toMatchObject({
-    setup: "needs-setup",
-    endpoint: "http://127.0.0.1:11434/v1",
-    missing: { settings: [], key: true },
-    settings: [{ key: "baseUrl", label: "API URL", value: "http://127.0.0.1:11434/v1" }],
-  });
-  // A provider this host no longer installs keeps its connection, which cannot be used.
-  expect(old).toMatchObject({ provider: undefined, setup: "unavailable", keySaved: true });
-  await waitFor(() => expect(f.view.canCreate()).toBe(true));
-  await waitFor(() => expect(f.view.connection("team")?.createdBy).toBe("Alice"));
 });
 
-it("creates a connection, retrying a lost response with the same key, then saves its key", async () => {
+it("creates a connection with its key in one request, retrying with the same request key, then checks it", async () => {
   const f = fixture();
-  await waitFor(() => expect(f.view.providers()).toHaveLength(2));
-  f.view.create.begin("openai-compatible");
-  expect(f.view.create.name()).toBe("OpenAI-compatible");
+  await waitFor(() => expect(f.view.integrations()).toHaveLength(2));
+  f.view.create.begin("search");
+  expect(f.view.create.name()).toBe("Search server");
+  expect(f.view.create.auth()).toBe("apiKey");
+  f.view.create.setName(" Web search ");
+  f.view.create.setValue("url", "https://web.example.com/mcp");
+  f.view.create.setValue("retries", "9");
+  expect(f.view.create.issue("retries")).toBe("range");
+  f.view.create.setValue("retries", "3");
+  f.view.create.setValue("verbose", "true");
   expect(f.view.create.ready()).toBe(false);
-  f.view.create.setName(" Router ");
-  f.view.create.setValue("baseUrl", "openrouter.ai");
-  expect(f.view.create.issue("baseUrl")).toBe("url");
-  f.view.create.setValue("baseUrl", "https://openrouter.ai/api/v1");
+  f.view.create.setApiKey(" sk-web ");
   expect(f.view.create.ready()).toBe(true);
   f.server.answers.push(new Response("Host unavailable", { status: 503 }));
   f.view.create.save();
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "create", error: "failed" }));
-  expect(f.view.stale()).toBe(false);
   f.view.create.save();
   await waitFor(() => expect(f.done).toHaveLength(1));
-  expect(f.done[0]).toEqual({
-    action: "create",
-    subject: "Router",
-    created: "created",
-    method: "api-key",
-  });
-  expect(f.writes.map((write) => write.key)).toEqual([f.writes[0]?.key, f.writes[0]?.key]);
+  expect(f.done[0]).toEqual({ action: "create", subject: "Web search", created: "created" });
+  expect(f.writes.slice(0, 2).map((write) => write.key)).toEqual([
+    f.writes[0]?.key,
+    f.writes[0]?.key,
+  ]);
   expect(f.writes[1]?.body).toEqual({
-    name: "Router",
-    implementationId: "openai-compatible",
-    settings: { baseUrl: "https://openrouter.ai/api/v1" },
-    authentication: "ApiKey",
+    integration: "search",
+    name: "Web search",
+    settings: { url: "https://web.example.com/mcp", retries: 3, verbose: true },
+    auth: "apiKey",
+    apiKey: "sk-web",
   });
-  expect(f.view.connection("created")?.setup).toBe("needs-setup");
-  // The key goes in on its own and never comes back.
-  f.view.key.setSecret("sk-router");
-  f.view.key.save("created");
-  await waitFor(() => expect(f.done).toHaveLength(2));
-  expect(f.done[1]).toMatchObject({ action: "set-key", subject: "Router" });
+  expect(f.view.create.integration()).toBeUndefined();
+  expect(f.view.create.apiKey()).toBe("");
+  // Creating it checks it.
+  await waitFor(() => expect(f.view.check.health("created")).toEqual({ status: "healthy" }));
   expect(f.writes[2]).toMatchObject({
-    method: "PUT",
-    path: "/workspaces/one/connections/created/credential",
-    body: { secret: "sk-router" },
+    method: "POST",
+    path: "/workspaces/one/connections/created/check",
   });
-  expect(f.view.key.secret()).toBe("");
-  expect(f.view.connection("created")).toMatchObject({ setup: "configured", keySaved: true });
 });
 
-it("tells a host without credential storage apart from other failures, keeping the key typed", async () => {
+it("starts a new request when the key changes after a failed attempt", async () => {
   const f = fixture();
-  await waitFor(() => expect(f.view.connection("local")).toBeDefined());
-  f.view.key.setSecret("sk-local");
+  await waitFor(() => expect(f.view.integrations()).toHaveLength(2));
+  f.view.create.begin("search");
+  f.view.create.setValue("url", "https://web.example.com/mcp");
+  f.view.create.setApiKey("sk-one");
+  f.server.answers.push(new Response("Host unavailable", { status: 503 }));
+  f.view.create.save();
+  await waitFor(() => expect(f.view.failure()?.error).toBe("failed"));
+  f.view.create.setApiKey("sk-two");
+  f.view.create.save();
+  await waitFor(() => expect(f.done).toHaveLength(1));
+  expect(f.writes[1]?.key).not.toBe(f.writes[0]?.key);
+});
+
+it("says what the integration refused, and tells a host without key storage apart", async () => {
+  const f = fixture();
+  await waitFor(() => expect(f.view.integrations()).toHaveLength(2));
+  f.view.create.begin("search");
+  f.view.create.setValue("url", "https://web.example.com/mcp");
+  f.view.create.setApiKey("sk-web");
+  f.server.answers.push(
+    json(
+      {
+        _tag: "ConnectionService.InvalidConnection",
+        description: "Search server takes no retries.",
+      },
+      422,
+    ),
+  );
+  f.view.create.save();
+  await waitFor(() =>
+    expect(f.view.failure()).toEqual({
+      action: "create",
+      error: "refused",
+      description: "Search server takes no retries.",
+    }),
+  );
   f.server.answers.push(
     json({ _tag: "ConnectionService.CredentialsUnavailable", reason: "No credential key" }, 503),
   );
-  f.view.key.save("local");
+  f.view.create.save();
   await waitFor(() =>
-    expect(f.view.failure()).toEqual({ action: "set-key", error: "storage-unavailable" }),
+    expect(f.view.failure()).toEqual({ action: "create", error: "storage-unavailable" }),
   );
   expect(f.view.stale()).toBe(false);
-  expect(f.view.key.secret()).toBe("sk-local");
-  // Closing the dialog discards what was typed.
-  f.view.dismiss();
-  expect(f.view.key.secret()).toBe("");
-  expect(f.view.failure()).toBeUndefined();
+  expect(f.view.create.apiKey()).toBe("sk-web");
+  f.view.create.cancel();
+  expect(f.view.create.apiKey()).toBe("");
+});
+
+it("saves settings as their fields give them, and replaces a key", async () => {
+  const f = fixture();
+  await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
+  expect(f.view.configure.value("docs", "retries")).toBe("2");
+  f.view.configure.setValue("docs", "retries", "2");
+  expect(f.view.configure.changed("docs")).toBe(false);
+  f.view.configure.setValue("docs", "retries", "4");
+  f.view.configure.setValue("docs", "region", "eu");
+  expect(f.view.configure.changed("docs")).toBe(true);
+  f.view.configure.save("docs");
+  await waitFor(() => expect(f.done).toEqual([{ action: "configure", subject: "Docs search" }]));
+  expect(f.writes[0]?.body).toEqual({
+    settings: { url: "https://docs.example.com/mcp", retries: 4, verbose: false, region: "eu" },
+  });
+  expect(f.view.connection("docs")?.settings["region"]).toBe("eu");
+  f.view.key.setApiKey("sk-new");
+  f.view.key.save("docs");
+  await waitFor(() => expect(f.done).toHaveLength(2));
+  expect(f.writes[1]).toMatchObject({
+    method: "PUT",
+    path: "/workspaces/one/connections/docs/key",
+    body: { apiKey: "sk-new" },
+  });
+  expect(f.view.key.apiKey()).toBe("");
+});
+
+it("keeps why a check could not run with the connection it checked", async () => {
+  const f = fixture();
+  await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
+  f.server.answers.push(
+    json({ _tag: "ConnectionService.InvalidConnection", description: "No URL." }, 422),
+  );
+  f.view.check.run("docs");
+  expect(f.view.pending()).toBe("check");
+  expect(f.view.check.running("docs")).toBe(true);
+  await waitFor(() =>
+    expect(f.view.check.failure("docs")).toEqual({
+      action: "check",
+      error: "refused",
+      description: "No URL.",
+    }),
+  );
+  expect(f.view.check.failure("agent")).toBeUndefined();
+  expect(f.view.pending()).toBeUndefined();
+  f.view.check.run("docs");
+  await waitFor(() => expect(f.view.check.health("docs")).toEqual({ status: "healthy" }));
+  expect(f.view.check.failure("docs")).toBeUndefined();
 });
 
 it("keeps a rename draft through a conflict and saves it against the name reviewed", async () => {
   const f = fixture();
-  await waitFor(() => expect(f.view.connection("team")).toBeDefined());
-  f.view.rename.setName("team", "Studio models");
-  expect(f.view.rename.changed("team")).toBe(true);
-  // Someone renamed it meanwhile.
-  f.server.connections[0]!.name = "Team models";
-  f.server.answers.push(json({ _tag: "ConnectionService.Changed", connectionId: "team" }, 409));
-  f.view.rename.save("team");
+  await waitFor(() => expect(f.view.connection("docs")).toBeDefined());
+  f.view.rename.setName("docs", "Team search");
+  f.server.connections[0]!.name = "Docs";
+  f.server.answers.push(json({ _tag: "ConnectionService.Changed", connectionId: "docs" }, 409));
+  f.view.rename.save("docs");
   await waitFor(() => expect(f.view.failure()).toEqual({ action: "rename", error: "changed" }));
   expect(f.view.stale()).toBe(true);
-  expect(f.writes[0]?.body).toEqual({ name: "Studio models", expectedName: "Team" });
-  f.view.rename.save("team");
-  expect(f.writes).toHaveLength(1);
   f.view.refresh();
   await waitFor(() => expect(f.view.stale()).toBe(false));
-  expect(f.view.rename.name("team")).toBe("Studio models");
-  f.view.rename.save("team");
-  await waitFor(() => expect(f.done).toEqual([{ action: "rename", subject: "Studio models" }]));
-  expect(f.writes[1]?.body).toEqual({ name: "Studio models", expectedName: "Team models" });
-  expect(f.view.connection("team")?.name).toBe("Studio models");
-});
-
-it("removes a connection, and refreshes connections on their facts and on access changes", async () => {
-  const f = fixture();
-  await waitFor(() => expect(f.view.connections()).toHaveLength(3));
-  f.view.remove("old");
-  await waitFor(() => expect(f.done).toEqual([{ action: "remove", subject: "Old" }]));
-  expect(f.view.connections().map((connection) => connection.id)).toEqual(["team", "local"]);
-  for (const name of [
-    "connection.created",
-    "connection.renamed",
-    "connection.configured",
-    "connection.credential-set",
-    "connection.credential-cleared",
-    "connection.removed",
-    "workspace.assignment.revoked",
-  ])
-    expect(affectedKeys("one", [{ name }], true)).toContain("workspace/one/connections");
+  expect(f.view.rename.name("docs")).toBe("Team search");
+  f.view.rename.save("docs");
+  await waitFor(() => expect(f.done).toEqual([{ action: "rename", subject: "Team search" }]));
+  expect(f.writes[1]?.body).toEqual({ name: "Team search", expectedName: "Docs" });
 });

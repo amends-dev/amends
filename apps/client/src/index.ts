@@ -38,36 +38,17 @@ export type { WorkspaceFailure } from "./api/failures.ts";
 export {
   useConnectionList,
   useConnections,
+  type ConnectionListEntry,
   type ConnectionsDone,
   type ConnectionsView,
 } from "./connections/views.ts";
 export {
-  useConnectionV2List,
-  useConnectionsV2,
-  type ConnectionV2ListEntry,
-  type ConnectionsV2Done,
-  type ConnectionsV2View,
-} from "./connections-v2/views.ts";
-export {
-  useAgentV2List,
-  useAgentsV2,
-  type AgentV2ListEntry,
-  type AgentsV2Done,
-  type AgentsV2View,
-} from "./agents-v2/views.ts";
-export {
-  useEnvironmentList,
-  useEnvironments,
-  type EnvironmentsDone,
-  type EnvironmentsView,
-} from "./environments/views.ts";
-export {
   useAgentList,
-  useAgentStates,
   useAgents,
+  type AgentListEntry,
+  type AgentTurnEntry,
   type AgentsDone,
   type AgentsView,
-  type ConfigurationEditor,
 } from "./agents/views.ts";
 export { type SettingsData, type SettingsCommand, invitationIntent } from "./settings/api.ts";
 export {

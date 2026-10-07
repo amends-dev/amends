@@ -12,14 +12,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection-v2": "workspace:*",
-    "@amends/harness-v2": "workspace:*",
-    "@amends/sandbox-v2": "workspace:*",
+    "@amends/connection": "workspace:*",
+    "@amends/harness": "workspace:*",
+    "@amends/sandbox": "workspace:*",
     "@effect/platform-bun": "catalog:"
   },
   "devDependencies": {
-    "@amends/sandbox-daytona-v2": "workspace:*",
-    "@amends/sandbox-local-v2": "workspace:*",
+    "@amends/sandbox-daytona": "workspace:*",
+    "@amends/sandbox-local": "workspace:*",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"
   },

@@ -1,9 +1,6 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
-import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
-import { AgentV2Store } from "@amends/core/agent-v2";
 import { AgentStore } from "@amends/core/agent";
-import { AgentJobs, TurnJobs, TurnStore } from "@amends/core/turn";
-import { EnvironmentStore } from "@amends/core/environment";
+import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
 import {
   ThreadStore,
   ThreadParticipationStore,
@@ -239,33 +236,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        ConnectionStore.Service,
-        ConnectionStore.Service.of({
-          get: unexpected,
-          list: unexpected(),
-          insert: unexpected,
-          update: unexpected,
-        }),
-      ),
-      Context.add(
-        EnvironmentStore.Service,
-        EnvironmentStore.Service.of({
-          get: unexpected,
-          list: unexpected(),
-          insert: unexpected,
-          update: unexpected,
-        }),
-      ),
-      Context.add(
-        AgentStore.Service,
-        AgentStore.Service.of({
-          get: unexpected,
-          list: unexpected(),
-          insert: unexpected,
-          update: unexpected,
-        }),
-      ),
-      Context.add(
         TurnStore.Service,
         TurnStore.Service.of({
           get: unexpected,
@@ -273,17 +243,8 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           findLatest: unexpected,
           listActive: unexpected,
           listActiveByMember: unexpected,
-          listByThread: unexpected,
           insert: unexpected,
           update: unexpected,
-        }),
-      ),
-      Context.add(
-        ConnectionCredentialStore.Service,
-        ConnectionCredentialStore.Service.of({
-          put: unexpected,
-          get: unexpected,
-          remove: unexpected,
         }),
       ),
       Context.add(
@@ -310,8 +271,21 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
     )
     .pipe(
       Context.add(
-        ConnectionV2Store.Service,
-        ConnectionV2Store.Service.of({
+        SessionStateStore.Service,
+        SessionStateStore.Service.of({ get: unexpected, set: unexpected }),
+      ),
+      Context.add(
+        SessionLogStore.Service,
+        SessionLogStore.Service.of({
+          head: unexpected,
+          append: unexpected,
+          read: unexpected,
+          waitForAppend: unexpected,
+        }),
+      ),
+      Context.add(
+        ConnectionStore.Service,
+        ConnectionStore.Service.of({
           get: unexpected,
           listActive: unexpected(),
           insert: unexpected,
@@ -319,16 +293,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        ConnectionV2CredentialStore.Service,
-        ConnectionV2CredentialStore.Service.of({
+        ConnectionCredentialStore.Service,
+        ConnectionCredentialStore.Service.of({
           set: unexpected,
           get: unexpected,
           remove: unexpected,
         }),
       ),
       Context.add(
-        AgentV2Store.Service,
-        AgentV2Store.Service.of({
+        AgentStore.Service,
+        AgentStore.Service.of({
           get: unexpected,
           list: unexpected(),
           insert: unexpected,
@@ -348,7 +322,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
-    AgentJobs.layerNoRunner,
     TurnJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,

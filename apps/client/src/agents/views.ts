@@ -1,46 +1,58 @@
 import type {
-  AgentBlocker,
-  AgentEnvironmentOption,
+  AgentActivity,
   AgentIssue,
   AgentRoleOption,
+  AgentSummary,
+  AgentTurn,
   AgentsAction,
   AgentsFailure,
-  AgentSummary,
-  AgentTurnSummary,
-  ModelConnectionOption,
+  ConnectionOption,
+  Effort,
+  HarnessOption,
+  ModelChoices,
+  SetupConnection,
+  SetupFieldsProps,
+  SetupPart,
 } from "@amends/ui/screens/agents";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
-import { Cause, Effect, Option, Predicate } from "effect";
-import { Atom, AsyncResult } from "effect/reactivity";
+import { Cause, Effect, Option } from "effect";
+import { AsyncResult } from "effect/reactivity";
 import {
   createEffect,
   createMemo,
   createSignal,
   getOwner,
   on,
-  onCleanup,
   runWithOwner,
+  type Accessor,
 } from "solid-js";
-import {
-  agentProblems,
-  issueCode,
-  agentsReads,
-  changeAgent,
-  newAgentRequestKey,
-  reloadAgents,
-  Agent,
-  type AgentCommand,
-  type AgentConfiguration,
-  type AgentsReads,
-  EnvironmentCompatibility,
-} from "./api.ts";
-import { useApiClient } from "../provider.tsx";
 import { useChanges } from "../api/changes.ts";
 import { workspaceFailure } from "../api/failures.ts";
-import { toDate } from "../conversations/time.ts";
 import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
+import { toDate } from "../conversations/time.ts";
 import { memberName } from "../conversations/views.ts";
+import { useApiClient } from "../provider.tsx";
 import { useTurnActivity } from "../turns/views.ts";
+import {
+  agentsFailure,
+  agentsReads,
+  changeAgent,
+  issueOf,
+  newAgentRequestKey,
+  reloadAgents,
+  type Agent,
+  type AgentCommand,
+  type Connection,
+  type AgentsReads,
+  type SetupInput,
+} from "./api.ts";
+
+/** The harness choice that lets amends choose one as the agent works, as the setup fields name it. */
+const auto = "auto";
+/** The role a new agent starts with, unless the reader chooses another. */
+const memberRole = "builtin:member";
+/** No agent holds the owner's role. */
+const ownerRole = "builtin:owner";
 
 /** A change that completed and whose result is shown. */
 export interface AgentsDone {
@@ -51,209 +63,305 @@ export interface AgentsDone {
   readonly created?: string;
 }
 
-/** An agent's configuration being edited: for one being added, or one being configured. */
-export interface AgentDraft {
+/** How an agent is set up, as its form edits it. */
+interface SetupDraft {
   readonly instructions: string;
-  readonly connectionId: string | undefined;
+  /** `auto`, or a harness connection's ID. */
+  readonly harness: string;
+  readonly modelConnectionId: string | undefined;
   readonly model: string;
-  /** Undefined for the harness's default. */
-  readonly reasoning: string | undefined;
-  readonly environmentId: string | undefined;
+  readonly effort?: Effort;
+  readonly sandboxId?: string;
 }
 
-/** Edits to a draft's configuration, and what its choices look like now. */
-export interface ConfigurationEditor {
-  readonly draft: () => AgentDraft;
-  readonly setInstructions: (instructions: string) => void;
-  /** Choosing a connection suggests its first model when none was entered. */
-  readonly setConnection: (connectionId: string) => void;
-  readonly setModel: (model: string) => void;
-  readonly setReasoning: (reasoning: string | undefined) => void;
-  readonly setEnvironment: (environmentId: string) => void;
-  /** The environments the reader may use, with how each fits the chosen model access. */
-  readonly environments: () => readonly AgentEnvironmentOption[];
-  /** The chosen environment, once the reader may use it. */
-  readonly environment: () => AgentEnvironmentOption | undefined;
-  /** The draft names everything it needs, and nothing that cannot run. */
-  readonly complete: () => boolean;
-}
+const blankSetup: SetupDraft = {
+  instructions: "",
+  harness: auto,
+  modelConnectionId: undefined,
+  model: "",
+};
 
-/** The built-in Member role, the one a new agent starts with unless the reader chooses another. */
-const memberRole = "builtin:member";
+const draftOf = (view: Agent.View): SetupDraft => ({
+  instructions: view.instructions,
+  harness: view.harness._tag === "Auto" ? auto : view.harness.connectionId,
+  modelConnectionId: view.model.connectionId,
+  model: view.model.id,
+  ...(view.model.effort === undefined ? {} : { effort: view.model.effort }),
+  ...(view.sandbox === null ? {} : { sandboxId: view.sandbox.connectionId }),
+});
+
+/** The setup a draft sends, once it names a model. */
+const inputOf = (draft: SetupDraft): SetupInput | undefined =>
+  draft.modelConnectionId === undefined || draft.model.trim() === ""
+    ? undefined
+    : {
+        instructions: draft.instructions.trim(),
+        harnessId: draft.harness === auto ? undefined : draft.harness,
+        model: {
+          connectionId: draft.modelConnectionId,
+          id: draft.model.trim(),
+          ...(draft.effort === undefined ? {} : { effort: draft.effort }),
+        },
+        sandboxId: draft.sandboxId,
+      };
+
+const sameSetup = (left: SetupDraft, right: SetupDraft) =>
+  JSON.stringify(inputOf(left)) === JSON.stringify(inputOf(right));
+
+type SetupKey = keyof SetupDraft;
+
+/** The draft field that chooses each part's connection. */
+const connectionKey = {
+  harness: "harness",
+  model: "modelConnectionId",
+  sandbox: "sandboxId",
+} as const satisfies Record<SetupPart, SetupKey>;
+
+/** The draft fields whose edit may resolve an issue. */
+const resolvingKeys = (issue: AgentIssue): readonly SetupKey[] => {
+  switch (issue.kind) {
+    case "sandbox-required":
+      return ["harness", "sandboxId"];
+    case "no-harness":
+      return ["harness"];
+    case "invalid":
+      return issue.part === "model"
+        ? ["modelConnectionId", "model", "effort"]
+        : [connectionKey[issue.part]];
+    case "removed":
+    case "uninstalled":
+      return [connectionKey[issue.part]];
+  }
+};
+
+type Problem = Omit<AgentsFailure, "action" | "error">;
+
+/**
+ * What a refused setup still shows once the reader has edited `edited`: an issue stops showing as
+ * a field that may resolve it changes, and a refusal with none left is set aside.
+ */
+const remainingProblem = (problem: Problem, edited: ReadonlySet<SetupKey>): Problem | undefined => {
+  if (problem.part !== undefined && edited.has(connectionKey[problem.part])) return undefined;
+  if (problem.issues === undefined || problem.issues.length === 0) return problem;
+  const issues = problem.issues.filter(
+    (issue) => !resolvingKeys(issue).some((key) => edited.has(key)),
+  );
+  return issues.length === 0 ? undefined : { ...problem, issues };
+};
 
 const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | undefined =>
   AsyncResult.isFailure(read) && !read.waiting ? read.cause : undefined;
 
-const blocker = (issue: AgentIssue): issue is AgentBlocker =>
-  issue === "no-model-inference" ||
-  issue === "interface-unsupported" ||
-  issue === "reasoning-unsupported";
+/** One of an agent's turns in progress, with the thread its log opens beside, for its href. */
+export interface AgentTurnEntry extends Omit<AgentTurn, "href"> {
+  readonly groupId: string;
+  readonly threadId: string;
+}
 
-/** The same configuration, whatever surrounding whitespace was typed. */
-const sameConfiguration = (left: AgentConfiguration, right: AgentConfiguration) =>
-  left.instructions === right.instructions &&
-  left.model.connectionId === right.model.connectionId &&
-  left.model.model === right.model.model &&
-  left.model.reasoning === right.model.reasoning &&
-  left.environmentId === right.environmentId;
-
-/** An agent as the Agents sidebar lists it, with the member it acts as. */
-export interface AgentListEntry extends Pick<AgentSummary, "id" | "name" | "issues" | "activity"> {
+/** An agent as the Agents sidebar lists it. */
+export interface AgentListEntry {
+  readonly id: string;
   readonly memberId: string;
+  readonly name: string;
+  readonly issues: readonly AgentIssue[];
+  /** Where it is at work; unset while it is idle. */
+  readonly activity?: AgentActivity;
 }
 
 /**
- * A workspace's agents by name, for navigation, live while mounted. It shares the Agents page's
- * read, so both show the same agents. `canCreate` says whether the reader may add one.
+ * A workspace's agents by name, for navigation, live while mounted. It shares the page's reads.
+ * `canCreate` says whether the reader may add one.
  */
 export function useAgentList(workspaceId: string) {
   const reads = agentsReads(useApiClient(), workspaceId);
-  const read = reads ? useAtomValue(() => reads.agents) : undefined;
+  const agents = reads ? useAtomValue(() => reads.agents) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
-  const activity = useTurnActivity(workspaceId);
-  const agents = createMemo((): readonly AgentListEntry[] | undefined =>
-    read === undefined
-      ? undefined
-      : Option.getOrUndefined(AsyncResult.value(read()))?.map((view) => ({
-          id: view.id,
-          memberId: view.memberId,
-          name: view.name,
-          issues: Agent.Readiness.isAnyOf(["Incomplete"])(view.readiness)
-            ? view.readiness.issues.map(issueCode)
-            : [],
-          activity: activity.agentActivity(view.memberId),
-        })),
+  const turnActivity = useTurnActivity(workspaceId);
+  const entries = createMemo((): readonly AgentListEntry[] | undefined =>
+    Option.getOrUndefined(
+      Option.map(AsyncResult.value(agents?.() ?? AsyncResult.initial()), (views) =>
+        views.map((view) => {
+          const activity = turnActivity.agentActivity(view.memberId);
+          return {
+            id: view.id,
+            memberId: view.memberId,
+            name: view.name,
+            issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
+            ...(activity === undefined ? {} : { activity }),
+          };
+        }),
+      ),
+    ),
   );
   return {
-    agents: () => agents() ?? [],
+    agents: () => entries() ?? [],
     /** Nothing has loaded yet, so an empty list says nothing. */
-    loading: () => agents() === undefined,
-    canCreate,
+    loading: () => entries() === undefined,
+    canCreate: () => canCreate() === true,
   };
 }
 
 /**
- * Each agent's state by its member ID, live while mounted: its setup from the agents read it
- * shares with the Agents pages, and where it is at work from the active turns. Undefined for a
- * member who is not an agent, or before the agents load.
- */
-export function useAgentStates(workspaceId: string) {
-  const list = useAgentList(workspaceId);
-  const byMember = createMemo(
-    () => new Map(list.agents().map((agent) => [agent.memberId, agent] as const)),
-  );
-  return (memberId: string): Pick<AgentSummary, "issues" | "activity"> | undefined =>
-    byMember().get(memberId);
-}
-
-/**
- * A workspace's agents, live while mounted: each agent's configuration and readiness, the model
- * connections and environments it can use, and the changes the reader may make. Drafts keep what
- * they were made against, and survive a detour to create a model connection: an agent's draft
- * stays until it is saved or set aside. `selected` names the agent open for configuring, whose
- * environment choices are checked. `done` hears each change once its result is shown.
+ * A workspace's agents, live while mounted: each as its page shows it, with the connections its
+ * setup names; the choices a setup offers, with the models each connection offers; and the changes
+ * the reader may make. A connection an agent names that is removed, not installed, or no longer
+ * gives its part stays among the choices, marked unavailable. Drafts keep what they were made
+ * against: a rename saved elsewhere meanwhile conflicts instead of being overwritten. `done` hears
+ * each change once its result is shown.
  */
 export function useAgents(
   workspaceId: string,
-  options: {
-    readonly selected?: () => string | undefined;
-    readonly done?: (done: AgentsDone) => void;
-  } = {},
+  options: { readonly done?: (done: AgentsDone) => void } = {},
 ) {
-  const client = useApiClient();
-  const reads = agentsReads(client, workspaceId);
+  const reads = agentsReads(useApiClient(), workspaceId);
   const canCreate = useWorkspacePermission(workspaceId, "agent.create");
   const members = useMembers(workspaceId);
-  const activity = useTurnActivity(workspaceId);
+  const turnActivity = useTurnActivity(workspaceId);
   const read = reads ? connect(reads) : undefined;
+  const loaded = () =>
+    read?.agents() !== undefined &&
+    read.connections() !== undefined &&
+    read.integrations() !== undefined;
 
-  const connections = createMemo((): readonly ModelConnectionOption[] => {
-    const implementations = read?.connectionImplementations() ?? [];
-    return (read?.connections() ?? []).flatMap((connection) => {
-      const inference = connection.installed ? connection.capabilities.modelInference : undefined;
-      if (inference === undefined) return [];
-      const models =
-        implementations.find((implementation) => implementation.id === connection.implementationId)
-          ?.capabilities.modelInference?.models ?? [];
+  // Connections by ID, with what their integration gives, as a setup's choices offer them.
+  const integrations = createMemo(
+    () => new Map((read?.integrations() ?? []).map((integration) => [integration.id, integration])),
+  );
+  const connections = createMemo(
+    () => new Map((read?.connections() ?? []).map((connection) => [connection.id, connection])),
+  );
+  const capabilities = { harness: "harnesses", model: "models", sandbox: "sandboxes" } as const;
+  /** Why a connection can't give `part`, or nothing when it can. */
+  const unavailable = (connectionId: string, part: SetupPart): string | undefined => {
+    const connection = connections().get(connectionId as Connection.Id);
+    if (!connection) return "This connection was removed.";
+    const integration = integrations().get(connection.integration);
+    if (!integration) return "Its integration isn’t installed on this host.";
+    if (!integration.provides.includes(capabilities[part]))
+      return `${integration.name} gives no ${capabilities[part]}.`;
+    if (connection.readiness._tag === "Invalid") return connection.readiness.description;
+    return undefined;
+  };
+  const optionsFor = (
+    part: SetupPart,
+    current: string | undefined,
+  ): readonly ConnectionOption[] => {
+    const offered = (read?.connections() ?? []).flatMap((connection) => {
+      const integration = integrations().get(connection.integration);
+      if (!integration?.provides.includes(capabilities[part])) return [];
+      const why = unavailable(connection.id, part);
       return [
         {
           id: connection.id,
           name: connection.name,
-          ready: Predicate.isTagged(connection.readiness.modelInference, "Ready"),
-          models,
+          integrationName: integration.name,
+          ...(why === undefined ? {} : { unavailable: why }),
         },
       ];
     });
-  });
-  const connectionOf = (id: string | undefined) =>
-    id === undefined ? undefined : connections().find((connection) => connection.id === id);
+    if (
+      current === undefined ||
+      current === auto ||
+      offered.some((option) => option.id === current)
+    )
+      return offered;
+    const connection = connections().get(current as Connection.Id);
+    return [
+      ...offered,
+      {
+        id: current,
+        name: connection?.name ?? "Removed connection",
+        integrationName:
+          (connection && integrations().get(connection.integration)?.name) ??
+          connection?.integration ??
+          "",
+        unavailable: unavailable(current, part) ?? "This connection can’t be chosen.",
+      },
+    ];
+  };
+  const harnessOptions = (current: string | undefined): readonly HarnessOption[] =>
+    optionsFor("harness", current).map((option) => {
+      const connection = connections().get(option.id as Connection.Id);
+      const integration = connection && integrations().get(connection.integration);
+      return Object.assign({}, option, { requiresSandbox: integration?.requiresSandbox ?? false });
+    });
 
-  /** Each environment the reader may read, with its runtime and its harness's reasoning levels. */
-  const environments = createMemo(() => {
-    const implementations = read?.environmentImplementations();
-    return new Map(
-      (read?.environments() ?? []).map((environment) => {
-        const harness = implementations?.harnesses.find(
-          (candidate) => candidate.id === environment.harnessId,
-        );
-        const provider =
-          environment.sandbox === null
-            ? undefined
-            : (implementations?.sandboxes.find(
-                (candidate) => candidate.id === environment.sandbox?.providerId,
-              )?.name ?? environment.sandbox.providerId);
-        return [
-          environment.id as string,
-          {
-            id: environment.id as string,
-            name: environment.name,
-            runtime: `${harness?.name ?? environment.harnessId} · ${provider ?? "No sandbox"}`,
-            harness: harness?.name ?? environment.harnessId,
-            provider,
-            reasoningLevels: harness?.reasoning ?? [],
-          },
-        ] as const;
-      }),
-    );
-  });
+  // The models each connection offers, read once a setup names it and live while mounted.
+  const owner = getOwner();
+  const modelReads = new Map<string, Accessor<ModelChoices>>();
+  const models = (connectionId: string | undefined): ModelChoices | undefined => {
+    if (!reads || connectionId === undefined || unavailable(connectionId, "model") !== undefined)
+      return undefined;
+    let modelRead = modelReads.get(connectionId);
+    if (!modelRead) {
+      modelRead = runWithOwner(owner, () => modelChoices(reads, connectionId as Connection.Id))!;
+      modelReads.set(connectionId, modelRead);
+    }
+    return modelRead();
+  };
 
-  const entryOf = (view: Agent.View): AgentSummary => {
-    const environment = environments().get(view.environmentId);
+  const connectionOf = (connectionId: string): SetupConnection => {
+    const connection = connections().get(connectionId as Connection.Id);
+    return connection === undefined
+      ? { id: connectionId }
+      : { id: connectionId, name: connection.name };
+  };
+  const summaryOf = (view: Agent.View): AgentSummary => {
+    const offered = models(view.model.connectionId);
+    const listed =
+      offered?.status === "loaded"
+        ? offered.listed.find((model) => model.id === view.model.id)
+        : undefined;
+    const activity = turnActivity.agentActivity(view.memberId);
     return {
       id: view.id,
+      memberId: view.memberId,
       name: view.name,
-      role: view.role?.name,
       instructions: view.instructions,
-      connection: {
-        id: view.model.connectionId,
-        name: (read?.connections() ?? []).find(
-          (connection) => connection.id === view.model.connectionId,
-        )?.name,
+      harness:
+        view.harness._tag === "Auto"
+          ? { kind: "auto" }
+          : Object.assign({ kind: "connection" as const }, connectionOf(view.harness.connectionId)),
+      model: {
+        connection: connectionOf(view.model.connectionId),
+        id: view.model.id,
+        ...(listed === undefined ? {} : { name: listed.name }),
+        ...(view.model.effort === undefined ? {} : { effort: view.model.effort }),
       },
-      model: view.model.model,
-      reasoning: view.model.reasoning ?? undefined,
-      environment: {
-        id: view.environmentId,
-        name: environment?.name,
-        runtime: environment?.runtime,
-      },
-      issues: Agent.Readiness.isAnyOf(["Incomplete"])(view.readiness)
-        ? view.readiness.issues.map(issueCode)
-        : [],
+      ...(view.sandbox === null ? {} : { sandbox: connectionOf(view.sandbox.connectionId) }),
+      issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
       configurable: view.configurable,
-      removable: view.removable,
       createdBy: memberName(members.member(view.createdBy)),
       createdAt: toDate(view.createdAt),
-      activity: activity.agentActivity(view.memberId),
+      ...(activity === undefined ? {} : { activity }),
     };
   };
-  const all = createMemo(() => (read?.agents() ?? []).map(entryOf));
-  const loaded = () => read?.agents() !== undefined;
+  /** The agent's turns in progress, as its page lists them. */
+  const turnsOf = (memberId: string): readonly AgentTurnEntry[] =>
+    turnActivity.ofAgent(memberId).flatMap((turn) =>
+      turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
+        ? [
+            {
+              id: turn.id,
+              state: turn.state,
+              place: turn.place,
+              groupId: turn.groupId,
+              threadId: turn.threadId,
+            },
+          ]
+        : [],
+    );
+  const views = createMemo(() => read?.agents() ?? []);
+  const all = createMemo(() => views().map(summaryOf));
   const find = (agentId: string) => all().find((entry) => entry.id === agentId);
+  const viewOf = (agentId: string) => views().find((entry) => entry.id === agentId);
 
+  /** The roles a new agent may start with; only those marked assignable can be given. */
   const roles = createMemo((): readonly AgentRoleOption[] =>
     (read?.settings()?.roles ?? []).flatMap((choice) =>
-      choice.assignable ? [{ id: choice.role.id, name: choice.role.name }] : [],
+      choice.role.id === ownerRole
+        ? []
+        : [{ id: choice.role.id, name: choice.role.name, assignable: choice.assignable }],
     ),
   );
 
@@ -261,199 +369,51 @@ export function useAgents(
     write: changeAgent(workspaceId),
     reload: reads ? reloadAgents(reads) : Effect.void,
     failed: (cause) => {
-      const problems = agentProblems(cause);
-      // A connection or environment that left the reader's reach: reload what can be chosen.
-      if (
-        problems.some(
-          (problem) =>
-            problem.kind === "connection-unavailable" || problem.kind === "environment-unavailable",
-        )
-      )
-        read?.reloadChoices();
-      // An initial role the reader may not give is refused at its field; the rest stays current.
-      const error = problems.some((problem) => problem.kind === "role-denied")
-        ? "invalid"
-        : workspaceFailure(cause);
-      return { error, problems };
+      const { error, ...problem } = agentsFailure(cause);
+      return { error, problems: [problem] };
     },
-    done: (change: AgentCommand, created, subject: string | undefined) => {
+    done: (change: AgentCommand, created, details: { readonly subject?: string } | undefined) => {
       if (change.kind === "create") {
         intent = undefined;
         setCreating(undefined);
       }
       if (change.kind === "rename") forget(setNames, change.agentId);
-      if (change.kind === "configure") forget(setConfigs, change.agentId);
-      options.done?.({ action: change.kind, subject, created });
+      if (change.kind === "configure") forget(setSetups, change.agentId);
+      options.done?.({
+        action: change.kind,
+        ...(details?.subject === undefined ? {} : { subject: details.subject }),
+        ...(created === undefined ? {} : { created }),
+      });
     },
     outdated: () => loaded() && read?.failure() !== undefined,
   });
-  const send = changes.send;
-
-  /**
-   * The environment choices for a draft's model access. The model is checked once typing pauses,
-   * so each keystroke does not ask again.
-   */
-  const choicesFor = (draft: () => AgentDraft | undefined) => {
-    const [model, setModel] = createSignal<string>();
-    createEffect(
-      on(
-        () => draft()?.model.trim(),
-        (typed) => {
-          if (model() === undefined) return setModel(typed);
-          const timer = setTimeout(() => setModel(typed), 300);
-          onCleanup(() => clearTimeout(timer));
-        },
-      ),
-    );
-    const selection = createMemo(
-      () => {
-        const current = draft();
-        const connection = connectionOf(current?.connectionId);
-        const typed = model();
-        return current && connection && typed
-          ? { connectionId: connection.id, model: typed, reasoning: current.reasoning }
-          : undefined;
-      },
-      undefined,
-      {
-        equals: (left, right) =>
-          left?.connectionId === right?.connectionId &&
-          left?.model === right?.model &&
-          left?.reasoning === right?.reasoning,
-      },
-    );
-    return reads ? choices(reads, selection) : () => undefined;
+  // The setup fields edited since the last change was sent; the issues they may resolve stop showing.
+  const [edited, setEdited] = createSignal<ReadonlySet<SetupKey>>(new Set());
+  const send: typeof changes.send = (change, details) => {
+    setEdited(new Set<SetupKey>());
+    changes.send(change, details);
   };
 
-  /** Edits over whichever draft a form holds, with the environments it can choose from. */
-  const editor = (
-    draft: () => AgentDraft,
-    change: (update: (draft: AgentDraft) => AgentDraft) => void,
-    fits: () => ReadonlyArray<Agent.EnvironmentChoice> | undefined,
-  ): ConfigurationEditor => {
-    const options = createMemo((): readonly AgentEnvironmentOption[] => {
-      const checked = fits();
-      const known = environments();
-      if (checked === undefined)
-        return [...known.values()].map((environment) => ({ ...environment, fit: undefined }));
-      const pendingConnection = !(connectionOf(draft().connectionId)?.ready ?? true);
-      return checked.flatMap((choice): readonly AgentEnvironmentOption[] => {
-        const environment = known.get(choice.environmentId);
-        if (!environment) return [];
-        const compatibility = choice.compatibility;
-        if (EnvironmentCompatibility.Compatibility.isAnyOf(["Compatible"])(compatibility))
-          return [{ ...environment, fit: { kind: "works" } }];
-        const blockers = compatibility.reasons
-          .map((reason) =>
-            EnvironmentCompatibility.Reason.isAnyOf(["EnvironmentNotReady"])(reason)
-              ? undefined
-              : issueCode(reason),
-          )
-          .filter((issue): issue is AgentIssue => issue !== undefined)
-          .filter(blocker);
-        if (blockers.length > 0)
-          return [{ ...environment, fit: { kind: "cant-run", reasons: blockers } }];
-        const issues = compatibility.reasons.flatMap((reason) =>
-          EnvironmentCompatibility.Reason.isAnyOf(["EnvironmentNotReady"])(reason)
-            ? reason.issues
-            : [],
-        );
-        return [
-          {
-            ...environment,
-            fit: {
-              kind: "needs-setup",
-              issues,
-              connection:
-                pendingConnection ||
-                compatibility.reasons.some(
-                  EnvironmentCompatibility.Reason.isAnyOf(["ConnectionNotReady"]),
-                ),
-            },
-          },
-        ];
-      });
-    });
-    const chosen = () => options().find((option) => option.id === draft().environmentId);
-    return {
-      draft,
-      setInstructions: (instructions) => change((current) => ({ ...current, instructions })),
-      setConnection: (connectionId) =>
-        change((current) => ({
-          ...current,
-          connectionId,
-          model:
-            current.model.trim() === ""
-              ? (connectionOf(connectionId)?.models[0]?.id ?? "")
-              : current.model,
-        })),
-      setModel: (model) => change((current) => ({ ...current, model })),
-      setReasoning: (reasoning) => change((current) => ({ ...current, reasoning })),
-      setEnvironment: (environmentId) => change((current) => ({ ...current, environmentId })),
-      environments: options,
-      environment: chosen,
-      complete: () => {
-        const current = draft();
-        const environment = chosen();
-        return (
-          connectionOf(current.connectionId) !== undefined &&
-          current.model.trim() !== "" &&
-          environment !== undefined &&
-          environment.fit?.kind !== "cant-run" &&
-          (current.reasoning === undefined ||
-            environment.reasoningLevels.includes(current.reasoning))
-        );
-      },
-    };
-  };
-  const configurationOf = (draft: AgentDraft): AgentConfiguration | undefined =>
-    draft.connectionId === undefined || draft.environmentId === undefined
-      ? undefined
-      : {
-          instructions: draft.instructions.trim(),
-          model: {
-            connectionId: draft.connectionId,
-            model: draft.model.trim(),
-            reasoning: draft.reasoning ?? null,
-          },
-          environmentId: draft.environmentId,
-        };
-
-  // A new agent. Retrying the same request reuses its key, so an attempt whose response was lost
-  // is not created twice.
-  const [creating, setCreating] = createSignal<
-    AgentDraft & { readonly name: string; readonly roleId: string | undefined }
-  >();
+  // A new agent: its name, its role, and its setup. Retrying the same request reuses its request
+  // key, so an attempt whose response was lost is not created twice; changing it makes a new one.
+  const [creating, setCreating] = createSignal<{
+    readonly name: string;
+    readonly roleId: string | undefined;
+    readonly setup: SetupDraft;
+  }>();
   let intent:
     | { readonly body: string; readonly key: ReturnType<typeof newAgentRequestKey> }
     | undefined;
-  const createDraft = () => creating() ?? blank();
-  const blank = () => ({
-    name: "",
-    roleId: undefined,
-    instructions: "",
-    connectionId: undefined,
-    model: "",
-    reasoning: undefined,
-    environmentId: undefined,
-  });
-  const createEditor = editor(
-    createDraft,
-    (update) => setCreating((current) => current && Object.assign({}, current, update(current))),
-    choicesFor(creating),
-  );
   const createRole = () => {
-    const id = creating()?.roleId;
-    return roles().find((role) => role.id === id)
-      ? id
-      : (roles().find((role) => role.id === memberRole) ?? roles()[0])?.id;
+    const chosen = roles().find((role) => role.id === creating()?.roleId && role.assignable);
+    return (chosen ?? roles().find((role) => role.id === memberRole && role.assignable))?.id;
   };
 
-  // Per agent: a rename keeps the name it was made against; configuration drafts keep their edits.
+  // Per agent: a rename keeps the name it was made against; a setup keeps its edits.
   const [names, setNames] = createSignal<
     Readonly<Record<string, { readonly name: string; readonly expected: string }>>
   >({});
-  const [configs, setConfigs] = createSignal<Readonly<Record<string, AgentDraft>>>({});
+  const [setups, setSetups] = createSignal<Readonly<Record<string, SetupDraft>>>({});
   const forget = <A>(
     set: (update: (previous: Readonly<Record<string, A>>) => Readonly<Record<string, A>>) => void,
     agentId: string,
@@ -461,42 +421,11 @@ export function useAgents(
     set((previous) =>
       Object.fromEntries(Object.entries(previous).filter(([id]) => id !== agentId)),
     );
-  const savedDraft = (agentId: string): AgentDraft | undefined => {
-    const entry = find(agentId);
-    return (
-      entry && {
-        instructions: entry.instructions,
-        connectionId: entry.connection.id,
-        model: entry.model,
-        reasoning: entry.reasoning,
-        environmentId: entry.environment.id,
-      }
-    );
+  const savedSetup = (agentId: string) => {
+    const view = viewOf(agentId);
+    return view ? draftOf(view) : undefined;
   };
-  const configDraft = (agentId: string) => configs()[agentId] ?? savedDraft(agentId) ?? blank();
-  const selectedId = () => options.selected?.();
-  const selectedDraft = () => {
-    const id = selectedId();
-    return id === undefined ? undefined : configDraft(id);
-  };
-  const selectedFits = choicesFor(selectedDraft);
-  // One editor per agent, owned by this view, so reading it again keeps the same choices.
-  const owner = getOwner();
-  const editors = new Map<string, ConfigurationEditor>();
-  const configEditor = (agentId: string) => {
-    const known = editors.get(agentId);
-    if (known) return known;
-    const created = runWithOwner(owner, () =>
-      editor(
-        () => configDraft(agentId),
-        (update) =>
-          setConfigs((previous) => ({ ...previous, [agentId]: update(configDraft(agentId)) })),
-        () => (selectedId() === agentId ? selectedFits() : undefined),
-      ),
-    )!;
-    editors.set(agentId, created);
-    return created;
-  };
+  const setupOf = (agentId: string) => setups()[agentId] ?? savedSetup(agentId) ?? blankSetup;
 
   // After an explicit refresh, rename drafts stay and are made against the name now shown.
   createEffect(
@@ -515,6 +444,35 @@ export function useAgents(
     ),
   );
 
+  /** The setup fields over a draft, which `edit` changes. */
+  const fieldsOf = (
+    draft: SetupDraft,
+    apply: (change: Partial<SetupDraft>) => void,
+  ): Omit<SetupFieldsProps, "problems" | "disabled"> => {
+    const edit = (change: Partial<SetupDraft>) => {
+      setEdited((previous) => new Set([...previous, ...(Object.keys(change) as SetupKey[])]));
+      apply(change);
+    };
+    return {
+      instructions: draft.instructions,
+      onInstructionsChange: (instructions) => edit({ instructions }),
+      harness: draft.harness,
+      onHarnessChange: (harness) => edit({ harness }),
+      harnesses: harnessOptions(draft.harness),
+      modelConnections: optionsFor("model", draft.modelConnectionId),
+      modelConnectionId: draft.modelConnectionId,
+      onModelConnectionChange: (modelConnectionId) =>
+        edit({ modelConnectionId, model: "", effort: undefined }),
+      models: models(draft.modelConnectionId),
+      model: draft.model,
+      onModelChange: (model) => edit({ model }),
+      effort: draft.effort,
+      onEffortChange: (effort) => edit({ effort }),
+      sandboxes: optionsFor("sandbox", draft.sandboxId),
+      sandboxId: draft.sandboxId,
+      onSandboxChange: (sandboxId) => edit({ sandboxId }),
+    };
+  };
   return {
     /** Why nothing shows yet; undefined once the agents have loaded. */
     status: (): "loading" | "failed" | "unavailable" | undefined => {
@@ -527,31 +485,23 @@ export function useAgents(
     /** Every agent the reader may read, by name. */
     agents: all,
     agent: find,
-    /** An agent's turns in progress, by where each runs. */
-    turns: (agentId: string): readonly AgentTurnSummary[] => {
-      const memberId = read?.agents()?.find((view) => view.id === agentId)?.memberId;
-      return memberId === undefined
-        ? []
-        : activity
-            .ofAgent(memberId)
-            .flatMap((turn) =>
-              turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
-                ? [{ id: turn.id, state: turn.state, where: turn.place }]
-                : [],
-            );
-    },
-    /** The connections agents can use for model access, ready ones first. */
-    connections: () =>
-      connections().toSorted((left, right) => Number(right.ready) - Number(left.ready)),
-    /** Whether the connections have loaded, so an empty list means there are none. */
-    connectionsLoaded: () => read?.connections() !== undefined,
-    /** The roles the reader may give a new agent. */
-    roles,
+    /** An agent's turns in progress, by its member ID, as its page lists them. */
+    turnsOf,
     /** The reader may add agents. */
     canCreate: () => canCreate() === true,
+    /** The roles a new agent may start with. */
+    roles,
     /** The change running, or `refresh`. */
     pending: changes.pending,
-    failure: (): AgentsFailure | undefined => changes.failure(),
+    /** The last change's failure, or a refresh's. */
+    failure: (): AgentsFailure | undefined => {
+      const failure = changes.failure();
+      if (!failure) return undefined;
+      const [problem] = failure.problems;
+      const remaining = problem && remainingProblem(problem, edited());
+      if (problem && !remaining) return undefined;
+      return Object.assign({ action: failure.action, error: failure.error }, remaining);
+    },
     /** What the reader sees is out of date: changes wait for a refresh. */
     stale: changes.stale,
     /** Reload, on behalf of the change that found the values out of date, if any. */
@@ -560,53 +510,82 @@ export function useAgents(
       else changes.refresh();
     },
     /** Set aside the last change's failure, as a dialog closes. */
-    dismiss: changes.dismiss,
+    dismiss: () => {
+      if (!changes.pending()) changes.dismiss();
+    },
     create: {
-      /**
-       * Start an agent: Member, the first ready model connection and its first suggested model,
-       * and the first environment.
-       */
+      /** Start a new agent, with Member as its role when the reader may give it. */
       begin: () => {
         changes.dismiss();
         intent = undefined;
-        const connection = connections().find((candidate) => candidate.ready) ?? connections()[0];
-        setCreating({
-          name: "",
-          roleId: undefined,
-          instructions: "",
-          connectionId: connection?.id,
-          model: connection?.models[0]?.id ?? "",
-          reasoning: undefined,
-          environmentId: [...environments().keys()][0],
-        });
+        setCreating({ name: "", roleId: undefined, setup: blankSetup });
       },
-      /** An agent is being added, including while a detour creates a connection for it. */
-      active: () => creating() !== undefined,
       name: () => creating()?.name ?? "",
-      setName: (name: string) =>
-        setCreating((current) => current && Object.assign({}, current, { name })),
+      setName: (name: string) => setCreating((current) => current && { ...current, name }),
       roleId: createRole,
-      setRole: (roleId: string) =>
-        setCreating((current) => current && Object.assign({}, current, { roleId })),
-      configuration: createEditor,
-      /** Everything is complete, so the agent can be created. */
-      ready: () =>
-        (creating()?.name.trim() ?? "") !== "" &&
-        createRole() !== undefined &&
-        createEditor.complete(),
-      save: () => {
+      setRole: (roleId: string) => setCreating((current) => current && { ...current, roleId }),
+      /** The setup fields over the new agent's draft. */
+      fields: () =>
+        fieldsOf(creating()?.setup ?? blankSetup, (edit) =>
+          setCreating(
+            (current) => current && { ...current, setup: Object.assign({}, current.setup, edit) },
+          ),
+        ),
+      /** The draft has a name, a role the reader may give, and a model. */
+      ready: () => {
         const current = creating();
-        const roleId = createRole();
-        const configuration = current && configurationOf(current);
-        if (!current || !roleId || !configuration) return;
-        const input = { name: current.name.trim(), roleId, configuration };
-        const serialized = JSON.stringify(input);
+        return (
+          current !== undefined &&
+          current.name.trim() !== "" &&
+          createRole() !== undefined &&
+          inputOf(current.setup) !== undefined
+        );
+      },
+      save: () => {
+        const current = creating(),
+          roleId = createRole(),
+          setup = current && inputOf(current.setup);
+        if (!current || !roleId || !setup) return;
+        const body = { name: current.name.trim(), roleId, setup };
+        const serialized = JSON.stringify(body);
         if (intent?.body !== serialized) intent = { body: serialized, key: newAgentRequestKey() };
-        send({ kind: "create", ...input, key: intent.key }, input.name);
+        send({ kind: "create", ...body, key: intent.key }, { subject: body.name });
       },
       cancel: () => {
         intent = undefined;
         setCreating(undefined);
+      },
+    },
+    setup: {
+      /** The setup fields over the agent's draft, its saved setup until it is edited. */
+      fields: (agentId: string) =>
+        fieldsOf(setupOf(agentId), (edit) =>
+          setSetups((previous) => ({
+            ...previous,
+            [agentId]: Object.assign({}, setupOf(agentId), edit),
+          })),
+        ),
+      /** The setup differs from the saved one, names a model, and can be saved now. */
+      changed: (agentId: string) => {
+        const edit = setups()[agentId],
+          saved = savedSetup(agentId);
+        return (
+          !changes.stale() &&
+          edit !== undefined &&
+          saved !== undefined &&
+          inputOf(edit) !== undefined &&
+          !sameSetup(edit, saved)
+        );
+      },
+      save: (agentId: string) => {
+        const edit = setups()[agentId],
+          setup = edit && inputOf(edit);
+        if (setup) send({ kind: "configure", agentId, setup }, { subject: find(agentId)?.name });
+      },
+      /** Put the saved setup back in place of the edits. */
+      discard: (agentId: string) => {
+        if (changes.attempt()?.action === "configure") changes.dismiss();
+        forget(setSetups, agentId);
       },
     },
     rename: {
@@ -628,102 +607,67 @@ export function useAgents(
         if (edit)
           send(
             { kind: "rename", agentId, name: edit.name.trim(), expectedName: edit.expected },
-            edit.name.trim(),
+            { subject: edit.name.trim() },
           );
       },
     },
-    configure: {
-      /** Edits to an agent's configuration, kept until saved or reset. */
-      configuration: configEditor,
-      /** The configuration differs from the one saved, and can be saved now. */
-      changed: (agentId: string) => {
-        const edit = configs()[agentId];
-        const saved = savedDraft(agentId);
-        if (!edit || !saved || changes.stale()) return false;
-        const next = configurationOf(edit);
-        const current = configurationOf(saved);
-        return (
-          next !== undefined &&
-          current !== undefined &&
-          !sameConfiguration(next, current) &&
-          configEditor(agentId).complete()
-        );
-      },
-      save: (agentId: string) => {
-        const edit = configs()[agentId];
-        const configuration = edit && configurationOf(edit);
-        if (configuration) send({ kind: "configure", agentId, configuration }, find(agentId)?.name);
-      },
-      /** Discard unsaved edits, such as when the details close. */
-      reset: (agentId: string) => {
-        forget(setConfigs, agentId);
-        forget(setNames, agentId);
-      },
+    /** Discard an agent's unsaved name and setup, such as when its page closes. */
+    reset: (agentId: string) => {
+      forget(setNames, agentId);
+      forget(setSetups, agentId);
     },
-    remove: (agentId: string) => send({ kind: "remove", agentId }, find(agentId)?.name),
+    /** Remove the agent from the workspace, ending its membership. */
+    remove: (agentId: string) => {
+      const agent = find(agentId);
+      if (agent)
+        send({ kind: "remove", agentId, memberId: agent.memberId }, { subject: agent.name });
+    },
   };
 }
 export type AgentsView = ReturnType<typeof useAgents>;
 
+/** The models a connection offers, as the setup's model field suggests them. */
+function modelChoices(reads: AgentsReads, connectionId: Connection.Id): Accessor<ModelChoices> {
+  const result = useAtomValue(() => reads.models(connectionId));
+  return () => {
+    const current = result();
+    const value = AsyncResult.value(current);
+    if (Option.isSome(value))
+      return {
+        status: "loaded",
+        listed: value.value.listed.map((model) => ({
+          id: model.id,
+          name: model.name,
+          efforts: model.reasoning?.efforts ?? [],
+        })),
+        unlisted: value.value.unlisted,
+      };
+    return settled(current) === undefined ? { status: "loading" } : { status: "failed" };
+  };
+}
+
 function connect(reads: AgentsReads) {
   const agents = useAtomValue(() => reads.agents),
     connections = useAtomValue(() => reads.connections),
-    connectionImplementations = useAtomValue(() => reads.connectionImplementations),
-    environments = useAtomValue(() => reads.environments),
-    environmentImplementations = useAtomValue(() => reads.environmentImplementations),
+    integrations = useAtomValue(() => reads.integrations),
     settings = useAtomValue(() => reads.settings),
     retryAgents = useAtomRefresh(() => reads.agents),
     retryConnections = useAtomRefresh(() => reads.connections),
-    retryEnvironments = useAtomRefresh(() => reads.environments);
-  const value = <A, E>(read: AsyncResult.AsyncResult<A, E>) =>
-    Option.getOrUndefined(AsyncResult.value(read));
+    retryIntegrations = useAtomRefresh(() => reads.integrations);
   return {
-    agents: () => value(agents()),
-    /** The connections the reader may read; none while they load or when they cannot. */
-    connections: () => value(connections()),
-    connectionImplementations: () => value(connectionImplementations()),
-    environments: () => value(environments()),
-    environmentImplementations: () => value(environmentImplementations()),
-    settings: () => value(settings()),
-    /** Why the latest read of the agents failed, once it settles. */
+    agents: () => Option.getOrUndefined(AsyncResult.value(agents())),
+    connections: () => Option.getOrUndefined(AsyncResult.value(connections())),
+    integrations: () => Option.getOrUndefined(AsyncResult.value(integrations())),
+    settings: () => Option.getOrUndefined(AsyncResult.value(settings())),
+    /** Why the latest read failed, once it settles. */
     failure: () => {
-      const cause = settled(agents());
+      const cause = settled(agents()) ?? settled(connections()) ?? settled(integrations());
       return cause === undefined ? undefined : workspaceFailure(cause);
     },
     retry: () => {
       retryAgents();
       retryConnections();
-      retryEnvironments();
-    },
-    /** Reload the connections and environments a draft chooses from. */
-    reloadChoices: () => {
-      retryConnections();
-      retryEnvironments();
+      retryIntegrations();
     },
   };
-}
-
-/** A read of nothing, for a draft that names no model access yet. */
-const nothing = Atom.make(AsyncResult.initial<ReadonlyArray<Agent.EnvironmentChoice>, unknown>());
-
-/** The environment choices for a selection, live while it names model access. */
-function choices(
-  reads: AgentsReads,
-  selection: () =>
-    | { readonly connectionId: string; readonly model: string; readonly reasoning?: string }
-    | undefined,
-) {
-  const result = useAtomValue(() => {
-    const current = selection();
-    return current === undefined
-      ? nothing
-      : (reads.environmentChoices({
-          connectionId: current.connectionId as Parameters<
-            AgentsReads["environmentChoices"]
-          >[0]["connectionId"],
-          model: current.model,
-          reasoning: current.reasoning,
-        }) as unknown as typeof nothing);
-  });
-  return () => Option.getOrUndefined(AsyncResult.value(result()));
 }

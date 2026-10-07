@@ -2,6 +2,7 @@ import { Agent, AgentStore } from "@amends/core/agent";
 import { Store } from "@amends/core/journal";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
+import type { MemoryDatabase } from "./database.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
@@ -25,6 +26,22 @@ export const make = Effect.fn("Agents.make")(function* () {
         });
       return record;
     });
+  /** Fails when another agent than `record` has its membership, as PostgreSQL's unique index does. */
+  const requireOwnMembership = (
+    operation: string,
+    record: Agent.Record,
+    space: MemoryDatabase.Space,
+  ) =>
+    Effect.gen(function* () {
+      const agents = yield* rows
+        .all(space.records.agents)
+        .pipe(Effect.mapError(storeFailure(AgentStore, operation)));
+      if (agents.some((agent) => agent.memberId === record.memberId && agent.id !== record.id))
+        return yield* new AgentStore.Conflict({
+          operation,
+          message: "Another agent has this membership",
+        });
+    });
   return AgentStore.Service.of({
     get: Effect.fn("Agents.get")(
       function* (input) {
@@ -44,6 +61,7 @@ export const make = Effect.fn("Agents.make")(function* () {
           operation: "insert",
           message: "Agent ID already exists",
         });
+      yield* requireOwnMembership("insert", record, space);
       const row = yield* rows
         .encode(record)
         .pipe(Effect.mapError(storeFailure(AgentStore, "insert")));
@@ -60,6 +78,7 @@ export const make = Effect.fn("Agents.make")(function* () {
           operation: "update",
           message: "Expected a stored agent",
         });
+      yield* requireOwnMembership("update", record, space);
       const row = yield* rows
         .encode(record)
         .pipe(Effect.mapError(storeFailure(AgentStore, "update")));

@@ -6,8 +6,7 @@ storage, transports, and other platform adapters. They may use dependencies need
 by their runtime.
 
 `local/` is the Bun host. Run it from the repository root with `bun run start`
-or `bun run dev`. `harness-server/` is the program a host compiles and uploads into a sandbox to
-run a harness there; it serves one harness session over its standard input and output. It implements no storage itself: it composes the PostgreSQL
+or `bun run dev`. It implements no storage itself: it composes the PostgreSQL
 adapter over the database at `AMENDS_DATABASE_URL` and provides development sign-in
 and credentials. A future Cloudflare host belongs in `hosts/cloudflare/`.
 

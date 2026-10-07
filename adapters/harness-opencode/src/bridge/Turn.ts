@@ -10,7 +10,7 @@
  * interrupted while tools run or cannot load its model, ends when its events do, with
  * `finishStopped`.
  */
-import { HarnessError, type StreamPart } from "@amends/harness-v2";
+import { HarnessError, type StreamPart } from "@amends/harness";
 import { Result, Schema } from "effect";
 import { Response } from "effect/ai";
 import type { SessionEvent, StepEnded } from "./SessionEvent.ts";

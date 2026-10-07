@@ -3,10 +3,8 @@
  * default `cluster` prefix. Cluster never removes a message or its reply, so the host prunes
  * the ones it has handled.
  */
-import { AgentJob } from "@amends/cluster";
-import { Clock, DateTime, Effect, Option, Schema } from "effect";
+import { DateTime, Effect, Schema } from "effect";
 import { Snowflake } from "effect/cluster";
-import { SqlClient } from "effect/sql";
 import { PostgresDatabase } from "./database.ts";
 
 /** Another live process runs jobs at this runner address. */
@@ -74,102 +72,6 @@ export const claimAddress = Effect.fn("PostgresClusterStorage.claimAddress")(fun
   yield* Effect.addFinalizer(() =>
     Effect.ignore(claim("SELECT pg_advisory_unlock(hashtextextended($1, 2)) AS held")),
   );
-});
-
-/** One kind of agent job request, such as `AcceptWork`, across every workspace. */
-export interface RequestStatus {
-  readonly request: string;
-  /** Requests due now that no runner has handled yet. */
-  readonly due: number;
-  /** Requests set for later: a retry after a failed run. */
-  readonly scheduled: number;
-  /** Of the requests not yet handled, those that follow a failed run. */
-  readonly retrying: number;
-  /** When the longest-waiting due request became due. */
-  readonly oldestDue: Option.Option<DateTime.Utc>;
-}
-/** A request waiting to run again after failed runs. */
-export interface Retry {
-  readonly request: string;
-  readonly workspaceId: string;
-  readonly memberId: string;
-  readonly attempt: number;
-  readonly at: DateTime.Utc;
-}
-export interface Status {
-  readonly requests: ReadonlyArray<RequestStatus>;
-  /** The most recent retries, newest first. */
-  readonly retries: ReadonlyArray<Retry>;
-}
-
-const RequestFields = Schema.Struct({
-  workspaceId: Schema.String,
-  memberId: Schema.String,
-  attempt: Schema.Int,
-  at: Schema.Finite,
-});
-const fromJson = <S extends Schema.Top>(schema: S) =>
-  Schema.decodeUnknownEffect(Schema.fromJsonString(schema));
-
-/**
- * What agent jobs wait for and retry, from the requests Cluster keeps: per kind of request, and the
- * latest `limit` (twenty by default) retries. Empty before any host has run agent jobs over this
- * database. It only reads, over any client of the database, such as
- * `PostgresDatabase.layerClient`, which leaves the schema as it is.
- */
-export const agentJobStatus = Effect.fn("PostgresClusterStorage.agentJobStatus")(function* (
-  options: { readonly limit?: number | undefined } = {},
-) {
-  const sql = yield* SqlClient.SqlClient;
-  const limit = options.limit ?? 20;
-  const [tables] = yield* sql<{ readonly present: boolean }>`
-    SELECT to_regclass('cluster_messages') IS NOT NULL AS present`;
-  if (tables?.present !== true) return { requests: [], retries: [] } satisfies Status;
-  const entityType = AgentJob.entity.type;
-  const now = yield* Clock.currentTimeMillis;
-  const waiting = yield* sql<{
-    readonly request: string;
-    readonly due: number;
-    readonly scheduled: number;
-    readonly retrying: number;
-    readonly oldest: string | null;
-  }>`
-    SELECT tag AS request,
-      count(*) FILTER (WHERE deliver_at IS NULL OR deliver_at <= ${now})::int AS due,
-      count(*) FILTER (WHERE deliver_at > ${now})::int AS scheduled,
-      count(*) FILTER (WHERE (payload::jsonb->>'attempt')::int > 0)::int AS retrying,
-      min(coalesce(deliver_at, 0)) FILTER (WHERE deliver_at IS NULL OR deliver_at <= ${now})::text
-        AS oldest
-    FROM cluster_messages
-    WHERE entity_type = ${entityType} AND kind = 0 AND NOT processed
-    GROUP BY 1
-    ORDER BY 1`;
-  const retried = yield* sql<{ readonly request: string; readonly payload: string }>`
-    SELECT tag AS request, payload FROM cluster_messages
-    WHERE entity_type = ${entityType} AND kind = 0 AND NOT processed
-      AND (payload::jsonb->>'attempt')::int > 0
-    ORDER BY id DESC LIMIT ${limit}`;
-  const retries = yield* Effect.forEach(retried, (row) =>
-    Effect.map(fromJson(RequestFields)(row.payload), (fields) => ({
-      request: row.request,
-      workspaceId: fields.workspaceId,
-      memberId: fields.memberId,
-      attempt: fields.attempt,
-      at: DateTime.makeUnsafe(fields.at),
-    })),
-  );
-  return {
-    requests: waiting.map((row) => ({
-      request: row.request,
-      due: row.due,
-      scheduled: row.scheduled,
-      retrying: row.retrying,
-      oldestDue: Option.map(Option.fromNullOr(row.oldest), (millis) =>
-        DateTime.makeUnsafe(Number(millis)),
-      ),
-    })),
-    retries,
-  } satisfies Status;
 });
 
 export * as PostgresClusterStorage from "./cluster-storage.ts";

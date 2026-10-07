@@ -29,8 +29,8 @@ export const phoneOnly = style({
   "@media": { [media.mobile]: { display: "inline" } },
 });
 
-// Columns: a 32px provider tile, marked when the connection cannot be used, the connection, and
-// how it authenticates in a 140px column. Phones leave out the authentication.
+// Columns: a 32px tile, marked when the connection cannot be used, the connection, and how it
+// authenticates in a 140px column. Phones leave out the authentication.
 const columns = {
   gridTemplateColumns: "2rem minmax(0, 1fr) 8.75rem",
   columnGap: "0.75rem",
@@ -83,14 +83,14 @@ export const list = style({
   listStyle: "none",
 });
 
-// A 100px row: the name, provider, and endpoint beside the tile; setup and authentication after.
+// An 80px row: the name and its integration beside the tile; authentication after.
 export const row = style({
   ...columns,
   position: "relative",
   display: "grid",
   alignItems: "start",
   boxSizing: "border-box",
-  minHeight: "6.25rem",
+  minHeight: "5rem",
   padding: "0.875rem 0.75rem",
   boxShadow: `inset 0 -1px 0 ${vars.color.border.divider}`,
   color: vars.color.text.secondary,
@@ -114,10 +114,11 @@ export const tile = style({
   placeItems: "center",
   width: "2rem",
   height: "2rem",
-  marginBlockStart: "0.25rem",
   backgroundColor: vars.color.surface.subtle,
   color: vars.color.text.primary,
 });
+
+export const rowTile = style([tile, { marginBlockStart: "0.25rem" }]);
 
 // A status patch over the tile's bottom-right corner, as on an avatar.
 export const tileStatus = style({
@@ -137,21 +138,14 @@ export const rowName = style({
   fontWeight: fontWeight.medium,
 });
 
-export const rowProvider = style({
+export const rowIntegration = style({
   ...typeScale.control,
   ...ellipsis,
   marginBlockStart: "0.375rem",
   color: vars.color.text.secondary,
 });
 
-export const rowEndpoint = style({
-  ...typeScale.hint,
-  ...ellipsis,
-  marginBlockStart: "0.125rem",
-  color: vars.color.text.muted,
-});
-
-export const rowMethod = style({
+export const rowAuth = style({
   ...typeScale.hint,
   display: "flex",
   alignItems: "center",
@@ -182,7 +176,7 @@ export const placeholder = style({
   gridTemplateColumns: "2rem minmax(0, 1fr)",
   columnGap: "0.75rem",
   alignItems: "start",
-  minHeight: "6.25rem",
+  minHeight: "5rem",
   boxSizing: "border-box",
   padding: "1.125rem 0.75rem",
   boxShadow: `inset 0 -1px 0 ${vars.color.border.divider}`,
@@ -264,87 +258,97 @@ export const detailName = style({ ...typeScale.hint, color: vars.color.text.seco
 
 export const detailValue = style({ ...typeScale.item, margin: 0, color: vars.color.text.primary });
 
-export const credential = style({ display: "flex", flexDirection: "column", gap: "0.4375rem" });
+export const link = style({
+  color: "inherit",
+  textUnderlineOffset: "0.1875rem",
+  selectors: { "&:hover": { color: vars.color.text.primary } },
+});
 
-export const credentialTitle = style({
+export const lines = style({ display: "flex", flexDirection: "column", gap: "0.4375rem" });
+
+export const title = style({
   ...typeScale.item,
   margin: 0,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
 });
 
-export const credentialActions = style({
+export const actions = style({
   display: "flex",
   alignItems: "center",
   gap: "0.75rem",
   marginBlockStart: "0.5rem",
 });
 
+// A check's result: its mark beside what it found.
+export const health = style({
+  display: "grid",
+  gridTemplateColumns: "0.625rem minmax(0, 1fr)",
+  columnGap: "0.75rem",
+  alignItems: "baseline",
+});
+
+export const healthMark = style({ alignSelf: "center" });
+
+export const healthLine = style([note, { gridColumn: "2" }]);
+
 // Dialogs.
 export const stack = style({ display: "flex", flexDirection: "column", gap: "1.25rem" });
 
 export const intro = style({ ...typeScale.control, margin: 0, color: vars.color.text.secondary });
 
-export const keyForm = style([form, { gap: "1.5rem" }]);
-
-export const providers = style({
+// The integrations to choose from: a row each, divided, under the search.
+export const integrations = style({
   display: "flex",
   flexDirection: "column",
-  gap: "1rem",
   margin: 0,
   padding: 0,
   listStyle: "none",
+  borderBlockStart: `1px solid ${vars.color.border.divider}`,
 });
 
-export const provider = style({
+export const integration = style({
   display: "grid",
-  gridTemplateColumns: "2rem minmax(0, 1fr) 1rem",
-  alignItems: "start",
+  gridTemplateColumns: "2rem minmax(0, 1fr)",
+  alignItems: "center",
   columnGap: "0.75rem",
   boxSizing: "border-box",
   width: "100%",
-  minHeight: "6.75rem",
-  padding: "0.9375rem 0.875rem 1rem 1rem",
-  border: `1px solid ${vars.color.border.default}`,
-  background: vars.color.surface.raised,
+  minHeight: "3.75rem",
+  padding: "0.625rem 0.75rem",
+  border: "none",
+  boxShadow: `inset 0 -1px 0 ${vars.color.border.divider}`,
+  background: "none",
   color: vars.color.text.secondary,
   fontFamily: "inherit",
   textAlign: "start",
   cursor: "pointer",
   selectors: {
-    "&:hover": { borderColor: vars.color.border.strong },
-    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "2px" },
+    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
   },
 });
 
-export const providerText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
+export const integrationText = style({ display: "flex", flexDirection: "column", minWidth: 0 });
 
-export const providerName = style({
+export const integrationName = style({
   ...typeScale.item,
+  ...ellipsis,
   color: vars.color.text.primary,
   fontWeight: fontWeight.medium,
 });
 
-export const providerDescription = style({
-  ...typeScale.control,
-  marginBlockStart: "0.5625rem",
-  color: vars.color.text.secondary,
-});
-
-export const providerMethods = style({
+export const integrationDetail = style({
   ...typeScale.hint,
-  marginBlockStart: "0.75rem",
+  ...ellipsis,
+  marginBlockStart: "0.125rem",
   color: vars.color.text.muted,
 });
 
-export const providerArrow = style({
-  width: "1rem",
-  height: "1rem",
-  marginBlockStart: "0.1875rem",
-  color: vars.color.text.secondary,
-});
+// The search spans the dialog, as the list under it does.
+export const chooseSearch = style({ flex: "1 1 0", minWidth: 0 });
 
-// Back, Cancel, and Finish later sit at the start; the primary action at the end.
+// Back and Cancel sit at the start; the primary action at the end.
 export const leading = style({
   minWidth: "8.125rem",
   marginInlineEnd: "auto",

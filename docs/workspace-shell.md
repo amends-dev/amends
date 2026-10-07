@@ -6,8 +6,7 @@ Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace lay
 panel. Every destination uses them the same way, as the Lunacy "Agents / Light mode / v02 ·
 Navigation" frames lay out:
 
-- **Rail** picks a destination: Home, Agents, Agents v2, Environments, Connections, and Connections
-  v2, the v2 destinations built beside those they are to replace, then Settings and the reader's
+- **Rail** picks a destination: Home, Agents, and Connections, then Settings and the reader's
   avatar, which opens the account menu. The current destination is marked
   `aria-current="true"`, whichever of its pages shows.
 - **Sidebar** lists the destination's items. Its header, the workspace switcher, stays the same
@@ -31,24 +30,14 @@ The destinations' sidebars:
   to six teammates, people and agents, they have no one-to-one conversation with yet, by name,
   with New message. A teammate's row opens a first message to them; the conversation starts when
   it is sent. The reader is not listed: a direct group needs at least one other member. A
-  one-to-one row with an agent carries the agent's status patch, and the logo while it works;
-  people's rows gain theirs with presence, which is not implemented yet.
-- **Agents**: each agent by name with its avatar and status patch, and the logo while one of its
-  turns is queued or running; + is Add agent (`?add=agent`). See [agents](agents.md).
-- **Agents v2**: each agent by name with its avatar and status patch; + is Add agent
-  (`?add=agent`). See [agents v2](agents-v2.md).
-- **Environments**: each environment, marked at the row's end when it needs setup or is
-  unavailable; + is Add environment
-  (`?add=environment`). One section: every environment serves the same use, and the sandbox is a
-  field of one creation flow. See [environments](environments.md).
-- **Connections**: Model providers, then Sandbox accounts, each with its own Browse (the list of
-  that kind, `?kind=`) and + (`?add=model-access` or `?add=sandboxes`), which offers only that
-  kind's providers. Connections whose provider this host no longer installs follow under
-  Unavailable. See [connections](connections.md).
-- **Connections v2**: Models, Tools, Sandboxes, and Harnesses, each connection under what its
+  one-to-one row with an agent carries the agent's status patch; people's rows gain theirs with
+  presence, which is not implemented yet.
+- **Agents**: each agent by name with its avatar and status patch; + is Add agent
+  (`?add=agent`). See [agents](agents.md).
+- **Connections**: Models, Tools, Sandboxes, and Harnesses, each connection under what its
   integration gives, each section with its own Browse (`?tab=`) and + (`?add=`), which offers only
   that kind's integrations. A connection whose integration this host no longer installs shows only
-  in the list. See [connections v2](connections-v2.md).
+  in the list. See [connections](connections.md).
 - **Settings**: Workspace and Members, each its own page. See
   [workspace settings](workspace-settings.md).
 
@@ -123,14 +112,13 @@ Try again under a note when a page fails. A notification whose thread the reader
 
 Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
 side panel, such as Settings' member details, attaches beside the main content like the thread
-panel. [Agents](agents.md) follows its v02 navigation frames; [Connections](connections.md) and
-[Environments](environments.md) follow the same pattern, with their v01 frames for lists, forms,
-and modals. The workspace's own address redirects to the Inbox; Triage and Tasks are placeholders
+panel. [Agents](agents.md) follows the Agents v02 navigation frames, and
+[Connections](connections.md) the same pattern. The workspace's own address redirects to the Inbox; Triage and Tasks are placeholders
 drawn with UI's EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
 above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
 empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts
 on hover, and checking a restored session shows the mark at work. Search jumps to a page, group,
-conversation, person, agent, environment, or connection by name, from ⌘K or Ctrl+K, the
+conversation, person, agent, or connection by name, from ⌘K or Ctrl+K, the
 sidebar's "Find anything", or the rail's Search; messages cannot be searched yet. A group shows its
 Threads tab alone: the mocks' Tasks and Files tabs, reactions, and task references have no backend
 and are not shown.

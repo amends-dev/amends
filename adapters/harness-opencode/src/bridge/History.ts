@@ -9,7 +9,7 @@
  * be opencode's own. The steps name the model `amends/history`, because a conversation does not say
  * which model answered; opencode reads them whichever model they name.
  */
-import { HarnessError } from "@amends/harness-v2";
+import { HarnessError } from "@amends/harness";
 import { Predicate, Result, Schema } from "effect";
 import type { Prompt } from "effect/ai";
 import { type ModelRef, type SessionEvent, ToolContent } from "./SessionEvent.ts";

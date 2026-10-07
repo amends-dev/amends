@@ -56,22 +56,19 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "members",
     "permissions",
     "connections",
-    "connections-v2",
-    "environments",
     "agents",
-    "agents-v2",
     directoryKey,
   ],
   // An agent is a member: its name, and whether it is still in the workspace, show with it.
-  "workspace.member.added": ["members", "ownership", "agents", "agents-v2", directoryKey],
-  "workspace.member.removed": ["members", "ownership", "agents", "agents-v2", directoryKey],
+  "workspace.member.added": ["members", "ownership", "agents", directoryKey],
+  "workspace.member.removed": ["members", "ownership", "agents", directoryKey],
   // A member's name shows wherever members are named, and in the directory's memberships.
-  "workspace.member.renamed": ["members", "agents", "agents-v2", directoryKey],
+  "workspace.member.renamed": ["members", "agents", directoryKey],
   "workspace.invitation.issued": ["invitations"],
   "workspace.invitation.revoked": ["invitations"],
   "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],
   "workspace.role.created": ["settings", "members"],
-  "workspace.role.renamed": ["settings", "members", "agents"],
+  "workspace.role.renamed": ["settings", "members"],
   // Grants decide what the reader may do and see, including another member's access, and which
   // notification sources they can still read.
   "workspace.role.permissions-changed": [
@@ -82,10 +79,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
     "connections",
-    "connections-v2",
-    "environments",
     "agents",
-    "agents-v2",
     "active-turns",
   ],
   "workspace.assignment.created": [
@@ -96,10 +90,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
     "connections",
-    "connections-v2",
-    "environments",
     "agents",
-    "agents-v2",
     "active-turns",
   ],
   "workspace.assignment.revoked": [
@@ -110,10 +101,7 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "inbox",
     "permissions",
     "connections",
-    "connections-v2",
-    "environments",
     "agents",
-    "agents-v2",
     "active-turns",
   ],
   // A public group's creation reaches everyone who might join it.
@@ -127,32 +115,15 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "group.follow.ended": ["groups"],
   // A group's latest activity, and whether it is new to the reader.
   "thread.activity.recorded": ["groups"],
-  // Connections as the workspace's readers see them: their names, settings, and readiness, which
-  // also decides whether an environment running under one as its account is ready.
-  // An agent's readiness follows its model connection too.
-  "connection.created": ["connections", "environments", "agents"],
-  "connection.renamed": ["connections", "environments", "agents"],
-  "connection.configured": ["connections", "environments", "agents"],
-  "connection.credential-set": ["connections", "environments", "agents"],
-  "connection.credential-cleared": ["connections", "environments", "agents"],
-  "connection.removed": ["connections", "environments", "agents"],
-  // Connections v2: their names, settings, and readiness, which agents v2 name and follow.
+  // Connections: their names, settings, and readiness, which agents name and follow.
   // Replacing a key changes none of them.
-  "connection-v2.created": ["connections-v2", "agents-v2"],
-  "connection-v2.renamed": ["connections-v2", "agents-v2"],
-  "connection-v2.configured": ["connections-v2", "agents-v2"],
-  "connection-v2.removed": ["connections-v2", "agents-v2"],
-  // Environments: their names, harness, sandbox settings, and readiness, which agents follow.
-  "environment.created": ["environments", "agents"],
-  "environment.renamed": ["environments", "agents"],
-  "environment.configured": ["environments", "agents"],
-  "environment.removed": ["environments", "agents"],
-  // Agents: their configuration and readiness.
+  "connection.created": ["connections", "agents"],
+  "connection.renamed": ["connections", "agents"],
+  "connection.configured": ["connections", "agents"],
+  "connection.removed": ["connections", "agents"],
+  // Agents: how each is set up, and so its readiness.
   "agent.created": ["agents"],
   "agent.configured": ["agents"],
-  // Agents v2: how each is set up, and so its readiness.
-  "agent-v2.created": ["agents-v2"],
-  "agent-v2.configured": ["agents-v2"],
   // Where agents are at work: a turn starting, changing state, or ending.
   ...Object.fromEntries(
     [
@@ -215,7 +186,6 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     [
       "turn.created",
       "turn.retried",
-      "turn.input-accepted",
       "turn.started",
       "turn.cancel-requested",
       "turn.completed",

@@ -6,7 +6,7 @@
 // from the state it started with, whose conversation the session keeps. Each launch adds a line to `launches.jsonl` in the
 // bridge's working directory, with its process id, its agent's options, and whether its environment
 // holds the token, and destroying a session writes `destroyed-<session>` there.
-import { type Bridge, BridgeServer, type StreamPart } from "@amends/harness-v2";
+import { type Bridge, BridgeServer, type StreamPart } from "@amends/harness";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, Option, Path, Ref, Schedule, Schema, Stream } from "effect";
 import * as BunBridge from "../src/bridge/BunBridge.ts";

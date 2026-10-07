@@ -30,18 +30,13 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-core's `AgentJobs.Service` and `TurnJobs.Service`, and `Crypto.Crypto`, in the host's scope. It captures
+core's `TurnJobs.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
-long an unused workspace stays prepared; it defaults to five minutes. `options.connections` lists
-the connection implementations the host installed, as they declare themselves; every workspace's
-core receives them as its `ConnectionCatalog`, so storage bindings exclude it. It defaults to none.
-`options.integrations` lists the integrations the host installs, whose ids must be distinct; every
-workspace's core receives them as connection-v2's `Integrations`, also excluded from storage
-bindings. It defaults to none.
-`options.harnesses` and `options.sandboxes` list the harnesses and sandbox providers the host
-installed; every workspace's core receives them as its `EnvironmentCatalog`, also excluded from
-storage bindings. Each defaults to none. `Gateway.layer(options?)`
+long an unused workspace stays prepared; it defaults to five minutes. `options.integrations` lists
+the integrations the host installs, whose ids must be distinct; every workspace's core receives them
+as connection's `Integrations`, so storage bindings exclude them. It defaults to none.
+`Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 
@@ -69,8 +64,9 @@ implementation.
   bypass the checks core performs inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor: for invitation acceptance,
   where the recipient is not yet a member, and for a host's [jobs](../core/README.md#jobs).
-  Programs may require core's `Operations` and `JobServices`, which jobs call, and `Scope`. A
-  workspace that was never created returns `WorkspaceNotFound` without being prepared.
+  Programs may require core's `Operations` and `JobServices`, which jobs call, including the
+  session logs a turn's job writes, and `Scope`. A workspace that was never created returns
+  `WorkspaceNotFound` without being prepared.
 
 Both keep the workspace prepared for the caller's scope, as an Effect resource is: an HTTP
 response's scope, which a stream holds until the client disconnects, or one the caller closes
@@ -80,7 +76,7 @@ host changed the workspace uses it prepared again. Both apply one error policy, 
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`): its stores and
-its `SignalHub.Service`; core's `AgentJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
+its `SignalHub.Service`; core's `TurnJobs.Service`, which takes every workspace's job requests,
 each naming its workspace, and `Crypto.Crypto`. The gateway passes the job services to each
 workspace's core as they are. A host that runs no jobs provides each one's `layerNoRunner`:
 requests are accepted and nothing runs, so work waits in agents' inboxes, or queued.
@@ -146,8 +142,9 @@ host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
-[`@amends/cluster`](../cluster/README.md) implements core's `AgentJobs` and `TurnJobs` on
-Effect Cluster, with the workers that run what they store through `inWorkspace`.
+Hosts implement core's `TurnJobs` on a job runner that enters workspaces through `inWorkspace`,
+as [`@amends/cluster`](../cluster/README.md)'s `TurnJob` does; a host that runs none uses
+`TurnJobs.layerNoRunner`.
 
 Storage binds each workspace's `SignalHub.Service`, which delivers
 [ephemeral signals](../core/README.md#signals), such as typing, between every process over the

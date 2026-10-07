@@ -1,6 +1,6 @@
+import { Connection as ConnectionContract } from "@amends/connection";
 import { Connection } from "@amends/core/connection";
 import { Workspace } from "@amends/core/workspace";
-import { ConnectionImplementation } from "@amends/connection";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
@@ -10,16 +10,17 @@ const connection = { workspaceId: Workspace.Id, connectionId: Connection.Id };
 const view = Connection.View.annotate({ identifier: "Connection" });
 
 /**
- * The workspace's connections to external systems, and the implementations this host installed
- * to make them. Every member may read connections by default; administrators add and manage
- * them. A credential goes in on its own and never comes back out: readers see whether one is set.
+ * The workspace's connections to the integrations this host installs, which replace those of
+ * `connections`, and the integrations themselves. Every member may read them; administrators add,
+ * manage, and check them. A key goes in with its connection or in place of its key, and never
+ * comes back out.
  */
 export class ConnectionsGroup extends HttpApiGroup.make("connections")
   .add(
-    HttpApiEndpoint.get("implementations", "/implementations", {
+    HttpApiEndpoint.get("integrations", "/integrations", {
       params: { workspaceId: Workspace.Id },
       success: Schema.Array(
-        ConnectionImplementation.Declaration.annotate({ identifier: "ConnectionImplementation" }),
+        Connection.IntegrationView.annotate({ identifier: "ConnectionIntegration" }),
       ),
       error: ApiErrors.member,
     }),
@@ -38,15 +39,20 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       error: [
         ...ApiErrors.member,
         ApiErrors.ConnectionNotFound,
-        ApiErrors.UnknownImplementation,
-        ApiErrors.InvalidSettings,
-        ApiErrors.UnsupportedAuthentication,
+        ApiErrors.UnknownIntegration,
+        ApiErrors.InvalidConnection,
+        ApiErrors.ConnectionCredentialsUnavailable,
       ],
     }),
     HttpApiEndpoint.get("get", "/:connectionId", {
       params: connection,
       success: view,
       error: [...ApiErrors.member, ApiErrors.ConnectionNotFound],
+    }),
+    HttpApiEndpoint.get("models", "/:connectionId/models", {
+      params: connection,
+      success: Connection.Models.annotate({ identifier: "ConnectionModels" }),
+      error: [...ApiErrors.member, ApiErrors.ConnectionNotFound, ApiErrors.UnknownIntegration],
     }),
     HttpApiEndpoint.post("rename", "/:connectionId/rename", {
       params: connection,
@@ -64,29 +70,30 @@ export class ConnectionsGroup extends HttpApiGroup.make("connections")
       error: [
         ...ApiErrors.member,
         ApiErrors.ConnectionNotFound,
-        ApiErrors.UnknownImplementation,
-        ApiErrors.InvalidSettings,
+        ApiErrors.UnknownIntegration,
+        ApiErrors.InvalidConnection,
       ],
     }),
-    HttpApiEndpoint.put("setCredential", "/:connectionId/credential", {
+    HttpApiEndpoint.put("replaceKey", "/:connectionId/key", {
       params: connection,
-      payload: Schema.Struct({ secret: Connection.SetCredentialInput.fields.secret }),
+      payload: Schema.Struct({ apiKey: Connection.ReplaceKeyInput.fields.apiKey }),
       success: view,
       error: [
         ...ApiErrors.member,
         ApiErrors.ConnectionNotFound,
-        ApiErrors.UnknownImplementation,
-        ApiErrors.UnsupportedAuthentication,
-        ApiErrors.CredentialsUnavailable,
+        ApiErrors.Keyless,
+        ApiErrors.ConnectionCredentialsUnavailable,
       ],
     }),
-    HttpApiEndpoint.delete("clearCredential", "/:connectionId/credential", {
+    HttpApiEndpoint.post("check", "/:connectionId/check", {
       params: connection,
-      success: view,
+      success: ConnectionContract.Health.annotate({ identifier: "ConnectionHealth" }),
       error: [
         ...ApiErrors.member,
         ApiErrors.ConnectionNotFound,
-        ApiErrors.UnsupportedAuthentication,
+        ApiErrors.UnknownIntegration,
+        ApiErrors.InvalidConnection,
+        ApiErrors.ConnectionCredentialsUnavailable,
       ],
     }),
     HttpApiEndpoint.delete("remove", "/:connectionId", {

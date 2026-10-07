@@ -1,52 +1,68 @@
-import { ConnectionImplementation } from "@amends/connection";
+/**
+ * A connection is a workspace's link to one integration its host installed, such as its Anthropic
+ * account, its Daytona organization, or an MCP server, as `@amends/connection` describes them.
+ * Core keeps each connection's record: what the workspace calls it, the settings its integration
+ * takes, and how it authenticates. Its key is kept apart from it, so that no secret enters the
+ * journal, a fact, or a view.
+ */
+import { Connection, Integration, ModelCatalog } from "@amends/connection";
 import { Schema } from "effect";
 import { Text } from "../text/text.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
-import { ConnectionId } from "./id.ts";
 
-export const Id = ConnectionId.Id;
-export type Id = ConnectionId.Id;
+export const Id = Connection.ConnectionId;
+export type Id = Connection.ConnectionId;
 
-/** Identifies one stored credential; replacing a credential stores another. */
-export const CredentialId = Schema.NonEmptyString.pipe(Schema.brand("ConnectionCredentialId"));
-export type CredentialId = typeof CredentialId.Type;
-
+/** A connection's name as recorded; names chosen now are `NewName`. */
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
 export type Name = typeof Name.Type;
+/** A name chosen for a connection: 1 to 80 characters, without hidden ones. */
 export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
 
-/** A connection's settings by key, as its implementation declares them. Never secret. */
-export const Settings = Schema.Record(Schema.NonEmptyString, Schema.String);
+/**
+ * A connection's settings by name, as the fields of its integration's settings form give them:
+ * text, a number, or yes or no. Never secret.
+ */
+export const Settings = Schema.Record(
+  Schema.String,
+  Schema.Union([Schema.String, Schema.Finite, Schema.Boolean]),
+);
 export type Settings = typeof Settings.Type;
+/**
+ * Settings given now, whose text has no surrounding spaces and is what storage keeps as given. The
+ * connection's integration decides which names it takes.
+ */
 export const NewSettings = Schema.Record(
-  Schema.NonEmptyString,
-  Schema.Trimmed.check(Schema.isMaxLength(2048), Text.isStorable),
+  Schema.String,
+  Schema.Union([
+    Schema.Trimmed.check(Schema.isMaxLength(2048), Text.isStorable),
+    Schema.Finite,
+    Schema.Boolean,
+  ]),
 );
 
-/** How a connection authenticates, and a reference to its credential once one is set. */
-export const Authentication = Schema.TaggedUnion({
-  None: {},
-  ApiKey: { credentialId: Schema.NullOr(CredentialId) },
-});
-export type Authentication = typeof Authentication.Type;
-export const Method = Schema.Literals(["None", "ApiKey"]);
-export type Method = typeof Method.Type;
+/** The API key a connection authenticates with, redacted so that logs and errors never show it. */
+export const ApiKey = Schema.Redacted(
+  Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(8192), Text.isStorable),
+);
+export type ApiKey = typeof ApiKey.Type;
 
+/** A removed connection's record stays, so that retrying the request that created it finds it. */
 export const Status = Schema.Literals(["active", "removed"]);
 export type Status = typeof Status.Type;
 
-/**
- * Workspace-owned access to an external system through a registered implementation: its settings
- * and how it authenticates. The credential itself is in protected storage, referenced here.
- */
 export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
+
+  /** The integration the connection links to, as its id names it, such as `anthropic`. */
+  integration: Schema.NonEmptyString,
   name: Name,
-  implementationId: ConnectionImplementation.Id,
   settings: Settings,
-  authentication: Authentication,
+
+  /** How the connection authenticates; one that authenticates with a key always has one. */
+  auth: Connection.AuthMethod,
   status: Status,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
@@ -57,19 +73,26 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
 export const change = (record: Record, changes: Partial<Record>): Record =>
   Object.assign({}, record, changes);
 
-/** Secret material, such as an API key, kept redacted so logs and errors never show it. */
-export const Secret = Schema.Redacted(Schema.NonEmptyString.check(Schema.isMaxLength(8192)));
-export type Secret = typeof Secret.Type;
-
-/** A new connection, which takes its credential separately so no secret reaches the journal. */
+/**
+ * A new connection, with its key when it authenticates with one, and only then. The key is stored
+ * apart from the connection, in the same commit.
+ */
 export const CreateInput = Schema.Struct({
+  integration: Schema.NonEmptyString,
   name: NewName,
-  implementationId: ConnectionImplementation.Id,
   settings: NewSettings,
-  authentication: Method,
-});
+  auth: Connection.AuthMethod,
+  apiKey: Schema.optionalKey(ApiKey),
+}).check(
+  Schema.makeFilter(
+    (input) =>
+      (input.auth === "apiKey") === (input.apiKey !== undefined) ||
+      "Expected an API key exactly when the connection authenticates with one",
+  ),
+);
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
 
+/** A new name, with the name it replaces, so that a rename made meanwhile is not overwritten. */
 export const RenameInput = Schema.Struct({ connectionId: Id, name: NewName, expectedName: Name });
 export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 
@@ -77,8 +100,9 @@ export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
 export const ConfigureInput = Schema.Struct({ connectionId: Id, settings: NewSettings });
 export interface ConfigureInput extends Schema.Schema.Type<typeof ConfigureInput> {}
 
-export const SetCredentialInput = Schema.Struct({ connectionId: Id, secret: Secret });
-export interface SetCredentialInput extends Schema.Schema.Type<typeof SetCredentialInput> {}
+/** A new key for a connection that authenticates with one, in place of its key. */
+export const ReplaceKeyInput = Schema.Struct({ connectionId: Id, apiKey: ApiKey });
+export interface ReplaceKeyInput extends Schema.Schema.Type<typeof ReplaceKeyInput> {}
 
 /** What renaming records. */
 export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id, name: Name });
@@ -90,135 +114,102 @@ export const Configured = Schema.Struct({
   settings: Settings,
 });
 export interface Configured extends Schema.Schema.Type<typeof Configured> {}
-/** What setting a credential records: the reference, never the secret. */
-export const CredentialSet = Schema.Struct({
-  workspaceId: WorkspaceId.Id,
-  connectionId: Id,
-  credentialId: CredentialId,
-});
-export interface CredentialSet extends Schema.Schema.Type<typeof CredentialSet> {}
-/** What clearing a credential or removing a connection records. */
+/** What replacing a connection's key or removing a connection records. */
 export const Change = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id });
 export interface Change extends Schema.Schema.Type<typeof Change> {}
 
 /**
- * Whether a connection has what one capability needs, or what it lacks: required settings by
- * key, and whether its credential is missing. Readiness never removes a capability the
- * implementation declares.
+ * Whether a connection can be used as it is: `Invalid` when its integration no longer takes its
+ * settings or how it authenticates, as after the host changed the integration, and `Uninstalled`
+ * when the host no longer installs its integration. Being ready says nothing of whether the system
+ * accepts its key, which only checking the connection asks.
  */
 export const Readiness = Schema.TaggedUnion({
   Ready: {},
-  Incomplete: { settings: Schema.Array(Schema.String), credential: Schema.Boolean },
+  Invalid: { description: Schema.String },
+  Uninstalled: {},
 });
 export type Readiness = typeof Readiness.Type;
 
-/** A connection as its readers see it: never its credential, only whether one is set. */
+/** A connection as its readers see it: never its key. */
 export const View = Schema.Struct({
   id: Id,
   name: Name,
-  implementationId: ConnectionImplementation.Id,
+  integration: Schema.NonEmptyString,
   settings: Settings,
-  authentication: Schema.TaggedUnion({ None: {}, ApiKey: { configured: Schema.Boolean } }),
+  auth: Connection.AuthMethod,
+  readiness: Readiness,
+
+  /** Whether the reader may rename it, change its settings and key, check it, and remove it. */
+  manageable: Schema.Boolean,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
-  /**
-   * Whether this host has installed the implementation. Without it, the connection declares no
-   * capabilities here and cannot be used, though its record remains.
-   */
-  installed: Schema.Boolean,
-  capabilities: ConnectionImplementation.Capabilities,
-  /** Whether the reader may rename, configure, set or clear the credential of, and remove it. */
-  manageable: Schema.Boolean,
-  /** Readiness for each capability the implementation declares. */
-  readiness: Schema.Struct({
-    modelInference: Schema.optionalKey(Readiness),
-    sandbox: Schema.optionalKey(Readiness),
-  }),
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
-const isUrl = /^https?:\/\/[^\s/?#]+[^\s]*$/;
-const isWholeNumber = /^[1-9]\d{0,14}$/;
+/** The connection as its integration takes it. */
+export const connectionOf = (record: Record): Connection.Connection => ({
+  id: record.id,
+  integration: record.integration,
+  name: record.name,
+  settings: record.settings,
+  auth: record.auth,
+});
 
-/**
- * The problems with settings for an implementation: keys it does not declare, required values
- * missing, and values that are not what their kind asks for.
- */
-export const settingIssues = (
-  declaration: ConnectionImplementation.Declaration,
-  settings: Settings,
-): ReadonlyArray<string> => {
-  const declared = new Map(declaration.settings.map((setting) => [setting.key, setting]));
-  const issues: Array<string> = [];
-  for (const key of Object.keys(settings))
-    if (!declared.has(key)) issues.push(`${key} is not a setting of ${declaration.name}.`);
-  for (const setting of declaration.settings) {
-    const value = settings[setting.key];
-    if (value === undefined || value === "") {
-      if (setting.required) issues.push(`${setting.label} is required.`);
-    } else if (setting.kind === "url" && !isUrl.test(value))
-      issues.push(`${setting.label} must be an http or https URL.`);
-    else if (setting.kind === "integer" && !isWholeNumber.test(value))
-      issues.push(`${setting.label} must be a whole number above zero.`);
-  }
-  return issues;
-};
-
-/** Required settings a connection lacks, by key. */
-const missingSettings = (
-  declaration: ConnectionImplementation.Declaration,
-  settings: Settings,
-): ReadonlyArray<string> =>
-  declaration.settings.flatMap((setting) =>
-    setting.required && (settings[setting.key] ?? "") === "" ? [setting.key] : [],
-  );
-
-/**
- * Readiness for one capability, from what the connection has. Every capability needs the same
- * settings and credential today; per-capability requirements, such as OAuth scopes, will differ.
- */
-export const readiness = (
-  record: Record,
-  declaration: ConnectionImplementation.Declaration,
-): Readiness => {
-  const settings = missingSettings(declaration, record.settings);
-  const credential =
-    Authentication.isAnyOf(["ApiKey"])(record.authentication) &&
-    record.authentication.credentialId === null;
-  return settings.length === 0 && !credential
-    ? { _tag: "Ready" }
-    : { _tag: "Incomplete", settings, credential };
-};
-
-/** A connection as its readers see it, with readiness for what this host's catalog declares. */
-export const view = (
-  record: Record,
-  declaration: ConnectionImplementation.Declaration | undefined,
-  manageable: boolean,
-): View => ({
+/** A connection as its readers see it, as ready as its integration finds it. */
+export const view = (record: Record, readiness: Readiness, manageable: boolean): View => ({
   id: record.id,
   name: record.name,
-  implementationId: record.implementationId,
+  integration: record.integration,
   settings: record.settings,
-  authentication: Authentication.isAnyOf(["ApiKey"])(record.authentication)
-    ? { _tag: "ApiKey", configured: record.authentication.credentialId !== null }
-    : { _tag: "None" },
+  auth: record.auth,
+  readiness,
+  manageable,
   createdBy: record.createdBy,
   createdAt: record.createdAt,
-  installed: declaration !== undefined,
-  capabilities: declaration?.capabilities ?? {},
-  manageable,
-  readiness:
-    declaration === undefined
-      ? {}
-      : {
-          ...(declaration.capabilities.modelInference === undefined
-            ? {}
-            : { modelInference: readiness(record, declaration) }),
-          ...(declaration.capabilities.sandbox === undefined
-            ? {}
-            : { sandbox: readiness(record, declaration) }),
-        },
 });
+
+/**
+ * An integration its host installs, as readers see it when they connect to it: what it is, how a
+ * connection authenticates, what it gives, and the form of its settings. Every member may see it.
+ */
+export const IntegrationView = Schema.Struct({
+  id: Schema.NonEmptyString,
+  name: Schema.String,
+
+  /** Where the system's documentation is, as for how to get a key. */
+  docs: Schema.optionalKey(Schema.String),
+
+  /** How a connection can authenticate, in the order to offer them. */
+  auth: Schema.NonEmptyArray(Connection.AuthMethod),
+  provides: Schema.Array(Integration.Capability),
+
+  /** Whether the agent of the harnesses a connection gives works only in a sandbox. */
+  requiresSandbox: Schema.Boolean,
+  settings: Integration.SettingsForm,
+});
+export interface IntegrationView extends Schema.Schema.Type<typeof IntegrationView> {}
+
+/** An integration as readers see it. */
+export const integrationView = (integration: Integration.Integration): IntegrationView => ({
+  id: integration.id,
+  name: integration.name,
+  ...(integration.docs === undefined ? {} : { docs: integration.docs }),
+  auth: integration.auth,
+  provides: integration.provides,
+  requiresSandbox: integration.requiresSandbox,
+  settings: integration.settings,
+});
+
+/**
+ * The models a connection offers an agent: the catalog's models its integration lists, and whether
+ * it also offers models it does not list, by any id, as an API of the connection's own does. A
+ * connection whose integration gives no models offers none.
+ */
+export const Models = Schema.Struct({
+  listed: Schema.Array(ModelCatalog.Model),
+  unlisted: Schema.Boolean,
+});
+export interface Models extends Schema.Schema.Type<typeof Models> {}
 
 export * as Connection from "./connection.ts";

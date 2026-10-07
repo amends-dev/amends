@@ -1,4 +1,3 @@
-import { ConnectionImplementation } from "@amends/connection";
 import { Schema } from "effect";
 import { Connection } from "./connection.ts";
 
@@ -14,25 +13,27 @@ export class Changed extends Schema.TaggedError<Changed>()("ConnectionService.Ch
   connectionId: Connection.Id,
 }) {}
 
-/** This host has not installed the implementation. */
-export class UnknownImplementation extends Schema.TaggedError<UnknownImplementation>()(
-  "ConnectionService.UnknownImplementation",
-  { implementationId: ConnectionImplementation.Id },
+/** This host does not install the integration. */
+export class UnknownIntegration extends Schema.TaggedError<UnknownIntegration>()(
+  "ConnectionService.UnknownIntegration",
+  { integration: Schema.String },
 ) {}
 
-/** The settings do not match what the implementation declares. */
-export class InvalidSettings extends Schema.TaggedError<InvalidSettings>()(
-  "ConnectionService.InvalidSettings",
-  { issues: Schema.Array(Schema.String) },
+/**
+ * The integration does not take the connection: its settings, or how it authenticates. The
+ * description is the integration's, for the person who gave them.
+ */
+export class InvalidConnection extends Schema.TaggedError<InvalidConnection>()(
+  "ConnectionService.InvalidConnection",
+  { description: Schema.String },
 ) {}
 
-/** The implementation does not authenticate this way, or the connection takes no credential. */
-export class UnsupportedAuthentication extends Schema.TaggedError<UnsupportedAuthentication>()(
-  "ConnectionService.UnsupportedAuthentication",
-  { implementationId: ConnectionImplementation.Id, method: Connection.Method },
-) {}
+/** The connection authenticates with nothing, so it takes no key. */
+export class Keyless extends Schema.TaggedError<Keyless>()("ConnectionService.Keyless", {
+  connectionId: Connection.Id,
+}) {}
 
-/** This host cannot store credentials, so none can be set. */
+/** This host keeps no credentials, so no connection that authenticates with a key can be used. */
 export class CredentialsUnavailable extends Schema.TaggedError<CredentialsUnavailable>()(
   "ConnectionService.CredentialsUnavailable",
   { reason: Schema.String },

@@ -33,9 +33,10 @@ export const make = Effect.fn("Connections.make")(function* () {
       },
       Effect.mapError(storeFailure(ConnectionStore, "get")),
     ),
-    list: Effect.gen(function* () {
-      return yield* rows.all((yield* read).records.connections);
-    }).pipe(Effect.mapError(storeFailure(ConnectionStore, "list"))),
+    listActive: Effect.gen(function* () {
+      const records = yield* rows.all((yield* read).records.connections);
+      return records.filter((record) => record.status === "active");
+    }).pipe(Effect.mapError(storeFailure(ConnectionStore, "listActive"))),
     insert: Effect.fn("Connections.insert")(function* (input) {
       const record = yield* valid("insert", input);
       const space = yield* write.pipe(Effect.mapError(storeFailure(ConnectionStore, "insert")));

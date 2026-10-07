@@ -6,7 +6,6 @@
  * the two leaves readers to their poll. One listener per pool, on one connection, routes both.
  */
 import { PgClient } from "@effect/sql-pg";
-import type { Entry } from "@amends/core/journal";
 import { Signal, SignalHub } from "@amends/core/signal";
 import type { Workspace } from "@amends/core/workspace";
 import { Deferred, Duration, Effect, Option, Queue, RcRef, Schema, Stream } from "effect";
@@ -15,9 +14,16 @@ import type { Scope } from "effect";
 /** The channel every notice uses. */
 export const channel = "amends_notices";
 
-/** The notice a commit sends for each log it appended to. */
-export const appendNotice = (workspaceId: Workspace.Id, logId: Entry.LogId): string =>
+/**
+ * The notice an append sends for each log it appended to: a journal log, by its id, or a session
+ * log, by `sessionLogKey`.
+ */
+export const appendNotice = (workspaceId: Workspace.Id, logId: string): string =>
   JSON.stringify(["append", workspaceId, logId]);
+
+/** How appends name a participation's session log, apart from every journal log's id. */
+export const sessionLogKey = (participationId: string): string =>
+  JSON.stringify(["session-log", participationId]);
 
 const signalCodec = Schema.toCodecJson(Signal.Value);
 const encodeSignal = Schema.encodeEffect(signalCodec);
@@ -53,7 +59,12 @@ export interface Interface {
    * append between the check and the wait still wakes the caller. Hold a `listening` lease while
    * waiting.
    */
-  readonly nextAppend: (workspaceId: Workspace.Id, logId: Entry.LogId) => Deferred.Deferred<void>;
+  readonly nextAppend: (workspaceId: Workspace.Id, logId: string) => Deferred.Deferred<void>;
+  /**
+   * Tell waiting readers in every pool that an append outside any transaction landed, best effort:
+   * a notice lost leaves them to their poll.
+   */
+  readonly notifyAppend: (workspaceId: Workspace.Id, logId: string) => Effect.Effect<void>;
   /** Publish a signal to its workspace's subscribers in every pool, best effort. */
   readonly publishSignal: (signal: Signal.Value) => Effect.Effect<void>;
   /**
@@ -134,7 +145,7 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
   });
   const listening = RcRef.get(listener);
 
-  const nextAppend = (workspaceId: Workspace.Id, logId: Entry.LogId) => {
+  const nextAppend = (workspaceId: Workspace.Id, logId: string) => {
     const key = appendNotice(workspaceId, logId);
     const existing = waiting.get(key);
     if (existing !== undefined) return existing;
@@ -151,10 +162,21 @@ export const make = Effect.fn("PostgresNotices.make")(function* (options: Option
       Effect.catchCause((cause) => Effect.logWarning("Signal not published", cause)),
     );
 
+  const notifyAppend = (workspaceId: Workspace.Id, logId: string) =>
+    client
+      .notify(channel, appendNotice(workspaceId, logId))
+      .pipe(Effect.catchCause((cause) => Effect.logWarning("Append notice not sent", cause)));
+
   const subscribeSignals = (workspaceId: Workspace.Id) =>
     Effect.andThen(listening, signals.subscribe(workspaceId));
 
-  return { listening, nextAppend, publishSignal, subscribeSignals } satisfies Interface;
+  return {
+    listening,
+    nextAppend,
+    notifyAppend,
+    publishSignal,
+    subscribeSignals,
+  } satisfies Interface;
 });
 
 export * as PostgresNotices from "./notices.ts";

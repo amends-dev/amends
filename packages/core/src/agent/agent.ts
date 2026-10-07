@@ -1,49 +1,86 @@
+/**
+ * An agent is a workspace member that works, as its instructions say, on a harness and a model, and
+ * in a sandbox when it needs one, each given by one of the workspace's connections, as
+ * `@amends/core/connection` keeps them. Its name, its role, and whether it is still in the
+ * workspace are its membership's, which it joins with as any member does.
+ */
+import { ModelEndpoint } from "@amends/harness";
 import { Schema } from "effect";
-import { ConnectionId } from "../connection/id.ts";
-import { EnvironmentCompatibility } from "../environment/compatibility.ts";
-import { EnvironmentId } from "../environment/id.ts";
-import { Identity } from "../identity/identity.ts";
 import { Role } from "../authorization/role/role.ts";
+import { Connection } from "../connection/connection.ts";
+import { Identity } from "../identity/identity.ts";
+import { Text } from "../text/text.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { Member } from "../workspace/member/member.ts";
 
-/** An agent's identity, which its workspace membership refers to. */
+/** An agent's identity, which its membership refers to. */
 export const Id = Identity.AgentId;
 export type Id = Identity.AgentId;
 
-/** Instructions an agent works by: its system prompt. */
+/** What an agent works by, its system prompt: up to 20,000 characters. */
 export const Instructions = Schema.String.check(Schema.isMaxLength(20_000));
-const NewInstructions = Schema.Trimmed.check(Schema.isMaxLength(20_000));
+export type Instructions = typeof Instructions.Type;
+/** Instructions given now, without surrounding space, which storage keeps as given. */
+export const NewInstructions = Schema.Trimmed.check(Schema.isMaxLength(20_000), Text.isStorable);
 
 /**
- * The model access an agent asks for: a workspace connection with model inference, the
- * provider's model identifier, and a reasoning level, if any.
+ * The harness an agent runs on: that of one of the workspace's connections that gives harnesses,
+ * or `Auto`, for amends to choose among them as the agent works.
  */
-export const ModelSelection = Schema.Struct({
-  connectionId: ConnectionId.Id,
-  model: Schema.NonEmptyString,
-  reasoning: Schema.NullOr(Schema.NonEmptyString),
+export const Harness = Schema.TaggedUnion({
+  Auto: {},
+  Connection: { connectionId: Connection.Id },
 });
-export interface ModelSelection extends Schema.Schema.Type<typeof ModelSelection> {}
-const NewModelSelection = Schema.Struct({
-  connectionId: ConnectionId.Id,
-  model: Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
-  reasoning: Schema.NullOr(Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(50))),
+export type Harness = typeof Harness.Type;
+
+// TODO: Add the models a turn can name besides an agent's model, and the most an answer may write,
+// once a turn names a model or a person sets a limit.
+/**
+ * The model an agent runs on: one that a connection offers, by the id its provider gives it, and how
+ * hard it reasons, which is the model's default when absent.
+ */
+export const Model = Schema.Struct({
+  connectionId: Connection.Id,
+  id: Schema.NonEmptyString,
+  effort: Schema.optionalKey(ModelEndpoint.Effort),
+});
+export interface Model extends Schema.Schema.Type<typeof Model> {}
+/** A model chosen now, whose id has no surrounding space. */
+export const NewModel = Schema.Struct({
+  ...Model.fields,
+  id: Schema.Trimmed.check(Schema.isMinLength(1), Schema.isMaxLength(200), Text.isStorable),
 });
 
+// TODO: Add how an agent's sandboxes are prepared, such as the image they start from and the
+// commands that set them up, and the network they reach, once an agent's work needs them.
+/** Where an agent works: the sandboxes of one of the workspace's connections that gives them. */
+export const Sandbox = Schema.Struct({ connectionId: Connection.Id });
+export interface Sandbox extends Schema.Schema.Type<typeof Sandbox> {}
+
 /**
- * An agent's behavioral configuration: its instructions, model access, and the environment it
- * starts in. Its name, status, and access belong to its workspace membership, `memberId`; its
- * credentials to its connection.
+ * The harness, model, and sandbox a turn runs on: an agent's setup, with its harness chosen when it
+ * is on `Auto`. A turn that runs again runs on the selection it started with.
  */
+export const Selection = Schema.Struct({
+  harness: Schema.Struct({ connectionId: Connection.Id }),
+  model: Model,
+  sandbox: Schema.NullOr(Sandbox),
+});
+export interface Selection extends Schema.Schema.Type<typeof Selection> {}
+
 export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
+
+  /** The agent's membership, which names it and gives it its role. */
   memberId: MemberId.Id,
   instructions: Instructions,
-  model: ModelSelection,
-  environmentId: EnvironmentId.Id,
+  harness: Harness,
+  model: Model,
+
+  /** Where it works, or nowhere, for an agent that answers from its model alone. */
+  sandbox: Schema.NullOr(Sandbox),
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
 });
@@ -53,25 +90,27 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
 export const change = (record: Record, changes: Partial<Record>): Record =>
   Object.assign({}, record, changes);
 
-/** What configuring replaces: the agent's instructions, model access, and starting environment. */
+/** How an agent is set up, which configuring replaces as a whole. */
 export const Configuration = Schema.Struct({
   instructions: NewInstructions,
-  model: NewModelSelection,
-  environmentId: EnvironmentId.Id,
+  harness: Harness,
+  model: NewModel,
+  sandbox: Schema.NullOr(Sandbox),
 });
 export interface Configuration extends Schema.Schema.Type<typeof Configuration> {}
 
-/** A new agent: its name, its configuration, and the role its membership starts with. */
+/** A new agent: its name and the role it starts with, as its membership's, and how it is set up. */
 export const CreateInput = Schema.Struct({
   name: Member.NewName,
-  ...Configuration.fields,
   roleId: Role.Id,
+  ...Configuration.fields,
 });
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
 
 export const ConfigureInput = Schema.Struct({ agentId: Id, ...Configuration.fields });
 export interface ConfigureInput extends Schema.Schema.Type<typeof ConfigureInput> {}
 
+/** A new name, with the name it replaces, so that a rename made meanwhile is not overwritten. */
 export const RenameInput = Schema.Struct({
   agentId: Id,
   name: Member.NewName,
@@ -85,62 +124,83 @@ export const Configured = Schema.Struct({
   agentId: Id,
   memberId: MemberId.Id,
   instructions: Instructions,
-  model: ModelSelection,
-  environmentId: EnvironmentId.Id,
+  harness: Harness,
+  model: Model,
+  sandbox: Schema.NullOr(Sandbox),
 });
 export interface Configured extends Schema.Schema.Type<typeof Configured> {}
 
+/** The part of an agent's setup that a connection gives. */
+export const Part = Schema.Literals(["harness", "model", "sandbox"]);
+export type Part = typeof Part.Type;
+
 /**
- * Why an agent cannot run as configured: its environment or connection is gone, or the
- * environment cannot run its model selection.
+ * Why an agent cannot run as it is set up: the connection for one of its parts was removed, its
+ * integration is no longer installed, or it no longer gives that part as the agent takes it, as
+ * when its integration no longer offers the agent's model, which the integration describes; its
+ * harness's agent works only in a sandbox and it has none; or, on `Auto`, no connection gives a
+ * harness it can run on.
  */
-export const Issue = Schema.Union([
-  EnvironmentCompatibility.Reason,
-  Schema.TaggedStruct("EnvironmentUnavailable", {}),
-  Schema.TaggedStruct("ConnectionUnavailable", {}),
-]);
+export const Issue = Schema.TaggedUnion({
+  Removed: { part: Part },
+  Uninstalled: { part: Part },
+  Invalid: { part: Part, description: Schema.String },
+  SandboxRequired: {},
+  NoHarness: {},
+});
 export type Issue = typeof Issue.Type;
 
+/** Whether an agent can run as it is set up now, whoever reads it. */
 export const Readiness = Schema.TaggedUnion({
   Ready: {},
   Incomplete: { issues: Schema.NonEmptyArray(Issue) },
 });
 export type Readiness = typeof Readiness.Type;
 
-/** An agent as its readers see it. */
+/**
+ * An agent as its readers see it. Its role and its removal are its membership's, which members'
+ * operations read and change.
+ */
 export const View = Schema.Struct({
   id: Id,
   memberId: MemberId.Id,
+
   /** Its membership's name. */
   name: Member.Name,
   instructions: Instructions,
-  model: ModelSelection,
-  environmentId: EnvironmentId.Id,
+  harness: Harness,
+  model: Model,
+  sandbox: Schema.NullOr(Sandbox),
+  readiness: Readiness,
+
+  /** Whether the reader may rename it and change how it is set up. */
+  configurable: Schema.Boolean,
+  /** Whether the reader may direct it: ask it for work, and stop or retry its turns. */
+  usable: Schema.Boolean,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
-  /**
-   * The role its membership holds across the workspace, when the reader may read its access; null
-   * when they may not, or when it holds none.
-   */
-  role: Schema.NullOr(Schema.Struct({ id: Role.Id, name: Schema.NonEmptyString })),
-  /** Whether the reader may change its name and configuration. */
-  configurable: Schema.Boolean,
-  /**
-   * Whether the reader may remove it: configuring it and removing members, within the delegation
-   * rules, which leave an agent holding more than Member to the owner.
-   */
-  removable: Schema.Boolean,
-  /** Whether the reader may ask it for work. */
-  usable: Schema.Boolean,
-  readiness: Readiness,
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
-/** Whether a candidate environment can run a model selection, for choosing where an agent starts. */
-export const EnvironmentChoice = Schema.Struct({
-  environmentId: EnvironmentId.Id,
-  compatibility: EnvironmentCompatibility.Compatibility,
+/** An agent named `name`, as ready as `readiness` says, as a reader with `access` sees it. */
+export const view = (
+  record: Record,
+  name: Member.Name,
+  readiness: Readiness,
+  access: { readonly configurable: boolean; readonly usable: boolean },
+): View => ({
+  id: record.id,
+  memberId: record.memberId,
+  name,
+  instructions: record.instructions,
+  harness: record.harness,
+  model: record.model,
+  sandbox: record.sandbox,
+  readiness,
+  configurable: access.configurable,
+  usable: access.usable,
+  createdBy: record.createdBy,
+  createdAt: record.createdAt,
 });
-export interface EnvironmentChoice extends Schema.Schema.Type<typeof EnvironmentChoice> {}
 
 export * as Agent from "./agent.ts";

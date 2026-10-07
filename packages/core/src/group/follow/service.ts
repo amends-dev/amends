@@ -107,7 +107,11 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
       return yield* new AgentRequired({ memberId: request.memberId });
     // Directing an agent's attention is using it, in either direction.
     yield* authorization.require([
-      Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId: member.id }),
+      Requirement.make(AgentPermissions.Use, {
+        _tag: "Member",
+        workspaceId,
+        memberId: member.id,
+      }),
     ]);
     return admission.value;
   });

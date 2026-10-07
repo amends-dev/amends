@@ -111,7 +111,9 @@ export const logOf = (
     agent: { name: "Yumi" },
     state,
     where: "Thread in #general",
-    ...(started && { model: "Anthropic · claude-sonnet-5", environment: "In-process" }),
+    ...(started && {
+      setup: { harness: "opencode", model: "Anthropic · claude-sonnet-5", sandbox: "Daytona" },
+    }),
     stoppable: state === "queued" || state === "working",
     retryable: state === "failed" || state === "stopped",
     agentHref: "#agents",
@@ -189,10 +191,7 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
   };
   return (
     <Shell.Root>
-      <WorkspaceNavigation
-        {...base}
-        destinations={["home", "agents", "environments", "connections"]}
-      >
+      <WorkspaceNavigation {...base} destinations={["home", "agents", "connections"]}>
         <HomeSidebar
           {...base}
           groups={[

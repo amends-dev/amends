@@ -25,10 +25,7 @@ import { GroupsPage } from "./pages/groups.tsx";
 import { DirectPage } from "./pages/direct.tsx";
 import { WorkspaceIndex, TriagePage, TasksPage, MissingWorkspacePage } from "./pages/workspace.tsx";
 import { AgentsPage } from "./pages/agents.tsx";
-import { AgentsV2Page } from "./pages/agents-v2.tsx";
 import { ConnectionsPage } from "./pages/connections.tsx";
-import { ConnectionsV2Page } from "./pages/connections-v2.tsx";
-import { EnvironmentsPage } from "./pages/environments.tsx";
 
 function RequireSession(props: ParentProps) {
   const session = useSession();
@@ -119,28 +116,10 @@ export function ApplicationRoutes() {
           <Route path="/direct" component={DirectPage} />
           <Route path="/triage" component={TriagePage} />
           <Route path="/tasks" component={TasksPage} />
-          <Route
-            path={["/agents", "/agents/:agentId", "/agents/:agentId/:tab"]}
-            matchFilters={{ tab: ["configuration"] }}
-            component={AgentsPage}
-          />
-          <Route path={["/agents-v2", "/agents-v2/:agentId"]} component={AgentsV2Page} />
-          <Route
-            path={[
-              "/environments",
-              "/environments/:environmentId",
-              "/environments/:environmentId/:tab",
-            ]}
-            matchFilters={{ tab: ["sandbox"] }}
-            component={EnvironmentsPage}
-          />
+          <Route path={["/agents", "/agents/:agentId"]} component={AgentsPage} />
           <Route
             path={["/connections", "/connections/:connectionId"]}
             component={ConnectionsPage}
-          />
-          <Route
-            path={["/connections-v2", "/connections-v2/:connectionId"]}
-            component={ConnectionsV2Page}
           />
           <Route path="/settings">
             <Route path="/" component={SettingsIndex} />

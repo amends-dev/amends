@@ -6,7 +6,7 @@
  * own, which the bridge gives a second to close after the bridge's own finalizers have run, rather
  * than wait for hosts to close their connections.
  */
-import { type Bridge, BridgeServer } from "@amends/harness-v2";
+import { type Bridge, BridgeServer } from "@amends/harness";
 import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, Exit, Fiber, Layer, Redacted, Scope } from "effect";
 

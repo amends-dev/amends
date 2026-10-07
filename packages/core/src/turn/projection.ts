@@ -15,7 +15,7 @@ const stored = Effect.fnUntraced(function* (payload: {
   return { store: turnStore, turn: found.value };
 });
 
-export const definition = Projection.make("turns", { version: 3 })
+export const definition = Projection.make("turns", { version: 4 })
   .on(
     TurnFacts.Created,
     Effect.fn("TurnProjection.created")(function* ({ payload }) {
@@ -29,15 +29,6 @@ export const definition = Projection.make("turns", { version: 3 })
     Effect.fn("TurnProjection.retried")(function* ({ payload }) {
       const turnStore = yield* TurnStore.Service;
       yield* turnStore.insert(payload);
-    }),
-  )
-  .on(
-    TurnFacts.InputAccepted,
-    Effect.fn("TurnProjection.inputAccepted")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, { acceptedThroughSequence: payload.acceptedThroughSequence }),
-      );
     }),
   )
   .on(
@@ -93,7 +84,11 @@ export const definition = Projection.make("turns", { version: 3 })
     Effect.fn("TurnProjection.cancelled")(function* ({ payload }) {
       const { store, turn } = yield* stored(payload);
       yield* store.update(
-        Turn.change(turn, { status: "cancelled", finishedAt: payload.finishedAt }),
+        Turn.change(turn, {
+          status: "cancelled",
+          cancelReason: payload.cancelReason,
+          finishedAt: payload.finishedAt,
+        }),
       );
     }),
   );

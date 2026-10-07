@@ -19,10 +19,14 @@ export interface TurnLogTurn {
   readonly state: TurnState;
   /** Where it works, such as "Thread in #general". */
   readonly where: string;
-  /** The model access it started with, such as "Anthropic · claude-sonnet-5"; unset before it starts. */
-  readonly model?: string;
-  /** The environment it started in, by name. */
-  readonly environment?: string;
+  /** What it started on, each by its connection's name; unset before it starts. */
+  readonly setup?: {
+    readonly harness: string;
+    /** The model and its connection, such as "OpenRouter · claude-opus-5-5". */
+    readonly model: string;
+    /** Where it works, or none, for an agent that answers from its model alone. */
+    readonly sandbox?: string;
+  };
   readonly stoppable: boolean;
   readonly retryable: boolean;
   /** Where the agent's setup is fixed, offered with a failure. */
@@ -91,7 +95,10 @@ function describe(entry: TurnLogActivity, agent: string): { title: string; text?
     case "accepted":
       return { title: "Work accepted", text: `${agent} picked up the request from this thread.` };
     case "started":
-      return { title: "Turn started", text: "Running with the recorded model and environment." };
+      return {
+        title: "Turn started",
+        text: "Running on the recorded harness, model, and sandbox.",
+      };
     case "input":
       return {
         title: "Thread input received",
@@ -202,23 +209,26 @@ export function TurnLogPane(props: TurnLogPaneProps) {
                   <div class={s.summary}>
                     <span>{turn().where}</span>
                     <Show
-                      when={turn().model}
+                      when={turn().setup}
                       fallback={
                         <span>
                           {turn().state === "failed"
                             ? "This turn failed before execution started."
                             : turn().state === "stopped"
                               ? "This turn stopped before execution started."
-                              : "Model and environment are recorded when work starts."}
+                              : "The harness, model, and sandbox are recorded when work starts."}
                         </span>
                       }
                     >
-                      {(model) => (
+                      {(setup) => (
                         <>
-                          <span class={s.model}>{model()}</span>
-                          <Show when={turn().environment}>
-                            {(environment) => <span>Environment · {environment()}</span>}
-                          </Show>
+                          <span class={s.model}>{setup().model}</span>
+                          <span>Harness · {setup().harness}</span>
+                          <span>
+                            {setup().sandbox === undefined
+                              ? "No sandbox"
+                              : `Sandbox · ${setup().sandbox}`}
+                          </span>
                         </>
                       )}
                     </Show>

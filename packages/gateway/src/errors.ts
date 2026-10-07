@@ -22,11 +22,8 @@ import {
 } from "@amends/core/workspace";
 import { ReadStateService } from "@amends/core/read-state";
 import { ConnectionService } from "@amends/core/connection";
-import { ConnectionV2Service } from "@amends/core/connection-v2";
-import { AgentV2Service } from "@amends/core/agent-v2";
 import { AgentService } from "@amends/core/agent";
 import { Turn, TurnService } from "@amends/core/turn";
-import { EnvironmentService } from "@amends/core/environment";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {
@@ -132,35 +129,17 @@ export const PublicError = Schema.Union([
   InvitationService.InvalidExpiry,
   ConnectionService.NotFound,
   ConnectionService.Changed,
-  ConnectionService.UnknownImplementation,
-  ConnectionService.InvalidSettings,
-  ConnectionService.UnsupportedAuthentication,
+  ConnectionService.UnknownIntegration,
+  ConnectionService.InvalidConnection,
+  ConnectionService.Keyless,
   ConnectionService.CredentialsUnavailable,
-  ConnectionV2Service.NotFound,
-  ConnectionV2Service.Changed,
-  ConnectionV2Service.UnknownIntegration,
-  ConnectionV2Service.InvalidConnection,
-  ConnectionV2Service.Keyless,
-  ConnectionV2Service.CredentialsUnavailable,
-  AgentV2Service.NotFound,
-  AgentV2Service.Changed,
-  AgentV2Service.ConnectionUnavailable,
-  AgentV2Service.Incomplete,
-  EnvironmentService.NotFound,
-  EnvironmentService.Changed,
-  EnvironmentService.UnknownHarness,
-  EnvironmentService.UnknownSandboxProvider,
-  EnvironmentService.UnsupportedPlacement,
-  EnvironmentService.InvalidSandbox,
   AgentService.NotFound,
   AgentService.Changed,
   AgentService.ConnectionUnavailable,
-  AgentService.EnvironmentUnavailable,
-  AgentService.Incompatible,
+  AgentService.Incomplete,
   TurnService.NotFound,
   TurnService.NotActive,
   TurnService.NotRetryable,
-  TurnService.ThreadNotFound,
 ]);
 export type PublicError = typeof PublicError.Type;
 

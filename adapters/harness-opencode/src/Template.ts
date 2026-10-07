@@ -11,7 +11,7 @@
  * sandbox sharing this machine's home with one prepared before, is ready at once, and a new bridge
  * program installs without downloading the programs again.
  */
-import { Template } from "@amends/sandbox-v2";
+import { Template } from "@amends/sandbox";
 import { Crypto, Effect, FileSystem, Path, PlatformError, Result, Stream } from "effect";
 import { Base64, Hex } from "effect/encoding";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";

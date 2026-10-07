@@ -1,15 +1,13 @@
-import { ConnectionPermissions } from "@amends/core/connection";
-import { AgentV2Permissions } from "@amends/core/agent-v2";
-import { ConnectionV2Permissions } from "@amends/core/connection-v2";
-import { EnvironmentPermissions } from "@amends/core/environment";
 import { AgentPermissions } from "@amends/core/agent";
-import { AgentWork } from "@amends/core/turn";
+import { ConnectionPermissions } from "@amends/core/connection";
+import { TurnExecution } from "@amends/core/turn";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
 import type { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
 import * as Core from "@amends/core";
 import {
+  Thread,
   ThreadMessagePermissions,
   ThreadParticipationPermissions,
   ThreadPermissions,
@@ -125,12 +123,7 @@ export const gateway = (harness: Harness) => {
                     AgentPermissions.Use.name,
                     ConnectionPermissions.Read.name,
                     ConnectionPermissions.Use.name,
-                    EnvironmentPermissions.Read.name,
-                    EnvironmentPermissions.Use.name,
                     AgentPermissions.Read.name,
-                    ConnectionV2Permissions.Read.name,
-                    ConnectionV2Permissions.Use.name,
-                    AgentV2Permissions.Read.name,
                   ],
                 }),
               );
@@ -167,20 +160,9 @@ export const gateway = (harness: Harness) => {
                       ConnectionPermissions.Read.name,
                       ConnectionPermissions.Manage.name,
                       ConnectionPermissions.Use.name,
-                      EnvironmentPermissions.Create.name,
-                      EnvironmentPermissions.Read.name,
-                      EnvironmentPermissions.Manage.name,
-                      EnvironmentPermissions.Use.name,
                       AgentPermissions.Create.name,
                       AgentPermissions.Read.name,
                       AgentPermissions.Configure.name,
-                      ConnectionV2Permissions.Create.name,
-                      ConnectionV2Permissions.Read.name,
-                      ConnectionV2Permissions.Manage.name,
-                      ConnectionV2Permissions.Use.name,
-                      AgentV2Permissions.Create.name,
-                      AgentV2Permissions.Read.name,
-                      AgentV2Permissions.Configure.name,
                     ],
                   }),
                 );
@@ -191,9 +173,9 @@ export const gateway = (harness: Harness) => {
               const batches = yield* bound.store.read(journalLog, { limit: 10 });
               expect(batches).toHaveLength(1);
               // The workspace, its owner, three roles and their revision, the owner's assignment,
-              // the general group with the owner in it, and the in-process environment.
-              expect(batches[0]?.entries).toHaveLength(10);
-              expect(batches[0]?.commit.entryCount).toBe(10);
+              // and the general group with the owner in it.
+              expect(batches[0]?.entries).toHaveLength(9);
+              expect(batches[0]?.commit.entryCount).toBe(9);
             }
           }),
         ),
@@ -318,8 +300,8 @@ export const gateway = (harness: Harness) => {
           const bound = yield* forWorkspace(yield* storage.connect(), outcome.a.id);
           const batches = yield* bound.store.read(journalLog, { limit: 10 });
           expect(batches.map((batch) => Number(batch.position))).toEqual([0, 1, 2, 3]);
-          expect(batches[0]?.entries).toHaveLength(10);
-          expect(batches[0]?.commit.entryCount).toBe(10);
+          expect(batches[0]?.entries).toHaveLength(9);
+          expect(batches[0]?.commit.entryCount).toBe(9);
           const second = batches[1];
           if (second === undefined) return yield* Effect.die("Missing second batch");
           expect(yield* bound.store.get(journalLog, second.commit.id)).toEqual(Option.some(second));
@@ -393,11 +375,14 @@ export const gateway = (harness: Harness) => {
             Effect.gen(function* () {
               const gateway = yield* Gateway.Service;
               const workspace = yield* Operations.createWorkspace(alice.id);
+              const threadId = Thread.Id.make("thread");
               // A member that is no agent has no work to accept.
-              const acceptWork = Effect.flatMap(AgentWork.Service, (agentWork) =>
-                agentWork.acceptWork(workspace.ownerMemberId),
+              const acceptWork = Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                turnExecution.accept({ memberId: workspace.ownerMemberId, threadId }),
               );
-              yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork));
+              expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork))).toEqual(
+                Option.none(),
+              );
               const missing = Workspace.Id.make("never-created");
               expect(
                 yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork))),

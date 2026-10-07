@@ -94,41 +94,36 @@ log ID. It decodes the stored envelope through the same path as journal pages, h
 transaction, and opens none. This supports notification-source reads without scanning the log
 or changing the schema.
 
-`connections` holds connection records, with an implementation's settings as JSON since each
-implementation declares its own, and a check that only an API-key connection references a
-credential. `connection_credentials` holds each secret sealed with the host's credential key,
-outside the read models, so rebuilding projections keeps it. `PostgresStorage.make({ credentialKey })`
-takes that key as 32 bytes of base64 and refuses a malformed one when the host starts; without one
-the store reports `Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row's
-workspace, credential, and connection as additional data, so a sealed value opens only as the
-credential it was stored as. Grant scopes gained `target_connection_id` for connection targets.
-Adding these replaced the development baseline; recreate disposable PostgreSQL databases.
+`connections` holds the records of connections, with an integration's settings as JSON since
+each integration declares its own. `connection_credentials` holds each connection's credential,
+one for each connection, outside the read models, so rebuilding projections keeps it: the JSON of
+its encoded form, sealed with the host's credential key and bound to its workspace and connection,
+and replaced in place when its key is. `PostgresStorage.make({ credentialKey })` takes that key as
+32 bytes of base64 and refuses a malformed one when the host starts; without one the store reports
+`Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row as additional data.
+Grant scopes have `target_connection_id` for `Connection` targets.
 
-`connections_v2` holds the records of connections v2, with an integration's settings as JSON since
-each integration declares its own. `connection_v2_credentials` holds each connection's credential,
-one for each connection: the JSON of its encoded form, sealed as above and bound to its workspace
-and connection, and replaced in place when its key is. Grant scopes gained
-`target_connection_v2_id` for `ConnectionV2` targets; the development baseline was regenerated.
-
-`agents_v2` holds the records of agents v2, one row per agent with a unique membership per
+`agents` holds the records of agents, one row per agent with a unique membership per
 workspace. Each part of its setup is its connection's id as a column: a null
 `harness_connection_id` is `Auto`, a null `model_effort` the model's default, and a null
-`sandbox_connection_id` no sandbox. Adding it regenerated the development baseline; recreate
-disposable PostgreSQL databases.
+`sandbox_connection_id` no sandbox.
 
-`environments` holds environment records: a sandbox's columns are all set or all null, its
-variables and setup commands are JSON, and grant scopes gained `target_environment_id` for
-environment targets. Adding them replaced the development baseline; recreate disposable PostgreSQL
-databases.
-
-`agents` holds agents' configuration, one row per agent with its model access as columns and a
-unique membership per workspace. `turns` holds agents' attempts, with a partial unique index that
-allows one active turn per agent and thread, and the selection a turn ran with as columns set all
-together or not at all. Each turn holds where it begins in its agent's log for the thread, the
-checkpoint its history starts from, the turn it retries, and the replies it published as a text
-array in order. A notification an agent accepted into a turn is
-`Accepted`, with its turn and time. Adding them replaced the development baseline too; recreate
-disposable PostgreSQL databases when adopting it.
+`turns` holds agents' turns, with a partial unique index that
+allows one active turn per agent and thread, and the harness, model, and sandbox a turn started on
+as columns set all together or not at all. Each turn holds how far into its thread its input
+reaches, where its entries begin in its session log, the turn it retries and who asked, both or
+neither, and its reply as a text array. A notification an agent accepted into a turn is
+`Accepted`, with its turn and time. `session_states` holds each participation's harness session as
+its last turn left it, beside its conversation: the harness's agent, what that agent returned as
+JSON, how far into the thread it was prompted, and what it ran on, as columns.
+`session_log_entries` holds each participation's session log, keyed by its position, each entry's
+kind and turn as columns and the rest of it as JSON in `details`, as a thread activity's are. Its
+statements run on their own, apart from any transaction the caller is in, since the log takes
+part in no commit: an append checks the log's latest position, and the key refuses a position
+taken meanwhile, which is the store's `Conflict`; it then notifies on the append channel, which
+`waitForAppend` listens on, polling as the journal's readers do. Like credentials, both are
+outside the projections a rebuild discards. Changing these replaced the
+development baseline too; recreate disposable PostgreSQL databases when adopting it.
 
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
@@ -356,17 +351,11 @@ returns how many went. A message's ID carries when Cluster stored it; messages n
 stay, however old, and so do other entity types'. Each statement removes at most `batch`
 messages, a thousand by default.
 
-`PostgresClusterStorage.agentJobStatus(options?)` reports agent jobs from those tables: per kind
-of request, such as `AcceptWork`, the requests due, scheduled, and retrying, and when the
-longest-waiting due request became due; then the latest retries, with their agents and
-workspaces. It reports nothing before any host has run agent jobs over the database. It needs
-only a SQL client, such as `PostgresDatabase.layerClient`, so reading it changes no schema.
-
 `PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
 processes over the database never run Cluster at one address: it fails with `AddressTaken`
 while another process holds it. The claim is a session-level advisory lock on a connection it
 keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
-dies. `cluster-storage.test.ts` checks pruning and the status over real agent job requests, and the claim
+dies. `cluster-storage.test.ts` checks pruning over a test job's real requests, and the claim
 across pools.
 
 ## Composition

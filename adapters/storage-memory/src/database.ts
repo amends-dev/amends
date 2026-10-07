@@ -45,10 +45,7 @@ export const projections = [
   "threadMessages",
   "threadActivities",
   "connections",
-  "connectionsV2",
-  "environments",
   "agents",
-  "agentsV2",
   "turns",
   "checkpoints",
   "liveProjections",
@@ -74,10 +71,10 @@ export interface Space {
   readonly groupTimes: Map<string, number>;
   /** Private Seen by notification ID: when its human recipient first saw it. Kept through rebuilds. */
   readonly notificationsSeen: Map<string, number>;
-  /** Connections' credentials, outside the journal and its read models, which rebuilds keep. */
-  readonly credentials: Map<string, string>;
   /** Each connection's credential by connection ID, outside the journal, which rebuilds keep. */
-  readonly connectionV2Credentials: Map<string, string>;
+  readonly connectionCredentials: Map<string, string>;
+  /** Each participation's harness session, outside the journal, which rebuilds keep. */
+  readonly sessionStates: Map<string, string>;
 }
 
 export interface Interface {
@@ -93,7 +90,12 @@ export interface Interface {
    * it ends, and a standalone append holds its one log.
    */
   readonly logLocks: Map<string, Semaphore.Semaphore>;
-  /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
+  /**
+   * Each participation's session log by workspace and participation: its entries' JSON in position
+   * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
+   */
+  readonly sessionLogs: Map<string, ReadonlyArray<string>>;
+  /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
   /** Every workspace's signals, across every host; signals themselves are never kept. */
   readonly signals: SignalHub.Local;
@@ -114,8 +116,8 @@ export const empty = (): Space => ({
   threadPositions: new Map(),
   groupTimes: new Map(),
   notificationsSeen: new Map(),
-  credentials: new Map(),
-  connectionV2Credentials: new Map(),
+  connectionCredentials: new Map(),
+  sessionStates: new Map(),
 });
 
 /** An isolated snapshot: every map is copied, and the values they hold never change. */
@@ -129,8 +131,8 @@ export const copy = (space: Space): Space => ({
   threadPositions: new Map(space.threadPositions),
   groupTimes: new Map(space.groupTimes),
   notificationsSeen: new Map(space.notificationsSeen),
-  credentials: new Map(space.credentials),
-  connectionV2Credentials: new Map(space.connectionV2Credentials),
+  connectionCredentials: new Map(space.connectionCredentials),
+  sessionStates: new Map(space.sessionStates),
 });
 
 /** Committed state of one workspace, without creating any. */
@@ -229,6 +231,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
     spaces: new Map(),
     writers: new Map(),
     logLocks: new Map(),
+    sessionLogs: new Map(),
     appended: yield* Deferred.make<void>(),
     signals: yield* SignalHub.makeLocal,
     nextId: (prefix) => `${prefix}-${++issued}`,

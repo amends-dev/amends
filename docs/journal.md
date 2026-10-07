@@ -1,10 +1,10 @@
 # Journal and execution logs
 
-The journal uses the same append-only log mechanism as execution history.
-`Journal.publish` appends a fact event to its configured log and applies matching
-projections inside the same commit. A turn's log stores its own schema-defined
-execution entries through `Log`, without running domain projections, as
-[`TurnLog`](../packages/core/README.md#turns) does. Turn execution remains planned; the turn and
+The journal is an append-only log. `Journal.publish` appends a fact event to its configured log
+and applies matching projections inside the same commit. Other logs can store their own
+schema-defined entries through `Log`, without running domain projections. An agent's session log,
+the record of its conversation in a thread, is not one of them: it has a store of its own, apart
+from the journal and its commits ([`SessionLog`](../packages/core/README.md#turns)). The turn and
 agent examples below illustrate consumers rather than available application operations.
 
 ## Ownership
@@ -492,9 +492,8 @@ pin workspace initialization, message, and turn-checkpoint bytes captured with E
 encoding to produce identical bytes. Other payload variants still need fixed fixtures;
 encoding and decoding with the same upgraded codec alone cannot prove old payload compatibility.
 
-In the planned turn domain, turn logs provide durable history for continuation and final-response
-derivation. Rebuilding domain projections from the journal does not recreate those
-separate logs. Notification generation handles recorded thread activity using
+Session logs provide the durable history agents' turns continue from and take their answers
+from. Rebuilding domain projections from the journal does not recreate them. Notification generation handles recorded thread activity using
 recorded recipient selection and source-derived IDs. Arbitrary log entries do not create
 notifications. See [thread workflows](thread-workflows.md) for the implemented boundary.
 

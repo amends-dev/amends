@@ -4,6 +4,7 @@ import { Agent } from "./agent.ts";
 import { AgentFacts } from "./facts.ts";
 import { AgentStore } from "./store.ts";
 
+/** Agents' records; their names and departures are their memberships'. */
 export const definition = Projection.make("agents", { version: 1 })
   .on(
     AgentFacts.Created,
@@ -21,8 +22,9 @@ export const definition = Projection.make("agents", { version: 1 })
       yield* agentStore.update(
         Agent.change(found.value, {
           instructions: payload.instructions,
+          harness: payload.harness,
           model: payload.model,
-          environmentId: payload.environmentId,
+          sandbox: payload.sandbox,
         }),
       );
     }),

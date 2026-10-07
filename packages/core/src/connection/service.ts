@@ -1,5 +1,5 @@
-import { ConnectionImplementation } from "@amends/connection";
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { type Connection as ConnectionContract, Integrations } from "@amends/connection";
+import { Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import type { Permission } from "../authorization/permission.ts";
@@ -11,16 +11,15 @@ import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
-import { ConnectionCatalog } from "./catalog.ts";
 import { Connection } from "./connection.ts";
 import { ConnectionCredentialStore } from "./credential-store.ts";
 import {
   Changed,
   CredentialsUnavailable,
-  InvalidSettings,
+  InvalidConnection,
+  Keyless,
   NotFound,
-  UnknownImplementation,
-  UnsupportedAuthentication,
+  UnknownIntegration,
 } from "./errors.ts";
 import { ConnectionFacts } from "./facts.ts";
 import { ConnectionPermissions } from "./permissions.ts";
@@ -28,10 +27,10 @@ import { ConnectionStore } from "./store.ts";
 export {
   Changed,
   CredentialsUnavailable,
-  InvalidSettings,
+  InvalidConnection,
+  Keyless,
   NotFound,
-  UnknownImplementation,
-  UnsupportedAuthentication,
+  UnknownIntegration,
 } from "./errors.ts";
 
 export type ReadError =
@@ -39,39 +38,43 @@ export type ReadError =
   | ConnectionStore.Failure
   | Schema.SchemaError
   | NotFound;
-export type Error =
-  | ReadError
-  | PlatformError.PlatformError
-  | Log.WriteError
-  | Projection.Error
-  | ConnectionCredentialStore.Failure;
-/** Creating can also meet an implementation this host lacks, or a request key used before. */
-export type CreateError =
-  | Error
-  | UnknownImplementation
-  | InvalidSettings
-  | UnsupportedAuthentication;
-export type ConfigureError = Error | UnknownImplementation | InvalidSettings;
-export type CredentialError =
-  | Error
-  | UnknownImplementation
-  | UnsupportedAuthentication
-  | CredentialsUnavailable;
+/** What every change can meet besides reading. */
+export type Error = ReadError | PlatformError.PlatformError | Log.WriteError | Projection.Error;
+/** Storing or reading a key can also meet a host that keeps no credentials. */
+type KeyError = ConnectionCredentialStore.Failure | CredentialsUnavailable;
+export type CreateError = Error | UnknownIntegration | InvalidConnection | KeyError;
+export type ConfigureError = Error | UnknownIntegration | InvalidConnection;
+export type ReplaceKeyError = Error | Keyless | KeyError;
+export type RemoveError = Error | ConnectionCredentialStore.Failure;
+export type CheckError = ReadError | UnknownIntegration | InvalidConnection | KeyError;
+export type ModelsError = ReadError | UnknownIntegration;
 
 export interface Interface {
   /**
-   * The implementations this host installed, as they declare themselves. They describe the host
+   * The integrations this host installs, in the order it installs them. They describe the host
    * rather than the workspace, so every member may see them.
    */
-  readonly implementations: ReadonlyArray<ConnectionImplementation.Declaration>;
+  readonly integrations: Effect.Effect<
+    ReadonlyArray<Connection.IntegrationView>,
+    Authorization.Error,
+    Actor.Service
+  >;
   /** The workspace's connections the actor may read, by name. */
   readonly list: Effect.Effect<ReadonlyArray<Connection.View>, ReadError, Actor.Service>;
   readonly get: (
     connectionId: Connection.Id,
   ) => Effect.Effect<Connection.View, ReadError, Actor.Service>;
   /**
-   * Add a connection through an installed implementation, with settings it declares and a way
-   * of authenticating it accepts. Its credential, if it takes one, is set separately.
+   * The models the connection offers an agent, to set an agent up with one: those its integration
+   * lists, and whether it also offers others by any id. A connection whose integration this host no
+   * longer installs offers nothing, and fails with UnknownIntegration.
+   */
+  readonly models: (
+    connectionId: Connection.Id,
+  ) => Effect.Effect<Connection.Models, ModelsError, Actor.Service>;
+  /**
+   * Connect the workspace to an installed integration, with settings and a way of authenticating
+   * the integration takes, and its key when it authenticates with one, stored in the same commit.
    */
   readonly create: (
     input: Connection.CreateInput,
@@ -80,46 +83,75 @@ export interface Interface {
   readonly rename: (
     input: Connection.RenameInput,
   ) => Effect.Effect<Connection.View, Error | Changed, Actor.Service>;
-  /** Replace its settings, which must match what the implementation declares. */
+  /** Replace its settings, which its integration must take. */
   readonly configure: (
     input: Connection.ConfigureInput,
   ) => Effect.Effect<Connection.View, ConfigureError, Actor.Service>;
-  /** Store a new credential for a connection that takes one, replacing any earlier one. */
-  readonly setCredential: (
-    input: Connection.SetCredentialInput,
-  ) => Effect.Effect<Connection.View, CredentialError, Actor.Service>;
-  readonly clearCredential: (
+  /** Store a new key for a connection that authenticates with one, in place of its key. */
+  readonly replaceKey: (
+    input: Connection.ReplaceKeyInput,
+  ) => Effect.Effect<Connection.View, ReplaceKeyError, Actor.Service>;
+  /**
+   * Ask the connection's system whether the connection works, with its key, as its integration
+   * checks it. It changes nothing, and holds no commit open while the system answers.
+   */
+  readonly check: (
     connectionId: Connection.Id,
-  ) => Effect.Effect<Connection.View, Error | UnsupportedAuthentication, Actor.Service>;
-  /** Stop its use and delete its credential; its record remains for history. */
-  readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, Error, Actor.Service>;
+  ) => Effect.Effect<ConnectionContract.Health, CheckError, Actor.Service>;
+  /** Stop its use and delete its key; its record remains. */
+  readonly remove: (connectionId: Connection.Id) => Effect.Effect<void, RemoveError, Actor.Service>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/connection/service/Service",
 ) {}
 
+const ready: Connection.Readiness = { _tag: "Ready" };
+const uninstalled: Connection.Readiness = { _tag: "Uninstalled" };
+
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("ConnectionService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const connectionStore = yield* ConnectionStore.Service;
   const connectionCredentialStore = yield* ConnectionCredentialStore.Service;
-  const connectionCatalog = yield* ConnectionCatalog.Service;
+  const integrations = yield* Integrations.Integrations;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
 
   const connectionTarget = (connectionId: Connection.Id) =>
     ({ _tag: "Connection", workspaceId, connectionId }) as const;
-  const findDeclaration = (id: ConnectionImplementation.Id) =>
-    Option.getOrUndefined(connectionCatalog.get(id));
-  const toView = (record: Connection.Record, manageable: boolean) =>
-    Connection.view(record, findDeclaration(record.implementationId), manageable);
+
+  const requireIntegration = (integration: string) =>
+    Effect.mapError(integrations.find(integration), () => new UnknownIntegration({ integration }));
+
+  /** Fails, as the integration describes it, for a connection the integration does not take. */
+  const toInvalidConnection = (error: ConnectionContract.ConnectionError) =>
+    new InvalidConnection({ description: error.reason.description });
+
+  /** How ready the connection is, as the integration this host installs now finds it. */
+  const readinessOf = Effect.fnUntraced(function* (record: Connection.Record) {
+    const integration = yield* Effect.option(integrations.find(record.integration));
+    if (Option.isNone(integration)) return uninstalled;
+    const validated = yield* Effect.result(
+      integration.value.validate(Connection.connectionOf(record)),
+    );
+    if (Result.isSuccess(validated)) return ready;
+    const invalid: Connection.Readiness = {
+      _tag: "Invalid",
+      description: validated.failure.reason.description,
+    };
+    return invalid;
+  });
+
+  const viewOf = (record: Connection.Record, manageable: boolean) =>
+    Effect.map(readinessOf(record), (readiness) => Connection.view(record, readiness, manageable));
+
   /** The connection as the actor sees it, including whether they may manage it. */
   const viewForActor = (record: Connection.Record) =>
     authorization
       .permitted([Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id))])
-      .pipe(Effect.map(([manageable = false]) => toView(record, manageable)));
+      .pipe(Effect.flatMap(([manageable = false]) => viewOf(record, manageable)));
 
   /** The active connection by ID, or NotFound. */
   const requireActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
@@ -128,6 +160,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
       return yield* new NotFound({ connectionId });
     return found.value;
   });
+
   /** A connection the actor may act on with `permission`; to anyone else it is missing. */
   const requirePermittedConnection = Effect.fnUntraced(function* (
     connectionId: Connection.Id,
@@ -142,22 +175,24 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     );
     return record;
   });
-  const checkSettings = (
-    declaration: ConnectionImplementation.Declaration,
-    settings: Connection.Settings,
-  ) => {
-    const issues = Connection.settingIssues(declaration, settings);
-    return issues.length === 0 ? Effect.void : Effect.fail(new InvalidSettings({ issues }));
-  };
-  const requireImplementation = (id: ConnectionImplementation.Id) =>
-    Option.match(connectionCatalog.get(id), {
-      onNone: () => Effect.fail(new UnknownImplementation({ implementationId: id })),
-      onSome: Effect.succeed,
-    });
+
+  const setKey = (connectionId: Connection.Id, apiKey: Connection.ApiKey) =>
+    connectionCredentialStore
+      .set(connectionId, { apiKey })
+      .pipe(
+        Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
+          Effect.fail(new CredentialsUnavailable({ reason })),
+        ),
+      );
+
+  const listIntegrations = Effect.gen(function* () {
+    yield* authorization.require([]);
+    return integrations.all.map(Connection.integrationView);
+  });
 
   const list = Effect.gen(function* () {
     yield* authorization.require([]);
-    const active = (yield* connectionStore.list).filter((record) => record.status === "active");
+    const active = yield* connectionStore.listActive;
     // One grant resolution answers both permissions for every connection.
     const permitted = yield* authorization.permitted(
       active.flatMap((record) => [
@@ -165,17 +200,15 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id)),
       ]),
     );
-    return active
-      .flatMap((record, index) =>
-        permitted[index * 2] === true ? [toView(record, permitted[index * 2 + 1] === true)] : [],
-      )
-      .toSorted((left, right) =>
-        left.name === right.name
-          ? left.id < right.id
-            ? -1
-            : 1
-          : left.name.localeCompare(right.name),
-      );
+    const views = yield* Effect.forEach(
+      active.flatMap((record, index) =>
+        permitted[index * 2] === true ? [{ record, manageable: permitted[index * 2 + 1] }] : [],
+      ),
+      ({ record, manageable }) => viewOf(record, manageable === true),
+    );
+    return views.toSorted(
+      (left, right) => left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1),
+    );
   });
 
   const get = Effect.fn("ConnectionService.get")(function* (connectionId: Connection.Id) {
@@ -183,10 +216,10 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     return yield* viewForActor(yield* requirePermittedConnection(id, ConnectionPermissions.Read));
   });
 
-  const readRetriedConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
-    const found = yield* connectionStore.get(connectionId);
-    if (Option.isNone(found)) return yield* new NotFound({ connectionId });
-    return found.value;
+  const models = Effect.fn("ConnectionService.models")(function* (connectionId: Connection.Id) {
+    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
+    const record = yield* requirePermittedConnection(id, ConnectionPermissions.Read);
+    return (yield* requireIntegration(record.integration)).models;
   });
 
   const create = Effect.fn("ConnectionService.create")(
@@ -203,37 +236,31 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
           actor.memberId,
         ]),
       );
-      // A retry returns the connection its first attempt created.
-      if (
-        options.requestKey !== undefined &&
-        Option.isSome(yield* connectionStore.get(connectionId))
-      )
-        return yield* viewForActor(yield* readRetriedConnection(connectionId));
-      const declaration = yield* requireImplementation(request.implementationId);
-      if (
-        !declaration.authentication.some(
-          ConnectionImplementation.Authentication.isAnyOf([request.authentication]),
-        )
-      )
-        return yield* new UnsupportedAuthentication({
-          implementationId: declaration.id,
-          method: request.authentication,
-        });
-      yield* checkSettings(declaration, request.settings);
+      // A retry returns the connection its first attempt created, unless it was removed since.
+      if (options.requestKey !== undefined) {
+        const retried = yield* connectionStore.get(connectionId);
+        if (Option.isSome(retried)) {
+          if (retried.value.status !== "active") return yield* new NotFound({ connectionId });
+          return yield* viewForActor(retried.value);
+        }
+      }
       const created: Connection.Record = {
         id: connectionId,
         workspaceId,
+        integration: request.integration,
         name: request.name,
-        implementationId: declaration.id,
         settings: request.settings,
-        authentication:
-          request.authentication === "ApiKey"
-            ? { _tag: "ApiKey", credentialId: null }
-            : { _tag: "None" },
+        auth: request.auth,
         status: "active",
         createdBy: actor.memberId,
         createdAt: yield* DateTime.now,
       };
+      const integration = yield* requireIntegration(created.integration);
+      yield* Effect.mapError(
+        integration.validate(Connection.connectionOf(created)),
+        toInvalidConnection,
+      );
+      if (request.apiKey !== undefined) yield* setKey(connectionId, request.apiKey);
       yield* journal.publish(ConnectionFacts.Created, created);
       return yield* viewForActor(created);
     },
@@ -249,7 +276,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         request.connectionId,
         ConnectionPermissions.Manage,
       );
-      if (record.name === request.name) return toView(record, true);
+      if (record.name === request.name) return yield* viewOf(record, true);
       if (record.name !== request.expectedName)
         return yield* new Changed({ connectionId: record.id });
       yield* journal.publish(ConnectionFacts.Renamed, {
@@ -257,7 +284,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         connectionId: record.id,
         name: request.name,
       });
-      return toView(Connection.change(record, { name: request.name }), true);
+      return yield* viewOf(Connection.change(record, { name: request.name }), true);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -271,93 +298,68 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         request.connectionId,
         ConnectionPermissions.Manage,
       );
-      yield* checkSettings(yield* requireImplementation(record.implementationId), request.settings);
+      const configured = Connection.change(record, { settings: request.settings });
+      const integration = yield* requireIntegration(record.integration);
+      yield* Effect.mapError(
+        integration.validate(Connection.connectionOf(configured)),
+        toInvalidConnection,
+      );
       yield* journal.publish(ConnectionFacts.Configured, {
         workspaceId,
         connectionId: record.id,
         settings: request.settings,
       });
-      return toView(Connection.change(record, { settings: request.settings }), true);
+      return yield* viewOf(configured, true);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
 
-  const setCredential = Effect.fn("ConnectionService.setCredential")(
-    function* (input: Connection.SetCredentialInput) {
-      const request = yield* Schema.decodeEffect(Schema.toType(Connection.SetCredentialInput))(
-        input,
-      );
+  const replaceKey = Effect.fn("ConnectionService.replaceKey")(
+    function* (input: Connection.ReplaceKeyInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Connection.ReplaceKeyInput))(input);
       const record = yield* requirePermittedConnection(
         request.connectionId,
         ConnectionPermissions.Manage,
       );
-      const declaration = yield* requireImplementation(record.implementationId);
-      if (!Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication))
-        return yield* new UnsupportedAuthentication({
-          implementationId: declaration.id,
-          method: record.authentication._tag,
-        });
-      const credentialId = Connection.CredentialId.make(yield* crypto.randomUUIDv4);
-      yield* connectionCredentialStore
-        .put({ id: credentialId, connectionId: record.id, secret: request.secret })
-        .pipe(
-          Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
-            Effect.fail(new CredentialsUnavailable({ reason })),
-          ),
-          // A credential takes a new random ID, which nothing else holds.
-          Effect.catchTag("ConnectionCredentialStore.Conflict", Effect.die),
-        );
-      const replaced = record.authentication.credentialId;
-      if (replaced !== null) yield* connectionCredentialStore.remove(replaced);
-      yield* journal.publish(ConnectionFacts.CredentialSet, {
+      if (record.auth !== "apiKey") return yield* new Keyless({ connectionId: record.id });
+      yield* setKey(record.id, request.apiKey);
+      yield* journal.publish(ConnectionFacts.KeyReplaced, {
         workspaceId,
         connectionId: record.id,
-        credentialId,
       });
-      return toView(
-        Connection.change(record, { authentication: { _tag: "ApiKey", credentialId } }),
-        true,
-      );
+      return yield* viewOf(record, true);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
 
-  const clearCredential = Effect.fn("ConnectionService.clearCredential")(
-    function* (connectionId: Connection.Id) {
-      const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
-      const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
-      if (!Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication))
-        return yield* new UnsupportedAuthentication({
-          implementationId: record.implementationId,
-          method: record.authentication._tag,
-        });
-      const cleared = record.authentication.credentialId;
-      if (cleared === null) return toView(record, true);
-      yield* connectionCredentialStore.remove(cleared);
-      yield* journal.publish(ConnectionFacts.CredentialCleared, { workspaceId, connectionId: id });
-      return toView(
-        Connection.change(record, { authentication: { _tag: "ApiKey", credentialId: null } }),
-        true,
-      );
-    },
-    Publication.withActor,
-    Effect.provideService(Crypto.Crypto, crypto),
-    journal.commit,
-  );
+  const check = Effect.fn("ConnectionService.check")(function* (connectionId: Connection.Id) {
+    const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
+    const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
+    const integration = yield* requireIntegration(record.integration);
+    const credential =
+      record.auth === "apiKey"
+        ? yield* connectionCredentialStore.get(record.id).pipe(
+            Effect.map(Option.getOrUndefined),
+            Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
+              Effect.fail(new CredentialsUnavailable({ reason })),
+            ),
+          )
+        : undefined;
+    return yield* Effect.mapError(
+      integration.check(Connection.connectionOf(record), credential),
+      toInvalidConnection,
+    );
+  });
 
   const remove = Effect.fn("ConnectionService.remove")(
     function* (connectionId: Connection.Id) {
       const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
       const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
-      if (
-        Connection.Authentication.isAnyOf(["ApiKey"])(record.authentication) &&
-        record.authentication.credentialId !== null
-      )
-        yield* connectionCredentialStore.remove(record.authentication.credentialId);
+      if (record.auth === "apiKey") yield* connectionCredentialStore.remove(record.id);
       yield* journal.publish(ConnectionFacts.Removed, { workspaceId, connectionId: id });
     },
     Publication.withActor,
@@ -366,14 +368,15 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   );
 
   return Service.of({
-    implementations: connectionCatalog.list,
+    integrations: listIntegrations,
     list,
     get,
+    models,
     create,
     rename,
     configure,
-    setCredential,
-    clearCredential,
+    replaceKey,
+    check,
     remove,
   });
 });

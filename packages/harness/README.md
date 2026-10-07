@@ -1,152 +1,167 @@
 # Harness
 
-`@amends/harness` is the common harness contract from the
-[core model](../../docs/core-model.md#agreed-every-harness-records-the-same-events): how a turn
-drives a harness session, and the events every harness reports. Implementations translate their
-native interaction into it; [`@amends/harness-amends`](../harness-amends/README.md) is amends's own.
-Nothing here knows about environments, threads, or turns; [turn execution](../cluster/README.md#running-a-turn)
-runs harnesses.
+A harness runs an agent, such as opencode, Codex, Claude Code, or a loop of our own over an Effect
+AI `LanguageModel`, and streams every agent's turns in one format, so callers do not depend on which
+agent works for them. It is to agents what Effect AI is to model providers, and is modelled on AI
+SDK's harnesses. The package depends only on Effect and on [`@amends/sandbox`](../sandbox),
+the sandboxes agents work in.
 
-## One recorded standard
+## Agents and harnesses
 
-A turn's log stores `HarnessEvent.Event` values, whichever harness produced them and wherever it
-ran, so a log reads the same in process, in a sandbox, or after moving between them. A response is
-reported block by block as each completes, the unit a harness running its own loop in a sandbox can
-also report:
+An agent's adapter implements `Agent.Agent`: its id, the `template` that installs it in a sandbox,
+the `ports` it listens on there, whether it `requiresSandbox`, and `startSession`, which starts an
+`AgentSession`, a new one or one picked up from what an earlier one returned. An agent session runs
+each turn with `promptTurn`, streaming `StreamPart`s until its `finish` part, and interrupting the
+stream aborts the turn. `suspendTurn`, `detach`, and `stop` return the agent's own state as JSON,
+which `startSession` takes back.
 
-| Event               | What it records                                                                |
-| ------------------- | ------------------------------------------------------------------------------ |
-| `InputIncorporated` | A submitted batch the harness took into its context, after everything earlier. |
-| `TextDelta`         | More text for one block of a streaming response; live only.                    |
-| `ReasoningDelta`    | More reasoning for one block of a streaming response; live only.               |
-| `BlockCompleted`    | One completed block of a response, by position: text, reasoning, or tool call. |
-| `ResponseFinished`  | The response finished, with its finish reason, model, and usage.               |
-| `ToolCallStarted`   | The harness began running a call, which from now on may have had an effect.    |
-| `ToolCallCompleted` | A tool call's result, whether the session ran the call or was given it.        |
-| `ContextFull`       | The next request would pass the session's context limit; it does no more.      |
-| `Idle`              | Every input has its response, no call waits, and nothing waits to be taken in. |
+`Harness.make` turns an agent into the `Harness` service, as `LanguageModel.make` turns a provider
+into a language model, and `Harness.layer` provides it. Its `agent` is the agent it runs, as the
+adapter describes it, without `startSession`: only the harness starts the agent's sessions.
+`startSession` starts a session: a new one, named by its `id`, or one that goes on from what it last
+saved, given as `resumeFrom`, on this agent or another. A new session given a `history` starts with
+that conversation, as when the agent joins one already under way. The caller creates the sandbox, from the
+agent's `template` and with its `ports`, and owns it: a harness never stops or destroys one. Each
+session works in its own directory there, named by its id, so that its files stay in place when it
+moves from one agent to another.
 
-A harness continues from a `Transcript.Value`: the history the turn chose, then what its events
-recorded. `HarnessEvent.transcript(events, history, { unfinished })` builds it. It has three kinds
-of item: `Input` attributed to its author, `Response` with text, reasoning, and tool-call parts, and
-`ToolResult` answering one call. Deltas, starts, and `Idle` add nothing, so:
+## Models
 
-- a finished response enters with its blocks in order, and results its calls got before it
-  finished follow it;
-- a response that stopped before finishing keeps only its completed blocks. Its calls that never
-  started did not happen and are dropped; one that started without a result is answered by
-  `cutShort`, its effect unknown, and never runs again. It stays in the transcript when it holds a
-  started call. Otherwise, with `unfinished: "omit"`, the default for execution that goes on, it is
-  left out and the next session asks for a fresh response; with `unfinished: "keep"`, for work that
-  ended, what it wrote stays;
-- when work ended, calls still pending are answered too, by `cutShort` or `notRun`, so later input
-  can follow; while execution goes on, a finished response's unanswered calls stay pending, and
-  whoever knows their outcome supplies it;
-- incorporated input appears once, so continuing never submits it twice.
+A `ModelEndpoint` is how an agent reaches a model: its provider and the provider's id for it, as
+models.dev names them, the protocol it is served through (Anthropic's Messages API, OpenAI's
+Responses API, or Chat Completions), the base URL that the protocol's paths follow, the key a
+request presents, and how hard it reasons and how much it may write. A host makes an endpoint for
+each model an agent may use, as from the catalog in [`@amends/connection`](../connection).
 
-Recovering from a failure, moving to another environment, and retrying all prepare a fresh session
-from the same transcript; there is no separate restore path.
-
-`Transcript.summarize` checks the order every provider requires, which the `Transcript.Value`
-schema also applies: each response's calls have unique IDs and are answered once, by results that
-follow it before any other input or response. Only the last response's calls may be pending. It
-reports those `pending` calls and whether the transcript `awaitsResponse`.
-
-A tool result is sent as its `structured` JSON value, or else its text, and past
-`Transcript.resultCharacters` (24,000) as text clipped to its beginning and end, saying how much of
-its middle was left out (`Transcript.sentResult`, `Transcript.clip`); the log keeps it whole.
-`Transcript.characters` counts what a transcript holds as a model reads it, tool results as sent, and
-`Transcript.estimate` how many tokens that is: exactly what a provider measured through the
-response it measured (`Transcript.Measured`), and a token for every four characters after it, with
-the instructions when no measurement covers them.
-
-A part can carry `native` data that only the harness that recorded it can use, keyed by that
-harness's name, such as a provider's signature over its reasoning that the same provider requires
-back. Other harnesses ignore it; what a transcript means never depends on it.
-
-Stored events are tagged unions encoded as JSON. Adding an event kind or an optional field keeps
-old logs readable; changing what an existing field means does not. The tests round-trip every kind
-through JSON.
-
-## Declarations
-
-`HarnessImplementation.Declaration` is what a host registers in its catalog and core checks
-environments against: the harness's `id` (its `Harness.Name`), `name`, and `description`; its
-`placement`, where its loop can run (`in-process` in the amends process, or `in-sandbox` as a
-program inside a sandbox); how it reaches a model (`LanguageModel`, Effect AI access from any model
-connection the host installed, or `Interfaces`, provider interfaces it speaks itself); and the
-`reasoning` levels it can request, if any.
+Every agent is made with `Agent.Options`: the endpoint a turn runs on when it names none, and the
+endpoints a turn can name, by name. An adapter's own options extend them with what only its agent
+takes, such as the port opencode's bridge listens on. amends's own agent makes an Effect AI language
+model of each endpoint with `Models.LanguageModels`, which `Models.layer` provides over the host's
+`HttpClient`; opencode's adapter configures opencode with them.
 
 ## Sessions
 
-`Harness.Interface<R>` is an implementation: its `declaration`, which a host lists in its catalog
-from the same value it runs, its `Capabilities`, and how it starts sessions that live until their
-scope closes. `R` is what sessions need from their environment, such as model
-access. `StartOptions` carries the session ID, which prefixes the IDs a session assigns so they stay
-unique across the sessions sharing one log, and the agent's instructions and `HarnessTool.Tools`.
-It can also carry a `contextLimit`, the most tokens one model request may carry, with what a
-provider `measured` of the transcript the session is prepared with. A harness that honors the limit
-reports `ContextFull` instead of making a request it estimates over it and does nothing more, so the
-host can shorten the transcript for a new session; one that does not runs until its provider
-refuses.
+A `Session.Session` is what callers hold. `stream` runs a turn, `generate` returns it whole as a
+`GenerateResult`, and `generateObject` decodes its answer in JSON with a schema. A turn's
+`toolkit` gives the agent the host's tools: when the agent calls one, the session runs its handler
+on the host and gives the agent the result. A tool with `needsApproval` is asked about first: the
+turn streams a `tool-approval-request` after the call and waits, while the agent waits for the
+result, until `approve` allows the call or refuses it, which answers the agent `execution-denied`.
+`generate` and `generateObject` return only when the turn ends, so they refuse every request.
+`approve` also passes on the requests an agent makes for its own tools, and `compact` asks the
+agent to summarize the conversation so far.
 
-A `Harness.Session` follows the core model's stages:
+`suspendTurn`, `detach`, and `stop` return a `SessionState` for the caller to store, as JSON with
+`Schema.toCodecJson(Session.SessionState)`. It records the conversation as Effect AI `Prompt`
+messages, each step's tool calls and results included, beside the agent's own state. The agent that
+last ran the session resumes from its own state; any other loads the conversation.
+`Session.messagesOfStep` gives the messages that record one `Step`, as the conversation records
+it, for a caller that keeps a session's steps itself and gives the conversation back as `history`,
+rather than storing the whole of it with every turn. `suspendTurn`
+ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
+once `startSession` resumes the session, from the step that was in flight; another agent runs it
+again from its prompt. `detach` lets go between turns, `stop` stops the agent to start it again
+later, and `destroy` stops it for good.
 
-1. `prepare(transcript)` sets the conversation to continue, once, before anything else. It starts
-   no work. An invalid transcript fails with `InvalidTranscript`; a harness that cannot continue it
-   fails with `Unsupported`; one that could not set up its own session, such as a harness in a
-   sandbox whose process ended, fails with `ExecutionFailed`.
-2. `submit(batch)` hands over input, which the session takes in once no call is waiting and before
-   its next model request.
-3. `resolve(callId, outcome)` answers a call the prepared transcript left pending, such as an
-   environment switch completing in its destination. A call the session is running itself, or one
-   that is not pending, fails with `NotPending`.
-4. `resume` continues a transcript that awaits a response, and reports `Idle` when nothing is owed.
+`StreamPart` holds the parts an Effect AI provider streams, in their encoded form, and three that
+only agents produce: `finish-step`, `file-change`, and `compaction`. Tool calls and results keep
+their params and results as JSON, since an agent runs tools of its own that no toolkit declares.
+`stepsOf` adds a turn's parts up into its `Step`s, as `GenerateResult.steps` has them: each
+step's texts and reasonings whole, its tool calls and final results, and the `finish-step` that
+ended it, which a step the turn ended partway through lacks. A step is JSON, for callers that
+store a turn's steps. A failure the agent reports arrives as an `error` part; the operations themselves fail with
+`HarnessError`, which names the agent and holds a reason such as `UnsupportedError` or
+`UnavailableError`.
 
-`events` reports everything in order to one consumer. It fails with `ExecutionFailed`, which says
-whether the same work can be retried unchanged, and later operations fail with it too. Its
-`problem` is what the host tells the turn's readers: the model's provider refused the credential,
-ran out of quota, limited requests, could not be reached, failed on its side, declined the content,
-refused a request longer than its model's context window, or rejected the request otherwise; the
-model's output could not be used or it went silent; the session ended
-first; or something unexpected. Its `reason` is the detail for the host's logs only.
-`HarnessErrors.fromModel` builds one from an Effect AI failure, and `modelProblem` names the
-problem such a failure is.
+## Bridges
 
-`Capabilities.transcript` says a harness prepares its context from any valid transcript, including
-another harness's; `pendingToolCalls` says it takes a result for a call an earlier session left
-pending. A harness that restores only its own native sessions declares neither.
+An agent that works in a sandbox is reached only through a bridge there: a program that is all the
+sandbox exposes of the agent. One bridge runs for an agent in each sandbox and serves every
+session in it, on the agent's port, to hosts that present its token as `Authorization: Bearer`. It
+runs each turn itself, so that a turn goes on when a host's connection drops or the host lets go,
+and numbers and keeps the turn's parts, so that a host reads them from any number: after
+reconnecting, or to continue a turn another host suspended. `Bridge.Rpcs` is the protocol, over a
+WebSocket, at the version `Bridge.protocolVersion` names, which `Hello` answers. A host asks a
+bridge that speaks an older version to `Exit`, aborting its turns, and launches its own in its
+place; it refuses a bridge that speaks a newer one. Every version keeps `Hello` and `Exit` as they
+are.
 
-`HarnessTool.Definition` describes a tool to the model with a JSON Schema for its parameters, and
-`Tools.invoke` runs a call to an outcome. A tool's own failure is an outcome the model reads
-(`HarnessTool.failure`), not an error; `Transcript.toolResult` pairs an outcome with its call.
+- `Bridge.Driver` is what an adapter implements to drive its agent behind a bridge. It starts the
+  agent's sessions and runs their turns, but needs neither to suspend nor to continue one: the
+  bridge keeps the turns.
+- `BridgeServer.serve` serves a driver over the HTTP server a bridge program provides, until a host
+  asks the bridge to exit, with the token and state directory from the `Bridge.LaunchOptions` that
+  `BridgeServer.readLaunchOptions` reads from standard input. Each turn's parts go to a file in the state directory as well as to
+  memory, and a session keeps only its latest turn. A bridge started again serves a turn that had
+  finished or failed before it exited. One it aborted, as when it exited or died during the turn,
+  it continues when a host starts it again: the turn keeps the steps it finished, and the bridge
+  prompts the agent with `Continue.`, as AI SDK's harness does, if the agent kept the conversation
+  that holds the turn. Otherwise the host runs the turn again from its prompt.
+- `BridgeClient.startSession` starts the sessions of the adapter's `Agent.Agent`, which hosts run:
+  the agent requires a sandbox, lists the bridge's port among its `ports`, and calls it from
+  `startSession`, with what `BridgeClient.Options` says of its bridge. A session connects to the
+  bridge at the sandbox's endpoint for the port, and launches it with the adapter's command when
+  none answers, giving it the launch options on standard input. It runs the template first, which
+  installs only what the sandbox lacks, so that a sandbox prepared with another version of it
+  launches this one. The token comes from the host's `token` function, derived from the sandbox's id
+  with a secret every host shares, so that any host connects to a bridge any of them launched. Each
+  connection starts the session in the bridge from the state the bridge last gave, so that a bridge
+  that died and was launched again has it again. `continueTurn` starts the turn again, which the
+  bridge continues if it did not finish it, but a turn the bridge loses while a stream reads it
+  fails with `NoTurnError`. A connection that drops is not opened again: requests it dropped are
+  sent again over another, for up to 30 seconds, except a tool's result, an approval, and a request
+  to compact, which the bridge must not receive twice. A turn is `StartTurn`, under an id the host
+  picks, and `ReadTurn`, which reads on from the last part read. A session closes its connection
+  when it lets go, or once it has gone unused for a minute. One whose bridge cannot answer, as when
+  its sandbox is gone, lets go with the state it last gave.
 
-## Conformance suites
+opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
+program, a template that installs it, and an agent whose sessions `BridgeClient.startSession`
+starts.
 
-`@amends/harness/conformance` holds test suites every harness runs against itself, so a new
-harness passes the same tests as the ones in this repository; it is the one module here that uses
-`@effect/vitest`, and only test files import it.
+## Host tools through a relay
 
-A harness supplies a `Subject`, conventionally in `test/subject.ts`. It is called the subject
-rather than a harness, which names what is under test:
+An agent in a sandbox can use the host's tools only through something it can call there.
+`HostToolRelay` is that, for any agent that is an MCP client over HTTP: an MCP server, on the
+loopback of the sandbox it runs in, that lists the tools of a session's running turn and turns each
+call into a `tool-call` part of that turn. The host runs the tool as it runs any host tool, with its
+approval if the tool needs one, and `submitToolResult` gives the agent's call its answer. The tools'
+handlers never leave the host, so no credential reaches the sandbox: the agent holds only the token
+of its session, which lets it ask the host to run that session's tools, and the host's toolkit and
+approvals still decide.
 
-| Member      | Meaning                                                                                |
-| ----------- | -------------------------------------------------------------------------------------- |
-| `name`      | Names the harness in suite titles.                                                     |
-| `available` | `false` skips every suite, as opencode's do when it is not installed.                  |
-| `harness`   | The harness under test, built for one test's scope.                                    |
-| `model`     | A model following a script, reached as the harness reaches a real one.                 |
-| `timeout`   | How long one test may take, in milliseconds; a harness that runs a program needs more. |
+- `HostToolRelay.make` is the relay without a transport. `open` starts a session, which has a token of
+  its own, until its scope closes, and `answer` takes an MCP message with the `Authorization`
+  header it came with. A session's `offerTools` lists the tools of a turn, for as long as the
+  turn's scope lasts, and returns the stream of the calls the agent makes. The tools stay listed
+  after the turn, so that an agent that read them once keeps them, but a call between turns fails.
+  `HostToolRelay.layer` serves the relay on the `HttpServer` a program provides, at
+  `http://127.0.0.1:<port>/mcp`, and is what a bridge program uses.
+- It speaks the part of MCP that tools need, in the versions 2025-11-25, 2025-06-18, 2025-03-26, and
+  2024-11-05 over Streamable HTTP: `initialize`, `ping`, `tools/list`, `tools/call`, and
+  cancellation. It lists no resources or prompts, and sends no notification of its own except
+  progress. A call is answered with an event stream. Because the host may wait on a person, the
+  relay sends progress notifications every ten seconds while it waits, if the agent asked for them
+  with a `progressToken`, which an agent with a time limit for a request takes as a sign of life. It
+  gives up on a call the host has not answered in an hour.
+- A result the model reads is a text as it is, a failure by its message, a refusal by its reason,
+  and anything else as JSON. A call that the agent cancels, or that the end of the turn ends, fails
+  with that said.
+- An agent that adds to the names of the tools it is given, as opencode prefixes `host_`, leaves a
+  model API's 64 characters too few: its `maxToolNameLength` says how many it takes, for the host to
+  name its tools to fit.
 
-A script lists the text the model answers each request with, or says it refuses its key. The model
-also returns each request it received as text, which the suites search for what the conversation
-said. Amends's harness gets an Effect AI model; opencode gets a chat-completions server on a local
-port. Each test file registers one suite, such as `Suites.sessions(subject)`. The tests use live
-time, since a harness may run a program.
+No agent uses the relay yet. opencode's adapter would, but the runner behind opencode's `/api/session`
+(1.18.23) shows its model only the tools registered in its own process, and not those of MCP servers, so the
+adapter refuses a turn with host tools. The relay was run against opencode's older session API, where the
+model called a host tool through it and answered with the result the host gave. The relay's server must
+not close idle connections: Bun's does after ten seconds, unless it is made with `idleTimeout: 0`.
 
-### Suites
+## Testing
 
-| Suite          | Covers                                                                                                                                                                                                           |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sessions`     | Input answered in a new session and attributed to its author, instructions reaching the model, input submitted while it works taken in order before it is idle, the order of operations, and a refused key.      |
-| `continuation` | Answering the input a transcript ends with in its context, tool calls and results another harness recorded reaching the model, idleness when nothing is owed, a transcript out of order, and pending tool calls. |
+`test/harness.test.ts` and `test/session.test.ts` run sessions over fake agents from
+`test/fakes.ts`, and `test/bridge-server.test.ts` runs the bridge's handlers without a transport,
+over a fake `Bridge.Driver` and a file system in memory. `test/relay.test.ts` runs the relay without
+a transport, with the test clock for its progress and its time limit; its HTTP server is tested in
+the opencode adapter. The bridge over a real WebSocket, launched
+in a local sandbox, is tested in the opencode adapter. Run them with `bun run test packages/harness`.

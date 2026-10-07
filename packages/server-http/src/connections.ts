@@ -7,7 +7,8 @@ import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 
 /**
- * Register connection handlers, capturing the gateway and reading the principal per request.
+ * Register the handlers of connections, capturing the gateway and reading the principal per
+ * request.
  *
  * @category layers
  */
@@ -31,10 +32,8 @@ export const layer = HttpApiBuilder.group(
         ),
       );
     return handlers.handleAll({
-      implementations: ({ params }) =>
-        asMember(params.workspaceId, (connectionService) =>
-          Effect.succeed(connectionService.implementations),
-        ),
+      integrations: ({ params }) =>
+        asMember(params.workspaceId, (connectionService) => connectionService.integrations),
       list: ({ params }) =>
         asMember(params.workspaceId, (connectionService) => connectionService.list),
       create: ({ params, headers, payload }) =>
@@ -44,6 +43,10 @@ export const layer = HttpApiBuilder.group(
       get: ({ params }) =>
         asMember(params.workspaceId, (connectionService) =>
           connectionService.get(params.connectionId),
+        ),
+      models: ({ params }) =>
+        asMember(params.workspaceId, (connectionService) =>
+          connectionService.models(params.connectionId),
         ),
       rename: ({ params, payload }) =>
         asMember(params.workspaceId, (connectionService) =>
@@ -60,16 +63,16 @@ export const layer = HttpApiBuilder.group(
             settings: payload.settings,
           }),
         ),
-      setCredential: ({ params, payload }) =>
+      replaceKey: ({ params, payload }) =>
         asMember(params.workspaceId, (connectionService) =>
-          connectionService.setCredential({
+          connectionService.replaceKey({
             connectionId: params.connectionId,
-            secret: payload.secret,
+            apiKey: payload.apiKey,
           }),
         ),
-      clearCredential: ({ params }) =>
+      check: ({ params }) =>
         asMember(params.workspaceId, (connectionService) =>
-          connectionService.clearCredential(params.connectionId),
+          connectionService.check(params.connectionId),
         ),
       remove: ({ params }) =>
         asMember(params.workspaceId, (connectionService) =>

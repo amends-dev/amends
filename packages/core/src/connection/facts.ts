@@ -29,22 +29,18 @@ export const Configured = Fact.make("connection.configured", {
   payload: Connection.Configured,
 });
 
-/** A credential stored for it, by reference; the secret never enters the journal. */
-export const CredentialSet = Fact.make("connection.credential-set", {
-  audience: workspace,
-  version: 1,
-  subject: (payload) => Subject.make("connection", payload.connectionId),
-  payload: Connection.CredentialSet,
-});
-
-export const CredentialCleared = Fact.make("connection.credential-cleared", {
+/**
+ * Its key replaced with another, which the commit stored apart from the journal. The fact names no
+ * key and changes nothing a reader sees; it records when the key was replaced, and by whom.
+ */
+export const KeyReplaced = Fact.make("connection.key-replaced", {
   audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   payload: Connection.Change,
 });
 
-/** Removed from use; its record remains for history and its credential is deleted. */
+/** Removed from use, with its key; its record remains. */
 export const Removed = Fact.make("connection.removed", {
   audience: workspace,
   version: 1,

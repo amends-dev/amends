@@ -1,26 +1,16 @@
-import { AgentService } from "./agent/service.ts";
 import { AgentPermissions } from "./agent/permissions.ts";
-import { AgentV2Permissions } from "./agent-v2/permissions.ts";
-import { AgentV2Projection } from "./agent-v2/projection.ts";
-import { AgentV2Service } from "./agent-v2/service.ts";
 import { AgentProjection } from "./agent/projection.ts";
+import { AgentService } from "./agent/service.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
-import { AgentJobs } from "./turn/agent-jobs.ts";
-import { AgentWork } from "./turn/agent-work.ts";
 import { TurnExecution } from "./turn/execution.ts";
+import type { SessionLogStore } from "./turn/session-log-store.ts";
+import { AgentQuery } from "./agent/query.ts";
 import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
-import { ConnectionV2Service } from "./connection-v2/service.ts";
-import { ConnectionV2Permissions } from "./connection-v2/permissions.ts";
-import { ConnectionV2Projection } from "./connection-v2/projection.ts";
-import { EnvironmentService } from "./environment/service.ts";
-import { EnvironmentPermissions } from "./environment/permissions.ts";
-import { EnvironmentProjection } from "./environment/projection.ts";
-import { EnvironmentQuery } from "./environment/query.ts";
 import { ThreadService } from "./thread/service.ts";
 import { ThreadCommand } from "./thread/command.ts";
 import { GroupCommand } from "./group/command.ts";
@@ -32,7 +22,6 @@ import { ThreadParticipationPermissions } from "./thread/participation/permissio
 import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
-import { TurnQuery } from "./turn/query.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
@@ -68,7 +57,6 @@ import { GrantResolver } from "./authorization/grant-resolver.ts";
 import { PermissionCatalog } from "./authorization/permission-catalog.ts";
 import { RoleProjection } from "./authorization/role/projection.ts";
 import { Journal } from "./journal/journal.ts";
-import type { Reaction } from "./journal/reaction.ts";
 import { Log } from "./journal/log.ts";
 import { NotificationService } from "./notification/service.ts";
 import { NotificationProjection } from "./notification/projection.ts";
@@ -104,10 +92,7 @@ export const projections = [
   ThreadActivityProjection.definition,
   NotificationProjection.definition,
   ConnectionProjection.definition,
-  ConnectionV2Projection.definition,
-  EnvironmentProjection.definition,
   AgentProjection.definition,
-  AgentV2Projection.definition,
   TurnProjection.definition,
 ] as const;
 
@@ -139,20 +124,9 @@ export const permissions = [
   ConnectionPermissions.Read,
   ConnectionPermissions.Manage,
   ConnectionPermissions.Use,
-  EnvironmentPermissions.Create,
-  EnvironmentPermissions.Read,
-  EnvironmentPermissions.Manage,
-  EnvironmentPermissions.Use,
   AgentPermissions.Create,
   AgentPermissions.Read,
   AgentPermissions.Configure,
-  ConnectionV2Permissions.Create,
-  ConnectionV2Permissions.Read,
-  ConnectionV2Permissions.Manage,
-  ConnectionV2Permissions.Use,
-  AgentV2Permissions.Create,
-  AgentV2Permissions.Read,
-  AgentV2Permissions.Configure,
 ];
 
 /**
@@ -173,14 +147,12 @@ export const journalLog = Log.Id.make("journal");
 
 /**
  * The domain journal and its log, over host storage. A commit that publishes a fact that changes
- * an agent's work, or creates or retries a turn, requests that job in the same commit.
+ * an agent's work in a thread requests that agent's turn job in the same commit.
  */
 const journal = Journal.layer({
   logId: journalLog,
   projections,
-  reactions: [...AgentJobs.reactions, ...TurnJobs.reactions] as ReadonlyArray<
-    Reaction.Definition<AgentJobs.Service | TurnJobs.Service>
-  >,
+  reactions: TurnJobs.reactions,
 }).pipe(Layer.provideMerge(Log.layer));
 
 /** Authorization for the acting member, with its grant resolution. */
@@ -196,7 +168,6 @@ const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
 const turnCommand = TurnCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand)),
 );
-const turnQuery = TurnQuery.layer;
 const readStateCommand = ReadStateCommand.layer;
 const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
 /**
@@ -230,10 +201,7 @@ const operations = Layer.mergeAll(
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
   ConnectionService.layer,
-  ConnectionV2Service.layer,
-  EnvironmentService.layer,
-  AgentService.layer.pipe(Layer.provide(MemberService.layer)),
-  AgentV2Service.layer,
+  AgentService.layer,
   TurnService.layer,
 ).pipe(
   Layer.provide(
@@ -242,25 +210,22 @@ const operations = Layer.mergeAll(
       AssignmentCommand.layer,
       memberCommand,
       groupQuery,
-      EnvironmentQuery.layer,
       groupCommand,
       threadQuery,
       threadCommand,
       readStateCommand,
       turnCommand,
-      turnQuery,
       changeFeedSource,
     ),
   ),
 );
 
 /**
- * What jobs call, outside requests: an agent's work, accepting what is asked of it and stopping its
- * turns where it left, and turn execution, which a turn's job drives. Neither is an operation an
- * actor calls.
+ * What jobs call, outside requests: turn execution, which an agent's turn job drives in a thread.
+ * It is not an operation an actor calls.
  */
-const jobServices = Layer.mergeAll(AgentWork.layer, TurnExecution.layer).pipe(
-  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
+const jobServices = TurnExecution.layer.pipe(
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand, AgentQuery.layer)),
 );
 
 /**
@@ -276,8 +241,9 @@ export const layer = Layer.mergeAll(operations, jobServices).pipe(
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
- * store, cryptography, the workspace's signals, and its agent and turn jobs. Adding a required store changes this type
- * and makes incomplete host compositions fail type checking.
+ * store, cryptography, the workspace's signals, the integrations it installs, and its turn jobs.
+ * Adding a required store changes this type and makes incomplete host compositions fail type
+ * checking.
  *
  * @category models
  */
@@ -293,9 +259,11 @@ export type HostServices = Layer.Services<typeof layer>;
 export type Operations = Layer.Success<typeof operations>;
 
 /**
- * The services a host's jobs call. They act as the agent or the product and check no actor's
- * permissions, so only jobs a host trusts run them, never a protocol's handlers for an actor.
+ * The services a host's jobs call: what they ask of the workspace, and the session logs a turn's
+ * job writes, which take part in no commit. They act as the agent or the product and check no
+ * actor's permissions, so only jobs a host trusts run them, never a protocol's handlers for an
+ * actor.
  *
  * @category models
  */
-export type JobServices = Layer.Success<typeof jobServices>;
+export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.Service;

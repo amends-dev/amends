@@ -329,81 +329,43 @@ panel with their role (`Select`, and Save role), access, and Remove member. `Inv
 `InvitationHistory`, `TransferOwnership`, `ConfirmRemoveMember`, and `ConfirmRevokeInvitation`
 are its modals. They name the settings codes client returns (`SettingsError`, by `SettingsAction`) and
 own the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
-completed change. `ConnectionsPane` is Connections from the Lunacy "Connections" frames, with All
-and Needs setup tabs, Add connection, quiet placeholder rows while loading, and a failed state
-with Retry. `ConnectionList` searches the connections and lists each with its provider, endpoint,
-and how it authenticates, marking the tile of one that needs setup or is unavailable, with an
-empty state that offers adding one; each row opens the connection's page. `ConnectionPane` is that
-page in one column: a notice with what setup still needs when it cannot be used, the name and the provider's settings as
-separate saves, its key, which is only ever replaced or removed, its details, and removal. `ChooseProvider`, `ConfigureConnection`, `ConnectionKey` (for
-setup, adding, and replacing), `ConfirmRemoveConnection`, and `ConfirmRemoveKey` are its modals;
-they name the codes client returns (`ConnectionsError`) and own the wording, and `connectionsToast` words the
-toasts. `ConfigureConnection` and `ConnectionKey` take `returnTo` for creating a connection on
-the way to another form, such as a sandbox account while adding an environment. **Screens / Connections** walks adding a connection and its key, a host without key
-storage, an unavailable provider, a read-only member, search, and a stale rename.
-`ConnectionsV2Pane`, `ConnectionV2List`, and `ConnectionV2Pane` are Connections v2, built beside
-Connections over the integrations a host installs, with no mocks yet: the list has All, Models,
+completed change. `ConnectionsPane`, `ConnectionList`, and `ConnectionPane` are Connections, over the
+integrations a host installs, with no mocks yet: the list has All, Models,
 Tools, Sandboxes, and Harnesses tabs, and a connection's page checks whether it works (Working, Key
 refused, Settings don’t work, or Couldn’t reach it), then holds its name, its integration's
 settings through `FormFields`, its key, which is only replaced, its details with the integration's
 documentation, and removal. A connection whose integration is gone lists its saved settings and
-offers only removal. `ChooseIntegration` searches the integrations by name, `ConfigureConnectionV2`
+offers only removal. `ChooseIntegration` searches the integrations by name, `ConfigureConnection`
 takes the name, settings, way of authenticating, and key in one step, and `ReplaceKeyV2` and
-`ConfirmRemoveConnectionV2` are its other modals. The rail offers Connections v2 beside
-Connections while both exist. **Screens / Connections v2** walks adding and checking a connection,
+`ConfirmRemoveConnection` are its other modals. **Screens / Connections** walks adding and checking a connection,
 a refused key and a refused setup, a gone integration, a host without key storage, a read-only
 member, search, and a stale rename.
-`AgentsV2Pane`, `AgentV2List`, and `AgentV2Pane` are Agents v2, built beside Agents over
-connections v2, with no mocks of their own: they follow the Agents frames' navigation and the
-Connections v2 page. The list has All and Needs setup, and each agent's harness, with its sandbox,
-and model as columns, or under the name on phones, with its state as a patch on its avatar. The
-agent's page reads in one column: a notice listing why it can't run, its name, its setup saved as a
-whole, its details, and removal. `SetupFields` is the setup both it and `AddAgentV2` ask for: the
+`AgentsPane`, `AgentList`, and `AgentPane` are Agents, over connections, with no mocks
+of their own: they follow the Agents frames' navigation and the
+Connections page. The list has All and Needs setup, and each agent's harness, with its sandbox,
+its model, and where it is at work as columns, or under the name on phones, with its state as a
+patch on its avatar. The agent's page reads in one column: a notice listing why it can't run, its
+name, its setup saved as a whole, its details, with each turn in progress opening its log, and
+removal. `SetupFields` is the setup both it and `AddAgent` ask for: the
 instructions, the harness or Auto, the model connection, the model, which the connection's list
 suggests and which may be any other when it takes models it doesn't list, the effort the chosen
 model takes, and the sandbox, warning when the harness works only in one. A connection the agent
 names that is removed or not installed stays chosen and shows as Unavailable, and what the host
-refuses shows beside the field it concerns. `ConfirmRemoveAgentV2` confirms removal, which ends
-the agent's membership. The rail offers Agents v2 beside Agents while both exist. **Screens /
-Agents v2** walks adding an agent, the roles the reader may give, a removed sandbox and a harness
-that needs one, listed models and efforts, models that load or fail, a refused connection, Auto
+refuses shows beside the field it concerns. `ConfirmRemoveAgent` confirms removal, which ends
+the agent's membership. **Screens / Agents** walks adding an agent, the roles the reader may give, agents at work and
+idle, a removed sandbox and a harness that needs one, listed models and efforts, models that load or fail, a refused connection, Auto
 with no harness, removal, a read-only member, search, and a stale rename.
-`EnvironmentsPane` and `EnvironmentList` are Environments from the Lunacy "Environments" frames:
-All and Needs setup, and each environment's harness and sandbox, as columns when the pane has room
-and under the name when narrow or on phones, with a mark on the tile of one that cannot run; each
-row opens its page. `EnvironmentPane` is that page: an Overview in one column, with a notice and
-its recovery when it cannot run, the name, the fixed
-runtime, its details, and removal, and a Sandbox tab, whose `SandboxFields` edit the account, template, variables, commands, and retention,
-or whose `SandboxSummary` shows them to members. `AddEnvironment` takes the basics, then the
-sandbox settings, and `ConfirmRemoveEnvironment` confirms removal; the wording, including the
-mocks' exact error and readiness copy, lives beside them. **Screens / Environments** walks adding
-with the account detour, editing variables and commands, a refused account, readiness, and
-members' view. `AgentsPane` and `AgentList` are Agents from the Lunacy "Agents" frames: All and
-Needs setup, and each agent's model (connection and model), environment, and activity, as columns
-with room and under the name otherwise, with lilac one-letter avatars carrying their status
-patches; each row opens its page. `AgentPane` is that page, from the v02 navigation frames: its
-title avatar carries the patch, and an Overview in one column, with a notice and its recovery when
-it cannot run, the name as its own save, the saved configuration with Edit configuration, details (its
-role, its turns in progress, each opening its log beside the page, and who created it), and
-Membership with Remove agent, and a Configuration tab whose `InstructionsField` and `ModelFields` (the model connection,
-the suggested or entered model, and each environment marked with whether it works, needs setup,
-or can't run the model) save together, or whose `ConfigurationSummary` shows them to members.
-`AddAgent` takes the name and initial role beside the same fields, and `ConfirmRemoveAgent`
-confirms removal. `ChooseProvider`, `ConfigureConnection`, and `ConnectionKey` take `returnTo`
-with `returnKind="agent"` for the model-connection detour. **Screens / Agents** walks the detour,
-roles, suggestions, fitting environments, a refused connection, stale reasoning, and members'
-view. Agents also shows each agent's current activity apart from its setup: nothing while idle,
-or its most pressing turn state with the threads it works in. `agentStatus`,
-`environmentStatus`, and `connectionStatus` word each one's state as a `Status` for the sidebar,
-profile cards, and rows the apps compose; an environment or connection that is ready has none. `TurnRow` shows an agent's turn as a compact row,
+`agentStatus` and `connectionStatus` word each one's state as a `Status` for the sidebar,
+profile cards, and rows the apps compose: an agent at work says where, and one that is ready and
+idle has none. `TurnRow` shows an agent's turn as a compact row,
 from the Lunacy "Turn activity" frames: the agent, its state, View log, and Stop or Retry for a
 reader who may direct it, with a failure's reason and Agent settings, and a refused command worded
 from its `TurnProblem` code; it moves its actions under the name when too narrow. A timeline's
 `turn` entries render as these rows where the agent took on the work, keyed by turn so Stop keeps
 its focus, when the `Timeline` or `ThreadPane` has `turns` controls; the timeline offers View turn
 log in an agent's reply's actions; a thread's replies and a sidebar group mark where agents work.
-`TurnLogPane` shows a turn's log in place of its thread: where and with what it runs, its
-activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
+`TurnLogPane` shows a turn's log in place of its thread: where it runs and its harness, model,
+and sandbox, its activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
 failure, and a footer that follows live, offers "New activity · Jump to latest" once the reader
 scrolls up, or offers Retry turn or View reply. **Screens / Turns** walks each state, the log's
 states, and a stop and retry. `ButtonLink` is a link drawn as a button, for actions such as Agent
@@ -437,11 +399,7 @@ preview's join prompt spans the main content only; the open thread beside it sim
 composer. Tab counts are plain numbers everywhere, where some mocks draw them as badges.
 The settings copy says "group" where the mocks said "channel", and the visibility help follows
 the chosen option. Task panel messages use the standard message size rather than the mock's
-smaller text. Connections' field errors keep the design system's error color and icon where the
-mocks draw them in caution, and an unavailable provider's saved settings are labeled by what the
-connection stored, since its declaration is gone. Environments' command fields grow to two lines as
-drawn; an account's refusal shows under its field rather than in it, and the mocks' Daytona
-connection details keep the generic connection layout. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
+smaller text. The mocks draw different composer toolbars per size; the screens use Attach and Mention, which
 the icon set covers, at every size, and add Formatting and its toggle, which the mocks do not draw;
 pressed formats share the selected row's fill.
 

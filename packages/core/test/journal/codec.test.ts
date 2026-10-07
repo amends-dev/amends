@@ -3,7 +3,6 @@ import { Effect, Result, Schema } from "effect";
 import { Hex } from "effect/encoding";
 import { Codec } from "../../src/journal/codec.ts";
 import { ThreadMessageFacts } from "../../src/thread/message/facts.ts";
-import { TurnLog } from "../../src/turn/log.ts";
 import { WorkspaceFacts } from "../../src/workspace/facts.ts";
 import { fixtures } from "./codec-fixtures.ts";
 
@@ -24,8 +23,4 @@ it.effect("preserves workspace initialization bytes written with Effect rc.115",
 
 it.effect("preserves message bytes with dates, Unicode, mentions, and a nullable turn", () =>
   verifyStoredPayload(ThreadMessageFacts.Published.payload, fixtures.message),
-);
-
-it.effect("preserves checkpoint bytes with transcript variants and provider metadata", () =>
-  verifyStoredPayload(TurnLog.Entry, fixtures.checkpoint),
 );

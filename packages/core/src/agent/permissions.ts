@@ -1,24 +1,30 @@
 import { Permission } from "../authorization/permission.ts";
 
 /**
- * Creating an agent establishes its membership and configuration. Its initial role still needs
- * the authority to grant it.
+ * Adding an agent adds its membership, so the actor must also be able to grant the role it starts
+ * with.
  */
 export const Create = Permission.make("agent.create", {
   targetKind: "Workspace",
   builtinTier: "administrator",
 });
 
-/** Seeing an agent's configuration: its instructions, model access, and environment. */
-export const Read = Permission.make("agent.read", { targetKind: "Member", builtinTier: "member" });
+/** Seeing how an agent is set up: its instructions, harness, model, and sandbox. */
+export const Read = Permission.make("agent.read", {
+  targetKind: "Member",
+  builtinTier: "member",
+});
 
-/** Changing an agent's name, instructions, model access, and environment. */
+/** Renaming an agent and changing how it is set up. */
 export const Configure = Permission.make("agent.configure", {
   targetKind: "Member",
   builtinTier: "administrator",
 });
 
-/** Authorize work directed to a particular agent's workspace membership. */
+/**
+ * Asking an agent for work: mentioning it, starting a conversation with it, making it follow a
+ * group, and retrying its turns. It keeps the name it had before agents, as it means the same.
+ */
 export const Use = Permission.make("agent.use", { targetKind: "Member", builtinTier: "member" });
 
 export * as AgentPermissions from "./permissions.ts";
