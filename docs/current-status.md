@@ -42,9 +42,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   opencode refuses a turn that gives some: only an agent without instructions runs on it.
 - The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
-  [Daytona](../adapters/sandbox-daytona/README.md). Local sandboxes share this machine's ports,
-  so only one that listens on a port, such as one running opencode's bridge, runs at a time. No
-  provider for E2B, Vercel, or Cloudflare exists; Cloudflare's SDK runs only inside a Worker, so
+  [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare
+  exists; Cloudflare's SDK runs only inside a Worker, so
   reaching it from a host needs its Bridge Worker.
 - [Connections](../packages/core/README.md#connections) are set up over HTTP and on the
   [Connections page](connections.md), from the integrations the

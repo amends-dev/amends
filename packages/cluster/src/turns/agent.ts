@@ -49,7 +49,6 @@ export const open = Effect.fn("TurnAgent.open")(function* (
     Effect.catchReason("SandboxError", "NotFoundError", () =>
       sandboxProvider.create({
         id,
-        ...(harness.agent.ports === undefined ? {} : { ports: harness.agent.ports }),
         ...(harness.agent.template === undefined ? {} : { template: harness.agent.template }),
       }),
     ),

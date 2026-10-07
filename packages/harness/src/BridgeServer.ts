@@ -1,8 +1,13 @@
 /**
  * The bridge's side of `Bridge.Rpcs`, which runs in the sandbox and serves a driver's sessions to
  * hosts. `serve` serves them over a WebSocket at `/`, refusing a host that does not present the
- * bridge's token, until a host asks the bridge to exit, and `layerHandlers` is the same bridge
- * without a transport. `readLaunchOptions` reads what the host that launched the bridge gave it.
+ * bridge's token, and `layerHandlers` is the same bridge without a transport. `readLaunchOptions`
+ * reads what the host that launched the bridge gave it.
+ *
+ * Once it listens, the bridge writes the port to `Bridge.listeningFile` in its state directory,
+ * where hosts find it. It exits once it runs no turn and either no host has started a session or a
+ * turn there for its idle timeout, or the file names another port: another bridge of its id took
+ * its place, as when two hosts launched one at once.
  *
  * Each session the bridge starts runs in a scope of its own until a host stops or destroys it. The
  * bridge runs the session's turns itself, one at a time, in that scope, so that a turn does not end
@@ -13,10 +18,12 @@
  * no end, which the bridge ran when it died, ended then, aborted. A turn the bridge aborted that a
  * host starts again continues, in the conversation the agent kept, from the steps it finished.
  */
+import { Network } from "@amends/sandbox";
 import {
   Cause,
+  Clock,
   Data,
-  Deferred,
+  Duration,
   Effect,
   Exit,
   Fiber,
@@ -25,7 +32,9 @@ import {
   Option,
   Path,
   Redacted,
+  Ref,
   Result,
+  Schedule,
   Schema,
   Scope,
   Semaphore,
@@ -34,7 +43,7 @@ import {
   SubscriptionRef,
 } from "effect";
 import { Prompt } from "effect/ai";
-import { HttpRouter, HttpServerResponse } from "effect/http";
+import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
 import { RpcSerialization, RpcServer } from "effect/rpc";
 import type { SessionId } from "./Agent.ts";
 import * as Bridge from "./Bridge.ts";
@@ -52,19 +61,48 @@ export interface Options {
   /** The token hosts present when they connect. */
   readonly token: Redacted.Redacted<string>;
 
-  /** The absolute directory the bridge keeps its turns in, outside every session's directory. */
+  /** The bridge's id, which `Hello` answers. */
+  readonly bridge: Bridge.BridgeId;
+
+  /**
+   * The absolute directory, outside every session's directory, that the bridge keeps its turns in
+   * and writes `Bridge.listeningFile` to.
+   */
   readonly stateDirectory: string;
+
+  /**
+   * How long the bridge waits for a host while it runs no turn, before it exits; 10 minutes by
+   * default.
+   */
+  readonly idleTimeout?: Duration.Input;
 }
 
 /**
- * Serves `driver`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, until a host
- * asks the bridge to exit. The sessions end, aborting their turns, when the scope closes.
+ * How busy a bridge is: how many turns it runs, and when a host last started a session or a turn
+ * there, or a turn last ended, in milliseconds since the epoch.
+ */
+export interface Activity {
+  readonly turns: number;
+  readonly lastActiveAt: number;
+}
+
+/**
+ * Serves `driver`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, and writes the
+ * server's port to `Bridge.listeningFile`, until the bridge has been idle for its idle timeout or
+ * another bridge of its id takes its place. The sessions end, aborting their turns, when the scope
+ * closes.
  */
 export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options: Options) {
-  const exitAsked = yield* Deferred.make<void>();
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const activity = yield* Ref.make<Activity>({
+    turns: 0,
+    lastActiveAt: yield* Clock.currentTimeMillis,
+  });
   const handlers = layerHandlers(driver, {
     stateDirectory: options.stateDirectory,
-    exit: Deferred.succeed(exitAsked, undefined),
+    bridge: options.bridge,
+    activity,
   });
   yield* Layer.build(
     HttpRouter.serve(
@@ -75,16 +113,41 @@ export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options
       { disableLogger: true },
     ),
   );
-  yield* Deferred.await(exitAsked);
+  const { address } = yield* HttpServer.HttpServer;
+  if (address._tag === "UnixPathAddress") {
+    return yield* Effect.die("A bridge listens on a port, not on a Unix socket");
+  }
+  const port = Network.Port.make(address.port);
+  const file = path.join(options.stateDirectory, Bridge.listeningFile);
+  /** Whether `Bridge.listeningFile` names this bridge's port. */
+  const isListed = Effect.map(readListening(file), (listed) => listed?.port === port);
+  yield* writeListening(file, { port });
+  // A file naming a bridge that has exited would cost the next host a request to learn so.
+  yield* Effect.addFinalizer(() =>
+    Effect.flatMap(isListed, (listed) => (listed ? Effect.ignore(fs.remove(file)) : Effect.void)),
+  );
+  const idleMillis = Duration.toMillis(options.idleTimeout ?? "10 minutes");
+  yield* Effect.repeat(
+    Effect.gen(function* () {
+      const { turns, lastActiveAt } = yield* Ref.get(activity);
+      const now = yield* Clock.currentTimeMillis;
+      return turns === 0 && (now - lastActiveAt >= idleMillis || !(yield* isListed));
+    }),
+    { until: (done) => done, schedule: Schedule.spaced("1 second") },
+  );
 });
 
 /**
- * Handles `Bridge.Rpcs` for `driver`'s sessions, over whichever transport serves them. `exit` ends
- * the bridge when a host asks it to.
+ * Handles `Bridge.Rpcs` for `driver`'s sessions, over whichever transport serves them, recording in
+ * `activity` the turns they run and when a host was last active.
  */
 export const layerHandlers = (
   driver: Bridge.Driver,
-  options: { readonly stateDirectory: string; readonly exit: Effect.Effect<unknown> },
+  options: {
+    readonly stateDirectory: string;
+    readonly bridge: Bridge.BridgeId;
+    readonly activity?: Ref.Ref<Activity>;
+  },
 ) => Bridge.Rpcs.toLayer(makeHandlers(driver, options));
 
 /**
@@ -167,13 +230,24 @@ const continuePrompt = Prompt.makeMessage("user", {
 
 const makeHandlers = Effect.fnUntraced(function* (
   driver: Bridge.Driver,
-  {
-    stateDirectory,
-    exit,
-  }: { readonly stateDirectory: string; readonly exit: Effect.Effect<unknown> },
+  options: {
+    readonly stateDirectory: string;
+    readonly bridge: Bridge.BridgeId;
+    readonly activity?: Ref.Ref<Activity>;
+  },
 ) {
+  const { stateDirectory, bridge } = options;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  const activity =
+    options.activity ??
+    (yield* Ref.make<Activity>({ turns: 0, lastActiveAt: yield* Clock.currentTimeMillis }));
+
+  /** Records that a host or a turn was active now, as the bridge runs `change` more turns. */
+  const recordActivity = (change: number) =>
+    Effect.flatMap(Clock.currentTimeMillis, (now) =>
+      Ref.update(activity, ({ turns }) => ({ turns: turns + change, lastActiveAt: now })),
+    );
   /** The handlers' scope, which every session's is forked from, so that sessions end with it. */
   const bridgeScope = yield* Effect.scope;
   const sessions = new Map<SessionId, StartedSession>();
@@ -241,29 +315,38 @@ const makeHandlers = Effect.fnUntraced(function* (
   const abortTurn = (started: StartedSession) =>
     started.fiber === undefined ? Effect.void : Fiber.interrupt(started.fiber);
 
-  /** Runs `turn` to its end, keeping each part as it streams, then how the turn ended. */
+  /**
+   * Runs `turn` to its end, keeping each part as it streams, then how the turn ended. The bridge
+   * counts it among its turns until it ends, and only then do its readers learn how it ended, so
+   * that a host that read the end finds the bridge no longer running it.
+   */
   const runTurn = (
     driverSession: Bridge.DriverSession,
     turn: Turn,
     options: Bridge.TurnOptions,
     file: string,
   ) =>
-    driverSession.promptTurn(options).pipe(
-      Stream.runForEach((part) => {
-        const numbered: Bridge.NumberedPart = { seq: turn.parts.length + 1, part };
-        return appendLine(file, numbered).pipe(
-          Effect.andThen(Effect.sync(() => turn.parts.push(numbered))),
-          Effect.andThen(SubscriptionRef.set(turn.progress, { count: numbered.seq })),
-        );
-      }),
-      Effect.onExit((exit) => {
+    Effect.acquireUseRelease(
+      recordActivity(1),
+      () =>
+        driverSession.promptTurn(options).pipe(
+          Stream.runForEach((part) => {
+            const numbered: Bridge.NumberedPart = { seq: turn.parts.length + 1, part };
+            return appendLine(file, numbered).pipe(
+              Effect.andThen(Effect.sync(() => turn.parts.push(numbered))),
+              Effect.andThen(SubscriptionRef.set(turn.progress, { count: numbered.seq })),
+            );
+          }),
+        ),
+      (_, exit) => {
         const end = endOf(exit, bridgeFailure);
         // Should this fail, the file has no end, so a bridge started again treats the turn as lost.
-        return Effect.andThen(
-          Effect.ignore(appendLine(file, { end })),
-          SubscriptionRef.set(turn.progress, { count: turn.parts.length, end }),
+        return Effect.ignore(appendLine(file, { end })).pipe(
+          Effect.andThen(recordActivity(-1)),
+          Effect.andThen(SubscriptionRef.set(turn.progress, { count: turn.parts.length, end })),
         );
-      }),
+      },
+    ).pipe(
       // How the turn ended, failure included, is kept for its readers.
       Effect.ignore,
     );
@@ -310,14 +393,14 @@ const makeHandlers = Effect.fnUntraced(function* (
   });
 
   return Bridge.Rpcs.of({
-    Hello: () => Effect.succeed({ agent: driver.id, protocolVersion: Bridge.protocolVersion }),
-
-    Exit: () => Effect.asVoid(exit),
+    Hello: () => Effect.succeed({ agent: driver.id, bridge }),
 
     StartSession: ({ session, directory, history, agentState, unfinishedTurn }) =>
       Semaphore.withPermit(
         lock,
         Effect.gen(function* () {
+          // A host connecting starts its session again, whether the bridge has it or not.
+          yield* recordActivity(0);
           const started =
             sessions.get(session) ??
             (yield* startSession({ id: session, directory, history, agentState }));
@@ -478,6 +561,29 @@ const endOf = (
     error: cause instanceof HarnessError ? cause : bridgeFailure(cause),
   });
 };
+
+/** What `file` says a bridge listens on, or nothing when it is missing or unreadable. */
+const readListening = (file: string) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const text = yield* fs.readFileString(file);
+    return yield* Schema.decodeEffect(Schema.fromJsonString(Bridge.Listening))(text);
+  }).pipe(Effect.orElseSucceed(() => undefined));
+
+/**
+ * Writes `listening` to `file` whole, through a file of its own beside it, so that a host never
+ * reads it half written. Another bridge of the same id writing at once leaves one of them listed.
+ */
+const writeListening = (file: string, listening: Bridge.Listening) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const text = yield* Schema.encodeEffect(Schema.fromJsonString(Bridge.Listening))(listening);
+    const written = `${file}.${listening.port}`;
+    yield* fs.makeDirectory(path.dirname(file), { recursive: true });
+    yield* fs.writeFileString(written, text);
+    yield* fs.rename(written, file);
+  });
 
 /**
  * Serves the protocol over WebSockets at `/`, opened only by a host that presents `token` as

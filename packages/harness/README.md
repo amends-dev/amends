@@ -9,7 +9,7 @@ the sandboxes agents work in.
 ## Agents and harnesses
 
 An agent's adapter implements `Agent.Agent`: its id, the `template` that installs it in a sandbox,
-the `ports` it listens on there, whether it `requiresSandbox`, and `startSession`, which starts an
+whether it `requiresSandbox`, and `startSession`, which starts an
 `AgentSession`, a new one or one picked up from what an earlier one returned. An agent session runs
 each turn with `promptTurn`, streaming `StreamPart`s until its `finish` part, and interrupting the
 stream aborts the turn. `suspendTurn`, `detach`, and `stop` return the agent's own state as JSON,
@@ -21,10 +21,9 @@ adapter describes it, without `startSession`: only the harness starts the agent'
 `startSession` starts a session: a new one, named by its `id`, or one that goes on from what it last
 saved, given as `resumeFrom`, on this agent or another. A new session given a `history` starts with
 that conversation, as when the agent joins one already under way. The caller creates the sandbox,
-from the agent's `template`, and owns it: a harness never stops or destroys one, and only exposes
-the agent's `ports` there, which the sandbox may have been created without, as when its session
-moves from another agent. Each session works in its own directory there, named by its id, so that
-its files stay in place when it moves from one agent to another.
+from the agent's `template`, and owns it: a harness never stops or destroys one. Each session works
+in its own directory there, named by its id, so that its files stay in place when it moves from one
+agent to another.
 
 ## Models
 
@@ -77,39 +76,49 @@ store a turn's steps. A failure the agent reports arrives as an `error` part; th
 ## Bridges
 
 An agent that works in a sandbox is reached only through a bridge there: a program that is all the
-sandbox exposes of the agent. One bridge runs for an agent in each sandbox and serves every
-session in it, on the agent's port, to hosts that present its token as `Authorization: Bearer`. It
-runs each turn itself, so that a turn goes on when a host's connection drops or the host lets go,
-and numbers and keeps the turn's parts, so that a host reads them from any number: after
-reconnecting, or to continue a turn another host suspended. `Bridge.Rpcs` is the protocol, over a
-WebSocket, at the version `Bridge.protocolVersion` names, which `Hello` answers. A host asks a
-bridge that speaks an older version to `Exit`, aborting its turns, and launches its own in its
-place; it refuses a bridge that speaks a newer one. Every version keeps `Hello` and `Exit` as they
-are.
+sandbox exposes of the agent, on a port of its own, to hosts that present its token as
+`Authorization: Bearer`. It runs each turn itself, so that a turn goes on when a host's connection
+drops or the host lets go, and numbers and keeps the turn's parts, so that a host reads them from
+any number: after reconnecting, or to continue a turn another host suspended. `Bridge.Rpcs` is the
+protocol, over a WebSocket.
+
+A bridge is named by its `Bridge.BridgeId`, a digest of everything a host launches it with, the
+protocol's version and the sandbox's token included, and serves every session that hosts start
+with those settings. Hosts that launch a bridge alike share it; a host with other settings, such as
+another model or key, runs its own beside it, so a bridge never runs a session on settings its host
+did not give. Each bridge listens on a port the sandbox picks, and writes it to
+`Bridge.listeningFile` in its state directory, `.bridge/<agent>/<bridge id>` in the sandbox's working
+directory, where hosts find it. It exits once it runs no turn and either no host has started a
+session or a turn there for ten minutes, or the file names another bridge of its id, as when two
+hosts launched one at once.
 
 - `Bridge.Driver` is what an adapter implements to drive its agent behind a bridge. It starts the
   agent's sessions and runs their turns, but needs neither to suspend nor to continue one: the
   bridge keeps the turns.
-- `BridgeServer.serve` serves a driver over the HTTP server a bridge program provides, until a host
-  asks the bridge to exit, with the token and state directory from the `Bridge.LaunchOptions` that
-  `BridgeServer.readLaunchOptions` reads from standard input. Each turn's parts go to a file in the state directory as well as to
+- `BridgeServer.serve` serves a driver over the HTTP server a bridge program provides, and writes
+  the server's port to `Bridge.listeningFile`, until the bridge exits idle or another takes its
+  place, with the token, the bridge's id, and its state directory from the `Bridge.LaunchOptions`
+  that `BridgeServer.readLaunchOptions` reads from standard input. Each turn's parts go to a file in the state directory as well as to
   memory, and a session keeps only its latest turn. A bridge started again serves a turn that had
   finished or failed before it exited. One it aborted, as when it exited or died during the turn,
   it continues when a host starts it again: the turn keeps the steps it finished, and the bridge
   prompts the agent with `Continue.`, as AI SDK's harness does, if the agent kept the conversation
   that holds the turn. Otherwise the host runs the turn again from its prompt.
 - `BridgeClient.startSession` starts the sessions of the adapter's `Agent.Agent`, which hosts run:
-  the agent requires a sandbox, lists the bridge's port among its `ports`, and calls it from
-  `startSession`, with what `BridgeClient.Options` says of its bridge. A session connects to the
-  bridge at the sandbox's endpoint for the port, and launches it with the adapter's command when
-  none answers, giving it the launch options on standard input. It runs the template first, which
+  the agent requires a sandbox and calls it from `startSession`, with what `BridgeClient.Options`
+  says of its bridge. A session reads its bridge's port from `Bridge.listeningFile`, exposes it,
+  and connects to the bridge at the sandbox's endpoint for the port; it launches the bridge with the
+  adapter's command when none answers there as that bridge, giving it the launch options on
+  standard input. It runs the template first, which
   installs only what the sandbox lacks, so that a sandbox prepared with another version of it
   launches this one. The token comes from the host's `token` function, derived from the sandbox's id
   with a secret every host shares, so that any host connects to a bridge any of them launched. Each
   connection starts the session in the bridge from the state the bridge last gave, so that a bridge
-  that died and was launched again has it again. `continueTurn` starts the turn again, which the
-  bridge continues if it did not finish it, but a turn the bridge loses while a stream reads it
-  fails with `NoTurnError`. A connection that drops is not opened again: requests it dropped are
+  that died, or exited idle, and was launched again has it again. `suspendTurn` keeps which bridge
+  runs the turn, so that `continueTurn` starts it again there, even for a host with other settings,
+  which goes on in its own bridge once the turn ends; a turn whose bridge is gone runs again from
+  its prompt. The bridge continues a turn it did not finish, but a turn the bridge loses while a
+  stream reads it fails with `NoTurnError`. A connection that drops is not opened again: requests it dropped are
   sent again over another, for up to 30 seconds, except a tool's result, an approval, and a request
   to compact, which the bridge must not receive twice. A turn is `StartTurn`, under an id the host
   picks, and `ReadTurn`, which reads on from the last part read. A session closes its connection

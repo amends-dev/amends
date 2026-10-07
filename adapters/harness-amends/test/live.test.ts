@@ -255,9 +255,7 @@ describe.skipIf(!enabled)("amends's agent set up from connections", () => {
         );
         const sandbox = yield* Effect.acquireRelease(
           provider.create(
-            harness.agent.template === undefined
-              ? { ports: harness.agent.ports }
-              : { template: harness.agent.template, ports: harness.agent.ports },
+            harness.agent.template === undefined ? {} : { template: harness.agent.template },
           ),
           (created) => Effect.ignore(created.destroy),
         );

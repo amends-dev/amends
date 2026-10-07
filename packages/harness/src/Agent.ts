@@ -15,7 +15,7 @@
  * Every agent is made with `Options`, the models it runs on, which its adapter extends with what
  * only that agent takes.
  */
-import { type Network, Sandbox, type Template } from "@amends/sandbox";
+import { Sandbox, type Template } from "@amends/sandbox";
 import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
@@ -180,12 +180,6 @@ export interface Agent {
 
   /** Installs the agent in a sandbox. An agent that runs in the host's process has none. */
   readonly template?: Template.Template;
-
-  /**
-   * The ports the agent listens on in its sandbox, which the harness exposes there when a session
-   * starts. A caller may also create the sandbox with them.
-   */
-  readonly ports?: ReadonlyArray<Network.Port>;
 
   /**
    * The longest name of a host tool the agent takes, for an agent that adds to the names it is given

@@ -1,13 +1,10 @@
 import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection";
 import type { ModelEndpoint } from "@amends/harness";
-import { Network } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Effect, Layer, Redacted } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
-
-const port = Network.Port.make(4096);
 
 const connection: Connection.Connection = {
   id: Connection.ConnectionId.make("conn-1"),
@@ -26,7 +23,6 @@ const sonnet = {
 } satisfies ModelEndpoint.ModelEndpoint;
 
 const makeIntegration = OpencodeAgent.integration({
-  port,
   token: () => Redacted.make("bridge-token"),
 });
 
@@ -46,7 +42,6 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
         expect(integration.requiresSandbox).toBe(true);
         expect(harness.agent.id).toBe("opencode");
         expect(harness.agent.requiresSandbox).toBe(true);
-        expect(harness.agent.ports).toEqual([port]);
         expect(harness.agent.template?.name).toBe("opencode");
         expect(another.agent.template).toBe(harness.agent.template);
         expect(yield* integration.check(connection, undefined)).toEqual({ status: "healthy" });

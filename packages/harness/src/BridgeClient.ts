@@ -1,21 +1,30 @@
 /**
- * The host's side of `Bridge.Rpcs`, for an agent that works in a sandbox and is reached through the
- * bridge there. The adapter's `Agent.Agent` requires a sandbox, lists the bridge's port among its
- * `ports`, and starts each session with `startSession`, from what the adapter says of its bridge.
+ * The host's side of `Bridge.Rpcs`, for an agent that works in a sandbox and is reached through a
+ * bridge there. The adapter's `Agent.Agent` requires a sandbox and starts each session with
+ * `startSession`, from what the adapter says of its bridge.
  *
- * A session connects to the bridge in its sandbox while it uses it, and closes the connection when
- * it lets go, or once it has gone unused for a minute. Each connection launches the bridge when none
- * answers, and starts the session there from the state the bridge last gave, so that a bridge that
- * restarted, as after it died, has the session again. A connection that drops is not opened again:
- * a request it dropped is sent again over another, for up to 30 seconds, as AI SDK's harness
+ * A session's own bridge is the one its options launch: its `Bridge.BridgeId` is a digest of them
+ * and of the sandbox's token, so that sessions of hosts that launch a bridge alike share one, and a
+ * host with other options, such as another model, runs its own beside it. A session finds the
+ * bridge's port in `Bridge.listeningFile`, in the bridge's state directory, exposes the port, and
+ * launches the bridge when none answers there.
+ *
+ * A session connects to its bridge while it uses it, and closes the connection when it lets go, or
+ * once it has gone unused for a minute. Each connection launches the bridge when none answers, and
+ * starts the session there from the state the bridge last gave, so that a bridge that restarted,
+ * as after it died or exited idle, has the session again. A connection that drops is not opened
+ * again: a request it dropped is sent again over another, for up to 30 seconds, as AI SDK's harness
  * reconnects, unless the bridge must not receive it twice.
  *
  * A turn is two requests: `StartTurn`, under an id the host picks, and `ReadTurn`, which reads the
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge
- * whoever reads it, so `suspendTurn` only stops reading, and `continueTurn` starts the turn again,
- * which the bridge continues if it did not finish it, as when it died, and reads it again from its
- * start, after the steps the harness has. A session whose bridge cannot answer, as when its sandbox
- * is gone, lets go with the state the bridge last gave.
+ * whoever reads it, so `suspendTurn` only stops reading, keeping which bridge runs the turn, and
+ * `continueTurn` starts the turn again there, which the bridge continues if it did not finish it,
+ * as when it died, and reads it again from its start, after the steps the harness has. A session
+ * resumed with other options continues the turn in the bridge that runs it and then goes on in its
+ * own; one whose turn's bridge is gone runs the turn again from its prompt in its own. A session
+ * whose bridge cannot answer, as when its sandbox is gone, lets go with the state the bridge last
+ * gave.
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox";
 import {
@@ -23,6 +32,7 @@ import {
   Deferred,
   Effect,
   Exit,
+  FileSystem,
   Path,
   RcRef,
   Record,
@@ -35,6 +45,7 @@ import {
   Stream,
 } from "effect";
 import { Tool } from "effect/ai";
+import { Hex } from "effect/encoding";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { RpcClient, type RpcClientError, RpcSerialization } from "effect/rpc";
 import { Socket } from "effect/socket";
@@ -63,16 +74,13 @@ export interface Options {
    */
   readonly template: Template.Template;
 
-  /** The port the bridge listens on in its sandbox, which the agent lists among its `ports`. */
-  readonly port: Network.Port;
-
   /** The command that runs the bridge in the sandbox, and its arguments. */
   readonly command: string;
 
   readonly args?: ReadonlyArray<string>;
 
   /**
-   * The token the bridge in the sandbox `id` takes, derived from the id with a secret every host
+   * The token the bridges in the sandbox `id` take, derived from the id with a secret every host
    * shares, such as an HMAC of it, so that every host connects to a bridge any of them launched.
    */
   readonly token: (id: Sandbox.SandboxId) => Redacted.Redacted<string>;
@@ -86,19 +94,16 @@ const State = Schema.Struct({
   /** What the agent behind the bridge gave as the session's state. */
   agentState: Schema.Json,
 
-  /** The turn `suspendTurn` cut short. */
-  unfinishedTurn: Schema.optionalKey(Bridge.TurnId),
+  /** The turn `suspendTurn` cut short, and the bridge that runs it. */
+  unfinishedTurn: Schema.optionalKey(
+    Schema.Struct({ turn: Bridge.TurnId, bridge: Bridge.BridgeId }),
+  ),
 });
 
 const StateJson = Schema.toCodecJson(State);
 
 /** A client of the bridge in a sandbox. */
 type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientError>;
-
-/** A client of a bridge, with what the bridge answered to `Hello`. */
-interface Answer extends Schema.Schema.Type<typeof Bridge.Hello.successSchema> {
-  readonly client: Client;
-}
 
 /**
  * Starts a session, as `Agent.startSession` does, of the agent behind the bridge that `options`
@@ -119,6 +124,8 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
   const { sandbox, directory } = workspace;
   const session = startOptions.id;
   const crypto = yield* Crypto.Crypto;
+  const token = options.token(sandbox.id);
+  const own = yield* bridgeIdOf(options, token);
 
   const saved = yield* Schema.decodeEffect(Schema.UndefinedOr(StateJson))(
     startOptions.unfinishedTurn ?? startOptions.agentState,
@@ -134,7 +141,9 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
   );
 
   /** The turn running, or the one `suspendTurn` cut short, for `continueTurn` to read. */
-  const running = yield* Ref.make(saved?.unfinishedTurn);
+  const running = yield* Ref.make(saved?.unfinishedTurn?.turn);
+  /** The bridge the session uses: the one that runs the turn `suspendTurn` cut short, or its own. */
+  const bridge = yield* Ref.make(saved?.unfinishedTurn?.bridge ?? own);
   /**
    * The session's state as the bridge last gave it, which a bridge that restarted starts the
    * session again from, and which the session lets go with when the bridge cannot answer.
@@ -148,6 +157,18 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
    * and the session closes knowing the turn the bridge runs.
    */
   const admission = yield* Semaphore.make(1);
+
+  /**
+   * A client of the session's bridge, or of its own when that bridge is gone, launching its own when
+   * none answers: only the options of its own are the session's to launch.
+   */
+  const connectToBridge = Effect.gen(function* () {
+    const current = yield* Ref.get(bridge);
+    const found = current === own ? undefined : yield* findBridge(options, sandbox, token, current);
+    if (found !== undefined) return found;
+    yield* Ref.set(bridge, own);
+    return yield* connect(options, sandbox, token, own);
+  });
 
   /**
    * Starts the session in the bridge from its latest state, with the turn running, or takes up the
@@ -175,7 +196,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
    * that starts the session, in a scope of its own that nothing closes.
    */
   const connection = yield* RcRef.make({
-    acquire: Effect.flatMap(connect(options, sandbox), startInBridge),
+    acquire: Effect.flatMap(connectToBridge, startInBridge),
     idleTimeToLive: "1 minute",
   }).pipe(Scope.provide(yield* Scope.make()));
 
@@ -247,9 +268,14 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
       );
       yield* Ref.set(latestState, agentState);
       yield* RcRef.invalidate(connection);
-      return yield* Schema.encodeEffect(StateJson)(
-        unfinishedTurn === undefined ? { agentState } : { agentState, unfinishedTurn },
-      ).pipe(Effect.orDie);
+      const state: typeof State.Type =
+        unfinishedTurn === undefined
+          ? { agentState }
+          : {
+              agentState,
+              unfinishedTurn: { turn: unfinishedTurn, bridge: yield* Ref.get(bridge) },
+            };
+      return yield* Schema.encodeEffect(StateJson)(state).pipe(Effect.orDie);
     });
 
   /**
@@ -266,7 +292,14 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
         const afterTurn = Effect.gen(function* () {
           if (yield* Deferred.isDone(closed)) return;
           yield* Ref.set(running, undefined);
-          if (yield* Ref.get(finished)) {
+          if ((yield* Ref.get(bridge)) !== own) {
+            // The turn ran in the bridge of the host that started it, with that host's options;
+            // the session goes on in its own, which starts it from the state this one gives.
+            const agentState = yield* send((client) => client.StopSession({ session }));
+            yield* Ref.set(latestState, agentState);
+            yield* Ref.set(bridge, own);
+            yield* RcRef.invalidate(connection);
+          } else if (yield* Ref.get(finished)) {
             const agentState = yield* send((client) => client.ReadState({ session }));
             yield* Ref.set(latestState, agentState);
           } else {
@@ -390,21 +423,87 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
 });
 
 /**
- * A client of the bridge in `sandbox`, over a WebSocket open for as long as the scope is, launching
- * the bridge when none answers, and replacing one that speaks an older version of the protocol. The
- * WebSocket is not opened again when it drops, so that requests then fail with `RpcClientError`
- * rather than reach a bridge that restarted without the session. Fails with `UnsupportedError` when
- * the bridge on the port runs another agent, or speaks a newer version of the protocol.
+ * A client of the bridge `bridge`, which `options` launch in `sandbox`, over a WebSocket open for as
+ * long as the scope is, launching the bridge when none answers.
  */
 const connect = Effect.fnUntraced(function* (
   options: Options,
   sandbox: Sandbox.Sandbox["Service"],
+  token: Redacted.Redacted<string>,
+  bridge: Bridge.BridgeId,
 ) {
-  const endpoint = yield* sandbox.endpoint(options.port, "ws").pipe(
+  // The client lives in this scope, whichever effect finds the bridge.
+  const find = findBridge(options, sandbox, token, bridge).pipe(Scope.provide(yield* Effect.scope));
+  return (yield* find) ?? (yield* launch(options, sandbox, token, bridge, find));
+});
+
+/**
+ * A client of the bridge `bridge` in `sandbox`, at the port its `Bridge.listeningFile` names, over a
+ * WebSocket open for as long as the scope is, or nothing, with the WebSocket closed, when no bridge
+ * answers there as that bridge within 2 seconds: one that exited left its file behind, and another
+ * may listen on its port since. A bridge that is not running refuses the WebSocket, so the question
+ * fails rather than waits. The WebSocket is not opened again when it drops, so that requests then
+ * fail with `RpcClientError` rather than reach a bridge that restarted without the session.
+ */
+const findBridge = Effect.fnUntraced(function* (
+  options: Options,
+  sandbox: Sandbox.Sandbox["Service"],
+  token: Redacted.Redacted<string>,
+  bridge: Bridge.BridgeId,
+) {
+  const listening = yield* readListening(sandbox, options.id, bridge);
+  if (listening === undefined) return undefined;
+  const endpoint = yield* endpointOf(options.id, sandbox, listening.port);
+  const clientScope = yield* Scope.fork(yield* Effect.scope);
+  return yield* openClient(endpoint, token).pipe(
+    Effect.tap((client) =>
+      Effect.timeout(client.Hello(), "2 seconds").pipe(
+        Effect.filterOrFail((hello) => hello.agent === options.id && hello.bridge === bridge),
+      ),
+    ),
+    Scope.provide(clientScope),
+    Effect.onError((cause) => Scope.close(clientScope, Exit.failCause(cause))),
+    Effect.orElseSucceed(() => undefined),
+  );
+});
+
+/** Where the bridge `bridge` of the agent `agent` says it listens, or nothing when it says nothing. */
+const readListening = (
+  sandbox: Sandbox.Sandbox["Service"],
+  agent: string,
+  bridge: Bridge.BridgeId,
+) =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const directory = yield* stateDirectoryOf(sandbox, agent, bridge);
+    const text = yield* fs.readFileString(path.join(directory, Bridge.listeningFile));
+    return yield* Schema.decodeEffect(Schema.fromJsonString(Bridge.Listening))(text);
+  }).pipe(
+    Effect.orElseSucceed(() => undefined),
+    Effect.provide(Sandbox.layerServices(sandbox)),
+  );
+
+/**
+ * The directory in `sandbox` that the bridge `bridge` of the agent `agent` keeps its state in,
+ * outside every session's directory.
+ */
+const stateDirectoryOf = (
+  sandbox: Sandbox.Sandbox["Service"],
+  agent: string,
+  bridge: Bridge.BridgeId,
+) => Effect.map(Path.Path, (path) => path.join(sandbox.workingDirectory, ".bridge", agent, bridge));
+
+/** How to reach `port` of `sandbox`, which the sandbox exposes first if it does not yet. */
+const endpointOf = (agent: string, sandbox: Sandbox.Sandbox["Service"], port: Network.Port) =>
+  sandbox.endpoint(port, "ws").pipe(
+    Effect.catchReason("SandboxError", "NotFoundError", () =>
+      Effect.andThen(sandbox.exposePorts([port]), sandbox.endpoint(port, "ws")),
+    ),
     Effect.mapError(
       (error) =>
         new HarnessError({
-          agent: options.id,
+          agent,
           reason:
             error.reason._tag === "UnavailableError"
               ? new UnavailableError({ description: error.message })
@@ -413,60 +512,6 @@ const connect = Effect.fnUntraced(function* (
         }),
     ),
   );
-  const token = options.token(sandbox.id);
-  const scope = yield* Effect.scope;
-
-  /**
-   * A client over a new WebSocket, and what the bridge there answers to `Hello`, or nothing, with
-   * the WebSocket closed, when no bridge answers within 2 seconds. A bridge that is not running
-   * refuses the WebSocket, so the question fails rather than waits.
-   */
-  const answer = Effect.gen(function* () {
-    const clientScope = yield* Scope.fork(scope);
-    return yield* openClient(endpoint, token).pipe(
-      Effect.flatMap((client) =>
-        Effect.map(Effect.timeout(client.Hello(), "2 seconds"), (hello): Answer => ({
-          client,
-          ...hello,
-        })),
-      ),
-      Scope.provide(clientScope),
-      Effect.onError((cause) => Scope.close(clientScope, Exit.failCause(cause))),
-      Effect.orElseSucceed(() => undefined),
-    );
-  });
-
-  /**
-   * Asks a bridge of an older version of the protocol to exit, which aborts its turns, and launches
-   * this host's once no bridge answers.
-   */
-  const replace = (older: Answer) =>
-    Effect.gen(function* () {
-      yield* Effect.ignore(older.client.Exit());
-      yield* Effect.repeat(answer, {
-        until: (reply) => reply === undefined,
-        schedule: Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "30 seconds" })),
-      });
-      return yield* launch(options, sandbox, token, answer);
-    });
-
-  const unsupported = (description: string) =>
-    new HarnessError({ agent: options.id, reason: new UnsupportedError({ description }) });
-
-  const found = (yield* answer) ?? (yield* launch(options, sandbox, token, answer));
-  if (found.agent !== options.id) {
-    return yield* unsupported(
-      `The bridge on port ${options.port} runs ${found.agent}, not ${options.id}`,
-    );
-  }
-  const answered = found.protocolVersion < Bridge.protocolVersion ? yield* replace(found) : found;
-  if (answered.protocolVersion !== Bridge.protocolVersion) {
-    return yield* unsupported(
-      `The bridge on port ${options.port} speaks version ${answered.protocolVersion} of the bridge protocol, and this host version ${Bridge.protocolVersion}`,
-    );
-  }
-  return answered.client;
-});
 
 /**
  * A client of the bridge at `endpoint`, over a WebSocket that presents `token`, for as long as the
@@ -500,33 +545,33 @@ const openClient = Effect.fnUntraced(function* (
 });
 
 /**
- * Launches the bridge, once the template has installed it, giving it its launch options on standard
- * input, and waits until it answers, as `answer` asks it. Unreferenced, the bridge outlives the
- * scope that launched it and the host; it stops with the sandbox.
+ * Launches the bridge `bridge`, once the template has installed it, giving it its launch options on
+ * standard input, and waits until `find` finds it. Unreferenced, the bridge outlives the scope that
+ * launched it and the host; it exits once idle, or stops with the sandbox.
  */
 const launch = Effect.fnUntraced(
   function* (
     options: Options,
     sandbox: Sandbox.Sandbox["Service"],
     token: Redacted.Redacted<string>,
-    answer: Effect.Effect<Answer | undefined, never, Socket.WebSocketConstructor>,
+    bridge: Bridge.BridgeId,
+    find: Effect.Effect<Client | undefined, HarnessError, Socket.WebSocketConstructor>,
   ) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const path = yield* Path.Path;
     const unavailable = (description: string) =>
       new HarnessError({ agent: options.id, reason: new UnavailableError({ description }) });
 
     const launchOptions = yield* Schema.encodeEffect(Schema.fromJsonString(Bridge.LaunchOptions))({
       token: Redacted.value(token),
-      port: options.port,
-      stateDirectory: path.join(sandbox.workingDirectory, ".bridge", options.id),
+      bridge,
+      stateDirectory: yield* stateDirectoryOf(sandbox, options.id, bridge),
       agentOptions: options.agentOptions,
     }).pipe(Effect.orDie);
     // A sandbox prepared with another version of the template lacks this version's bridge.
     yield* options.template.prepare;
     // TODO: Keep the bridge's own output in its state directory, for a host to report why the
     // bridge failed to start.
-    const bridge = yield* spawner.spawn(
+    const process = yield* spawner.spawn(
       ChildProcess.make(options.command, options.args ?? [], {
         cwd: sandbox.workingDirectory,
         // One line, which the bridge reads without waiting for its input to end.
@@ -536,30 +581,24 @@ const launch = Effect.fnUntraced(
       }),
     );
     // Never referenced again, so the effect that would do so is dropped.
-    yield* Effect.asVoid(bridge.unref);
+    yield* Effect.asVoid(process.unref);
 
-    const answered = answer.pipe(
+    const found = find.pipe(
       Effect.filterOrFail(
-        (reply) => reply !== undefined,
-        () => "no answer" as const,
+        (client) => client !== undefined,
+        () => unavailable("The bridge did not answer within 30 seconds"),
       ),
       Effect.retry(Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "30 seconds" }))),
-      Effect.mapError(() => unavailable("The bridge did not answer within 30 seconds")),
     );
-    // Another host launching a bridge at the same time takes the port first; this one then exits
-    // while the other answers. A bridge already on the port that refuses the token makes it exit
-    // too.
-    const exited = Effect.flatMap(bridge.exitCode, (code) =>
+    // A bridge that fails to start exits, which the host learns at once rather than in 30 seconds.
+    const exited = Effect.flatMap(process.exitCode, (code) =>
       Effect.filterOrFail(
-        answer,
-        (reply) => reply !== undefined,
-        () =>
-          unavailable(
-            `The bridge exited with code ${code} before it answered. A bridge already on port ${options.port} that refuses this host's token makes it exit so.`,
-          ),
+        find,
+        (client) => client !== undefined,
+        () => unavailable(`The bridge exited with code ${code} before it answered`),
       ),
     );
-    return yield* Effect.raceFirst(answered, exited);
+    return yield* Effect.raceFirst(found, exited);
   },
   Effect.scoped,
   (effect, _options, sandbox) => Effect.provide(effect, Sandbox.layerServices(sandbox)),
@@ -649,3 +688,49 @@ const afterSteps = (steps: number) =>
         finished < steps ? [] : [part],
       ] as const,
   );
+
+// Every runtime this package runs on has the WHATWG `TextEncoder`, which no type the package
+// includes declares, and Effect exports no encoder of its own.
+declare const TextEncoder: new () => { readonly encode: (text: string) => Uint8Array };
+
+/**
+ * The id of the bridge `options` launch, in the sandbox whose bridges take `token`: a digest of
+ * everything the bridge is launched with, keyed by the token, so that it says nothing of the
+ * options' keys, and hosts with another secret never share a bridge.
+ */
+const bridgeIdOf = Effect.fnUntraced(function* (
+  options: Options,
+  token: Redacted.Redacted<string>,
+) {
+  const crypto = yield* Crypto.Crypto;
+  const launchedWith = canonicalJsonOf({
+    token: Redacted.value(token),
+    agent: options.id,
+    protocolVersion: Bridge.protocolVersion,
+    template: options.template.identity,
+    command: options.command,
+    args: options.args ?? [],
+    agentOptions: options.agentOptions,
+  });
+  const digest = yield* crypto
+    .digest("SHA-256", new TextEncoder().encode(launchedWith))
+    .pipe(Effect.orDie);
+  return Bridge.BridgeId.make(Hex.encode(digest).slice(0, 32));
+});
+
+/** `value` as JSON with each object's keys in order, so that equal values have equal text. */
+const canonicalJsonOf = (value: Schema.Json): string => JSON.stringify(sortedKeys(value));
+
+const sortedKeys = (value: Schema.Json): Schema.Json => {
+  if (value === null || typeof value !== "object") return value;
+  if (isJsonArray(value)) return value.map(sortedKeys);
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, sortedKeys(value[key] ?? null)]),
+  );
+};
+
+// `Array.isArray` narrows no readonly array out of a union.
+const isJsonArray = (value: Schema.JsonArray | Schema.JsonObject): value is Schema.JsonArray =>
+  Array.isArray(value);

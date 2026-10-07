@@ -4,16 +4,16 @@
  * agent's adapter, as `LanguageModel.make` builds a language model from a provider's.
  *
  * The caller creates the sandbox a session works in, from the `template` of the harness's `agent`,
- * and owns it: a harness never stops or destroys a sandbox, and only exposes the agent's `ports`
- * there. Each session works in its own directory there, named by its id, so that its files stay in
- * place when the session moves from one agent to another. A session needs no sandbox when its agent does not require one, such as for a plain
+ * and owns it: a harness never stops or destroys a sandbox. Each session works in its own directory
+ * there, named by its id, so that its files stay in place when the session moves from one agent to
+ * another. A session needs no sandbox when its agent does not require one, such as for a plain
  * conversation.
  */
-import { Sandbox, type SandboxError } from "@amends/sandbox";
+import { Sandbox } from "@amends/sandbox";
 import { Context, Effect, FileSystem, Layer, Path } from "effect";
 import { Prompt } from "effect/ai";
 import type { Agent, SessionId, Workspace } from "./Agent.ts";
-import { HarnessError, UnavailableError, UnknownError, UnsupportedError } from "./HarnessError.ts";
+import { HarnessError, UnknownError, UnsupportedError } from "./HarnessError.ts";
 import { makeSession } from "./internal/session.ts";
 import type * as Session from "./Session.ts";
 
@@ -53,8 +53,7 @@ export class Harness extends Context.Service<
     /**
      * The agent the harness runs, as its adapter describes it: its id, the sandbox it works in, and
      * the names of tools it takes. Only the harness starts its sessions. Starting one fails with
-     * `UnsupportedError` without a sandbox when the agent `requiresSandbox`, and exposes the agent's
-     * `ports` in the sandbox, which fails as the sandbox does when it cannot expose them.
+     * `UnsupportedError` without a sandbox when the agent `requiresSandbox`.
      */
     readonly agent: Omit<Agent, "startSession">;
 
@@ -80,20 +79,6 @@ export const make = (agent: Agent): Harness["Service"] => {
           }),
         )
       : Effect.void;
-
-  /** Exposes the ports the agent listens on in `sandbox`, which may have been created without them. */
-  const exposeAgentPorts = (sandbox: Sandbox.Sandbox["Service"]) =>
-    agent.ports === undefined || agent.ports.length === 0
-      ? Effect.void
-      : Effect.mapError(
-          sandbox.exposePorts(agent.ports),
-          (error) =>
-            new HarnessError({
-              agent: agent.id,
-              reason: reasonOfSandboxError(error),
-              cause: error,
-            }),
-        );
 
   /** The session's workspace in `sandbox`, creating its directory if it does not exist yet. */
   const makeWorkspace = Effect.fnUntraced(
@@ -122,10 +107,7 @@ export const make = (agent: Agent): Harness["Service"] => {
       const { sandbox, resumeFrom } = options;
       const id = options.resumeFrom === undefined ? options.id : options.resumeFrom.id;
       yield* checkSandbox(sandbox);
-      const workspace =
-        sandbox === undefined
-          ? undefined
-          : yield* Effect.andThen(exposeAgentPorts(sandbox), makeWorkspace(sandbox, id));
+      const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, id);
       const history = resumeFrom?.history ?? options.history ?? Prompt.empty;
       // An agent's own state means something only to the agent that wrote it. Any other agent
       // starts from the conversation, and the session runs an unfinished turn again on it.
@@ -146,19 +128,6 @@ export const make = (agent: Agent): Harness["Service"] => {
       });
     }),
   });
-};
-
-/** The reason a harness fails for a sandbox's failure: unsupported or unavailable as it was. */
-const reasonOfSandboxError = (error: SandboxError.SandboxError) => {
-  const description = error.message;
-  switch (error.reason._tag) {
-    case "UnsupportedError":
-      return new UnsupportedError({ description });
-    case "UnavailableError":
-      return new UnavailableError({ description });
-    default:
-      return new UnknownError({ description });
-  }
 };
 
 /** A harness over `agent`, for programs that run one agent. */

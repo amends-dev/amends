@@ -1,4 +1,3 @@
-import type { Port } from "@amends/sandbox/Network";
 import { Sandbox, SandboxId } from "@amends/sandbox/Sandbox";
 import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
@@ -46,9 +45,6 @@ export interface FakeAgentOptions {
   /** Whether every session needs a sandbox, as most agents do. True by default. */
   readonly requiresSandbox?: boolean;
 
-  /** The ports the agent listens on in its sandbox. None by default. */
-  readonly ports?: ReadonlyArray<Port>;
-
   /** The longest name of a host tool the agent takes. No limit by default. */
   readonly maxToolNameLength?: number;
 
@@ -83,7 +79,6 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
     const agent: Agent = {
       id,
       requiresSandbox: options.requiresSandbox ?? true,
-      ports: options.ports,
       maxToolNameLength: options.maxToolNameLength,
       startSession: (startOptions) =>
         Effect.gen(function* () {
@@ -172,14 +167,10 @@ export interface FakeSandbox {
 
   /** The directories created in the sandbox, in order. */
   readonly directories: ReadonlyArray<string>;
-
-  /** The ports each `exposePorts` exposed, in order. */
-  readonly exposed: ReadonlyArray<ReadonlyArray<Port>>;
 }
 
 export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
   const directories: Array<string> = [];
-  const exposed: Array<ReadonlyArray<Port>> = [];
   const sandbox = Sandbox.of({
     id: SandboxId.make("fake"),
     description: "A fake sandbox",
@@ -190,14 +181,14 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
     childProcessSpawner: ChildProcessSpawner.make(() =>
       Effect.die("The fake sandbox runs no processes"),
     ),
-    exposePorts: (ports) => Effect.sync(() => void exposed.push(ports)),
+    exposePorts: () => Effect.void,
     endpoint: () => Effect.die("The fake sandbox reaches no ports"),
     stop: Effect.void,
     destroy: Effect.void,
     setNetworkPolicy: () => Effect.void,
     addRequestTransformations: () => Effect.void,
   });
-  return { sandbox, directories, exposed };
+  return { sandbox, directories };
 });
 
 /** A turn that answers `text` in one step. */

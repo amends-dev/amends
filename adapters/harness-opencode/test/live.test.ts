@@ -9,7 +9,7 @@ import {
 import { SessionId } from "@amends/harness/Agent";
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
 import { LocalSandboxProvider } from "@amends/sandbox-local";
-import { Network, type Sandbox, type Template } from "@amends/sandbox";
+import type { Sandbox, Template } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -30,7 +30,7 @@ import { FetchHttpClient } from "effect/http";
 import * as OpencodeDriver from "../src/bridge/Driver.ts";
 import * as Models from "../src/Models.ts";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
-import { freePort, makeSandbox } from "./fixtures.ts";
+import { makeSandbox } from "./fixtures.ts";
 
 /**
  * These tests run real opencode, whose turns a model answers over the network, so they take a
@@ -111,16 +111,14 @@ const makeLiveDriver = (endpoints?: Parameters<typeof Models.fromEndpoints>[0]) 
     return { driver, directory };
   });
 
-/** The sandboxes hosts run opencode in, the port its bridge listens on there, and opencode's environment. */
+/** The sandboxes hosts run opencode in, and opencode's environment. */
 interface Sandboxes {
-  readonly freePort: Effect.Effect<Network.Port, unknown, Scope.Scope>;
   readonly env: Effect.Effect<
     OpencodeAgent.Options["env"],
     unknown,
     Scope.Scope | FileSystem.FileSystem | Path.Path
   >;
   readonly create: (
-    port: Network.Port,
     template: Template.Template | undefined,
   ) => Effect.Effect<Sandbox.Sandbox["Service"], unknown, Scope.Scope | HostServices>;
 }
@@ -129,22 +127,20 @@ type HostServices = Layer.Success<typeof HostLayer>;
 
 /** Directories on this machine, where opencode keeps apart from this machine's own. */
 const localSandboxes: Sandboxes = {
-  freePort,
   env: makeOpencodeEnv,
   create: makeSandbox,
 };
 
 /** Machines of their own in Daytona's cloud, where nothing listens on a port yet. */
 const daytonaSandboxes: Sandboxes = {
-  freePort: Effect.succeed(Network.Port.make(4096)),
   env: Effect.succeed({}),
-  create: (port, template) =>
+  create: (template) =>
     Effect.gen(function* () {
       const provider = yield* DaytonaSandboxProvider.make({
         apiKey: Redacted.make(process.env.DAYTONA_API_KEY ?? ""),
       });
       return yield* Effect.acquireRelease(
-        provider.create(template === undefined ? { ports: [port] } : { ports: [port], template }),
+        provider.create(template === undefined ? {} : { template }),
         (sandbox) => Effect.ignore(sandbox.destroy),
       );
     }),
@@ -157,13 +153,11 @@ const daytonaSandboxes: Sandboxes = {
  */
 const makeLiveHosts = (sandboxes: Sandboxes) =>
   Effect.gen(function* () {
-    const port = yield* sandboxes.freePort;
     const env = yield* sandboxes.env;
     const model = yield* makeEndpoint;
     const makeHarness = Effect.map(
       OpencodeAgent.make({
         model,
-        port,
         token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
         config,
         ...(env === undefined ? {} : { env }),
@@ -172,7 +166,7 @@ const makeLiveHosts = (sandboxes: Sandboxes) =>
     );
     const harness = yield* makeHarness;
     const nextHarness = yield* makeHarness;
-    const sandbox = yield* sandboxes.create(port, harness.agent.template);
+    const sandbox = yield* sandboxes.create(harness.agent.template);
     return { sandbox, harness, nextHarness };
   });
 
@@ -576,7 +570,6 @@ const describeConnections = (
       () =>
         Effect.gen(function* () {
           const fs = yield* FileSystem.FileSystem;
-          const port = yield* sandbox.sandboxes.freePort;
           const env = yield* sandbox.sandboxes.env;
           const integrations = yield* Integrations.make([
             ...(yield* ModelIntegrations.catalogProviders),
@@ -585,7 +578,6 @@ const describeConnections = (
             }),
             yield* DaytonaSandboxProvider.integration,
             yield* OpencodeAgent.integration({
-              port,
               token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
               config,
               ...(env === undefined ? {} : { env }),
@@ -607,9 +599,7 @@ const describeConnections = (
           )).sandboxProvider(sandbox.connection, sandbox.credential);
           const created = yield* Effect.acquireRelease(
             provider.create(
-              harness.agent.template === undefined
-                ? { ports: harness.agent.ports }
-                : { template: harness.agent.template, ports: harness.agent.ports },
+              harness.agent.template === undefined ? {} : { template: harness.agent.template },
             ),
             (made) => Effect.ignore(made.destroy),
           );

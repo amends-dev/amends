@@ -1,25 +1,11 @@
-import { Bridge, Harness, type StreamPart } from "@amends/harness";
+import { Harness, type StreamPart } from "@amends/harness";
 import { SessionId } from "@amends/harness/Agent";
-import { type Network, type Sandbox, Template } from "@amends/sandbox";
-import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
+import { type Sandbox, Template } from "@amends/sandbox";
+import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import {
-  Deferred,
-  Effect,
-  Exit,
-  Fiber,
-  Layer,
-  Path,
-  Redacted,
-  Schedule,
-  Schema,
-  Scope,
-  Stream,
-} from "effect";
-import { HttpRouter } from "effect/http";
+import { Deferred, Effect, Fiber, Layer, Path, Redacted, Schedule, Schema, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
-import { freePort, isRunning, makeBridgedAgent, makeProxy, makeSandbox } from "./fixtures.ts";
+import { isRunning, makeBridgedAgent, makeProxy, makeSandbox } from "./fixtures.ts";
 
 /**
  * The bridge client launches `fake-bridge.ts`, a bridge over a stand-in agent, in a sandbox on this
@@ -60,32 +46,34 @@ const templateOf = (version: string): Template.Template => ({
   }),
 });
 
+const secretOfHosts = "the hosts' secret";
+
 /**
- * A harness over the fake bridge on `port`, at `version`, run by a host that derives tokens from
- * `secret`.
+ * A harness over the fake bridge at `version`, whose agent greets with `greeting`, run by a host
+ * that derives tokens from `secret`. Its bridge exits after `idleSeconds` without a host, if given.
  */
-const makeHarness = (
-  port: Network.Port,
-  { secret = "the hosts' secret", version = "1" }: { secret?: string; version?: string } = {},
-) =>
+const makeHarness = ({
+  secret = secretOfHosts,
+  version = "1",
+  greeting = "hello",
+  idleSeconds,
+}: { secret?: string; version?: string; greeting?: string; idleSeconds?: number } = {}) =>
   Effect.map(
     makeBridgedAgent({
       id: "fake",
       template: templateOf(version),
-      port,
       command: process.execPath,
       args: [`bridge-${version}.ts`],
       token: (sandboxId) => Redacted.make(`${secret}/${sandboxId}`),
-      agentOptions: { greeting: "hello" },
+      agentOptions: { greeting, ...(idleSeconds === undefined ? {} : { idleSeconds }) },
     }),
     Harness.make,
   );
 
-/** A sandbox on a free port, and a harness over the fake bridge there. */
+/** A sandbox, and a harness over the fake bridge there. */
 const makeSetup = Effect.gen(function* () {
-  const port = yield* freePort;
-  const sandbox = yield* makeSandbox(port);
-  return { port, sandbox, harness: yield* makeHarness(port) };
+  const sandbox = yield* makeSandbox();
+  return { sandbox, harness: yield* makeHarness() };
 });
 
 /** The lines of `file` in the sandbox's working directory, as JSON. */
@@ -101,55 +89,64 @@ const linesOf = (sandbox: Sandbox.Sandbox["Service"], file: string) =>
       .map((line): unknown => JSON.parse(line));
   });
 
+/** The process ids of the bridges launched in the sandbox, in the order they launched. */
+const launchedPids = (sandbox: Sandbox.Sandbox["Service"]) =>
+  Effect.flatMap(linesOf(sandbox, "launches.jsonl"), (launches) =>
+    Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ pid: Schema.Int })))(launches),
+  ).pipe(Effect.map((launches) => launches.map(({ pid }) => pid)));
+
+/** Waits until the process `pid` has exited, for up to 10 seconds. */
+const awaitExit = (pid: number) =>
+  Effect.repeat(isRunning(pid), {
+    while: (running) => running,
+    schedule: Schedule.spaced("50 millis"),
+  }).pipe(Effect.timeout("10 seconds"));
+
 /** Kills the bridge launched last in the sandbox, as when it crashes, once it has exited. */
 const killBridge = (sandbox: Sandbox.Sandbox["Service"]) =>
   Effect.gen(function* () {
-    const launches = yield* linesOf(sandbox, "launches.jsonl");
-    const { pid } = yield* Schema.decodeUnknownEffect(Schema.Struct({ pid: Schema.Int }))(
-      launches.at(-1),
-    );
+    const pid = (yield* launchedPids(sandbox)).at(-1) ?? 0;
     process.kill(pid, "SIGKILL");
-    yield* Effect.repeat(isRunning(pid), {
-      while: (running) => running,
-      schedule: Schedule.spaced("20 millis"),
-    });
+    yield* awaitExit(pid);
   });
 
-/**
- * Serves on `port`, from this process, a bridge of the fake agent that speaks `protocolVersion`,
- * as a host of another version would have launched, answering only the requests every version
- * keeps. It stops listening once a host asks it to exit, which the returned `Deferred` records.
- */
-const serveOtherVersion = (port: Network.Port, protocolVersion: number) =>
+/** Where each bridge of the fake agent in the sandbox says it listens: its file, and the port. */
+const listeningOf = (sandbox: Sandbox.Sandbox["Service"]) =>
   Effect.gen(function* () {
-    const exitAsked = yield* Deferred.make<void>();
-    const Rpcs = RpcGroup.make(Bridge.Hello, Bridge.Exit);
-    const serverScope = yield* Scope.make();
-    // Bun's server finishes stopping only once hosts close their connections.
-    const stop = Effect.forkDetach(Scope.close(serverScope, Exit.void)).pipe(
-      Effect.flatMap(Fiber.await),
-      Effect.timeout("1 second"),
-      Effect.ignore,
-    );
-    yield* Effect.addFinalizer(() => stop);
-    yield* Layer.buildWithScope(
-      HttpRouter.serve(
-        RpcServer.layer(Rpcs).pipe(
-          Layer.provide(
-            Rpcs.toLayer({
-              Hello: () => Effect.succeed({ agent: "fake", protocolVersion }),
-              Exit: () => Effect.asVoid(Deferred.succeed(exitAsked, undefined)),
-            }),
-          ),
-          Layer.provide(RpcServer.layerProtocolWebsocket({ path: "/" })),
-          Layer.provide(RpcSerialization.layerJson),
+    const path = yield* Path.Path;
+    const root = path.join(sandbox.workingDirectory, ".bridge", "fake");
+    const bridges = yield* sandbox.fileSystem.readDirectory(root);
+    const listed = yield* Effect.forEach(bridges, (bridge) => {
+      const file = path.join(root, bridge, "listening.json");
+      return sandbox.fileSystem.readFileString(file).pipe(
+        Effect.flatMap(
+          Schema.decodeEffect(Schema.fromJsonString(Schema.Struct({ port: Schema.Int }))),
         ),
-        { disableLogger: true },
-      ).pipe(Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port }))),
-      serverScope,
-    );
-    yield* Effect.forkScoped(Effect.andThen(Deferred.await(exitAsked), stop));
-    return exitAsked;
+        Effect.map(({ port }) => ({ file, port })),
+        Effect.option,
+      );
+    });
+    return listed.flatMap((option) => (option._tag === "Some" ? [option.value] : []));
+  });
+
+/** Whether a WebSocket to `port` on this machine, presenting `token`, opens. */
+const opens = (port: number, token: string) =>
+  Effect.callback<boolean>((resume) => {
+    let answered = false;
+    const answer = (opened: boolean) => {
+      if (answered) return;
+      answered = true;
+      resume(Effect.succeed(opened));
+    };
+    const webSocket = new WebSocket(`ws://127.0.0.1:${port}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    webSocket.onopen = () => {
+      answer(true);
+      webSocket.close();
+    };
+    webSocket.onerror = () => answer(false);
+    webSocket.onclose = () => answer(false);
   });
 
 /** Lets the stand-in agent finish a `wait` turn of the session `id`. */
@@ -197,9 +194,8 @@ describe("BridgeClient", () => {
 
     it.live("installs its bridge before it launches it, in a sandbox prepared for another", () =>
       Effect.gen(function* () {
-        const port = yield* freePort;
-        const sandbox = yield* makeSandbox(port, templateOf("1"));
-        const harness = yield* makeHarness(port, { version: "2" });
+        const sandbox = yield* makeSandbox(templateOf("1"));
+        const harness = yield* makeHarness({ version: "2" });
 
         const session = yield* harness.startSession({ sandbox, id });
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
@@ -208,37 +204,11 @@ describe("BridgeClient", () => {
       }).pipe(Effect.provide(TestLayer)),
     );
 
-    it.live("replaces a bridge of an older protocol with its own", () =>
+    it.live("connects to the bridge another host launched with the same options", () =>
       Effect.gen(function* () {
-        const { port, sandbox, harness } = yield* makeSetup;
-        const exitAsked = yield* serveOtherVersion(port, Bridge.protocolVersion - 1);
-
-        const session = yield* harness.startSession({ sandbox, id });
-        const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
-
-        expect(yield* Deferred.isDone(exitAsked)).toBe(true);
-        expect(parts).toEqual(answer("hello"));
-        expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(1);
-      }).pipe(Effect.provide(TestLayer)),
-    );
-
-    it.live("refuses a bridge of a newer protocol, leaving it running", () =>
-      Effect.gen(function* () {
-        const { port, sandbox, harness } = yield* makeSetup;
-        const exitAsked = yield* serveOtherVersion(port, Bridge.protocolVersion + 1);
-
-        const error = yield* Effect.flip(harness.startSession({ sandbox, id }));
-
-        expect(error.reason._tag).toBe("UnsupportedError");
-        expect(yield* Deferred.isDone(exitAsked)).toBe(false);
-      }).pipe(Effect.provide(TestLayer)),
-    );
-
-    it.live("connects to the bridge another host launched", () =>
-      Effect.gen(function* () {
-        const { port, sandbox, harness } = yield* makeSetup;
+        const { sandbox, harness } = yield* makeSetup;
         yield* harness.startSession({ sandbox, id });
-        const otherHarness = yield* makeHarness(port);
+        const otherHarness = yield* makeHarness();
 
         const session = yield* otherHarness.startSession({
           sandbox,
@@ -251,28 +221,48 @@ describe("BridgeClient", () => {
       }).pipe(Effect.provide(TestLayer)),
     );
 
-    it.live("is refused by the bridge when the host's token is another", () =>
+    it.live("runs a bridge of its own for a host with other options, or another secret", () =>
       Effect.gen(function* () {
-        const { port, sandbox, harness } = yield* makeSetup;
+        const { sandbox, harness } = yield* makeSetup;
+        const greet = (made: Harness.Harness["Service"], session: string) =>
+          Effect.flatMap(made.startSession({ sandbox, id: SessionId.make(session) }), (started) =>
+            Stream.runCollect(started.stream({ prompt: "greet" })),
+          );
+
+        const greetings = [
+          yield* greet(harness, "session-1"),
+          yield* greet(yield* makeHarness({ greeting: "hi" }), "session-2"),
+          yield* greet(yield* makeHarness({ secret: "another secret" }), "session-3"),
+        ];
+
+        expect(greetings).toEqual([answer("hello"), answer("hi"), answer("hello")]);
+        expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(3);
+        expect(yield* listeningOf(sandbox)).toHaveLength(3);
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("refuses a connection that presents another token", () =>
+      Effect.gen(function* () {
+        const { sandbox, harness } = yield* makeSetup;
         yield* harness.startSession({ sandbox, id });
-        const strangerHarness = yield* makeHarness(port, { secret: "another secret" });
+        const [listening] = yield* listeningOf(sandbox);
+        const port = listening?.port ?? 0;
 
-        const error = yield* Effect.flip(strangerHarness.startSession({ sandbox, id }));
-
-        expect(error.reason._tag).toBe("UnavailableError");
+        expect(yield* opens(port, "another token")).toBe(false);
+        expect(yield* opens(port, `${secretOfHosts}/${sandbox.id}`)).toBe(true);
       }).pipe(Effect.provide(TestLayer)),
     );
 
     it.live("leaves a suspended turn running in the bridge, for another host to continue", () =>
       Effect.gen(function* () {
-        const { port, sandbox, harness } = yield* makeSetup;
+        const { sandbox, harness } = yield* makeSetup;
         const session = yield* harness.startSession({ sandbox, id });
         const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
 
         const state = yield* session.suspendTurn;
         yield* Fiber.join(reading);
         yield* release(sandbox);
-        const otherHarness = yield* makeHarness(port);
+        const otherHarness = yield* makeHarness();
         const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
         const parts = yield* Stream.runCollect(resumed.continueStream({}));
 
@@ -281,17 +271,42 @@ describe("BridgeClient", () => {
     );
 
     it.live(
+      "continues a suspended turn in the bridge that runs it, for a host with other options, then goes on in its own",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeSetup;
+          const session = yield* harness.startSession({ sandbox, id });
+          const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
+
+          const state = yield* session.suspendTurn;
+          yield* Fiber.join(reading);
+          yield* release(sandbox);
+          const otherHarness = yield* makeHarness({ greeting: "hi" });
+          const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+          const continued = yield* Stream.runCollect(resumed.continueStream({}));
+          const next = yield* Stream.runCollect(resumed.stream({ prompt: "greet" }));
+          const { agentState } = yield* resumed.detach;
+
+          expect(continued).toEqual(answer("later"));
+          expect(next).toEqual(answer("hi"));
+          // The session's own bridge starts it from the state the other gave, of its first turn.
+          expect(agentState).toEqual({ agentState: { turns: 2 } });
+          expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
+        }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live(
       "continues a suspended turn its bridge lost when it died, in the agent's conversation",
       () =>
         Effect.gen(function* () {
-          const { port, sandbox, harness } = yield* makeSetup;
+          const { sandbox, harness } = yield* makeSetup;
           const session = yield* harness.startSession({ sandbox, id });
           const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
 
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
           yield* killBridge(sandbox);
-          const otherHarness = yield* makeHarness(port);
+          const otherHarness = yield* makeHarness();
           const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
           const parts = yield* Stream.runCollect(resumed.continueStream({}));
           const { history } = yield* resumed.detach;
@@ -300,6 +315,27 @@ describe("BridgeClient", () => {
           expect(parts).toEqual(answer("Continue."));
           expect(history.content.map((message) => message.role)).toEqual(["user", "assistant"]);
           expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
+        }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live(
+      "runs a suspended turn again in its own bridge, when the bridge that ran it is gone",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeSetup;
+          const session = yield* harness.startSession({ sandbox, id });
+          const reading = yield* readFromFirstPart(session.stream({ prompt: "wait again" }));
+
+          const state = yield* session.suspendTurn;
+          yield* Fiber.join(reading);
+          yield* killBridge(sandbox);
+          yield* release(sandbox);
+          const otherHarness = yield* makeHarness({ greeting: "hi" });
+          const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+          const parts = yield* Stream.runCollect(resumed.continueStream({}));
+
+          // Run again from its prompt, rather than continued, which would answer "Continue.".
+          expect(parts).toEqual(answer("again"));
         }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -319,11 +355,17 @@ describe("BridgeClient", () => {
 
     it.live("reads on after the connection drops, from the last part read", () =>
       Effect.gen(function* () {
-        const { port, sandbox, harness } = yield* makeSetup;
-        const proxy = yield* makeProxy(port);
+        const { sandbox, harness } = yield* makeSetup;
+        /** The port of the bridge, which the proxy forwards to once an endpoint names it. */
+        let upstream = 0;
+        const proxy = yield* makeProxy(() => upstream);
         const throughProxy: Sandbox.Sandbox["Service"] = {
           ...sandbox,
-          endpoint: () => Effect.succeed({ url: `ws://127.0.0.1:${proxy.port}`, headers: {} }),
+          endpoint: (port) =>
+            Effect.sync(() => {
+              upstream = port;
+              return { url: `ws://127.0.0.1:${proxy.port}`, headers: {} };
+            }),
         };
         const session = yield* harness.startSession({ sandbox: throughProxy, id });
         const reading = yield* readFromFirstPart(session.stream({ prompt: "wait across" }));
@@ -394,6 +436,72 @@ describe("BridgeClient", () => {
         expect(
           yield* sandbox.fileSystem.exists(path.join(sandbox.workingDirectory, `destroyed-${id}`)),
         ).toBe(true);
+      }).pipe(Effect.provide(TestLayer)),
+    );
+  });
+
+  describe("over a bridge that exits", () => {
+    it.live(
+      "exits once idle, removing where it listens, and is launched again for the next turn",
+      () =>
+        Effect.gen(function* () {
+          const sandbox = yield* makeSandbox();
+          const harness = yield* makeHarness({ idleSeconds: 1 });
+          const session = yield* harness.startSession({ sandbox, id });
+          yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
+
+          const [pid = 0] = yield* launchedPids(sandbox);
+          yield* awaitExit(pid);
+          const listedOnceIdle = yield* listeningOf(sandbox);
+          const parts = yield* Stream.runCollect(session.stream({ prompt: "reply second" }));
+          const state = yield* session.detach;
+
+          expect(listedOnceIdle).toEqual([]);
+          expect(parts).toEqual(answer("second"));
+          expect(state.agentState).toEqual({ agentState: { turns: 2 } });
+          expect(yield* launchedPids(sandbox)).toHaveLength(2);
+        }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("exits once another bridge of its id takes its place, leaving that one listed", () =>
+      Effect.gen(function* () {
+        const { sandbox, harness } = yield* makeSetup;
+        yield* harness.startSession({ sandbox, id });
+        const [listening] = yield* listeningOf(sandbox);
+        const file = listening?.file ?? "";
+
+        yield* sandbox.fileSystem.writeFileString(file, JSON.stringify({ port: 1 }));
+        const [pid = 0] = yield* launchedPids(sandbox);
+        yield* awaitExit(pid);
+
+        expect(yield* listeningOf(sandbox)).toEqual([{ file, port: 1 }]);
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
+    it.live("ends with one bridge when two hosts launch it at once, serving both", () =>
+      Effect.gen(function* () {
+        const sandbox = yield* makeSandbox();
+        const harnesses = [yield* makeHarness(), yield* makeHarness()];
+        const sessions = yield* Effect.forEach(
+          harnesses,
+          (harness, index) =>
+            harness.startSession({ sandbox, id: SessionId.make(`session-${index + 1}`) }),
+          { concurrency: "unbounded" },
+        );
+
+        const first = yield* Effect.forEach(sessions, (session) =>
+          Stream.runCollect(session.stream({ prompt: "reply first" })),
+        );
+        // A bridge another took the place of exits within a second or so of running no turn.
+        yield* Effect.sleep("3 seconds");
+        const running = yield* Effect.filter(yield* launchedPids(sandbox), isRunning);
+        const second = yield* Effect.forEach(sessions, (session) =>
+          Stream.runCollect(session.stream({ prompt: "reply second" })),
+        );
+
+        expect(first).toEqual([answer("first"), answer("first")]);
+        expect(running).toHaveLength(1);
+        expect(second).toEqual([answer("second"), answer("second")]);
       }).pipe(Effect.provide(TestLayer)),
     );
   });

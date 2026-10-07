@@ -1,8 +1,9 @@
 /**
  * opencode as an agent that hosts run. opencode works in the sandbox behind its bridge: the agent's
  * template installs both there, and a session launches the bridge when none answers. One bridge and
- * one opencode server serve every session in a sandbox, whichever host started it. What runs in the
- * sandbox is in `bridge/`.
+ * one opencode server serve every session that hosts start in a sandbox with the same options,
+ * whichever host started it; other options, such as another model, get a bridge and a server of
+ * their own. What runs in the sandbox is in `bridge/`.
  *
  * opencode runs on the model endpoints the agent is made with, which `Models` configures it for.
  * Their keys reach opencode in its configuration, in the sandbox, where the commands opencode runs
@@ -15,7 +16,7 @@
  */
 import { Connection, Integration } from "@amends/connection";
 import { type Agent, BridgeClient, Harness, HarnessError } from "@amends/harness";
-import type { Network, Sandbox } from "@amends/sandbox";
+import type { Sandbox } from "@amends/sandbox";
 import { type Crypto, Effect, type Redacted, Schema } from "effect";
 import type { Socket } from "effect/socket";
 import type { Options as DriverOptions } from "./bridge/Driver.ts";
@@ -25,9 +26,6 @@ import * as Template from "./Template.ts";
 // TODO: Keep the endpoints' keys out of the sandbox, giving opencode stand-ins that the sandbox
 // replaces with the keys in the requests that leave it, once a sandbox provider can.
 export interface Options extends Agent.Options {
-  /** The port the bridge listens on in its sandbox, which the harness exposes there. */
-  readonly port: Network.Port;
-
   /**
    * The token the bridge in the sandbox `id` takes, derived from the id with a secret every host
    * shares, such as an HMAC of it, so that every host connects to a bridge any of them launched.
@@ -109,7 +107,6 @@ const agentOf = Effect.fnUntraced(function* (
   const bridge: BridgeClient.Options = {
     id: "opencode",
     ...installation,
-    port: options.port,
     token: options.token,
     agentOptions: {
       model: models.model,
@@ -122,7 +119,6 @@ const agentOf = Effect.fnUntraced(function* (
     id: "opencode",
     requiresSandbox: true,
     template: installation.template,
-    ports: [options.port],
     startSession: (startOptions) =>
       Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
   };

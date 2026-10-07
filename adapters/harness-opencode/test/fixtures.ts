@@ -1,24 +1,21 @@
 import { type Agent, BridgeClient } from "@amends/harness";
 import { LocalSandboxProvider } from "@amends/sandbox-local";
 import { Network, type Template } from "@amends/sandbox";
-import { BunHttpServer } from "@effect/platform-bun";
 import { type Crypto, Effect, FileSystem, Path, Schema } from "effect";
 import type { Socket } from "effect/socket";
 import { SessionEvent } from "../src/bridge/SessionEvent.ts";
 
 /**
- * A new sandbox on this machine exposing `port`, prepared with `template` if given, and destroyed
- * with the processes it runs, such as opencode's server, when the scope closes.
+ * A new sandbox on this machine, prepared with `template` if given, and destroyed with the
+ * processes it runs, such as opencode's server, when the scope closes.
  */
-export const makeSandbox = (port: Network.Port, template?: Template.Template) =>
+export const makeSandbox = (template?: Template.Template) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const provider = yield* LocalSandboxProvider.make({
       directory: yield* fs.makeTempDirectoryScoped(),
     });
-    const sandbox = yield* provider.create(
-      template === undefined ? { ports: [port] } : { ports: [port], template },
-    );
+    const sandbox = yield* provider.create(template === undefined ? {} : { template });
     yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
     return sandbox;
   });
@@ -34,7 +31,6 @@ export const makeBridgedAgent = (bridge: BridgeClient.Options) =>
       id: bridge.id,
       requiresSandbox: true,
       template: bridge.template,
-      ports: [bridge.port],
       startSession: (startOptions) =>
         Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
     }),
@@ -83,15 +79,6 @@ export const isRunning = (pid: number) =>
     }
   });
 
-/** A port on this machine that nothing listens on, for a server the test starts on it. */
-export const freePort = Effect.scoped(
-  Effect.flatMap(BunHttpServer.make({ hostname: "127.0.0.1", port: 0 }), ({ address }) =>
-    address._tag === "UnixPathAddress"
-      ? Effect.die("The server listens on no port")
-      : Effect.succeed(Network.Port.make(address.port)),
-  ),
-);
-
 /**
  * Numbers events as opencode records them in the session `sessionID`, from `firstSeq`: the
  * returned function makes the session's next event of `type`, with `data` beside the fields every
@@ -127,8 +114,8 @@ export interface Proxy {
   readonly drop: Effect.Effect<void>;
 }
 
-/** A proxy to `port` on this machine, stopped when the scope closes. */
-export const makeProxy = (port: Network.Port) =>
+/** A proxy to the port `upstream` names at each connection, stopped when the scope closes. */
+export const makeProxy = (upstream: () => number) =>
   Effect.map(
     Effect.acquireRelease(
       Effect.sync(() => {
@@ -150,7 +137,7 @@ export const makeProxy = (port: Network.Port) =>
               // A port nothing listens on yet refuses the connection, which then closes.
               Bun.connect({
                 hostname: "127.0.0.1",
-                port,
+                port: upstream(),
                 socket: {
                   open: (upstream) => {
                     pair.upstream = upstream;

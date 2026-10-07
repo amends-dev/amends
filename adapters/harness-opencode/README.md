@@ -8,11 +8,12 @@ outside the sandbox.
 ## Running it
 
 `OpencodeAgent.make` gives the agent a harness runs. Its options are `Agent.Options`, the `model`
-endpoint a turn runs on when it names none and the `models` a turn can name, by name, with the `port`
-the bridge listens on, which has no default; and the host's `token` function, which derives each sandbox's bridge token
-from its id with a secret every host shares, such as an HMAC. opencode's `config`, as opencode 1.18
-writes its `opencode.json`, whose `providers` the models' replace, and its `env` take effect when
-the bridge starts opencode's server; a server already running keeps the ones it started with.
+endpoint a turn runs on when it names none and the `models` a turn can name, by name, with the
+host's `token` function, which derives each sandbox's bridge token from its id with a secret every
+host shares, such as an HMAC. opencode's `config`, as opencode 1.18 writes its `opencode.json`,
+whose `providers` the models' replace, and its `env` take effect when the bridge starts opencode's
+server. All of these, the keys included, name the bridge, so an agent made with other options gets
+a bridge and a server of its own in a sandbox, and never runs on another's.
 
 `Models` configures opencode for the endpoints. Each endpoint names its provider and model as
 opencode finds them in models.dev, which tells opencode the rest of the model, such as whether it
@@ -25,11 +26,10 @@ models.dev does not list runs without tools.
 
 `make` bundles the bridge program with `Bun.build`, so the host runs on Bun, with the adapter's
 sources. It needs `Crypto` and a `Socket.WebSocketConstructor` that sends headers, as Bun's and
-Node's do. The caller creates each sandbox with the `template` of the harness's `agent`, whose
-`ports` the harness exposes there.
+Node's do. The caller creates each sandbox with the `template` of the harness's `agent`.
 
 `OpencodeAgent.integration` is the integration of opencode, for a host to install with what the
-agent takes besides its models: the `port`, the `token` function, and opencode's `config` and `env`.
+agent takes besides its models: the `token` function, and opencode's `config` and `env`.
 It bundles the bridge once, when it is made, and needs what `make` does, and says that opencode
 requires a sandbox. A connection to it gives no settings and no credential, and is always healthy,
 as it reaches nothing; its harness runs on the endpoints it is given, which connections to model
@@ -52,8 +52,8 @@ A session launches the bridge, when none answers, with `sh -c 'exec "$HOME/…/b
 giving it its launch options on standard input. It runs the template first, so that a sandbox a
 host of another version prepared gets this version's bridge program, and Bun and opencode if their
 versions changed. `src/bridge/main.ts` is the program: it makes
-the driver in `src/bridge/Driver.ts` from the agent options and serves it on the port with
-`BunBridge.serve`. Bun's server never finishes stopping once a WebSocket has been open, so
+the driver in `src/bridge/Driver.ts` from the agent options and serves it with `BunBridge.serve`,
+on a port the sandbox picks, which it writes to the bridge's state directory for hosts to find. Bun's server never finishes stopping once a WebSocket has been open, so
 `BunBridge` runs it in a scope of its own, which it gives a second to close.
 
 When the first session starts, the bridge starts opencode's server, `opencode serve`, on
@@ -62,8 +62,7 @@ server only in its environment. The server reads its configuration from a direct
 makes for it, which only the sandbox's user can read and which the bridge removes when the server
 stops, in place of the configuration under the sandbox user's home; a project's own configuration,
 in a session's directory, applies over it. A server that has not stopped 3 seconds after the bridge
-asks it to is killed. One server serves every session in the sandbox, each in its own
-directory. A server that fails to start is started again by the next session; one that exits by
+asks it to is killed. One server serves every session of the bridge, each in its own directory. A server that fails to start is started again by the next session; one that exits by
 itself takes the bridge with it, and the next session launches both again. A bridge that dies, as
 when it is killed, leaves its server running, still on the turn the bridge ran, beside the server
 the next bridge starts, and its configuration stays with it. opencode keeps its data where it
