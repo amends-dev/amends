@@ -75,9 +75,9 @@ its own tables beside the adapter's (`cluster_messages`, `cluster_replies`, `clu
 holds one of the pool's connections for its shard locks. Every hour, one runner prunes job
 requests handled more than seven days ago.
 
-The host runs no [turn jobs](../../packages/core/README.md#jobs) yet, while the turn job is rebuilt
-on harness-v2: core's requests for them are accepted and nothing runs them, so work asked of agents
-waits in their inboxes.
+The host runs no [turn jobs](../../packages/core/README.md#jobs) yet, though
+[cluster](../../packages/cluster/README.md) has the turn job: core's requests for them are accepted
+and nothing runs them, so work asked of agents waits in their inboxes.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
 share out the jobs, and when one stops answering, the others take its

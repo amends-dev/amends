@@ -5,6 +5,7 @@ import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
 import { TurnExecution } from "./turn/execution.ts";
+import type { SessionLogStore } from "./turn/session-log-store.ts";
 import { AgentV2Query } from "./agent-v2/query.ts";
 import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionV2Service } from "./connection-v2/service.ts";
@@ -258,9 +259,11 @@ export type HostServices = Layer.Services<typeof layer>;
 export type Operations = Layer.Success<typeof operations>;
 
 /**
- * The services a host's jobs call. They act as the agent or the product and check no actor's
- * permissions, so only jobs a host trusts run them, never a protocol's handlers for an actor.
+ * The services a host's jobs call: what they ask of the workspace, and the session logs a turn's
+ * job writes, which take part in no commit. They act as the agent or the product and check no
+ * actor's permissions, so only jobs a host trusts run them, never a protocol's handlers for an
+ * actor.
  *
  * @category models
  */
-export type JobServices = Layer.Success<typeof jobServices>;
+export type JobServices = Layer.Success<typeof jobServices> | SessionLogStore.Service;

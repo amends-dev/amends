@@ -16,17 +16,21 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), but no
-  host runs turns yet: the turn job is being rebuilt on [harness-v2](../packages/harness-v2/README.md),
-  so the local host accepts its requests and runs nothing, and work waits in agents' inboxes. Core
-  starts each turn as one harness turn on what [agents v2](../packages/core/README.md#agents-v2)
-  select, prompted with the thread's messages since the agent's last turn there, and posts the
-  reply its job gives, the text of the turn's last step; a turn that fails or is stopped posts
-  nothing. The job is to record the conversation in each participation's session log, from which
-  the agent's next turn there resumes; resuming reads the whole log each turn, since nothing yet
-  compacts a long one. A reader with a turn's log open follows it as a stream of its items and the
-  step being written; the text being written is best effort, and a reader sees it from the next
-  draft that starts at its part's beginning, or once its step finishes. The [turn screens](turns.md) follow, stop, and retry turns in
-  threads and show each turn's log; threads have no titles, so the log names a thread by its group.
+  host runs turns yet: [cluster](../packages/cluster/README.md)'s turn job runs them on
+  [harness-v2](../packages/harness-v2/README.md), and the local host does not run it, so it accepts
+  core's requests and runs nothing, and work waits in agents' inboxes. Core starts each turn as one
+  harness turn on what [agents v2](../packages/core/README.md#agents-v2) select, prompted with the
+  thread's messages since the agent's last turn there, and posts the reply its job gives, the text
+  of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
+  conversation in each participation's session log, from which the agent's next turn there
+  resumes; resuming reads the whole log each turn, since nothing yet compacts a long one. A turn
+  cut short runs again from its prompt rather than continuing, and a session's sandbox is left
+  running between turns, never stopped or destroyed. A reader with a turn's log open follows it as
+  a stream of its items and the step being written; the text being written is best effort, and a
+  reader who starts following midway, or misses a draft while reconnecting, sees a step's text
+  from its next text part, or once the step finishes. The [turn screens](turns.md) follow, stop,
+  and retry turns in threads and show each turn's log; threads have no titles, so the log names a
+  thread by its group.
   A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
   activity for participants is not built. The active turns read covers at most a hundred active
   turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
@@ -34,7 +38,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - [Harness v2](../packages/harness-v2/README.md) runs amends's own agent
   ([harness-amends-v2](../adapters/harness-amends-v2)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
-  no turn runs on either until the turn job is rebuilt. Amends's agent does not summarize a
+  no host runs turns on either yet. Amends's agent does not summarize a
   conversation that outgrows its model's context, and opencode's session API takes no
   instructions for a turn, so opencode refuses a turn that gives some.
 - The [v2 sandbox contract](../packages/sandbox-v2) has two providers: directories on this machine
@@ -57,7 +61,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   profile photos, and the Agents v2 page does not show where an agent is at work. A removed agent's
   membership cannot be reactivated, as a person's cannot.
 - Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
-  job for each agent in each thread. The local host runs none until the turn job is rebuilt, and
+  job for each agent in each thread. The local host runs none yet, and
   prunes handled job requests on an Effect Cluster runner. Several host processes over one
   database share that work; one that stops answering keeps its workspaces for the takeover time,
   35 seconds by default. Cluster's socket transport, which delivers job requests between processes

@@ -55,8 +55,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   gives a workspace's connections (models, tools, sandboxes, and harnesses), and the model catalog.
   `cluster` runs jobs, the work outside requests, on Effect Cluster: entities whose requests a
   commit stores, with their retries and pruning. Jobs enter workspaces through the gateway like
-  any other caller. Its turn job, one for each agent in each thread, is being rebuilt on
-  `harness-v2`.
+  any other caller. Its turn job, one for each agent in each thread, runs the agent's turns on
+  `harness-v2` and writes their session logs.
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `harness-amends-v2` is amends's own agent, a loop over Effect AI's
   `LanguageModel` with the model providers' clients, and `harness-opencode` runs opencode behind its

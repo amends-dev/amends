@@ -27,7 +27,7 @@ remaining gaps with links to their owning code.
 | [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                     |
 | [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for harness v2, behind its bridge in a sandbox.                                                |
 | [Daytona sandboxes](../adapters/sandbox-daytona-v2/README.md)        | Sandboxes on Daytona for the v2 sandbox contract, and running their tests with an API key.                          |
-| [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: job retries and pruning, while the turn job is rebuilt.                    |
+| [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.            |
 | [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                    |
 | [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                        |
 | [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                              |

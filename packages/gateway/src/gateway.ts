@@ -46,8 +46,8 @@ export interface Interface {
    * Run a program in a workspace without an actor, keeping the workspace prepared for the caller's
    * scope: invitation acceptance, where the recipient is not yet a member, and a host's jobs, which
    * call the services core gives them. Programs may require only core's operations and those
-   * services, never its stores or journal. A workspace that was never created returns
-   * WorkspaceNotFound without being prepared.
+   * services, never the journal or the stores commits write. A workspace that was never created
+   * returns WorkspaceNotFound without being prepared.
    */
   readonly inWorkspace: <A, E, R extends Core.Operations | Core.JobServices | Scope.Scope>(
     workspaceId: Workspace.Id,

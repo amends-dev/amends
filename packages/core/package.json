@@ -27,7 +27,6 @@
   "dependencies": {
     "@amends/connection-v2": "workspace:*",
     "@amends/harness-v2": "workspace:*",
-    "@amends/sandbox-v2": "workspace:*",
     "effect": "catalog:"
   }
 }

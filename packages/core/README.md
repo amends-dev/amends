@@ -644,10 +644,10 @@ agent's job names the agent by its membership.
 
 `TurnJobs.Service` is a host service, shared by every workspace, which delivers each request to
 whatever runs turn jobs; `TurnJobs.layerNoRunner` accepts requests and runs nothing. What the job
-calls, `TurnExecution`, is part of `Core.layer` as `Core.JobServices`, apart from
-`Core.Operations`, since no actor calls it: it acts as the agent. A host's jobs reach it through
-the gateway's `inWorkspace`. The turn job that runs on harness-v2 is being rebuilt in
-[cluster](../cluster/README.md), so hosts run none yet.
+calls, `TurnExecution`, is part of `Core.layer`, and `Core.JobServices` names it with the
+`SessionLogStore` the job writes, apart from `Core.Operations`, since no actor calls them: they act
+as the agent. A host's jobs reach them through the gateway's `inWorkspace`.
+[Cluster](../cluster/README.md)'s `TurnJob` runs turn jobs, though no host runs it yet.
 
 ## Module dependencies and exports
 

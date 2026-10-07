@@ -5,20 +5,21 @@ import type { Reaction } from "../journal/reaction.ts";
 import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { ThreadActivityFacts } from "../thread/activity/facts.ts";
-import type { ThreadId } from "../thread/id.ts";
+import { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
-import type { WorkspaceId } from "../workspace/id.ts";
-import type { MemberId } from "../workspace/member/id.ts";
+import { WorkspaceId } from "../workspace/id.ts";
+import { MemberId } from "../workspace/member/id.ts";
 import { TurnFacts } from "./facts.ts";
 import { TurnStore } from "./store.ts";
 import type { Turn } from "./turn.ts";
 
 /** An agent's turn job: the work of one agent in one thread, named by its membership. */
-export interface Job {
-  readonly workspaceId: WorkspaceId.Id;
-  readonly memberId: MemberId.Id;
-  readonly threadId: ThreadId.Id;
-}
+export const Job = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  memberId: MemberId.Id,
+  threadId: ThreadId.Id,
+});
+export interface Job extends Schema.Schema.Type<typeof Job> {}
 
 /**
  * Turn jobs: one for each agent in each thread, which takes the work asked of the agent there into

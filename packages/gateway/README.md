@@ -64,8 +64,9 @@ implementation.
   bypass the checks core performs inside each operation.
 - `inWorkspace(workspaceId, program)` is the same without an actor: for invitation acceptance,
   where the recipient is not yet a member, and for a host's [jobs](../core/README.md#jobs).
-  Programs may require core's `Operations` and `JobServices`, which jobs call, and `Scope`. A
-  workspace that was never created returns `WorkspaceNotFound` without being prepared.
+  Programs may require core's `Operations` and `JobServices`, which jobs call, including the
+  session logs a turn's job writes, and `Scope`. A workspace that was never created returns
+  `WorkspaceNotFound` without being prepared.
 
 Both keep the workspace prepared for the caller's scope, as an Effect resource is: an HTTP
 response's scope, which a stream holds until the client disconnects, or one the caller closes
@@ -142,7 +143,7 @@ does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
 Hosts implement core's `TurnJobs` on a job runner that enters workspaces through `inWorkspace`,
-as [`@amends/cluster`](../cluster/README.md) is to; until its turn job is rebuilt, hosts use
+as [`@amends/cluster`](../cluster/README.md)'s `TurnJob` does; a host that runs none uses
 `TurnJobs.layerNoRunner`.
 
 Storage binds each workspace's `SignalHub.Service`, which delivers
