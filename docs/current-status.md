@@ -15,10 +15,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Only member workflows exist. Task and channel workflows, which will start threads with contacts
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
-- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), but no
-  host runs turns yet: [cluster](../packages/cluster/README.md)'s turn job runs them on
-  [harness-v2](../packages/harness-v2/README.md), and the local host does not run it, so it accepts
-  core's requests and runs nothing, and work waits in agents' inboxes. Core starts each turn as one
+- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), which the
+  local host runs as [cluster](../packages/cluster/README.md)'s turn jobs on
+  [harness-v2](../packages/harness-v2/README.md). Core starts each turn as one
   harness turn on what [agents v2](../packages/core/README.md#agents-v2) select, prompted with the
   thread's messages since the agent's last turn there, and posts the reply its job gives, the text
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
@@ -38,19 +37,20 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - [Harness v2](../packages/harness-v2/README.md) runs amends's own agent
   ([harness-amends-v2](../adapters/harness-amends-v2)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
-  no host runs turns on either yet. Amends's agent does not summarize a
-  conversation that outgrows its model's context, and opencode's session API takes no
-  instructions for a turn, so opencode refuses a turn that gives some.
+  the local host runs turns on both. Amends's agent does not summarize a conversation that
+  outgrows its model's context, and opencode's session API takes no instructions for a turn, so
+  opencode refuses a turn that gives some: only an agent without instructions runs on it.
 - The [v2 sandbox contract](../packages/sandbox-v2) has two providers: directories on this machine
   ([sandbox-local-v2](../adapters/sandbox-local-v2)), for development, and
-  [Daytona](../adapters/sandbox-daytona-v2/README.md). No provider for E2B, Vercel, or Cloudflare
-  exists; Cloudflare's SDK runs only inside a Worker, so reaching it from a host needs its Bridge
-  Worker.
+  [Daytona](../adapters/sandbox-daytona-v2/README.md). Local sandboxes share this machine's ports,
+  so only one that listens on a port, such as one running opencode's bridge, runs at a time. No
+  provider for E2B, Vercel, or Cloudflare exists; Cloudflare's SDK runs only inside a Worker, so
+  reaching it from a host needs its Bridge Worker.
 - [Connections v2](../packages/core/README.md#connections-v2) are set up over HTTP and on the
   [Connections v2 page](connections-v2.md), from the integrations the
   [local host](../hosts/local/README.md) installs of every kind. They authenticate with an API key
-  or nothing, and there is no OAuth. Agents v2 name them, and turns start on them, though no host
-  runs turns yet. A check's result is not stored. Keys are sealed with one host key, which nothing
+  or nothing, and there is no OAuth. Agents v2 name them, and turns run on them. A check's result
+  is not stored. Keys are sealed with one host key, which nothing
   rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier keys.
 - [Agents v2](../packages/core/README.md#agents-v2) are created, configured, renamed, and removed
   over connections v2, in core, [over HTTP](../packages/api-http/README.md#agents-v2), and on the
@@ -61,8 +61,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   profile photos, and the Agents v2 page does not show where an agent is at work. A removed agent's
   membership cannot be reactivated, as a person's cannot.
 - Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
-  job for each agent in each thread. The local host runs none yet, and
-  prunes handled job requests on an Effect Cluster runner. Several host processes over one
+  job for each agent in each thread. The local host runs them, and prunes handled job requests on an Effect Cluster runner. Several host processes over one
   database share that work; one that stops answering keeps its workspaces for the takeover time,
   35 seconds by default. Cluster's socket transport, which delivers job requests between processes
   at once, is not authenticated and belongs on a private network.

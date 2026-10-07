@@ -647,7 +647,7 @@ whatever runs turn jobs; `TurnJobs.layerNoRunner` accepts requests and runs noth
 calls, `TurnExecution`, is part of `Core.layer`, and `Core.JobServices` names it with the
 `SessionLogStore` the job writes, apart from `Core.Operations`, since no actor calls them: they act
 as the agent. A host's jobs reach them through the gateway's `inWorkspace`.
-[Cluster](../cluster/README.md)'s `TurnJob` runs turn jobs, though no host runs it yet.
+[Cluster](../cluster/README.md)'s `TurnJob` runs turn jobs, as the local host does.
 
 ## Module dependencies and exports
 

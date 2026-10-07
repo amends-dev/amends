@@ -5,7 +5,7 @@ delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kind of
 **turn job**, one for each agent in each thread, which runs the agent's
 [turns](../core/README.md#turns) there on [harness-v2](../harness-v2/README.md). Jobs enter
 workspaces through the [gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an
-actor does. No host runs turn jobs yet.
+actor does. The [local host](../../hosts/local/README.md) runs them.
 
 | Module                        | What it holds                                                                                                                          |
 | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |

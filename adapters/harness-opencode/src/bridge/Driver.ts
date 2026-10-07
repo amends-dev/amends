@@ -334,7 +334,8 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
     }),
   );
 
-// TODO: Give opencode a turn's instructions, once its session API takes them.
+// TODO: Run a turn whose instructions opencode cannot take without them, rather than refusing
+// it, and give opencode the instructions once its session API takes them.
 // TODO: Answer in JSON, once opencode's session API takes a response format.
 // TODO: Send the files a prompt carries, once `Server.prompt` sends files.
 /** Why opencode cannot run a turn with `turnOptions`, or nothing when it can. */

@@ -44,8 +44,9 @@ sandboxes in a directory of its own in the sandbox directory, and
 [Daytona](../../adapters/sandbox-daytona-v2/README.md); and amends's
 [agent](../../adapters/harness-amends-v2) and
 [opencode](../../adapters/harness-opencode/README.md) as harnesses. Connections' keys are sealed with
-`AMENDS_CREDENTIAL_KEY`. Nothing runs a turn on them yet, so opencode's bridge tokens come
-from a secret of this process's own.
+`AMENDS_CREDENTIAL_KEY`, and opencode's bridge tokens are derived from it, so a host reaches a
+bridge any host over the database launched; without a key, they come from a secret of this
+process's own, which only a single process can use.
 
 The pool size is the most connections the host opens. Four are the host's own: one listens for
 notifications, two run jobs, and one holds the runner address. A busy workspace's
@@ -75,9 +76,11 @@ its own tables beside the adapter's (`cluster_messages`, `cluster_replies`, `clu
 holds one of the pool's connections for its shard locks. Every hour, one runner prunes job
 requests handled more than seven days ago.
 
-The host runs no [turn jobs](../../packages/core/README.md#jobs) yet, though
-[cluster](../../packages/cluster/README.md) has the turn job: core's requests for them are accepted
-and nothing runs them, so work asked of agents waits in their inboxes.
+The host runs [turn jobs](../../packages/core/README.md#jobs) as
+[cluster](../../packages/cluster/README.md)'s `TurnJob`, entering workspaces through its gateway,
+and builds each turn's harness, model, and sandbox from the integrations it installs. Local
+sandboxes share this machine's ports, so only one sandbox that listens on a port, such as one
+running opencode's bridge, can run on the local provider at a time.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
 share out the jobs, and when one stops answering, the others take its
@@ -112,15 +115,15 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                                                                                                        |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                    |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                          |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                 |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                   |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with job pruning, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `makeIntegrations` is what workspaces connect to. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                              |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                    |
+| Module                             | Responsibility                                                                                                                                                                                                                                                      |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                  |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                        |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                               |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                 |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with turn jobs and job pruning, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `makeIntegrations` is what workspaces connect to. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                            |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                  |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires
@@ -184,7 +187,12 @@ Authentication tests cover constructor and layer behavior, state isolation,
 single-use codes, exact expiry, repeated requests, concurrent completion, and
 failed or interrupted delivery. Configuration tests cover defaults, port, pool-size, runner-address, transport, and takeover
 bounds, the required database URL, empty values, and redacted errors. `jobs.test.ts` checks that
-a process refuses to start at a runner address another process holds.
+a turn job request is stored with the commit that makes it, and not one that rolls back, runs as
+the commit is done rather than at the next read, and reaches another process over sockets at once,
+and that a process refuses to start at a runner address another process holds. `turns.test.ts`
+runs agents' turns over HTTP with a model provider of its own: an agent asked in a thread answers
+there, its next turn resumes the conversation, and a turn asked to stop while its model answers
+posts nothing.
 
 Tests that open storage run in the `postgresql` test project, each over its own
 temporary database; they are reported as skipped without PostgreSQL, as the

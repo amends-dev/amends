@@ -18,10 +18,8 @@ states of a turn at work.
   Stop shows Stopping… at once and stays disabled until the turn stops; if it already finished,
   the row says so and shows what actually happened. Leaving the thread never stops a turn.
 - **Where agents work:** a thread's replies in its group's stream say "Yumi working", and the
-  sidebar marks a group whose threads have agents at work with the most pressing state. The Agents
-  page shows each agent's current activity beside its setup: Idle, or its state with the threads
-  it works in, "#general + 1 more"; those agents run no turns now, and the Agents v2 page shows no
-  activity yet. Queued, working, and stopping move as the logo's `thread`, `working`, and `tug`
+  sidebar marks a group whose threads have agents at work with the most pressing state. The
+  Agents v2 page does not show agents' activity yet. Queued, working, and stopping move as the logo's `thread`, `working`, and `tug`
   motions, still for readers who prefer reduced motion.
 - **The log:** View log replaces the thread in the side panel (`?log=:turnId` on the thread's
   route); Back returns to the thread with its reply draft kept, and closing leaves both. The log
