@@ -1,4 +1,5 @@
 import type { TurnState } from "@amends/ui/components/turn-status";
+import type { AgentV2Activity } from "@amends/ui/screens/agents-v2";
 import type {
   ThreadTurnControls,
   TurnLogActivity,
@@ -279,28 +280,25 @@ export function useTurnLog(
   const turn = createMemo(() => {
     const current = entry(),
       selection = read.value()?.selection;
-    if (current === undefined || selection === undefined) return undefined;
+    // Its setup names its connections, so it waits for them.
+    if (current === undefined || selection === undefined || connections.loading()) return undefined;
     const group = groups.group(current.groupId);
-    const nameOf = (connectionId: string | undefined) =>
-      connections.value()?.find((item) => item.id === connectionId)?.name;
-    // TODO: Show the turn's harness, model, and sandbox as parts of their own, once the turn log
-    // screen takes a selection rather than a model and an environment.
+    /** A connection's name, or "Removed connection" once it is removed. */
+    const nameOf = (connectionId: string) =>
+      connections.value()?.find((item) => item.id === connectionId)?.name ?? "Removed connection";
     return {
       agentId: current.agent.id,
       agent: { name: current.agent.name },
       state: current.state,
       where:
         group?.kind === "direct" ? `Thread with ${group.name}` : `Thread in #${group?.name ?? ""}`,
-      model:
-        selection === null
-          ? undefined
-          : [nameOf(selection.model.connectionId), selection.model.id].filter(Boolean).join(" · "),
-      environment:
-        selection === null
-          ? undefined
-          : [nameOf(selection.harness.connectionId), nameOf(selection.sandbox?.connectionId)]
-              .filter(Boolean)
-              .join(" in "),
+      ...(selection !== null && {
+        setup: {
+          harness: nameOf(selection.harness.connectionId),
+          model: `${nameOf(selection.model.connectionId)} · ${selection.model.id}`,
+          ...(selection.sandbox !== null && { sandbox: nameOf(selection.sandbox.connectionId) }),
+        },
+      }),
       stoppable: current.stoppable,
       retryable: current.retryable,
       replyId: current.replyId,
@@ -379,7 +377,8 @@ export function useTurnLog(
     turn,
     activity,
     draft,
-    loading: () => !lost() && (read.loading() || feed()?.items === undefined),
+    loading: () =>
+      !lost() && (read.loading() || connections.loading() || feed()?.items === undefined),
     failure,
     reconnecting: () => live() !== undefined || followingDown(),
     updatedAt: () => feed()?.updatedAt,
@@ -406,9 +405,20 @@ export interface TurnActivityView {
   readonly inGroup: (groupId: string) => "working" | "stopping" | "queued" | undefined;
   /** An agent's active turns, by its member ID. */
   readonly ofAgent: (memberId: string) => ReadonlyArray<ActiveTurn>;
+  /**
+   * Where an agent is at work, by its member ID: its most pressing state, and the place of each
+   * active turn. None while it is idle.
+   */
+  readonly agentActivity: (memberId: string) => AgentV2Activity | undefined;
 }
 
 const urgency = { working: 0, stopping: 1, queued: 2 } as const;
+
+/** The active ones of `states`, most urgent first: working, then stopping, then queued. */
+const mostUrgentFirst = (states: ReadonlyArray<TurnState>) =>
+  states
+    .filter((state): state is keyof typeof urgency => state in urgency)
+    .toSorted((left, right) => urgency[left] - urgency[right]);
 
 /** Where agents are at work across the workspace, live while mounted. */
 export function useTurnActivity(workspaceId: string): TurnActivityView {
@@ -429,11 +439,16 @@ export function useTurnActivity(workspaceId: string): TurnActivityView {
     all,
     inThread: (threadId) => all().filter((turn) => turn.threadId === threadId),
     inGroup: (groupId) =>
-      all()
-        .filter((turn) => turn.groupId === groupId)
-        .map((turn) => turn.state as keyof typeof urgency)
-        .filter((state) => state in urgency)
-        .toSorted((left, right) => urgency[left] - urgency[right])[0],
+      mostUrgentFirst(
+        all()
+          .filter((turn) => turn.groupId === groupId)
+          .map((turn) => turn.state),
+      )[0],
     ofAgent: (memberId) => all().filter((turn) => turn.agent.memberId === memberId),
+    agentActivity: (memberId) => {
+      const turns = all().filter((turn) => turn.agent.memberId === memberId);
+      const [state] = mostUrgentFirst(turns.map((turn) => turn.state));
+      return state === undefined ? undefined : { state, places: turns.map((turn) => turn.place) };
+    },
   };
 }

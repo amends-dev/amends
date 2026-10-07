@@ -12,9 +12,11 @@ from the sidebar's + or the list's Add agent, opens Add agent over either. The s
 Lunacy mocks of their own; they follow the Agents frames' navigation and the
 [workspace shell](workspace-shell.md)'s pattern.
 
-- **The list:** each agent with its avatar, its harness and the sandbox it works in, and its model
-  with the connection that gives it, with search. One that can't run shows a patch on its avatar,
-  "Needs setup", with why on hover.
+- **The list:** each agent with its avatar, its harness and the sandbox it works in, its model
+  with the connection that gives it, and where it is at work, with search. One that can't run shows
+  a patch on its avatar, "Needs setup", with why on hover; one at work shows its most pressing
+  turn's state (Working, Stopping, or Queued) and where, such as "#general + 1 more", as does its
+  patch in the sidebar.
 - **Adding** takes a name, the role it starts with (Member by default; a role the reader can't give
   shows but can't be chosen), and its setup.
 - **The setup** is the instructions; the harness, one of the connections that give harnesses, or
@@ -27,7 +29,8 @@ Lunacy mocks of their own; they follow the Agents frames' navigation and the
   says (a connection removed, an integration this host no longer installs, a connection that no
   longer gives its part as the agent takes it, a harness without the sandbox it needs, or Auto with
   no harness to choose); its name as its own save; its setup, saved as a whole, with Discard
-  changes; its details; and removal. A connection the agent names that is removed or not installed
+  changes; its details, with its current activity: each turn in progress with where it works,
+  opening the turn's log beside its thread, or Idle; and removal. A connection the agent names that is removed or not installed
   stays chosen and shows as unavailable, with why, until the agent is set up on another.
 
 An agent's name, role, and departure are its membership's: renaming it renames the member, its
@@ -45,8 +48,10 @@ setups name, offers each part's connections with the models each offers, keeps e
 it was made against, and reports failures by the change that failed: a connection the reader can't
 use, at its part, or a setup that couldn't run, with its issues, each shown beside its field until a
 field that may resolve it changes; UI's
-[Agents v2 screens](../apps/ui/README.md#screens) word them. `useAgentV2List` gives the sidebar the
-agents by name, sharing the page's read. The pages in web and desktop own the routes, the open
+[Agents v2 screens](../apps/ui/README.md#screens) word them. It gives where each agent is at work,
+and its turns in progress (`turnsOf`), from the workspace's active turns, which `useTurnActivity`
+follows as the sidebar's group marks do ([turns](turns.md)). `useAgentV2List` gives the sidebar the
+agents by name, with where each is at work, sharing the page's read. The pages in web and desktop own the routes, the open
 agent, and which modal shows.
 
 A rename carries the name it started from; one renamed elsewhere meanwhile conflicts, and the reader

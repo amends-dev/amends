@@ -65,7 +65,10 @@ import connectionsV2Meta, {
 } from "../src/screens/connections-v2/connections-v2.stories.tsx";
 import agentsV2Meta, {
   AddAgentFlow as AddAgentV2Flow,
+  AgentAtWork as AgentV2AtWork,
+  AgentIdle as AgentV2Idle,
   AgentPage as AgentV2Page,
+  AgentsAtWork as AgentsV2AtWork,
   AllAgents as AllAgentsV2,
   AutoWithoutHarness,
   ConnectionUnavailable as AgentV2ConnectionUnavailable,
@@ -393,6 +396,14 @@ describe("agents v2 screen", () => {
     await stories.story(AllAgentsV2).run();
     cleanup();
     await stories.story(AgentsV2NeedsSetup).run();
+  });
+  it("shows where agents are at work, each turn on an agent's page opening its log", async () => {
+    viewport(1600);
+    await stories.story(AgentsV2AtWork).run();
+    cleanup();
+    await stories.story(AgentV2AtWork).run();
+    cleanup();
+    await stories.story(AgentV2Idle).run();
   });
   it("adds an agent, offering only the roles the reader may give", async () => {
     viewport(1600);

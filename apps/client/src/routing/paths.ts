@@ -22,6 +22,9 @@ export const paths = {
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}`,
   thread: (id: string, groupId: string, threadId: string) =>
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
+  /** A turn's log, beside its thread. */
+  turnLog: (id: string, groupId: string, threadId: string, turnId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}?log=${encodeURIComponent(turnId)}`,
   /** An agent's page in Agents v2. */
   agentV2: (id: string, agentId: string) =>
     `/workspaces/${encodeURIComponent(id)}/agents-v2/${encodeURIComponent(agentId)}`,

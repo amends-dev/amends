@@ -46,6 +46,7 @@ export {
   useAgentV2List,
   useAgentsV2,
   type AgentV2ListEntry,
+  type AgentV2TurnEntry,
   type AgentsV2Done,
   type AgentsV2View,
 } from "./agents-v2/views.ts";

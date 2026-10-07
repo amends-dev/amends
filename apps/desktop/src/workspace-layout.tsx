@@ -170,10 +170,13 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const name = useMemberName(workspaceId, () => setDialog(undefined));
   const profiles = useMemberProfiles(workspaceId);
   const agents = useAgentV2List(workspaceId);
-  /** An agent's readiness as its status, for its profile card and its direct message row. */
+  /**
+   * An agent's state as its status, its readiness or where it is at work, for its profile card and
+   * its direct message row.
+   */
   const agentStatusOf = (memberId: string) => {
     const agent = agents.agents().find((candidate) => candidate.memberId === memberId);
-    return agent && agentV2Status(agent.issues);
+    return agent && agentV2Status(agent.issues, agent.activity);
   };
   /** A one-to-one conversation's status: the other member's. People have none until presence. */
   const soleStatus = (memberIds: readonly string[]) => {
@@ -570,7 +573,7 @@ function AgentsV2Sidebar(props: { readonly workspaceId: string }) {
               initials: agent.name.trim().charAt(0).toUpperCase(),
               tone: "lilac" as const,
             },
-            status: agentV2Status(agent.issues),
+            status: agentV2Status(agent.issues, agent.activity),
           })),
           loading: list.loading(),
           empty: "No agents yet",

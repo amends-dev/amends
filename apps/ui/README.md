@@ -343,27 +343,29 @@ member, search, and a stale rename.
 `AgentsV2Pane`, `AgentV2List`, and `AgentV2Pane` are Agents v2, over connections v2, with no mocks
 of their own: they follow the Agents frames' navigation and the
 Connections v2 page. The list has All and Needs setup, and each agent's harness, with its sandbox,
-and model as columns, or under the name on phones, with its state as a patch on its avatar. The
-agent's page reads in one column: a notice listing why it can't run, its name, its setup saved as a
-whole, its details, and removal. `SetupFields` is the setup both it and `AddAgentV2` ask for: the
+its model, and where it is at work as columns, or under the name on phones, with its state as a
+patch on its avatar. The agent's page reads in one column: a notice listing why it can't run, its
+name, its setup saved as a whole, its details, with each turn in progress opening its log, and
+removal. `SetupFields` is the setup both it and `AddAgentV2` ask for: the
 instructions, the harness or Auto, the model connection, the model, which the connection's list
 suggests and which may be any other when it takes models it doesn't list, the effort the chosen
 model takes, and the sandbox, warning when the harness works only in one. A connection the agent
 names that is removed or not installed stays chosen and shows as Unavailable, and what the host
 refuses shows beside the field it concerns. `ConfirmRemoveAgentV2` confirms removal, which ends
-the agent's membership. **Screens / Agents v2** walks adding an agent, the roles the reader may give, a removed sandbox and a harness
-that needs one, listed models and efforts, models that load or fail, a refused connection, Auto
+the agent's membership. **Screens / Agents v2** walks adding an agent, the roles the reader may give, agents at work and
+idle, a removed sandbox and a harness that needs one, listed models and efforts, models that load or fail, a refused connection, Auto
 with no harness, removal, a read-only member, search, and a stale rename.
 `agentV2Status` and `connectionV2Status` word each one's state as a `Status` for the sidebar,
-profile cards, and rows the apps compose; one that is ready has none. `TurnRow` shows an agent's turn as a compact row,
+profile cards, and rows the apps compose: an agent at work says where, and one that is ready and
+idle has none. `TurnRow` shows an agent's turn as a compact row,
 from the Lunacy "Turn activity" frames: the agent, its state, View log, and Stop or Retry for a
 reader who may direct it, with a failure's reason and Agent settings, and a refused command worded
 from its `TurnProblem` code; it moves its actions under the name when too narrow. A timeline's
 `turn` entries render as these rows where the agent took on the work, keyed by turn so Stop keeps
 its focus, when the `Timeline` or `ThreadPane` has `turns` controls; the timeline offers View turn
 log in an agent's reply's actions; a thread's replies and a sidebar group mark where agents work.
-`TurnLogPane` shows a turn's log in place of its thread: where and with what it runs, its
-activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
+`TurnLogPane` shows a turn's log in place of its thread: where it runs and its harness, model,
+and sandbox, its activity, the reply draft streaming with a caret (paused while reconnecting), next steps for a
 failure, and a footer that follows live, offers "New activity · Jump to latest" once the reader
 scrolls up, or offers Retry turn or View reply. **Screens / Turns** walks each state, the log's
 states, and a stop and retry. `ButtonLink` is a link drawn as a button, for actions such as Agent

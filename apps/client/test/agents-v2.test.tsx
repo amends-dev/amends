@@ -93,6 +93,53 @@ const opus = {
   reasoning: { toggle: false, efforts: ["low", "high"] },
 };
 
+const group = (id: string, name: string) => ({
+  group: {
+    id,
+    workspaceId: "one",
+    kind: "Team",
+    visibility: "Public",
+    name,
+    createdBy: "owner",
+    createdAt: "2026-10-06T12:00:00.000Z",
+  },
+  latestActivityAt: null,
+  readAt: null,
+  newActivity: false,
+  following: false,
+  pending: 0,
+  manageable: true,
+  membersRemovable: true,
+  renamable: true,
+});
+const groups = [group("design", "design"), group("general", "general")];
+/** Reviewer's turns in progress: one working in #general, and one queued in #design. */
+const activeTurn = (id: string, groupId: string, status: string) => ({
+  id,
+  workspaceId: "one",
+  groupId,
+  threadId: `thread-${groupId}`,
+  agentId: "reviewer",
+  memberId: "member-reviewer",
+  participationId: `p-${groupId}`,
+  retry: null,
+  status,
+  acceptedThroughSequence: 1,
+  selection: null,
+  messageIds: [],
+  failure: null,
+  cancelReason: null,
+  createdAt: "2026-10-06T12:00:00.000Z",
+  startedAt: null,
+  finishedAt: null,
+  stoppable: true,
+  retryable: false,
+});
+const activeTurns = [
+  activeTurn("queued-turn", "design", "queued"),
+  activeTurn("working-turn", "general", "running"),
+];
+
 interface Stored {
   id: string;
   memberId: string;
@@ -159,6 +206,8 @@ function fixture() {
     if (path === "/workspaces/one/members") return json([owner]);
     if (path === "/workspaces/one/permissions") return json(["agent-v2.create"]);
     if (path === "/workspaces/one/settings") return json(settings);
+    if (path === "/workspaces/one/groups") return json(groups);
+    if (path === "/workspaces/one/active-turns") return json(activeTurns);
     if (path === "/workspaces/one/connections-v2/integrations") return json(integrations);
     if (path === "/workspaces/one/connections-v2") return json(connections);
     if (path === "/workspaces/one/connections-v2/openrouter/models")
@@ -294,6 +343,37 @@ it("shapes agents with the connections they name, their model's name, and why th
   expect(f.view.roles()).toEqual([
     { id: "builtin:member", name: "Member", assignable: true },
     { id: "builtin:administrator", name: "Administrator", assignable: false },
+  ]);
+});
+
+it("says where each agent is at work, its most pressing turn first, and lists its turns", async () => {
+  const f = fixture();
+  await waitFor(() =>
+    expect(f.view.agent("reviewer")?.activity).toEqual({
+      state: "working",
+      places: ["#design", "#general"],
+    }),
+  );
+  expect(f.view.agent("archivist")?.activity).toBeUndefined();
+  expect(f.list.agents().map((entry) => [entry.name, entry.activity?.state])).toEqual([
+    ["Archivist", undefined],
+    ["Reviewer", "working"],
+  ]);
+  expect(f.view.turnsOf("member-reviewer")).toEqual([
+    {
+      id: "queued-turn",
+      state: "queued",
+      place: "#design",
+      groupId: "design",
+      threadId: "thread-design",
+    },
+    {
+      id: "working-turn",
+      state: "working",
+      place: "#general",
+      groupId: "general",
+      threadId: "thread-general",
+    },
   ]);
 });
 

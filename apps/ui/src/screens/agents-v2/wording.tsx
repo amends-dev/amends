@@ -56,7 +56,34 @@ export interface AgentV2Summary {
   /** Who added it, by name. */
   readonly createdBy: string;
   readonly createdAt: Date;
+  /** Where it is at work now, apart from its setup; unset while it is idle. */
+  readonly activity?: AgentV2Activity;
 }
+
+/** Where an agent is at work: its most pressing turn state, and each place, such as "#general". */
+export interface AgentV2Activity {
+  readonly state: "queued" | "working" | "stopping";
+  readonly places: readonly string[];
+}
+
+/** One of an agent's turns in progress, as its page lists it. */
+export interface AgentV2Turn {
+  readonly id: string;
+  readonly state: "queued" | "working" | "stopping";
+  /** Where it works, such as "#general". */
+  readonly place: string;
+  /** Where its log opens, beside its thread. */
+  readonly href: string;
+}
+
+const turnStates = { queued: "Queued", working: "Working", stopping: "Stopping" } as const;
+
+/** A turn's state in a word, such as "Working". */
+export const turnStateWord = (state: AgentV2Turn["state"]) => turnStates[state];
+
+/** Where an agent is at work, as a line: "#general", or "#general + 1 more". */
+export const placesLine = (places: readonly string[]) =>
+  places.length > 1 ? `${places[0]} + ${places.length - 1} more` : (places[0] ?? "");
 
 /** A connection that gives harnesses, as the harness choice offers it. */
 export interface HarnessOption {
@@ -197,13 +224,23 @@ export function issueField(issue: AgentV2Issue): SetupField {
 }
 
 /**
- * An agent's state when it can't run: Needs setup, with its first issue on hover. Undefined while
- * it can, which shows nothing.
+ * An agent's state: Needs setup when it can't run, with its first issue on hover; else where it is
+ * at work, such as "Working in #general", with the logo moving where the words show. Undefined
+ * while it is ready and idle, which shows nothing.
  */
-export function agentV2Status(issues: readonly AgentV2Issue[]): Status | undefined {
+export function agentV2Status(
+  issues: readonly AgentV2Issue[],
+  activity?: AgentV2Activity,
+): Status | undefined {
   const [first] = issues;
-  if (first === undefined) return undefined;
-  return { mark: "attention", label: "Needs setup", detail: issueMessage(first) };
+  if (first !== undefined)
+    return { mark: "attention", label: "Needs setup", detail: issueMessage(first) };
+  if (activity === undefined) return undefined;
+  return {
+    mark: "available",
+    label: `${turnStateWord(activity.state)} in ${placesLine(activity.places)}`,
+    activity: activity.state,
+  };
 }
 
 /** The harness it runs on, as a line: "Auto", or the connection's name. */

@@ -8,6 +8,7 @@ import { SearchField } from "../../components/input/index.ts";
 import { markTone, type Status } from "../../components/status-mark/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";
 import { Tooltip } from "../../components/tooltip/index.ts";
+import { TurnActivity } from "../../components/turn-status/index.ts";
 import { Keyed } from "../../internal/keyed.tsx";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
@@ -16,7 +17,9 @@ import {
   agentV2Status,
   harnessLine,
   modelLine,
+  placesLine,
   sandboxLine,
+  turnStateWord,
   type AgentV2Summary,
   type AgentsV2Failure,
 } from "./wording.tsx";
@@ -190,9 +193,9 @@ export interface AgentV2ListProps {
 
 /**
  * The agent list: search, then each agent with its state as a patch on its avatar, the harness it
- * runs on and where, and its model, each row opening the agent's page. With room the harness and
- * model are columns; on phones they sit under the name. With no agents yet it offers adding one.
- * Place it in AgentsV2Pane.
+ * runs on and where, its model, and where it is at work, each row opening the agent's page. With
+ * room these are columns, the activity blank while the agent is idle; on phones they sit under the
+ * name. With no agents yet it offers adding one. Place it in AgentsV2Pane.
  */
 export function AgentV2List(props: AgentV2ListProps) {
   const search = () => props.query.trim();
@@ -245,6 +248,7 @@ export function AgentV2List(props: AgentV2ListProps) {
         <span class={s.headingAgent}>Agent</span>
         <span>Harness</span>
         <span>Model</span>
+        <span>Activity</span>
         <Divider class={s.headingsStitch} />
       </div>
       <Pane.Body inset="list">
@@ -272,7 +276,7 @@ export function AgentV2List(props: AgentV2ListProps) {
             <ul class={s.list} aria-label="Agents">
               <Keyed each={props.agents} by={(agent) => agent.id}>
                 {(agent) => {
-                  const status = () => agentV2Status(agent().issues);
+                  const status = () => agentV2Status(agent().issues, agent().activity);
                   return (
                     <li>
                       <a href={props.agentHref(agent().id)} class={s.row}>
@@ -292,6 +296,15 @@ export function AgentV2List(props: AgentV2ListProps) {
                           <span class={s.rowUnder}>
                             {`${harnessLine(agent().harness)} · ${modelLine(agent().model)}`}
                           </span>
+                          <Show when={agent().activity}>
+                            {(activity) => (
+                              <span class={s.rowUnder}>
+                                <TurnActivity state={activity().state}>
+                                  {`${turnStateWord(activity().state)} · ${placesLine(activity().places)}`}
+                                </TurnActivity>
+                              </span>
+                            )}
+                          </Show>
                         </span>
                         <span class={s.rowColumn}>
                           <span class={s.rowValue}>{harnessLine(agent().harness)}</span>
@@ -302,6 +315,20 @@ export function AgentV2List(props: AgentV2ListProps) {
                           <span class={s.rowDetail}>
                             {agent().model.connection.name ?? "Removed connection"}
                           </span>
+                        </span>
+                        <span class={s.rowColumn}>
+                          <Show when={agent().activity}>
+                            {(activity) => (
+                              <>
+                                <span class={s.rowValue}>
+                                  <TurnActivity state={activity().state}>
+                                    {turnStateWord(activity().state)}
+                                  </TurnActivity>
+                                </span>
+                                <span class={s.rowDetail}>{placesLine(activity().places)}</span>
+                              </>
+                            )}
+                          </Show>
                         </span>
                       </a>
                     </li>

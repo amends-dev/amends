@@ -14,9 +14,11 @@ import {
   agentV2Status,
   agentsV2Toast,
   autoHarness,
+  type AgentV2Activity,
   type AgentV2Issue,
   type AgentV2RoleOption,
   type AgentV2Summary,
+  type AgentV2Turn,
   type AgentsV2Action,
   type AgentsV2Failure,
   type AgentsV2Tab,
@@ -192,6 +194,25 @@ function issuesOf(
   return issues;
 }
 
+/** Each agent's turns in progress, by its id; the others are idle. */
+const sampleTurns: Readonly<Record<string, readonly AgentV2Turn[]>> = {
+  reviewer: [
+    { id: "turn-review", state: "working", place: "#general", href: "#turn-review" },
+    { id: "turn-design", state: "queued", place: "#design", href: "#turn-design" },
+  ],
+  planner: [{ id: "turn-plan", state: "stopping", place: "Jamie Morgan", href: "#turn-plan" }],
+};
+
+const urgency = { working: 0, stopping: 1, queued: 2 } as const;
+
+/** Where an agent is at work, as the client finds it from its turns in progress. */
+const activityOf = (turns: readonly AgentV2Turn[]): AgentV2Activity | undefined => {
+  const [state] = turns
+    .map((turn) => turn.state)
+    .toSorted((left, right) => urgency[left] - urgency[right]);
+  return state === undefined ? undefined : { state, places: turns.map((turn) => turn.place) };
+};
+
 const connectionName = (id: string | undefined) =>
   [...sampleHarnesses, ...sampleModelConnections, ...sampleSandboxes, uninstalled].find(
     (option) => option.id === id,
@@ -207,7 +228,9 @@ function summaryOf(
     models?.status === "loaded"
       ? models.listed.find((model) => model.id === record.model)
       : undefined;
+  const activity = activityOf(sampleTurns[record.id] ?? []);
   return {
+    ...(activity && { activity }),
     id: record.id,
     memberId: `member-${record.id}`,
     name: record.name,
@@ -408,7 +431,7 @@ export function AgentsV2Workspace(props: AgentsV2WorkspaceProps) {
                     href: `#agent-${agent.id}`,
                     current: selected() === agent.id,
                     person: { name: agent.name, initials: agent.name.charAt(0), tone: "lilac" },
-                    status: agentV2Status(agent.issues),
+                    status: agentV2Status(agent.issues, agent.activity),
                   })),
               loading: props.status === "loading",
               empty: "No agents yet",
@@ -456,6 +479,7 @@ export function AgentsV2Workspace(props: AgentsV2WorkspaceProps) {
             <AgentV2Pane
               workspaceName="Mercier & Co"
               agent={agent()}
+              turns={sampleTurns[agent().id] ?? []}
               onBrowse={() => open(undefined)}
               name={nameOf(agent().id)}
               onNameChange={(name) => setNames({ ...names(), [agent().id]: name })}

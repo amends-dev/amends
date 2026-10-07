@@ -118,6 +118,8 @@ export const LogStreaming = {
     await expect(canvas.getByText("Streaming")).toBeVisible();
     await expect(canvas.getByText("Draft output · not posted to the thread yet")).toBeVisible();
     await expect(canvas.getByText("Following live")).toBeVisible();
+    await expect(canvas.getByText("Harness · opencode")).toBeVisible();
+    await expect(canvas.getByText("Sandbox · Daytona")).toBeVisible();
   },
 } satisfies Story;
 

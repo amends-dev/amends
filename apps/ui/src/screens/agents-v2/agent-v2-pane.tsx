@@ -5,6 +5,7 @@ import { EmptyState } from "../../components/empty-state/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { Input } from "../../components/input/index.ts";
 import { Notice } from "../../components/notice/index.ts";
+import { TurnActivity } from "../../components/turn-status/index.ts";
 import { calendarDate } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
@@ -14,7 +15,9 @@ import {
   agentV2Status,
   issueMessage,
   setupProblems,
+  turnStateWord,
   type AgentV2Summary,
+  type AgentV2Turn,
   type AgentsV2Action,
   type AgentsV2Failure,
 } from "./wording.tsx";
@@ -45,6 +48,8 @@ export interface AgentV2PaneProps {
   readonly onDiscardSetup: () => void;
   /** Asks to remove the agent from the workspace. */
   readonly onRemove?: () => void;
+  /** Its turns in progress, each where it works. */
+  readonly turns?: readonly AgentV2Turn[];
   /** The change running, if any. */
   readonly pending?: AgentsV2Action | "refresh";
   /** A failed change made here, or a read that failed. */
@@ -54,8 +59,9 @@ export interface AgentV2PaneProps {
 
 /**
  * An agent's page in the main content, in one column: a notice when it can't run as it is set up,
- * listing why; its name as its own save; its setup, saved as a whole; its details; and removal. A
- * reader who may not configure it sees the same values without the actions.
+ * listing why; its name as its own save; its setup, saved as a whole; its details, with where it is
+ * at work, each turn opening its log; and removal. A reader who may not configure it sees the same
+ * values without the actions.
  */
 export function AgentV2Pane(props: AgentV2PaneProps) {
   const nameForm = `agent-name-${createUniqueId()}`;
@@ -87,7 +93,7 @@ export function AgentV2Pane(props: AgentV2PaneProps) {
               tone: "lilac",
             }
           }
-          status={props.agent && agentV2Status(props.agent.issues)}
+          status={props.agent && agentV2Status(props.agent.issues, props.agent.activity)}
           context={props.workspaceName}
         >
           {props.agent?.name ?? "Agent"}
@@ -214,6 +220,31 @@ export function AgentV2Pane(props: AgentV2PaneProps) {
                       <dt class={s.detailName}>Role</dt>
                       <dd class={s.detailValue}>
                         Changed in Settings › Members, as any member’s is.
+                      </dd>
+                    </div>
+                    <div class={s.detail}>
+                      <dt class={s.detailName}>Current activity</dt>
+                      <dd class={s.detailValue}>
+                        <Show when={(props.turns ?? []).length > 0} fallback="Idle">
+                          <ul class={s.turns}>
+                            <For each={props.turns}>
+                              {(turn) => (
+                                <li>
+                                  <a
+                                    href={turn.href}
+                                    class={s.turn}
+                                    aria-label={`${turnStateWord(turn.state)} in ${turn.place}: open its log`}
+                                  >
+                                    <TurnActivity state={turn.state}>
+                                      {turnStateWord(turn.state)}
+                                    </TurnActivity>
+                                    <span class={s.turnPlace}>{turn.place}</span>
+                                  </a>
+                                </li>
+                              )}
+                            </For>
+                          </ul>
+                        </Show>
                       </dd>
                     </div>
                     <div class={s.detail}>

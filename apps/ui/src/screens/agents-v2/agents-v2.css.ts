@@ -29,10 +29,11 @@ export const phoneOnly = style({
   "@media": { [media.mobile]: { display: "inline" } },
 });
 
-// Columns: a 32px avatar, the agent, its harness in a 160px column, and its model in a 192px one.
-// Phones keep the avatar and the agent, with the harness and model under its name.
+// Columns: a 32px avatar, the agent, its harness in a 160px column, its model in a 192px one, and
+// where it is at work in a 160px one. Phones keep the avatar and the agent, with the rest under its
+// name.
 const columns = {
-  gridTemplateColumns: "2rem minmax(0, 1fr) 10rem 12rem",
+  gridTemplateColumns: "2rem minmax(0, 1fr) 10rem 12rem 10rem",
   columnGap: "0.75rem",
   "@media": { [media.mobile]: { gridTemplateColumns: "2rem minmax(0, 1fr)" } },
 } as const;
@@ -119,7 +120,7 @@ export const rowName = style({
   fontWeight: fontWeight.medium,
 });
 
-// The harness and model under the name, on phones only.
+// The harness and model, then where it is at work, under the name, on phones only.
 export const rowUnder = style({
   ...typeScale.control,
   ...ellipsis,
@@ -262,6 +263,34 @@ export const detail = style({ display: "flex", flexDirection: "column", gap: "0.
 export const detailName = style({ ...typeScale.hint, color: vars.color.text.secondary });
 
 export const detailValue = style({ ...typeScale.item, margin: 0, color: vars.color.text.primary });
+
+// Its turns in progress, each opening its log beside its thread.
+export const turns = style({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: "0.25rem",
+  margin: 0,
+  padding: 0,
+  listStyle: "none",
+});
+
+export const turn = style({
+  ...typeScale.item,
+  display: "flex",
+  alignItems: "center",
+  gap: "0.625rem",
+  marginInline: "-0.375rem",
+  padding: "0.125rem 0.375rem",
+  color: vars.color.text.primary,
+  textDecoration: "none",
+  selectors: {
+    "&:hover": { backgroundColor: vars.color.surface.hover },
+    "&:focus-visible": { outline: `2px solid ${vars.color.text.primary}`, outlineOffset: "-2px" },
+  },
+});
+
+export const turnPlace = style({ fontWeight: fontWeight.medium });
 
 export const actions = style({ display: "flex", alignItems: "center", gap: "0.75rem" });
 

@@ -1,7 +1,9 @@
 import type {
+  AgentV2Activity,
   AgentV2Issue,
   AgentV2RoleOption,
   AgentV2Summary,
+  AgentV2Turn,
   AgentsV2Action,
   AgentsV2Failure,
   ConnectionOption,
@@ -30,6 +32,7 @@ import { useMembers, useWorkspacePermission } from "../conversations/reads.ts";
 import { toDate } from "../conversations/time.ts";
 import { memberName } from "../conversations/views.ts";
 import { useApiClient } from "../provider.tsx";
+import { useTurnActivity } from "../turns/views.ts";
 import {
   agentsV2Failure,
   agentsV2Reads,
@@ -149,12 +152,20 @@ const remainingProblem = (problem: Problem, edited: ReadonlySet<SetupKey>): Prob
 const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | undefined =>
   AsyncResult.isFailure(read) && !read.waiting ? read.cause : undefined;
 
+/** One of an agent's turns in progress, with the thread its log opens beside, for its href. */
+export interface AgentV2TurnEntry extends Omit<AgentV2Turn, "href"> {
+  readonly groupId: string;
+  readonly threadId: string;
+}
+
 /** An agent as the Agents v2 sidebar lists it. */
 export interface AgentV2ListEntry {
   readonly id: string;
   readonly memberId: string;
   readonly name: string;
   readonly issues: readonly AgentV2Issue[];
+  /** Where it is at work; unset while it is idle. */
+  readonly activity?: AgentV2Activity;
 }
 
 /**
@@ -165,15 +176,20 @@ export function useAgentV2List(workspaceId: string) {
   const reads = agentsV2Reads(useApiClient(), workspaceId);
   const agents = reads ? useAtomValue(() => reads.agents) : undefined;
   const canCreate = useWorkspacePermission(workspaceId, "agent-v2.create");
+  const turnActivity = useTurnActivity(workspaceId);
   const entries = createMemo((): readonly AgentV2ListEntry[] | undefined =>
     Option.getOrUndefined(
       Option.map(AsyncResult.value(agents?.() ?? AsyncResult.initial()), (views) =>
-        views.map((view) => ({
-          id: view.id,
-          memberId: view.memberId,
-          name: view.name,
-          issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
-        })),
+        views.map((view) => {
+          const activity = turnActivity.agentActivity(view.memberId);
+          return {
+            id: view.id,
+            memberId: view.memberId,
+            name: view.name,
+            issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
+            ...(activity === undefined ? {} : { activity }),
+          };
+        }),
       ),
     ),
   );
@@ -200,6 +216,7 @@ export function useAgentsV2(
   const reads = agentsV2Reads(useApiClient(), workspaceId);
   const canCreate = useWorkspacePermission(workspaceId, "agent-v2.create");
   const members = useMembers(workspaceId);
+  const turnActivity = useTurnActivity(workspaceId);
   const read = reads ? connect(reads) : undefined;
   const loaded = () =>
     read?.agents() !== undefined &&
@@ -295,6 +312,7 @@ export function useAgentsV2(
       offered?.status === "loaded"
         ? offered.listed.find((model) => model.id === view.model.id)
         : undefined;
+    const activity = turnActivity.agentActivity(view.memberId);
     return {
       id: view.id,
       memberId: view.memberId,
@@ -315,8 +333,24 @@ export function useAgentsV2(
       configurable: view.configurable,
       createdBy: memberName(members.member(view.createdBy)),
       createdAt: toDate(view.createdAt),
+      ...(activity === undefined ? {} : { activity }),
     };
   };
+  /** The agent's turns in progress, as its page lists them. */
+  const turnsOf = (memberId: string): readonly AgentV2TurnEntry[] =>
+    turnActivity.ofAgent(memberId).flatMap((turn) =>
+      turn.state === "queued" || turn.state === "working" || turn.state === "stopping"
+        ? [
+            {
+              id: turn.id,
+              state: turn.state,
+              place: turn.place,
+              groupId: turn.groupId,
+              threadId: turn.threadId,
+            },
+          ]
+        : [],
+    );
   const views = createMemo(() => read?.agents() ?? []);
   const all = createMemo(() => views().map(summaryOf));
   const find = (agentId: string) => all().find((entry) => entry.id === agentId);
@@ -451,6 +485,8 @@ export function useAgentsV2(
     /** Every agent the reader may read, by name. */
     agents: all,
     agent: find,
+    /** An agent's turns in progress, by its member ID, as its page lists them. */
+    turnsOf,
     /** The reader may add agents. */
     canCreate: () => canCreate() === true,
     /** The roles a new agent may start with. */

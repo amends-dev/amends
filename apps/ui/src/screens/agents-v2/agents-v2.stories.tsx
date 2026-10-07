@@ -69,6 +69,41 @@ export const AgentPage = {
   },
 } satisfies Story;
 
+/** Agents at work say where, their most pressing turn first; an idle agent's activity is blank. */
+export const AgentsAtWork = {
+  render: () => <AgentsV2Workspace />,
+  play: async ({ canvasElement }) => {
+    const rows = list(canvasElement);
+    const reviewer = rows.getByRole("link", { name: /Reviewer/ });
+    await expect(reviewer).toHaveTextContent("Working");
+    await expect(reviewer).toHaveTextContent("#general + 1 more");
+    await expect(rows.getByRole("link", { name: /Planner/ })).toHaveTextContent("Stopping");
+    await expect(rows.getByRole("link", { name: /Researcher/ })).not.toHaveTextContent(
+      /Working|Queued|Stopping/,
+    );
+  },
+} satisfies Story;
+
+/** An agent's page lists each of its turns in progress, each opening its log. */
+export const AgentAtWork = {
+  render: () => <AgentsV2Workspace selected="reviewer" />,
+  play: async ({ canvasElement }) => {
+    const page = main(canvasElement);
+    await expect(
+      page.getByRole("link", { name: "Working in #general: open its log" }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: "Queued in #design: open its log" })).toBeVisible();
+  },
+} satisfies Story;
+
+/** An agent with no turn in progress is idle. */
+export const AgentIdle = {
+  render: () => <AgentsV2Workspace selected="researcher" />,
+  play: async ({ canvasElement }) => {
+    await expect(main(canvasElement).getByText("Idle")).toBeVisible();
+  },
+} satisfies Story;
+
 /** An agent whose sandbox connection was removed says so, and runs again in another sandbox. */
 export const SandboxRemoved = {
   render: () => <AgentsV2Workspace selected="tester" />,

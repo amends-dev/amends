@@ -88,6 +88,18 @@ function AgentsV2(props: { readonly workspaceId: string }) {
   const refreshing = () => view.pending() === "refresh";
   const name = () => workspace()?.workspace.name ?? "";
   const selected = () => (params.agentId === undefined ? undefined : view.agent(params.agentId));
+  /** The selected agent's turns in progress, each opening its log beside its thread. */
+  const turnsOfSelected = () => {
+    const agent = selected();
+    return agent === undefined
+      ? []
+      : view.turnsOf(agent.memberId).map((turn) => ({
+          id: turn.id,
+          state: turn.state,
+          place: turn.place,
+          href: href(paths.turnLog(workspaceId, turn.groupId, turn.threadId, turn.id)),
+        }));
+  };
   const tabHref = (next: AgentsV2Tab) => href(next === "all" ? base : `${base}?tab=${next}`);
   return (
     <>
@@ -155,6 +167,7 @@ function AgentsV2(props: { readonly workspaceId: string }) {
                   }
                 : undefined
             }
+            turns={turnsOfSelected()}
             pending={view.pending()}
             failure={adding() || removing() ? undefined : view.failure()}
             onRefresh={view.refresh}

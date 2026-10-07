@@ -18,13 +18,15 @@ states of a turn at work.
   Stop shows Stopping… at once and stays disabled until the turn stops; if it already finished,
   the row says so and shows what actually happened. Leaving the thread never stops a turn.
 - **Where agents work:** a thread's replies in its group's stream say "Yumi working", and the
-  sidebar marks a group whose threads have agents at work with the most pressing state. The
-  Agents v2 page does not show agents' activity yet. Queued, working, and stopping move as the logo's `thread`, `working`, and `tug`
-  motions, still for readers who prefer reduced motion.
+  sidebar marks a group whose threads have agents at work with the most pressing state. On
+  Agents v2, an agent at work shows its most pressing state and where, such as "Working ·
+  #general + 1 more", and its page lists each of its turns in progress, each opening its log.
+  Queued, working, and stopping move as the logo's `thread`, `working`, and `tug` motions, still
+  for readers who prefer reduced motion.
 - **The log:** View log replaces the thread in the side panel (`?log=:turnId` on the thread's
   route); Back returns to the thread with its reply draft kept, and closing leaves both. The log
-  names where the turn runs and the model and harness it started on, with its sandbox, then its
-  activity with times: work accepted, the turn started, the messages the agent was prompted with,
+  names where the turn runs and the harness, model, and sandbox it started on, each by its
+  connection's name, then its activity with times: work accepted, the turn started, the messages the agent was prompted with,
   each step that wrote text, interruptions it recovered from, and how it ended. While the agent
   writes, the step streams into a draft marked "not posted to the thread yet", which the finished
   step replaces. The log follows the turn over its own stream, which opens with the log as it stands
@@ -34,6 +36,6 @@ states of a turn at work.
   completed one View reply in thread. On phones the log is full-screen.
 
 Threads have no titles yet, so the log names a thread by its group ("Thread in #general"). The
-mocks' popover listing an agent's active turns on the Agents page is not built; the row lists
-where it works instead. Drafts are best effort: text missed while reconnecting shows once the
+mocks' popover listing an agent's active turns on the Agents page is not built; the row names where
+it works, and the agent's page lists its turns. Drafts are best effort: text missed while reconnecting shows once the
 step finishes. See [known limitations](current-status.md) for what turns do not do yet.

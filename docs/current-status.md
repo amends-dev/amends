@@ -58,8 +58,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   agent's setup selects, kept for the agent's later turns in the thread: on `Auto`, the harness its
   previous turn there ran on while a connection still gives it, and otherwise the oldest connection
   that gives one it can run on. Agents have no toolkits, skills, memory, or schedules, and no
-  profile photos, and the Agents v2 page does not show where an agent is at work. A removed agent's
-  membership cannot be reactivated, as a person's cannot.
+  profile photos. A removed agent's membership cannot be reactivated, as a person's cannot.
 - Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
   job for each agent in each thread. The local host runs them, and prunes handled job requests on an Effect Cluster runner. Several host processes over one
   database share that work; one that stops answering keeps its workspaces for the takeover time,
