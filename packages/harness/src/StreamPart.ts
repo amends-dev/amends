@@ -60,7 +60,10 @@ export interface FileChangePart extends Schema.Schema.Type<typeof FileChangePart
 
 /**
  * Reports that the agent replaced its conversation so far with a summary, because it was asked to
- * (`manual`) or because the conversation outgrew its context (`auto`).
+ * (`manual`) or because the conversation outgrew its context (`auto`). The conversation keeps the
+ * summary in place of everything before it, as `Session.recordStep` records it. An agent that
+ * compacts during a turn streams the compaction between two steps, so that it starts the step
+ * after; `AgentSession.compact` returns one made between turns.
  */
 export const CompactionPart = Schema.Struct({
   type: Schema.tag("compaction"),

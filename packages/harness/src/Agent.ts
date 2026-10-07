@@ -20,7 +20,7 @@ import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
 import type { ModelEndpoint } from "./ModelEndpoint.ts";
-import type { StreamPart } from "./StreamPart.ts";
+import type { CompactionPart, StreamPart } from "./StreamPart.ts";
 
 /**
  * What every agent is made with: the model a turn runs on when it names none, and the models a turn
@@ -139,11 +139,11 @@ export interface AgentSession {
   ) => Effect.Effect<void, HarnessError>;
 
   /**
-   * Asks the agent to replace its conversation so far with a summary, guided by `instructions`. The
-   * summary arrives as a `compaction` part. Fails with `UnsupportedError` when the agent compacts
-   * only by itself.
+   * Replaces the conversation so far with a summary, guided by `instructions`, and returns the
+   * compaction. The session asks only between turns. Fails with `UnsupportedError` when the agent
+   * compacts only by itself.
    */
-  readonly compact: (instructions?: string) => Effect.Effect<void, HarnessError>;
+  readonly compact: (instructions?: string) => Effect.Effect<CompactionPart, HarnessError>;
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns what

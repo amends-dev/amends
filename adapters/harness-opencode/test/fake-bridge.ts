@@ -93,7 +93,7 @@ const program = Effect.gen(function* () {
           },
           submitToolResult: () => Effect.void,
           approve: () => Effect.void,
-          compact: () => Effect.void,
+          compact: () => Effect.succeed({ type: "compaction", trigger: "manual", summary: "" }),
           state: Effect.map(Ref.get(turns), (count) => State.make({ turns: count })),
           destroy: Effect.orDie(fs.writeFileString(`destroyed-${options.id}`, "")),
         };

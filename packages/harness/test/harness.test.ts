@@ -206,8 +206,15 @@ describe("Harness", () => {
         const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
         const result = yield* Stream.runCollect(session.continueStream({}));
 
-        expect(state.unfinishedTurn?.steps.map((step) => step.content)).toMatchObject([
-          readingMessages,
+        expect(state.unfinishedTurn?.steps).toMatchObject([
+          {
+            parts: [
+              { type: "text", text: "Reading the notes." },
+              { type: "tool-call", id: "call-read" },
+              { type: "tool-result", id: "call-read" },
+            ],
+            finish: { type: "finish-step" },
+          },
         ]);
         expect(codex.createdWith[1]?.agentState).toBeUndefined();
         expect(codex.createdWith[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });

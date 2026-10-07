@@ -49,15 +49,17 @@ turn streams a `tool-approval-request` after the call and waits, while the agent
 result, until `approve` allows the call or refuses it, which answers the agent `execution-denied`.
 `generate` and `generateObject` return only when the turn ends, so they refuse every request.
 `approve` also passes on the requests an agent makes for its own tools, and `compact` asks the
-agent to summarize the conversation so far.
+agent, between turns, to summarize the conversation so far, and returns the `compaction`.
 
 `suspendTurn`, `detach`, and `stop` return a `SessionState` for the caller to store, as JSON with
 `Schema.toCodecJson(Session.SessionState)`. It records the conversation as Effect AI `Prompt`
 messages, each step's tool calls and results included, beside the agent's own state. The agent that
 last ran the session resumes from its own state; any other loads the conversation.
-`Session.messagesOfStep` gives the messages that record one `Step`, as the conversation records
-it, for a caller that keeps a session's steps itself and gives the conversation back as `history`,
-rather than storing the whole of it with every turn. `suspendTurn`
+A compaction, made by `compact` or by the agent itself during a turn, replaces everything before
+it with its summary, as a user message, so that the conversation is the one the agent goes on with.
+`Session.recordStep` records one `Step` in a conversation as the session does, for a caller that
+keeps a session's steps itself and gives the conversation back as `history`, rather than storing
+the whole of it with every turn. `suspendTurn`
 ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
 once `createSession` resumes the session, from the step that was in flight; another agent runs it
 again from its prompt. `detach` lets go between turns, `stop` stops the agent to start it again

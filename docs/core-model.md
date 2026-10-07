@@ -953,8 +953,11 @@ they are appended, with the step being written as drafts that are not kept.
 A conversation can outgrow its model's context. Summarizing it is the harness's work, reported as
 a compaction in a step, so that the conversation a session resumes with starts from the latest
 compaction rather than the log's beginning, and reading it costs what the summary and what
-followed cost. The thread and the log keep everything a summary replaced. How a harness decides to
-compact, and what a summary keeps verbatim, remain open; nothing compacts yet.
+followed cost. The thread and the log keep everything a summary replaced. An agent compacts by
+itself when its conversation outgrows its context, streaming the compaction between steps, and on
+request between turns; the summary goes into the conversation as a user message. opencode
+compacts by itself; amends's own agent does not compact yet. What a summary keeps verbatim
+remains open.
 
 ## Agreed: sandbox providers share one contract, separate from harnesses
 

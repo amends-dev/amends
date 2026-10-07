@@ -24,6 +24,15 @@ const writing = (...texts: ReadonlyArray<string>): StreamPart.Step => ({
   finish: { type: "finish-step", reason: "stop", usage },
 });
 
+/** A step that starts by compacting the conversation into `summary`, then writes `text`. */
+const compacting = (summary: string, text: string): StreamPart.Step => ({
+  parts: [
+    { type: "compaction", trigger: "auto", summary },
+    { type: "text", text },
+  ],
+  finish: { type: "finish-step", reason: "stop", usage },
+});
+
 const step = (id: string, steps: StreamPart.Step, turn = turnId): SessionLog.Entry => ({
   _tag: "Step",
   turnId: turn,
@@ -129,6 +138,38 @@ describe("the conversation a session log records", () => {
       role: "user",
       content: [{ type: "text", text: "Ada: And 4 and 5?" }],
     });
+  });
+
+  it("starts from the latest compaction's summary", () => {
+    const later = Turn.Id.make("turn-2");
+    const history = SessionLog.historyOf([
+      prompted(),
+      step("one", writing("The sum is 5.")),
+      prompted("Ada: And 4 and 5?", later),
+      step("two", compacting("Ada asked for 2 and 3, then for 4 and 5.", "9."), later),
+    ]);
+
+    expect(history.content).toMatchObject([
+      {
+        role: "user",
+        content: [{ type: "text", text: expect.stringContaining("Ada asked for 2 and 3") }],
+      },
+      { role: "assistant", content: [{ type: "text", text: "9." }] },
+    ]);
+  });
+
+  it("drops a compaction with the run that made it, when the run stopped short", () => {
+    const history = SessionLog.historyOf([
+      prompted(),
+      step("one", compacting("Ada asked for 2 and 3.", "Before.")),
+      interrupted,
+      step("two", writing("After.")),
+    ]);
+
+    expect(history.content).toMatchObject([
+      { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
+      { role: "assistant", content: [{ type: "text", text: "After." }] },
+    ]);
   });
 
   it("keeps only the latest run of a turn whose run stopped short", () => {

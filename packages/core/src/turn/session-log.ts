@@ -49,30 +49,37 @@ export const isOfTurn =
 /**
  * The conversation a log records, as the agent's session resumes with it: the conversation it
  * joined, then each turn's prompt and the steps of its latest run, since a turn whose run stopped
- * short ran again from its prompt.
+ * short ran again from its prompt. A step that compacted the conversation leaves its summary in
+ * place of what came before.
  */
 export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt => {
-  const messages: Array<Prompt.Message> = [];
-  /** Where the latest turn's run starts among the messages: right after its prompt. */
-  let runStart = 0;
+  let conversation = Prompt.empty;
+  /** The conversation the latest turn's run started from: up to its prompt. */
+  let runStart = conversation;
   for (const entry of entries) {
     switch (entry._tag) {
       case "Joined":
-        messages.push(...entry.conversation.map(TurnPrompt.promptMessageOf));
+        conversation = Prompt.concat(
+          conversation,
+          Prompt.fromMessages(entry.conversation.map(TurnPrompt.promptMessageOf)),
+        );
         break;
       case "Prompted":
-        messages.push(TurnPrompt.userMessageOf(entry.texts));
-        runStart = messages.length;
+        conversation = Prompt.concat(
+          conversation,
+          Prompt.fromMessages([TurnPrompt.userMessageOf(entry.texts)]),
+        );
+        runStart = conversation;
         break;
       case "Step":
-        messages.push(...Session.messagesOfStep(entry.step));
+        conversation = Session.recordStep(conversation, entry.step);
         break;
       case "Interrupted":
-        messages.length = runStart;
+        conversation = runStart;
         break;
     }
   }
-  return Prompt.fromMessages(messages);
+  return conversation;
 };
 
 /** A step's text, as the parts it wrote it in, joined. */

@@ -18,18 +18,17 @@ import { Prompt, type Tool } from "effect/ai";
 import { type AgentSession, SessionId } from "./Agent.ts";
 import type { GenerateObjectResult, GenerateResult } from "./GenerateResult.ts";
 import type { HarnessError } from "./HarnessError.ts";
-import type { Step, StreamPart } from "./StreamPart.ts";
+import { type CompactionPart, Step, type StreamPart } from "./StreamPart.ts";
 
 /** A turn that `suspendTurn` cut short, kept so that the session can finish it later. */
 export const UnfinishedTurn = Schema.Struct({
   prompt: Prompt.UserMessage,
 
   /**
-   * The steps the turn finished before `suspendTurn`, each as the messages that record it. The
-   * agent that cut the turn short continues it after them; any other runs the turn again without
-   * them.
+   * The steps the turn finished before `suspendTurn`, their parts added up. The agent that cut the
+   * turn short continues it after them; any other runs the turn again without them.
    */
-  steps: Schema.Array(Prompt.Prompt),
+  steps: Schema.Array(Step),
 
   /**
    * What the agent's `suspendTurn` returned. Without it, the next agent runs the turn again from
@@ -48,7 +47,8 @@ export const SessionState = Schema.Struct({
 
   /**
    * The conversation so far: each turn's prompt, the tools its steps called, and its answer. A turn
-   * that ended early, as when `stop` aborted it, is kept as far as it got.
+   * that ended early, as when `stop` aborted it, is kept as far as it got. Once the agent compacts
+   * the conversation, its summary stands in for everything before it.
    */
   history: Prompt.Prompt,
 
@@ -167,7 +167,11 @@ export interface Session {
    */
   readonly approve: AgentSession["approve"];
 
-  /** Asks the agent to replace its conversation so far with a summary, which arrives as a `compaction` part. */
+  /**
+   * Asks the agent to replace the conversation so far with a summary, guided by `instructions`, and
+   * returns the compaction, which the conversation then starts from. It runs between turns, and no
+   * turn starts meanwhile. Fails with `UnsupportedError` when the agent compacts only by itself.
+   */
   readonly compact: AgentSession["compact"];
 
   /**
@@ -193,23 +197,49 @@ export interface Session {
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
 
+/**
+ * `conversation` with `step` recorded after it, as `SessionState.history` records a conversation:
+ * an assistant message with what the model wrote and the tools it called, followed by a tool
+ * message with the results, and none for a step that wrote nothing and called none. A step that
+ * compacted the conversation replaces it, and what the step had before, with the summary, as a user
+ * message, so that the conversation is the one the agent goes on with.
+ */
+export const recordStep = (conversation: Prompt.Prompt, step: Step): Prompt.Prompt => {
+  const compactedAt = step.parts.findLastIndex((part) => part.type === "compaction");
+  const compaction = step.parts[compactedAt];
+  return compaction?.type === "compaction"
+    ? Prompt.fromMessages([
+        summaryMessageOf(compaction),
+        ...messagesOfParts(step.parts.slice(compactedAt + 1)),
+      ])
+    : Prompt.concat(conversation, Prompt.fromMessages(messagesOfParts(step.parts)));
+};
+
+/** The message a compacted conversation starts with: the summary of what came before. */
+const summaryMessageOf = (compaction: CompactionPart) =>
+  Prompt.makeMessage("user", {
+    content: [
+      Prompt.makePart("text", {
+        text: `This conversation continues from an earlier part, summarized below.\n\n${compaction.summary}`,
+      }),
+    ],
+  });
+
 // TODO: Record what the model reasoned, and the files it wrote, once a model can read them back
 // from another: providers read back only the reasoning they produced.
 /**
- * The messages that record one step of a turn in a conversation, as `SessionState.history` records
- * it: an assistant message with what the model wrote and the tools it called, followed by a tool
- * message with the results, and none for a step that wrote nothing and called none. In a prompt, a
- * `providerExecuted` call is one the model's provider ran, so every call is recorded as one the
- * model made, whoever ran the tool, which any model reads.
+ * The messages that record a step's parts. In a prompt, a `providerExecuted` call is one the
+ * model's provider ran, so every call is recorded as one the model made, whoever ran the tool,
+ * which any model reads.
  *
  * A step its turn ended partway through keeps what it wrote so far, and each call it left without a
  * result is answered as interrupted, as Effect AI answers the calls of a response cut short, since
  * models refuse a conversation with a call no result answers.
  */
-export const messagesOfStep = (step: Step): ReadonlyArray<Prompt.Message> => {
+const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> => {
   const said: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
   const results: Array<Prompt.ToolResultPart> = [];
-  for (const part of step.parts) {
+  for (const part of parts) {
     switch (part.type) {
       case "text":
         if (part.text !== "") said.push(Prompt.makePart("text", { text: part.text }));

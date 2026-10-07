@@ -32,7 +32,7 @@ import {
 } from "../HarnessError.ts";
 import {
   type ContinueOptions,
-  messagesOfStep,
+  recordStep,
   type Session,
   type SessionState,
   type StreamOptions,
@@ -40,7 +40,7 @@ import {
   type TurnServices,
   type UnfinishedTurn,
 } from "../Session.ts";
-import { type StreamPart, stepsOf } from "../StreamPart.ts";
+import { type Step, type StreamPart, stepsOf } from "../StreamPart.ts";
 
 /** Makes the session `Harness.createSession` hands out, over an agent session it started. */
 export const makeSession = Effect.fn("Session.make")(function* (options: {
@@ -312,6 +312,36 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   const submitResult = <Part extends Parameters<AgentSession["submitToolResult"]>[0]>(part: Part) =>
     Effect.as(agentSession.submitToolResult(part), part);
 
+  /**
+   * Asks the agent to compact the conversation, holding the session meanwhile so that no turn
+   * starts, and records the compaction once the agent made it.
+   */
+  const compact = Effect.fn("Session.compact")(function* (instructions?: string) {
+    yield* Effect.flatten(
+      Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
+        const reason = refusal(current, "compact");
+        if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
+        return [Effect.void, { ...current, status: Status.Compacting() }];
+      }),
+    );
+    const compaction = yield* Effect.onError(agentSession.compact(instructions), () =>
+      Ref.update(state, (current) =>
+        current.status._tag === "Compacting" ? { ...current, status: Status.Idle() } : current,
+      ),
+    );
+    // A compaction between turns is recorded as a step that only compacts.
+    yield* Ref.update(state, (current) =>
+      current.status._tag === "Compacting"
+        ? {
+            ...current,
+            status: Status.Idle(),
+            history: recordStep(current.history, { parts: [compaction] }),
+          }
+        : current,
+    );
+    return compaction;
+  });
+
   /** Runs a new turn with the caller's prompt, once the session can start one. */
   const promptTurn = <Tools extends Record<string, Tool.Any>>(
     options: StreamOptions<Tools>,
@@ -441,8 +471,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
 
     approve,
 
-    compact: (instructions) =>
-      Effect.andThen(checkStatus("compact"), agentSession.compact(instructions)),
+    compact,
 
     suspendTurn: Effect.gen(function* () {
       const [agentState, { status, history }] = yield* letGo(
@@ -496,13 +525,14 @@ interface State {
 }
 
 /**
- * Where a session is: between turns, holding a turn `suspendTurn` cut short, running a turn, or let
- * go of.
+ * Where a session is: between turns, holding a turn `suspendTurn` cut short, running a turn,
+ * compacting the conversation between turns, or let go of.
  */
 type Status = Data.TaggedEnum<{
   Idle: {};
   Unfinished: { readonly turn: UnfinishedTurn };
   Running: { readonly turn: RunningTurn };
+  Compacting: {};
   Closed: {
     /** Whether `stop` or `destroy` aborted a running turn, before its `finish`. */
     readonly abortedTurn: boolean;
@@ -526,11 +556,8 @@ const abortedEnding: ReadonlyArray<StreamPart> = [
 interface RunningTurn {
   readonly prompt: Prompt.UserMessage;
 
-  /**
-   * The steps the turn finished, each as the messages that record it, with those before
-   * `suspendTurn`.
-   */
-  readonly steps: ReadonlyArray<Prompt.Prompt>;
+  /** The steps the turn finished, their parts added up, with those before `suspendTurn`. */
+  readonly steps: ReadonlyArray<Step>;
 
   /** The parts delivered of the step the turn is taking. */
   readonly stepParts: ReadonlyArray<StreamPart>;
@@ -545,12 +572,12 @@ const deliver = (state: State, part: StreamPart): [boolean, State] => {
   if (state.status._tag !== "Running") return [false, state];
   const { turn } = state.status;
   if (part.type === "finish") {
-    const history = Prompt.concat(state.history, conversationOf(turn));
+    const history = withTurn(state.history, turn.prompt, stepsSoFar(turn));
     return [true, { ...state, status: Status.Idle(), history }];
   }
   if (part.type === "finish-step") {
-    const step = Prompt.fromMessages(messagesOfParts(turn.stepParts));
-    const next = { ...turn, steps: [...turn.steps, step], stepParts: [] };
+    const steps = [...turn.steps, ...stepsOf([...turn.stepParts, part])];
+    const next = { ...turn, steps, stepParts: [] };
     return [true, { ...state, status: Status.Running({ turn: next }) }];
   }
   const next = { ...turn, stepParts: [...turn.stepParts, part] };
@@ -577,11 +604,13 @@ const refusal = (
   }
   switch (operation) {
     case "stream":
+    case "compact":
       if (status._tag === "Unfinished") {
         return new TurnInProgressError({
           description: "The session has an unfinished turn, which `continueStream` finishes",
         });
       }
+      if (status._tag === "Compacting") return compactingError();
       return status._tag === "Running" ? new TurnInProgressError({}) : undefined;
     case "continueStream":
       if (status._tag === "Running") return new TurnInProgressError({});
@@ -593,17 +622,20 @@ const refusal = (
         ? undefined
         : new NoTurnError({ description: "The session is not running a turn" });
     case "detach":
+      if (status._tag === "Compacting") return compactingError();
       return status._tag === "Running"
         ? new TurnInProgressError({
             description: "A running turn must be suspended before the session detaches",
           })
         : undefined;
     case "approve":
-    case "compact":
     case "stop":
       return undefined;
   }
 };
+
+const compactingError = () =>
+  new TurnInProgressError({ description: "The session is compacting its conversation" });
 
 const userMessageOf = (prompt: string | Prompt.UserMessage): Prompt.UserMessage =>
   typeof prompt === "string"
@@ -627,18 +659,14 @@ const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
 const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
   turn.steps.length === 0 && turn.stepParts.length === 0
     ? history
-    : Prompt.concat(history, conversationOf(turn));
+    : withTurn(history, turn.prompt, stepsSoFar(turn));
 
-/** A turn as the conversation records it: its prompt, then each step it took. */
-const conversationOf = (turn: RunningTurn) =>
-  Prompt.concat(
-    conversationOfFinishedSteps(turn),
-    Prompt.fromMessages(messagesOfParts(turn.stepParts)),
-  );
+/** The conversation with a turn after `history`: the turn's prompt, then each of its `steps`. */
+const withTurn = (history: Prompt.Prompt, prompt: Prompt.UserMessage, steps: ReadonlyArray<Step>) =>
+  steps.reduce(recordStep, Prompt.concat(history, Prompt.fromMessages([prompt])));
 
-/** A turn's prompt and the steps it finished, as the conversation records them. */
-const conversationOfFinishedSteps = (turn: RunningTurn) =>
-  Prompt.fromMessages([turn.prompt, ...turn.steps.flatMap((step) => step.content)]);
+/** The steps of a turn as far as the session delivered them, the one it is taking last. */
+const stepsSoFar = (turn: RunningTurn) => [...turn.steps, ...stepsOf(turn.stepParts)];
 
 // TODO: Give `needsApproval` the parts of the step its call is in, and of the steps the caller has
 // not read yet, by deciding at the call's delivery rather than when the session reads the call.
@@ -648,14 +676,8 @@ const conversationOfFinishedSteps = (turn: RunningTurn) =>
  * has not read to its end yet may be missing.
  */
 const recordedConversation = ({ status, history }: State): ReadonlyArray<Prompt.Message> =>
-  (status._tag === "Running"
-    ? Prompt.concat(history, conversationOfFinishedSteps(status.turn))
-    : history
-  ).content;
-
-/** The messages that record the parts a step delivered, as far as they go. */
-const messagesOfParts = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Prompt.Message> =>
-  stepsOf(parts).flatMap(messagesOfStep);
+  (status._tag === "Running" ? withTurn(history, status.turn.prompt, status.turn.steps) : history)
+    .content;
 
 /** What `approve` answers a request with. */
 type ApprovalResponse = Parameters<AgentSession["approve"]>[0];

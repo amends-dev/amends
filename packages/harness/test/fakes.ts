@@ -59,6 +59,9 @@ export interface FakeAgentOptions {
    * When it fails, so does the agent, letting go of nothing.
    */
   readonly beforeLettingGo?: Effect.Effect<void, HarnessError>;
+
+  /** Runs when the session compacts, before the agent summarizes. When it fails, so does `compact`. */
+  readonly beforeCompacting?: Effect.Effect<void, HarnessError>;
 }
 
 /**
@@ -110,7 +113,12 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
                 Queue.offer(toolResults, result.result),
               ),
             approve: (response) => Effect.sync(() => void approvals.push(response)),
-            compact: () => Effect.void,
+            compact: (instructions) =>
+              Effect.as(options.beforeCompacting ?? Effect.void, {
+                type: "compaction",
+                trigger: "manual",
+                summary: `codex summarizes${instructions === undefined ? "" : `, ${instructions}`}`,
+              }),
             suspendTurn: Effect.andThen(
               beforeLettingGo,
               Effect.as(close, { agent: id, turn: true }),
@@ -269,7 +277,7 @@ export const makeFakeDriver = (
               }),
             submitToolResult: (result) => Effect.sync(() => void submitted.push(result.result)),
             approve: () => Effect.void,
-            compact: () => Effect.void,
+            compact: () => Effect.succeed({ type: "compaction", trigger: "manual", summary: "" }),
             state: Effect.succeed({ session: options.id, created }),
             destroy: Effect.sync(() => void destroyed.push(options.id)),
           };

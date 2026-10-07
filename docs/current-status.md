@@ -22,7 +22,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   thread's messages since the agent's last turn there, and posts the reply its job gives, the text
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
   conversation in each participation's session log, from which the agent's next turn there
-  resumes; resuming reads the whole log each turn, since nothing yet compacts a long one. A turn
+  resumes; resuming reads the whole log each turn and goes on from its latest compaction, which
+  only opencode makes, by itself, while amends's own agent does not compact yet. A turn
   cut short runs again from its prompt rather than continuing, and a session's sandbox is left
   running between turns, never stopped or destroyed. A reader with a turn's log open follows it as
   a stream of its items and the step being written; the text being written is best effort, and a

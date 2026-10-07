@@ -221,7 +221,7 @@ export const makeScriptedAgent = (
           continueTurn: () => Stream.die("The scripted agent continues no turn"),
           submitToolResult: () => Effect.die("The scripted agent calls no host tool"),
           approve: () => Effect.die("The scripted agent asks for no approval"),
-          compact: () => Effect.void,
+          compact: () => Effect.succeed({ type: "compaction", trigger: "manual", summary: "" }),
           suspendTurn: Effect.die("The scripted agent suspends no turn"),
           detach: Effect.sync(() => ({ turns: turns.length })),
           stop: Effect.sync(() => ({ turns: turns.length })),

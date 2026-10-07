@@ -868,3 +868,127 @@ describe("Session", () => {
     }),
   );
 });
+
+describe("Session compaction", () => {
+  /** The user message a compacted conversation starts with, holding `summary`. */
+  const summaryMessage = (summary: string) => ({
+    role: "user",
+    content: [{ type: "text", text: expect.stringMatching(new RegExp(`\n\n${summary}$`)) }],
+  });
+
+  it.effect("keeps a compaction the agent makes during a turn in place of what came before", () =>
+    Effect.gen(function* () {
+      const { session } = yield* createSession((prompt, host) =>
+        prompt === "long"
+          ? Stream.fromIterable([
+              ...readingStep,
+              { type: "compaction", trigger: "auto", summary: "codex read the notes" },
+              ...reply("The sum is 5"),
+            ])
+          : answers(prompt, host),
+      );
+
+      yield* session.generate({ prompt: "hello" });
+      const parts = yield* Stream.runCollect(session.stream({ prompt: "long" }));
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(parts).toContainEqual({
+        type: "compaction",
+        trigger: "auto",
+        summary: "codex read the notes",
+      });
+      expect(state.history.content).toMatchObject([
+        summaryMessage("codex read the notes"),
+        { role: "assistant", content: [{ type: "text", text: "The sum is 5" }] },
+        { role: "user", content: [{ type: "text", text: "again" }] },
+        { role: "assistant", content: [{ type: "text", text: "codex answers again" }] },
+      ]);
+    }),
+  );
+
+  it.effect("compacts between turns, and the conversation goes on from the summary", () =>
+    Effect.gen(function* () {
+      const { session } = yield* createSession(answers);
+
+      yield* session.generate({ prompt: "hello" });
+      const compaction = yield* session.compact("keep the greeting");
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(compaction).toEqual({
+        type: "compaction",
+        trigger: "manual",
+        summary: "codex summarizes, keep the greeting",
+      });
+      expect(state.history.content).toMatchObject([
+        summaryMessage("codex summarizes, keep the greeting"),
+        { role: "user", content: [{ type: "text", text: "again" }] },
+        { role: "assistant", content: [{ type: "text", text: "codex answers again" }] },
+      ]);
+    }),
+  );
+
+  it.effect("refuses to compact while a turn runs", () =>
+    Effect.gen(function* () {
+      const running = yield* Deferred.make<void>();
+      const { session } = yield* createSession(() =>
+        Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
+      );
+
+      yield* Stream.runCollect(session.stream({ prompt: "slow" })).pipe(Effect.forkChild);
+      yield* Deferred.await(running);
+      const refused = yield* Effect.flip(session.compact());
+
+      expect(refused.reason._tag).toBe("TurnInProgressError");
+    }),
+  );
+
+  it.effect("starts no turn while it compacts", () =>
+    Effect.gen(function* () {
+      const compacting = yield* Deferred.make<void>();
+      const compacted = yield* Deferred.make<void>();
+      const { fake, session } = yield* createSession(answers, {
+        beforeCompacting: Effect.andThen(
+          Deferred.succeed(compacting, undefined),
+          Deferred.await(compacted),
+        ),
+      });
+
+      const compaction = yield* Effect.forkChild(session.compact());
+      yield* Deferred.await(compacting);
+      const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
+      yield* Deferred.succeed(compacted, undefined);
+      yield* Fiber.join(compaction);
+      const result = yield* session.generate({ prompt: "again" });
+
+      expect(refused.reason._tag).toBe("TurnInProgressError");
+      expect(fake.turns.map((turn) => turn.prompt.content)).toMatchObject([
+        [{ type: "text", text: "again" }],
+      ]);
+      expect(result.text).toBe("codex answers again");
+    }),
+  );
+
+  it.effect("keeps the conversation as it was when the agent fails to compact", () =>
+    Effect.gen(function* () {
+      const unsupported = new HarnessError({ agent: "codex", reason: new UnsupportedError({}) });
+      const { session } = yield* createSession(answers, {
+        beforeCompacting: Effect.fail(unsupported),
+      });
+
+      yield* session.generate({ prompt: "hello" });
+      const failed = yield* Effect.flip(session.compact());
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(failed.reason._tag).toBe("UnsupportedError");
+      expect(state.history.content.map((message) => message.role)).toEqual([
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+      ]);
+    }),
+  );
+});

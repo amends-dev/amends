@@ -29,7 +29,7 @@ import { Prompt } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 import { type AgentSession, SessionId } from "./Agent.ts";
 import { HarnessError } from "./HarnessError.ts";
-import { StreamPart } from "./StreamPart.ts";
+import { CompactionPart, StreamPart } from "./StreamPart.ts";
 
 /** A tool the host runs, as the agent reads it: its name, what it does, and its parameters. */
 export const ToolDefinition = Schema.Struct({
@@ -257,6 +257,7 @@ export class Rpcs extends RpcGroup.make(
 
   Rpc.make("Compact", {
     payload: { ...inSession, instructions: Schema.optional(Schema.String) },
+    success: CompactionPart,
     error: HarnessError,
   }),
 
