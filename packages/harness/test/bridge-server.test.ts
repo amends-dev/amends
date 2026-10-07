@@ -244,7 +244,7 @@ describe("BridgeServer", () => {
           restarted.ReadTurn({ session, turn: firstTurn, after: 0 }),
         );
 
-        expect(fake.starts[1]?.agentState).toEqual({ session, start: 1 });
+        expect(fake.createdWith[1]?.agentState).toEqual({ session, created: 1 });
         expect(hasUnfinishedTurn).toBe(true);
         expect(fake.turns).toHaveLength(1);
         expect(read).toEqual(numbered(reply("hello")));
@@ -318,8 +318,8 @@ describe("BridgeServer", () => {
       const started = yield* client.StartSession(startOptions);
       const takenUp = yield* client.StartSession(startOptions);
 
-      expect(fake.starts).toHaveLength(1);
-      expect(started).toEqual({ hasUnfinishedTurn: false, agentState: { session, start: 1 } });
+      expect(fake.createdWith).toHaveLength(1);
+      expect(started).toEqual({ hasUnfinishedTurn: false, agentState: { session, created: 1 } });
       expect(takenUp).toEqual(started);
     }),
   );
@@ -351,7 +351,7 @@ describe("BridgeServer", () => {
       const state = yield* client.StopSession({ session });
       const afterStop = yield* Effect.flip(client.ReadState({ session }));
 
-      expect(state).toEqual({ session, start: 1 });
+      expect(state).toEqual({ session, created: 1 });
       expect(fake.turnEnds).toEqual(["interrupted"]);
       expect(fake.ended).toEqual([session]);
       expect(afterStop.reason._tag).toBe("NotFoundError");

@@ -41,7 +41,7 @@ describe("opencode's bridge program", () => {
       const sandbox = yield* makeSandbox();
       const harness = yield* makeHarness(command);
 
-      yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+      yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
 
       expect(yield* startsIn(directory)).toMatchObject([
         { args: ["serve", "--hostname=127.0.0.1", "--port=0"], config, greeting: "hello" },
@@ -54,7 +54,7 @@ describe("opencode's bridge program", () => {
       const { command, directory } = yield* installStandIn;
       const sandbox = yield* makeSandbox();
       const harness = yield* makeHarness(command, { FAKE_OPENCODE_EXIT_AFTER: "200" });
-      yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+      yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
       const [started] = yield* startsIn(directory);
       // The server runs until the bridge has learned that it exited.
       yield* isRunning(started?.pid ?? 0).pipe(
@@ -65,7 +65,7 @@ describe("opencode's bridge program", () => {
       // A bridge still running would start no second server, but fail the session on the one that
       // exited, until it exits too; the bridge the next host launches then starts its own.
       yield* nextHarness
-        .startSession({ sandbox, id: SessionId.make("session-2") })
+        .createSession({ sandbox, id: SessionId.make("session-2") })
         .pipe(
           Effect.retry(
             Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "10 seconds" })),

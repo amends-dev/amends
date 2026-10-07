@@ -19,7 +19,7 @@
  *
  * An agent's adapter implements `Bridge.Driver`, which drives the agent behind a bridge, and
  * `BridgeServer.serve` serves the driver in the sandbox. The adapter's `Agent.Agent`, which hosts
- * run, reaches it with `BridgeClient.startSession`.
+ * run, reaches it with `BridgeClient.createSession`.
  * `Rpcs` is the protocol between them, over a WebSocket whose host presents the token as
  * `Authorization: Bearer <token>` when it connects.
  */
@@ -64,10 +64,10 @@ export const TurnOptions = Schema.Struct({
 
 export interface TurnOptions extends Schema.Schema.Type<typeof TurnOptions> {}
 
-export interface StartSessionOptions {
+export interface CreateSessionOptions {
   readonly id: SessionId;
 
-  /** The absolute directory the session works in. It exists before `startSession`. */
+  /** The absolute directory the session works in. It exists before `createSession`. */
   readonly directory: string;
 
   /**
@@ -102,7 +102,7 @@ export interface DriverSession {
   readonly compact: AgentSession["compact"];
 
   /**
-   * What `startSession` takes as `agentState` to start the session again, as a restarted bridge
+   * What `createSession` takes as `agentState` to start the session again, as a restarted bridge
    * does.
    */
   readonly state: Effect.Effect<Schema.Json, HarnessError>;
@@ -121,11 +121,11 @@ export interface Driver {
   readonly id: string;
 
   /**
-   * Starts a session: a new one, or one started again from its `state`. The session runs until its
+   * Creates a session: a new one, or one created again from its `state`. The session runs until its
    * scope closes, when a host stops or destroys it, or the bridge exits.
    */
-  readonly startSession: (
-    options: StartSessionOptions,
+  readonly createSession: (
+    options: CreateSessionOptions,
   ) => Effect.Effect<DriverSession, HarnessError, Scope.Scope>;
 }
 

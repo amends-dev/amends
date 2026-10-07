@@ -119,8 +119,8 @@ const agentOf = Effect.fnUntraced(function* (
     id: "opencode",
     requiresSandbox: true,
     template: installation.template,
-    startSession: (startOptions) =>
-      Effect.provide(BridgeClient.startSession(bridge, startOptions), services),
+    createSession: (sessionOptions) =>
+      Effect.provide(BridgeClient.createSession(bridge, sessionOptions), services),
   };
   return agent;
 });

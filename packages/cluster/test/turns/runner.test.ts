@@ -63,9 +63,9 @@ describe("a turn's run", () => {
 
         expect(yield* runNextTurn).toEqual(Option.some(turn.id));
         // The session starts anew, named after the participation, with the conversation joined.
-        expect(scripted.starts).toHaveLength(1);
-        expect(scripted.starts[0]?.id).toBe(participationId);
-        expect(scripted.starts[0]?.history.content.map(userTexts)).toEqual([
+        expect(scripted.createdWith).toHaveLength(1);
+        expect(scripted.createdWith[0]?.id).toBe(participationId);
+        expect(scripted.createdWith[0]?.history.content.map(userTexts)).toEqual([
           ["Kai: We need a plan."],
         ]);
         expect(
@@ -119,8 +119,8 @@ describe("a turn's run", () => {
           },
         );
         yield* runNextTurn;
-        expect(scripted.starts[0]?.agentState).toEqual({ turns: 4 });
-        expect(scripted.starts[0]?.history.content.map(({ role }) => role)).toEqual([
+        expect(scripted.createdWith[0]?.agentState).toEqual({ turns: 4 });
+        expect(scripted.createdWith[0]?.history.content.map(({ role }) => role)).toEqual([
           "user",
           "assistant",
         ]);
@@ -149,7 +149,7 @@ describe("a turn's run", () => {
         ["Alice: The prompt told."],
       ]);
       // The session starts without the turn, which its prompt brings.
-      expect(scripted.starts[0]?.history).toEqual(Prompt.empty);
+      expect(scripted.createdWith[0]?.history).toEqual(Prompt.empty);
       expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
         "Prompted",
         "Step",
@@ -280,7 +280,7 @@ describe("a turn's run", () => {
         workWaits: false,
       });
       expect(yield* runNextTurn).toEqual(Option.none());
-      expect(scripted.starts).toEqual([]);
+      expect(scripted.createdWith).toEqual([]);
       expect(workspace.log()).toEqual([]);
     }),
   );

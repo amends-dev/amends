@@ -81,7 +81,7 @@ describe.skipIf(!enabled)("a model reached from the catalog", () => {
         const endpoint = yield* endpointFor("openrouter", openRouterModel, openRouterKey);
         const session = yield* Harness.make(
           yield* AmendsAgent.make({ model: endpoint }),
-        ).startSession({
+        ).createSession({
           id: Agent.SessionId.make("live"),
         });
         const toolkit = yield* Effect.provide(
@@ -110,7 +110,7 @@ describe.skipIf(!enabled)("a model reached from the catalog", () => {
         const endpoint = yield* endpointFor("openrouter", openRouterModel, openRouterKey);
         const session = yield* Harness.make(
           yield* AmendsAgent.make({ model: endpoint }),
-        ).startSession({
+        ).createSession({
           id: Agent.SessionId.make("live"),
         });
 
@@ -228,7 +228,7 @@ describe.skipIf(!enabled)("amends's agent set up from connections", () => {
           [{ source, definitions: yield* source.discover }],
           () => "allow",
         );
-        const session = yield* harness.startSession({ id });
+        const session = yield* harness.createSession({ id });
 
         const result = yield* session.generate({
           prompt:
@@ -259,7 +259,7 @@ describe.skipIf(!enabled)("amends's agent set up from connections", () => {
           ),
           (created) => Effect.ignore(created.destroy),
         );
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
 
         const result = yield* session.generate({
           prompt: "Run `echo amends-live > proof.txt` with your bash tool, then reply with: done",

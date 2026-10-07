@@ -95,7 +95,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
     const sessionId = Agent.SessionId.make(ready.turn.participationId);
     const agent = yield* TurnAgent.open(ready.runnable, sessionId);
     const { history } = writer.opening;
-    const session = yield* agent.harness.startSession({
+    const session = yield* agent.harness.createSession({
       ...(agent.sandbox === undefined ? {} : { sandbox: agent.sandbox }),
       ...(ready.resume === null
         ? { id: sessionId, history }

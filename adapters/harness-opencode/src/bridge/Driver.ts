@@ -68,7 +68,7 @@ export interface Driver extends Bridge.Driver {
   readonly serverExited: Effect.Effect<void>;
 }
 
-/** What `state` returns, for `startSession` to take back. */
+/** What `state` returns, for `createSession` to take back. */
 const State = Schema.Struct({
   sessionID: Schema.String,
 
@@ -123,25 +123,30 @@ export const make = Effect.fn("OpencodeDriver.make")(function* (options: Require
   const driver: Driver = {
     id: "opencode",
     serverExited: Deferred.await(serverExited),
-    startSession: (startOptions) =>
-      Effect.flatMap(startedServer, (server) => startSession(server, options, startOptions)),
+    createSession: (sessionOptions) =>
+      Effect.flatMap(startedServer, (server) => createSession(server, options, sessionOptions)),
   };
   return driver;
 });
 
-const startSession = Effect.fn("OpencodeDriver.startSession")(function* (
+const createSession = Effect.fn("OpencodeDriver.createSession")(function* (
   server: Server.Server,
   options: Pick<Options, "model" | "models">,
-  startOptions: Bridge.StartSessionOptions,
+  sessionOptions: Bridge.CreateSessionOptions,
 ) {
   // opencode may have lost the session, as when the sandbox lost its data, and then starts one
   // from the conversation.
-  const saved = yield* readState(startOptions.agentState);
+  const saved = yield* readState(sessionOptions.agentState);
   const kept =
     saved !== undefined && (yield* server.hasSession(saved.sessionID)) ? saved : undefined;
   const state =
     kept ??
-    (yield* createSession(server, startOptions.directory, options.model, startOptions.history));
+    (yield* createOpencodeSession(
+      server,
+      sessionOptions.directory,
+      options.model,
+      sessionOptions.history,
+    ));
   const { sessionID } = state;
 
   /** The model the session runs its turns on, switched when a turn names another. */
@@ -275,7 +280,7 @@ const startSession = Effect.fn("OpencodeDriver.startSession")(function* (
  * A new opencode session in `directory` on `model`, holding `history`. A session the history could
  * not be written into is deleted.
  */
-const createSession = Effect.fnUntraced(function* (
+const createOpencodeSession = Effect.fnUntraced(function* (
   server: Server.Server,
   directory: string,
   model: ModelRef,
@@ -370,7 +375,7 @@ const isSameModel = (one: ModelRef, other: ModelRef) =>
 const textOf = (message: Prompt.UserMessage) =>
   message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n");
 
-/** The state `startSession` was given, if any, as the state `state` returned. */
+/** The state `createSession` was given, if any, as the state `state` returned. */
 const readState = (json: Schema.Json | undefined) =>
   Schema.decodeEffect(Schema.UndefinedOr(StateJson))(json).pipe(
     Effect.mapError((cause) =>

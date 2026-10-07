@@ -222,7 +222,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
             },
           }),
         );
-        const session = yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+        const session = yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
         yield* session.destroy;
       }).pipe(Effect.provide(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))),
     180_000,

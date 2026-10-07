@@ -42,7 +42,7 @@ import {
 } from "../Session.ts";
 import { type StreamPart, stepsOf } from "../StreamPart.ts";
 
-/** Makes the session `Harness.startSession` hands out, over an agent session it started. */
+/** Makes the session `Harness.createSession` hands out, over an agent session it started. */
 export const makeSession = Effect.fn("Session.make")(function* (options: {
   readonly id: SessionId;
   readonly agent: string;

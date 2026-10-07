@@ -1,10 +1,10 @@
 /**
  * A session is one conversation with an agent, run a turn at a time. It is what callers hold:
- * `Harness.startSession` starts one over an agent session, and the session adds the host's tools,
+ * `Harness.createSession` creates one over an agent session, and the session adds the host's tools,
  * whole-turn results, and the record of the conversation that `SessionState` keeps.
  *
  * `SessionState` is what `suspendTurn`, `detach`, and `stop` return for the caller to store. It
- * records the conversation as Effect AI `Prompt` messages, so that `Harness.startSession` can
+ * records the conversation as Effect AI `Prompt` messages, so that `Harness.createSession` can
  * resume the session from it on any agent: the agent that last ran it resumes from its own state,
  * and any other loads the conversation, and runs an unfinished turn again from its prompt.
  *
@@ -173,7 +173,7 @@ export interface Session {
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns the
    * session with the turn unfinished, for `continueStream` to finish once
-   * `Harness.startSession` resumes it.
+   * `Harness.createSession` resumes it.
    */
   readonly suspendTurn: Effect.Effect<SessionState, HarnessError>;
 

@@ -48,7 +48,7 @@ const program = Effect.gen(function* () {
 
   const driver: Bridge.Driver = {
     id: "fake",
-    startSession: (options) =>
+    createSession: (options) =>
       Effect.gen(function* () {
         const turns = yield* Ref.make(
           Option.match(Schema.decodeUnknownOption(State)(options.agentState), {

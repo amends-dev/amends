@@ -1,7 +1,7 @@
 /**
  * The host's side of `Bridge.Rpcs`, for an agent that works in a sandbox and is reached through a
  * bridge there. The adapter's `Agent.Agent` requires a sandbox and starts each session with
- * `startSession`, from what the adapter says of its bridge.
+ * `createSession`, from what the adapter says of its bridge.
  *
  * A session's own bridge is the one its options launch: its `Bridge.BridgeId` is a digest of them
  * and of the sandbox's token, so that sessions of hosts that launch a bridge alike share one, and a
@@ -89,7 +89,7 @@ export interface Options {
   readonly agentOptions: Schema.Json;
 }
 
-/** What `suspendTurn`, `detach`, and `stop` return, for `startSession` to take back. */
+/** What `suspendTurn`, `detach`, and `stop` return, for `createSession` to take back. */
 const State = Schema.Struct({
   /** What the agent behind the bridge gave as the session's state. */
   agentState: Schema.Json,
@@ -106,29 +106,29 @@ const StateJson = Schema.toCodecJson(State);
 type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientError>;
 
 /**
- * Starts a session, as `Agent.startSession` does, of the agent behind the bridge that `options`
+ * Creates a session, as `Agent.createSession` does, of the agent behind the bridge that `options`
  * describes, in the sandbox of the session's workspace. It connects with the `WebSocketConstructor`
  * provided, which must send headers when it opens a connection, as Bun's and Node's do.
  */
-export const startSession = Effect.fn("BridgeClient.startSession")(function* (
+export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   options: Options,
-  startOptions: Agent.StartSessionOptions,
+  sessionOptions: Agent.CreateSessionOptions,
 ) {
   const harnessError = (reason: HarnessErrorReason, cause?: unknown) =>
     new HarnessError({ agent: options.id, reason, cause });
-  const { workspace } = startOptions;
+  const { workspace } = sessionOptions;
   if (workspace === undefined) {
     const description = `${options.id} works in a sandbox`;
     return yield* harnessError(new UnsupportedError({ description }));
   }
   const { sandbox, directory } = workspace;
-  const session = startOptions.id;
+  const session = sessionOptions.id;
   const crypto = yield* Crypto.Crypto;
   const token = options.token(sandbox.id);
   const own = yield* bridgeIdOf(options, token);
 
   const saved = yield* Schema.decodeEffect(Schema.UndefinedOr(StateJson))(
-    startOptions.unfinishedTurn ?? startOptions.agentState,
+    sessionOptions.unfinishedTurn ?? sessionOptions.agentState,
   ).pipe(
     Effect.mapError((cause) =>
       harnessError(
@@ -180,7 +180,7 @@ export const startSession = Effect.fn("BridgeClient.startSession")(function* (
     const started = yield* client.StartSession({
       session,
       directory,
-      history: startOptions.history,
+      history: sessionOptions.history,
       ...(agentState === undefined ? {} : { agentState }),
       unfinishedTurn: yield* Ref.get(running),
     });

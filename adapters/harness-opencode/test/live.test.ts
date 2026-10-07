@@ -279,7 +279,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
             },
           },
         });
-        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         const answered = yield* runTurn(session, "Say pong.");
         const refused = [
@@ -311,7 +311,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const { driver, directory } = yield* makeLiveDriver();
-        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(
           session,
@@ -369,7 +369,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
           },
           { role: "assistant", content: [{ type: "text", text: "Noted." }] },
         ]);
-        const session = yield* driver.startSession({ id, directory, history });
+        const session = yield* driver.createSession({ id, directory, history });
 
         const result = yield* runTurn(
           session,
@@ -391,7 +391,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
           model,
           models: { missing: { ...model, model: "no-such-model" } },
         });
-        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(session, "Say hi.", { model: "missing" });
 
@@ -405,12 +405,12 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const { driver, directory } = yield* makeLiveDriver();
-        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
         const agentState = yield* session.state;
 
         yield* session.destroy;
         // opencode no longer has the session, so the driver starts another.
-        const again = yield* driver.startSession({
+        const again = yield* driver.createSession({
           id,
           directory,
           history: Prompt.empty,
@@ -429,7 +429,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const { driver, directory } = yield* makeLiveDriver();
-        const session = yield* driver.startSession({ id, directory, history: Prompt.empty });
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         yield* session
           .promptTurn(turnOptions("Run `sleep 300` with your bash tool, then say done."))
@@ -454,7 +454,7 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
       () =>
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeLiveHosts(sandboxes);
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
 
           const result = yield* session.generate({
             prompt:
@@ -474,7 +474,7 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
       () =>
         Effect.gen(function* () {
           const { sandbox, harness, nextHarness } = yield* makeLiveHosts(sandboxes);
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
           const before: Array<StreamPart.StreamPart> = [];
           const calledTool = yield* Deferred.make<void>();
 
@@ -495,7 +495,7 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
           yield* Deferred.await(calledTool);
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
-          const resumed = yield* nextHarness.startSession({ sandbox, resumeFrom: state });
+          const resumed = yield* nextHarness.createSession({ sandbox, resumeFrom: state });
           const after = yield* Stream.runCollect(resumed.continueStream({}));
           const history = (yield* resumed.detach).history.content;
 
@@ -603,7 +603,7 @@ const describeConnections = (
             ),
             (made) => Effect.ignore(made.destroy),
           );
-          const session = yield* harness.startSession({ sandbox: created, id });
+          const session = yield* harness.createSession({ sandbox: created, id });
 
           const result = yield* session.generate({
             prompt:

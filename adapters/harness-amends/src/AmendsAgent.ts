@@ -42,7 +42,7 @@ export interface Options extends Agent.Options {
 }
 
 /**
- * What `suspendTurn` returns, for `startSession` to take back: the steps of the turn it cut short,
+ * What `suspendTurn` returns, for `createSession` to take back: the steps of the turn it cut short,
  * each as the messages that record it, as the model saw them.
  */
 const UnfinishedTurn = Schema.Struct({ steps: Schema.Array(Prompt.Prompt) });
@@ -74,7 +74,7 @@ export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
   const agent: Agent.Agent = {
     id: "amends",
     requiresSandbox: false,
-    startSession: (startOptions) => startSession(options, modelFor, startOptions),
+    createSession: (sessionOptions) => createSession(options, modelFor, sessionOptions),
   };
   return agent;
 });
@@ -104,17 +104,17 @@ export const integration = Effect.fn("AmendsAgent.integration")(function* (
   });
 });
 
-const startSession = Effect.fn("AmendsAgent.startSession")(function* (
+const createSession = Effect.fn("AmendsAgent.createSession")(function* (
   options: Options,
   modelFor: (
     name: string | undefined,
   ) => Effect.Effect<LanguageModel.LanguageModel, HarnessError.HarnessError>,
-  startOptions: Agent.StartSessionOptions,
+  sessionOptions: Agent.CreateSessionOptions,
 ) {
-  const { workspace } = startOptions;
+  const { workspace } = sessionOptions;
   const maxSteps = options.maxSteps ?? Number.POSITIVE_INFINITY;
-  const suspended = yield* readUnfinishedTurn(startOptions.unfinishedTurn);
-  const conversation = yield* Ref.make(startOptions.history);
+  const suspended = yield* readUnfinishedTurn(sessionOptions.unfinishedTurn);
+  const conversation = yield* Ref.make(sessionOptions.history);
   /**
    * The running turn, or the one `suspendTurn` cut short. A turn joins the conversation once the
    * session takes its `finish`, so that a turn which finished before the session had all of it can

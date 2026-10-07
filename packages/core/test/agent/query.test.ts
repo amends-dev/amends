@@ -38,7 +38,7 @@ const harnessOf = (id: string, requiresSandbox: boolean) => () =>
     Harness.make({
       id,
       requiresSandbox,
-      startSession: () => Effect.die("No test starts a session"),
+      createSession: () => Effect.die("No test starts a session"),
     }),
   );
 

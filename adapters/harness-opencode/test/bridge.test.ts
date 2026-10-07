@@ -177,7 +177,7 @@ describe("BridgeClient", () => {
     it.live("launches the bridge with its options on standard input, and runs a turn there", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
 
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
 
@@ -197,7 +197,7 @@ describe("BridgeClient", () => {
         const sandbox = yield* makeSandbox(templateOf("1"));
         const harness = yield* makeHarness({ version: "2" });
 
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
 
         expect(parts).toEqual(answer("hello"));
@@ -207,10 +207,10 @@ describe("BridgeClient", () => {
     it.live("connects to the bridge another host launched with the same options", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        yield* harness.startSession({ sandbox, id });
+        yield* harness.createSession({ sandbox, id });
         const otherHarness = yield* makeHarness();
 
-        const session = yield* otherHarness.startSession({
+        const session = yield* otherHarness.createSession({
           sandbox,
           id: SessionId.make("session-2"),
         });
@@ -225,7 +225,7 @@ describe("BridgeClient", () => {
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
         const greet = (made: Harness.Harness["Service"], session: string) =>
-          Effect.flatMap(made.startSession({ sandbox, id: SessionId.make(session) }), (started) =>
+          Effect.flatMap(made.createSession({ sandbox, id: SessionId.make(session) }), (started) =>
             Stream.runCollect(started.stream({ prompt: "greet" })),
           );
 
@@ -244,7 +244,7 @@ describe("BridgeClient", () => {
     it.live("refuses a connection that presents another token", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        yield* harness.startSession({ sandbox, id });
+        yield* harness.createSession({ sandbox, id });
         const [listening] = yield* listeningOf(sandbox);
         const port = listening?.port ?? 0;
 
@@ -256,14 +256,14 @@ describe("BridgeClient", () => {
     it.live("leaves a suspended turn running in the bridge, for another host to continue", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
         const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
 
         const state = yield* session.suspendTurn;
         yield* Fiber.join(reading);
         yield* release(sandbox);
         const otherHarness = yield* makeHarness();
-        const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+        const resumed = yield* otherHarness.createSession({ sandbox, resumeFrom: state });
         const parts = yield* Stream.runCollect(resumed.continueStream({}));
 
         expect(parts).toEqual(answer("later"));
@@ -275,14 +275,14 @@ describe("BridgeClient", () => {
       () =>
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
           const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
 
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
           yield* release(sandbox);
           const otherHarness = yield* makeHarness({ greeting: "hi" });
-          const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+          const resumed = yield* otherHarness.createSession({ sandbox, resumeFrom: state });
           const continued = yield* Stream.runCollect(resumed.continueStream({}));
           const next = yield* Stream.runCollect(resumed.stream({ prompt: "greet" }));
           const { agentState } = yield* resumed.detach;
@@ -300,14 +300,14 @@ describe("BridgeClient", () => {
       () =>
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
           const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
 
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
           yield* killBridge(sandbox);
           const otherHarness = yield* makeHarness();
-          const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+          const resumed = yield* otherHarness.createSession({ sandbox, resumeFrom: state });
           const parts = yield* Stream.runCollect(resumed.continueStream({}));
           const { history } = yield* resumed.detach;
 
@@ -323,7 +323,7 @@ describe("BridgeClient", () => {
       () =>
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
           const reading = yield* readFromFirstPart(session.stream({ prompt: "wait again" }));
 
           const state = yield* session.suspendTurn;
@@ -331,7 +331,7 @@ describe("BridgeClient", () => {
           yield* killBridge(sandbox);
           yield* release(sandbox);
           const otherHarness = yield* makeHarness({ greeting: "hi" });
-          const resumed = yield* otherHarness.startSession({ sandbox, resumeFrom: state });
+          const resumed = yield* otherHarness.createSession({ sandbox, resumeFrom: state });
           const parts = yield* Stream.runCollect(resumed.continueStream({}));
 
           // Run again from its prompt, rather than continued, which would answer "Continue.".
@@ -342,7 +342,7 @@ describe("BridgeClient", () => {
     it.live("aborts a turn whose stream the caller ends", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
 
         yield* session.stream({ prompt: "wait forever" }).pipe(Stream.take(1), Stream.runDrain);
         // The bridge runs one turn of a session at a time, so this one starts only once the first
@@ -367,7 +367,7 @@ describe("BridgeClient", () => {
               return { url: `ws://127.0.0.1:${proxy.port}`, headers: {} };
             }),
         };
-        const session = yield* harness.startSession({ sandbox: throughProxy, id });
+        const session = yield* harness.createSession({ sandbox: throughProxy, id });
         const reading = yield* readFromFirstPart(session.stream({ prompt: "wait across" }));
 
         yield* proxy.drop;
@@ -383,7 +383,7 @@ describe("BridgeClient", () => {
       () =>
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
           yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
 
           yield* killBridge(sandbox);
@@ -399,7 +399,7 @@ describe("BridgeClient", () => {
     it.live("fails a turn its bridge lost when it died, and runs the next in another", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
         const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
 
         yield* killBridge(sandbox);
@@ -414,7 +414,7 @@ describe("BridgeClient", () => {
     it.live("lets go with the state its bridge last gave when its sandbox is gone", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
         yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
 
         yield* sandbox.destroy;
@@ -428,7 +428,7 @@ describe("BridgeClient", () => {
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
         const path = yield* Path.Path;
-        const session = yield* harness.startSession({ sandbox, id });
+        const session = yield* harness.createSession({ sandbox, id });
 
         yield* session.stop;
         yield* session.destroy;
@@ -447,7 +447,7 @@ describe("BridgeClient", () => {
         Effect.gen(function* () {
           const sandbox = yield* makeSandbox();
           const harness = yield* makeHarness({ idleSeconds: 1 });
-          const session = yield* harness.startSession({ sandbox, id });
+          const session = yield* harness.createSession({ sandbox, id });
           yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
 
           const [pid = 0] = yield* launchedPids(sandbox);
@@ -466,7 +466,7 @@ describe("BridgeClient", () => {
     it.live("exits once another bridge of its id takes its place, leaving that one listed", () =>
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
-        yield* harness.startSession({ sandbox, id });
+        yield* harness.createSession({ sandbox, id });
         const [listening] = yield* listeningOf(sandbox);
         const file = listening?.file ?? "";
 
@@ -485,7 +485,7 @@ describe("BridgeClient", () => {
         const sessions = yield* Effect.forEach(
           harnesses,
           (harness, index) =>
-            harness.startSession({ sandbox, id: SessionId.make(`session-${index + 1}`) }),
+            harness.createSession({ sandbox, id: SessionId.make(`session-${index + 1}`) }),
           { concurrency: "unbounded" },
         );
 

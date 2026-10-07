@@ -46,7 +46,7 @@ layer(BunServices.layer)("AmendsAgent.integration", (it) => {
         model: endpointOf("default"),
         models: { quick: endpointOf("fast") },
       });
-      const session = yield* harness.startSession({ id });
+      const session = yield* harness.createSession({ id });
       const first = yield* session.generate({ prompt: "hi" });
       const second = yield* session.generate({ prompt: "hi", model: "quick" });
 
@@ -73,7 +73,7 @@ layer(BunServices.layer)("AmendsAgent.integration", (it) => {
       const harness = yield* integration.harness(connection, undefined, {
         model: endpointOf("default"),
       });
-      const session = yield* harness.startSession({ id, sandbox: yield* makeSandbox });
+      const session = yield* harness.createSession({ id, sandbox: yield* makeSandbox });
       const result = yield* session.generate({ prompt: "keep going" });
 
       expect(requests).toHaveLength(2);

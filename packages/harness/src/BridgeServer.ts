@@ -292,10 +292,10 @@ const makeHandlers = Effect.fnUntraced(function* (
         : Effect.succeed(started);
     });
 
-  /** Starts a session in a scope of its own, which closes again if the driver fails to start it. */
-  const startSession = Effect.fnUntraced(function* (options: Bridge.StartSessionOptions) {
+  /** Creates a session in a scope of its own, which closes again if the driver fails to create it. */
+  const createSession = Effect.fnUntraced(function* (options: Bridge.CreateSessionOptions) {
     const scope = yield* Scope.fork(bridgeScope);
-    const driverSession = yield* driver.startSession(options).pipe(
+    const driverSession = yield* driver.createSession(options).pipe(
       Scope.provide(scope),
       Effect.onError((cause) => Scope.close(scope, Exit.failCause(cause))),
     );
@@ -403,7 +403,7 @@ const makeHandlers = Effect.fnUntraced(function* (
           yield* recordActivity(0);
           const started =
             sessions.get(session) ??
-            (yield* startSession({ id: session, directory, history, agentState }));
+            (yield* createSession({ id: session, directory, history, agentState }));
           const state = yield* started.driverSession.state;
           if (unfinishedTurn === undefined) return { hasUnfinishedTurn: false, agentState: state };
           const turnStart = yield* turnStartOf(session, started, unfinishedTurn);

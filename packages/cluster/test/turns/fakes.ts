@@ -190,8 +190,8 @@ export type FakeWorkspace = ReturnType<typeof makeFakeWorkspace>;
 
 export interface ScriptedAgent {
   readonly agent: Agent.Agent;
-  /** What each `startSession` was given, in order. */
-  readonly starts: ReadonlyArray<Agent.StartSessionOptions>;
+  /** What each `createSession` was given, in order. */
+  readonly createdWith: ReadonlyArray<Agent.CreateSessionOptions>;
   /** What each turn was given, in order. */
   readonly turns: ReadonlyArray<Agent.TurnOptions>;
 }
@@ -203,14 +203,14 @@ export interface ScriptedAgent {
 export const makeScriptedAgent = (
   script: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
 ): ScriptedAgent => {
-  const starts: Array<Agent.StartSessionOptions> = [];
+  const createdWith: Array<Agent.CreateSessionOptions> = [];
   const turns: Array<Agent.TurnOptions> = [];
   const agent: Agent.Agent = {
     id: "scripted",
     requiresSandbox: false,
-    startSession: (options) =>
+    createSession: (options) =>
       Effect.sync(() => {
-        starts.push(options);
+        createdWith.push(options);
         return {
           hasUnfinishedTurn: false,
           promptTurn: (options) =>
@@ -229,7 +229,7 @@ export const makeScriptedAgent = (
         };
       }),
   };
-  return { agent, starts, turns };
+  return { agent, createdWith, turns };
 };
 
 /** The integrations a host installs for the scripted agent: models, and the agent's harness. */

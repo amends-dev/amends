@@ -9,16 +9,16 @@ the sandboxes agents work in.
 ## Agents and harnesses
 
 An agent's adapter implements `Agent.Agent`: its id, the `template` that installs it in a sandbox,
-whether it `requiresSandbox`, and `startSession`, which starts an
+whether it `requiresSandbox`, and `createSession`, which starts an
 `AgentSession`, a new one or one picked up from what an earlier one returned. An agent session runs
 each turn with `promptTurn`, streaming `StreamPart`s until its `finish` part, and interrupting the
 stream aborts the turn. `suspendTurn`, `detach`, and `stop` return the agent's own state as JSON,
-which `startSession` takes back.
+which `createSession` takes back.
 
 `Harness.make` turns an agent into the `Harness` service, as `LanguageModel.make` turns a provider
 into a language model, and `Harness.layer` provides it. Its `agent` is the agent it runs, as the
-adapter describes it, without `startSession`: only the harness starts the agent's sessions.
-`startSession` starts a session: a new one, named by its `id`, or one that goes on from what it last
+adapter describes it, without `createSession`: only the harness starts the agent's sessions.
+`createSession` creates a session: a new one, named by its `id`, or one that goes on from what it last
 saved, given as `resumeFrom`, on this agent or another. A new session given a `history` starts with
 that conversation, as when the agent joins one already under way. The caller creates the sandbox,
 from the agent's `template`, and owns it: a harness never stops or destroys one. Each session works
@@ -59,7 +59,7 @@ last ran the session resumes from its own state; any other loads the conversatio
 it, for a caller that keeps a session's steps itself and gives the conversation back as `history`,
 rather than storing the whole of it with every turn. `suspendTurn`
 ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
-once `startSession` resumes the session, from the step that was in flight; another agent runs it
+once `createSession` resumes the session, from the step that was in flight; another agent runs it
 again from its prompt. `detach` lets go between turns, `stop` stops the agent to start it again
 later, and `destroy` stops it for good.
 
@@ -104,8 +104,8 @@ hosts launched one at once.
   it continues when a host starts it again: the turn keeps the steps it finished, and the bridge
   prompts the agent with `Continue.`, as AI SDK's harness does, if the agent kept the conversation
   that holds the turn. Otherwise the host runs the turn again from its prompt.
-- `BridgeClient.startSession` starts the sessions of the adapter's `Agent.Agent`, which hosts run:
-  the agent requires a sandbox and calls it from `startSession`, with what `BridgeClient.Options`
+- `BridgeClient.createSession` creates the sessions of the adapter's `Agent.Agent`, which hosts run:
+  the agent requires a sandbox and calls it from `createSession`, with what `BridgeClient.Options`
   says of its bridge. A session reads its bridge's port from `Bridge.listeningFile`, exposes it,
   and connects to the bridge at the sandbox's endpoint for the port; it launches the bridge with the
   adapter's command when none answers there as that bridge, giving it the launch options on
@@ -126,7 +126,7 @@ hosts launched one at once.
   its sandbox is gone, lets go with the state it last gave.
 
 opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
-program, a template that installs it, and an agent whose sessions `BridgeClient.startSession`
+program, a template that installs it, and an agent whose sessions `BridgeClient.createSession`
 starts.
 
 ## Host tools through a relay

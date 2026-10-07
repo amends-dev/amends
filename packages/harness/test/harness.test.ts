@@ -78,7 +78,7 @@ const answersAs =
 const suspendSlowTurn = (harness: Harness.Harness["Service"], running: Deferred.Deferred<void>) =>
   Effect.gen(function* () {
     const { sandbox } = yield* makeFakeSandbox;
-    const session = yield* harness.startSession({ sandbox, id });
+    const session = yield* harness.createSession({ sandbox, id });
     const slow = yield* readUntil(
       session.stream({ prompt: "slow" }),
       (part) => part.type === "text-delta" && part.id === "answer",
@@ -99,20 +99,23 @@ const textsOf = (history: Prompt.Prompt) =>
 
 describe("Harness", () => {
   it.effect(
-    "starts a session in a directory named by its id, in the sandbox's working directory",
+    "creates a session in a directory named by its id, in the sandbox's working directory",
     () =>
       Effect.gen(function* () {
         const codex = yield* makeFakeAgent("codex", answersAs("codex"));
         const { sandbox, directories } = yield* makeFakeSandbox;
 
-        yield* Harness.make(codex.agent).startSession({ sandbox, id });
+        yield* Harness.make(codex.agent).createSession({ sandbox, id });
 
         expect(directories).toEqual(["/work/session-one"]);
-        expect(codex.starts[0]?.id).toBe(id);
-        expect(codex.starts[0]?.workspace).toEqual({ sandbox, directory: "/work/session-one" });
-        expect(codex.starts[0]?.history.content).toEqual([]);
-        expect(codex.starts[0]?.agentState).toBeUndefined();
-        expect(codex.starts[0]?.unfinishedTurn).toBeUndefined();
+        expect(codex.createdWith[0]?.id).toBe(id);
+        expect(codex.createdWith[0]?.workspace).toEqual({
+          sandbox,
+          directory: "/work/session-one",
+        });
+        expect(codex.createdWith[0]?.history.content).toEqual([]);
+        expect(codex.createdWith[0]?.agentState).toBeUndefined();
+        expect(codex.createdWith[0]?.unfinishedTurn).toBeUndefined();
       }),
   );
 
@@ -121,14 +124,14 @@ describe("Harness", () => {
       const codex = yield* makeFakeAgent("codex", answersAs("codex"));
       const harness = Harness.make(codex.agent);
       const { sandbox } = yield* makeFakeSandbox;
-      const session = yield* harness.startSession({ sandbox, id });
+      const session = yield* harness.createSession({ sandbox, id });
       yield* session.generate({ prompt: "hello" });
       const state = yield* session.detach;
 
-      yield* harness.startSession({ sandbox, resumeFrom: state });
+      yield* harness.createSession({ sandbox, resumeFrom: state });
 
-      expect(codex.starts[1]?.agentState).toEqual({ agent: "codex" });
-      expect(textsOf(codex.starts[1]?.history ?? state.history)).toEqual([
+      expect(codex.createdWith[1]?.agentState).toEqual({ agent: "codex" });
+      expect(textsOf(codex.createdWith[1]?.history ?? state.history)).toEqual([
         "hello",
         "codex answers hello",
       ]);
@@ -140,18 +143,18 @@ describe("Harness", () => {
       const codex = yield* makeFakeAgent("codex", answersAs("codex"));
       const opencode = yield* makeFakeAgent("opencode", answersAs("opencode"));
       const { sandbox } = yield* makeFakeSandbox;
-      const onCodex = yield* Harness.make(codex.agent).startSession({ sandbox, id });
+      const onCodex = yield* Harness.make(codex.agent).createSession({ sandbox, id });
       yield* onCodex.generate({ prompt: "hello" });
 
-      const onOpencode = yield* Harness.make(opencode.agent).startSession({
+      const onOpencode = yield* Harness.make(opencode.agent).createSession({
         sandbox,
         resumeFrom: yield* onCodex.detach,
       });
       yield* onOpencode.generate({ prompt: "again" });
       const state = yield* onOpencode.detach;
 
-      expect(opencode.starts[0]?.agentState).toBeUndefined();
-      expect(textsOf(opencode.starts[0]?.history ?? state.history)).toEqual([
+      expect(opencode.createdWith[0]?.agentState).toBeUndefined();
+      expect(textsOf(opencode.createdWith[0]?.history ?? state.history)).toEqual([
         "hello",
         "codex answers hello",
       ]);
@@ -174,12 +177,12 @@ describe("Harness", () => {
         { role: "assistant", content: [{ type: "text", text: "opencode answers hello" }] },
       ]);
 
-      const session = yield* Harness.make(codex.agent).startSession({ sandbox, id, history });
+      const session = yield* Harness.make(codex.agent).createSession({ sandbox, id, history });
       yield* session.generate({ prompt: "again" });
       const state = yield* session.detach;
 
-      expect(codex.starts[0]?.history).toEqual(history);
-      expect(codex.starts[0]?.agentState).toBeUndefined();
+      expect(codex.createdWith[0]?.history).toEqual(history);
+      expect(codex.createdWith[0]?.agentState).toBeUndefined();
       expect(textsOf(state.history)).toEqual([
         "hello",
         "opencode answers hello",
@@ -199,15 +202,15 @@ describe("Harness", () => {
         const state = yield* suspendSlowTurn(harness, running);
         const { sandbox } = yield* makeFakeSandbox;
 
-        const session = yield* harness.startSession({ sandbox, resumeFrom: state });
+        const session = yield* harness.createSession({ sandbox, resumeFrom: state });
         const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
         const result = yield* Stream.runCollect(session.continueStream({}));
 
         expect(state.unfinishedTurn?.steps.map((step) => step.content)).toMatchObject([
           readingMessages,
         ]);
-        expect(codex.starts[1]?.agentState).toBeUndefined();
-        expect(codex.starts[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });
+        expect(codex.createdWith[1]?.agentState).toBeUndefined();
+        expect(codex.createdWith[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });
         expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError");
         expect(codex.continued).toEqual([1]);
         expect(result).toEqual(reply("codex answers slow"));
@@ -227,13 +230,13 @@ describe("Harness", () => {
       const state = yield* suspendSlowTurn(Harness.make(codex.agent), running);
       const { sandbox } = yield* makeFakeSandbox;
 
-      const session = yield* Harness.make(opencode.agent).startSession({
+      const session = yield* Harness.make(opencode.agent).createSession({
         sandbox,
         resumeFrom: state,
       });
       const result = yield* Stream.runCollect(session.continueStream({}));
 
-      expect(opencode.starts[0]?.unfinishedTurn).toBeUndefined();
+      expect(opencode.createdWith[0]?.unfinishedTurn).toBeUndefined();
       expect(result).toEqual(reply("opencode answers slow"));
       expect(textsOf((yield* session.detach).history)).toEqual(["slow", "opencode answers slow"]);
     }),
@@ -251,7 +254,7 @@ describe("Harness", () => {
         const state = yield* suspendSlowTurn(harness, running);
         const { sandbox } = yield* makeFakeSandbox;
 
-        const session = yield* harness.startSession({ sandbox, resumeFrom: state });
+        const session = yield* harness.createSession({ sandbox, resumeFrom: state });
         const result = yield* Stream.runCollect(session.continueStream({}));
 
         expect(codex.continued).toEqual([]);
@@ -265,16 +268,16 @@ describe("Harness", () => {
       }),
   );
 
-  it.effect("starts a session without a sandbox for an agent that does not require one", () =>
+  it.effect("creates a session without a sandbox for an agent that does not require one", () =>
     Effect.gen(function* () {
       const amends = yield* makeFakeAgent("amends", answersAs("amends"), {
         requiresSandbox: false,
       });
 
-      const session = yield* Harness.make(amends.agent).startSession({ id });
+      const session = yield* Harness.make(amends.agent).createSession({ id });
       const result = yield* session.generate({ prompt: "how are you doing" });
 
-      expect(amends.starts[0]?.workspace).toBeUndefined();
+      expect(amends.createdWith[0]?.workspace).toBeUndefined();
       expect(result.text).toBe("amends answers how are you doing");
     }),
   );
@@ -285,20 +288,20 @@ describe("Harness", () => {
         requiresSandbox: false,
       });
       const codex = yield* makeFakeAgent("codex", answersAs("codex"));
-      const onAmends = yield* Harness.make(amends.agent).startSession({ id });
+      const onAmends = yield* Harness.make(amends.agent).createSession({ id });
       yield* onAmends.generate({ prompt: "hello" });
       const state = yield* onAmends.detach;
       const harness = Harness.make(codex.agent);
 
-      const refusedStart = yield* Effect.flip(harness.startSession({ id }));
-      const refusedResume = yield* Effect.flip(harness.startSession({ resumeFrom: state }));
+      const refusedStart = yield* Effect.flip(harness.createSession({ id }));
+      const refusedResume = yield* Effect.flip(harness.createSession({ resumeFrom: state }));
       const { sandbox } = yield* makeFakeSandbox;
-      const onCodex = yield* harness.startSession({ sandbox, resumeFrom: state });
+      const onCodex = yield* harness.createSession({ sandbox, resumeFrom: state });
       const result = yield* onCodex.generate({ prompt: "again" });
 
       expect(refusedStart.reason._tag).toBe("UnsupportedError");
       expect(refusedResume.reason._tag).toBe("UnsupportedError");
-      expect(textsOf(codex.starts[0]?.history ?? state.history)).toEqual([
+      expect(textsOf(codex.createdWith[0]?.history ?? state.history)).toEqual([
         "hello",
         "amends answers hello",
       ]);
