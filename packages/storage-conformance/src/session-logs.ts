@@ -55,6 +55,12 @@ const step: SessionLog.Entry = {
     finish: { type: "finish-step", reason: "tool-calls", usage },
   },
 };
+const started: SessionLog.Entry = {
+  _tag: "Started",
+  turnId,
+  agent: "opencode",
+  agentState: { session: "ses_1", turn: { id: "turn-1", bridge: "bridge-1" } },
+};
 const interrupted: SessionLog.Entry = { _tag: "Interrupted", turnId, reason: "The run stopped." };
 
 /** Each participation's session log: append-only, apart from every commit. */
@@ -70,14 +76,19 @@ export const sessionLogs = (harness: Harness) => {
             expect(yield* sessionLogs.read(participation, { after: 0, limit: 10 })).toEqual([]);
 
             const first = yield* sessionLogs.append(participation, [joined, prompted], 0);
-            const second = yield* sessionLogs.append(participation, [step, interrupted], 2);
+            const second = yield* sessionLogs.append(
+              participation,
+              [started, step, interrupted],
+              2,
+            );
             expect([...first, ...second].map(({ position, entry }) => [position, entry])).toEqual([
               [1, joined],
               [2, prompted],
-              [3, step],
-              [4, interrupted],
+              [3, started],
+              [4, step],
+              [5, interrupted],
             ]);
-            expect(yield* sessionLogs.head(participation)).toBe(4);
+            expect(yield* sessionLogs.head(participation)).toBe(5);
             // Reads give each entry back as it was recorded, from past a position, a page at a time.
             expect(yield* sessionLogs.read(participation, { after: 0, limit: 10 })).toEqual([
               ...first,
@@ -87,7 +98,7 @@ export const sessionLogs = (harness: Harness) => {
               first[1],
               second[0],
             ]);
-            expect(yield* sessionLogs.read(participation, { after: 4, limit: 10 })).toEqual([]);
+            expect(yield* sessionLogs.read(participation, { after: 5, limit: 10 })).toEqual([]);
           }),
         ),
     );

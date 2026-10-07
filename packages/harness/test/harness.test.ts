@@ -218,6 +218,7 @@ describe("Harness", () => {
         ]);
         expect(codex.createdWith[1]?.agentState).toBeUndefined();
         expect(codex.createdWith[1]?.unfinishedTurn).toEqual({ agent: "codex", turn: true });
+        expect(session.hasUnfinishedTurn).toBe(true);
         expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("TurnInProgressError");
         expect(codex.continued).toEqual([1]);
         expect(result).toEqual(reply("codex answers slow"));
@@ -264,6 +265,7 @@ describe("Harness", () => {
         const session = yield* harness.createSession({ sandbox, resumeFrom: state });
         const result = yield* Stream.runCollect(session.continueStream({}));
 
+        expect(session.hasUnfinishedTurn).toBe(false);
         expect(codex.continued).toEqual([]);
         expect(codex.turns).toHaveLength(2);
         expect(result).toEqual([...readingStep, ...reply("codex answers slow")]);

@@ -64,7 +64,8 @@ keeps a session's steps itself and gives the conversation back as `history`, rat
 the whole of it with every turn. `suspendTurn`
 ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
 once `createSession` resumes the session, from the step that was in flight; another agent runs it
-again from its prompt. A turn that runs apart from the host, as one behind a bridge does, starts
+again from its prompt, as `hasUnfinishedTurn` says, for a caller that keeps the steps itself to
+set them aside. A turn that runs apart from the host, as one behind a bridge does, starts
 with a `turn-start` part carrying what `suspendTurn` would return as the unfinished turn's
 `agentState`, so that a caller that keeps it continues the turn the same way once the host that ran
 it is gone, as after a crash, without suspending it. `detach` lets go between turns, `stop` stops

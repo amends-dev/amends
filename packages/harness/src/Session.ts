@@ -120,6 +120,13 @@ export interface Session {
   readonly id: SessionId;
 
   /**
+   * Whether the agent has the unfinished turn the session resumed with, which `continueStream`
+   * then continues after the steps it finished. Otherwise `continueStream` runs the turn again from
+   * its prompt, without them, for a caller that keeps the steps to set them aside.
+   */
+  readonly hasUnfinishedTurn: boolean;
+
+  /**
    * Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn, which
    * the conversation keeps as far as it got. A failure the agent reports arrives as an `error` part,
    * and the turn finishes with `error`.

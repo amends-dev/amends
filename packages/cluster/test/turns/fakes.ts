@@ -194,17 +194,22 @@ export interface ScriptedAgent {
   readonly createdWith: ReadonlyArray<Agent.CreateSessionOptions>;
   /** What each turn was given, in order. */
   readonly turns: ReadonlyArray<Agent.TurnOptions>;
+  /** How many finished steps each continued turn was told of, in order. */
+  readonly continued: ReadonlyArray<number>;
 }
 
 /**
  * An agent in the host's process whose turns stream `script`, and whose state, which letting go of
- * a session returns, counts its turns.
+ * a session returns, counts its turns. One that `keepsTurns` has the unfinished turn a session is
+ * created with, and continues it with `script`.
  */
 export const makeScriptedAgent = (
   script: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
+  { keepsTurns = false }: { readonly keepsTurns?: boolean } = {},
 ): ScriptedAgent => {
   const createdWith: Array<Agent.CreateSessionOptions> = [];
   const turns: Array<Agent.TurnOptions> = [];
+  const continued: Array<number> = [];
   const agent: Agent.Agent = {
     id: "scripted",
     requiresSandbox: false,
@@ -212,13 +217,17 @@ export const makeScriptedAgent = (
       Effect.sync(() => {
         createdWith.push(options);
         return {
-          hasUnfinishedTurn: false,
+          hasUnfinishedTurn: keepsTurns && options.unfinishedTurn !== undefined,
           promptTurn: (options) =>
             Stream.suspend(() => {
               turns.push(options);
               return script;
             }),
-          continueTurn: () => Stream.die("The scripted agent continues no turn"),
+          continueTurn: (_, finishedSteps) =>
+            Stream.suspend(() => {
+              continued.push(finishedSteps);
+              return script;
+            }),
           submitToolResult: () => Effect.die("The scripted agent calls no host tool"),
           approve: () => Effect.die("The scripted agent asks for no approval"),
           compact: () => Effect.succeed({ type: "compaction", trigger: "manual", summary: "" }),
@@ -229,7 +238,7 @@ export const makeScriptedAgent = (
         };
       }),
   };
-  return { agent, createdWith, turns };
+  return { agent, createdWith, turns, continued };
 };
 
 /** The integrations a host installs for the scripted agent: models, and the agent's harness. */

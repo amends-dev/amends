@@ -1,3 +1,4 @@
+import type { SessionLog } from "@amends/core/turn";
 import { HarnessError, type StreamPart } from "@amends/harness";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
@@ -29,10 +30,14 @@ type Script = Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>;
 const runnerFor = (
   script: Script | ((workspace: FakeWorkspace) => Script),
   options: FakeWorkspaceOptions = {},
+  agentOptions: Parameters<typeof makeScriptedAgent>[1] = {},
 ) =>
   Effect.gen(function* () {
     const workspace = makeFakeWorkspace(options);
-    const scripted = makeScriptedAgent(typeof script === "function" ? script(workspace) : script);
+    const scripted = makeScriptedAgent(
+      typeof script === "function" ? script(workspace) : script,
+      agentOptions,
+    );
     const services = Layer.merge(
       Layer.succeed(Gateway.Service, workspace.gateway),
       integrationsFor(scripted.agent),
@@ -50,6 +55,13 @@ const userTexts = (message: Prompt.Message) =>
   typeof message.content === "string"
     ? [message.content]
     : message.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
+
+/** How a logged step ended. */
+const stepEnd: StreamPart.FinishStepPart = {
+  type: "finish-step",
+  reason: "stop",
+  usage: { inputTokens: {}, outputTokens: {} },
+};
 
 describe("a turn's run", () => {
   it.effect(
@@ -71,12 +83,15 @@ describe("a turn's run", () => {
         expect(
           scripted.turns.map(({ prompt, instructions }) => [userTexts(prompt), instructions]),
         ).toEqual([[["Alice: Planner, summarize the plan."], "Plan each change."]]);
+        // The turn starts with the agent's first part, as the agent announces no start.
         expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
           "Joined",
           "Prompted",
+          "Started",
           "Step",
           "Step",
         ]);
+        expect(workspace.log()[2]).toEqual({ _tag: "Started", turnId: turn.id, agent: "scripted" });
         // Steps are named after the run's opening position in the log, as their drafts are.
         expect(
           workspace.log().flatMap((entry) => (entry._tag === "Step" ? [entry.id] : [])),
@@ -150,12 +165,123 @@ describe("a turn's run", () => {
       ]);
       // The session starts without the turn, which its prompt brings.
       expect(scripted.createdWith[0]?.history).toEqual(Prompt.empty);
+      expect(scripted.createdWith[0]?.unfinishedTurn).toBeUndefined();
       expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
         "Prompted",
         "Step",
         "Interrupted",
+        "Started",
         "Step",
       ]);
+      expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Again." }]);
+    }),
+  );
+
+  it.effect("notes the turn's start with what continues it, as the agent announces it", () =>
+    Effect.gen(function* () {
+      const { workspace, runNextTurn } = yield* runnerFor(
+        Stream.fromIterable<StreamPart.StreamPart>([
+          { type: "turn-start", agentState: { turn: "turn-a" } },
+          ...writing("Done."),
+          finish,
+        ]),
+      );
+      yield* runNextTurn;
+      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step"]);
+      expect(workspace.log()[1]).toEqual({
+        _tag: "Started",
+        turnId: turn.id,
+        agent: "scripted",
+        agentState: { turn: "turn-a" },
+      });
+      expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Done." }]);
+    }),
+  );
+
+  /** A log in which a run of the turn, on an agent that keeps the turn, stopped short of its end. */
+  const cutShort: ReadonlyArray<SessionLog.Entry> = [
+    { _tag: "Prompted", turnId: turn.id, texts: ["Alice: The prompt told."], messages: 1 },
+    { _tag: "Started", turnId: turn.id, agent: "scripted", agentState: { turn: "turn-a" } },
+    {
+      _tag: "Step",
+      turnId: turn.id,
+      id: "1.0",
+      step: { parts: [{ type: "text", text: "Half" }], finish: stepEnd },
+    },
+  ];
+
+  it.effect(
+    "continues a turn cut short on the agent that kept it, after the steps its log has",
+    () =>
+      Effect.gen(function* () {
+        const { workspace, scripted, runNextTurn } = yield* runnerFor(
+          Stream.fromIterable([...writing("Rest."), finish]),
+          { logged: cutShort, resume: { agent: "scripted", agentState: { turns: 3 } } },
+          { keepsTurns: true },
+        );
+        yield* runNextTurn;
+        // The session resumes with the turn as the agent kept it, in place of what the turn before
+        // left, and the agent continues it after the step the log has.
+        expect(scripted.createdWith[0]).toMatchObject({
+          history: Prompt.empty,
+          unfinishedTurn: { turn: "turn-a" },
+        });
+        expect(scripted.createdWith[0]?.agentState).toBeUndefined();
+        expect(scripted.turns).toEqual([]);
+        expect(scripted.continued).toEqual([1]);
+        expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
+          "Prompted",
+          "Started",
+          "Step",
+          "Interrupted",
+          "Step",
+        ]);
+        expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Rest." }]);
+      }),
+  );
+
+  it.effect("replies with what a continued turn answered before, when it adds nothing", () =>
+    Effect.gen(function* () {
+      const { workspace, runNextTurn } = yield* runnerFor(
+        Stream.fromIterable([finish]),
+        { logged: cutShort },
+        { keepsTurns: true },
+      );
+      yield* runNextTurn;
+      expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
+        "Prompted",
+        "Started",
+        "Step",
+        "Interrupted",
+      ]);
+      expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Half" }]);
+    }),
+  );
+
+  it.effect("runs a turn cut short again from its prompt, when the agent lost it", () =>
+    Effect.gen(function* () {
+      const { workspace, scripted, runNextTurn } = yield* runnerFor(
+        Stream.fromIterable<StreamPart.StreamPart>([
+          { type: "turn-start", agentState: { turn: "turn-b" } },
+          ...writing("Again."),
+          finish,
+        ]),
+        { logged: cutShort },
+      );
+      yield* runNextTurn;
+      expect(scripted.createdWith[0]?.unfinishedTurn).toEqual({ turn: "turn-a" });
+      expect(scripted.turns.map(({ prompt }) => userTexts(prompt))).toEqual([
+        ["Alice: The prompt told."],
+      ]);
+      expect(workspace.log().map(({ _tag }) => _tag)).toEqual([
+        "Prompted",
+        "Started",
+        "Step",
+        "Interrupted",
+        "Started",
+        "Step",
+      ]);
+      expect(workspace.log()[4]).toMatchObject({ agentState: { turn: "turn-b" } });
       expect(workspace.endings()).toMatchObject([{ kind: "close", reply: "Again." }]);
     }),
   );
@@ -171,7 +297,7 @@ describe("a turn's run", () => {
         ]),
       );
       yield* runNextTurn;
-      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Step"]);
+      expect(workspace.log().map(({ _tag }) => _tag)).toEqual(["Prompted", "Started", "Step"]);
       expect(workspace.endings()).toEqual([
         {
           kind: "fail",
@@ -287,21 +413,76 @@ describe("a turn's run", () => {
 });
 
 describe("opening a session log for a run", () => {
+  const ready = {
+    _tag: "Ready",
+    turn,
+    prompt: ["Alice: Go."],
+    messages: 1,
+    resume: null,
+  } as unknown as SessionLogWriter.Ready;
+
   it("starts a new log with the conversation joined, and leaves it out when there is none", () => {
-    const ready = {
-      _tag: "Ready",
-      turn,
-      prompt: ["Alice: Go."],
-      messages: 1,
-    } as unknown as SessionLogWriter.Ready;
-    expect(SessionLogWriter.openingOf([], ready, []).entries.map(({ _tag }) => _tag)).toEqual([
-      "Prompted",
-    ]);
+    const opening = SessionLogWriter.openingOf([], ready, []);
+    expect(opening.entries.map(({ _tag }) => _tag)).toEqual(["Prompted"]);
+    expect(opening.resumeFrom).toBeUndefined();
     expect(
       SessionLogWriter.openingOf([], ready, [{ role: "user", texts: ["Kai: Hi."] }]).entries.map(
         ({ _tag }) => _tag,
       ),
     ).toEqual(["Joined", "Prompted"]);
+  });
+
+  it("resumes a turn cut short as the agent that started it last keeps it, with its steps", () => {
+    const step = (id: string, text: string): SessionLog.Entry => ({
+      _tag: "Step",
+      turnId: turn.id,
+      id,
+      step: { parts: [{ type: "text", text }], finish: stepEnd },
+    });
+    const opening = SessionLogWriter.openingOf(
+      [
+        { _tag: "Prompted", turnId: turn.id, texts: ["Alice: Go."], messages: 1 },
+        { _tag: "Started", turnId: turn.id, agent: "codex", agentState: { turn: "turn-a" } },
+        step("1.0", "First"),
+        { _tag: "Interrupted", turnId: turn.id, reason: "Its run stopped short." },
+        { _tag: "Started", turnId: turn.id, agent: "opencode", agentState: { turn: "turn-b" } },
+        step("4.0", "Second"),
+      ],
+      { ...ready, resume: { agent: "codex", agentState: { turns: 2 } } },
+      [],
+    );
+
+    expect(opening.entries.map(({ _tag }) => _tag)).toEqual(["Interrupted"]);
+    expect(opening.resumeFrom).toEqual({
+      id: participationId,
+      agent: "opencode",
+      history: Prompt.empty,
+      unfinishedTurn: {
+        prompt: Prompt.makeMessage("user", {
+          content: [Prompt.makePart("text", { text: "Alice: Go." })],
+        }),
+        steps: [{ parts: [{ type: "text", text: "Second" }], finish: stepEnd }],
+        agentState: { turn: "turn-b" },
+      },
+    });
+  });
+
+  it("resumes a turn cut short from what the turn before left, when no agent keeps it", () => {
+    const opening = SessionLogWriter.openingOf(
+      [
+        { _tag: "Prompted", turnId: turn.id, texts: ["Alice: Go."], messages: 1 },
+        { _tag: "Started", turnId: turn.id, agent: "amends" },
+      ],
+      { ...ready, resume: { agent: "amends", agentState: { turns: 2 } } },
+      [],
+    );
+
+    expect(opening.resumeFrom).toEqual({
+      id: participationId,
+      agent: "amends",
+      agentState: { turns: 2 },
+      history: Prompt.empty,
+    });
   });
 });
 

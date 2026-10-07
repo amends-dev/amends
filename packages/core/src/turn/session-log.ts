@@ -22,9 +22,23 @@ export const Entry = Schema.TaggedUnion({
     texts: Schema.NonEmptyArray(Schema.String),
     messages: Schema.Int,
   },
+  /**
+   * A run of the turn started it from its prompt on the harness's agent `agent`, setting aside the
+   * steps of any earlier run, with what continues the turn once the run is gone, when the agent
+   * gives that: what `Session.UnfinishedTurn` takes as `agentState`. A run that continues the turn
+   * starts none.
+   */
+  Started: {
+    turnId: TurnId.Id,
+    agent: Schema.String,
+    agentState: Schema.optionalKey(Schema.Json),
+  },
   /** A step of the turn finished, its parts added up. `id` names it, as its drafts do. */
   Step: { turnId: TurnId.Id, id: Schema.NonEmptyString, step: StreamPart.Step },
-  /** The turn's run stopped before the turn ended, and it runs again from its prompt. */
+  /**
+   * The turn's run stopped before the turn ended. The next run continues the turn from the steps
+   * it finished when the agent still has it, and otherwise starts it again from its prompt.
+   */
   Interrupted: { turnId: TurnId.Id, reason: Schema.NonEmptyString },
 });
 export type Entry = typeof Entry.Type;
@@ -48,14 +62,15 @@ export const isOfTurn =
 
 /**
  * The conversation a log records, as the agent's session resumes with it: the conversation it
- * joined, then each turn's prompt and the steps of its latest run, since a turn whose run stopped
- * short ran again from its prompt. A step that compacted the conversation leaves its summary in
- * place of what came before.
+ * joined, then each turn's prompt and the steps since the turn last started from it, since a run
+ * that starts the turn again sets aside the steps of the runs before, and one that continues the
+ * turn keeps them. A step that compacted the conversation leaves its summary in place of what came
+ * before.
  */
 export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt => {
   let conversation = Prompt.empty;
-  /** The conversation the latest turn's run started from: up to its prompt. */
-  let runStart = conversation;
+  /** The conversation the latest turn starts from: up to its prompt. */
+  let turnStart = conversation;
   for (const entry of entries) {
     switch (entry._tag) {
       case "Joined":
@@ -69,13 +84,15 @@ export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt => {
           conversation,
           Prompt.fromMessages([TurnPrompt.userMessageOf(entry.texts)]),
         );
-        runStart = conversation;
+        turnStart = conversation;
+        break;
+      case "Started":
+        conversation = turnStart;
         break;
       case "Step":
         conversation = Session.recordStep(conversation, entry.step);
         break;
       case "Interrupted":
-        conversation = runStart;
         break;
     }
   }
@@ -87,13 +104,13 @@ const textOf = (step: StreamPart.Step) =>
   step.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
 
 /**
- * What a turn answers, from its entries: the text of the last step of its latest run that has any
- * parts, as harness answers a turn. Empty when that step wrote nothing.
+ * What a turn answers, from its entries: the text of the last step that has any parts since the
+ * turn last started, as harness answers a turn. Empty when that step wrote nothing.
  */
 export const answerOf = (entries: ReadonlyArray<Entry>): string => {
   let answer = "";
   for (const entry of entries) {
-    if (entry._tag === "Prompted" || entry._tag === "Interrupted") answer = "";
+    if (entry._tag === "Prompted" || entry._tag === "Started") answer = "";
     else if (entry._tag === "Step" && entry.step.parts.length > 0) answer = textOf(entry.step);
   }
   return answer;
@@ -121,6 +138,7 @@ export const reader = (): Reader => {
   const add: Reader["add"] = ({ entry, recordedAt: at }) => {
     switch (entry._tag) {
       case "Joined":
+      case "Started":
         return;
       case "Prompted":
         lastResponse = undefined;

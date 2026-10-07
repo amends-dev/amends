@@ -23,7 +23,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
   conversation in each participation's session log, from which the agent's next turn there
   resumes; resuming reads the whole log each turn and goes on from its latest compaction. A turn
-  cut short runs again from its prompt rather than continuing, and a session's sandbox is left
+  whose run stopped short continues where its agent kept it, as opencode does behind its bridge,
+  and runs again from its prompt otherwise, and a session's sandbox is left
   running between turns, never stopped or destroyed. A reader with a turn's log open follows it as
   a stream of its items and the step being written; the text being written is best effort, and a
   reader who starts following midway, or misses a draft while reconnecting, sees a step's text

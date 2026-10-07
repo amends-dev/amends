@@ -83,7 +83,9 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
 
   /**
    * Run the turn on the agent's harness until it ends or is stopped, logging each step it
-   * finishes and showing drafts of the step it is writing.
+   * finishes and showing drafts of the step it is writing. A turn the agent kept from a run that
+   * stopped short continues after the steps the log has; any other starts from its prompt, which
+   * the log notes once the agent's first part arrives.
    */
   const runAgent = Effect.fnUntraced(function* (
     ready: SessionLogWriter.Ready,
@@ -94,14 +96,21 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
     // A participation's session, and the sandbox it works in, are named after it.
     const sessionId = Agent.SessionId.make(ready.turn.participationId);
     const agent = yield* TurnAgent.open(ready.runnable, sessionId);
-    const { history } = writer.opening;
+    const { history, resumeFrom } = writer.opening;
     const session = yield* agent.harness.createSession({
       ...(agent.sandbox === undefined ? {} : { sandbox: agent.sandbox }),
-      ...(ready.resume === null
-        ? { id: sessionId, history }
-        : { resumeFrom: { id: sessionId, history, ...ready.resume } }),
+      ...(resumeFrom === undefined ? { id: sessionId, history } : { resumeFrom }),
     });
-    progress.session = { session, agent: agent.harness.agent.id };
+    const agentId = agent.harness.agent.id;
+    progress.session = { session, agent: agentId };
+    progress.started = session.hasUnfinishedTurn;
+    /** The run started the turn from its prompt, with what `part` says continues it, if it does. */
+    const startedEntry = (part: StreamPart.StreamPart): SessionLog.Entry => ({
+      _tag: "Started",
+      turnId,
+      agent: agentId,
+      ...(part.type === "turn-start" ? { agentState: part.agentState } : {}),
+    });
     /** Names a step of this run: the run's opening position in the log, and the step's index. */
     const stepId = (index: number) => `${writer.openedAt}.${index}`;
     const showDrafts = Effect.gen(function* () {
@@ -127,7 +136,13 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
       );
     });
     const takePart = Effect.fnUntraced(function* (part: StreamPart.StreamPart) {
-      if (part.type === "finish") return;
+      // An agent whose turn runs apart from the run announces one it starts from its prompt; any
+      // other starts it with its first part.
+      if (part.type === "turn-start" || !progress.started) {
+        yield* writer.append([startedEntry(part)]);
+        progress.started = true;
+      }
+      if (part.type === "turn-start" || part.type === "finish") return;
       if (part.type === "finish-step") {
         const [step] = StreamPart.stepsOf([...progress.stepParts, part]);
         progress.stepParts = [];
@@ -147,12 +162,15 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
         yield* showDrafts;
     });
     const instructions = ready.runnable.instructions;
-    yield* session
-      .stream({
-        prompt: TurnPrompt.userMessageOf(writer.opening.prompt),
-        ...(instructions === "" ? {} : { instructions }),
-      })
-      .pipe(Stream.runForEach(takePart));
+    const turnOptions = instructions === "" ? {} : { instructions };
+    const turn =
+      resumeFrom?.unfinishedTurn === undefined
+        ? session.stream({
+            prompt: TurnPrompt.userMessageOf(writer.opening.prompt),
+            ...turnOptions,
+          })
+        : session.continueStream(turnOptions);
+    yield* Stream.runForEach(turn, takePart);
     return progress.reported === undefined
       ? Outcome.Answered()
       : Outcome.Failed({ reason: describeError(progress.reported) });
@@ -192,7 +210,10 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
         Answered: () =>
           resume === undefined
             ? Effect.die("A turn its agent answered has no session")
-            : turnExecution.close(turnId, { reply: SessionLog.answerOf(writer.written()), resume }),
+            : turnExecution.close(turnId, {
+                reply: SessionLog.answerOf(writer.turnEntries()),
+                resume,
+              }),
         Failed: ({ reason }) => turnExecution.fail(turnId, { reason, resume }),
         Stopped: () => turnExecution.confirmStopped(turnId, { resume }),
       }),
@@ -262,6 +283,8 @@ const letGo = (progress: Progress) => {
 interface Progress {
   /** The session, once started, and the agent that runs it. */
   session: { readonly session: Session.Session; readonly agent: string } | undefined;
+  /** Whether the run started the turn, as the log notes, or continues one a run before started. */
+  started: boolean;
   /** The parts of the step being written, since the last that finished. */
   stepParts: Array<StreamPart.StreamPart>;
   /** How many steps finished. */
@@ -276,6 +299,7 @@ interface Progress {
 
 const makeProgress = (): Progress => ({
   session: undefined,
+  started: false,
   stepParts: [],
   steps: 0,
   shown: new Map(),

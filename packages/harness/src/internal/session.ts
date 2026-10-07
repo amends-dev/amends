@@ -421,6 +421,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   const session: Session = {
     id: options.id,
 
+    hasUnfinishedTurn: unfinishedTurn !== undefined && agentSession.hasUnfinishedTurn,
+
     stream: (streamOptions) => promptTurn(streamOptions, { type: "text" }),
 
     generate: Effect.fn("Session.generate")(function* (generateOptions) {

@@ -77,14 +77,20 @@ append of the session log, through `inWorkspace`. `runNextTurn` runs one turn at
 3. Open the session log (`SessionLogWriter.open`): read the participation's log and write the run's
    opening, the turn's prompt, after the conversation the agent joined when the log is new
    (`joinedConversation`). A log that has the turn's prompt already, as a run cut short leaves it,
-   gets `Interrupted` instead, and the turn runs again from that prompt. The conversation before
-   the turn, rebuilt from the log (`SessionLog.historyOf`), is what the session starts with.
+   gets `Interrupted` instead. The conversation before the turn, rebuilt from the log
+   (`SessionLog.historyOf`), is what the session starts with, and the opening says what it resumes
+   from: the turn as the agent that last started it keeps it, when that run's `Started` carries
+   what continues the turn, with the steps the log has since, or else what the participation's
+   last turn left.
 4. Build the agent (`TurnAgent.open`): the model's endpoint and the harness, from their connections'
    integrations with their keys, and, for an agent with a sandbox, the sandbox named for the
    participation, resumed, or created from the harness's template when it does not exist yet.
-5. Start the session, named for the participation: anew, or from what the participation's last turn
-   left, with the conversation either way.
-6. Stream the turn with its prompt and the agent's instructions. Each step that finishes is
+5. Start the session, named for the participation: anew, or from what the opening says, with the
+   conversation either way.
+6. Stream the turn with the agent's instructions: a turn the agent kept continues after the steps
+   the log has (`continueStream`), and any other starts from its prompt, which the log notes as
+   `Started` once the agent's first part arrives, with what continues the turn when the agent
+   announces its start (`turn-start`). Each step that finishes is
    appended to the log, named by the run's opening position in the log and the step's index, and
    what a step writes before it finishes is shown to readers as drafts (`showDraft`), each carrying
    what a text part added since the last at its offset: at once, then at most every 100
@@ -103,8 +109,9 @@ run of the turn, as when Cluster moved the job to another runner, and stops with
 again. `giveUp` fails a turn the job could not run.
 
 A session's sandbox is left running between turns; nothing stops an idle one or destroys it once
-its participation ends. A turn `suspendTurn` cut short is not continued: a run cut short runs again
-from its prompt.
+its participation ends. A run never calls `suspendTurn`: a run cut short, as when its host died,
+is continued by the next from what the agent announced at the turn's start, where the agent kept
+the turn, and runs again from its prompt otherwise.
 
 ## Verify
 

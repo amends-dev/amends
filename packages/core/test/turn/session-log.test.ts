@@ -50,6 +50,13 @@ const interrupted: SessionLog.Entry = {
   turnId,
   reason: "The run stopped.",
 };
+/** A run started the turn from its prompt, on an agent that keeps the turn apart from the run. */
+const started: SessionLog.Entry = {
+  _tag: "Started",
+  turnId,
+  agent: "opencode",
+  agentState: { turn: "turn-1" },
+};
 
 const itemsOf = (
   entries: ReadonlyArray<SessionLog.Entry>,
@@ -73,14 +80,19 @@ describe("a turn's answer", () => {
     expect(
       SessionLog.answerOf([prompted(), step("one", writing("Reading.")), step("two", reading)]),
     ).toBe("");
+    // A run that starts the turn again answers anew; one that continues it keeps the answer so far.
     expect(
       SessionLog.answerOf([
         prompted(),
         step("one", writing("Before.")),
         interrupted,
+        started,
         step("two", reading),
       ]),
     ).toBe("");
+    expect(SessionLog.answerOf([prompted(), step("one", writing("Before.")), interrupted])).toBe(
+      "Before.",
+    );
     expect(SessionLog.answerOf([prompted()])).toBe("");
   });
 });
@@ -88,7 +100,13 @@ describe("a turn's answer", () => {
 describe("a turn's log items", () => {
   it("show the prompt, each step that wrote text, and runs that stopped short", () => {
     expect(
-      itemsOf([prompted(), step("one", reading), step("two", writing("Half")), interrupted]),
+      itemsOf([
+        prompted(),
+        started,
+        step("one", reading),
+        step("two", writing("Half")),
+        interrupted,
+      ]),
     ).toEqual([
       { _tag: "InputTaken", at, messages: 1 },
       { _tag: "Responded", at, responseId: "two", text: "Half", parts: [1], reply: false },
@@ -158,11 +176,12 @@ describe("the conversation a session log records", () => {
     ]);
   });
 
-  it("drops a compaction with the run that made it, when the run stopped short", () => {
+  it("drops a compaction with the run that made it, when the turn starts again", () => {
     const history = SessionLog.historyOf([
       prompted(),
       step("one", compacting("Ada asked for 2 and 3.", "Before.")),
       interrupted,
+      started,
       step("two", writing("After.")),
     ]);
 
@@ -172,9 +191,26 @@ describe("the conversation a session log records", () => {
     ]);
   });
 
-  it("keeps only the latest run of a turn whose run stopped short", () => {
+  it("sets aside the steps of a run that stopped short, when the turn starts again", () => {
     const history = SessionLog.historyOf([
       prompted(),
+      started,
+      step("one", writing("Before.")),
+      interrupted,
+      started,
+      step("two", writing("After.")),
+    ]);
+
+    expect(history.content).toMatchObject([
+      { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
+      { role: "assistant", content: [{ type: "text", text: "After." }] },
+    ]);
+  });
+
+  it("keeps the steps of a run that stopped short, when the next run continues the turn", () => {
+    const history = SessionLog.historyOf([
+      prompted(),
+      started,
       step("one", writing("Before.")),
       interrupted,
       step("two", writing("After.")),
@@ -182,6 +218,7 @@ describe("the conversation a session log records", () => {
 
     expect(history.content).toMatchObject([
       { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
+      { role: "assistant", content: [{ type: "text", text: "Before." }] },
       { role: "assistant", content: [{ type: "text", text: "After." }] },
     ]);
   });

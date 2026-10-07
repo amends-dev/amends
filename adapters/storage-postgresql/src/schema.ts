@@ -871,7 +871,9 @@ export const sessionLogEntries = pgTable(
     participationId: text("participation_id").notNull(),
     position: integer("position").notNull(),
     recordedAt: instant("recorded_at").notNull(),
-    kind: text("kind", { enum: ["Joined", "Prompted", "Step", "Interrupted"] }).notNull(),
+    kind: text("kind", {
+      enum: ["Joined", "Prompted", "Started", "Step", "Interrupted"],
+    }).notNull(),
     turnId: text("turn_id"),
     details: jsonb("details").$type<unknown>().notNull(),
   },
