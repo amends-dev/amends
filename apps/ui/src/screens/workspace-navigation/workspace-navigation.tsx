@@ -1,11 +1,11 @@
 import { For, Show, type JSX } from "solid-js";
 import {
   IconList,
+  IconMarkAgents,
   IconMarkChannel,
-  IconMarkCommand,
+  IconMarkConnections,
   IconMarkHome,
   IconMarkMail,
-  IconMarkMarketplace,
   IconMarkNew,
   IconMarkSearch,
   IconMarkSettings,
@@ -25,12 +25,12 @@ import { Rail } from "../../patterns/rail/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Sidebar } from "../../patterns/sidebar/index.ts";
 
-export type Destination = "home" | "agents-v2" | "connections-v2";
+export type Destination = "home" | "agents" | "connections";
 
 const destinations = [
   { id: "home", label: "Home", icon: IconMarkHome },
-  { id: "agents-v2", label: "Agents v2", icon: IconMarkCommand },
-  { id: "connections-v2", label: "Connections v2", icon: IconMarkMarketplace },
+  { id: "agents", label: "Agents", icon: IconMarkAgents },
+  { id: "connections", label: "Connections", icon: IconMarkConnections },
 ] as const;
 
 export interface NavigationLink {
@@ -417,7 +417,7 @@ export interface DestinationSidebarProps {
 
 /**
  * A destination's sidebar: each section's items, which open in the main content. The same
- * pattern serves Agents v2, Connections v2, and Settings.
+ * pattern serves Agents, Connections, and Settings.
  */
 export function DestinationSidebar(props: DestinationSidebarProps) {
   return (

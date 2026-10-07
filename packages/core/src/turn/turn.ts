@@ -1,5 +1,5 @@
 import { Schema, Struct } from "effect";
-import { AgentV2 } from "../agent-v2/agent.ts";
+import { Agent } from "../agent/agent.ts";
 import { GroupId } from "../group/id.ts";
 import { Identity } from "../identity/identity.ts";
 import { Notification } from "../notification/notification.ts";
@@ -72,7 +72,7 @@ export const Record = Schema.Struct({
    */
   logAfter: Sequence,
   /** What the turn runs on, recorded when it starts and kept when it runs again. */
-  selection: Schema.NullOr(AgentV2.Selection),
+  selection: Schema.NullOr(Agent.Selection),
   /** The agent's reply, once the turn posted it. */
   messageIds: Schema.Array(ThreadMessageId.Id),
   /** Why it failed. */

@@ -14,7 +14,7 @@
  * out everything else on the machine. A failed request fails with the `HarnessError` the driver
  * reports.
  */
-import { HarnessError } from "@amends/harness-v2";
+import { HarnessError } from "@amends/harness";
 import {
   Crypto,
   Deferred,

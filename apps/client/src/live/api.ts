@@ -55,15 +55,15 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "ownership",
     "members",
     "permissions",
-    "connections-v2",
-    "agents-v2",
+    "connections",
+    "agents",
     directoryKey,
   ],
   // An agent is a member: its name, and whether it is still in the workspace, show with it.
-  "workspace.member.added": ["members", "ownership", "agents-v2", directoryKey],
-  "workspace.member.removed": ["members", "ownership", "agents-v2", directoryKey],
+  "workspace.member.added": ["members", "ownership", "agents", directoryKey],
+  "workspace.member.removed": ["members", "ownership", "agents", directoryKey],
   // A member's name shows wherever members are named, and in the directory's memberships.
-  "workspace.member.renamed": ["members", "agents-v2", directoryKey],
+  "workspace.member.renamed": ["members", "agents", directoryKey],
   "workspace.invitation.issued": ["invitations"],
   "workspace.invitation.revoked": ["invitations"],
   "workspace.invitation.accepted": ["invitations", "members", "ownership", directoryKey],
@@ -78,8 +78,8 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "groups",
     "inbox",
     "permissions",
-    "connections-v2",
-    "agents-v2",
+    "connections",
+    "agents",
     "active-turns",
   ],
   "workspace.assignment.created": [
@@ -89,8 +89,8 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "groups",
     "inbox",
     "permissions",
-    "connections-v2",
-    "agents-v2",
+    "connections",
+    "agents",
     "active-turns",
   ],
   "workspace.assignment.revoked": [
@@ -100,8 +100,8 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
     "groups",
     "inbox",
     "permissions",
-    "connections-v2",
-    "agents-v2",
+    "connections",
+    "agents",
     "active-turns",
   ],
   // A public group's creation reaches everyone who might join it.
@@ -117,13 +117,13 @@ const affects: Readonly<Record<string, ReadonlyArray<Affected>>> = {
   "thread.activity.recorded": ["groups"],
   // Connections: their names, settings, and readiness, which agents name and follow.
   // Replacing a key changes none of them.
-  "connection-v2.created": ["connections-v2", "agents-v2"],
-  "connection-v2.renamed": ["connections-v2", "agents-v2"],
-  "connection-v2.configured": ["connections-v2", "agents-v2"],
-  "connection-v2.removed": ["connections-v2", "agents-v2"],
+  "connection.created": ["connections", "agents"],
+  "connection.renamed": ["connections", "agents"],
+  "connection.configured": ["connections", "agents"],
+  "connection.removed": ["connections", "agents"],
   // Agents: how each is set up, and so its readiness.
-  "agent-v2.created": ["agents-v2"],
-  "agent-v2.configured": ["agents-v2"],
+  "agent.created": ["agents"],
+  "agent.configured": ["agents"],
   // Where agents are at work: a turn starting, changing state, or ending.
   ...Object.fromEntries(
     [

@@ -1,6 +1,6 @@
-import { type Agent, BridgeClient } from "@amends/harness-v2";
-import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
-import { Network, type Template } from "@amends/sandbox-v2";
+import { type Agent, BridgeClient } from "@amends/harness";
+import { LocalSandboxProvider } from "@amends/sandbox-local";
+import { Network, type Template } from "@amends/sandbox";
 import { BunHttpServer } from "@effect/platform-bun";
 import { type Crypto, Effect, FileSystem, Path, Schema } from "effect";
 import type { Socket } from "effect/socket";

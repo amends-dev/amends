@@ -1,12 +1,12 @@
 import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer } from "effect";
-import { AgentsV2 } from "./agents-v2.ts";
+import { Agents } from "./agents.ts";
 import { Assignments } from "./assignments.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
-import { ConnectionV2Credentials } from "./connection-v2-credentials.ts";
-import { ConnectionsV2 } from "./connections-v2.ts";
+import { ConnectionCredentials } from "./connection-credentials.ts";
+import { Connections } from "./connections.ts";
 import { MemoryConnection } from "./connection.ts";
 import { GroupFollows } from "./group-follows.ts";
 import { GroupMemberships } from "./group-memberships.ts";
@@ -50,9 +50,9 @@ const layerStores = Layer.mergeAll(
   ThreadMessages.layer,
   ThreadActivities.layer,
   ReadStates.layer,
-  ConnectionsV2.layer,
-  ConnectionV2Credentials.layer,
-  AgentsV2.layer,
+  Connections.layer,
+  ConnectionCredentials.layer,
+  Agents.layer,
   TurnRecords.layer,
   SessionStates.layer,
   SessionLogs.layer,

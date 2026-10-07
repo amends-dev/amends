@@ -1,4 +1,4 @@
-import { HarnessError, type StreamPart } from "@amends/harness-v2";
+import { HarnessError, type StreamPart } from "@amends/harness";
 import { Gateway } from "@amends/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option, Stream } from "effect";

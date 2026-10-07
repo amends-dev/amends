@@ -155,7 +155,7 @@ const agents = (current?: string): NavigationSection => ({
  */
 export const AgentsSidebar = {
   render: () => (
-    <Frame navigation={navigation({ groups: [] })} destination="agents-v2" title="Agents">
+    <Frame navigation={navigation({ groups: [] })} destination="agents" title="Agents">
       <DestinationSidebar sections={[agents()]} />
     </Frame>
   ),
@@ -176,7 +176,7 @@ export const AgentsSidebar = {
 /** The Lunacy "Agents v02 / 02" frame: an open agent is the sidebar's current row. */
 export const AgentOpen = {
   render: () => (
-    <Frame navigation={navigation({ groups: [] })} destination="agents-v2" title="Atlas">
+    <Frame navigation={navigation({ groups: [] })} destination="agents" title="Atlas">
       <DestinationSidebar sections={[agents("atlas")]} />
     </Frame>
   ),
@@ -192,7 +192,7 @@ export const AgentOpen = {
 /** The Lunacy "Agents v02 / 06" frame: no agents yet. */
 export const NoAgents = {
   render: () => (
-    <Frame navigation={navigation({ groups: [] })} destination="agents-v2" title="Agents">
+    <Frame navigation={navigation({ groups: [] })} destination="agents" title="Agents">
       <DestinationSidebar sections={[{ ...agents(), entries: [] }]} />
     </Frame>
   ),

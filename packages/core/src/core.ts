@@ -1,16 +1,16 @@
-import { AgentV2Permissions } from "./agent-v2/permissions.ts";
-import { AgentV2Projection } from "./agent-v2/projection.ts";
-import { AgentV2Service } from "./agent-v2/service.ts";
+import { AgentPermissions } from "./agent/permissions.ts";
+import { AgentProjection } from "./agent/projection.ts";
+import { AgentService } from "./agent/service.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import type { SessionLogStore } from "./turn/session-log-store.ts";
-import { AgentV2Query } from "./agent-v2/query.ts";
+import { AgentQuery } from "./agent/query.ts";
 import { TurnProjection } from "./turn/projection.ts";
-import { ConnectionV2Service } from "./connection-v2/service.ts";
-import { ConnectionV2Permissions } from "./connection-v2/permissions.ts";
-import { ConnectionV2Projection } from "./connection-v2/projection.ts";
+import { ConnectionService } from "./connection/service.ts";
+import { ConnectionPermissions } from "./connection/permissions.ts";
+import { ConnectionProjection } from "./connection/projection.ts";
 import { ThreadService } from "./thread/service.ts";
 import { ThreadCommand } from "./thread/command.ts";
 import { GroupCommand } from "./group/command.ts";
@@ -91,8 +91,8 @@ export const projections = [
   ThreadMessageProjection.definition,
   ThreadActivityProjection.definition,
   NotificationProjection.definition,
-  ConnectionV2Projection.definition,
-  AgentV2Projection.definition,
+  ConnectionProjection.definition,
+  AgentProjection.definition,
   TurnProjection.definition,
 ] as const;
 
@@ -119,14 +119,14 @@ export const permissions = [
   ThreadPermissions.Read,
   ThreadMessagePermissions.Publish,
   ThreadParticipationPermissions.Follow,
-  AgentV2Permissions.Use,
-  ConnectionV2Permissions.Create,
-  ConnectionV2Permissions.Read,
-  ConnectionV2Permissions.Manage,
-  ConnectionV2Permissions.Use,
-  AgentV2Permissions.Create,
-  AgentV2Permissions.Read,
-  AgentV2Permissions.Configure,
+  AgentPermissions.Use,
+  ConnectionPermissions.Create,
+  ConnectionPermissions.Read,
+  ConnectionPermissions.Manage,
+  ConnectionPermissions.Use,
+  AgentPermissions.Create,
+  AgentPermissions.Read,
+  AgentPermissions.Configure,
 ];
 
 /**
@@ -200,8 +200,8 @@ const operations = Layer.mergeAll(
   ReadStateService.layer,
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
-  ConnectionV2Service.layer,
-  AgentV2Service.layer,
+  ConnectionService.layer,
+  AgentService.layer,
   TurnService.layer,
 ).pipe(
   Layer.provide(
@@ -225,7 +225,7 @@ const operations = Layer.mergeAll(
  * It is not an operation an actor calls.
  */
 const jobServices = TurnExecution.layer.pipe(
-  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand, AgentV2Query.layer)),
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand, AgentQuery.layer)),
 );
 
 /**

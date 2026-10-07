@@ -1,4 +1,4 @@
-import type { ModelEndpoint } from "@amends/harness-v2";
+import type { ModelEndpoint } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Redacted, Result } from "effect";
 import * as Models from "../src/Models.ts";

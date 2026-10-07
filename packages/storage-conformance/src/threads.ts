@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import type * as Core from "@amends/core";
-import { AgentV2Permissions } from "@amends/core/agent-v2";
+import { AgentPermissions } from "@amends/core/agent";
 
 import {
   Assignment,
@@ -340,7 +340,7 @@ export const threads = (harness: Harness) => {
               ).toMatchObject({
                 _tag: "Authorization.Denied",
                 requirement: {
-                  permission: { name: AgentV2Permissions.Use.name },
+                  permission: { name: AgentPermissions.Use.name },
                   target: { memberId: agentId },
                 },
               });
@@ -355,7 +355,7 @@ export const threads = (harness: Harness) => {
                     memberId: humanId,
                     source: {
                       _tag: "Direct",
-                      grant: Grant.make(AgentV2Permissions.Use, {
+                      grant: Grant.make(AgentPermissions.Use, {
                         _tag: "Target",
                         target: { _tag: "Member", workspaceId, memberId: agentId },
                       }),
@@ -438,7 +438,7 @@ export const threads = (harness: Harness) => {
               const denied = {
                 _tag: "Authorization.Denied",
                 requirement: {
-                  permission: { name: AgentV2Permissions.Use.name },
+                  permission: { name: AgentPermissions.Use.name },
                   target: { memberId: agentId },
                 },
               };

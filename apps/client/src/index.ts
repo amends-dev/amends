@@ -36,20 +36,20 @@ export {
 } from "./settings/views.ts";
 export type { WorkspaceFailure } from "./api/failures.ts";
 export {
-  useConnectionV2List,
-  useConnectionsV2,
-  type ConnectionV2ListEntry,
-  type ConnectionsV2Done,
-  type ConnectionsV2View,
-} from "./connections-v2/views.ts";
+  useConnectionList,
+  useConnections,
+  type ConnectionListEntry,
+  type ConnectionsDone,
+  type ConnectionsView,
+} from "./connections/views.ts";
 export {
-  useAgentV2List,
-  useAgentsV2,
-  type AgentV2ListEntry,
-  type AgentV2TurnEntry,
-  type AgentsV2Done,
-  type AgentsV2View,
-} from "./agents-v2/views.ts";
+  useAgentList,
+  useAgents,
+  type AgentListEntry,
+  type AgentTurnEntry,
+  type AgentsDone,
+  type AgentsView,
+} from "./agents/views.ts";
 export { type SettingsData, type SettingsCommand, invitationIntent } from "./settings/api.ts";
 export {
   useWorkspacePicker,

@@ -10,7 +10,7 @@
     "packages/cluster/test/**/*.ts",
     "packages/server-http/test/**/*.ts",
     "packages/toolkit/test/**/*.ts",
-    "packages/connection-v2/test/**/*.ts",
+    "packages/connection/test/**/*.ts",
     "vitest.config.ts"
   ],
   "exclude": ["node_modules", "repos", "dist", "out", "coverage"]

@@ -39,9 +39,9 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
-import { AgentV2Store } from "@amends/core/agent-v2";
-import { Integration, Integrations, type ModelCatalog } from "@amends/connection-v2";
+import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
+import { AgentStore } from "@amends/core/agent";
+import { Integration, Integrations, type ModelCatalog } from "@amends/connection";
 import {
   SessionLogStore,
   SessionStateStore,
@@ -50,7 +50,7 @@ import {
   TurnStore,
   TurnTimeline,
 } from "@amends/core/turn";
-import { Harness as HarnessV2 } from "@amends/harness-v2";
+import { Harness as AgentHarness } from "@amends/harness";
 import { Gateway, WorkspaceStorage } from "@amends/gateway";
 import { Clock, Context, DateTime, Effect, Layer, Option, Redacted, Result, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
@@ -86,7 +86,7 @@ export const testModel: ModelCatalog.Model = {
  */
 const idleHarness = (id: string, requiresSandbox: boolean) =>
   Effect.succeed(
-    HarnessV2.make({
+    AgentHarness.make({
       id,
       requiresSandbox,
       startSession: () => Effect.die("No suite starts a session"),
@@ -229,9 +229,9 @@ export const bind = (
   groupMemberships: Context.get(context, GroupMembershipStore.Service),
   groupFollows: Context.get(context, GroupFollowStore.Service),
   readStates: Context.get(context, ReadStateStore.Service),
-  connectionsV2: Context.get(context, ConnectionV2Store.Service),
-  connectionV2Credentials: Context.get(context, ConnectionV2CredentialStore.Service),
-  agentsV2: Context.get(context, AgentV2Store.Service),
+  connections: Context.get(context, ConnectionStore.Service),
+  connectionCredentials: Context.get(context, ConnectionCredentialStore.Service),
+  agents: Context.get(context, AgentStore.Service),
   turns: Context.get(context, TurnStore.Service),
   sessionStates: Context.get(context, SessionStateStore.Service),
   sessionLogs: Context.get(context, SessionLogStore.Service),

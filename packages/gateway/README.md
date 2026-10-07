@@ -35,7 +35,7 @@ those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `options.integrations` lists
 the integrations the host installs, whose ids must be distinct; every workspace's core receives them
-as connection-v2's `Integrations`, so storage bindings exclude them. It defaults to none.
+as connection's `Integrations`, so storage bindings exclude them. It defaults to none.
 `Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.

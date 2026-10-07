@@ -1,5 +1,5 @@
 import { Record, Schema } from "effect";
-import { ConnectionV2 } from "../connection-v2/connection.ts";
+import { Connection } from "../connection/connection.ts";
 import { ThreadId } from "../thread/id.ts";
 import { GroupId } from "../group/id.ts";
 import { Member } from "../workspace/member/member.ts";
@@ -11,7 +11,7 @@ export const Reference = Schema.TaggedUnion({
   Member: { workspaceId: Workspace.Id, memberId: Member.Id },
   Thread: { workspaceId: Workspace.Id, threadId: ThreadId.Id },
   Group: { workspaceId: Workspace.Id, groupId: GroupId.Id },
-  ConnectionV2: { workspaceId: Workspace.Id, connectionId: ConnectionV2.Id },
+  Connection: { workspaceId: Workspace.Id, connectionId: Connection.Id },
 });
 export type Reference = typeof Reference.Type;
 

@@ -6,14 +6,14 @@ import {
   ModelCatalog,
   ModelIntegrations,
   ToolIntegrations,
-} from "@amends/connection-v2";
+} from "@amends/connection";
 import { JobPruning, TurnJob } from "@amends/cluster";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
-import { AmendsAgent, Models } from "@amends/harness-amends-v2";
+import { AmendsAgent, Models } from "@amends/harness-amends";
 import { OpencodeAgent } from "@amends/harness-opencode";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
-import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
-import { Network } from "@amends/sandbox-v2";
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+import { LocalSandboxProvider } from "@amends/sandbox-local";
+import { Network } from "@amends/sandbox";
 import {
   PostgresClusterStorage,
   PostgresDatabase,

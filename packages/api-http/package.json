@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection-v2": "workspace:*",
+    "@amends/connection": "workspace:*",
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",
     "effect": "catalog:"

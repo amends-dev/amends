@@ -1,15 +1,15 @@
 /**
- * The agent a turn runs, built from the connections core gives as `AgentV2Query.Runnable` with the
+ * The agent a turn runs, built from the connections core gives as `AgentQuery.Runnable` with the
  * integrations the host installs: its harness, on its model, and the sandbox its session works in,
  * if it has one.
  */
-import { Integrations } from "@amends/connection-v2";
-import type { AgentV2Query } from "@amends/core/agent-v2";
-import { Sandbox } from "@amends/sandbox-v2";
+import { Integrations } from "@amends/connection";
+import type { AgentQuery } from "@amends/core/agent";
+import { Sandbox } from "@amends/sandbox";
 import { Effect } from "effect";
 
 /** A connection's key, as its integration takes it. */
-const credentialOf = (access: AgentV2Query.Access) => access.credential ?? undefined;
+const credentialOf = (access: AgentQuery.Access) => access.credential ?? undefined;
 
 // TODO: Stop a session's sandbox once its agent has been idle there for a while, and destroy it
 // once the participation ends; sandboxes are left running between turns.
@@ -18,7 +18,7 @@ const credentialOf = (access: AgentV2Query.Access) => access.credential ?? undef
  * it from the harness's template when it does not exist yet, for the scope.
  */
 export const open = Effect.fn("TurnAgent.open")(function* (
-  runnable: AgentV2Query.Runnable,
+  runnable: AgentQuery.Runnable,
   sessionId: string,
 ) {
   const integrations = yield* Integrations.Integrations;

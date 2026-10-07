@@ -1,6 +1,6 @@
-import { Bridge, Harness, type StreamPart } from "@amends/harness-v2";
-import { SessionId } from "@amends/harness-v2/Agent";
-import { type Network, type Sandbox, Template } from "@amends/sandbox-v2";
+import { Bridge, Harness, type StreamPart } from "@amends/harness";
+import { SessionId } from "@amends/harness/Agent";
+import { type Network, type Sandbox, Template } from "@amends/sandbox";
 import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {

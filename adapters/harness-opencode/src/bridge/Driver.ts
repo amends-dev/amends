@@ -13,7 +13,7 @@
  * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
  * tools, or a request to compact, which fail with `UnsupportedError`.
  */
-import { type Bridge, HarnessError } from "@amends/harness-v2";
+import { type Bridge, HarnessError } from "@amends/harness";
 import {
   Clock,
   type Crypto,

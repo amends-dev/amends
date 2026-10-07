@@ -4,8 +4,8 @@ export type WorkspacePage =
   | "inbox"
   | "triage"
   | "tasks"
-  | "agents-v2"
-  | "connections-v2"
+  | "agents"
+  | "connections"
   | "settings";
 export const paths = {
   settingsSection: (id: string, section: SettingsTab) =>
@@ -25,12 +25,12 @@ export const paths = {
   /** A turn's log, beside its thread. */
   turnLog: (id: string, groupId: string, threadId: string, turnId: string) =>
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}?log=${encodeURIComponent(turnId)}`,
-  /** An agent's page in Agents v2. */
-  agentV2: (id: string, agentId: string) =>
-    `/workspaces/${encodeURIComponent(id)}/agents-v2/${encodeURIComponent(agentId)}`,
-  /** A connection's page in Connections v2. */
-  connectionV2: (id: string, connectionId: string) =>
-    `/workspaces/${encodeURIComponent(id)}/connections-v2/${encodeURIComponent(connectionId)}`,
+  /** An agent's page in Agents. */
+  agent: (id: string, agentId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentId)}`,
+  /** A connection's page in Connections. */
+  connection: (id: string, connectionId: string) =>
+    `/workspaces/${encodeURIComponent(id)}/connections/${encodeURIComponent(connectionId)}`,
   /** A first message to some people who have no direct group together yet. */
   directDraft: (id: string, memberIds: ReadonlyArray<string>) =>
     `/workspaces/${encodeURIComponent(id)}/direct?to=${memberIds.map(encodeURIComponent).join(",")}`,
@@ -48,7 +48,7 @@ export function returnPath(value: string | undefined): string {
     url.origin !== "https://amends.invalid" ||
     !(
       url.pathname === paths.workspaces ||
-      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|agents-v2(?:\/[^/]+)?|connections-v2(?:\/[^/]+)?|settings(?:\/(?:workspace|members))?|groups(?:\/[^/]+(?:\/threads\/[^/]+)?)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|agents(?:\/[^/]+)?|connections(?:\/[^/]+)?|settings(?:\/(?:workspace|members))?|groups(?:\/[^/]+(?:\/threads\/[^/]+)?)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
         url.pathname,
       )
     )

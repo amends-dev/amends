@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
-import { ConnectionV2 } from "../src/connection-v2/connection.ts";
+import { Connection } from "../src/connection/connection.ts";
 import { Group } from "../src/group/group.ts";
 import { ThreadMessage } from "../src/thread/message/message.ts";
 import { Member } from "../src/workspace/member/member.ts";
 import { Workspace } from "../src/workspace/workspace.ts";
 
-const names = [Group.NewName, Workspace.NewName, Member.NewName, ConnectionV2.NewName];
+const names = [Group.NewName, Workspace.NewName, Member.NewName, Connection.NewName];
 // Names people type in any script, with emoji joined by zero-width joiners.
 const readable = [
   "Ada Lovelace",

@@ -1,5 +1,5 @@
 import { Context, Schema } from "effect";
-import { AgentV2 } from "../agent-v2/agent.ts";
+import { Agent } from "../agent/agent.ts";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
 import type { ThreadParticipationId } from "../thread/participation/id.ts";
@@ -28,7 +28,7 @@ export interface Resume extends Schema.Schema.Type<typeof Resume> {}
 export const Saved = Schema.Struct({
   ...Resume.fields,
   promptedThroughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  selection: AgentV2.Selection,
+  selection: Agent.Selection,
 });
 export interface Saved extends Schema.Schema.Type<typeof Saved> {}
 

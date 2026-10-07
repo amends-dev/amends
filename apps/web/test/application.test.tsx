@@ -445,14 +445,11 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "true");
   expect(screen.getByRole("navigation", { name: "Workspace" })).toBe(sidebar);
   expect(screen.getByRole("button", { name: "Account: alice" })).toBe(trigger);
-  for (const page of ["Triage", "Connections v2"] as const) {
+  for (const page of ["Triage", "Connections"] as const) {
     fireEvent.click(screen.getByRole("link", { name: page }));
     await screen.findByRole("heading", { name: page });
   }
-  expect(screen.getByRole("link", { name: "Connections v2" })).toHaveAttribute(
-    "aria-current",
-    "true",
-  );
+  expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "true");
   history.set({ value: "/workspaces/two/settings", scroll: false });
   await screen.findByRole("heading", { name: "Workspace" });
   // Another workspace gets its own shell, reading its own groups and names.
@@ -1352,8 +1349,8 @@ it("follows and renames a group from commands typed after /, posting nothing", a
   expect(writes).toEqual(["follow"]);
 });
 
-/** A host installing an MCP integration, answering Connections v2's reads, writes, and checks. */
-function connectionsV2Host() {
+/** A host installing an MCP integration, answering Connections's reads, writes, and checks. */
+function connectionsHost() {
   const mcp = {
     id: "mcp",
     name: "MCP server",
@@ -1385,15 +1382,15 @@ function connectionsV2Host() {
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/connections-v2/integrations") return response([mcp]);
-    if (path === "/workspaces/one/connections-v2" && request.method === "GET")
+    if (path === "/workspaces/one/connections/integrations") return response([mcp]);
+    if (path === "/workspaces/one/connections" && request.method === "GET")
       return response(created === undefined ? [] : [view()]);
-    if (path === "/workspaces/one/connections-v2" && request.method === "POST") {
+    if (path === "/workspaces/one/connections" && request.method === "POST") {
       created = (await request.json()) as Record<string, unknown>;
       writes.push({ method: "POST", path, body: created });
       return response(view(), 201);
     }
-    if (path === "/workspaces/one/connections-v2/c1/check") {
+    if (path === "/workspaces/one/connections/c1/check") {
       writes.push({ method: "POST", path, body: undefined });
       return response({ status: "unauthorized", description: "The server refused the key." });
     }
@@ -1435,10 +1432,10 @@ async function addMcpServerWithKey() {
   await within(screen.getByRole("main")).findByText("Key refused");
   expect(screen.getByText("The server refused the key.")).toBeInTheDocument();
 }
-const connectionV2Writes = [
+const connectionWrites = [
   {
     method: "POST",
-    path: "/workspaces/one/connections-v2",
+    path: "/workspaces/one/connections",
     body: {
       integration: "mcp",
       name: "MCP server",
@@ -1447,25 +1444,25 @@ const connectionV2Writes = [
       apiKey: "sk-tools",
     },
   },
-  { method: "POST", path: "/workspaces/one/connections-v2/c1/check", body: undefined },
+  { method: "POST", path: "/workspaces/one/connections/c1/check", body: undefined },
 ];
 
-it("adds a connection with its key from Connections v2, opening its page and checking it", async () => {
-  const host = connectionsV2Host();
+it("adds a connection with its key from Connections, opening its page and checking it", async () => {
+  const host = connectionsHost();
   const history = mount(
-    "/workspaces/one/connections-v2",
+    "/workspaces/one/connections",
     memoryStore(session("alice")).store,
     host.fetch,
     undefined,
-    { permissions: ["connection-v2.create"] },
+    { permissions: ["connection.create"] },
   );
   await addMcpServerWithKey();
-  expect(history.get()).toBe("/workspaces/one/connections-v2/c1");
-  expect(host.writes).toEqual(connectionV2Writes);
+  expect(history.get()).toBe("/workspaces/one/connections/c1");
+  expect(host.writes).toEqual(connectionWrites);
 });
 
-/** A host with two agents v2, one whose sandbox connection was removed, and their connections. */
-function agentsV2Host() {
+/** A host with two agents, one whose sandbox connection was removed, and their connections. */
+function agentsHost() {
   const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" };
   const agent = (id: string, name: string, sandbox: string | null) => ({
     id,
@@ -1506,19 +1503,19 @@ function agentsV2Host() {
   return vi.fn<typeof globalThis.fetch>(async (input, init) => {
     const request = new Request(input, init);
     const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/agents-v2")
+    if (path === "/workspaces/one/agents")
       return response([agent("a1", "Atlas", null), agent("a2", "Review helper", "gone")]);
-    if (path === "/workspaces/one/connections-v2/integrations")
+    if (path === "/workspaces/one/connections/integrations")
       return response([
         integration("amends", "amends", "harnesses"),
         integration("openai-compatible", "OpenAI-compatible API", "models"),
       ]);
-    if (path === "/workspaces/one/connections-v2")
+    if (path === "/workspaces/one/connections")
       return response([
         connection("h1", "Amends harness", "amends"),
         connection("m1", "Local models", "openai-compatible"),
       ]);
-    if (path === "/workspaces/one/connections-v2/m1/models")
+    if (path === "/workspaces/one/connections/m1/models")
       return response({ listed: [], unlisted: true });
     if (path === "/workspaces/one/settings")
       return response({
@@ -1545,25 +1542,25 @@ function agentsV2Host() {
     });
   });
 }
-it("lists agents v2 in the sidebar, opens one with its setup, and adds from the sidebar", async () => {
+it("lists agents in the sidebar, opens one with its setup, and adds from the sidebar", async () => {
   const history = mount(
-    "/workspaces/one/agents-v2",
+    "/workspaces/one/agents",
     memoryStore(session("alice")).store,
-    agentsV2Host(),
+    agentsHost(),
     undefined,
-    { permissions: ["agent-v2.create"] },
+    { permissions: ["agent.create"] },
   );
   const sidebar = within(await screen.findByRole("navigation", { name: "Workspace" }));
   await sidebar.findByRole("link", { name: /Atlas/ });
-  expect(sidebar.getByRole("link", { name: "Agents v2" })).toHaveAttribute("aria-current", "page");
+  expect(sidebar.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
   expect(sidebar.getByRole("link", { name: /Review helper, Needs setup$/ })).toBeInTheDocument();
   fireEvent.click(sidebar.getByRole("link", { name: /Review helper/ }));
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one/agents-v2/a2"));
+  await waitFor(() => expect(history.get()).toBe("/workspaces/one/agents/a2"));
   const main = within(screen.getByRole("main"));
   await main.findByText("Its sandbox connection was removed.");
   expect(main.getByRole("button", { name: /^Harness/ })).toHaveTextContent("Amends harness");
   expect(main.getByRole("button", { name: /^Sandbox/ })).toHaveTextContent("Removed connection");
   fireEvent.click(sidebar.getByRole("button", { name: "Add agent" }));
   await screen.findByRole("dialog", { name: "Add agent" });
-  expect(history.get()).toBe("/workspaces/one/agents-v2/a2?add=agent");
+  expect(history.get()).toBe("/workspaces/one/agents/a2?add=agent");
 });

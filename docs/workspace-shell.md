@@ -6,7 +6,7 @@ Opening `/workspaces/:workspaceId` shows Home inside the app-owned workspace lay
 panel. Every destination uses them the same way, as the Lunacy "Agents / Light mode / v02 ·
 Navigation" frames lay out:
 
-- **Rail** picks a destination: Home, Agents v2, and Connections v2, then Settings and the reader's
+- **Rail** picks a destination: Home, Agents, and Connections, then Settings and the reader's
   avatar, which opens the account menu. The current destination is marked
   `aria-current="true"`, whichever of its pages shows.
 - **Sidebar** lists the destination's items. Its header, the workspace switcher, stays the same
@@ -32,12 +32,12 @@ The destinations' sidebars:
   it is sent. The reader is not listed: a direct group needs at least one other member. A
   one-to-one row with an agent carries the agent's status patch; people's rows gain theirs with
   presence, which is not implemented yet.
-- **Agents v2**: each agent by name with its avatar and status patch; + is Add agent
-  (`?add=agent`). See [agents v2](agents-v2.md).
-- **Connections v2**: Models, Tools, Sandboxes, and Harnesses, each connection under what its
+- **Agents**: each agent by name with its avatar and status patch; + is Add agent
+  (`?add=agent`). See [agents](agents.md).
+- **Connections**: Models, Tools, Sandboxes, and Harnesses, each connection under what its
   integration gives, each section with its own Browse (`?tab=`) and + (`?add=`), which offers only
   that kind's integrations. A connection whose integration this host no longer installs shows only
-  in the list. See [connections v2](connections-v2.md).
+  in the list. See [connections](connections.md).
 - **Settings**: Workspace and Members, each its own page. See
   [workspace settings](workspace-settings.md).
 
@@ -112,8 +112,8 @@ Try again under a note when a page fails. A notification whose thread the reader
 
 Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
 side panel, such as Settings' member details, attaches beside the main content like the thread
-panel. [Agents v2](agents-v2.md) follows the Agents v02 navigation frames, and
-[Connections v2](connections-v2.md) the same pattern. The workspace's own address redirects to the Inbox; Triage and Tasks are placeholders
+panel. [Agents](agents.md) follows the Agents v02 navigation frames, and
+[Connections](connections.md) the same pattern. The workspace's own address redirects to the Inbox; Triage and Tasks are placeholders
 drawn with UI's EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
 above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
 empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts

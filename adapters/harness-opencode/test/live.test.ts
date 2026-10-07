@@ -1,15 +1,15 @@
-import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection-v2";
+import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection";
 import {
   type Bridge,
   GenerateResult,
   Harness,
   type ModelEndpoint,
   type StreamPart,
-} from "@amends/harness-v2";
-import { SessionId } from "@amends/harness-v2/Agent";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
-import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
-import { Network, type Sandbox, type Template } from "@amends/sandbox-v2";
+} from "@amends/harness";
+import { SessionId } from "@amends/harness/Agent";
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+import { LocalSandboxProvider } from "@amends/sandbox-local";
+import { Network, type Sandbox, type Template } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {

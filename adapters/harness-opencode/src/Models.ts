@@ -7,7 +7,7 @@
  * opencode finds the providers and models that models.dev lists by their ids, as endpoints name
  * them, and knows the rest of a model from there, such as whether it calls tools.
  */
-import { HarnessError, type ModelEndpoint } from "@amends/harness-v2";
+import { HarnessError, type ModelEndpoint } from "@amends/harness";
 import { Array, Redacted, Result, type Schema } from "effect";
 import type { ModelRef } from "./bridge/SessionEvent.ts";
 

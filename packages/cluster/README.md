@@ -3,7 +3,7 @@
 `@amends/cluster` runs **jobs**: work outside any request that a commit asks for and Effect Cluster
 delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kind of job is the
 **turn job**, one for each agent in each thread, which runs the agent's
-[turns](../core/README.md#turns) there on [harness-v2](../harness-v2/README.md). Jobs enter
+[turns](../core/README.md#turns) there on [harness](../harness/README.md). Jobs enter
 workspaces through the [gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an
 actor does. The [local host](../../hosts/local/README.md) runs them.
 
@@ -17,8 +17,8 @@ actor does. The [local host](../../hosts/local/README.md) runs them.
 | `jobs/retry.ts`               | `JobRetry.delay`, the delay before a job's failed request runs again.                                                                  |
 | `jobs/pruning.ts`             | `JobPruning`, the hourly job that removes handled requests.                                                                            |
 
-The package depends on Effect, core, the gateway, and the harness-v2, sandbox-v2, and
-connection-v2 contracts. It knows no harness, model provider, or sandbox platform: the host
+The package depends on Effect, core, the gateway, and the harness, sandbox, and
+connection contracts. It knows no harness, model provider, or sandbox platform: the host
 installs their integrations.
 
 ## Jobs

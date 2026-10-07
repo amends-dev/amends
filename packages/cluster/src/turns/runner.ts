@@ -12,7 +12,7 @@ import {
   type TurnJobs,
   TurnPrompt,
 } from "@amends/core/turn";
-import { Agent, type Session, StreamPart } from "@amends/harness-v2";
+import { Agent, type Session, StreamPart } from "@amends/harness";
 import { Cause, Clock, Data, Deferred, Effect, Option, Predicate, Semaphore, Stream } from "effect";
 import { TurnAgent } from "./agent.ts";
 import { SessionLogWriter } from "./session-log-writer.ts";

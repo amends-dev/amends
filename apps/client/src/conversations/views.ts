@@ -14,7 +14,7 @@ import { useAtomValue } from "@effect/atom-solid";
 import { Option, Predicate } from "effect";
 import { AsyncResult } from "effect/reactivity";
 import { createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
-import { agentsV2Reads } from "../agents-v2/api.ts";
+import { agentsReads } from "../agents/api.ts";
 import { useApiClient } from "../provider.tsx";
 import {
   Group,
@@ -260,10 +260,10 @@ const isParticipation = (item: ThreadTimeline.Item): item is Participation => "p
 
 /**
  * Which agents the reader may see, by member ID, with whether they may direct each, live while
- * mounted. It shares the Agents v2 page's read.
+ * mounted. It shares the Agents page's read.
  */
 function useAgentAccess(workspaceId: string) {
-  const reads = agentsV2Reads(useApiClient(), workspaceId);
+  const reads = agentsReads(useApiClient(), workspaceId);
   const read = reads ? useAtomValue(() => reads.agents) : undefined;
   const byMember = createMemo(
     () =>

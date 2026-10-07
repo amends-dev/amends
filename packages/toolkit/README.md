@@ -2,7 +2,7 @@
 
 A tool source is a system that tells which tools it has and runs them, such as an MCP server or an
 HTTP API. This package gives every kind of source one shape, `ToolSource`, and builds from sources
-the Effect AI toolkit that a model, or a [harness](../harness-v2) session, is given as its `toolkit`.
+the Effect AI toolkit that a model, or a [harness](../harness) session, is given as its `toolkit`.
 It depends only on Effect. No other package uses it yet.
 
 No credential enters the package. A source is built over an HTTP client that the caller has already

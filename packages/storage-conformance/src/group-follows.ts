@@ -1,6 +1,6 @@
 import { Notification } from "@amends/core/notification";
 import { describe, expect, it } from "@effect/vitest";
-import { AgentV2Permissions } from "@amends/core/agent-v2";
+import { AgentPermissions } from "@amends/core/agent";
 import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
 import {
   Group,
@@ -200,7 +200,7 @@ export const groupFollows = (harness: Harness) => {
               expect(yield* Effect.flip(run(bound, plain, follow(team.id, agentId)))).toMatchObject(
                 {
                   _tag: "Authorization.Denied",
-                  requirement: { permission: { name: AgentV2Permissions.Use.name } },
+                  requirement: { permission: { name: AgentPermissions.Use.name } },
                 },
               );
               expect(yield* Effect.flip(run(bound, owner, follow(team.id, outsiderId)))).toEqual(

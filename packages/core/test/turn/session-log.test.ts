@@ -1,4 +1,4 @@
-import type { StreamPart } from "@amends/harness-v2";
+import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
 import { SessionLog } from "../../src/turn/session-log.ts";

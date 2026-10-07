@@ -1,5 +1,5 @@
 import * as Core from "@amends/core";
-import { AgentV2Permissions } from "@amends/core/agent-v2";
+import { AgentPermissions } from "@amends/core/agent";
 import {
   Assignment,
   AssignmentService,
@@ -38,7 +38,7 @@ const current = BuiltinRoles.make(workspaceId, Core.permissions);
 const next: BuiltinRoleUpgrade.Target = {
   revision: BuiltinRoles.revision + 1,
   definitions: Core.permissions.flatMap((permission): ReadonlyArray<Permission.Definition> => {
-    if (permission.name === AgentV2Permissions.Use.name) return [];
+    if (permission.name === AgentPermissions.Use.name) return [];
     return [
       permission.name === MemberPermissions.Remove.name
         ? Object.assign({}, permission, { builtinTier: "member" as const })
@@ -57,7 +57,7 @@ const later: BuiltinRoleUpgrade.Target = {
   ],
 };
 /** Earlier declarations, before agent use existed. */
-const older = Core.permissions.filter(({ name }) => name !== AgentV2Permissions.Use.name);
+const older = Core.permissions.filter(({ name }) => name !== AgentPermissions.Use.name);
 const ownerMemberId = Member.Id.make("owner");
 
 /** Built-in role bundles: recorded at creation, and upgraded through facts to later revisions. */

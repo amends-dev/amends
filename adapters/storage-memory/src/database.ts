@@ -44,8 +44,8 @@ export const projections = [
   "threadParticipations",
   "threadMessages",
   "threadActivities",
-  "connectionsV2",
-  "agentsV2",
+  "connections",
+  "agents",
   "turns",
   "checkpoints",
   "liveProjections",
@@ -72,7 +72,7 @@ export interface Space {
   /** Private Seen by notification ID: when its human recipient first saw it. Kept through rebuilds. */
   readonly notificationsSeen: Map<string, number>;
   /** Each connection's credential by connection ID, outside the journal, which rebuilds keep. */
-  readonly connectionV2Credentials: Map<string, string>;
+  readonly connectionCredentials: Map<string, string>;
   /** Each participation's harness session, outside the journal, which rebuilds keep. */
   readonly sessionStates: Map<string, string>;
 }
@@ -116,7 +116,7 @@ export const empty = (): Space => ({
   threadPositions: new Map(),
   groupTimes: new Map(),
   notificationsSeen: new Map(),
-  connectionV2Credentials: new Map(),
+  connectionCredentials: new Map(),
   sessionStates: new Map(),
 });
 
@@ -131,7 +131,7 @@ export const copy = (space: Space): Space => ({
   threadPositions: new Map(space.threadPositions),
   groupTimes: new Map(space.groupTimes),
   notificationsSeen: new Map(space.notificationsSeen),
-  connectionV2Credentials: new Map(space.connectionV2Credentials),
+  connectionCredentials: new Map(space.connectionCredentials),
   sessionStates: new Map(space.sessionStates),
 });
 

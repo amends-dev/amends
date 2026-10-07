@@ -106,14 +106,14 @@ const workspaceWithAgent = (modelsUrl: string) =>
       payload: { name: "Studio", memberName: "Alice" },
     });
     const connect = (integration: string, settings: Record<string, string> = {}) =>
-      asAlice.connectionsV2.create({
+      asAlice.connections.create({
         params: { workspaceId },
         headers: {},
         payload: { integration, name: integration, settings, auth: "none" },
       });
     const amends = yield* connect("amends");
     const models = yield* connect("openai-compatible", { url: modelsUrl });
-    const agent = yield* asAlice.agentsV2.create({
+    const agent = yield* asAlice.agents.create({
       params: { workspaceId },
       headers: {},
       payload: {

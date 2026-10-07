@@ -1,7 +1,7 @@
 import type * as Core from "@amends/core";
-import { AgentV2Service } from "@amends/core/agent-v2";
+import { AgentService } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
-import { ConnectionV2Service } from "@amends/core/connection-v2";
+import { ConnectionService } from "@amends/core/connection";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
@@ -22,7 +22,7 @@ import {
 } from "@amends/core/turn";
 import type { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
-import type { StreamPart } from "@amends/harness-v2";
+import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Redacted, Stream } from "effect";
 import type { Harness as ConformanceHarness } from "./harness.ts";
@@ -162,12 +162,12 @@ const resume: SessionStateStore.Resume = { agent: "test-in-process", agentState:
  */
 const workspaceWithAgent = Effect.gen(function* () {
   const workspace = yield* Operations.createWorkspace(alice.id, "Alice");
-  const connect = (input: Parameters<ConnectionV2Service.Interface["create"]>[0]) =>
+  const connect = (input: Parameters<ConnectionService.Interface["create"]>[0]) =>
     as(
       workspace.id,
       alice,
-      Effect.flatMap(ConnectionV2Service.Service, (connectionV2Service) =>
-        connectionV2Service.create(input),
+      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+        connectionService.create(input),
       ),
     );
   const models = yield* connect({
@@ -186,8 +186,8 @@ const workspaceWithAgent = Effect.gen(function* () {
   const agent = yield* as(
     workspace.id,
     alice,
-    Effect.flatMap(AgentV2Service.Service, (agentV2Service) =>
-      agentV2Service.create({
+    Effect.flatMap(AgentService.Service, (agentService) =>
+      agentService.create({
         name: "Planner",
         roleId: BuiltinRoles.MemberId,
         instructions: "Plan each change.",
@@ -769,8 +769,8 @@ export const turns = (harness: ConformanceHarness) => {
             yield* as(
               workspace.id,
               alice,
-              Effect.flatMap(ConnectionV2Service.Service, (connectionV2Service) =>
-                connectionV2Service.remove(models.id),
+              Effect.flatMap(ConnectionService.Service, (connectionService) =>
+                connectionService.remove(models.id),
               ),
             );
             const started = yield* start(workspace.id, "Planner, draft the notes.", [

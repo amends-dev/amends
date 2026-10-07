@@ -21,8 +21,8 @@ import {
   WorkspaceSettingsService,
 } from "@amends/core/workspace";
 import { ReadStateService } from "@amends/core/read-state";
-import { ConnectionV2Service } from "@amends/core/connection-v2";
-import { AgentV2Service } from "@amends/core/agent-v2";
+import { ConnectionService } from "@amends/core/connection";
+import { AgentService } from "@amends/core/agent";
 import { Turn, TurnService } from "@amends/core/turn";
 import { Schema } from "effect";
 
@@ -127,16 +127,16 @@ export const PublicError = Schema.Union([
   InvitationService.AlreadyMember,
   InvitationService.Unavailable,
   InvitationService.InvalidExpiry,
-  ConnectionV2Service.NotFound,
-  ConnectionV2Service.Changed,
-  ConnectionV2Service.UnknownIntegration,
-  ConnectionV2Service.InvalidConnection,
-  ConnectionV2Service.Keyless,
-  ConnectionV2Service.CredentialsUnavailable,
-  AgentV2Service.NotFound,
-  AgentV2Service.Changed,
-  AgentV2Service.ConnectionUnavailable,
-  AgentV2Service.Incomplete,
+  ConnectionService.NotFound,
+  ConnectionService.Changed,
+  ConnectionService.UnknownIntegration,
+  ConnectionService.InvalidConnection,
+  ConnectionService.Keyless,
+  ConnectionService.CredentialsUnavailable,
+  AgentService.NotFound,
+  AgentService.Changed,
+  AgentService.ConnectionUnavailable,
+  AgentService.Incomplete,
   TurnService.NotFound,
   TurnService.NotActive,
   TurnService.NotRetryable,

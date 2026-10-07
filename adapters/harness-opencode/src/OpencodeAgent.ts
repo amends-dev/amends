@@ -13,9 +13,9 @@
  *
  * `integration` gives the agent to connections, for a host to install.
  */
-import { Connection, Integration } from "@amends/connection-v2";
-import { type Agent, BridgeClient, Harness, HarnessError } from "@amends/harness-v2";
-import type { Network, Sandbox } from "@amends/sandbox-v2";
+import { Connection, Integration } from "@amends/connection";
+import { type Agent, BridgeClient, Harness, HarnessError } from "@amends/harness";
+import type { Network, Sandbox } from "@amends/sandbox";
 import { type Crypto, Effect, type Redacted, Schema } from "effect";
 import type { Socket } from "effect/socket";
 import type { Options as DriverOptions } from "./bridge/Driver.ts";

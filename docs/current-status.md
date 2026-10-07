@@ -17,8 +17,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   participants or muting.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), which the
   local host runs as [cluster](../packages/cluster/README.md)'s turn jobs on
-  [harness-v2](../packages/harness-v2/README.md). Core starts each turn as one
-  harness turn on what [agents v2](../packages/core/README.md#agents-v2) select, prompted with the
+  [harness](../packages/harness/README.md). Core starts each turn as one
+  harness turn on what [agents](../packages/core/README.md#agents) select, prompted with the
   thread's messages since the agent's last turn there, and posts the reply its job gives, the text
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
   conversation in each participation's session log, from which the agent's next turn there
@@ -34,27 +34,27 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   activity for participants is not built. The active turns read covers at most a hundred active
   turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
   outside the store. Task activity kinds remain design intent.
-- [Harness v2](../packages/harness-v2/README.md) runs amends's own agent
-  ([harness-amends-v2](../adapters/harness-amends-v2)) and
+- The [harness](../packages/harness/README.md) runs amends's own agent
+  ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
   the local host runs turns on both. Amends's agent does not summarize a conversation that
   outgrows its model's context, and opencode's session API takes no instructions for a turn, so
   opencode refuses a turn that gives some: only an agent without instructions runs on it.
-- The [v2 sandbox contract](../packages/sandbox-v2) has two providers: directories on this machine
-  ([sandbox-local-v2](../adapters/sandbox-local-v2)), for development, and
-  [Daytona](../adapters/sandbox-daytona-v2/README.md). Local sandboxes share this machine's ports,
+- The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
+  ([sandbox-local](../adapters/sandbox-local)), for development, and
+  [Daytona](../adapters/sandbox-daytona/README.md). Local sandboxes share this machine's ports,
   so only one that listens on a port, such as one running opencode's bridge, runs at a time. No
   provider for E2B, Vercel, or Cloudflare exists; Cloudflare's SDK runs only inside a Worker, so
   reaching it from a host needs its Bridge Worker.
-- [Connections v2](../packages/core/README.md#connections-v2) are set up over HTTP and on the
-  [Connections v2 page](connections-v2.md), from the integrations the
+- [Connections](../packages/core/README.md#connections) are set up over HTTP and on the
+  [Connections page](connections.md), from the integrations the
   [local host](../hosts/local/README.md) installs of every kind. They authenticate with an API key
-  or nothing, and there is no OAuth. Agents v2 name them, and turns run on them. A check's result
+  or nothing, and there is no OAuth. Agents name them, and turns run on them. A check's result
   is not stored. Keys are sealed with one host key, which nothing
   rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier keys.
-- [Agents v2](../packages/core/README.md#agents-v2) are created, configured, renamed, and removed
-  over connections v2, in core, [over HTTP](../packages/api-http/README.md#agents-v2), and on the
-  [Agents v2 page](agents-v2.md); roles are changed in workspace Members. A turn starts on what the
+- [Agents](../packages/core/README.md#agents) are created, configured, renamed, and removed
+  over connections, in core, [over HTTP](../packages/api-http/README.md#agents), and on the
+  [Agents page](agents.md); roles are changed in workspace Members. A turn starts on what the
   agent's setup selects, kept for the agent's later turns in the thread: on `Auto`, the harness its
   previous turn there ran on while a connection still gives it, and otherwise the oldest connection
   that gives one it can run on. Agents have no toolkits, skills, memory, or schedules, and no
@@ -130,7 +130,7 @@ recorded before departures stopped writing to them.
 
 Every workspace starts with a general group that every member joins with the workspace and leaves
 only by leaving the workspace; workspaces created before it existed have none. Agents created on the
-Agents v2 page join it as every member does. The sidebar lists teammates the reader has
+Agents page join it as every member does. The sidebar lists teammates the reader has
 not messaged under Direct messages, capped at six, and opens a first message to them. There is no
 conversation with oneself, since a direct group needs another member.
 
@@ -138,7 +138,7 @@ People are shown by the name they chose in the workspace, or by the identity the
 until they choose one. The apps ask for a name when creating a workspace or accepting an
 invitation, suggesting one from an email address, and the account menu changes it later. Each
 member names only themselves: nobody renames another member, and agents are named by whoever adds
-or configures them on the Agents v2 page. There are no profile photos.
+or configures them on the Agents page. There are no profile photos.
 
 Everyone gets "Create group" on the sidebar's Groups heading and the Groups page (every role holds
 `group.create`): a modal names a team group, picks its people and agents
@@ -191,7 +191,7 @@ placeholder until tasks exist.
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. Search is Jump to, over what the app already
-reads: pages, groups, conversations, people, agents v2, and connections v2, by name.
+reads: pages, groups, conversations, people, agents, and connections, by name.
 Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
 tabs, reactions, and task references have no backend and are not shown.
 
@@ -221,8 +221,8 @@ proposals, since the mocks have no dark error state. Contrast, gamut, font loadi
 have no automated checks: stories are compared with their Lunacy frames in a browser at phone,
 touch, and desktop widths. Right-to-left layouts and forced colors are not reviewed. The
 navigation pattern (a sidebar per rail destination, items as pages in the main content) has Lunacy
-frames only for Agents ("Agents / Light mode / v02 · Navigation"), which Agents v2 follows;
-Connections v2 and Settings follow it without frames of their own, as the Settings frames still
+frames only for Agents ("Agents / Light mode / v02 · Navigation"), which the Agents page
+follows; Connections and Settings follow it without frames of their own, as the Settings frames still
 draw Workspace in two columns. Status marks and the status color tones follow "Status / Light
 mode / v01", which draws the Agents screens only; the connection tiles, the Direct messages rows,
 the tooltip, and the dark status values follow its rules without frames of their own, and the

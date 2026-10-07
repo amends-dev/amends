@@ -152,7 +152,7 @@ function fixture(options: { readonly atlasLeft?: boolean } = {}) {
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/agents-v2") return json(agents);
+    if (path === "/workspaces/one/agents") return json(agents);
     if (path === "/workspaces/one/threads/thread/timeline") {
       const after = Number(url.searchParams.get("afterSequence") ?? 0);
       return json(server.items.filter((item) => item.activity.sequence > after));
@@ -397,7 +397,7 @@ function followed(
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
     if (path === "/workspaces/one/turns/atlas-1") return json(turn);
-    if (path === "/workspaces/one/connections-v2") return json(connections);
+    if (path === "/workspaces/one/connections") return json(connections);
     // The workspace's change feed is live, so that nothing here depends on how long a test takes: a
     // feed that never connected would count as down once `liveGrace` passed.
     if (path === "/workspaces/one/changes") {

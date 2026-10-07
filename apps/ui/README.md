@@ -329,33 +329,33 @@ panel with their role (`Select`, and Save role), access, and Remove member. `Inv
 `InvitationHistory`, `TransferOwnership`, `ConfirmRemoveMember`, and `ConfirmRevokeInvitation`
 are its modals. They name the settings codes client returns (`SettingsError`, by `SettingsAction`) and
 own the wording, with Refresh when the values are out of date; `settingsToast` words the toast for a
-completed change. `ConnectionsV2Pane`, `ConnectionV2List`, and `ConnectionV2Pane` are Connections v2, over the
+completed change. `ConnectionsPane`, `ConnectionList`, and `ConnectionPane` are Connections, over the
 integrations a host installs, with no mocks yet: the list has All, Models,
 Tools, Sandboxes, and Harnesses tabs, and a connection's page checks whether it works (Working, Key
 refused, Settings don’t work, or Couldn’t reach it), then holds its name, its integration's
 settings through `FormFields`, its key, which is only replaced, its details with the integration's
 documentation, and removal. A connection whose integration is gone lists its saved settings and
-offers only removal. `ChooseIntegration` searches the integrations by name, `ConfigureConnectionV2`
+offers only removal. `ChooseIntegration` searches the integrations by name, `ConfigureConnection`
 takes the name, settings, way of authenticating, and key in one step, and `ReplaceKeyV2` and
-`ConfirmRemoveConnectionV2` are its other modals. **Screens / Connections v2** walks adding and checking a connection,
+`ConfirmRemoveConnection` are its other modals. **Screens / Connections** walks adding and checking a connection,
 a refused key and a refused setup, a gone integration, a host without key storage, a read-only
 member, search, and a stale rename.
-`AgentsV2Pane`, `AgentV2List`, and `AgentV2Pane` are Agents v2, over connections v2, with no mocks
+`AgentsPane`, `AgentList`, and `AgentPane` are Agents, over connections, with no mocks
 of their own: they follow the Agents frames' navigation and the
-Connections v2 page. The list has All and Needs setup, and each agent's harness, with its sandbox,
+Connections page. The list has All and Needs setup, and each agent's harness, with its sandbox,
 its model, and where it is at work as columns, or under the name on phones, with its state as a
 patch on its avatar. The agent's page reads in one column: a notice listing why it can't run, its
 name, its setup saved as a whole, its details, with each turn in progress opening its log, and
-removal. `SetupFields` is the setup both it and `AddAgentV2` ask for: the
+removal. `SetupFields` is the setup both it and `AddAgent` ask for: the
 instructions, the harness or Auto, the model connection, the model, which the connection's list
 suggests and which may be any other when it takes models it doesn't list, the effort the chosen
 model takes, and the sandbox, warning when the harness works only in one. A connection the agent
 names that is removed or not installed stays chosen and shows as Unavailable, and what the host
-refuses shows beside the field it concerns. `ConfirmRemoveAgentV2` confirms removal, which ends
-the agent's membership. **Screens / Agents v2** walks adding an agent, the roles the reader may give, agents at work and
+refuses shows beside the field it concerns. `ConfirmRemoveAgent` confirms removal, which ends
+the agent's membership. **Screens / Agents** walks adding an agent, the roles the reader may give, agents at work and
 idle, a removed sandbox and a harness that needs one, listed models and efforts, models that load or fail, a refused connection, Auto
 with no harness, removal, a read-only member, search, and a stale rename.
-`agentV2Status` and `connectionV2Status` word each one's state as a `Status` for the sidebar,
+`agentStatus` and `connectionStatus` word each one's state as a `Status` for the sidebar,
 profile cards, and rows the apps compose: an agent at work says where, and one that is ready and
 idle has none. `TurnRow` shows an agent's turn as a compact row,
 from the Lunacy "Turn activity" frames: the agent, its state, View log, and Stop or Retry for a

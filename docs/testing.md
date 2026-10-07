@@ -204,9 +204,9 @@ also set opencode up as they would from a workspace's connections, to OpenRouter
 it runs on, to the agent, and to this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1`,
 Daytona's.
 
-The sandbox providers in `adapters/sandbox-local-v2` and
-`adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports, and
-`packages/sandbox-v2/test` checks the contract's own rules, such as what names a template. The local
+The sandbox providers in `adapters/sandbox-local` and
+`adapters/sandbox-daytona` run the suites `@amends/sandbox/conformance` exports, and
+`packages/sandbox/test` checks the contract's own rules, such as what names a template. The local
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
 policies Daytona enforces, create real sandboxes and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
@@ -214,7 +214,7 @@ policies Daytona enforces, create real sandboxes and cost money, so they run onl
 against a fake of Daytona's API in the test's process; with `AMENDS_TEST_DAYTONA=1`, its tests also
 check a real organization's key and create a sandbox through a connection.
 
-`packages/connection-v2` and `adapters/harness-amends-v2` run everywhere against fakes: a client
+`packages/connection` and `adapters/harness-amends` run everywhere against fakes: a client
 that answers as each model API does, an MCP server in the test's process, and an HTTP API with an
 OpenAPI document. Their live tests reach real model providers and run only with
 `AMENDS_TEST_MODELS=1`: amends's agent runs turns on a free OpenRouter model, with

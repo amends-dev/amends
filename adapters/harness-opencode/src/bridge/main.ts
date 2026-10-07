@@ -7,7 +7,7 @@
  * The driver runs the opencode installed beside the program, as the template installs it, unless
  * the agent options name another command.
  */
-import { BridgeServer } from "@amends/harness-v2";
+import { BridgeServer } from "@amends/harness";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";

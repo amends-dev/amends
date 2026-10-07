@@ -1,7 +1,7 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
 import { TurnJobs } from "@amends/core/turn";
-import { type Integration, Integrations } from "@amends/connection-v2";
+import { type Integration, Integrations } from "@amends/connection";
 import { Journal } from "@amends/core/journal";
 import { Workspace } from "@amends/core/workspace";
 import {

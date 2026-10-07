@@ -41,55 +41,55 @@ import formsMeta, {
   SettingsFields,
   SuggestionsAndStatuses,
 } from "../src/components/forms.stories.tsx";
-import connectionsV2Meta, {
-  AddConnectionFlow as AddConnectionV2Flow,
-  AllConnections as AllConnectionsV2,
+import connectionsMeta, {
+  AddConnectionFlow,
+  AllConnections,
   ChooseIntegration,
   ChooseToolIntegration,
   ConfigureMcpServer,
-  ConfigureWithoutAuthentication as ConfigureV2WithoutAuthentication,
-  ConnectionPage as ConnectionV2Page,
-  EmptyConnections as EmptyConnectionsV2,
+  ConfigureWithoutAuthentication,
+  ConnectionPage,
+  EmptyConnections,
   IntegrationNotInstalled,
   KeyRefused,
   KeyStorageUnavailable,
-  LoadFailed as ConnectionsV2LoadFailed,
-  Loading as ConnectionsV2Loading,
-  NoMatchingConnections as NoMatchingConnectionsV2,
-  ReadOnly as ConnectionsV2ReadOnly,
-  RemoveConnection as RemoveConnectionV2,
+  LoadFailed as ConnectionsLoadFailed,
+  Loading as ConnectionsLoading,
+  NoMatchingConnections,
+  ReadOnly as ConnectionsReadOnly,
+  RemoveConnection,
   RenamedMeanwhile as RenamedMeanwhileV2,
   ReplaceKey as ReplaceKeyV2,
   SetupRefused,
   ToolConnections,
-} from "../src/screens/connections-v2/connections-v2.stories.tsx";
-import agentsV2Meta, {
-  AddAgentFlow as AddAgentV2Flow,
-  AgentAtWork as AgentV2AtWork,
-  AgentIdle as AgentV2Idle,
-  AgentPage as AgentV2Page,
-  AgentsAtWork as AgentsV2AtWork,
-  AllAgents as AllAgentsV2,
+} from "../src/screens/connections/connections.stories.tsx";
+import agentsMeta, {
+  AddAgentFlow,
+  AgentAtWork,
+  AgentIdle,
+  AgentPage,
+  AgentsAtWork,
+  AllAgents,
   AutoWithoutHarness,
-  ConnectionUnavailable as AgentV2ConnectionUnavailable,
-  EmptyAgents as EmptyAgentsV2,
+  ConnectionUnavailable as AgentConnectionUnavailable,
+  EmptyAgents,
   HarnessNeedsSandbox,
-  IntegrationNotInstalled as AgentV2IntegrationNotInstalled,
+  IntegrationNotInstalled as AgentIntegrationNotInstalled,
   ListedModels,
-  LoadFailed as AgentsV2LoadFailed,
-  Loading as AgentsV2Loading,
+  LoadFailed as AgentsLoadFailed,
+  Loading as AgentsLoading,
   ModelWithoutEffort,
   ModelsFailed,
   ModelsLoading,
-  NeedsSetup as AgentsV2NeedsSetup,
-  NoMatchingAgents as NoMatchingAgentsV2,
-  ReadOnly as AgentsV2ReadOnly,
-  RemoveAgent as RemoveAgentV2,
-  RenamedMeanwhile as AgentV2RenamedMeanwhile,
-  RoleOptions as AgentV2RoleOptions,
+  NeedsSetup as AgentsNeedsSetup,
+  NoMatchingAgents,
+  ReadOnly as AgentsReadOnly,
+  RemoveAgent,
+  RenamedMeanwhile as AgentRenamedMeanwhile,
+  RoleOptions as AgentRoleOptions,
   SandboxRemoved,
-  Unavailable as AgentsV2Unavailable,
-} from "../src/screens/agents-v2/agents-v2.stories.tsx";
+  Unavailable as AgentsUnavailable,
+} from "../src/screens/agents/agents.stories.tsx";
 import createMeta, { CreateAndOpen, OpenForm } from "../src/screens/group/create.stories.tsx";
 import directoryMeta, {
   Discover,
@@ -315,20 +315,20 @@ describe("form components", () => {
   });
 });
 
-describe("connections v2 screen", () => {
-  const stories = definePreview(preview).meta(connectionsV2Meta);
+describe("connections screen", () => {
+  const stories = definePreview(preview).meta(connectionsMeta);
   it("renders the list, a connection's page, the dialogs, and states", async () => {
     viewport(1600);
     for (const story of [
-      ConnectionV2Page,
+      ConnectionPage,
       ChooseToolIntegration,
       ConfigureMcpServer,
-      ConfigureV2WithoutAuthentication,
+      ConfigureWithoutAuthentication,
       ReplaceKeyV2,
-      RemoveConnectionV2,
-      EmptyConnectionsV2,
-      ConnectionsV2Loading,
-      ConnectionsV2LoadFailed,
+      RemoveConnection,
+      EmptyConnections,
+      ConnectionsLoading,
+      ConnectionsLoadFailed,
     ]) {
       await stories.story(story).run();
       cleanup();
@@ -336,13 +336,13 @@ describe("connections v2 screen", () => {
   });
   it("lists every kind in the sidebar, and a connection whose integration is gone only in the list", async () => {
     viewport(1600);
-    await stories.story(AllConnectionsV2).run();
+    await stories.story(AllConnections).run();
     cleanup();
     await stories.story(ToolConnections).run();
   });
   it("adds a connection with its key in one step, then checks it", async () => {
     viewport(1600);
-    await stories.story(AddConnectionV2Flow).run();
+    await stories.story(AddConnectionFlow).run();
   });
   it("narrows the integrations by a search", async () => {
     viewport(1600);
@@ -364,28 +364,28 @@ describe("connections v2 screen", () => {
   });
   it("shows members connections without any action", async () => {
     viewport(1600);
-    await stories.story(ConnectionsV2ReadOnly).run();
+    await stories.story(ConnectionsReadOnly).run();
   });
   it("offers to clear a search that finds nothing, and keeps a draft name renamed meanwhile", async () => {
     viewport(1600);
-    await stories.story(NoMatchingConnectionsV2).run();
+    await stories.story(NoMatchingConnections).run();
     cleanup();
     await stories.story(RenamedMeanwhileV2).run();
   });
 });
 
-describe("agents v2 screen", () => {
-  const stories = definePreview(preview).meta(agentsV2Meta);
+describe("agents screen", () => {
+  const stories = definePreview(preview).meta(agentsMeta);
   it("renders the list, an agent's page, the dialogs, and states", async () => {
     viewport(1600);
     for (const story of [
-      AgentV2Page,
-      AgentV2IntegrationNotInstalled,
+      AgentPage,
+      AgentIntegrationNotInstalled,
       AutoWithoutHarness,
-      EmptyAgentsV2,
-      AgentsV2Loading,
-      AgentsV2LoadFailed,
-      AgentsV2Unavailable,
+      EmptyAgents,
+      AgentsLoading,
+      AgentsLoadFailed,
+      AgentsUnavailable,
     ]) {
       await stories.story(story).run();
       cleanup();
@@ -393,23 +393,23 @@ describe("agents v2 screen", () => {
   });
   it("lists every agent with its harness and model, and those that need setup", async () => {
     viewport(1600);
-    await stories.story(AllAgentsV2).run();
+    await stories.story(AllAgents).run();
     cleanup();
-    await stories.story(AgentsV2NeedsSetup).run();
+    await stories.story(AgentsNeedsSetup).run();
   });
   it("shows where agents are at work, each turn on an agent's page opening its log", async () => {
     viewport(1600);
-    await stories.story(AgentsV2AtWork).run();
+    await stories.story(AgentsAtWork).run();
     cleanup();
-    await stories.story(AgentV2AtWork).run();
+    await stories.story(AgentAtWork).run();
     cleanup();
-    await stories.story(AgentV2Idle).run();
+    await stories.story(AgentIdle).run();
   });
   it("adds an agent, offering only the roles the reader may give", async () => {
     viewport(1600);
-    await stories.story(AddAgentV2Flow).run();
+    await stories.story(AddAgentFlow).run();
     cleanup();
-    await stories.story(AgentV2RoleOptions).run();
+    await stories.story(AgentRoleOptions).run();
   });
   it("says why an agent can't run, and saves a setup that can", async () => {
     viewport(1600);
@@ -429,17 +429,17 @@ describe("agents v2 screen", () => {
   });
   it("keeps the draft when the host refuses a connection, and removes an agent", async () => {
     viewport(1600);
-    await stories.story(AgentV2ConnectionUnavailable).run();
+    await stories.story(AgentConnectionUnavailable).run();
     cleanup();
-    await stories.story(RemoveAgentV2).run();
+    await stories.story(RemoveAgent).run();
   });
   it("shows members agents without any action, and keeps a draft name renamed meanwhile", async () => {
     viewport(1600);
-    await stories.story(AgentsV2ReadOnly).run();
+    await stories.story(AgentsReadOnly).run();
     cleanup();
-    await stories.story(NoMatchingAgentsV2).run();
+    await stories.story(NoMatchingAgents).run();
     cleanup();
-    await stories.story(AgentV2RenamedMeanwhile).run();
+    await stories.story(AgentRenamedMeanwhile).run();
   });
 });
 

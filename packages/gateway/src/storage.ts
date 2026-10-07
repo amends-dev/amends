@@ -1,4 +1,4 @@
-import type { Integrations } from "@amends/connection-v2";
+import type { Integrations } from "@amends/connection";
 import type * as Core from "@amends/core";
 import type { TurnJobs } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";

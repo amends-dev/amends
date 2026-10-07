@@ -74,13 +74,13 @@ so a client can import the complete contract without loading server code.
   generated clients pass `payload: {}`.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
-- `connectionsV2`: connections to the integrations this host installs; see
-  [Connections v2](#connections-v2).
-- `agentsV2` and `turns`: agents, on connections v2, and their turns on threads; see
-  [Agents v2](#agents-v2) and [Turns](#turns).
+- `connections`: connections to the integrations this host installs; see
+  [Connections](#connections).
+- `agents` and `turns`: agents, on connections, and their turns on threads; see
+  [Agents](#agents) and [Turns](#turns).
 
-`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections-v2`,
-`POST …/agents-v2`, both thread starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
+`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
+`POST …/agents`, both thread starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
 same key returns the first attempt's result, whatever the retry's body. Clients generating the
 typed client pass it in `headers`.
 
@@ -237,60 +237,60 @@ following there are 409s; unfollowing an ended participation or removing an ende
 also a 409. Positions, read times, and what they saw reach the caller's sessions as
 signals on the change feed, and the conversation's facts reach the group's readers as commits.
 
-### Connections v2
+### Connections
 
-Paths sit under `/workspaces/:workspaceId/connections-v2` and require active membership. Every
+Paths sit under `/workspaces/:workspaceId/connections` and require active membership. Every
 member may read connections and the integrations this host installs; the built-in administrator
 tier adds, changes, checks, and removes them. The
-[core section](../core/README.md#connections-v2) describes the rules.
+[core section](../core/README.md#connections) describes the rules.
 
-| Endpoint                                      | Operation                                                                                                                                     |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/connections-v2/integrations`           | The installed integrations: name, docs, ways of authenticating, what each provides, whether its agent needs a sandbox, and its settings form. |
-| `GET …/connections-v2`                        | The connections, by name.                                                                                                                     |
-| `POST …/connections-v2`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it.                     |
-| `GET …/connections-v2/:connectionId`          | One connection.                                                                                                                               |
-| `GET …/connections-v2/:connectionId/models`   | The models its integration offers, as `{ listed, unlisted }`: those it lists from the catalog, and whether it takes a model it does not list. |
-| `POST …/connections-v2/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionV2Service.Changed`.                                |
-| `PUT …/connections-v2/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                                     |
-| `PUT …/connections-v2/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                                            |
-| `POST …/connections-v2/:connectionId/check`   | Ask its system whether it works as set up, answering `Connection.Health`; stores nothing.                                                     |
-| `DELETE …/connections-v2/:connectionId`       | Remove it and delete its key; 204.                                                                                                            |
+| Endpoint                                   | Operation                                                                                                                                     |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/connections/integrations`           | The installed integrations: name, docs, ways of authenticating, what each provides, whether its agent needs a sandbox, and its settings form. |
+| `GET …/connections`                        | The connections, by name.                                                                                                                     |
+| `POST …/connections`                       | Add one from `{ integration, name, settings, auth, apiKey? }`, with the key exactly when `auth` is `apiKey`; 201 with it.                     |
+| `GET …/connections/:connectionId`          | One connection.                                                                                                                               |
+| `GET …/connections/:connectionId/models`   | The models its integration offers, as `{ listed, unlisted }`: those it lists from the catalog, and whether it takes a model it does not list. |
+| `POST …/connections/:connectionId/rename`  | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionService.Changed`.                                  |
+| `PUT …/connections/:connectionId/settings` | Replace its settings from `{ settings }`.                                                                                                     |
+| `PUT …/connections/:connectionId/key`      | Replace its key with `{ apiKey }`.                                                                                                            |
+| `POST …/connections/:connectionId/check`   | Ask its system whether it works as set up, answering `Connection.Health`; stores nothing.                                                     |
+| `DELETE …/connections/:connectionId`       | Remove it and delete its key; 204.                                                                                                            |
 
 An integration's settings form is an MCP elicitation form schema, a flat object of strings,
 numbers, and booleans with titles and descriptions, for a client to render. A connection reads as
-`ConnectionV2.View`: its settings and way of authenticating but never its key, its readiness
+`Connection.View`: its settings and way of authenticating but never its key, its readiness
 (`Ready`, `Invalid` with what the integration refused, or `Uninstalled`), and `manageable`, whether
 the caller may change it. A connection the caller may not read answers 404 as a missing one does,
 as does a retried create whose connection was removed since. An integration this host lacks is 422
-`ConnectionV2Service.UnknownIntegration`; settings or a way of authenticating it does not take are
+`ConnectionService.UnknownIntegration`; settings or a way of authenticating it does not take are
 422 `InvalidConnection`; a key for a connection that authenticates with nothing is 422 `Keyless`. A
-host without a credential key answers a key with 503 `ConnectionV2Service.CredentialsUnavailable`.
+host without a credential key answers a key with 503 `ConnectionService.CredentialsUnavailable`.
 
-### Agents v2
+### Agents
 
-Paths sit under `/workspaces/:workspaceId/agents-v2` and require active membership. Every member
+Paths sit under `/workspaces/:workspaceId/agents` and require active membership. Every member
 may read agents; the built-in administrator tier adds, configures, and renames them. An agent's role
 and removal are its membership's, through `assignments` and `DELETE …/members/:memberId`. The
-[core section](../core/README.md#agents-v2) describes the rules.
+[core section](../core/README.md#agents) describes the rules.
 
-| Endpoint                                 | Operation                                                                                                             |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `GET …/agents-v2`                        | The agents the caller may read, by name.                                                                              |
-| `POST …/agents-v2`                       | Add one from `{ name, roleId, instructions, harness, model, sandbox }`; 201 with it.                                  |
-| `GET …/agents-v2/:agentId`               | One agent.                                                                                                            |
-| `PUT …/agents-v2/:agentId/configuration` | Replace `{ instructions, harness, model, sandbox }` as a whole.                                                       |
-| `POST …/agents-v2/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentV2Service.Changed`. |
+| Endpoint                              | Operation                                                                                                           |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `GET …/agents`                        | The agents the caller may read, by name.                                                                            |
+| `POST …/agents`                       | Add one from `{ name, roleId, instructions, harness, model, sandbox }`; 201 with it.                                |
+| `GET …/agents/:agentId`               | One agent.                                                                                                          |
+| `PUT …/agents/:agentId/configuration` | Replace `{ instructions, harness, model, sandbox }` as a whole.                                                     |
+| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentService.Changed`. |
 
 `harness` is `{ _tag: "Connection", connectionId }` or `{ _tag: "Auto" }`; `model` is
-`{ connectionId, id, effort? }`, a model `GET …/connections-v2/:connectionId/models` offers; and
-`sandbox` is `{ connectionId }` or `null`. An agent reads as `AgentV2.View`: how it is set up, its
+`{ connectionId, id, effort? }`, a model `GET …/connections/:connectionId/models` offers; and
+`sandbox` is `{ connectionId }` or `null`. An agent reads as `Agent.View`: how it is set up, its
 membership's `memberId` and name, `configurable` and `usable` (whether the caller may direct it)
 for the caller, and its readiness, `Ready` or
 `Incomplete` with its issues. One the caller may not read, or whose membership ended, answers 404,
 as does a retried create whose agent was removed since. A connection that is missing or removed, or
-that the caller may not read and use, is 422 `AgentV2Service.ConnectionUnavailable` naming the part;
-a setup that could not run is 422 `AgentV2Service.Incomplete` with its issues, except that an agent
+that the caller may not read and use, is 422 `AgentService.ConnectionUnavailable` naming the part;
+a setup that could not run is 422 `AgentService.Incomplete` with its issues, except that an agent
 on `Auto` may wait for a harness. The initial role follows the delegation rules, as for agents.
 
 ### Turns

@@ -41,7 +41,7 @@ export const participantKinds = ["Member", "Contact", "Triage"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = ["Workspace", "Member", "Thread", "Group", "ConnectionV2"] as const;
+export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** A notification's state; a human recipient's Seen is also kept in notification_seen. */
 export const notificationStates = [
@@ -59,14 +59,14 @@ const scopeColumns = {
   targetMemberId: text("target_member_id"),
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
-  targetConnectionV2Id: text("target_connection_v2_id"),
+  targetConnectionId: text("target_connection_id"),
 };
 /** The column holding each kind of target's ID; a workspace target needs none. */
 const targetIds = {
   Member: "targetMemberId",
   Thread: "targetThreadId",
   Group: "targetGroupId",
-  ConnectionV2: "targetConnectionV2Id",
+  Connection: "targetConnectionId",
 } as const;
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
   /** Only the named target ID column is set, or none. */
@@ -717,10 +717,10 @@ export const threadActivities = pgTable(
 /**
  * Workspaces' connections to the integrations their host installs. An integration declares its own
  * settings, so they are stored as JSON, like a thread activity's kind-specific details; a
- * connection's credential is kept in connection_v2_credentials.
+ * connection's credential is kept in connection_credentials.
  */
-export const connectionsV2 = pgTable(
-  "connections_v2",
+export const connections = pgTable(
+  "connections",
   {
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
@@ -739,8 +739,8 @@ export const connectionsV2 = pgTable(
  * Each connection's credential, outside the journal and its read models: rebuilding projections
  * keeps them. Each is sealed with the host's credential key, bound to its workspace and connection.
  */
-export const connectionV2Credentials = pgTable(
-  "connection_v2_credentials",
+export const connectionCredentials = pgTable(
+  "connection_credentials",
   {
     workspaceId: text("workspace_id").notNull(),
     connectionId: text("connection_id").notNull(),
@@ -750,13 +750,13 @@ export const connectionV2Credentials = pgTable(
 );
 
 /**
- * Agents v2, each one workspace membership, which names it and holds its role. Its harness is a
+ * Agents, each one workspace membership, which names it and holds its role. Its harness is a
  * connection's, or chosen among the workspace's when `harness_connection_id` is null; its model is
  * a connection's, by the provider's id, with an effort when one is set; and its sandbox a
  * connection's, or none.
  */
-export const agentsV2 = pgTable(
-  "agents_v2",
+export const agents = pgTable(
+  "agents",
   {
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
@@ -772,7 +772,7 @@ export const agentsV2 = pgTable(
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
-    uniqueIndex("agents_v2_by_member").on(t.workspaceId, t.memberId),
+    uniqueIndex("agents_by_member").on(t.workspaceId, t.memberId),
   ],
 );
 

@@ -94,16 +94,16 @@ log ID. It decodes the stored envelope through the same path as journal pages, h
 transaction, and opens none. This supports notification-source reads without scanning the log
 or changing the schema.
 
-`connections_v2` holds the records of connections v2, with an integration's settings as JSON since
-each integration declares its own. `connection_v2_credentials` holds each connection's credential,
+`connections` holds the records of connections, with an integration's settings as JSON since
+each integration declares its own. `connection_credentials` holds each connection's credential,
 one for each connection, outside the read models, so rebuilding projections keeps it: the JSON of
 its encoded form, sealed with the host's credential key and bound to its workspace and connection,
 and replaced in place when its key is. `PostgresStorage.make({ credentialKey })` takes that key as
 32 bytes of base64 and refuses a malformed one when the host starts; without one the store reports
 `Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row as additional data.
-Grant scopes have `target_connection_v2_id` for `ConnectionV2` targets.
+Grant scopes have `target_connection_id` for `Connection` targets.
 
-`agents_v2` holds the records of agents v2, one row per agent with a unique membership per
+`agents` holds the records of agents, one row per agent with a unique membership per
 workspace. Each part of its setup is its connection's id as a column: a null
 `harness_connection_id` is `Auto`, a null `model_effort` the model's default, and a null
 `sandbox_connection_id` no sandbox.

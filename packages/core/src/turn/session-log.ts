@@ -5,7 +5,7 @@
  * log takes part in no commit of the workspace, so a host may keep it apart, in a store built for
  * appending (`SessionLogStore`). The agent's session resumes with the conversation rebuilt from it.
  */
-import { Session, StreamPart } from "@amends/harness-v2";
+import { Session, StreamPart } from "@amends/harness";
 import { Schema } from "effect";
 import { Prompt } from "effect/ai";
 import type { ThreadMessageId } from "../thread/message/id.ts";
@@ -81,7 +81,7 @@ const textOf = (step: StreamPart.Step) =>
 
 /**
  * What a turn answers, from its entries: the text of the last step of its latest run that has any
- * parts, as harness-v2 answers a turn. Empty when that step wrote nothing.
+ * parts, as harness answers a turn. Empty when that step wrote nothing.
  */
 export const answerOf = (entries: ReadonlyArray<Entry>): string => {
   let answer = "";

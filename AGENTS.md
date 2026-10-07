@@ -46,21 +46,21 @@ currently run through TypeScript. Check compatibility before changing this setup
   over the same gateway rather than new gateway methods. `storage-conformance` holds
   the test suites every storage adapter runs against itself through a harness; behavior
   core relies on belongs there, and adapter tests keep only what one adapter stores or
-  fails differently. `harness-v2` is the contract every harness implements: an agent's sessions
+  fails differently. `harness` is the contract every harness implements: an agent's sessions
   and turns, streamed in one format whichever agent runs them, and the bridge through which a host
-  drives an agent inside a sandbox. `sandbox-v2` is the contract every sandbox provider implements,
-  with the suites each provider runs from `@amends/sandbox-v2/conformance`; a sandbox knows nothing
+  drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements,
+  with the suites each provider runs from `@amends/sandbox/conformance`; a sandbox knows nothing
   of what harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server
-  or an HTTP API, one shape. `connection-v2` holds the integrations a host installs, what each
+  or an HTTP API, one shape. `connection` holds the integrations a host installs, what each
   gives a workspace's connections (models, tools, sandboxes, and harnesses), and the model catalog.
   `cluster` runs jobs, the work outside requests, on Effect Cluster: entities whose requests a
   commit stores, with their retries and pruning. Jobs enter workspaces through the gateway like
   any other caller. Its turn job, one for each agent in each thread, runs the agent's turns on
-  `harness-v2` and writes their session logs.
+  `harness` and writes their session logs.
 - `adapters/*`: implementations of gateway contracts over one external system, with
-  that system's dependencies. `harness-amends-v2` is amends's own agent, a loop over Effect AI's
+  that system's dependencies. `harness-amends` is amends's own agent, a loop over Effect AI's
   `LanguageModel` with the model providers' clients, and `harness-opencode` runs opencode behind its
-  bridge in a sandbox; `sandbox-local-v2` and `sandbox-daytona-v2` implement the sandbox contract
+  bridge in a sandbox; `sandbox-local` and `sandbox-daytona` implement the sandbox contract
   over this machine's directories and over Daytona. Each gives the integration a host installs.
   `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column

@@ -1,6 +1,6 @@
-import { Integration, Integrations } from "@amends/connection-v2";
-import type { AgentV2Query } from "@amends/core/agent-v2";
-import { ConnectionV2 } from "@amends/core/connection-v2";
+import { Integration, Integrations } from "@amends/connection";
+import type { AgentQuery } from "@amends/core/agent";
+import { Connection } from "@amends/core/connection";
 import { Identity } from "@amends/core/identity";
 import { Group } from "@amends/core/group";
 import { ThreadId, ThreadParticipation } from "@amends/core/thread";
@@ -15,7 +15,7 @@ import {
 } from "@amends/core/turn";
 import { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
-import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends/harness-v2";
+import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends/harness";
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
 
 export const workspaceId = Workspace.Id.make("workspace-1");
@@ -50,7 +50,7 @@ export const turn: Turn.Record = {
 /** A connection the runnable names, on `integration`, taking no key. */
 const connectionOn = (integration: string) => ({
   connection: {
-    id: ConnectionV2.Id.make(`connection-${integration}`),
+    id: Connection.Id.make(`connection-${integration}`),
     integration,
     name: integration,
     settings: {},
@@ -59,12 +59,12 @@ const connectionOn = (integration: string) => ({
   credential: null,
 });
 /** What the agent runs on: its harness on `harnessIntegration`, a model, and no sandbox. */
-export const runnableOn = (harnessIntegration: string): AgentV2Query.Runnable => ({
+export const runnableOn = (harnessIntegration: string): AgentQuery.Runnable => ({
   instructions: "Plan each change.",
   harness: connectionOn(harnessIntegration),
   model: {
     ...connectionOn("test-models"),
-    model: { connectionId: ConnectionV2.Id.make("connection-test-models"), id: "test-model" },
+    model: { connectionId: Connection.Id.make("connection-test-models"), id: "test-model" },
   },
   sandbox: null,
 });
@@ -86,7 +86,7 @@ export interface FakeWorkspaceOptions {
   /** What the participation's session resumes from, or none for a new one. */
   readonly resume?: SessionStateStore.Resume | null;
   /** What the agent's job is given to run it on. */
-  readonly runnable?: AgentV2Query.Runnable;
+  readonly runnable?: AgentQuery.Runnable;
   /** The conversation the agent joined. */
   readonly joined?: ReadonlyArray<TurnPrompt.Message>;
   /** What the session log holds before the run. */

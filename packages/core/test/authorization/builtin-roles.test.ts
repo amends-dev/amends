@@ -231,6 +231,14 @@ revisions[7] = Object.fromEntries(
   ]),
 );
 
+// Agents v2 and connections v2 took the names of the agents and connections they replaced.
+revisions[8] = Object.fromEntries(
+  Object.entries(revisions[7]!).map(([roleId, names]) => [
+    roleId,
+    names.map((name) => name.replace(/^(agent|connection)-v2\./, "$1.")),
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

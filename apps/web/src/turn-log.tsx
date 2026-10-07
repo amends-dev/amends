@@ -19,7 +19,7 @@ export function TurnLog(props: {
   const turn = () => {
     const current = log.turn();
     return (
-      current && { ...current, agentHref: href(paths.agentV2(props.workspaceId, current.agentId)) }
+      current && { ...current, agentHref: href(paths.agent(props.workspaceId, current.agentId)) }
     );
   };
   const status = () => {

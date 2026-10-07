@@ -1,6 +1,6 @@
-import { AgentV2 } from "@amends/core/agent-v2";
+import { Agent } from "@amends/core/agent";
 import { BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
-import { ConnectionV2 } from "@amends/core/connection-v2";
+import { Connection } from "@amends/core/connection";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
 import {
@@ -96,9 +96,9 @@ export const workspaceIsolation = (harness: Harness) => {
                 kept: (on) => on.invitations.get(Invitation.Id.make("foreign-invitation")),
               },
               {
-                store: "ConnectionV2Store",
-                write: bound.connectionsV2.insert({
-                  id: ConnectionV2.Id.make("foreign-connection"),
+                store: "ConnectionStore",
+                write: bound.connections.insert({
+                  id: Connection.Id.make("foreign-connection"),
                   workspaceId: otherWorkspaceId,
                   integration: "test-models",
                   name: "Foreign",
@@ -108,22 +108,22 @@ export const workspaceIsolation = (harness: Harness) => {
                   createdBy: memberId,
                   createdAt: now,
                 }),
-                kept: (on) => on.connectionsV2.get(ConnectionV2.Id.make("foreign-connection")),
+                kept: (on) => on.connections.get(Connection.Id.make("foreign-connection")),
               },
               {
-                store: "AgentV2Store",
-                write: bound.agentsV2.insert({
-                  id: AgentV2.Id.make("foreign-agent-v2"),
+                store: "AgentStore",
+                write: bound.agents.insert({
+                  id: Agent.Id.make("foreign-agent"),
                   workspaceId: otherWorkspaceId,
-                  memberId: Member.Id.make("foreign-agent-v2-member"),
+                  memberId: Member.Id.make("foreign-agent-member"),
                   instructions: "",
                   harness: { _tag: "Auto" },
-                  model: { connectionId: ConnectionV2.Id.make("foreign-connection"), id: "model" },
+                  model: { connectionId: Connection.Id.make("foreign-connection"), id: "model" },
                   sandbox: null,
                   createdBy: memberId,
                   createdAt: now,
                 }),
-                kept: (on) => on.agentsV2.get(AgentV2.Id.make("foreign-agent-v2")),
+                kept: (on) => on.agents.get(Agent.Id.make("foreign-agent")),
               },
               {
                 store: "TurnStore",

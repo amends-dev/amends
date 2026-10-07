@@ -5,14 +5,14 @@ contracts over one external system, such as a database. Adapters consume shared
 packages and may install the dependencies their system needs, which is why they
 live outside `packages/`. Hosts compose them; shared packages never depend on them.
 
-`sandbox-local-v2/` and `sandbox-daytona-v2/` implement the
-[v2 sandbox contract](../packages/sandbox-v2): the first with directories on this machine, for
+`sandbox-local/` and `sandbox-daytona/` implement the
+[sandbox contract](../packages/sandbox): the first with directories on this machine, for
 development, and the second over Daytona's hosted sandboxes. Both run its conformance suites.
 
-`harness-amends-v2/` is amends's own agent for [harness v2](../packages/harness-v2/README.md), a
+`harness-amends/` is amends's own agent for the [harness contract](../packages/harness/README.md), a
 loop over an Effect AI `LanguageModel` with the model providers' clients, and `harness-opencode/`
 runs opencode behind its bridge in a sandbox. Each of these four gives the
-[integration](../packages/connection-v2/README.md) a host installs.
+[integration](../packages/connection/README.md) a host installs.
 
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client

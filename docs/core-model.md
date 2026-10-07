@@ -6,8 +6,8 @@ exists, what it owns, and how it relates to the others.
 
 This document describes design intent. It does not describe or validate the current
 implementation. Its sections on environments, on the first harness contract, and on an agent's
-log of turns predate harness v2 and agents v2: environments were removed, and turns are being
-rebuilt on harness v2, so those sections are superseded where they disagree with
+log of turns predate the current harness and agents: environments were removed, and turns run on
+the current harness, so those sections are superseded where they disagree with
 [known limitations](current-status.md). The discussion is grounded in the work users want to do and the contracts
 of external systems. Existing implementation choices do not constrain the design.
 
@@ -1042,8 +1042,8 @@ native sessions declares neither, so it cannot be offered as the destination of 
 transcript it cannot continue.
 
 The shared schema, the transcript rules, and amends's own in-process harness were implemented in
-`@amends/harness` and `@amends/harness-amends`, which [harness v2](../packages/harness-v2/README.md)
-replaced: it records a session's conversation as Effect AI prompts and streams turns as its own
+the first `@amends/harness` and `@amends/harness-amends`, which the
+[current harness](../packages/harness/README.md) replaced: it records a session's conversation as Effect AI prompts and streams turns as its own
 parts.
 
 ## Agreed: an agent's memory in a thread is one log of its turns
@@ -1339,7 +1339,7 @@ memory snapshots; and isolation, which a local directory does not provide. Anyth
 to inside a sandbox therefore listens on a port rather than relying on standard input. A snapshot
 is a reference that only the provider which took it can restore or delete.
 
-The contract and its conformance suites are [`@amends/sandbox-v2`](../packages/sandbox-v2), with
+The contract and its conformance suites are [`@amends/sandbox`](../packages/sandbox), with
 local and Daytona providers in `adapters/`. Environments, which composed a harness with a sandbox,
 were removed.
 

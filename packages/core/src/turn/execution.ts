@@ -1,7 +1,7 @@
 import { Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
-import type { AgentV2 } from "../agent-v2/agent.ts";
-import { AgentV2Query } from "../agent-v2/query.ts";
+import type { Agent } from "../agent/agent.ts";
+import { AgentQuery } from "../agent/query.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Actor } from "../identity/actor.ts";
@@ -58,7 +58,7 @@ export type StartError =
   | ThreadParticipationStore.Failure
   | ThreadActivityStore.Failure
   | ThreadMessageStore.Failure
-  | AgentV2Query.BuildError;
+  | AgentQuery.BuildError;
 export type ReadError =
   | Error
   | MemberStore.Failure
@@ -84,7 +84,7 @@ export const Start = Schema.TaggedUnion({
   Idle: {},
   Ready: {
     turn: Turn.Record,
-    runnable: AgentV2Query.Runnable,
+    runnable: AgentQuery.Runnable,
     /**
      * The prompt's texts: the thread's messages the agent was not told yet, through what the turn
      * accepted, each named by its author, and who asked when someone retried the turn.
@@ -136,7 +136,7 @@ export interface Interface {
   readonly accept: (job: Job) => Effect.Effect<Option.Option<Turn.Record>, AcceptError>;
   /**
    * Start the turn: one asked to stop, or whose participation ended, ends as it stands; one that
-   * cannot run on what `AgentV2Query` selects for it, kept when it runs again, fails; and one with
+   * cannot run on what `AgentQuery` selects for it, kept when it runs again, fails; and one with
    * nothing to tell the agent completes. Otherwise it is ready to run, and a queued turn starts.
    * A turn that is no longer active is `Idle`.
    */
@@ -187,7 +187,7 @@ export class Service extends Context.Service<Service, Interface>()(
 const pageSize = 100;
 
 /** Why the agent cannot run, as the turn that failed for it says. */
-const describeIssue = (issue: AgentV2.Issue): string => {
+const describeIssue = (issue: Agent.Issue): string => {
   switch (issue._tag) {
     case "Removed":
       return `The connection for the agent's ${issue.part} was removed.`;
@@ -215,7 +215,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const threadQuery = yield* ThreadQuery.Service;
   const threadCommand = yield* ThreadCommand.Service;
   const turnCommand = yield* TurnCommand.Service;
-  const agentV2Query = yield* AgentV2Query.Service;
+  const agentQuery = yield* AgentQuery.Service;
   const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
   const signalHub = yield* SignalHub.Service;
@@ -428,7 +428,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const selectionOf = Effect.fnUntraced(function* (turn: Turn.Record) {
     if (turn.selection !== null) return turn.selection;
     const saved = yield* sessionStateStore.get(turn.participationId);
-    return yield* agentV2Query.select(
+    return yield* agentQuery.select(
       turn.memberId,
       Option.getOrUndefined(Option.map(saved, ({ selection }) => selection)),
     );
@@ -461,8 +461,8 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
    */
   const readyTurn = Effect.fnUntraced(function* (
     turn: Turn.Record,
-    selection: AgentV2.Selection,
-    runnable: AgentV2Query.Runnable,
+    selection: Agent.Selection,
+    runnable: AgentQuery.Runnable,
   ) {
     const participation = yield* requireParticipation(turn);
     const saved = yield* sessionStateStore.get(turn.participationId);
@@ -526,21 +526,21 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
             outcome: "cancelled",
             cancelReason: "participation-ended",
           });
-        const failWithIssues = (incomplete: { readonly issues: ReadonlyArray<AgentV2.Issue> }) =>
+        const failWithIssues = (incomplete: { readonly issues: ReadonlyArray<Agent.Issue> }) =>
           endAsIdle(turn, {
             outcome: "failed",
             reason: incomplete.issues.map(describeIssue).join(" "),
           });
         const built = yield* Effect.gen(function* () {
           const selection = yield* selectionOf(turn);
-          const runnable = yield* agentV2Query.buildRunnable(turn.memberId, selection);
+          const runnable = yield* agentQuery.buildRunnable(turn.memberId, selection);
           return { selection, runnable };
         }).pipe(
           Effect.asSome,
           Effect.catchTags({
-            "AgentV2Service.Incomplete": (incomplete) =>
+            "AgentService.Incomplete": (incomplete) =>
               Effect.as(failWithIssues(incomplete), Option.none()),
-            "AgentV2Query.NotFound": () =>
+            "AgentQuery.NotFound": () =>
               Effect.as(
                 endAsIdle(turn, { outcome: "failed", reason: "The agent can no longer run." }),
                 Option.none(),

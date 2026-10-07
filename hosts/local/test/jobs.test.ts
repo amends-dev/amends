@@ -1,5 +1,5 @@
 import { TurnJob } from "@amends/cluster";
-import { Integrations } from "@amends/connection-v2";
+import { Integrations } from "@amends/connection";
 import { Commit, Store } from "@amends/core/journal";
 import { ThreadId } from "@amends/core/thread";
 import { SessionLogStore, TurnExecution, TurnJobs } from "@amends/core/turn";

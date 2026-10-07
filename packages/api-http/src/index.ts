@@ -1,7 +1,7 @@
-export { AgentsV2Group } from "./agents-v2.ts";
+export { AgentsGroup } from "./agents.ts";
 export { Api } from "./api.ts";
 export { ChangeFeedGroup } from "./change-feed.ts";
-export { ConnectionsV2Group } from "./connections-v2.ts";
+export { ConnectionsGroup } from "./connections.ts";
 export { Authentication, Principal, Unauthorized } from "./authentication.ts";
 export { ApiErrors } from "./errors.ts";
 export { GroupsGroup } from "./groups.ts";
@@ -29,6 +29,6 @@ export { Assignment, Scope } from "@amends/core/authorization";
 export { Group, GroupMembership } from "@amends/core/group";
 export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends/core/thread";
 export { Notification, NotificationInbox } from "@amends/core/notification";
-export { ConnectionV2 } from "@amends/core/connection-v2";
-export { AgentV2 } from "@amends/core/agent-v2";
+export { Connection } from "@amends/core/connection";
+export { Agent } from "@amends/core/agent";
 export { Turn } from "@amends/core/turn";

@@ -151,12 +151,12 @@ gateway, adapting the same session token resolution to their own authentication.
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs
 them against itself.
 
-`@amends/harness-v2` is the [harness contract](./harness-v2/README.md): an agent's sessions and
+`@amends/harness` is the [harness contract](./harness/README.md): an agent's sessions and
 turns, streamed in one format whichever agent runs them, and the bridge through which a host drives
-an agent inside a sandbox. `@amends/sandbox-v2` is the sandbox contract every provider implements,
+an agent inside a sandbox. `@amends/sandbox` is the sandbox contract every provider implements,
 with the conformance suites each provider runs against itself; it knows nothing of harnesses.
 `@amends/toolkit` gives every kind of [tool source](./toolkit/README.md) one shape.
-`@amends/connection-v2` holds the [integrations](./connection-v2/README.md) a host installs, what
+`@amends/connection` holds the [integrations](./connection/README.md) a host installs, what
 each gives a workspace's connections, and the model catalog. The agents and sandbox providers
 themselves, with their dependencies, live in `adapters/`.
 

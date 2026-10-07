@@ -19,7 +19,7 @@ import {
   WorkspaceInitialization,
   WorkspaceStore,
 } from "@amends/core/workspace";
-import { Integrations } from "@amends/connection-v2";
+import { Integrations } from "@amends/connection";
 import { TurnJobs } from "@amends/core/turn";
 import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";

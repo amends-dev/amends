@@ -1,6 +1,6 @@
-import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection-v2";
-import type { ModelEndpoint } from "@amends/harness-v2";
-import { Network } from "@amends/sandbox-v2";
+import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection";
+import type { ModelEndpoint } from "@amends/harness";
+import { Network } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Effect, Layer, Redacted } from "effect";

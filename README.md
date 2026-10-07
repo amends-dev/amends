@@ -44,17 +44,17 @@ packages/
   server-http/        @amends/server-http: HTTP handlers and authentication
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
   cluster/            @amends/cluster: jobs on Effect Cluster, with their retries and pruning
-  connection-v2/      @amends/connection-v2: integrations, connections, and the model catalog
-  harness-v2/         @amends/harness-v2: the harness contract, its stream format, and the bridge
-  sandbox-v2/         @amends/sandbox-v2: the sandbox provider contract and its suites
+  connection/      @amends/connection: integrations, connections, and the model catalog
+  harness/         @amends/harness: the harness contract, its stream format, and the bridge
+  sandbox/         @amends/sandbox: the sandbox provider contract and its suites
   toolkit/            @amends/toolkit: tool sources, such as MCP servers and HTTP APIs
 adapters/
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
   storage-memory/     @amends/storage-memory: in-memory reference storage and directory
-  harness-amends-v2/  @amends/harness-amends-v2: amends's own agent over Effect AI
+  harness-amends/  @amends/harness-amends: amends's own agent over Effect AI
   harness-opencode/   @amends/harness-opencode: opencode behind its bridge in a sandbox
-  sandbox-local-v2/   @amends/sandbox-local-v2: sandboxes as local directories, for development
-  sandbox-daytona-v2/ @amends/sandbox-daytona-v2: sandboxes on Daytona
+  sandbox-local/   @amends/sandbox-local: sandboxes as local directories, for development
+  sandbox-daytona/ @amends/sandbox-daytona: sandboxes on Daytona
 hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/

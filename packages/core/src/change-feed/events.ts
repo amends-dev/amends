@@ -1,14 +1,14 @@
 import { Data, Effect, Option, Schema } from "effect";
 import { TurnFacts } from "../turn/facts.ts";
-import { AgentV2Facts } from "../agent-v2/facts.ts";
-import { AgentV2Permissions } from "../agent-v2/permissions.ts";
+import { AgentFacts } from "../agent/facts.ts";
+import { AgentPermissions } from "../agent/permissions.ts";
 import { AssignmentFacts } from "../authorization/assignment/facts.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { RoleFacts } from "../authorization/role/facts.ts";
 import { GroupFacts } from "../group/facts.ts";
-import type { ConnectionV2 } from "../connection-v2/connection.ts";
-import { ConnectionV2Facts } from "../connection-v2/facts.ts";
-import { ConnectionV2Permissions } from "../connection-v2/permissions.ts";
+import type { Connection } from "../connection/connection.ts";
+import { ConnectionFacts } from "../connection/facts.ts";
+import { ConnectionPermissions } from "../connection/permissions.ts";
 import type { Group } from "../group/group.ts";
 import { GroupFollowFacts } from "../group/follow/facts.ts";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
@@ -150,14 +150,14 @@ const readMemberRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id)
   Requirement.make(MemberPermissions.Read, { _tag: "Member", workspaceId, memberId });
 const readAccessRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AssignmentPermissions.Read, { _tag: "Member", workspaceId, memberId });
-const readConnectionV2Requirement = (connectionId: ConnectionV2.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(ConnectionV2Permissions.Read, {
-    _tag: "ConnectionV2",
+const readConnectionRequirement = (connectionId: Connection.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(ConnectionPermissions.Read, {
+    _tag: "Connection",
     workspaceId,
     connectionId,
   });
-const readAgentV2Requirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
-  Requirement.make(AgentV2Permissions.Read, { _tag: "Member", workspaceId, memberId });
+const readAgentRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(AgentPermissions.Read, { _tag: "Member", workspaceId, memberId });
 const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
@@ -223,32 +223,32 @@ const registry: ReadonlyArray<Registered> = [
     access: ({ memberId }) => Access.Groups({ memberId }),
   }),
   // Connections reach those who may read them; no fact carries a key.
-  registerFact(ConnectionV2Facts.Created, {
-    requirement: ({ id }, workspaceId) => readConnectionV2Requirement(id, workspaceId),
+  registerFact(ConnectionFacts.Created, {
+    requirement: ({ id }, workspaceId) => readConnectionRequirement(id, workspaceId),
   }),
-  registerFact(ConnectionV2Facts.Renamed, {
+  registerFact(ConnectionFacts.Renamed, {
     requirement: ({ connectionId }, workspaceId) =>
-      readConnectionV2Requirement(connectionId, workspaceId),
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  registerFact(ConnectionV2Facts.Configured, {
+  registerFact(ConnectionFacts.Configured, {
     requirement: ({ connectionId }, workspaceId) =>
-      readConnectionV2Requirement(connectionId, workspaceId),
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  registerFact(ConnectionV2Facts.KeyReplaced, {
+  registerFact(ConnectionFacts.KeyReplaced, {
     requirement: ({ connectionId }, workspaceId) =>
-      readConnectionV2Requirement(connectionId, workspaceId),
+      readConnectionRequirement(connectionId, workspaceId),
   }),
-  registerFact(ConnectionV2Facts.Removed, {
+  registerFact(ConnectionFacts.Removed, {
     requirement: ({ connectionId }, workspaceId) =>
-      readConnectionV2Requirement(connectionId, workspaceId),
+      readConnectionRequirement(connectionId, workspaceId),
   }),
   // Agents' configuration reaches those who may read it; their names and departures come with
   // membership facts.
-  registerFact(AgentV2Facts.Created, {
-    requirement: ({ memberId }, workspaceId) => readAgentV2Requirement(memberId, workspaceId),
+  registerFact(AgentFacts.Created, {
+    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
   }),
-  registerFact(AgentV2Facts.Configured, {
-    requirement: ({ memberId }, workspaceId) => readAgentV2Requirement(memberId, workspaceId),
+  registerFact(AgentFacts.Configured, {
+    requirement: ({ memberId }, workspaceId) => readAgentRequirement(memberId, workspaceId),
   }),
   // Turns reach those who may read their thread: what the agent is doing there, and how it ended.
   registerFact(TurnFacts.Created, {

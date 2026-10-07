@@ -37,12 +37,12 @@ server proxies `/api` here. `bun run dev` restarts the host when its source chan
 and setting one reports `CredentialsUnavailable`. Keep it secret and stable: a changed key cannot
 open credentials sealed with the old one, and nothing rotates them yet.
 
-`LocalHost.makeIntegrations` installs the [integrations](../../packages/connection-v2/README.md) workspaces connect to: every
+`LocalHost.makeIntegrations` installs the [integrations](../../packages/connection/README.md) workspaces connect to: every
 model provider in the catalog and any OpenAI-compatible API; MCP servers and HTTP APIs as tools; the
-[local](../../adapters/sandbox-local-v2) sandbox provider, keeping each connection's
+[local](../../adapters/sandbox-local) sandbox provider, keeping each connection's
 sandboxes in a directory of its own in the sandbox directory, and
-[Daytona](../../adapters/sandbox-daytona-v2/README.md); and amends's
-[agent](../../adapters/harness-amends-v2) and
+[Daytona](../../adapters/sandbox-daytona/README.md); and amends's
+[agent](../../adapters/harness-amends) and
 [opencode](../../adapters/harness-opencode/README.md) as harnesses. Connections' keys are sealed with
 `AMENDS_CREDENTIAL_KEY`, and opencode's bridge tokens are derived from it, so a host reaches a
 bridge any host over the database launched; without a key, they come from a secret of this

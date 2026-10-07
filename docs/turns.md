@@ -10,7 +10,7 @@ states of a turn at work.
   read from the thread's own activity: the agent, its state (Queued, Working, Stopping…, Stopped,
   Failed, or Completed without a reply), View log, and Stop while it is active or Retry once it
   failed or stopped, for a reader who may direct the agent. Messages posted while it works follow
-  its row. A failure names its reason and links to the agent's page on Agents v2; a turn
+  its row. A failure names its reason and links to the agent's page on Agents; a turn
   stopped because its agent left the thread says so and offers no retry. A retry leaves the failed
   or stopped turn where it was, no longer offering Retry, and the new attempt's row follows at the
   end. A turn that replied shows no row: its replies stand for it, and their actions offer View
@@ -19,7 +19,7 @@ states of a turn at work.
   the row says so and shows what actually happened. Leaving the thread never stops a turn.
 - **Where agents work:** a thread's replies in its group's stream say "Yumi working", and the
   sidebar marks a group whose threads have agents at work with the most pressing state. On
-  Agents v2, an agent at work shows its most pressing state and where, such as "Working ·
+  Agents, an agent at work shows its most pressing state and where, such as "Working ·
   #general + 1 more", and its page lists each of its turns in progress, each opening its log.
   Queued, working, and stopping move as the logo's `thread`, `working`, and `tug` motions, still
   for readers who prefer reduced motion.

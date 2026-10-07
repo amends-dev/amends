@@ -22,8 +22,8 @@ The current domains contain these features:
 | `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                         |
 | `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.               |
 | `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage.        |
-| `agent-v2`      | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on. |
-| `connection-v2` | Workspaces' connections to the integrations a host installs, with their settings and keys.                              |
+| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on. |
+| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                              |
 | `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.  |
 | `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                |
 | `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                   |
@@ -147,15 +147,14 @@ member's follow of the group and every thread participation held through the adm
 without thread activity. Workspace-member removal uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
 
-## Connections v2
+## Connections
 
-`@amends/core/connection-v2` holds the connections that replace those above, built beside them
-and sharing nothing with them: a workspace's link to one integration its host installs, as
-[connection-v2](../connection-v2/README.md) declares integrations. `ConnectionV2Service` lists the
-host's `integrations`, each as `ConnectionV2.IntegrationView` (its auth methods, what it gives,
+`@amends/core/connection` holds a workspace's connections, each its link to one integration its
+host installs, as [connection](../connection/README.md) declares integrations. `ConnectionService` lists the
+host's `integrations`, each as `Connection.IntegrationView` (its auth methods, what it gives,
 whether the agent of its harnesses `requiresSandbox`, and the form of its settings), which every
-member may see; lists and reads the connections the actor may read, as `ConnectionV2.View`, and the
-`models` each offers an agent, as `ConnectionV2.Models` (the catalog's models its integration
+member may see; lists and reads the connections the actor may read, as `Connection.View`, and the
+`models` each offers an agent, as `Connection.Models` (the catalog's models its integration
 lists, and whether it offers others by any id); and creates, renames, configures, replaces the key
 of, checks, and removes them. A view is the record without its key, `manageable`, and its readiness: `Ready`,
 `Invalid` with the integration's description when it no longer takes the connection's settings or
@@ -163,60 +162,59 @@ auth method, or `Uninstalled` when the host no longer installs it.
 
 Creating takes the key with the connection, when it authenticates with one and only then, and the
 integration validates its settings and auth method first (`UnknownIntegration`,
-`InvalidConnection`). The key goes to `ConnectionV2CredentialStore`, one credential for each
+`InvalidConnection`). The key goes to `ConnectionCredentialStore`, one credential for each
 connection, in the commit that records the connection; replacing it overwrites it, and removal
 deletes it and keeps the record, so a retried create finds the connection and answers `NotFound`.
 No fact, change-feed event, or view carries a key. `check` reads the key and asks the integration
 to check the connection with its system, returning `Health`; it holds no commit open while the
 system answers.
 
-`connection-v2.create` works on the workspace; `connection-v2.read`, `connection-v2.manage`, and
-`connection-v2.use` on each connection, a `ConnectionV2` target. Members read and use connections;
+`connection.create` works on the workspace; `connection.read`, `connection.manage`, and
+`connection.use` on each connection, a `Connection` target. Members read and use connections;
 administrators and the owner create and manage them, and checking is managing, since it sends the
-key. Using a connection is giving it to what runs on it, as to an agent. `ConnectionV2Store` is a
-projection store and `ConnectionV2CredentialStore` keeps credentials outside the journal, reporting
+key. Using a connection is giving it to what runs on it, as to an agent. `ConnectionStore` is a
+projection store and `ConnectionCredentialStore` keeps credentials outside the journal, reporting
 `Unavailable` on a host that keeps none (`CredentialsUnavailable`); both are host bindings. The
 gateway supplies the host's integrations as `Integrations`.
 
-## Agents v2
+## Agents
 
-`@amends/core/agent-v2` holds the agents that replace those of `agent/`, built beside them and
-sharing nothing with them. An agent is a workspace member that works: `AgentV2.Record` keeps its
-instructions; its `harness`, the harnesses of one of the workspace's connections v2 or `Auto`, for
+`@amends/core/agent` holds a workspace's agents. An agent is a workspace member that works: `Agent.Record` keeps its
+instructions; its `harness`, the harnesses of one of the workspace's connections or `Auto`, for
 amends to choose among them; its `model`, one a connection offers, by id, with an `effort`; and its
 `sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
-membership's. `AgentV2Facts.Created` records an agent in the commit that adds its membership, and
-`Configured` replaces how it is set up as a whole; `AgentV2Projection` keeps them in
-`AgentV2Store`, a projection store.
+membership's. `AgentFacts.Created` records an agent in the commit that adds its membership, and
+`Configured` replaces how it is set up as a whole; `AgentProjection` keeps them in
+`AgentStore`, a projection store.
 
-`AgentV2Service` lists and reads the agents the actor may read, as `AgentV2.View`, and creates,
+`AgentService` lists and reads the agents the actor may read, as `Agent.View`, and creates,
 configures, and renames them. Creating adds the agent's membership with `MemberCommand.add`, with a
 role the actor must be able to grant. Its role is then changed, and it is removed, as any member's
 is, by `AssignmentService` and `MemberService`. Creating and configuring refuse a connection the
 actor may not read and use, or that is not active (`ConnectionUnavailable`, naming the part), and a
 setup that cannot run (`Incomplete`), except that an agent on `Auto` may wait for a connection that
-gives a harness. A view carries the agent's readiness, as `AgentV2Readiness` finds it against the
+gives a harness. A view carries the agent's readiness, as `AgentReadiness` finds it against the
 workspace's connections and the host's integrations whoever reads it: `Ready`, or `Incomplete` with
 issues naming the part whose connection was `Removed`, whose integration is `Uninstalled`, or that
 does not give the part as the agent takes it (`Invalid`, as the integration describes it, such as a
 model it no longer offers); `SandboxRequired` when its harness's agent works only in a sandbox and it
 has none; and `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
 
-`AgentV2Query` is what turns read of the agent they run, trusting their caller. `select` gives the
-`AgentV2.Selection` a turn runs on: the agent's model and sandbox, and its harness, which on `Auto`
+`AgentQuery` is what turns read of the agent they run, trusting their caller. `select` gives the
+`Agent.Selection` a turn runs on: the agent's model and sandbox, and its harness, which on `Auto`
 is that of the agent's last turn in the conversation while it can still run on it, and otherwise
 the oldest connection whose harness it can run on. `buildRunnable` gives the agent ready to run on
-a selection, as data (`AgentV2Query.Runnable`): its instructions now, and the connections of the
+a selection, as data (`AgentQuery.Runnable`): its instructions now, and the connections of the
 selection's harness, model, and sandbox, if it has one, each with the key it holds, beside the model
 as its integration's endpoint takes it. Whoever runs the agent builds its harness and sandbox from
 these with the integrations its host installs, so core runs nothing of an agent. Both fail with
 `Incomplete` when the agent cannot run, and `buildRunnable` also when a connection of the selection
 no longer gives its part or has no key.
 
-`agent-v2.create` works on the workspace; `agent-v2.read` and `agent-v2.configure` on the agent's
+`agent.create` works on the workspace; `agent.read` and `agent.configure` on the agent's
 membership, a `Member` target. Members read agents; administrators and the owner create and
-configure them. `agent.use`, which `AgentV2Permissions.Use` declares, keeps the name it had
-before agents v2, since it means the same: directing an agent, as asking it for work in a thread,
+configure them. `agent.use`, which `AgentPermissions.Use` declares, keeps the name it had
+before agents, since it means the same: directing an agent, as asking it for work in a thread,
 and stopping or retrying its [turns](#turns), requires.
 
 ## Turns
@@ -228,7 +226,7 @@ per thread, which the stores enforce, and work that arrives while it is active w
 A turn records the participation it works for, the timeline position through which it accepted
 work (`acceptedThroughSequence`), where its entries begin in the participation's session log
 (`logAfter`, the log's latest position when the turn was created, kept out of `Turn.View`), the
-turn it retries and who asked (`retry`), the `AgentV2.Selection` it started on, the reply it
+turn it retries and who asked (`retry`), the `Agent.Selection` it started on, the reply it
 posted, and why it failed or was asked to stop.
 
 Agents handle their own notifications as people do theirs. Each agent in each thread has a turn
@@ -241,7 +239,7 @@ job could call them from another process. Each change is its own commit, attribu
   while no work waits. Work waits while the agent cannot open the thread.
 - `start` readies the turn. A turn asked to stop, or whose participation ended, ends as it stands,
   and so does one with nothing to say. Otherwise the turn starts on what
-  [`AgentV2Query`](#agents-v2) selects, kept when it runs again, and fails with the reason when the
+  [`AgentQuery`](#agents) selects, kept when it runs again, and fails with the reason when the
   agent cannot run on it. `start` answers `Idle`, or `Ready` with the turn, the agent's `Runnable`,
   its prompt and how many messages it tells, and what the participation's session resumes from
   (`SessionStateStore.Resume`), or none when it starts anew. The prompt (`TurnPrompt.promptOf`) is
@@ -346,7 +344,7 @@ gateway. External authors use `Performer.Reference.Identity` with a Contact;
 `Performer.Reference.Member` always carries a member identity. Attribution does
 not grant authority, and a contact identity does not select an external reply destination.
 
-`Target.Reference` supports Workspace, Member, Group, Thread, and ConnectionV2. Group targets carry
+`Target.Reference` supports Workspace, Member, Group, Thread, and Connection. Group targets carry
 `workspaceId` and `Group.Id`; thread targets carry `workspaceId` and `ThreadId.Id`, exported from
 `@amends/core/thread`. Exact target scopes compare the workspace, kind, and ID; a workspace scope
 covers targets in that workspace. Group and thread actions also require current group membership,

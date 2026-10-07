@@ -17,19 +17,19 @@
         "vitest": "^5.0.1",
       },
     },
-    "adapters/harness-amends-v2": {
-      "name": "@amends/harness-amends-v2",
+    "adapters/harness-amends": {
+      "name": "@amends/harness-amends",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
-        "@amends/harness-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "@amends/sandbox": "workspace:*",
         "@effect/ai-anthropic": "catalog:",
         "@effect/ai-openai": "catalog:",
         "@effect/ai-openai-compat": "catalog:",
       },
       "devDependencies": {
-        "@amends/sandbox-local-v2": "workspace:*",
+        "@amends/sandbox-local": "workspace:*",
         "@amends/toolkit": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
@@ -43,14 +43,14 @@
       "name": "@amends/harness-opencode",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
-        "@amends/harness-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "@amends/sandbox": "workspace:*",
         "@effect/platform-bun": "catalog:",
       },
       "devDependencies": {
-        "@amends/sandbox-daytona-v2": "workspace:*",
-        "@amends/sandbox-local-v2": "workspace:*",
+        "@amends/sandbox-daytona": "workspace:*",
+        "@amends/sandbox-local": "workspace:*",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
@@ -58,12 +58,12 @@
         "effect": "catalog:",
       },
     },
-    "adapters/sandbox-daytona-v2": {
-      "name": "@amends/sandbox-daytona-v2",
+    "adapters/sandbox-daytona": {
+      "name": "@amends/sandbox-daytona",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
+        "@amends/sandbox": "workspace:*",
         "@daytona/sdk": "0.220.0",
       },
       "devDependencies": {
@@ -75,12 +75,12 @@
         "effect": "catalog:",
       },
     },
-    "adapters/sandbox-local-v2": {
-      "name": "@amends/sandbox-local-v2",
+    "adapters/sandbox-local": {
+      "name": "@amends/sandbox-local",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
+        "@amends/sandbox": "workspace:*",
       },
       "devDependencies": {
         "@effect/platform-bun": "catalog:",
@@ -95,7 +95,7 @@
       "name": "@amends/storage-memory",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "effect": "catalog:",
@@ -109,10 +109,10 @@
       "name": "@amends/storage-postgresql",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
-        "@amends/harness-v2": "workspace:*",
+        "@amends/harness": "workspace:*",
         "@effect/sql-pg": "catalog:",
         "drizzle-orm": "1.0.0-rc.5-5935859",
         "effect": "catalog:",
@@ -240,14 +240,14 @@
       "version": "0.0.0",
       "dependencies": {
         "@amends/cluster": "workspace:*",
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
-        "@amends/harness-amends-v2": "workspace:*",
+        "@amends/harness-amends": "workspace:*",
         "@amends/harness-opencode": "workspace:*",
-        "@amends/sandbox-daytona-v2": "workspace:*",
-        "@amends/sandbox-local-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/sandbox": "workspace:*",
+        "@amends/sandbox-daytona": "workspace:*",
+        "@amends/sandbox-local": "workspace:*",
         "@amends/server-http": "workspace:*",
         "@amends/storage-postgresql": "workspace:*",
         "@effect/platform-bun": "catalog:",
@@ -263,7 +263,7 @@
       "name": "@amends/api-http",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
         "effect": "catalog:",
@@ -273,20 +273,20 @@
       "name": "@amends/cluster",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
-        "@amends/harness-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "@amends/sandbox": "workspace:*",
         "effect": "catalog:",
       },
     },
-    "packages/connection-v2": {
-      "name": "@amends/connection-v2",
+    "packages/connection": {
+      "name": "@amends/connection",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/harness-v2": "workspace:*",
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/harness": "workspace:*",
+        "@amends/sandbox": "workspace:*",
         "@amends/toolkit": "workspace:*",
       },
       "devDependencies": {
@@ -301,8 +301,8 @@
       "name": "@amends/core",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
-        "@amends/harness-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
+        "@amends/harness": "workspace:*",
         "effect": "catalog:",
       },
     },
@@ -310,16 +310,16 @@
       "name": "@amends/gateway",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "effect": "catalog:",
       },
     },
-    "packages/harness-v2": {
-      "name": "@amends/harness-v2",
+    "packages/harness": {
+      "name": "@amends/harness",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/sandbox-v2": "workspace:*",
+        "@amends/sandbox": "workspace:*",
       },
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -329,8 +329,8 @@
         "effect": "catalog:",
       },
     },
-    "packages/sandbox-v2": {
-      "name": "@amends/sandbox-v2",
+    "packages/sandbox": {
+      "name": "@amends/sandbox",
       "version": "0.0.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -358,10 +358,10 @@
       "name": "@amends/storage-conformance",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection-v2": "workspace:*",
+        "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
-        "@amends/harness-v2": "workspace:*",
+        "@amends/harness": "workspace:*",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
@@ -405,7 +405,7 @@
 
     "@amends/cluster": ["@amends/cluster@workspace:packages/cluster"],
 
-    "@amends/connection-v2": ["@amends/connection-v2@workspace:packages/connection-v2"],
+    "@amends/connection": ["@amends/connection@workspace:packages/connection"],
 
     "@amends/core": ["@amends/core@workspace:packages/core"],
 
@@ -413,21 +413,21 @@
 
     "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
 
-    "@amends/harness-amends-v2": ["@amends/harness-amends-v2@workspace:adapters/harness-amends-v2"],
+    "@amends/harness": ["@amends/harness@workspace:packages/harness"],
+
+    "@amends/harness-amends": ["@amends/harness-amends@workspace:adapters/harness-amends"],
 
     "@amends/harness-opencode": ["@amends/harness-opencode@workspace:adapters/harness-opencode"],
-
-    "@amends/harness-v2": ["@amends/harness-v2@workspace:packages/harness-v2"],
 
     "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
 
     "@amends/icons": ["@amends/icons@workspace:apps/icons"],
 
-    "@amends/sandbox-daytona-v2": ["@amends/sandbox-daytona-v2@workspace:adapters/sandbox-daytona-v2"],
+    "@amends/sandbox": ["@amends/sandbox@workspace:packages/sandbox"],
 
-    "@amends/sandbox-local-v2": ["@amends/sandbox-local-v2@workspace:adapters/sandbox-local-v2"],
+    "@amends/sandbox-daytona": ["@amends/sandbox-daytona@workspace:adapters/sandbox-daytona"],
 
-    "@amends/sandbox-v2": ["@amends/sandbox-v2@workspace:packages/sandbox-v2"],
+    "@amends/sandbox-local": ["@amends/sandbox-local@workspace:adapters/sandbox-local"],
 
     "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
 
@@ -1773,7 +1773,7 @@
 
     "yocto-queue": ["yocto-queue@0.1.0", "", {}, "sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q=="],
 
-    "@amends/sandbox-daytona-v2/@daytona/sdk": ["@daytona/sdk@0.220.0", "", { "dependencies": { "@aws-sdk/client-s3": "^3.1136.0", "@aws-sdk/lib-storage": "^3.1136.0", "@daytona/analytics-api-client": "0.220.0", "@daytona/api-client": "0.220.0", "@daytona/toolbox-api-client": "0.220.0", "@iarna/toml": "^2.2.5", "@opentelemetry/api": "^1.9.1", "@opentelemetry/exporter-trace-otlp-http": "^0.222.0", "@opentelemetry/instrumentation-http": "^0.222.0", "@opentelemetry/otlp-exporter-base": "0.222.0", "@opentelemetry/resources": "2.11.0", "@opentelemetry/sdk-node": "^0.222.0", "@opentelemetry/sdk-trace-base": "^2.11.0", "@opentelemetry/semantic-conventions": "^1.43.0", "axios": "^1.20.0", "busboy": "^1.0.0", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.8.2", "socket.io-client": "^4.8.1", "tar": "^7.5.22", "tslib": "2.8.1", "ws": "^8.21.3" } }, "sha512-PJio3vbDwRApzlsK6AGO7r4CHJcF9PI5DWuUW2yUnA2MVJSh/jotS0onKBv6boC5F+oboljTibUMxrwVPIrOlQ=="],
+    "@amends/sandbox-daytona/@daytona/sdk": ["@daytona/sdk@0.220.0", "", { "dependencies": { "@aws-sdk/client-s3": "^3.1136.0", "@aws-sdk/lib-storage": "^3.1136.0", "@daytona/analytics-api-client": "0.220.0", "@daytona/api-client": "0.220.0", "@daytona/toolbox-api-client": "0.220.0", "@iarna/toml": "^2.2.5", "@opentelemetry/api": "^1.9.1", "@opentelemetry/exporter-trace-otlp-http": "^0.222.0", "@opentelemetry/instrumentation-http": "^0.222.0", "@opentelemetry/otlp-exporter-base": "0.222.0", "@opentelemetry/resources": "2.11.0", "@opentelemetry/sdk-node": "^0.222.0", "@opentelemetry/sdk-trace-base": "^2.11.0", "@opentelemetry/semantic-conventions": "^1.43.0", "axios": "^1.20.0", "busboy": "^1.0.0", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.8.2", "socket.io-client": "^4.8.1", "tar": "^7.5.22", "tslib": "2.8.1", "ws": "^8.21.3" } }, "sha512-PJio3vbDwRApzlsK6AGO7r4CHJcF9PI5DWuUW2yUnA2MVJSh/jotS0onKBv6boC5F+oboljTibUMxrwVPIrOlQ=="],
 
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
@@ -1811,13 +1811,13 @@
 
     "wrap-ansi/ansi-styles": ["ansi-styles@4.3.0", "", { "dependencies": { "color-convert": "^2.0.1" } }, "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg=="],
 
-    "@amends/sandbox-daytona-v2/@daytona/sdk/@daytona/analytics-api-client": ["@daytona/analytics-api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-3BGYILzjo2aFTJhLd6XBXlNEQBSo9Zr2Nj31OdX9o50fMRVUwVydF6ekIGkPGSLwskz6b6xxg5BSS+f9dbrxCQ=="],
+    "@amends/sandbox-daytona/@daytona/sdk/@daytona/analytics-api-client": ["@daytona/analytics-api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-3BGYILzjo2aFTJhLd6XBXlNEQBSo9Zr2Nj31OdX9o50fMRVUwVydF6ekIGkPGSLwskz6b6xxg5BSS+f9dbrxCQ=="],
 
-    "@amends/sandbox-daytona-v2/@daytona/sdk/@daytona/api-client": ["@daytona/api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-XaMEtiQCaIHc3T7y3HUqx1A5eWSnd+FJvhpSHDwP3Snu9Nnhy4t+K2LHBWgJQn9dGtWXsdOsbB9K0BqpmFJtyA=="],
+    "@amends/sandbox-daytona/@daytona/sdk/@daytona/api-client": ["@daytona/api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-XaMEtiQCaIHc3T7y3HUqx1A5eWSnd+FJvhpSHDwP3Snu9Nnhy4t+K2LHBWgJQn9dGtWXsdOsbB9K0BqpmFJtyA=="],
 
-    "@amends/sandbox-daytona-v2/@daytona/sdk/@daytona/toolbox-api-client": ["@daytona/toolbox-api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-Kn94AOxhGQil0XygOOR26SaCkndE4dOtxYS0hLbqrTxcP3H1uq1HGFGSRkHFQNkaR8eL9QwFUPSMqd0Vr3A64A=="],
+    "@amends/sandbox-daytona/@daytona/sdk/@daytona/toolbox-api-client": ["@daytona/toolbox-api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-Kn94AOxhGQil0XygOOR26SaCkndE4dOtxYS0hLbqrTxcP3H1uq1HGFGSRkHFQNkaR8eL9QwFUPSMqd0Vr3A64A=="],
 
-    "@amends/sandbox-daytona-v2/@daytona/sdk/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
+    "@amends/sandbox-daytona/@daytona/sdk/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
 
     "@babel/helper-compilation-targets/lru-cache/yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
 

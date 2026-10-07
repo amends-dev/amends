@@ -1,7 +1,7 @@
 import { Commit, Store } from "@amends/core/journal";
 import { Turn, TurnJobs } from "@amends/core/turn";
 import { Gateway } from "@amends/gateway";
-import type { StreamPart } from "@amends/harness-v2";
+import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Duration, Effect, Layer, Stream } from "effect";
 import {

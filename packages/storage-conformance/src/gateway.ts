@@ -1,5 +1,5 @@
-import { AgentV2Permissions } from "@amends/core/agent-v2";
-import { ConnectionV2Permissions } from "@amends/core/connection-v2";
+import { AgentPermissions } from "@amends/core/agent";
+import { ConnectionPermissions } from "@amends/core/connection";
 import { TurnExecution } from "@amends/core/turn";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
@@ -120,10 +120,10 @@ export const gateway = (harness: Harness) => {
                     ThreadPermissions.Read.name,
                     ThreadMessagePermissions.Publish.name,
                     ThreadParticipationPermissions.Follow.name,
-                    AgentV2Permissions.Use.name,
-                    ConnectionV2Permissions.Read.name,
-                    ConnectionV2Permissions.Use.name,
-                    AgentV2Permissions.Read.name,
+                    AgentPermissions.Use.name,
+                    ConnectionPermissions.Read.name,
+                    ConnectionPermissions.Use.name,
+                    AgentPermissions.Read.name,
                   ],
                 }),
               );
@@ -155,14 +155,14 @@ export const gateway = (harness: Harness) => {
                       ThreadPermissions.Read.name,
                       ThreadMessagePermissions.Publish.name,
                       ThreadParticipationPermissions.Follow.name,
-                      AgentV2Permissions.Use.name,
-                      ConnectionV2Permissions.Create.name,
-                      ConnectionV2Permissions.Read.name,
-                      ConnectionV2Permissions.Manage.name,
-                      ConnectionV2Permissions.Use.name,
-                      AgentV2Permissions.Create.name,
-                      AgentV2Permissions.Read.name,
-                      AgentV2Permissions.Configure.name,
+                      AgentPermissions.Use.name,
+                      ConnectionPermissions.Create.name,
+                      ConnectionPermissions.Read.name,
+                      ConnectionPermissions.Manage.name,
+                      ConnectionPermissions.Use.name,
+                      AgentPermissions.Create.name,
+                      AgentPermissions.Read.name,
+                      AgentPermissions.Configure.name,
                     ],
                   }),
                 );

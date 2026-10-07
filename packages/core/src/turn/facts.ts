@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { AgentV2 } from "../agent-v2/agent.ts";
+import { Agent } from "../agent/agent.ts";
 import { Group } from "../group/group.ts";
 import { GroupId } from "../group/id.ts";
 import { Fact } from "../journal/fact.ts";
@@ -56,7 +56,7 @@ export const Started = Fact.make("turn.started", {
   payload: Schema.Struct({
     ...Where,
     turnId: Turn.Id,
-    selection: AgentV2.Selection,
+    selection: Agent.Selection,
     startedAt: Schema.DateTimeUtcFromString,
   }),
 });

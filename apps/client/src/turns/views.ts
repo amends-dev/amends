@@ -1,5 +1,5 @@
 import type { TurnState } from "@amends/ui/components/turn-status";
-import type { AgentV2Activity } from "@amends/ui/screens/agents-v2";
+import type { AgentActivity } from "@amends/ui/screens/agents";
 import type {
   ThreadTurnControls,
   TurnLogActivity,
@@ -10,7 +10,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Effect, Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { connectionsV2Reads } from "../connections-v2/api.ts";
+import { connectionsReads } from "../connections/api.ts";
 import { timelineRead } from "../conversations/api.ts";
 import { useApiClient } from "../provider.tsx";
 import { writing } from "./drafts.ts";
@@ -258,7 +258,7 @@ export function useTurnLog(
   const feed = () => Option.getOrUndefined(AsyncResult.value(feedResult()));
   const entryOf = useEntries(workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
-  const connections = useRead(connectionsV2Reads(client, workspaceId)?.connections);
+  const connections = useRead(connectionsReads(client, workspaceId)?.connections);
   const live = useChangeFeedStatus();
   const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
   const failure = (): WorkspaceFailure | undefined => {
@@ -409,7 +409,7 @@ export interface TurnActivityView {
    * Where an agent is at work, by its member ID: its most pressing state, and the place of each
    * active turn. None while it is idle.
    */
-  readonly agentActivity: (memberId: string) => AgentV2Activity | undefined;
+  readonly agentActivity: (memberId: string) => AgentActivity | undefined;
 }
 
 const urgency = { working: 0, stopping: 1, queued: 2 } as const;
