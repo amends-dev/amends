@@ -2,7 +2,7 @@ import { Port } from "@amends/sandbox-v2/Network";
 import { Sandbox } from "@amends/sandbox-v2/Sandbox";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Schema, Stream } from "effect";
-import type { Prompt } from "effect/ai";
+import { Prompt } from "effect/ai";
 import { SessionId } from "../src/Agent.ts";
 import * as Harness from "../src/Harness.ts";
 import * as Session from "../src/Session.ts";
@@ -163,6 +163,30 @@ describe("Harness", () => {
         "codex answers hello",
         "again",
         "opencode answers again",
+      ]);
+    }),
+  );
+
+  it.effect("starts a new session with the conversation the agent joins", () =>
+    Effect.gen(function* () {
+      const codex = yield* makeFakeAgent("codex", answersAs("codex"));
+      const { sandbox } = yield* makeFakeSandbox;
+      const history = Prompt.make([
+        { role: "user", content: "hello" },
+        { role: "assistant", content: [{ type: "text", text: "opencode answers hello" }] },
+      ]);
+
+      const session = yield* Harness.make(codex.agent).startSession({ sandbox, id, history });
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(codex.starts[0]?.history).toEqual(history);
+      expect(codex.starts[0]?.agentState).toBeUndefined();
+      expect(textsOf(state.history)).toEqual([
+        "hello",
+        "opencode answers hello",
+        "again",
+        "codex answers again",
       ]);
     }),
   );

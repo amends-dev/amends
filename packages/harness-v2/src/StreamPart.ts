@@ -10,7 +10,7 @@
  * the tools of a toolkit. Params and results are therefore `unknown`, as JSON, even for the host's
  * tools; a caller that needs their types decodes them with the tool's schemas.
  */
-import { Schema } from "effect";
+import { Predicate, Schema } from "effect";
 import { Response } from "effect/ai";
 
 /** A call to any tool. The agent's own tools run inside the agent and are `providerExecuted`. */
@@ -110,16 +110,134 @@ export type StreamPart = Superset<typeof StreamPart.Type, Response.StreamPartEnc
 type Superset<Whole, Subset extends Whole> = Whole | Subset;
 
 /**
- * A turn's parts, split into its steps at their `finish-step` parts. The turn's `finish` part ends
- * the turn rather than a step, so no step holds it; a turn that reports no steps is one.
+ * A part of a step as the step's stream adds up: a text or a reasoning whole rather than its deltas,
+ * a tool call without the params it streamed on its way, and a tool's final result. These are the
+ * parts Effect AI's `generateText` returns for a response, and those only an agent produces.
  */
-export const stepsOf = (
-  parts: ReadonlyArray<StreamPart>,
-): ReadonlyArray<ReadonlyArray<StreamPart>> => {
-  const steps: Array<Array<StreamPart>> = [[]];
+export const StepPart = Schema.Union([
+  Schema.toEncoded(Response.TextPart),
+  Schema.toEncoded(Response.ReasoningPart),
+  ToolCallPart,
+  ToolResultPart,
+  Schema.toEncoded(Response.ToolApprovalRequestPart),
+  Schema.toEncoded(Response.FilePart),
+  Schema.toEncoded(Response.DocumentSourcePart),
+  Schema.toEncoded(Response.UrlSourcePart),
+  Schema.toEncoded(Response.ResponseMetadataPart),
+  Schema.toEncoded(Response.ErrorPart),
+  FileChangePart,
+  CompactionPart,
+]);
+
+export type StepPart = typeof StepPart.Type;
+
+/**
+ * One step of a turn: what the model wrote, the tools it called and their results, in the order
+ * the step streamed them, and the `finish-step` part that ended it. A step the turn ended partway
+ * through, by failing or being stopped, has what it streamed so far and no `finish`.
+ */
+export const Step = Schema.Struct({
+  parts: Schema.Array(StepPart),
+  finish: Schema.optional(FinishStepPart),
+});
+
+export interface Step extends Schema.Schema.Type<typeof Step> {}
+
+/**
+ * A turn's steps, from its parts as far as they go, split at their `finish-step` parts. The turn's
+ * `finish` part ends the turn rather than a step, so no step holds it. A step the parts end before
+ * its `finish-step` comes last when it has parts.
+ */
+export const stepsOf = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Step> => {
+  const steps: Array<Step> = [];
+  let stepParts: Array<StreamPart> = [];
   for (const part of parts) {
-    if (part.type === "finish-step") steps.push([]);
-    else if (part.type !== "finish") steps.at(-1)?.push(part);
+    if (part.type === "finish-step") {
+      steps.push({ parts: addUpStep(stepParts), finish: part });
+      stepParts = [];
+    } else if (part.type !== "finish") {
+      stepParts.push(part);
+    }
   }
-  return steps;
+  const unfinished = addUpStep(stepParts);
+  return unfinished.length === 0 ? steps : [...steps, { parts: unfinished }];
+};
+
+/**
+ * The parts of one step as they add up. A text or a reasoning sits where it started, with the
+ * deltas it has so far and the metadata of its parts merged, as Effect AI merges them; deltas of
+ * one that never started are dropped, as Effect AI drops them. A tool's params stream in its call,
+ * which holds them whole, and its preliminary results give way to the final one.
+ */
+const addUpStep = (parts: ReadonlyArray<StreamPart>): Array<StepPart> => {
+  const added: Array<StepPart> = [];
+  /** Each text or reasoning the step is writing, by kind and id, until it ends. */
+  const writing = new Map<string, Writing>();
+  for (const part of parts) {
+    switch (part.type) {
+      case "text-start":
+      case "reasoning-start": {
+        const type = part.type === "text-start" ? "text" : "reasoning";
+        const written: Writing = { type, text: "", ...metadataOf(part.metadata) };
+        writing.set(`${type}:${part.id}`, written);
+        added.push(written);
+        break;
+      }
+      case "text-delta":
+      case "text-end":
+      case "reasoning-delta":
+      case "reasoning-end": {
+        const key = `${part.type.startsWith("text") ? "text" : "reasoning"}:${part.id}`;
+        const written = writing.get(key);
+        if (written === undefined) break;
+        if (part.type === "text-delta" || part.type === "reasoning-delta") {
+          written.text += part.delta;
+        } else {
+          writing.delete(key);
+        }
+        Object.assign(written, metadataOf(mergeMetadata(written.metadata, part.metadata)));
+        break;
+      }
+      case "tool-params-start":
+      case "tool-params-delta":
+      case "tool-params-end":
+      case "finish-step":
+      case "finish":
+        break;
+      case "tool-result":
+        if (part.preliminary !== true) added.push(part);
+        break;
+      default:
+        added.push(part);
+    }
+  }
+  return added;
+};
+
+/** A text or a reasoning of a step, which grows as its deltas arrive. */
+interface Writing {
+  readonly type: "text" | "reasoning";
+  text: string;
+  metadata?: Response.ProviderMetadata;
+}
+
+/** `metadata` as a part's field, which a part without any leaves out. */
+const metadataOf = (metadata: Response.ProviderMetadata | undefined) =>
+  metadata === undefined ? {} : { metadata };
+
+/** What `left` says of each provider, with what `right` says merged in, as Effect AI merges it. */
+const mergeMetadata = (
+  left: Response.ProviderMetadata | undefined,
+  right: Response.ProviderMetadata | undefined,
+): Response.ProviderMetadata | undefined => {
+  if (right === undefined) return left;
+  const merged = { ...left };
+  for (const [provider, metadata] of Object.entries(right)) {
+    const previous = merged[provider];
+    merged[provider] =
+      Predicate.isObject(previous) && Predicate.isObject(metadata)
+        ? Object.assign({}, previous, metadata)
+        : metadata;
+  }
+  return merged;
 };

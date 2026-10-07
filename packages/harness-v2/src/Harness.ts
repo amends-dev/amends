@@ -17,7 +17,10 @@ import { HarnessError, UnknownError, UnsupportedError } from "./HarnessError.ts"
 import { makeSession } from "./internal/session.ts";
 import type * as Session from "./Session.ts";
 
-/** What a session starts from: the `id` of a new session, or what an earlier one returned. */
+/**
+ * What a session starts from: the `id` of a new session, with the conversation it starts with if
+ * any, or what an earlier one returned.
+ */
 export type StartSessionOptions = {
   /**
    * The sandbox the agent works in, created from the agent's `template`. Required when the agent
@@ -29,12 +32,18 @@ export type StartSessionOptions = {
   | {
       /** Names a new session. */
       readonly id: SessionId;
+      /**
+       * The conversation the session starts with, as when the agent joins one already under way.
+       * Empty when omitted.
+       */
+      readonly history?: Prompt.Prompt;
       readonly resumeFrom?: never;
     }
   | {
       /** What `suspendTurn`, `detach`, or `stop` returned, on this harness's agent or any other. */
       readonly resumeFrom: Session.SessionState;
       readonly id?: never;
+      readonly history?: never;
     }
 );
 
@@ -50,9 +59,9 @@ export class Harness extends Context.Service<
     readonly agent: Omit<Agent, "startSession">;
 
     /**
-     * Starts a session: a new one, or one that goes on where `resumeFrom` left it. The agent that
-     * last ran the session resumes from its own state. Any other agent loads the conversation
-     * instead, and runs an unfinished turn again.
+     * Starts a session: a new one, which loads the `history` it is given, or one that goes on where
+     * `resumeFrom` left it. The agent that last ran the session resumes from its own state. Any
+     * other agent loads the conversation instead, and runs an unfinished turn again.
      */
     readonly startSession: (
       options: StartSessionOptions,
@@ -99,7 +108,7 @@ export const make = (agent: Agent): Harness["Service"] => {
       const id = options.resumeFrom === undefined ? options.id : options.resumeFrom.id;
       yield* checkSandbox(sandbox);
       const workspace = sandbox === undefined ? undefined : yield* makeWorkspace(sandbox, id);
-      const history = resumeFrom?.history ?? Prompt.empty;
+      const history = resumeFrom?.history ?? options.history ?? Prompt.empty;
       // An agent's own state means something only to the agent that wrote it. Any other agent
       // starts from the conversation, and the session runs an unfinished turn again on it.
       const own = resumeFrom !== undefined && resumeFrom.agent === agent.id;

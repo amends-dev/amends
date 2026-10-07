@@ -19,7 +19,8 @@ which `startSession` takes back.
 into a language model, and `Harness.layer` provides it. Its `agent` is the agent it runs, as the
 adapter describes it, without `startSession`: only the harness starts the agent's sessions.
 `startSession` starts a session: a new one, named by its `id`, or one that goes on from what it last
-saved, given as `resumeFrom`, on this agent or another. The caller creates the sandbox, from the
+saved, given as `resumeFrom`, on this agent or another. A new session given a `history` starts with
+that conversation, as when the agent joins one already under way. The caller creates the sandbox, from the
 agent's `template` and with its `ports`, and owns it: a harness never stops or destroys one. Each
 session works in its own directory there, named by its id, so that its files stay in place when it
 moves from one agent to another.
@@ -62,7 +63,10 @@ later, and `destroy` stops it for good.
 `StreamPart` holds the parts an Effect AI provider streams, in their encoded form, and three that
 only agents produce: `finish-step`, `file-change`, and `compaction`. Tool calls and results keep
 their params and results as JSON, since an agent runs tools of its own that no toolkit declares.
-A failure the agent reports arrives as an `error` part; the operations themselves fail with
+`stepsOf` adds a turn's parts up into its `Step`s, as `GenerateResult.steps` has them: each
+step's texts and reasonings whole, its tool calls and final results, and the `finish-step` that
+ended it, which a step the turn ended partway through lacks. A step is JSON, for callers that
+store a turn's steps. A failure the agent reports arrives as an `error` part; the operations themselves fail with
 `HarnessError`, which names the agent and holds a reason such as `UnsupportedError` or
 `UnavailableError`.
 

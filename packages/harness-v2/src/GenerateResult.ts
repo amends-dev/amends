@@ -6,17 +6,21 @@
  * which adds the object that answer decoded to.
  */
 import type { Response } from "effect/ai";
-import { type FileChangePart, type StreamPart, stepsOf } from "./StreamPart.ts";
+import { type FileChangePart, type Step, type StreamPart, stepsOf } from "./StreamPart.ts";
 
-// TODO: Add `steps`, each step's parts with its own text, reasoning, and usage, once a caller needs
-// more of the turn than its answer.
 export class GenerateResult {
   constructor(readonly parts: ReadonlyArray<StreamPart>) {}
 
+  /** The turn's steps, each with the parts it streamed added up and how it finished. */
+  get steps(): ReadonlyArray<Step> {
+    return stepsOf(this.parts);
+  }
+
   /** The text of the turn's last step: its answer, without what the agent said while it worked. */
   get text(): string {
-    return lastStep(this.parts)
-      .flatMap((part) => (part.type === "text-delta" ? [part.delta] : []))
+    const lastStep = this.steps.findLast((step) => step.parts.length > 0);
+    return (lastStep?.parts ?? [])
+      .flatMap((part) => (part.type === "text" ? [part.text] : []))
       .join("");
   }
 
@@ -58,7 +62,3 @@ export class GenerateObjectResult<A> extends GenerateResult {
     super(parts);
   }
 }
-
-/** The parts of the turn's last step that has any. */
-const lastStep = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<StreamPart> =>
-  stepsOf(parts).findLast((step) => step.length > 0) ?? [];
