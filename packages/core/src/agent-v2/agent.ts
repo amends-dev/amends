@@ -26,7 +26,6 @@ export type Instructions = typeof Instructions.Type;
 /** Instructions given now, without surrounding space, which storage keeps as given. */
 export const NewInstructions = Schema.Trimmed.check(Schema.isMaxLength(20_000), Text.isStorable);
 
-// TODO: Choose the harness of an agent on `Auto` for each of its turns, once agents v2 run turns.
 /**
  * The harness an agent runs on: that of one of the workspace's connections that gives harnesses,
  * or `Auto`, for amends to choose among them as the agent works.
@@ -60,6 +59,17 @@ export const NewModel = Schema.Struct({
 /** Where an agent works: the sandboxes of one of the workspace's connections that gives them. */
 export const Sandbox = Schema.Struct({ connectionId: ConnectionV2.Id });
 export interface Sandbox extends Schema.Schema.Type<typeof Sandbox> {}
+
+/**
+ * The harness, model, and sandbox a turn runs on: an agent's setup, with its harness chosen when it
+ * is on `Auto`. A turn that runs again runs on the selection it started with.
+ */
+export const Selection = Schema.Struct({
+  harness: Schema.Struct({ connectionId: ConnectionV2.Id }),
+  model: Model,
+  sandbox: Schema.NullOr(Sandbox),
+});
+export interface Selection extends Schema.Schema.Type<typeof Selection> {}
 
 export const Record = Schema.Struct({
   id: Id,

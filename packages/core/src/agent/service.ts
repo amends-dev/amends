@@ -52,6 +52,7 @@ import {
 } from "./errors.ts";
 import { AgentFacts } from "./facts.ts";
 import { AgentPermissions } from "./permissions.ts";
+import { AgentV2Permissions } from "../agent-v2/permissions.ts";
 import { AgentStore } from "./store.ts";
 export {
   Changed,
@@ -300,7 +301,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
     const permissions = [
       AgentPermissions.Read,
       AgentPermissions.Configure,
-      AgentPermissions.Use,
+      AgentV2Permissions.Use,
       AssignmentPermissions.Read,
       MemberPermissions.Remove,
     ] as const;

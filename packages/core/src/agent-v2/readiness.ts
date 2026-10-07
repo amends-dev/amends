@@ -1,10 +1,10 @@
 /**
  * Whether an agent can run as it is set up: what keeps each connection it names from giving it its
- * part, as the integrations its host installs now find them, and whether `Auto` has a harness to
- * choose. It reads and runs nothing: callers give it the workspace's connections.
+ * part, as the integrations its host installs now find them, and which harnesses `Auto` has to
+ * choose from. It reads and runs nothing: callers give it the workspace's connections.
  */
 import type { Connection, Integration, Integrations } from "@amends/connection-v2";
-import { Array, Effect, Option } from "effect";
+import { Array, DateTime, Effect, Option } from "effect";
 import { ConnectionV2 } from "../connection-v2/connection.ts";
 import type { AgentV2 } from "./agent.ts";
 
@@ -15,7 +15,7 @@ export type Setup = Pick<AgentV2.Record, "harness" | "model" | "sandbox">;
 export type Connections = ReadonlyMap<ConnectionV2.Id, ConnectionV2.Record>;
 
 /** What a connection is to an agent's setup: removed, of an integration its host no longer installs, or installed. */
-type Resolved =
+export type Resolved =
   | { readonly _tag: "Removed" }
   | { readonly _tag: "Uninstalled" }
   | {
@@ -40,7 +40,7 @@ export const issuesOf = Effect.fnUntraced(function* (
     part: AgentV2.Part,
     connectionId: ConnectionV2.Id,
   ) {
-    const resolved = yield* resolve(connectionId, connections, integrations);
+    const resolved = yield* resolveConnection(connectionId, connections, integrations);
     if (resolved._tag !== "Installed") {
       issues.push({ _tag: resolved._tag, part });
       return undefined;
@@ -55,7 +55,7 @@ export const issuesOf = Effect.fnUntraced(function* (
     const harness = yield* integrationFor("harness", setup.harness.connectionId);
     if (harness?.requiresSandbox === true && setup.sandbox === null)
       issues.push({ _tag: "SandboxRequired" });
-  } else if (!(yield* hasHarnessToChoose(setup, connections, integrations))) {
+  } else if ((yield* harnessesToChoose(setup, connections, integrations)).length === 0) {
     issues.push({ _tag: "NoHarness" });
   }
   yield* integrationFor("model", setup.model.connectionId);
@@ -68,7 +68,7 @@ export const readinessOf = (issues: ReadonlyArray<AgentV2.Issue>): AgentV2.Readi
   Array.isReadonlyArrayNonEmpty(issues) ? { _tag: "Incomplete", issues } : { _tag: "Ready" };
 
 /** The connection `connectionId` among `connections`, with its integration when one is installed. */
-const resolve = (
+export const resolveConnection = (
   connectionId: ConnectionV2.Id,
   connections: Connections,
   integrations: Integrations.Integrations["Service"],
@@ -116,17 +116,18 @@ const refusalOf = (
 };
 
 /**
- * Whether one of `connections` gives a harness that an agent on `Auto`, set up as `setup`, can run
- * on: one whose integration gives harnesses and takes the connection, and whose agent has the
+ * The connections whose harness an agent on `Auto`, set up as `setup`, can run on, oldest first:
+ * those whose integration gives harnesses and takes the connection, and whose agent has the
  * sandbox it needs.
  */
-const hasHarnessToChoose = Effect.fnUntraced(function* (
+export const harnessesToChoose = Effect.fnUntraced(function* (
   setup: Setup,
   connections: Connections,
   integrations: Integrations.Integrations["Service"],
 ) {
+  const chosen: Array<ConnectionV2.Record> = [];
   for (const record of connections.values()) {
-    const resolved = yield* resolve(record.id, connections, integrations);
+    const resolved = yield* resolveConnection(record.id, connections, integrations);
     if (resolved._tag !== "Installed") continue;
     const { integration, connection } = resolved;
     if (!integration.provides.includes("harnesses")) continue;
@@ -135,9 +136,25 @@ const hasHarnessToChoose = Effect.fnUntraced(function* (
       onFailure: () => false,
       onSuccess: () => true,
     });
-    if (taken) return true;
+    if (taken) chosen.push(record);
   }
-  return false;
+  return chosen
+    .toSorted(
+      (left, right) =>
+        DateTime.Order(left.createdAt, right.createdAt) || (left.id < right.id ? -1 : 1),
+    )
+    .map((record) => record.id);
 });
+
+/**
+ * The harness an agent on `Auto` runs on, of the connections `harnessesToChoose` gives: the one
+ * its last turn in a conversation ran on, `previous`, while it is still among them, so that the
+ * conversation stays with one harness, and otherwise the first.
+ */
+export const chooseHarness = (
+  harnesses: ReadonlyArray<ConnectionV2.Id>,
+  previous: ConnectionV2.Id | undefined,
+): ConnectionV2.Id | undefined =>
+  previous !== undefined && harnesses.includes(previous) ? previous : harnesses[0];
 
 export * as AgentV2Readiness from "./readiness.ts";

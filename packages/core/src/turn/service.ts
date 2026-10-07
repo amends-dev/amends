@@ -1,6 +1,6 @@
 import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Schema, Stream } from "effect";
 import type { PlatformError, Scope } from "effect";
-import { AgentPermissions } from "../agent/permissions.ts";
+import { AgentV2Permissions } from "../agent-v2/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { ChangeFeedSource } from "../change-feed/source.ts";
@@ -144,7 +144,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return turn;
   });
   const directAgentRequirement = (turn: Turn.Record) =>
-    Requirement.make(AgentPermissions.Use, {
+    Requirement.make(AgentV2Permissions.Use, {
       _tag: "Member",
       workspaceId,
       memberId: turn.memberId,

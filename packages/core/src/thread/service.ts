@@ -1,7 +1,7 @@
 import { Identity } from "../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { AgentPermissions } from "../agent/permissions.ts";
+import { AgentV2Permissions } from "../agent-v2/permissions.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
 import { Actor } from "../identity/actor.ts";
@@ -204,7 +204,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       if (member === undefined) return yield* new ParticipantUnavailable({ memberId });
       if (Identity.MemberReference.isAnyOf(["Agent"])(member.identity))
         yield* authorization.require([
-          Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
+          Requirement.make(AgentV2Permissions.Use, { _tag: "Member", workspaceId, memberId }),
         ]);
     }
   });

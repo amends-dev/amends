@@ -34,6 +34,7 @@
     "@amends/harness": "workspace:*",
     "@amends/harness-v2": "workspace:*",
     "@amends/sandbox": "workspace:*",
+    "@amends/sandbox-v2": "workspace:*",
     "effect": "catalog:"
   }
 }

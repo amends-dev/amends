@@ -233,9 +233,19 @@ does not give the part as the agent takes it (`Invalid`, as the integration desc
 model it no longer offers); `SandboxRequired` when its harness's agent works only in a sandbox and it
 has none; and `NoHarness` when, on `Auto`, no connection gives a harness it can run on.
 
+`AgentV2Query` is what turns read of the agent they run, trusting their caller. `select` gives the
+`AgentV2.Selection` a turn runs on: the agent's model and sandbox, and its harness, which on `Auto`
+is that of the agent's last turn in the conversation while it can still run on it, and otherwise
+the oldest connection whose harness it can run on. `buildRunnable` gives the agent ready to run on
+a selection: its instructions now, the harness of the selection's connection, made with the key it
+holds and the model's endpoint, and its sandbox provider, unrun, for the caller to run in a scope
+that outlives the read. Both fail with `Incomplete` when the agent cannot run, and `buildRunnable`
+also when a connection of the selection no longer gives its part or has no key.
+
 `agent-v2.create` works on the workspace; `agent-v2.read` and `agent-v2.configure` on the agent's
 membership, a `Member` target. Members read agents; administrators and the owner create and
-configure them.
+configure them. `agent.use` keeps the name it had before agents v2, since it means the same:
+asking an agent for work, as the [old agents](#agents) describe.
 
 ## Environments
 

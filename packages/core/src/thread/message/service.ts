@@ -2,7 +2,7 @@ import { Identity } from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Duration, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Requirement } from "../../authorization/requirement.ts";
-import { AgentPermissions } from "../../agent/permissions.ts";
+import { AgentV2Permissions } from "../../agent-v2/permissions.ts";
 import { Actor } from "../../identity/actor.ts";
 import { Journal } from "../../journal/journal.ts";
 import { Publication } from "../../journal/publication.ts";
@@ -157,7 +157,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           request.mentions.includes(reference.memberId)
         )
           yield* authorization.require([
-            Requirement.make(AgentPermissions.Use, {
+            Requirement.make(AgentV2Permissions.Use, {
               _tag: "Member",
               workspaceId,
               memberId: reference.memberId,

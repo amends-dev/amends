@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 
 import type * as Core from "@amends/core";
-import { AgentPermissions } from "@amends/core/agent";
+import { AgentV2Permissions } from "@amends/core/agent-v2";
 
 import {
   Assignment,
@@ -230,7 +230,7 @@ export const threadReplies = (harness: Harness) => {
                 ThreadMessagePermissions.Publish,
                 threadTarget(first.thread.id),
               );
-              yield* grant(bound, humanId, AgentPermissions.Use, {
+              yield* grant(bound, humanId, AgentV2Permissions.Use, {
                 _tag: "Member",
                 workspaceId,
                 memberId: agentId,

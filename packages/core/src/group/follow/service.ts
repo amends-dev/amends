@@ -1,7 +1,7 @@
 import { Identity } from "../../identity/identity.ts";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
-import { AgentPermissions } from "../../agent/permissions.ts";
+import { AgentV2Permissions } from "../../agent-v2/permissions.ts";
 import { Authorization } from "../../authorization/authorization.ts";
 import { Requirement } from "../../authorization/requirement.ts";
 import { Actor } from "../../identity/actor.ts";
@@ -107,7 +107,11 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
       return yield* new AgentRequired({ memberId: request.memberId });
     // Directing an agent's attention is using it, in either direction.
     yield* authorization.require([
-      Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId: member.id }),
+      Requirement.make(AgentV2Permissions.Use, {
+        _tag: "Member",
+        workspaceId,
+        memberId: member.id,
+      }),
     ]);
     return admission.value;
   });
