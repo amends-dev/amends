@@ -28,7 +28,8 @@ export const harness: Harness = {
                 space.groupTimes.size +
                 space.notificationsSeen.size +
                 space.credentials.size +
-                space.connectionV2Credentials.size;
+                space.connectionV2Credentials.size +
+                space.sessionStates.size;
               for (const batches of space.logs.values())
                 for (const batch of batches) total += 1 + batch.entries.length;
               for (const name of MemoryDatabase.projections) total += space.records[name].size;

@@ -14,11 +14,10 @@ import { Request } from "../request/request.ts";
 import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
 import { ThreadQuery } from "../thread/query.ts";
-import { ThreadId } from "../thread/id.ts";
+import type { ThreadId } from "../thread/id.ts";
 import { ThreadParticipationStore } from "../thread/participation/store.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
-import { MemberStore } from "../workspace/member/store.ts";
-import { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
+import { NotActive, NotFound, NotRetryable } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnCommand } from "./command.ts";
 import { TurnFacts } from "./facts.ts";
@@ -26,7 +25,7 @@ import { TurnLog } from "./log.ts";
 import { TurnQuery } from "./query.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
-export { NotActive, NotFound, NotRetryable, ThreadNotFound } from "./errors.ts";
+export { NotActive, NotFound, NotRetryable } from "./errors.ts";
 
 export type ReadError =
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
@@ -35,10 +34,8 @@ export type ReadError =
   | ThreadParticipationStore.Failure
   | Schema.SchemaError
   | NotFound;
-export type ListError = Exclude<ReadError, NotFound> | ThreadNotFound;
 export type ActiveError = Exclude<ReadError, NotFound>;
-export type LogError = ReadError | Log.ReadError;
-export type WatchError = LogError | Turn.LogUnavailable;
+export type WatchError = ReadError | Log.ReadError | Turn.LogUnavailable;
 export type ChangeError =
   | ReadError
   | PlatformError.PlatformError
@@ -46,7 +43,7 @@ export type ChangeError =
   | Projection.Error
   | TurnCommand.EndError;
 export type CancelError = ChangeError | NotActive;
-export type RetryError = ChangeError | NotRetryable | MemberStore.Failure | Log.ReadError;
+export type RetryError = ChangeError | NotRetryable;
 
 export interface Interface {
   /**
@@ -54,11 +51,6 @@ export interface Interface {
    * its timeline requires. Outside the audience it is NotFound; without the permission, Denied.
    */
   readonly get: (turnId: Turn.Id) => Effect.Effect<Turn.View, ReadError, Actor.Service>;
-  /** A thread's turns, newest first, at most `limit`, for a reader who may read the thread. */
-  readonly listByThread: (
-    threadId: ThreadId.Id,
-    limit: number,
-  ) => Effect.Effect<ReadonlyArray<Turn.View>, ListError, Actor.Service>;
   /**
    * The workspace's active turns in threads the reader may read, oldest first, among at most
    * `limit` active turns in the workspace.
@@ -66,15 +58,13 @@ export interface Interface {
   readonly listActive: (
     limit: number,
   ) => Effect.Effect<ReadonlyArray<Turn.View>, ActiveError, Actor.Service>;
-  /** A turn with its log, for a reader who may read its thread. */
-  readonly log: (turnId: Turn.Id) => Effect.Effect<Turn.LogView, LogError, Actor.Service>;
   /**
    * Follow a turn's log, for a reader who may read its thread: its items as they stand, then
-   * those its agent's log adds or changes as the turn works, with the response it is writing, until
-   * the turn ends and every item is delivered. The caller owns the subscription scope. The stream
-   * fails with LogUnavailable when following cannot go on, including once the reader may no longer
-   * read the thread, which it checks with each batch and whenever a commit changes their groups or
-   * grants; following again starts from the items as they stand.
+   * those the log adds as the turn works, with the step it is writing, until the turn ends and
+   * every item is delivered. The caller owns the subscription scope. The stream fails with
+   * LogUnavailable when following cannot go on, including once the reader may no longer read the
+   * thread, which it checks with each batch and whenever a commit changes their groups or grants;
+   * following again starts from the items as they stand.
    */
   readonly watchLog: (
     turnId: Turn.Id,
@@ -85,16 +75,17 @@ export interface Interface {
   >;
   /**
    * Ask an active turn to stop, for a reader who may open its thread and direct its agent. A
-   * queued turn stops at once, since nothing runs it yet; a running one stops once execution
+   * queued turn stops at once, since nothing runs it yet; a running one stops once its job
    * confirms it. A turn already stopping stays as it is; a finished one is NotActive.
    */
   readonly cancel: (turnId: Turn.Id) => Effect.Effect<Turn.View, CancelError, Actor.Service>;
   /**
    * Run a failed or stopped turn again, for a reader who may open its thread and direct its
-   * agent: a new turn for the same agent and input, which continues from what that turn left and
-   * takes the request as new input, running with the agent's current configuration. Only the agent's latest turn on the thread can be retried, while the agent
-   * still takes part there; otherwise it is NotRetryable. A turn is retried at most once, so
-   * asking again returns the turn its retry created.
+   * agent: a new turn for the same agent and input, which continues the session that turn left
+   * and tells the agent who asked, on what the agent is set up with now. Only the agent's latest
+   * turn on the thread can be retried, while the agent still takes part there; otherwise it is
+   * NotRetryable. A turn is retried at most once, so asking again returns the turn its retry
+   * created.
    */
   readonly retry: (turnId: Turn.Id) => Effect.Effect<Turn.View, RetryError, Actor.Service>;
 }
@@ -112,7 +103,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const authorization = yield* Authorization.Service;
-  const memberStore = yield* MemberStore.Service;
   const turnCommand = yield* TurnCommand.Service;
   const journal = yield* Journal.Service;
   const log = yield* Log.Service;
@@ -164,25 +154,15 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return undefined;
   });
 
-  /**
-   * The turns as the reader sees them, with what they may do with each now. In a list of one
-   * thread's turns, newest first, only each agent's first can be its latest, so the others need
-   * no reads to tell they were superseded.
-   */
-  const toViews = Effect.fnUntraced(function* (
-    list: ReadonlyArray<Turn.Record>,
-    options: { readonly newestFirst?: boolean } = {},
-  ) {
+  /** The turns as the reader sees them, with what they may do with each now. */
+  const toViews = Effect.fnUntraced(function* (list: ReadonlyArray<Turn.Record>) {
     const directed = yield* authorization.permitted(list.map(directAgentRequirement));
-    const seen = new Set<string>();
     return yield* Effect.forEach(list, (turn, index) =>
       Effect.gen(function* () {
         const mayDirect = directed[index] === true;
-        const later = options.newestFirst === true && seen.has(turn.memberId);
-        seen.add(turn.memberId);
         const view: Turn.View = Object.assign({}, turn, {
           stoppable: mayDirect && Turn.active(turn.status) && turn.status !== "cancelling",
-          retryable: mayDirect && !later && (yield* whyNotRetryable(turn)) === undefined,
+          retryable: mayDirect && (yield* whyNotRetryable(turn)) === undefined,
         });
         return view;
       }),
@@ -193,20 +173,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
 
   const get = Effect.fn("TurnService.get")(function* (turnId: Turn.Id) {
     return yield* toView(yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId)));
-  });
-
-  const listByThread = Effect.fn("TurnService.listByThread")(function* (
-    threadId: ThreadId.Id,
-    limit: number,
-  ) {
-    const id = yield* Schema.decodeEffect(ThreadId.Id)(threadId);
-    const count = yield* decodeLimit(limit);
-    const thread = yield* requireReadableThread(id).pipe(
-      Effect.catchTag("ThreadQuery.NotFound", () =>
-        Effect.fail(new ThreadNotFound({ threadId: id })),
-      ),
-    );
-    return yield* toViews(yield* turnStore.listByThread(thread.id, count), { newestFirst: true });
   });
 
   const decodeLimit = Schema.decodeEffect(
@@ -235,14 +201,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
   });
 
-  const readLog = Effect.fn("TurnService.log")(function* (turnId: Turn.Id) {
-    const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
-    return {
-      turn: yield* toView(turn),
-      items: TurnLog.read(yield* TurnLog.readTurnEntries(log, turn)).items,
-    } satisfies Turn.LogView;
-  });
-
   const isSameItem = Schema.toEquivalence(Turn.LogItem);
   const toLogUnavailable = () => new Turn.LogUnavailable({});
 
@@ -255,7 +213,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       .subscribe(Option.none())
       .pipe(Effect.mapError(toLogUnavailable));
     const turn = yield* requireReadableTurn(id);
-    const handle = TurnLog.open(log, turn.participationId);
+    const handle = TurnLog.open(log, turn.id);
     // Following outlasts the request that opened it, so its access checks name the reader.
     const actor = yield* Actor.Service;
     /** The reader still may read the thread, or following ends. */
@@ -264,27 +222,19 @@ export const make = Effect.fn("TurnService.make")(function* () {
       Effect.mapError(toLogUnavailable),
     );
 
-    // The turn's entries sit together in its agent's log after `logAfter`, read as they come, and
-    // end with its end: only one turn writes there at a time, so another turn's entry also means
-    // this one's are over.
     const reader = TurnLog.reader();
-    let after = turn.logAfter ?? undefined;
+    let after: Log.Position | undefined;
     let over = false;
     const takeEntries = (batches: ReadonlyArray<Log.Batch<TurnLog.Entry>>) => {
       for (const batch of batches) {
         for (const entry of batch.entries) {
-          if (entry.payload.turnId !== turn.id) {
-            over = true;
-            return;
-          }
-          reader.add({ entry: entry.payload, at: entry.recordedAt, position: batch.position });
+          reader.add({ entry: entry.payload, at: entry.recordedAt });
           if (TurnLog.Entry.isAnyOf(["Ended"])(entry.payload)) over = true;
         }
         after = batch.position;
-        if (over) return;
       }
     };
-    /** Read what the log holds past what was taken, until the turn's entries are over. */
+    /** Read what the log holds past what was taken, until it is all read or the turn ended. */
     const readLogSoFar = Effect.gen(function* () {
       while (!over) {
         const batches = yield* handle.read(
@@ -296,26 +246,22 @@ export const make = Effect.fn("TurnService.make")(function* () {
     });
     // The items as sent, so a change is told apart from what the reader has.
     let sent: ReadonlyArray<Turn.LogItem> = [];
-    const collectChanges = (): ReadonlyArray<Turn.LogChange> => {
-      const items = reader.currentReading().items;
-      const changed = items.flatMap((item, index) => {
+    const changeMessages = (): ReadonlyArray<Turn.LogMessage> => {
+      const items = reader.items();
+      const changes = items.flatMap((item, index) => {
         const before = sent[index];
         return before !== undefined && isSameItem(before, item) ? [] : [{ index, item }];
       });
       sent = items;
-      return changed;
-    };
-    const changeMessages = (): ReadonlyArray<Turn.LogMessage> => {
-      const list = collectChanges();
-      return list.length === 0 ? [] : [Turn.LogMessage.cases.Changed.make({ changes: list })];
+      return changes.length === 0 ? [] : [Turn.LogMessage.cases.Changed.make({ changes })];
     };
     const endedMessage = Turn.LogMessage.cases.Ended.make({});
 
     yield* readLogSoFar;
-    sent = reader.currentReading().items;
+    sent = reader.items();
     const openedMessage = Turn.LogMessage.cases.Opened.make({ items: sent });
     if (over || !Turn.active(turn.status)) return Stream.make(openedMessage, endedMessage);
-    // What the response being written holds so far, since drafts carry only what follows it.
+    // What the step being written holds so far, since drafts carry only what follows it.
     const draftsSoFar = (yield* turnQuery.currentDrafts(turn.id)).map((draft) =>
       Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
     );
@@ -392,6 +338,39 @@ export const make = Effect.fn("TurnService.make")(function* () {
     );
   });
 
+  /**
+   * Ask an active turn to stop, in the caller's commit: a queued one ends cancelled at once, since
+   * nothing runs it yet; a running one is marked stopping, which its job confirms once it has
+   * stopped. Returns the turn as it now stands.
+   */
+  const requestStop = Effect.fnUntraced(function* (turn: Turn.Record) {
+    const requestedAt = yield* DateTime.now;
+    const requested = yield* journal.publish(TurnFacts.CancelRequested, {
+      workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      memberId: turn.memberId,
+      turnId: turn.id,
+      reason: "requested",
+      requestedAt,
+    });
+    if (turn.status === "queued") {
+      yield* turnCommand.endTurn(turn, { outcome: "cancelled", cancelReason: "requested" });
+      return Turn.change(turn, {
+        status: "cancelled",
+        cancelReason: "requested",
+        finishedAt: requestedAt,
+      });
+    }
+    yield* turnCommand.recordActivity(
+      turn.threadId,
+      TurnActivity.Stopping,
+      { turnId: turn.id, cancelReason: "requested" },
+      requested,
+    );
+    return Turn.change(turn, { status: "cancelling", cancelReason: "requested" });
+  });
+
   const cancel = Effect.fn("TurnService.cancel")(
     function* (turnId: Turn.Id) {
       const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
@@ -399,7 +378,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       if (!Turn.active(turn.status))
         return yield* new NotActive({ turnId: turn.id, status: turn.status });
       if (turn.status === "cancelling") return yield* toView(turn);
-      return yield* toView(yield* turnCommand.requestStop(turn, "requested"));
+      return yield* toView(yield* requestStop(turn));
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -418,16 +397,10 @@ export const make = Effect.fn("TurnService.make")(function* () {
         return yield* toView(yield* requireReadableTurn(retryId));
       const reason = yield* whyNotRetryable(turn);
       if (reason !== undefined) return yield* new NotRetryable({ turnId: turn.id, reason });
-      const handle = TurnLog.open(log, turn.participationId);
-      // The same input, continuing after the failed or stopped turn in the agent's log: its
-      // input starts after what that turn took in, from the latest checkpoint the log holds,
-      // with the agent's current model access and environment. It is created after the turn
-      // it retries, even on a clock that has not moved, so it is the agent's latest there.
-      const retried = TurnLog.read(yield* TurnLog.readTurnEntries(log, turn));
+      // The same input, in the same session, created after the turn it retries, even on a clock
+      // that has not moved, so it is the agent's latest there.
       const now = yield* DateTime.now;
-      const createdAt = DateTime.isGreaterThan(now, turn.createdAt)
-        ? now
-        : DateTime.add(turn.createdAt, { milliseconds: 1 });
+      const actor = yield* Actor.Service;
       const created: Turn.Record = {
         id: retryId,
         workspaceId,
@@ -436,17 +409,16 @@ export const make = Effect.fn("TurnService.make")(function* () {
         agentId: turn.agentId,
         memberId: turn.memberId,
         participationId: turn.participationId,
-        logAfter: Option.getOrNull(yield* handle.head),
-        historyFrom: retried.checkpoint ?? turn.historyFrom,
-        retryOf: turn.id,
+        retry: { of: turn.id, by: actor.memberId },
         status: "queued",
-        inputAfterSequence: retried.incorporatedThrough(turn.inputAfterSequence),
         acceptedThroughSequence: turn.acceptedThroughSequence,
         selection: null,
         messageIds: [],
         failure: null,
         cancelReason: null,
-        createdAt,
+        createdAt: DateTime.isGreaterThan(now, turn.createdAt)
+          ? now
+          : DateTime.add(turn.createdAt, { milliseconds: 1 }),
         startedAt: null,
         finishedAt: null,
       };
@@ -457,24 +429,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
         { turnId: created.id, memberId: created.memberId, retryOf: turn.id },
         event,
       );
-      // Who asked is the retry's new input, after what the turn it retries left.
-      const actor = yield* Actor.Service;
-      const asker = yield* memberStore.get(actor.memberId);
-      yield* handle.append({
-        _tag: "Requested",
-        turnId: created.id,
-        input: {
-          _tag: "Input",
-          author: {
-            id: actor.memberId,
-            name: Option.match(asker, {
-              onNone: () => "A member",
-              onSome: (member) => member.name ?? "A member",
-            }),
-          },
-          content: [{ _tag: "Text", text: "Please try that again." }],
-        },
-      });
       return yield* toView(created);
     },
     Publication.withActor,
@@ -482,15 +436,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     journal.commit,
   );
 
-  return Service.of({
-    get,
-    listByThread,
-    listActive,
-    log: readLog,
-    watchLog,
-    cancel,
-    retry,
-  });
+  return Service.of({ get, listActive, watchLog, cancel, retry });
 });
 
 /** @category layers */

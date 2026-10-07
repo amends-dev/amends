@@ -37,11 +37,6 @@ export interface Interface {
   readonly listActiveByMember: (
     memberId: MemberId.Id,
   ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
-  /** A thread's turns, newest first, at most `limit`. */
-  readonly listByThread: (
-    threadId: ThreadId.Id,
-    limit: number,
-  ) => Effect.Effect<ReadonlyArray<Turn.Record>, Failure>;
   /**
    * Reject invalid or foreign records, reused IDs, and a second active turn for the same agent
    * and thread. Never upsert.

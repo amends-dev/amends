@@ -20,6 +20,7 @@ import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
 import { ConnectionV2Credentials } from "./connection-v2-credentials.ts";
+import { SessionStates } from "./session-states.ts";
 import { ConnectionsV2 } from "./connections-v2.ts";
 import { Environments } from "./environments.ts";
 import { CredentialKey } from "./credential-key.ts";
@@ -66,6 +67,7 @@ const layerStores = Layer.mergeAll(
   ConnectionCredentials.layer,
   ConnectionsV2.layer,
   ConnectionV2Credentials.layer,
+  SessionStates.layer,
   Environments.layer,
   Agents.layer,
   AgentsV2.layer,

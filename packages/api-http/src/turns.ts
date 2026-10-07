@@ -1,4 +1,3 @@
-import { Thread } from "@amends/core/thread";
 import { Turn } from "@amends/core/turn";
 import { Workspace } from "@amends/core/workspace";
 import { Schema } from "effect";
@@ -11,20 +10,14 @@ const turn = { workspaceId: Workspace.Id, turnId: Turn.Id };
 const view = Turn.View.annotate({ identifier: "Turn" });
 
 /**
- * Agents' turns: each agent's attempt at the work asked of it on a thread, which a reader of the
- * thread may follow, with its log: read at once, or followed as a stream of its items and the
- * response being written until the turn ends. Whoever may direct the agent may stop an active
- * turn, or retry one that failed or stopped; each turn says whether the caller may do either now.
- * The workspace's active turns are those in threads the caller may open.
+ * Agents' turns: each agent's work on what was asked of it in a thread, which a reader of the
+ * thread may follow, with its log, as a stream of its items and the step being written until the
+ * turn ends. Whoever may direct the agent may stop an active turn, or retry one that failed or
+ * stopped; each turn says whether the caller may do either now. The workspace's active turns are
+ * those in threads the caller may open.
  */
 export class TurnsGroup extends HttpApiGroup.make("turns")
   .add(
-    HttpApiEndpoint.get("listByThread", "/threads/:threadId/turns", {
-      params: { workspaceId: Workspace.Id, threadId: Thread.Id },
-      query: { limit },
-      success: Schema.Array(view),
-      error: [...ApiErrors.member, ApiErrors.TurnThreadNotFound],
-    }),
     HttpApiEndpoint.get("listActive", "/active-turns", {
       params: { workspaceId: Workspace.Id },
       query: { limit },
@@ -34,11 +27,6 @@ export class TurnsGroup extends HttpApiGroup.make("turns")
     HttpApiEndpoint.get("get", "/turns/:turnId", {
       params: turn,
       success: view,
-      error: [...ApiErrors.member, ApiErrors.TurnNotFound],
-    }),
-    HttpApiEndpoint.get("log", "/turns/:turnId/log", {
-      params: turn,
-      success: Turn.LogView.annotate({ identifier: "TurnLog" }),
       error: [...ApiErrors.member, ApiErrors.TurnNotFound],
     }),
     HttpApiEndpoint.get("watchLog", "/turns/:turnId/log/events", {

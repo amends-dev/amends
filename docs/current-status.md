@@ -15,39 +15,25 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - Only member workflows exist. Task and channel workflows, which will start threads with contacts
   and triage and admit human followers, are not implemented, and neither are managing other
   participants or muting.
-- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), and the
-  local host [runs them](../packages/cluster/README.md), each closing with the agent's reply.
-  Turns are conversation only: agents have no tools. A turn posts every answer it completed when it closes, one message each, so an answer
-  given before more input arrived is posted after that input; a turn that fails or is stopped
-  posts nothing, even answers it completed. Each turn continues from the agent's log for the thread, read from its latest
-  checkpoint, and reads every message it has not seen, however many. When a turn's history and
-  waiting input would pass its budget, a share of the model's context window (at most 200,000
-  tokens), the agent's model summarizes the older part in passes before the turn works, keeping
-  the newest exchanges verbatim; a message longer than 40,000 characters is given in pieces, whose
-  older ones can be summarized. A summary that cannot be written interrupts the turn, which retries
-  and then fails. Size is measured with the tokens providers report for the latest response, and
-  estimated at four characters a token after it; context windows come from the Anthropic
-  connection's model table, or an OpenAI-compatible connection's setting (128,000 tokens without
-  one). Summaries happen before a turn rather than in the background after one, which can delay a
-  turn catching up on a long thread; old tool output is not shortened before summarizing beyond sending each result of more than 24,000
-  characters with its middle left out, and no tool lets an agent recall exact earlier content. A turn whose context proves full partway through records a checkpoint and goes on; a
-  provider's refusal of a request too long is recognized by the words providers use for it. A stopped response keeps only
-  the blocks it completed. A reader with a turn's log open follows it as a stream of its items
-  and the response being written; the text being written is best effort, and a draft missed while
-  reconnecting shows once its block completes. A stop request is noticed by polling, within a
-  second. A model that sends nothing for five minutes while a turn waits on it interrupts the run,
-  which runs again as other interruptions do, so a turn whose model keeps hanging fails after about
-  twenty minutes; no deadline bounds a turn's whole length. The [turn screens](turns.md) follow, stop, and retry turns in threads and show each
-  turn's log; threads have no titles, so the log names a thread by its group. A turn's changes show in its
-  thread's timeline, but inform no one: the design's informational turn activity for participants
-  is not built. No environment transfer exists, and the active turns read covers at most a hundred
-  active turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox outside
-  the store. Task activity kinds remain design intent.
+- Agents accept the work asked of them into [turns](../packages/core/README.md#turns), but no
+  host runs turns yet: the turn job is being rebuilt on [harness-v2](../packages/harness-v2/README.md),
+  so the local host accepts its requests and runs nothing, and work waits in agents' inboxes. Core
+  starts each turn as one harness turn on what [agents v2](../packages/core/README.md#agents-v2)
+  select, prompted with the thread's messages since the agent's last turn there, keeps the harness
+  session of each participation for its next turn, and posts the text of the turn's last step as the
+  reply; a turn that fails or is stopped posts nothing. Agents created before agents v2 run no turns:
+  a turn for one fails. A reader with a turn's log open follows it as a stream of its items and the
+  step being written; the text being written is best effort, and a draft missed while reconnecting
+  shows once its step finishes. The [turn screens](turns.md) follow, stop, and retry turns in
+  threads and show each turn's log; threads have no titles, so the log names a thread by its group.
+  A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
+  activity for participants is not built. The active turns read covers at most a hundred active
+  turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
+  outside the store. Task activity kinds remain design intent.
 - The [harness contract](../packages/harness/README.md), amends's own
   [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) run agents' turns in process. Only
-  opt-in live tests call a real model provider; the host's other end-to-end tests use a local
-  chat-completions stand-in. That harness stops rather
+  [environment runtime](../packages/environment/README.md) ran agents' turns before harness-v2, and
+  now run none. Only their opt-in live tests call a real model provider. That harness stops rather
   than answering the model when a response calls a tool it was not offered or holds a part it
   cannot record, and whether providers accept history with calls to tools a later session no
   longer offers is unverified.
@@ -57,9 +43,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   calls and results as text, and without reasoning, and one that starts with a response, or whose
   last calls await results, is `Unsupported`. ACP names a call by its kind, so its calls are
   recorded under names such as `execute`. It ignores a session's context limit and does not compact
-  itself: a conversation longer than its model's window reaches the turn runner's checkpoint only
-  once the provider refuses a request, which the harness recognizes from the refusal's words, and
-  that path has not been run against a real provider. No other ACP agent is installed.
+  itself: a conversation longer than its model's window is refused by the provider, which the
+  harness recognizes from the refusal's words, and that path has not been run against a real
+  provider. No other ACP agent is installed, and no turn runs on it now.
 - [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
   and an optional sandbox under an account connection, and every workspace starts with an
   in-process one; they are managed over HTTP and on the [Environments page](environments.md).
@@ -67,15 +53,13 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   sandbox is only where its tools would act, and none acts there yet, or, as opencode does, inside a
   local or Daytona sandbox, served by the
   [harness server](../packages/environment/README.md#the-harness-server), a Daytona one under the
-  workspace's Daytona connection; opt-in live tests run turns there with a real model. Each turn
-  acquires a sandbox of its own, so
-  with `stop` retention every turn leaves a stopped sandbox. Environments hold no defaults for
+  workspace's Daytona connection; opt-in live tests run harness sessions there with a real model.
+  No turn runs in an environment now. Environments hold no defaults for
   optional settings, since no installed harness takes reasoning levels. Model providers suggest
   models, but the compatibility check accepts any model name, and nothing checks one with its
   provider.
 - The [sandbox contract](../packages/sandbox/README.md) has two providers, local and Daytona, and
-  the local host installs both, making a Daytona provider for each workspace's account as a turn
-  needs it. A harness server in a sandbox listens on a port
+  the local host installs both for environments, which run nothing now. A harness server in a sandbox listens on a port
   with a token of its own, and a session a dead host left goes on there for the next run to attach
   to; a local sandbox's processes end when its host stops cleanly, so there the next run starts the
   session again. A session no run comes back to keeps its server running until its sandbox stops.
@@ -92,33 +76,31 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   over HTTP and on the [Connections page](connections.md). There is no OAuth, toolkit or channel
   support. Readiness is computed from settings and whether a credential is set;
   nothing checks a key with its provider. Agents check `connection.use` when configured, but
-  only turns resolve a credential for use, as they run; no toolkit consumes connections yet. Credentials are sealed with one host
+  nothing resolves a credential for use, since turns run on connections v2. Credentials are sealed with one host
   key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
 - [Connections v2](../packages/core/README.md#connections-v2), which are to replace them, are set up
   over HTTP and on the [Connections v2 page](connections-v2.md), beside Connections, from the
   integrations the [local host](../hosts/local/README.md) installs of every kind. They authenticate
-  with an API key or nothing. Agents v2 name them, but nothing runs on them yet: turns, agents, and
-  environments still use the old connections. A check's result is not stored.
+  with an API key or nothing. Agents v2 name them, and turns start on them, though no host runs
+  turns yet; agents and environments still use the old connections. A check's result is not stored.
 - [Agents v2](../packages/core/README.md#agents-v2), which are to replace agents, are created,
   configured, renamed, and removed over connections v2, in core,
   [over HTTP](../packages/api-http/README.md#agents-v2), and on the
-  [Agents v2 page](agents-v2.md), beside Agents; they run no turns. An agent on `Auto`
-  stores that choice, but nothing yet chooses a harness for it: its readiness only says whether a
-  connection gives one it could run on.
+  [Agents v2 page](agents-v2.md), beside Agents. A turn starts on what the agent's setup selects,
+  kept for the agent's later turns in the thread: on `Auto`, the harness its previous turn there ran
+  on while a connection still gives it, and otherwise the oldest connection that gives one it can
+  run on.
 - [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
   instructions, model access, and a starting environment, over HTTP and on the
   [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
-  turn to override, and no profile photos. Agents run only when their work arrives in a thread, and a removed agent's membership
-  cannot be reactivated, as a person's cannot.
-- Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish, and the
-  local host runs them on an Effect Cluster runner: an agent job per agent, which accepts its
-  work and stops its departed turns, and a turn job per turn. Several host
-  processes over one database share the work; one that stops answering keeps its workspaces for
-  the takeover time, 35 seconds by default. Cluster's socket transport, which delivers job requests
-  between processes at once, is not authenticated and belongs on a private network. Agent job
-  requests are not coalesced: a burst of commits that each ask an agent for work runs its
-  acceptance once per commit, and a person's leaving a group or thread runs an agent job that
-  finds no turns to stop, since the facts do not say whether the member is an agent.
+  turn to override, and no profile photos. They run no turns, which run agents v2, and a removed
+  agent's membership cannot be reactivated, as a person's cannot.
+- Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
+  job for each agent in each thread. The local host runs none until the turn job is rebuilt, and
+  prunes handled job requests on an Effect Cluster runner. Several host processes over one
+  database share that work; one that stops answering keeps its workspaces for the takeover time,
+  35 seconds by default. Cluster's socket transport, which delivers job requests between processes
+  at once, is not authenticated and belongs on a private network.
 - A removed member cannot be reactivated. Rejoining takes a fresh invitation and a new member ID,
   which starts with no group memberships, direct groups, thread participation, read positions, or
   notifications; the earlier membership keeps its own. Reactivating a removed membership, keeping
@@ -458,8 +440,8 @@ clients that reconnect repeatedly.
 
 [Codec.makeForSchema](../packages/core/src/journal/codec.ts) persists payloads through
 `SchemaBinary.toCodec` and copies output buffers. The [codec tests](../packages/core/test/journal/codec.test.ts)
-freeze representative workspace, message, and turn-checkpoint bytes captured with Effect
-4.0.0-rc.115, checking both decoding and identical encoding on 4.0.0. They cover dates,
+freeze representative workspace and message bytes captured with Effect 4.0.0-rc.115, and a turn
+step's bytes captured with 4.0.0, checking both decoding and identical encoding on 4.0.0. They cover dates,
 Unicode, tagged unions, nullable fields, arrays, and optional provider metadata, but not
 every fact or log variant. Existing storage tests also cover round trips, structured
 headers, and idempotency.

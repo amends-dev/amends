@@ -3,13 +3,14 @@ import { AgentV2Permissions } from "@amends/core/agent-v2";
 import { ConnectionV2Permissions } from "@amends/core/connection-v2";
 import { EnvironmentPermissions } from "@amends/core/environment";
 import { AgentPermissions } from "@amends/core/agent";
-import { AgentWork } from "@amends/core/turn";
+import { TurnExecution } from "@amends/core/turn";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
 import type { Identity } from "@amends/core/identity";
 import { Journal, Publication } from "@amends/core/journal";
 import * as Core from "@amends/core";
 import {
+  Thread,
   ThreadMessagePermissions,
   ThreadParticipationPermissions,
   ThreadPermissions,
@@ -393,14 +394,17 @@ export const gateway = (harness: Harness) => {
             Effect.gen(function* () {
               const gateway = yield* Gateway.Service;
               const workspace = yield* Operations.createWorkspace(alice.id);
-              // A member that is no agent has no work to accept.
-              const acceptWork = Effect.flatMap(AgentWork.Service, (agentWork) =>
-                agentWork.acceptWork(workspace.ownerMemberId),
+              const threadId = Thread.Id.make("thread");
+              // A member that is no agent has no work to run.
+              const startTurn = Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                turnExecution.start({ memberId: workspace.ownerMemberId, threadId }),
               );
-              yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork));
+              expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, startTurn))).toEqual(
+                TurnExecution.Start.Idle(),
+              );
               const missing = Workspace.Id.make("never-created");
               expect(
-                yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork))),
+                yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, startTurn))),
               ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: missing }));
               expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toMatchObject({
                 memberships: [{ workspace }],

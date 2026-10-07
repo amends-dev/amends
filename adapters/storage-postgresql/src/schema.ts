@@ -896,10 +896,10 @@ export const turnStatuses = [
 ] as const;
 
 /**
- * Agents' attempts on threads, with how far each has accepted and taken in its thread's input, and
- * where each begins in its agent's log for the thread and the checkpoint its history starts from.
- * An agent has at most one active turn on a thread; the model access and environment are recorded
- * when execution starts, all together or not at all.
+ * Agents' turns on threads, with how far into its thread each one's input reaches, and what it
+ * started on: a harness, a model, and a sandbox or none, recorded when it starts, all together or
+ * not at all. A retry names the turn it runs again and who asked, both or neither. An agent has at
+ * most one active turn on a thread.
  */
 export const turns = pgTable(
   "turns",
@@ -911,16 +911,15 @@ export const turns = pgTable(
     agentId: text("agent_id").notNull(),
     memberId: text("member_id").notNull(),
     participationId: text("participation_id").notNull(),
-    logAfter: integer("log_after"),
-    historyFrom: integer("history_from"),
     retryOf: text("retry_of"),
+    retriedBy: text("retried_by"),
     status: text("status", { enum: turnStatuses }).notNull(),
-    inputAfterSequence: integer("input_after_sequence").notNull(),
     acceptedThroughSequence: integer("accepted_through_sequence").notNull(),
-    connectionId: text("connection_id"),
-    model: text("model"),
-    reasoning: text("reasoning"),
-    environmentId: text("environment_id"),
+    harnessConnectionId: text("harness_connection_id"),
+    modelConnectionId: text("model_connection_id"),
+    modelId: text("model_id"),
+    modelEffort: text("model_effort"),
+    sandboxConnectionId: text("sandbox_connection_id"),
     messageIds: text("message_ids").array().notNull(),
     failure: text("failure"),
     cancelReason: text("cancel_reason", { enum: ["requested", "participation-ended"] }),
@@ -933,14 +932,35 @@ export const turns = pgTable(
     uniqueIndex("active_turn_by_agent_thread")
       .on(t.workspaceId, t.memberId, t.threadId)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
-    index("turns_by_thread").on(t.workspaceId, t.threadId, t.createdAt),
+    index("turns_by_agent_thread").on(t.workspaceId, t.memberId, t.threadId, t.createdAt),
     index("active_turns")
       .on(t.workspaceId, t.createdAt)
       .where(sql`${t.status} IN ('queued', 'running', 'cancelling')`),
-    check("turn_input_order", sql`${t.inputAfterSequence} <= ${t.acceptedThroughSequence}`),
+    check("turn_retry_complete", sql`(${t.retryOf} IS NULL) = (${t.retriedBy} IS NULL)`),
     check(
       "turn_selection_complete",
-      sql`(${t.connectionId} IS NULL AND ${t.model} IS NULL AND ${t.reasoning} IS NULL AND ${t.environmentId} IS NULL) OR (${t.connectionId} IS NOT NULL AND ${t.model} IS NOT NULL AND ${t.environmentId} IS NOT NULL)`,
+      sql`(${t.harnessConnectionId} IS NULL AND ${t.modelConnectionId} IS NULL AND ${t.modelId} IS NULL AND ${t.modelEffort} IS NULL AND ${t.sandboxConnectionId} IS NULL) OR (${t.harnessConnectionId} IS NOT NULL AND ${t.modelConnectionId} IS NOT NULL AND ${t.modelId} IS NOT NULL)`,
     ),
   ],
+);
+
+/**
+ * Each participation's harness session as its last turn left it, outside the journal and its read
+ * models: rebuilding projections keeps them. The session's state is the harness's own, the whole
+ * conversation included, so it is stored as JSON.
+ */
+export const sessionStates = pgTable(
+  "session_states",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    participationId: text("participation_id").notNull(),
+    state: jsonb("state").notNull(),
+    promptedThroughSequence: integer("prompted_through_sequence").notNull(),
+    harnessConnectionId: text("harness_connection_id").notNull(),
+    modelConnectionId: text("model_connection_id").notNull(),
+    modelId: text("model_id").notNull(),
+    modelEffort: text("model_effort"),
+    sandboxConnectionId: text("sandbox_connection_id"),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.participationId] })],
 );

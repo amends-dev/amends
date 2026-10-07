@@ -160,7 +160,6 @@ export const PublicError = Schema.Union([
   TurnService.NotFound,
   TurnService.NotActive,
   TurnService.NotRetryable,
-  TurnService.ThreadNotFound,
 ]);
 export type PublicError = typeof PublicError.Type;
 

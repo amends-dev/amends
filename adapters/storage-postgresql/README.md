@@ -122,13 +122,15 @@ environment targets. Adding them replaced the development baseline; recreate dis
 databases.
 
 `agents` holds agents' configuration, one row per agent with its model access as columns and a
-unique membership per workspace. `turns` holds agents' attempts, with a partial unique index that
-allows one active turn per agent and thread, and the selection a turn ran with as columns set all
-together or not at all. Each turn holds where it begins in its agent's log for the thread, the
-checkpoint its history starts from, the turn it retries, and the replies it published as a text
-array in order. A notification an agent accepted into a turn is
-`Accepted`, with its turn and time. Adding them replaced the development baseline too; recreate
-disposable PostgreSQL databases when adopting it.
+unique membership per workspace. `turns` holds agents' turns, with a partial unique index that
+allows one active turn per agent and thread, and the harness, model, and sandbox a turn started on
+as columns set all together or not at all. Each turn holds how far into its thread its input
+reaches, the turn it retries and who asked, both or neither, and its reply as a text array. A
+notification an agent accepted into a turn is `Accepted`, with its turn and time.
+`session_states` holds each participation's harness session as its last turn left it: the
+session's state as JSON, how far into the thread it was prompted, and what it ran on, as columns.
+Like credentials, it is outside the projections a rebuild discards. Changing these replaced the
+development baseline too; recreate disposable PostgreSQL databases when adopting it.
 
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
@@ -356,17 +358,11 @@ returns how many went. A message's ID carries when Cluster stored it; messages n
 stay, however old, and so do other entity types'. Each statement removes at most `batch`
 messages, a thousand by default.
 
-`PostgresClusterStorage.agentJobStatus(options?)` reports agent jobs from those tables: per kind
-of request, such as `AcceptWork`, the requests due, scheduled, and retrying, and when the
-longest-waiting due request became due; then the latest retries, with their agents and
-workspaces. It reports nothing before any host has run agent jobs over the database. It needs
-only a SQL client, such as `PostgresDatabase.layerClient`, so reading it changes no schema.
-
 `PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
 processes over the database never run Cluster at one address: it fails with `AddressTaken`
 while another process holds it. The claim is a session-level advisory lock on a connection it
 keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
-dies. `cluster-storage.test.ts` checks pruning and the status over real agent job requests, and the claim
+dies. `cluster-storage.test.ts` checks pruning over a test job's real requests, and the claim
 across pools.
 
 ## Composition

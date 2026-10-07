@@ -1,6 +1,6 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
-import { AgentJobs, TurnJobs } from "@amends/core/turn";
+import { TurnJobs } from "@amends/core/turn";
 import { ConnectionCatalog } from "@amends/core/connection";
 import { EnvironmentCatalog } from "@amends/core/environment";
 import type { HarnessImplementation } from "@amends/harness";
@@ -78,7 +78,6 @@ export interface Interface {
  */
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
-  const agentJobs = yield* AgentJobs.Service;
   const turnJobs = yield* TurnJobs.Service;
   const crypto = yield* Crypto.Crypto;
   const hostContext = yield* Effect.context<never>();
@@ -98,7 +97,6 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
         Layer.mergeAll(
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
-          Layer.succeed(AgentJobs.Service, agentJobs),
           Layer.succeed(TurnJobs.Service, turnJobs),
           Layer.succeed(ConnectionCatalog.Service, connectionCatalog),
           Layer.succeed(EnvironmentCatalog.Service, environmentCatalog),

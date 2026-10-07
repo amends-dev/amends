@@ -13,9 +13,9 @@ to stop. It logs to `<state file>.log`, since its output may reach no one.
 whose sessions work in the directory the server starts in, the sandbox's, with the model code of the
 [Anthropic](../../adapters/connection-anthropic/README.md) and
 [OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connections. A host lists
-the same harnesses in the `HarnessServer.Program` it installs, as the
-[local host](../local/README.md#turns) does from this value, so what it uploads runs what it
-offers. `HarnessServerHost.run(statePath)` serves the routes over Bun's HTTP server, with Bun's
+the same harnesses in the `HarnessServer.Program` it installs, from this value, so what it uploads
+runs what it offers; the [local host](../local/README.md) installs none now, since its turns no
+longer run in environments. `HarnessServerHost.run(statePath)` serves the routes over Bun's HTTP server, with Bun's
 processes and files for the sessions, and `src/index.ts` launches it. opencode itself is not in
 the build: the sandbox needs its pinned release on the `PATH`, which an environment's setup can
 install.

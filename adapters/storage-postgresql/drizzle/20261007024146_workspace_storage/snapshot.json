@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "6911b8a4-dd83-4d48-b147-6fa64ff42d8d",
+  "id": "ab4ef97b-f762-41c3-8897-fecdba28f724",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -147,6 +147,12 @@
     {
       "isRlsEnabled": false,
       "name": "roles",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "session_states",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2738,6 +2744,123 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "participation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "state",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "prompted_through_sequence",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "harness_connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "model_connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "model_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "model_effort",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
       "table": "thread_activities"
     },
     {
@@ -3404,27 +3527,14 @@
       "table": "turns"
     },
     {
-      "type": "integer",
+      "type": "text",
       "typeSchema": null,
       "notNull": false,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "log_after",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "turns"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "history_from",
+      "name": "retry_of",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -3437,7 +3547,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "retry_of",
+      "name": "retried_by",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -3463,19 +3573,6 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "input_after_sequence",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "turns"
-    },
-    {
-      "type": "integer",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
       "name": "accepted_through_sequence",
       "entityType": "columns",
       "schema": "public",
@@ -3489,7 +3586,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "connection_id",
+      "name": "harness_connection_id",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -3502,7 +3599,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "model",
+      "name": "model_connection_id",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -3515,7 +3612,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "reasoning",
+      "name": "model_id",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -3528,7 +3625,20 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "environment_id",
+      "name": "model_effort",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turns"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sandbox_connection_id",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -5039,6 +5149,13 @@
           "opclass": null
         },
         {
+          "value": "member_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
           "value": "thread_id",
           "isExpression": false,
           "asc": true,
@@ -5058,7 +5175,7 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "turns_by_thread",
+      "name": "turns_by_agent_thread",
       "entityType": "indexes",
       "schema": "public",
       "table": "turns"
@@ -5414,6 +5531,17 @@
     {
       "columns": [
         "workspace_id",
+        "participation_id"
+      ],
+      "nameExplicit": false,
+      "name": "session_states_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "columns": [
+        "workspace_id",
         "id"
       ],
       "nameExplicit": false,
@@ -5688,14 +5816,14 @@
       "table": "threads"
     },
     {
-      "value": "\"input_after_sequence\" <= \"accepted_through_sequence\"",
-      "name": "turn_input_order",
+      "value": "(\"retry_of\" IS NULL) = (\"retried_by\" IS NULL)",
+      "name": "turn_retry_complete",
       "entityType": "checks",
       "schema": "public",
       "table": "turns"
     },
     {
-      "value": "(\"connection_id\" IS NULL AND \"model\" IS NULL AND \"reasoning\" IS NULL AND \"environment_id\" IS NULL) OR (\"connection_id\" IS NOT NULL AND \"model\" IS NOT NULL AND \"environment_id\" IS NOT NULL)",
+      "value": "(\"harness_connection_id\" IS NULL AND \"model_connection_id\" IS NULL AND \"model_id\" IS NULL AND \"model_effort\" IS NULL AND \"sandbox_connection_id\" IS NULL) OR (\"harness_connection_id\" IS NOT NULL AND \"model_connection_id\" IS NOT NULL AND \"model_id\" IS NOT NULL)",
       "name": "turn_selection_complete",
       "entityType": "checks",
       "schema": "public",

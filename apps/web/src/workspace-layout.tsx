@@ -894,7 +894,7 @@ function ThreadPanel(props: {
       .entries()
       .map((entry) =>
         entry.kind === "turn" && entry.agentId !== undefined
-          ? { ...entry, agentHref: href(paths.agent(props.workspaceId, entry.agentId)) }
+          ? { ...entry, agentHref: href(paths.agentV2(props.workspaceId, entry.agentId)) }
           : entry,
       );
   return (

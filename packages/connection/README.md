@@ -43,7 +43,7 @@ speaks the provider's interface calls it itself, such as [opencode](../../adapte
 in a sandbox: a `ModelInference.Endpoint` with the interface the connection declares, its base URL
 when the connection sets one, its key, the model, and its limits. `limits` says how much the model takes: its
 context window in tokens, and the most it writes in one response when known, from which
-[the turn runner](../cluster/README.md#running-a-turn) keeps a conversation within it. The module is separate so reading declarations never loads Effect AI.
+a caller keeps a conversation within it. The module is separate so reading declarations never loads Effect AI.
 
 Implementations live in adapters, such as
 [`connection-anthropic`](../../adapters/connection-anthropic/README.md) and

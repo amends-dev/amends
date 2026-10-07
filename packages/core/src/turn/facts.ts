@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { AgentV2 } from "../agent-v2/agent.ts";
 import { Group } from "../group/group.ts";
 import { GroupId } from "../group/id.ts";
 import { Fact } from "../journal/fact.ts";
@@ -36,7 +37,7 @@ export const Created = Fact.make("turn.created", {
 
 /**
  * Someone asked a failed or stopped turn to run again: a new turn for the same agent and input,
- * with the agent's current configuration, continuing from the turn it retries.
+ * on what the agent is set up with now, continuing the session the turn it retries left.
  */
 export const Retried = Fact.make("turn.retried", {
   version: 1,
@@ -46,20 +47,7 @@ export const Retried = Fact.make("turn.retried", {
   payload: Schema.Struct(Turn.Record.fields),
 });
 
-/** An active turn accepted more input, settling the notifications that asked for it. */
-export const InputAccepted = Fact.make("turn.input-accepted", {
-  version: 1,
-  audience,
-  subject,
-  payload: Schema.Struct({
-    ...Where,
-    turnId: Turn.Id,
-    acceptedThroughSequence: Turn.Record.fields.acceptedThroughSequence,
-    ...Turn.Acceptance.fields,
-  }),
-});
-
-/** Execution took the turn, with the model access and environment it runs with. */
+/** The turn's job started it, with the harness, model, and sandbox it runs on. */
 export const Started = Fact.make("turn.started", {
   version: 1,
   audience,
@@ -68,7 +56,7 @@ export const Started = Fact.make("turn.started", {
   payload: Schema.Struct({
     ...Where,
     turnId: Turn.Id,
-    selection: Turn.Selection,
+    selection: AgentV2.Selection,
     startedAt: Schema.DateTimeUtcFromString,
   }),
 });
@@ -87,7 +75,7 @@ export const CancelRequested = Fact.make("turn.cancel-requested", {
   }),
 });
 
-/** The turn finished its work, with the replies it published, in order. */
+/** The turn finished its work, with the reply it posted, if it had one. */
 export const Completed = Fact.make("turn.completed", {
   version: 1,
   audience,
@@ -115,7 +103,10 @@ export const Failed = Fact.make("turn.failed", {
   }),
 });
 
-/** The turn stopped as it was asked to; its accepted input stays for a later turn. */
+/**
+ * The turn stopped, as it was asked to or because its agent no longer takes part where it worked;
+ * its accepted input stays for a later turn.
+ */
 export const Cancelled = Fact.make("turn.cancelled", {
   version: 1,
   audience,
@@ -124,6 +115,7 @@ export const Cancelled = Fact.make("turn.cancelled", {
   payload: Schema.Struct({
     ...Where,
     turnId: Turn.Id,
+    cancelReason: Turn.CancelReason,
     finishedAt: Schema.DateTimeUtcFromString,
   }),
 });

@@ -376,38 +376,35 @@ on `Auto` may wait for a harness. The initial role follows the delegation rules,
 
 ### Turns
 
-Turn paths sit under `/workspaces/:workspaceId` and require active membership. A turn is an agent's
-attempt at the work asked of it on a thread; the
+Turn paths sit under `/workspaces/:workspaceId` and require active membership. A turn is one
+harness turn of an agent on the work asked of it in a thread; the
 [core turns section](../core/README.md#turns) describes the rules.
 
 | Endpoint                         | Operation                                                                                     |
 | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `GET …/threads/:threadId/turns`  | The thread's turns, newest first, `?limit=` 1 to 100; a thread the caller cannot open is 404. |
 | `GET …/active-turns`             | The workspace's active turns in threads the caller may open, `?limit=` 1 to 100.              |
 | `GET …/turns/:turnId`            | One turn.                                                                                     |
-| `GET …/turns/:turnId/log`        | The turn with its log: input taken in, responses' text and replies, interruptions, in order.  |
 | `GET …/turns/:turnId/log/events` | Follow the turn's log as server-sent events, until the turn ends; see below.                  |
 | `POST …/turns/:turnId/cancel`    | Ask an active turn to stop; a queued one stops at once. A finished one is 409 `NotActive`.    |
 | `POST …/turns/:turnId/retry`     | Run a failed or stopped turn again as a new turn, 201; otherwise 409 `NotRetryable` with why. |
 
-Following a turn's log streams `Turn.LogMessage`s as its agent's log grows, for a caller who may
-open the thread. `Opened` starts every subscription with the log's `items` as they stand, the same
-items `GET …/log` returns. `Changed` carries `changes`, each an `index` and the `item` now there:
-new items, and items that changed, as a response's text grows block by block or whether it is a
-reply changes as input follows it. `Drafted` (`responseId`, `part`, `offset`, `text`) carries more
-of the response being written before its block completes, continuing its part at `offset`
-characters; it may be missed, and the block replaces it. `Ended` follows the turn's end once every
-item is delivered, and the stream closes. A stream that cannot go on, including once the caller can
-no longer open the thread, ends with `Turn.LogUnavailable`, and following again opens with the items
-as they stand. Log streams count within the same limits as change streams.
+Following a turn's log streams `Turn.LogMessage`s as the log grows, for a caller who may open the
+thread. `Opened` starts every subscription with the log's `items` as they stand: the messages the
+agent was prompted with, each step that wrote text, its reply marked once the turn ends, and runs
+that stopped short. `Changed` carries `changes`, each an `index` and the `item` now there.
+`Drafted` (`responseId`, `part`, `offset`, `text`) carries more of the step being written before it
+finishes, continuing its part at `offset` characters; it may be missed, and the step replaces it.
+`Ended` follows the turn's end once every item is delivered, and the stream closes. A stream that
+cannot go on, including once the caller can no longer open the thread, ends with
+`Turn.LogUnavailable`, and following again opens with the items as they stand. Log streams count
+within the same limits as change streams.
 
-A turn reads as `Turn.View`: its status, input positions, the model access and environment it
-started with, where it begins in its agent's log for the thread (`logAfter`) and the checkpoint its
-history starts from (`historyFrom`), the turn it retries (`retryOf`), its replies' `messageIds` in
-order, `failure`, `cancelReason`, and times, with `stoppable` and
-`retryable` for the caller. Stopping and retrying need permission to direct the agent (403
-otherwise). A turn in a thread the caller cannot open answers 404. A turn is retried at most once,
-so repeating `retry` returns the turn it created.
+A turn reads as `Turn.View`: its status, how far into the thread its input reaches
+(`acceptedThroughSequence`), the harness, model, and sandbox it started on (`selection`), the turn
+it retries and who asked (`retry`), its reply's `messageIds`, `failure`, `cancelReason`, and times,
+with `stoppable` and `retryable` for the caller. Stopping and retrying need permission to direct
+the agent (403 otherwise). A turn in a thread the caller cannot open answers 404. A turn is retried
+at most once, so repeating `retry` returns the turn it created.
 
 ## Authentication
 

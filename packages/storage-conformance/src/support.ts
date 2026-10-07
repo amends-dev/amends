@@ -27,6 +27,7 @@ import {
   ThreadParticipationTimeline,
   ThreadQuery,
   ThreadStore,
+  type Thread,
 } from "@amends/core/thread";
 import {
   type Invitation,
@@ -48,7 +49,8 @@ import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/con
 import { AgentV2Store } from "@amends/core/agent-v2";
 import { Integration, Integrations, type ModelCatalog } from "@amends/connection-v2";
 import { AgentStore } from "@amends/core/agent";
-import { AgentJobs, AgentWork, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
+import { SessionStateStore, type Turn, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
+import { Harness as HarnessV2 } from "@amends/harness-v2";
 import { EnvironmentCatalog, EnvironmentStore } from "@amends/core/environment";
 import { Harness as HarnessContract, HarnessImplementation } from "@amends/harness";
 import { SandboxImplementation } from "@amends/sandbox";
@@ -151,10 +153,24 @@ export const testModel: ModelCatalog.Model = {
 };
 
 /**
+ * The harness of an agent named `id` that no suite starts a session with: suites run turns
+ * themselves, as a host's turn jobs would, through turn execution.
+ */
+const idleHarness = (id: string, requiresSandbox: boolean) =>
+  Effect.succeed(
+    HarnessV2.make({
+      id,
+      requiresSandbox,
+      startSession: () => Effect.die("No suite starts a session"),
+    }),
+  );
+
+/**
  * The integrations the suites' hosts install: models at an endpoint a connection gives, reached
  * with a key or none, which list `testModel` and offer any other, and whose check accepts only
  * `goodKey`; tools that take no settings or key; a harness whose agent works only in a sandbox, and
- * one whose agent works in the host's process; and sandboxes. No suite runs a harness or a sandbox.
+ * one whose agent works in the host's process; and sandboxes. No suite starts a session or makes a
+ * sandbox.
  */
 export const testIntegrations = [
   Integration.make({
@@ -195,14 +211,14 @@ export const testIntegrations = [
     id: "test-harness",
     name: "Test harness",
     auth: ["none"],
-    harnesses: { requiresSandbox: true, harness: () => Effect.die("No suite runs a harness") },
+    harnesses: { requiresSandbox: true, harness: () => idleHarness("test-harness", true) },
     check: () => Effect.succeed({ status: "healthy" }),
   }),
   Integration.make({
     id: "test-in-process",
     name: "Test in process",
     auth: ["none"],
-    harnesses: { requiresSandbox: false, harness: () => Effect.die("No suite runs a harness") },
+    harnesses: { requiresSandbox: false, harness: () => idleHarness("test-in-process", false) },
     check: () => Effect.succeed({ status: "healthy" }),
   }),
   Integration.make({
@@ -222,66 +238,55 @@ export const installed = {
   integrations: testIntegrations,
 };
 
-/** The agent work each workspace's commits asked for and no suite has run yet, in order. */
-const requestedAgentWork = new Map<
-  Workspace.Id,
-  Array<{ readonly work: keyof AgentWork.Interface; readonly memberId: Member.Id }>
->();
-const keepOnceCommitted = (work: keyof AgentWork.Interface) => (request: AgentJobs.Request) =>
+/** A turn job request a commit made: to run an agent's work in a thread, or to stop its turn. */
+export type TurnJobRequest =
+  | { readonly kind: "run"; readonly memberId: Member.Id; readonly threadId: Thread.Id }
+  | {
+      readonly kind: "stop";
+      readonly memberId: Member.Id;
+      readonly threadId: Thread.Id;
+      readonly turnId: Turn.Id;
+    };
+
+/** The turn job requests each workspace's commits made and no suite has taken yet, in order. */
+const requestedTurnJobs = new Map<Workspace.Id, Array<TurnJobRequest>>();
+const keepOnceCommitted = (workspaceId: Workspace.Id, request: TurnJobRequest) =>
   Effect.flatMap(Store.Transaction, (storeTransaction) =>
     storeTransaction.afterCommit(
       Effect.sync(() => {
-        const requested = requestedAgentWork.get(request.workspaceId) ?? [];
-        requested.push({ work, memberId: request.memberId });
-        requestedAgentWork.set(request.workspaceId, requested);
+        requestedTurnJobs.set(workspaceId, [
+          ...(requestedTurnJobs.get(workspaceId) ?? []),
+          request,
+        ]);
       }),
     ),
   );
 
 /**
- * Agent jobs the suites run themselves: a commit's requests are kept once it commits, and
- * `runAgentJobs` does the work they asked for, as a host's agent jobs would.
+ * Turn jobs the suites run themselves: a commit's requests are kept once it commits, and
+ * `takeTurnJobs` hands them to the suite, which runs the turns through turn execution as a host's
+ * turn jobs would.
  */
-export const recordedAgentJobs = AgentJobs.Service.of({
-  requestAcceptWork: keepOnceCommitted("acceptWork"),
-  requestStopDepartedTurns: keepOnceCommitted("stopDepartedTurns"),
+export const recordedTurnJobs = TurnJobs.Service.of({
+  requestRun: ({ workspaceId, memberId, threadId }) =>
+    keepOnceCommitted(workspaceId, { kind: "run", memberId, threadId }),
+  requestStop: ({ workspaceId, memberId, threadId, turnId }) =>
+    keepOnceCommitted(workspaceId, { kind: "stop", memberId, threadId, turnId }),
 });
-export const layerRecordedAgentJobs = Layer.succeed(AgentJobs.Service, recordedAgentJobs);
+export const layerRecordedTurnJobs = Layer.succeed(TurnJobs.Service, recordedTurnJobs);
 
-/**
- * Do the agent work the workspace's commits asked for since the last run, in order and once each,
- * through the gateway in context, as a host's agent jobs would; with `only`, just that work, as when
- * the other's job is still to run. Work those runs ask for waits for the next.
- */
-export const runAgentJobs = Effect.fnUntraced(function* (
-  id: Workspace.Id,
-  options: { readonly only?: keyof AgentWork.Interface } = {},
-) {
-  const gateway = yield* Gateway.Service;
-  const requested = requestedAgentWork.get(id) ?? [];
-  const due = requested.filter(({ work }) => options.only === undefined || work === options.only);
-  requestedAgentWork.set(
-    id,
-    requested.filter((request) => !due.includes(request)),
-  );
-  const seen = new Set<string>();
-  for (const { work, memberId } of due) {
-    if (seen.has(`${work}:${memberId}`)) continue;
-    seen.add(`${work}:${memberId}`);
-    yield* Effect.scoped(
-      gateway.inWorkspace(
-        id,
-        Effect.flatMap(AgentWork.Service, (agentWork) => agentWork[work](memberId)),
-      ),
-    );
-  }
-});
+/** The turn job requests the workspace's commits made since the last take, in order. */
+export const takeTurnJobs = (id: Workspace.Id) =>
+  Effect.sync(() => {
+    const requested = requestedTurnJobs.get(id) ?? [];
+    requestedTurnJobs.delete(id);
+    return requested;
+  });
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
   context: Context.Context<
     | WorkspaceStorage.Bindings
-    | AgentJobs.Service
     | TurnJobs.Service
     | ConnectionCatalog.Service
     | EnvironmentCatalog.Service
@@ -313,6 +318,7 @@ export const bind = (
   agents: Context.get(context, AgentStore.Service),
   agentsV2: Context.get(context, AgentV2Store.Service),
   turns: Context.get(context, TurnStore.Service),
+  sessionStates: Context.get(context, SessionStateStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 
@@ -330,15 +336,14 @@ export const listOldestFirst = (
   );
 
 /**
- * A workspace's stores and signal hub, with agent and turn jobs the suites run themselves: a suite
- * does the agent work its commits asked for, and runs the turn it expects, as a host's jobs would.
+ * A workspace's stores and signal hub, with turn jobs the suites run themselves: a suite takes the
+ * requests its commits made, and runs the turns it expects, as a host's turn jobs would.
  */
 const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>) =>
   Effect.map(Integrations.make(testIntegrations), (integrations) =>
     bind(
       context.pipe(
-        Context.add(AgentJobs.Service, recordedAgentJobs),
-        Context.add(TurnJobs.Service, TurnJobs.noRunner),
+        Context.add(TurnJobs.Service, recordedTurnJobs),
         Context.add(ConnectionCatalog.Service, catalog),
         Context.add(EnvironmentCatalog.Service, environmentCatalog),
         Context.add(Integrations.Integrations, integrations),
@@ -388,12 +393,7 @@ export const make = (harness: Harness) => {
   const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
     Gateway.layer(options).pipe(
       Layer.provideMerge(
-        Layer.mergeAll(
-          Layer.succeedContext(host),
-          harness.crypto,
-          layerRecordedAgentJobs,
-          TurnJobs.layerNoRunner,
-        ),
+        Layer.mergeAll(Layer.succeedContext(host), harness.crypto, layerRecordedTurnJobs),
       ),
     );
   return {

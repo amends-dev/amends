@@ -7,9 +7,8 @@ import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
-import { AgentJobs } from "./turn/agent-jobs.ts";
-import { AgentWork } from "./turn/agent-work.ts";
 import { TurnExecution } from "./turn/execution.ts";
+import { AgentV2Query } from "./agent-v2/query.ts";
 import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
@@ -68,7 +67,6 @@ import { GrantResolver } from "./authorization/grant-resolver.ts";
 import { PermissionCatalog } from "./authorization/permission-catalog.ts";
 import { RoleProjection } from "./authorization/role/projection.ts";
 import { Journal } from "./journal/journal.ts";
-import type { Reaction } from "./journal/reaction.ts";
 import { Log } from "./journal/log.ts";
 import { NotificationService } from "./notification/service.ts";
 import { NotificationProjection } from "./notification/projection.ts";
@@ -173,14 +171,12 @@ export const journalLog = Log.Id.make("journal");
 
 /**
  * The domain journal and its log, over host storage. A commit that publishes a fact that changes
- * an agent's work, or creates or retries a turn, requests that job in the same commit.
+ * an agent's work in a thread requests that agent's turn job in the same commit.
  */
 const journal = Journal.layer({
   logId: journalLog,
   projections,
-  reactions: [...AgentJobs.reactions, ...TurnJobs.reactions] as ReadonlyArray<
-    Reaction.Definition<AgentJobs.Service | TurnJobs.Service>
-  >,
+  reactions: TurnJobs.reactions,
 }).pipe(Layer.provideMerge(Log.layer));
 
 /** Authorization for the acting member, with its grant resolution. */
@@ -255,12 +251,11 @@ const operations = Layer.mergeAll(
 );
 
 /**
- * What jobs call, outside requests: an agent's work, accepting what is asked of it and stopping its
- * turns where it left, and turn execution, which a turn's job drives. Neither is an operation an
- * actor calls.
+ * What jobs call, outside requests: turn execution, which an agent's turn job drives in a thread.
+ * It is not an operation an actor calls.
  */
-const jobServices = Layer.mergeAll(AgentWork.layer, TurnExecution.layer).pipe(
-  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
+const jobServices = TurnExecution.layer.pipe(
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand, AgentV2Query.layer)),
 );
 
 /**
@@ -276,8 +271,9 @@ export const layer = Layer.mergeAll(operations, jobServices).pipe(
 
 /**
  * Host-provided dependencies derived from the layer: workspace-bound stores, the checkpoint
- * store, cryptography, the workspace's signals, and its agent and turn jobs. Adding a required store changes this type
- * and makes incomplete host compositions fail type checking.
+ * store, cryptography, the workspace's signals, the integrations it installs, and its turn jobs.
+ * Adding a required store changes this type and makes incomplete host compositions fail type
+ * checking.
  *
  * @category models
  */

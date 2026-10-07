@@ -2,7 +2,7 @@ import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connect
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
 import { AgentV2Store } from "@amends/core/agent-v2";
 import { AgentStore } from "@amends/core/agent";
-import { AgentJobs, TurnJobs, TurnStore } from "@amends/core/turn";
+import { SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
 import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
@@ -273,7 +273,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           findLatest: unexpected,
           listActive: unexpected,
           listActiveByMember: unexpected,
-          listByThread: unexpected,
           insert: unexpected,
           update: unexpected,
         }),
@@ -309,6 +308,10 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       ),
     )
     .pipe(
+      Context.add(
+        SessionStateStore.Service,
+        SessionStateStore.Service.of({ get: unexpected, set: unexpected }),
+      ),
       Context.add(
         ConnectionV2Store.Service,
         ConnectionV2Store.Service.of({
@@ -348,7 +351,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
 const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
-    AgentJobs.layerNoRunner,
     TurnJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,

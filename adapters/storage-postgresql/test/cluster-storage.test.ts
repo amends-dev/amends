@@ -1,48 +1,46 @@
-import { AgentWork, TurnStore } from "@amends/core/turn";
-import { Member, Workspace } from "@amends/core/workspace";
-import { AgentJob } from "@amends/cluster";
-import { Gateway, GatewayErrors } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
-import { Clock, DateTime, Duration, Effect, Exit, Layer, Option, Scope } from "effect";
-import { RunnerAddress, SingleRunner } from "effect/cluster";
+import {
+  Clock,
+  DateTime,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  PrimaryKey,
+  Schema,
+  Scope,
+} from "effect";
+import { ClusterSchema, DeliverAt, Entity, RunnerAddress, SingleRunner } from "effect/cluster";
+import { Rpc } from "effect/rpc";
 import { SqlClient } from "effect/sql";
 import { PostgresClusterStorage } from "../src/index.ts";
 import { database, setup } from "./support.ts";
 
 const { available, withDatabase } = setup();
-const workspaceId = Workspace.Id.make("workspace-one");
-const agent = Member.Id.make("agent-member");
 
-/**
- * A gateway that only does agents' work: in a workspace named `missing`, which was never created;
- * in one named `failing`, failing; elsewhere, doing nothing.
- */
-const agentWorkOnly = () => {
-  const unexpected = () => Effect.die("Only agents' work is expected");
-  return Gateway.Service.of({
-    createWorkspace: unexpected,
-    asMember: unexpected,
-    inWorkspace: <A, E>(id: Workspace.Id, program: Effect.Effect<A, E, unknown>) => {
-      if (id === "missing")
-        return Effect.fail(new GatewayErrors.WorkspaceNotFound({ workspaceId: id }));
-      const work = () =>
-        id === "failing"
-          ? Effect.fail(new TurnStore.Failure({ operation: "get", cause: "Not yet" }))
-          : Effect.void;
-      return Effect.provideService(
-        program as Effect.Effect<A, GatewayErrors.PublicErrorOf<E>, AgentWork.Service>,
-        AgentWork.Service,
-        AgentWork.Service.of({ acceptWork: work, stopDepartedTurns: work }),
-      );
-    },
-  });
-};
+/** A request a job handles at `at`, under `key`, by doing nothing. */
+class Ping extends Schema.Class<Ping>("test/Job/Ping")({
+  key: Schema.String,
+  at: Schema.DateTimeUtcFromMillis,
+}) {
+  [PrimaryKey.symbol]() {
+    return this.key;
+  }
+  [DeliverAt.symbol]() {
+    return this.at;
+  }
+}
 
-/** Agent jobs over the test database, reading for due requests as often as `pollInterval`. */
+/** A job whose requests Cluster keeps, as a host's jobs are. */
+const entity = Entity.make("test/Job", [
+  Rpc.make("Ping", { payload: Ping }).annotate(ClusterSchema.Persisted, true),
+]);
+
+/** The job over the test database, reading for due requests as often as `pollInterval`. */
 const cluster = (url: string, pollInterval: Duration.Input = "1 second") =>
-  AgentJob.layer.pipe(
-    Layer.provide(Layer.mergeAll(Layer.succeed(Gateway.Service, agentWorkOnly()), BunCrypto.layer)),
+  entity.toLayer(entity.of({ Ping: () => Effect.void })).pipe(
     Layer.provideMerge(
       SingleRunner.layer({
         shardingConfig: {
@@ -54,23 +52,14 @@ const cluster = (url: string, pollInterval: Duration.Input = "1 second") =>
     Layer.provideMerge(database(url)),
   );
 
-/** Store a request for the agent to accept its work, due at `at` or now, under `key`. */
-const requestIn = (id: Workspace.Id, key: string, at?: DateTime.Utc) =>
+/** Store a request, due at `at` or now, under `key`. */
+const request = (key: string, at?: DateTime.Utc) =>
   Effect.gen(function* () {
-    const agentJobClient = yield* AgentJob.entity.client;
-    yield* agentJobClient(AgentJob.entityId(id, agent)).AcceptWork(
-      new AgentJob.AcceptWork({
-        workspaceId: id,
-        memberId: agent,
-        key,
-        at: at ?? (yield* DateTime.now),
-        attempt: 0,
-      }),
-      { discard: true },
-    );
+    const client = yield* entity.client;
+    yield* client("job-one").Ping(new Ping({ key, at: at ?? (yield* DateTime.now) }), {
+      discard: true,
+    });
   });
-
-const request = (key: string, at?: DateTime.Utc) => requestIn(workspaceId, key, at);
 
 const count = (query: string) =>
   Effect.flatMap(SqlClient.SqlClient, (sql) => sql.unsafe<{ readonly count: number }>(query)).pipe(
@@ -103,7 +92,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
                 UPDATE cluster_messages SET entity_type = 'other/Entity'
                 WHERE id = (SELECT min(id) FROM cluster_messages WHERE processed)`,
             ).pipe(Effect.orDie);
-            const types = [AgentJob.entity.type];
+            const types = [entity.type];
             const now = yield* DateTime.now;
             expect(
               yield* PostgresClusterStorage.prune(types, DateTime.subtract(now, { hours: 1 })),
@@ -150,52 +139,5 @@ describe.skipIf(!available)("PostgreSQL", () => {
         yield* Effect.scoped(claim(first, "runner-a:1"));
       }).pipe(Effect.scoped),
     ),
-  );
-
-  it.live(
-    "the agent job status counts what waits and retries, per kind of request",
-    () =>
-      withDatabase((url) =>
-        Effect.gen(function* () {
-          const empty = yield* Layer.build(database(url));
-          // Before any host ran agent jobs, there is nothing to report.
-          expect(
-            yield* PostgresClusterStorage.agentJobStatus().pipe(Effect.provide(empty)),
-          ).toEqual({ requests: [], retries: [] });
-          // Reading rarely, so the retry a failed run schedules stays waiting through the test.
-          const context = yield* Layer.build(cluster(url, "30 seconds"));
-          const now = yield* DateTime.now;
-          yield* Effect.gen(function* () {
-            for (const id of ["missing", "failing", "fine"])
-              yield* requestIn(Workspace.Id.make(id), `commit-${id}`);
-            yield* requestIn(
-              Workspace.Id.make("later"),
-              "commit-later",
-              DateTime.add(now, { hours: 1 }),
-            );
-            const deadline = (yield* Clock.currentTimeMillis) + 10_000;
-            while (
-              (yield* PostgresClusterStorage.agentJobStatus()).retries.length === 0 &&
-              (yield* Clock.currentTimeMillis) < deadline
-            )
-              yield* Effect.sleep("100 millis");
-            const status = yield* PostgresClusterStorage.agentJobStatus();
-            // The later request and the failed one's retry wait; the others were handled.
-            expect(status.requests).toEqual([
-              {
-                request: "AcceptWork",
-                due: 0,
-                scheduled: 2,
-                retrying: 1,
-                oldestDue: Option.none(),
-              },
-            ]);
-            expect(status.retries).toMatchObject([
-              { request: "AcceptWork", workspaceId: "failing", memberId: agent, attempt: 1 },
-            ]);
-          }).pipe(Effect.provide(context));
-        }).pipe(Effect.scoped),
-      ),
-    30_000,
   );
 });

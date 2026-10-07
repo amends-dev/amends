@@ -11,14 +11,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/environment": "workspace:*",
-    "@amends/gateway": "workspace:*",
-    "@amends/harness": "workspace:*",
     "effect": "catalog:"
-  },
-  "devDependencies": {
-    "@amends/harness-amends": "workspace:*"
   }
 }

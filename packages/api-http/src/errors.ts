@@ -251,8 +251,6 @@ export const AgentV2Incomplete = AgentV2Service.Incomplete.pipe(HttpApiSchema.st
 
 /** A turn the caller may not read, because its thread is closed to them, answers as missing. */
 export const TurnNotFound = TurnService.NotFound.pipe(HttpApiSchema.status(404));
-/** A thread the caller may not open answers as missing. */
-export const TurnThreadNotFound = TurnService.ThreadNotFound.pipe(HttpApiSchema.status(404));
 /** The turn has already finished, so there is nothing to stop. */
 export const TurnNotActive = TurnService.NotActive.pipe(HttpApiSchema.status(409));
 /** The turn can't run again, for the reason given. */

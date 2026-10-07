@@ -21,19 +21,38 @@ const decodeRows = Schema.decodeUnknownEffect(
   ),
 );
 type Row = typeof turns.$inferSelect;
-const toRecord = ({ connectionId, model, reasoning, environmentId, ...common }: Row) => ({
+/** The record a row stores, before its fields are checked. */
+const toRecord = ({
+  retryOf,
+  retriedBy,
+  harnessConnectionId,
+  modelConnectionId,
+  modelId,
+  modelEffort,
+  sandboxConnectionId,
+  ...common
+}: Row) => ({
   ...common,
+  retry: retryOf === null || retriedBy === null ? null : { of: retryOf, by: retriedBy },
   selection:
-    connectionId === null || model === null || environmentId === null
+    harnessConnectionId === null || modelConnectionId === null || modelId === null
       ? null
-      : { connectionId, model, reasoning, environmentId },
+      : {
+          harness: { connectionId: harnessConnectionId },
+          model: {
+            connectionId: modelConnectionId,
+            id: modelId,
+            ...(modelEffort === null ? {} : { effort: modelEffort }),
+          },
+          sandbox: sandboxConnectionId === null ? null : { connectionId: sandboxConnectionId },
+        },
 });
 const decode = (rows: ReadonlyArray<Row>) =>
   decodeRows(rows.map(toRecord)).pipe(
     Effect.flatMap((records) => Effect.forEach(records, (record) => validateRecord(record))),
   );
 const instant = (value: DateTime.Utc | null) => (value === null ? null : DateTime.toDate(value));
-const toRow = ({ selection, ...record }: Turn.Record): typeof turns.$inferInsert => ({
+const toRow = ({ selection, retry, ...record }: Turn.Record): typeof turns.$inferInsert => ({
   workspaceId: record.workspaceId,
   id: record.id,
   groupId: record.groupId,
@@ -41,16 +60,15 @@ const toRow = ({ selection, ...record }: Turn.Record): typeof turns.$inferInsert
   agentId: record.agentId,
   memberId: record.memberId,
   participationId: record.participationId,
-  logAfter: record.logAfter,
-  historyFrom: record.historyFrom,
-  retryOf: record.retryOf,
+  retryOf: retry?.of ?? null,
+  retriedBy: retry?.by ?? null,
   status: record.status,
-  inputAfterSequence: record.inputAfterSequence,
   acceptedThroughSequence: record.acceptedThroughSequence,
-  connectionId: selection?.connectionId ?? null,
-  model: selection?.model ?? null,
-  reasoning: selection?.reasoning ?? null,
-  environmentId: selection?.environmentId ?? null,
+  harnessConnectionId: selection?.harness.connectionId ?? null,
+  modelConnectionId: selection?.model.connectionId ?? null,
+  modelId: selection?.model.id ?? null,
+  modelEffort: selection?.model.effort ?? null,
+  sandboxConnectionId: selection?.sandbox?.connectionId ?? null,
   messageIds: [...record.messageIds],
   failure: record.failure,
   cancelReason: record.cancelReason,
@@ -154,20 +172,6 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
         ).pipe(Effect.flatMap(decode));
       },
       Effect.mapError(storeFailure(TurnStore, "listActiveByMember")),
-    ),
-    listByThread: Effect.fn("TurnRecords.listByThread")(
-      function* (threadInput, limit) {
-        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
-        return yield* guard(
-          db
-            .select()
-            .from(turns)
-            .where(and(inWorkspace, eq(turns.threadId, threadId)))
-            .orderBy(desc(turns.createdAt), desc(turns.acceptedThroughSequence), desc(orderedId))
-            .limit(limit),
-        ).pipe(Effect.flatMap(decode));
-      },
-      Effect.mapError(storeFailure(TurnStore, "listByThread")),
     ),
     insert: Effect.fn("TurnRecords.insert")(function* (input) {
       const record = yield* valid("insert", input);

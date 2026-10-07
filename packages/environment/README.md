@@ -5,8 +5,8 @@
 spawns the runtime, starts harness sessions in it with the turn's model access, and applies
 retention when released, as the
 [core model](../../docs/core-model.md#agreed-spawning-history-setup-and-input-submission-are-separate-stages)
-describes. [Turn execution](../cluster/README.md#running-a-turn) spawns one for each run of a
-turn and starts a session in it for each attempt. [Harnesses in sandboxes](../../docs/sandbox-harnesses.md)
+describes. Turns spawned one for each run and started a session in it for each attempt before
+they moved to [harness-v2](../harness-v2/README.md); none spawns one now. [Harnesses in sandboxes](../../docs/sandbox-harnesses.md)
 plans how harnesses come to run inside a sandbox.
 
 ## The service

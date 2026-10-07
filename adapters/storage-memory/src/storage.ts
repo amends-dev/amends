@@ -20,6 +20,7 @@ import { Journal } from "./journal.ts";
 import { Members } from "./members.ts";
 import { Notifications } from "./notifications.ts";
 import { ReadStates } from "./read-states.ts";
+import { SessionStates } from "./session-states.ts";
 import { MemorySignalHub } from "./signal-hub.ts";
 import { Roles } from "./roles.ts";
 import { ThreadActivities } from "./thread-activities.ts";
@@ -60,6 +61,7 @@ const layerStores = Layer.mergeAll(
   Agents.layer,
   AgentsV2.layer,
   TurnRecords.layer,
+  SessionStates.layer,
   MemorySignalHub.layer,
 );
 

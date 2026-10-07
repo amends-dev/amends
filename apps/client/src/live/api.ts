@@ -215,7 +215,6 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     [
       "turn.created",
       "turn.retried",
-      "turn.input-accepted",
       "turn.started",
       "turn.cancel-requested",
       "turn.completed",

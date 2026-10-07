@@ -10,7 +10,7 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Effect, Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/reactivity";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { agentsReads } from "../agents/api.ts";
+import { connectionsV2Reads } from "../connections-v2/api.ts";
 import { timelineRead } from "../conversations/api.ts";
 import { useApiClient } from "../provider.tsx";
 import { writing } from "./drafts.ts";
@@ -258,10 +258,7 @@ export function useTurnLog(
   const feed = () => Option.getOrUndefined(AsyncResult.value(feedResult()));
   const entryOf = useEntries(workspaceId);
   const groups = useWorkspaceGroups(workspaceId);
-  const setup = agentsReads(client, workspaceId);
-  const connections = useRead(setup?.connections);
-  const implementations = useRead(setup?.connectionImplementations);
-  const environments = useRead(setup?.environments);
+  const connections = useRead(connectionsV2Reads(client, workspaceId)?.connections);
   const live = useChangeFeedStatus();
   const followingDown = useLastingDown(() => feed()?.connection === "reconnecting");
   const failure = (): WorkspaceFailure | undefined => {
@@ -285,10 +282,10 @@ export function useTurnLog(
       selection = read.value()?.selection;
     if (current === undefined || selection === undefined) return undefined;
     const group = groups.group(current.groupId);
-    const connection = connections.value()?.find((item) => item.id === selection?.connectionId);
-    const provider = implementations
-      .value()
-      ?.find((item) => item.id === connection?.implementationId)?.name;
+    const nameOf = (connectionId: string | undefined) =>
+      connections.value()?.find((item) => item.id === connectionId)?.name;
+    // TODO: Show the turn's harness, model, and sandbox as parts of their own, once the turn log
+    // screen takes a selection rather than a model and an environment.
     return {
       agentId: current.agent.id,
       agent: { name: current.agent.name },
@@ -296,11 +293,15 @@ export function useTurnLog(
       where:
         group?.kind === "direct" ? `Thread with ${group.name}` : `Thread in #${group?.name ?? ""}`,
       model:
-        selection === null ? undefined : [provider, selection.model].filter(Boolean).join(" · "),
+        selection === null
+          ? undefined
+          : [nameOf(selection.model.connectionId), selection.model.id].filter(Boolean).join(" · "),
       environment:
         selection === null
           ? undefined
-          : environments.value()?.find((item) => item.id === selection.environmentId)?.name,
+          : [nameOf(selection.harness.connectionId), nameOf(selection.sandbox?.connectionId)]
+              .filter(Boolean)
+              .join(" in "),
       stoppable: current.stoppable,
       retryable: current.retryable,
       replyId: current.replyId,

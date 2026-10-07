@@ -22,7 +22,8 @@ take references to other read models as recorded, so each rebuilds alone. Lists 
 Commit and entry IDs come from a counter in each storage.
 Connections' credentials sit beside the records, outside the projections a rebuild discards, and
 are held as they are: this adapter is for tests, so it seals nothing. Connections v2 keep one
-credential for each connection the same way, as the JSON of its encoded form.
+credential for each connection the same way, as the JSON of its encoded form, and each
+participation's harness session is kept beside them too, as JSON.
 
 ## Transactions
 

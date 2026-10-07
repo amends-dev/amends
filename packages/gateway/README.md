@@ -30,7 +30,7 @@ and `WorkspaceDirectoryListing` for public API documentation.
 ## Construction
 
 `Gateway.make(options?)` constructs a `Gateway.Interface` from `WorkspaceStorage.Service`,
-core's `AgentJobs.Service` and `TurnJobs.Service`, and `Crypto.Crypto`, in the host's scope. It captures
+core's `TurnJobs.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
 long an unused workspace stays prepared; it defaults to five minutes. `options.connections` lists
@@ -80,7 +80,7 @@ host changed the workspace uses it prepared again. Both apply one error policy, 
 
 A host provides `WorkspaceStorage.Service`, whose `forWorkspace` returns the storage
 part of core's `HostServices` bound to one workspace (`WorkspaceStorage.Bindings`): its stores and
-its `SignalHub.Service`; core's `AgentJobs.Service` and `TurnJobs.Service`, which take every workspace's job requests,
+its `SignalHub.Service`; core's `TurnJobs.Service`, which takes every workspace's job requests,
 each naming its workspace, and `Crypto.Crypto`. The gateway passes the job services to each
 workspace's core as they are. A host that runs no jobs provides each one's `layerNoRunner`:
 requests are accepted and nothing runs, so work waits in agents' inboxes, or queued.
@@ -146,8 +146,9 @@ host-owned because they span workspaces or issue credentials, which core never
 does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
-[`@amends/cluster`](../cluster/README.md) implements core's `AgentJobs` and `TurnJobs` on
-Effect Cluster, with the workers that run what they store through `inWorkspace`.
+Hosts implement core's `TurnJobs` on a job runner that enters workspaces through `inWorkspace`,
+as [`@amends/cluster`](../cluster/README.md) is to; until its turn job is rebuilt, hosts use
+`TurnJobs.layerNoRunner`.
 
 Storage binds each workspace's `SignalHub.Service`, which delivers
 [ephemeral signals](../core/README.md#signals), such as typing, between every process over the

@@ -307,6 +307,19 @@ CREATE TABLE "roles" (
 	CONSTRAINT "roles_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
+CREATE TABLE "session_states" (
+	"workspace_id" text,
+	"participation_id" text,
+	"state" jsonb NOT NULL,
+	"prompted_through_sequence" integer NOT NULL,
+	"harness_connection_id" text NOT NULL,
+	"model_connection_id" text NOT NULL,
+	"model_id" text NOT NULL,
+	"model_effort" text,
+	"sandbox_connection_id" text,
+	CONSTRAINT "session_states_pkey" PRIMARY KEY("workspace_id","participation_id")
+);
+--> statement-breakpoint
 CREATE TABLE "thread_activities" (
 	"workspace_id" text,
 	"id" text,
@@ -388,16 +401,15 @@ CREATE TABLE "turns" (
 	"agent_id" text NOT NULL,
 	"member_id" text NOT NULL,
 	"participation_id" text NOT NULL,
-	"log_after" integer,
-	"history_from" integer,
 	"retry_of" text,
+	"retried_by" text,
 	"status" text NOT NULL,
-	"input_after_sequence" integer NOT NULL,
 	"accepted_through_sequence" integer NOT NULL,
-	"connection_id" text,
-	"model" text,
-	"reasoning" text,
-	"environment_id" text,
+	"harness_connection_id" text,
+	"model_connection_id" text,
+	"model_id" text,
+	"model_effort" text,
+	"sandbox_connection_id" text,
 	"message_ids" text[] NOT NULL,
 	"failure" text,
 	"cancel_reason" text,
@@ -405,8 +417,8 @@ CREATE TABLE "turns" (
 	"started_at" timestamp with time zone,
 	"finished_at" timestamp with time zone,
 	CONSTRAINT "turns_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "turn_input_order" CHECK ("input_after_sequence" <= "accepted_through_sequence"),
-	CONSTRAINT "turn_selection_complete" CHECK (("connection_id" IS NULL AND "model" IS NULL AND "reasoning" IS NULL AND "environment_id" IS NULL) OR ("connection_id" IS NOT NULL AND "model" IS NOT NULL AND "environment_id" IS NOT NULL))
+	CONSTRAINT "turn_retry_complete" CHECK (("retry_of" IS NULL) = ("retried_by" IS NULL)),
+	CONSTRAINT "turn_selection_complete" CHECK (("harness_connection_id" IS NULL AND "model_connection_id" IS NULL AND "model_id" IS NULL AND "model_effort" IS NULL AND "sandbox_connection_id" IS NULL) OR ("harness_connection_id" IS NOT NULL AND "model_connection_id" IS NOT NULL AND "model_id" IS NOT NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "workspaces" (
@@ -453,7 +465,7 @@ CREATE INDEX "threads_by_group" ON "threads" ("workspace_id","group_id","id" COL
 CREATE INDEX "threads_by_start" ON "threads" ("workspace_id","group_id","created_at","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "threads_by_latest" ON "threads" ("workspace_id","group_id","latest_activity_at","id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_turn_by_agent_thread" ON "turns" ("workspace_id","member_id","thread_id") WHERE "status" IN ('queued', 'running', 'cancelling');--> statement-breakpoint
-CREATE INDEX "turns_by_thread" ON "turns" ("workspace_id","thread_id","created_at");--> statement-breakpoint
+CREATE INDEX "turns_by_agent_thread" ON "turns" ("workspace_id","member_id","thread_id","created_at");--> statement-breakpoint
 CREATE INDEX "active_turns" ON "turns" ("workspace_id","created_at") WHERE "status" IN ('queued', 'running', 'cancelling');--> statement-breakpoint
 ALTER TABLE "log_append_keys" ADD CONSTRAINT "log_append_keys_batch" FOREIGN KEY ("workspace_id","log_id","commit_id") REFERENCES "log_batches"("workspace_id","log_id","commit_id");--> statement-breakpoint
 ALTER TABLE "log_batches" ADD CONSTRAINT "log_batches_commit" FOREIGN KEY ("workspace_id","commit_id") REFERENCES "commits"("workspace_id","id");--> statement-breakpoint

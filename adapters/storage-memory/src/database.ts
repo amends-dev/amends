@@ -78,6 +78,8 @@ export interface Space {
   readonly credentials: Map<string, string>;
   /** Each connection's credential by connection ID, outside the journal, which rebuilds keep. */
   readonly connectionV2Credentials: Map<string, string>;
+  /** Each participation's harness session, outside the journal, which rebuilds keep. */
+  readonly sessionStates: Map<string, string>;
 }
 
 export interface Interface {
@@ -116,6 +118,7 @@ export const empty = (): Space => ({
   notificationsSeen: new Map(),
   credentials: new Map(),
   connectionV2Credentials: new Map(),
+  sessionStates: new Map(),
 });
 
 /** An isolated snapshot: every map is copied, and the values they hold never change. */
@@ -131,6 +134,7 @@ export const copy = (space: Space): Space => ({
   notificationsSeen: new Map(space.notificationsSeen),
   credentials: new Map(space.credentials),
   connectionV2Credentials: new Map(space.connectionV2Credentials),
+  sessionStates: new Map(space.sessionStates),
 });
 
 /** Committed state of one workspace, without creating any. */

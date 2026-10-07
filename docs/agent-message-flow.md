@@ -1,5 +1,9 @@
 # From a message to an agent's reply
 
+> **Historical.** This describes the path before turns moved to harness-v2: through the agent job,
+> `AgentWork`, and the turn runner, which no longer exist. [Core's turns](../packages/core/README.md#turns)
+> describe the turn flow now, and [known limitations](current-status.md) what does not run yet.
+
 This guide follows one path through the system: a person posts a message that asks an agent for
 work, and the agent's reply appears in the thread. It names each step, the code that performs it,
 the commit it happens in, and what hands control to the next step. The steps are joined by
@@ -63,7 +67,7 @@ Publishing that fact does two things in the same transaction, in this order
   for the entity `amends/AgentJob`, keyed by workspace and the agent's membership, with the
   primary key `commit:<commit id>`. The local host gives Cluster and the workspace storage one SQL
   client, so the message is a row written in the commit's own transaction
-  ([cluster](../packages/cluster/README.md#agent-jobs)).
+  ([cluster](../packages/cluster/README.md)).
 
 The request is a reaction and not a projection because a projection also runs when a read model is
 rebuilt from the journal, and a rebuild must not ask for work again. A reaction runs only when a
@@ -117,7 +121,7 @@ entity `amends/TurnJob`, keyed by workspace and turn, in this same transaction.
 ## 4. The turn runs
 
 `TurnJob.layerWorker` handles the `Run` message on the turn's entity and calls
-`TurnRunner.run` ([cluster](../packages/cluster/README.md#running-a-turn)). Turns are separate entities, so
+`TurnRunner.run` ([cluster](../packages/cluster/README.md)). Turns are separate entities, so
 different turns run side by side while one turn runs once at a time.
 
 The runner never touches storage. Every step goes through `gateway.inWorkspace` to
@@ -199,7 +203,7 @@ followed over its own stream.
 | Commit B fails                  | No turn, notifications still pending, no `Run`; the agent job's retry accepts them.                                                                                  |
 | A turn's run fails              | The worker stores another `Run` after the same delay; after eight failed runs it stores an `Abandon`, which fails the turn, asking again until that is recorded.     |
 | A turn's run is cut short       | Cluster redelivers it; the runner continues from the log. Interruptions worth retrying count against `retries` (three) in the log, so a restart does not reset them. |
-| Model silent, context full      | The runner records the interruption, and retries or checkpoints; see [cluster](../packages/cluster/README.md#running-a-turn).                                        |
+| Model silent, context full      | The runner records the interruption, and retries or checkpoints; see [cluster](../packages/cluster/README.md).                                                       |
 
 ## Timing
 

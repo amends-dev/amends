@@ -26,6 +26,6 @@ it.effect("preserves message bytes with dates, Unicode, mentions, and a nullable
   verifyStoredPayload(ThreadMessageFacts.Published.payload, fixtures.message),
 );
 
-it.effect("preserves checkpoint bytes with transcript variants and provider metadata", () =>
-  verifyStoredPayload(TurnLog.Entry, fixtures.checkpoint),
+it.effect("preserves turn step bytes with tagged parts, tool JSON, and provider metadata", () =>
+  verifyStoredPayload(TurnLog.Entry, fixtures.step),
 );

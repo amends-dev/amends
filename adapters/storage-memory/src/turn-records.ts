@@ -94,15 +94,6 @@ export const make = Effect.fn("TurnRecords.make")(function* () {
         .filter((record) => record.memberId === memberId && Turn.active(record.status))
         .toSorted(byCreated);
     }),
-    listByThread: Effect.fn("TurnRecords.listByThread")(function* (threadInput, limit) {
-      const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput).pipe(
-        Effect.mapError(storeFailure(TurnStore, "listByThread")),
-      );
-      return (yield* all("listByThread"))
-        .filter((record) => record.threadId === threadId)
-        .toSorted((left, right) => byCreated(right, left))
-        .slice(0, limit);
-    }),
     insert: Effect.fn("TurnRecords.insert")(function* (input) {
       const record = yield* valid("insert", input);
       const space = yield* write.pipe(Effect.mapError(storeFailure(TurnStore, "insert")));

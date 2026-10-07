@@ -114,7 +114,6 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "TurnService.NotActive": "changed",
   "TurnService.NotRetryable": "changed",
   "TurnService.NotFound": "gone",
-  "TurnService.ThreadNotFound": "gone",
   // Following a turn's log stopped short, or too many streams are open: following again may work.
   "Turn.LogUnavailable": "failed",
   "Api.TooManyStreams": "failed",
