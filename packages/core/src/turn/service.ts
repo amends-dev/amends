@@ -33,7 +33,6 @@ import { NotActive, NotFound, NotRetryable } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnCommand } from "./command.ts";
 import { TurnFacts } from "./facts.ts";
-import { TurnQuery } from "./query.ts";
 import { SessionLog } from "./session-log.ts";
 import { SessionLogStore } from "./session-log-store.ts";
 import { TurnStore } from "./store.ts";
@@ -136,7 +135,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
   const journal = yield* Journal.Service;
   const sessionLogStore = yield* SessionLogStore.Service;
   const signalHub = yield* SignalHub.Service;
-  const turnQuery = yield* TurnQuery.Service;
   const changeFeedSource = yield* ChangeFeedSource.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -294,10 +292,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
     }
     sent = reader.items();
     const openedMessage = Turn.LogMessage.cases.Opened.make({ items: sent });
-    // What the step being written holds so far, since drafts carry only what follows it.
-    const draftsSoFar = (yield* turnQuery.currentDrafts(turn.id)).map((draft) =>
-      Turn.LogMessage.cases.Drafted.make({ ...draft, offset: 0 }),
-    );
 
     type Input = Data.TaggedEnum<{
       Logged: { readonly recorded: ReadonlyArray<SessionLog.Recorded> };
@@ -376,7 +370,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
           ),
         Ended: () => Effect.andThen(checkStillReadable, readEnding),
       });
-    return Stream.make(openedMessage, ...draftsSoFar).pipe(
+    return Stream.make(openedMessage).pipe(
       Stream.concat(
         Stream.mergeAll([loggedInputs, draftedInputs, committedInputs], {
           concurrency: "unbounded",

@@ -13,13 +13,18 @@ import {
   type ThreadTimeline,
   ThreadParticipation,
 } from "@amends/core/thread";
-import { Turn, TurnExecution, TurnService } from "@amends/core/turn";
+import {
+  type SessionLog,
+  type SessionStateStore,
+  Turn,
+  TurnExecution,
+  TurnService,
+} from "@amends/core/turn";
 import type { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
-import { Agent, type Session, type StreamPart } from "@amends/harness-v2";
+import type { StreamPart } from "@amends/harness-v2";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Redacted, Stream } from "effect";
-import { Prompt } from "effect/ai";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -58,13 +63,25 @@ const timelineOf = (id: Workspace.Id, threadId: Turn.Record["threadId"]) =>
 /** The turn as stored now. */
 const turnOf = (id: Workspace.Id, turnId: Turn.Id) =>
   Effect.flatMap(boundTo(id), (bound) => Effect.map(bound.turns.get(turnId), Option.getOrThrow));
-/** Every entry of the participation's session log, oldest first. */
-const entriesOf = (id: Workspace.Id, participationId: Turn.Record["participationId"]) =>
+/** Append to the participation's session log after its latest entry, as a turn's job does. */
+const appendToLog = (
+  id: Workspace.Id,
+  participationId: Turn.Record["participationId"],
+  entries: readonly [SessionLog.Entry, ...Array<SessionLog.Entry>],
+) =>
   Effect.flatMap(boundTo(id), (bound) =>
-    Effect.map(bound.sessionLogs.read(participationId, { after: 0, limit: 1_000 }), (recorded) =>
-      recorded.map(({ entry }) => entry),
+    Effect.flatMap(bound.sessionLogs.head(participationId), (head) =>
+      bound.sessionLogs.append(participationId, entries, head),
     ),
   );
+/** Log the prompt a turn started with, as its job does before running it. */
+const logPrompt = (id: Workspace.Id, ready: Ready) =>
+  appendToLog(id, ready.turn.participationId, [
+    { _tag: "Prompted", turnId: ready.turn.id, texts: ready.prompt, messages: ready.messages },
+  ]);
+/** Log a step the turn took, as its job does while running it. */
+const logStep = (id: Workspace.Id, turn: Turn.Record, stepId: string, step: StreamPart.Step) =>
+  appendToLog(id, turn.participationId, [{ _tag: "Step", turnId: turn.id, id: stepId, step }]);
 /**
  * Follow a turn's log, as alice unless another reader is named, for the enclosing scope: each
  * message as it arrives, and whether the stream has finished or failed as unavailable.
@@ -125,18 +142,6 @@ const told = (item: ThreadTimeline.Item) => {
   }
 };
 
-/** What a prompt says, each part's text. */
-const textsOf = (prompt: Prompt.UserMessage) =>
-  prompt.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
-
-/** A conversation in brief: each message's role, and its text or the kind of each other part. */
-const said = (history: Prompt.Prompt) =>
-  history.content.map(({ role, content }) =>
-    typeof content === "string"
-      ? `${role}: ${content}`
-      : `${role}: ${content.map((part) => (part.type === "text" ? part.text : `(${part.type})`)).join(" ")}`,
-  );
-
 const usage = { inputTokens: {}, outputTokens: {} };
 /** A step that only reads the notes. */
 const reading: StreamPart.Step = {
@@ -148,22 +153,8 @@ const answering = (text: string): StreamPart.Step => ({
   parts: [{ type: "text", text }],
   finish: { type: "finish-step", reason: "stop", usage },
 });
-/**
- * The session a harness hands back after a turn, as the agent's participation names it. Its
- * history is the harness's own record, which the session log stands in for.
- */
-const sessionAfter = (
-  participationId: Turn.Record["participationId"],
-  said: string,
-): Session.SessionState => ({
-  id: Agent.SessionId.make(participationId),
-  agent: "test-in-process",
-  history: Prompt.make([
-    { role: "user", content: said },
-    { role: "assistant", content: [{ type: "text", text: "Done." }] },
-  ]),
-  agentState: { turns: 1 },
-});
+/** What a harness session resumes from, as a turn's job hands it back when the turn ends. */
+const resume: SessionStateStore.Resume = { agent: "test-in-process", agentState: { turns: 1 } };
 
 /**
  * A workspace owned by alice, named Alice there, with an agent, Planner, that works in the host's
@@ -281,13 +272,33 @@ const unfollow = (
       ),
     );
   });
-/** Start the agent's work in the thread, as its turn job does, expecting a turn ready to run. */
-const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["threadId"]) =>
-  execute(id, (turnExecution) => turnExecution.start({ memberId, threadId })).pipe(
-    Effect.filterOrElse(TurnExecution.Start.$is("Ready"), (started) =>
-      Effect.die(`Expected a turn ready to run, not ${started._tag}`),
+type Ready = Extract<TurnExecution.Start, { readonly _tag: "Ready" }>;
+/** Nothing for a turn job to run. */
+const idle = TurnExecution.Start.cases.Idle.make({});
+/**
+ * Run the agent's job in the thread as far as core takes it: accept its work into a turn and start
+ * the turn, or nothing when no work waits.
+ */
+const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["threadId"]) =>
+  execute(id, (turnExecution) =>
+    Effect.flatMap(turnExecution.accept({ memberId, threadId }), (accepted) =>
+      Option.match(accepted, {
+        onNone: () => Effect.succeed(idle),
+        onSome: (turn) => turnExecution.start(turn.id),
+      }),
     ),
   );
+/** Run the agent's job in the thread, as its turn job does, expecting a turn ready to run. */
+const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["threadId"]) =>
+  runJob(id, memberId, threadId).pipe(
+    Effect.filterOrElse(
+      (started): started is Ready => started._tag === "Ready",
+      (started) => Effect.die(`Expected a turn ready to run, not ${started._tag}`),
+    ),
+  );
+/** The conversation the turn's agent joined, as its job reads it for a new session log. */
+const joinedOf = (id: Workspace.Id, turnId: Turn.Id) =>
+  execute(id, (turnExecution) => turnExecution.joinedConversation(turnId));
 
 export const turns = (harness: ConformanceHarness) => {
   const { runGateway } = Support.make(harness);
@@ -299,7 +310,7 @@ export const turns = (harness: ConformanceHarness) => {
           runGateway(
             storage,
             Effect.gen(function* () {
-              const { workspace, agent, identity, selection } = yield* workspaceWithAgent;
+              const { workspace, agent, identity, selection, models } = yield* workspaceWithAgent;
               const started = yield* start(workspace.id, "Planner, summarize the plan.", [
                 agent.memberId,
               ]);
@@ -326,17 +337,30 @@ export const turns = (harness: ConformanceHarness) => {
                 selection,
               });
               expect(yield* turnOf(workspace.id, turn.id)).toEqual(turn);
-              // The agent runs on its harness, with its instructions, in the host's process.
-              expect(ready.runnable.instructions).toBe("Plan each change.");
-              expect(ready.runnable.harness.agent.id).toBe("test-in-process");
-              expect(ready.runnable.sandboxProvider).toBeUndefined();
-              // Its first session in the thread is named by its participation, with nothing said
-              // before it joined, and the turn's prompt is what it was asked.
-              expect(ready.session).toEqual({
-                id: Agent.SessionId.make(turn.participationId),
-                history: Prompt.empty,
+              // The job runs the agent with its instructions on the connections of its selection,
+              // each with its key: its harness in the host's process, with no sandbox.
+              const { runnable } = ready;
+              expect(runnable.instructions).toBe("Plan each change.");
+              expect(runnable.harness).toMatchObject({
+                connection: { integration: "test-in-process" },
+                credential: null,
               });
-              expect(textsOf(ready.prompt)).toEqual(["Alice: Planner, summarize the plan."]);
+              expect(runnable.model).toMatchObject({
+                connection: { id: models.id, integration: "test-models" },
+                model: selection.model,
+              });
+              expect(
+                Option.map(Option.fromNullOr(runnable.model.credential), ({ apiKey }) =>
+                  Redacted.value(apiKey),
+                ),
+              ).toEqual(Option.some(goodKey));
+              expect(runnable.sandbox).toBeNull();
+              // Its first session in the thread starts anew, with nothing said before it joined,
+              // and the turn's prompt is what it was asked.
+              expect(ready.resume).toBeNull();
+              expect(yield* joinedOf(workspace.id, turn.id)).toEqual([]);
+              expect(ready.prompt).toEqual(["Alice: Planner, summarize the plan."]);
+              expect(ready.messages).toBe(1);
               expect(yield* bound.notifications.get(asked!.id)).toEqual(
                 Option.some(
                   Object.assign({}, asked, {
@@ -344,15 +368,6 @@ export const turns = (harness: ConformanceHarness) => {
                   }),
                 ),
               );
-              // The participation's session log has the prompt, as the agent is told it.
-              expect(yield* entriesOf(workspace.id, turn.participationId)).toEqual([
-                {
-                  _tag: "Prompted",
-                  turnId: turn.id,
-                  texts: ["Alice: Planner, summarize the plan."],
-                  messages: 1,
-                },
-              ]);
               const active = yield* as(
                 workspace.id,
                 alice,
@@ -360,14 +375,8 @@ export const turns = (harness: ConformanceHarness) => {
               );
               expect(active.map(({ id }) => id)).toEqual([turn.id]);
 
-              // A run cut short runs the turn again from its prompt, which its log notes.
-              const again = yield* startReady(workspace.id, agent.memberId, threadId);
-              expect(again.turn).toEqual(turn);
-              expect(again.session).toEqual(ready.session);
-              expect(textsOf(again.prompt)).toEqual(["Alice: Planner, summarize the plan."]);
-              expect(
-                (yield* entriesOf(workspace.id, turn.participationId)).map(({ _tag }) => _tag),
-              ).toEqual(["Prompted", "Interrupted"]);
+              // A run cut short runs the turn again, as it was ready to run.
+              expect(yield* startReady(workspace.id, agent.memberId, threadId)).toEqual(ready);
               expect((yield* timelineOf(workspace.id, threadId)).map(told)).toEqual([
                 "message: Planner, summarize the plan.",
                 `created ${turn.id}`,
@@ -393,16 +402,8 @@ export const turns = (harness: ConformanceHarness) => {
               const threadId = started.thread.id;
               const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
               yield* takeTurnJobs(workspace.id);
-              const state = sessionAfter(turn.participationId, "Planner, summarize the plan.");
               const closing = yield* execute(workspace.id, (turnExecution) =>
-                Effect.gen(function* () {
-                  yield* turnExecution.recordStep(turn.id, { id: "step-1", step: reading });
-                  yield* turnExecution.recordStep(turn.id, {
-                    id: "step-2",
-                    step: answering("The plan is on track."),
-                  });
-                  return yield* turnExecution.close(turn.id, state);
-                }),
+                turnExecution.close(turn.id, { reply: "The plan is on track.", resume }),
               );
               expect(closing._tag).toBe("Closed");
               const closed = yield* turnOf(workspace.id, turn.id);
@@ -425,11 +426,8 @@ export const turns = (harness: ConformanceHarness) => {
                   turnId: turn.id,
                 },
               });
-              // The session log holds the conversation: the prompt and each step the turn took.
-              expect(
-                (yield* entriesOf(workspace.id, turn.participationId)).map(({ _tag }) => _tag),
-              ).toEqual(["Prompted", "Step", "Step"]);
-              // The session is kept beside it for the agent's next turn there, as prompted so far.
+              // What the session resumes from is kept for the agent's next turn there, as prompted
+              // so far.
               const bound = yield* boundTo(workspace.id);
               expect(yield* bound.sessionStates.get(turn.participationId)).toEqual(
                 Option.some({
@@ -449,11 +447,7 @@ export const turns = (harness: ConformanceHarness) => {
               expect(yield* takeTurnJobs(workspace.id)).toEqual([
                 { kind: "run", memberId: agent.memberId, threadId },
               ]);
-              expect(
-                yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.start({ memberId: agent.memberId, threadId }),
-                ),
-              ).toEqual(TurnExecution.Start.Idle());
+              expect(yield* runJob(workspace.id, agent.memberId, threadId)).toEqual(idle);
 
               // More is asked, and the next turn resumes the session, prompted with only that.
               const more = yield* reply(workspace.id, threadId, "Include the risks too.");
@@ -466,37 +460,14 @@ export const turns = (harness: ConformanceHarness) => {
                 acceptedThroughSequence: more.activity.sequence,
                 selection,
               });
-              // It resumes with the conversation its session log records, read back as the agent
-              // was told it and as each step was taken.
-              expect(next.session).toEqual({
-                resumeFrom: {
-                  id: state.id,
-                  agent: state.agent,
-                  agentState: state.agentState,
-                  history: expect.anything(),
-                },
-              });
-              expect("resumeFrom" in next.session && said(next.session.resumeFrom.history)).toEqual(
-                [
-                  "user: Alice: Planner, summarize the plan.",
-                  "assistant: (tool-call)",
-                  "tool: (tool-result)",
-                  "assistant: The plan is on track.",
-                ],
-              );
-              expect(textsOf(next.prompt)).toEqual(["Alice: Include the risks too."]);
+              expect(next.resume).toEqual(resume);
+              expect(next.prompt).toEqual(["Alice: Include the risks too."]);
               // An answer of nothing posts nothing.
               expect(
                 yield* execute(workspace.id, (turnExecution) =>
-                  Effect.gen(function* () {
-                    yield* turnExecution.recordStep(next.turn.id, {
-                      id: "step-1",
-                      step: answering("  "),
-                    });
-                    return yield* turnExecution.close(next.turn.id, state);
-                  }),
+                  turnExecution.close(next.turn.id, { reply: "  ", resume }),
                 ),
-              ).toEqual(TurnExecution.Closing.Closed({ messageIds: [] }));
+              ).toEqual(TurnExecution.Closing.cases.Closed.make({ messageIds: [] }));
               expect(yield* turnOf(workspace.id, next.turn.id)).toMatchObject({
                 status: "completed",
                 messageIds: [],
@@ -529,7 +500,9 @@ export const turns = (harness: ConformanceHarness) => {
                 ]);
                 const threadId = started.thread.id;
                 const bound = yield* boundTo(workspace.id);
-                const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
+                const ready = yield* startReady(workspace.id, agent.memberId, threadId);
+                const { turn } = ready;
+                yield* logPrompt(workspace.id, ready);
                 const next = yield* followLog(workspace.id, turn.id);
                 expect(brief(yield* next)).toBe("opened InputTaken");
                 // A step being written reaches the reader before it finishes.
@@ -542,30 +515,23 @@ export const turns = (harness: ConformanceHarness) => {
                       text,
                     }),
                   );
-                yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.recordStep(turn.id, { id: "step-1", step: reading }),
-                );
+                yield* logStep(workspace.id, turn, "step-1", reading);
                 yield* draft("The ", 0);
                 expect(brief(yield* next)).toBe("drafted The ");
-                // A reader who starts following mid-step sees what it has written so far.
+                // A reader who starts following mid-step catches up from a draft of all the step's
+                // part has so far.
                 yield* Effect.yieldNow;
                 const late = yield* followLog(workspace.id, turn.id);
                 expect(brief(yield* late)).toBe("opened InputTaken");
-                expect(brief(yield* late)).toBe("drafted The ");
-                yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.recordStep(turn.id, {
-                    id: "step-2",
-                    step: answering("The plan is on track."),
-                  }),
-                );
+                yield* draft("The plan", 0);
+                expect(brief(yield* next)).toBe("drafted The plan");
+                expect(brief(yield* late)).toBe("drafted The plan");
+                yield* logStep(workspace.id, turn, "step-2", answering("The plan is on track."));
                 expect(brief(yield* next)).toBe("changed 1:The plan is on track.");
                 expect(brief(yield* late)).toBe("changed 1:The plan is on track.");
                 // Closing marks the step it posted as the reply, then the log ends.
                 yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.close(
-                    turn.id,
-                    sessionAfter(turn.participationId, "Planner, summarize the plan."),
-                  ),
+                  turnExecution.close(turn.id, { reply: "The plan is on track.", resume }),
                 );
                 expect(brief(yield* next)).toBe("changed 1:The plan is on track. (reply)");
                 expect(brief(yield* next)).toBe("ended");
@@ -645,7 +611,7 @@ export const turns = (harness: ConformanceHarness) => {
                   { kind: "run", memberId: agent.memberId, threadId },
                 ]);
                 const second = yield* startReady(workspace.id, agent.memberId, threadId);
-                expect(textsOf(second.prompt)).toEqual([
+                expect(second.prompt).toEqual([
                   "Alice: Planner, draft the notes.",
                   "Alice: Please try again.",
                 ]);
@@ -660,9 +626,8 @@ export const turns = (harness: ConformanceHarness) => {
                     Option.map(({ id, status }) => ({ id, status })),
                   ),
                 ).toEqual(Option.some({ id: second.turn.id, status: "cancelling" }));
-                const state = sessionAfter(second.turn.participationId, "Please try again.");
                 yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.confirmStopped(second.turn.id, state),
+                  turnExecution.confirmStopped(second.turn.id, { resume }),
                 );
                 expect(yield* turnOf(workspace.id, second.turn.id)).toMatchObject({
                   status: "cancelled",
@@ -670,14 +635,12 @@ export const turns = (harness: ConformanceHarness) => {
                 });
                 // Confirming again changes nothing.
                 yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.confirmStopped(second.turn.id, undefined),
+                  turnExecution.confirmStopped(second.turn.id, {}),
                 );
                 // What it took in stays told: the next turn resumes its session from there.
                 const third = yield* startReady(workspace.id, agent.memberId, threadId);
-                expect(third.session).toMatchObject({
-                  resumeFrom: { id: state.id, agent: state.agent, agentState: state.agentState },
-                });
-                expect(textsOf(third.prompt)).toEqual(["Alice: Actually, just the summary."]);
+                expect(third.resume).toEqual(resume);
+                expect(third.prompt).toEqual(["Alice: Actually, just the summary."]);
                 yield* execute(workspace.id, (turnExecution) =>
                   turnExecution.fail(third.turn.id, { reason: "The model is overloaded." }),
                 );
@@ -693,11 +656,7 @@ export const turns = (harness: ConformanceHarness) => {
                 yield* reply(workspace.id, threadId, "One more thing.");
                 const fourth = yield* startReady(workspace.id, agent.memberId, threadId);
                 yield* cancel(fourth.turn.id);
-                expect(
-                  yield* execute(workspace.id, (turnExecution) =>
-                    turnExecution.start({ memberId: agent.memberId, threadId }),
-                  ),
-                ).toEqual(TurnExecution.Start.Idle());
+                expect(yield* runJob(workspace.id, agent.memberId, threadId)).toEqual(idle);
                 expect(yield* turnOf(workspace.id, fourth.turn.id)).toMatchObject({
                   status: "cancelled",
                   cancelReason: "requested",
@@ -778,7 +737,7 @@ export const turns = (harness: ConformanceHarness) => {
               ]);
               const ready = yield* startReady(workspace.id, agent.memberId, threadId);
               expect(ready.turn.id).toBe(retried.id);
-              expect(textsOf(ready.prompt)).toEqual([
+              expect(ready.prompt).toEqual([
                 "Alice: Planner, draft the notes.",
                 "Alice asked you to try that again.",
               ]);
@@ -818,11 +777,7 @@ export const turns = (harness: ConformanceHarness) => {
               agent.memberId,
             ]);
             const threadId = started.thread.id;
-            expect(
-              yield* execute(workspace.id, (turnExecution) =>
-                turnExecution.start({ memberId: agent.memberId, threadId }),
-              ),
-            ).toEqual(TurnExecution.Start.Idle());
+            expect(yield* runJob(workspace.id, agent.memberId, threadId)).toEqual(idle);
             const bound = yield* boundTo(workspace.id);
             const failed = Option.getOrThrow(
               yield* bound.turns.findLatest(agent.memberId, threadId),
@@ -839,11 +794,7 @@ export const turns = (harness: ConformanceHarness) => {
               `ended ${failed.id} failed The connection for the agent's model was removed.`,
             ]);
             // A member who is no agent has no work to run.
-            expect(
-              yield* execute(workspace.id, (turnExecution) =>
-                turnExecution.start({ memberId: workspace.ownerMemberId, threadId }),
-              ),
-            ).toEqual(TurnExecution.Start.Idle());
+            expect(yield* runJob(workspace.id, workspace.ownerMemberId, threadId)).toEqual(idle);
           }),
         ),
       ),
@@ -861,18 +812,11 @@ export const turns = (harness: ConformanceHarness) => {
             const threadId = started.thread.id;
             const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
             yield* revokeRoles(workspace.id, agent.memberId);
-            const state = sessionAfter(turn.participationId, "Planner, draft the notes.");
             const closing = yield* execute(workspace.id, (turnExecution) =>
-              Effect.gen(function* () {
-                yield* turnExecution.recordStep(turn.id, {
-                  id: "step-1",
-                  step: answering("The notes."),
-                });
-                return yield* turnExecution.close(turn.id, state);
-              }),
+              turnExecution.close(turn.id, { reply: "The notes.", resume }),
             );
             expect(closing).toEqual(
-              TurnExecution.Closing.Failed({
+              TurnExecution.Closing.cases.Failed.make({
                 reason: "The agent may no longer post in this thread.",
               }),
             );
@@ -887,7 +831,7 @@ export const turns = (harness: ConformanceHarness) => {
                 yield* bound.sessionStates.get(turn.participationId),
                 ({ agent }) => agent,
               ),
-            ).toEqual(Option.some(state.agent));
+            ).toEqual(Option.some(resume.agent));
           }),
         ),
       ),
@@ -910,9 +854,8 @@ export const turns = (harness: ConformanceHarness) => {
             expect(yield* takeTurnJobs(workspace.id)).toEqual([
               { kind: "stop", memberId: agent.memberId, threadId, turnId: turn.id },
             ]);
-            const state = sessionAfter(turn.participationId, "Planner, look into this.");
             yield* execute(workspace.id, (turnExecution) =>
-              turnExecution.confirmStopped(turn.id, state),
+              turnExecution.confirmStopped(turn.id, { resume }),
             );
             const stopped = yield* as(
               workspace.id,
@@ -960,16 +903,7 @@ export const turns = (harness: ConformanceHarness) => {
               const threadId = started.thread.id;
               const { turn: departed } = yield* startReady(workspace.id, agent.memberId, threadId);
               yield* execute(workspace.id, (turnExecution) =>
-                Effect.gen(function* () {
-                  yield* turnExecution.recordStep(departed.id, {
-                    id: "step-1",
-                    step: answering("Looking."),
-                  });
-                  yield* turnExecution.close(
-                    departed.id,
-                    sessionAfter(departed.participationId, "Planner, look into this."),
-                  );
-                }),
+                turnExecution.close(departed.id, { reply: "Looking.", resume }),
               );
               yield* reply(workspace.id, threadId, "Planner, and the budget?");
               const { turn: unfinished } = yield* startReady(
@@ -988,11 +922,7 @@ export const turns = (harness: ConformanceHarness) => {
               );
               expect(asked?.participationId).not.toBe(departed.participationId);
               // Its job ends the departed turn first; that turn's end runs the job again.
-              expect(
-                yield* execute(workspace.id, (turnExecution) =>
-                  turnExecution.start({ memberId: agent.memberId, threadId }),
-                ),
-              ).toEqual(TurnExecution.Start.Idle());
+              expect(yield* runJob(workspace.id, agent.memberId, threadId)).toEqual(idle);
               expect(yield* turnOf(workspace.id, unfinished.id)).toMatchObject({
                 status: "cancelled",
                 cancelReason: "participation-ended",
@@ -1001,24 +931,16 @@ export const turns = (harness: ConformanceHarness) => {
               expect(next.turn.participationId).toBe(asked!.participationId);
               // The new participation starts a session of its own, with the conversation before
               // it rejoined: others' messages as the user's, its own answer as its.
-              expect(next.session).toMatchObject({
-                id: Agent.SessionId.make(next.turn.participationId),
-              });
-              expect("history" in next.session && next.session.history.content).toMatchObject([
+              expect(next.resume).toBeNull();
+              expect(yield* joinedOf(workspace.id, next.turn.id)).toEqual([
+                { role: "user", texts: ["Alice: Planner, look into this."] },
+                { role: "assistant", texts: ["Looking."] },
                 {
                   role: "user",
-                  content: [{ type: "text", text: "Alice: Planner, look into this." }],
-                },
-                { role: "assistant", content: [{ type: "text", text: "Looking." }] },
-                {
-                  role: "user",
-                  content: [
-                    { type: "text", text: "Alice: Planner, and the budget?" },
-                    { type: "text", text: "Alice: The budget grew." },
-                  ],
+                  texts: ["Alice: Planner, and the budget?", "Alice: The budget grew."],
                 },
               ]);
-              expect(textsOf(next.prompt)).toEqual(["Alice: Planner, come back to this."]);
+              expect(next.prompt).toEqual(["Alice: Planner, come back to this."]);
             }),
           ),
         ),
@@ -1047,23 +969,19 @@ export const turns = (harness: ConformanceHarness) => {
                 agent.memberId,
               ]);
               const first = yield* startReady(workspace.id, agent.memberId, threadId);
-              // Every earlier message is its history, not only the newest hundred activities.
-              const history = "history" in first.session ? first.session.history.content : [];
-              expect(history).toHaveLength(1);
-              const earlier = history[0]?.role === "user" ? history[0].content : [];
-              expect(earlier).toHaveLength(111);
-              expect(earlier[0]).toMatchObject({ text: "Alice: Planning the launch." });
-              expect(textsOf(first.prompt)).toEqual(["Alice: Planner, catch up and summarize."]);
+              // Every earlier message is in what it joined, not only the newest hundred activities.
+              const joined = yield* joinedOf(workspace.id, first.turn.id);
+              expect(joined).toHaveLength(1);
+              expect(joined[0]?.texts).toHaveLength(111);
+              expect(joined[0]?.texts[0]).toBe("Alice: Planning the launch.");
+              expect(first.prompt).toEqual(["Alice: Planner, catch up and summarize."]);
               yield* execute(workspace.id, (turnExecution) =>
-                turnExecution.close(
-                  first.turn.id,
-                  sessionAfter(first.turn.participationId, "Planner, catch up and summarize."),
-                ),
+                turnExecution.close(first.turn.id, { reply: "", resume }),
               );
               // More than a hundred messages arrive before it is asked again.
               yield* talk(120, "Later note");
               const second = yield* startReady(workspace.id, agent.memberId, threadId);
-              const prompt = textsOf(second.prompt);
+              const prompt = second.prompt;
               expect(prompt).toHaveLength(120);
               expect(prompt[0]).toBe("Alice: Later note 1.");
               expect(prompt.at(-1)).toBe("Alice: Later note 120.");
@@ -1146,7 +1064,9 @@ export const turns = (harness: ConformanceHarness) => {
                     }),
                   ),
                 );
-                const { turn } = yield* startReady(workspace.id, agent.memberId, started.thread.id);
+                const ready = yield* startReady(workspace.id, agent.memberId, started.thread.id);
+                const { turn } = ready;
+                yield* logPrompt(workspace.id, ready);
                 const next = yield* followLog(workspace.id, turn.id, bob);
                 expect(brief(yield* next)).toBe("opened InputTaken");
                 yield* execute(workspace.id, (turnExecution) =>

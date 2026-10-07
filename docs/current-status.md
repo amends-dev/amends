@@ -19,12 +19,13 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   host runs turns yet: the turn job is being rebuilt on [harness-v2](../packages/harness-v2/README.md),
   so the local host accepts its requests and runs nothing, and work waits in agents' inboxes. Core
   starts each turn as one harness turn on what [agents v2](../packages/core/README.md#agents-v2)
-  select, prompted with the thread's messages since the agent's last turn there, records the
-  conversation in each participation's session log, from which the agent's next turn there resumes,
-  and posts the text of the turn's last step as the reply; a turn that fails or is stopped posts
-  nothing. Resuming reads the whole session log each turn, since nothing yet compacts a long one. A reader with a turn's log open follows it as a stream of its items and the
-  step being written; the text being written is best effort, and a draft missed while reconnecting
-  shows once its step finishes. The [turn screens](turns.md) follow, stop, and retry turns in
+  select, prompted with the thread's messages since the agent's last turn there, and posts the
+  reply its job gives, the text of the turn's last step; a turn that fails or is stopped posts
+  nothing. The job is to record the conversation in each participation's session log, from which
+  the agent's next turn there resumes; resuming reads the whole log each turn, since nothing yet
+  compacts a long one. A reader with a turn's log open follows it as a stream of its items and the
+  step being written; the text being written is best effort, and a reader sees it from the next
+  draft that starts at its part's beginning, or once its step finishes. The [turn screens](turns.md) follow, stop, and retry turns in
   threads and show each turn's log; threads have no titles, so the log names a thread by its group.
   A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
   activity for participants is not built. The active turns read covers at most a hundred active

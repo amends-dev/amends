@@ -376,16 +376,16 @@ export const gateway = (harness: Harness) => {
               const gateway = yield* Gateway.Service;
               const workspace = yield* Operations.createWorkspace(alice.id);
               const threadId = Thread.Id.make("thread");
-              // A member that is no agent has no work to run.
-              const startTurn = Effect.flatMap(TurnExecution.Service, (turnExecution) =>
-                turnExecution.start({ memberId: workspace.ownerMemberId, threadId }),
+              // A member that is no agent has no work to accept.
+              const acceptWork = Effect.flatMap(TurnExecution.Service, (turnExecution) =>
+                turnExecution.accept({ memberId: workspace.ownerMemberId, threadId }),
               );
-              expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, startTurn))).toEqual(
-                TurnExecution.Start.Idle(),
+              expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork))).toEqual(
+                Option.none(),
               );
               const missing = Workspace.Id.make("never-created");
               expect(
-                yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, startTurn))),
+                yield* Effect.flip(Effect.scoped(gateway.inWorkspace(missing, acceptWork))),
               ).toEqual(new GatewayErrors.WorkspaceNotFound({ workspaceId: missing }));
               expect(yield* (yield* WorkspaceDirectory.Service).list(alice)).toMatchObject({
                 memberships: [{ workspace }],

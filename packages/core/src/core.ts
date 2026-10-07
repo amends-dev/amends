@@ -21,7 +21,6 @@ import { ThreadParticipationPermissions } from "./thread/participation/permissio
 import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
 import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
 import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
-import { TurnQuery } from "./turn/query.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { ThreadPermissions } from "./thread/permissions.ts";
 import { ThreadProjection } from "./thread/projection.ts";
@@ -168,7 +167,6 @@ const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
 const turnCommand = TurnCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand)),
 );
-const turnQuery = TurnQuery.layer;
 const readStateCommand = ReadStateCommand.layer;
 const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
 /**
@@ -216,7 +214,6 @@ const operations = Layer.mergeAll(
       threadCommand,
       readStateCommand,
       turnCommand,
-      turnQuery,
       changeFeedSource,
     ),
   ),

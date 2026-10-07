@@ -1,5 +1,5 @@
 import { Connection, Integration, Integrations, type ModelCatalog } from "@amends/connection-v2";
-import { Harness, type Agent } from "@amends/harness-v2";
+import { Harness } from "@amends/harness-v2";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Option, Redacted, Result } from "effect";
 import { AgentV2 } from "../../src/agent-v2/agent.ts";
@@ -27,23 +27,15 @@ const listed: ModelCatalog.Model = {
   reasoning: { toggle: false, efforts: ["low", "high"] },
 };
 
-/** What each harness the integrations made was given, in order. */
-const madeWith: Array<Agent.Options> = [];
-
-/** How many times a sandbox provider was run. */
-let providersRun = 0;
-
-/** A harness of an agent named `id`, which no test starts a session with. */
-const harnessOf =
-  (id: string, requiresSandbox: boolean) => (_access: unknown, options: Agent.Options) =>
-    Effect.sync(() => {
-      madeWith.push(options);
-      return Harness.make({
-        id,
-        requiresSandbox,
-        startSession: () => Effect.die("No test starts a session"),
-      });
-    });
+/** A harness of an agent named `id`, which no test makes. */
+const harnessOf = (id: string, requiresSandbox: boolean) => () =>
+  Effect.succeed(
+    Harness.make({
+      id,
+      requiresSandbox,
+      startSession: () => Effect.die("No test starts a session"),
+    }),
+  );
 
 const installed = Integrations.make([
   Integration.make({
@@ -83,11 +75,7 @@ const installed = Integrations.make([
     id: "boxes",
     name: "Boxes",
     auth: ["none"],
-    sandboxes: () =>
-      Effect.suspend(() => {
-        providersRun += 1;
-        return Effect.die("No test makes a sandbox");
-      }),
+    sandboxes: () => Effect.die("No test makes a sandbox"),
     check: () => Effect.succeed({ status: "healthy" }),
   }),
 ]);
@@ -279,48 +267,38 @@ describe("what an agent runs a turn on", () => {
 });
 
 describe("an agent ready to run", () => {
-  it.effect(
-    "has its instructions, its harness on the model with its key, and its sandboxes unrun",
-    () =>
-      Effect.gen(function* () {
-        madeWith.length = 0;
-        providersRun = 0;
-        const agentV2Query = yield* queryIn();
+  it.effect("has its instructions, and each connection of its selection with its key", () =>
+    Effect.gen(function* () {
+      const agentV2Query = yield* queryIn();
 
-        const runnable = yield* agentV2Query.buildRunnable(
-          agentMemberId,
-          selection({ harness: { connectionId: boxed.id }, sandbox: { connectionId: boxes.id } }),
-        );
+      const runnable = yield* agentV2Query.buildRunnable(
+        agentMemberId,
+        selection({ harness: { connectionId: boxed.id }, sandbox: { connectionId: boxes.id } }),
+      );
 
-        expect(runnable.instructions).toBe("Review each change.");
-        expect(runnable.harness.agent.id).toBe("boxed");
-        expect(madeWith).toEqual([
-          {
-            model: {
-              provider: "models",
-              model: "model-one",
-              protocol: "openai-chat",
-              url: "https://models.example/v1",
-              apiKey: expect.anything(),
-              effort: "high",
-            },
-          },
-        ]);
-        expect(Redacted.value(madeWith[0]?.model.apiKey ?? Redacted.make(""))).toBe("sk-models");
-        expect(providersRun).toBe(0);
-        yield* Effect.exit(Effect.scoped(runnable.sandboxProvider ?? Effect.void));
-        expect(providersRun).toBe(1);
-      }),
+      expect(runnable).toMatchObject({
+        instructions: "Review each change.",
+        harness: { connection: { id: boxed.id, integration: "boxed" }, credential: null },
+        model: {
+          connection: { id: models.id, integration: "models", auth: "apiKey" },
+          model: { connectionId: models.id, id: "model-one", effort: "high" },
+        },
+        sandbox: { connection: { id: boxes.id, integration: "boxes" }, credential: null },
+      });
+      expect(Redacted.value(runnable.model.credential?.apiKey ?? Redacted.make(""))).toBe(
+        "sk-models",
+      );
+    }),
   );
 
-  it.effect("has no sandboxes for an agent that works without one", () =>
+  it.effect("has no sandbox for an agent that works without one", () =>
     Effect.gen(function* () {
       const agentV2Query = yield* queryIn();
 
       const runnable = yield* agentV2Query.buildRunnable(agentMemberId, selection());
 
-      expect(runnable.harness.agent.id).toBe("in-process");
-      expect(runnable.sandboxProvider).toBeUndefined();
+      expect(runnable.harness.connection.integration).toBe("in-process");
+      expect(runnable.sandbox).toBeNull();
     }),
   );
 

@@ -1,7 +1,5 @@
-import { type Connection, Integrations } from "@amends/connection-v2";
-import type { Harness } from "@amends/harness-v2";
-import type { SandboxProvider } from "@amends/sandbox-v2";
-import { Array, Context, Effect, Layer, Option, Schema, type Scope } from "effect";
+import { Connection, Integrations } from "@amends/connection-v2";
+import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 import { ConnectionV2 } from "../connection-v2/connection.ts";
 import { ConnectionV2CredentialStore } from "../connection-v2/credential-store.ts";
 import { ConnectionV2Store } from "../connection-v2/store.ts";
@@ -24,27 +22,27 @@ export type SelectError = ReadError | ConnectionV2Store.Failure | Incomplete;
 /** Building can also meet a connection whose key cannot be read. */
 export type BuildError = SelectError | ConnectionV2CredentialStore.Failure;
 
-/** An agent ready to run on a selection. */
-export interface Runnable {
-  /** What the agent works by, as it is set up now. */
-  readonly instructions: AgentV2.Instructions;
+/** A connection as its integration takes it, with its key when it authenticates with one. */
+export const Access = Schema.Struct({
+  connection: Connection.Connection,
+  credential: Schema.NullOr(Connection.Credential),
+});
+export interface Access extends Schema.Schema.Type<typeof Access> {}
 
-  /** The harness of the selection's harness connection, running the agent on its model. */
-  readonly harness: Harness.Harness["Service"];
-
-  /**
-   * The provider of the sandboxes of the selection's sandbox connection, which works until the
-   * scope that runs it closes, or nothing for an agent that works without a sandbox. Nothing runs
-   * until the caller runs it, in a scope of its own.
-   */
-  readonly sandboxProvider:
-    | Effect.Effect<
-        SandboxProvider.SandboxProvider["Service"],
-        Connection.ConnectionError,
-        Scope.Scope
-      >
-    | undefined;
-}
+/**
+ * An agent ready to run on a selection, as data: what it works by, and the connections of its
+ * harness, model, and sandbox, each with its key. Whoever runs the agent builds it from them with
+ * the integrations its host installs, so the keys go to it.
+ */
+export const Runnable = Schema.Struct({
+  instructions: AgentV2.Instructions,
+  harness: Access,
+  /** The model's connection, and the model as its integration's endpoint takes it. */
+  model: Schema.Struct({ ...Access.fields, model: AgentV2.Model }),
+  /** The sandbox's connection, or none for an agent that works without a sandbox. */
+  sandbox: Schema.NullOr(Access),
+});
+export interface Runnable extends Schema.Schema.Type<typeof Runnable> {}
 
 export interface Interface {
   /**
@@ -58,10 +56,10 @@ export interface Interface {
   ) => Effect.Effect<AgentV2.Selection, SelectError>;
 
   /**
-   * The agent of `memberId` ready to run on `selection`: its instructions, the harness of the
-   * selection's connection, given the key it holds, and its sandbox provider. Fails with
-   * `Incomplete` when a connection of the selection can no longer give its part, as when it was
-   * removed since the selection was made, or it has no key.
+   * The agent of `memberId` ready to run on `selection`: its instructions, and each connection of
+   * the selection with the key it holds. Fails with `Incomplete` when a connection of the selection
+   * can no longer give its part, as when it was removed since the selection was made, or it has no
+   * key.
    */
   readonly buildRunnable: (
     memberId: MemberId.Id,
@@ -119,7 +117,8 @@ export const make = Effect.fn("AgentV2Query.make")(function* () {
 
   /**
    * The connection for `part` as its integration takes it, with the key it holds. Fails for `part`
-   * when the connection is gone, or its key cannot be read because this host keeps none.
+   * when the connection is gone, it authenticates with a key it has none of, or its key cannot be
+   * read because this host keeps none.
    */
   const accessFor = Effect.fnUntraced(function* (
     part: AgentV2.Part,
@@ -133,16 +132,18 @@ export const make = Effect.fn("AgentV2Query.make")(function* () {
     );
     if (resolved._tag !== "Installed")
       return yield* new Incomplete({ issues: [{ _tag: resolved._tag, part }] });
-    const credential =
-      resolved.connection.auth === "apiKey"
-        ? yield* connectionV2CredentialStore.get(connectionId).pipe(
-            Effect.map(Option.getOrUndefined),
-            Effect.catchTag("ConnectionV2CredentialStore.Unavailable", ({ reason }) =>
-              Effect.fail(invalid(part, reason)),
-            ),
-          )
-        : undefined;
-    return { ...resolved, credential };
+    const { connection } = resolved;
+    if (connection.auth === "none") return { connection, credential: null } satisfies Access;
+    const credential = yield* connectionV2CredentialStore
+      .get(connectionId)
+      .pipe(
+        Effect.catchTag("ConnectionV2CredentialStore.Unavailable", ({ reason }) =>
+          Effect.fail(invalid(part, reason)),
+        ),
+      );
+    if (Option.isNone(credential))
+      return yield* invalid(part, `The connection ${connection.name} has no API key`);
+    return { connection, credential: credential.value } satisfies Access;
   });
 
   const select = Effect.fn("AgentV2Query.select")(function* (
@@ -178,31 +179,17 @@ export const make = Effect.fn("AgentV2Query.make")(function* () {
     yield* requireNoIssues(
       yield* AgentV2Readiness.issuesOf(setupOf(selection), connections, integrations),
     );
-    const modelAccess = yield* accessFor("model", selection.model.connectionId, connections);
-    const endpoint = yield* modelAccess.integration
-      .modelEndpoint(modelAccess.connection, modelAccess.credential, {
-        model: selection.model.id,
-        ...(selection.model.effort === undefined ? {} : { effort: selection.model.effort }),
-      })
-      .pipe(Effect.mapError((error) => invalid("model", error.reason.description)));
-    const harnessAccess = yield* accessFor("harness", selection.harness.connectionId, connections);
-    const harness = yield* harnessAccess.integration
-      .harness(harnessAccess.connection, harnessAccess.credential, { model: endpoint })
-      .pipe(Effect.mapError((error) => invalid("harness", error.reason.description)));
-    const sandboxAccess =
-      selection.sandbox === null
-        ? undefined
-        : yield* accessFor("sandbox", selection.sandbox.connectionId, connections);
     const runnable: Runnable = {
       instructions: record.instructions,
-      harness,
-      sandboxProvider:
-        sandboxAccess === undefined
-          ? undefined
-          : sandboxAccess.integration.sandboxProvider(
-              sandboxAccess.connection,
-              sandboxAccess.credential,
-            ),
+      harness: yield* accessFor("harness", selection.harness.connectionId, connections),
+      model: {
+        ...(yield* accessFor("model", selection.model.connectionId, connections)),
+        model: selection.model,
+      },
+      sandbox:
+        selection.sandbox === null
+          ? null
+          : yield* accessFor("sandbox", selection.sandbox.connectionId, connections),
     };
     return runnable;
   });

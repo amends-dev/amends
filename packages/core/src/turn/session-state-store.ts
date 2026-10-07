@@ -10,15 +10,23 @@ export class Failure extends Schema.TaggedError<Failure>()("SessionStateStore.Fa
 }) {}
 
 /**
- * What an agent's harness session in a thread was left as when its last turn ended, beside its
- * conversation, which the session log keeps: the harness's agent that ran it last, and what that
- * agent returned of its own, which only it reads; the thread position through which it was given
- * the thread's messages, which the next turn's prompt follows; and what it ran on, whose harness
- * the next turn keeps on `Auto`.
+ * What an agent's harness session resumes from, beside its conversation, which the session log
+ * keeps: the harness's agent that last ran it, and what that agent returned of its own when it let
+ * go of the session, which only it reads.
  */
-export const Saved = Schema.Struct({
+export const Resume = Schema.Struct({
   agent: Schema.String,
   agentState: Schema.optionalKey(Schema.Json),
+});
+export interface Resume extends Schema.Schema.Type<typeof Resume> {}
+
+/**
+ * What an agent's harness session in a thread was left as when its last turn ended: what it
+ * resumes from; the thread position through which it was given the thread's messages, which the
+ * next turn's prompt follows; and what it ran on, whose harness the next turn keeps on `Auto`.
+ */
+export const Saved = Schema.Struct({
+  ...Resume.fields,
   promptedThroughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   selection: AgentV2.Selection,
 });

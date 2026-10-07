@@ -9,7 +9,6 @@ export { TurnFacts } from "./facts.ts";
 export { TurnId } from "./id.ts";
 export { TurnProjection } from "./projection.ts";
 export { TurnPrompt } from "./prompt.ts";
-export { TurnQuery } from "./query.ts";
 export { SessionLog } from "./session-log.ts";
 export { SessionLogStore } from "./session-log-store.ts";
 export { SessionStateStore } from "./session-state-store.ts";

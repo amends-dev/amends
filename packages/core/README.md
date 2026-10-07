@@ -206,10 +206,12 @@ has none; and `NoHarness` when, on `Auto`, no connection gives a harness it can 
 `AgentV2.Selection` a turn runs on: the agent's model and sandbox, and its harness, which on `Auto`
 is that of the agent's last turn in the conversation while it can still run on it, and otherwise
 the oldest connection whose harness it can run on. `buildRunnable` gives the agent ready to run on
-a selection: its instructions now, the harness of the selection's connection, made with the key it
-holds and the model's endpoint, and its sandbox provider, unrun, for the caller to run in a scope
-that outlives the read. Both fail with `Incomplete` when the agent cannot run, and `buildRunnable`
-also when a connection of the selection no longer gives its part or has no key.
+a selection, as data (`AgentV2Query.Runnable`): its instructions now, and the connections of the
+selection's harness, model, and sandbox, if it has one, each with the key it holds, beside the model
+as its integration's endpoint takes it. Whoever runs the agent builds its harness and sandbox from
+these with the integrations its host installs, so core runs nothing of an agent. Both fail with
+`Incomplete` when the agent cannot run, and `buildRunnable` also when a connection of the selection
+no longer gives its part or has no key.
 
 `agent-v2.create` works on the workspace; `agent-v2.read` and `agent-v2.configure` on the agent's
 membership, a `Member` target. Members read agents; administrators and the owner create and
@@ -230,37 +232,38 @@ turn it retries and who asked (`retry`), the `AgentV2.Selection` it started on, 
 posted, and why it failed or was asked to stop.
 
 Agents handle their own notifications as people do theirs. Each agent in each thread has a turn
-[job](#jobs), which drives `TurnExecution`, each step its own commit attributed to the agent:
+[job](#jobs), which runs the agent and writes the participation's session log. What it asks of the
+workspace is `TurnExecution`: commands and queries over data, which hold nothing in memory, so a
+job could call them from another process. Each change is its own commit, attributed to the agent:
 
-- `start` takes the agent's active turn in the thread or, while it has none, accepts its pending
-  work notifications there into a new turn, settling them as `Accepted` with the turn's ID. Work
-  waits while the agent cannot open the thread. A turn asked to stop, or whose participation
-  ended, ends as it stands, and so does one with nothing to say. Otherwise the turn starts on what
+- `accept` gives the agent's active turn in the thread or, while it has none, accepts its pending
+  work notifications there into a new turn, settling them as `Accepted` with the turn's ID; none
+  while no work waits. Work waits while the agent cannot open the thread.
+- `start` readies the turn. A turn asked to stop, or whose participation ended, ends as it stands,
+  and so does one with nothing to say. Otherwise the turn starts on what
   [`AgentV2Query`](#agents-v2) selects, kept when it runs again, and fails with the reason when the
-  agent cannot run on it. `start` answers `Idle`, or `Ready` with the turn, the agent built to run,
-  where its harness session starts, and its prompt. The prompt (`TurnPrompt.promptOf`) is the
-  others' messages since the agent was last prompted there, through what the turn accepted, each
-  named by its author, and, for a retry, who asked. Once the commit that starts the turn lands,
-  the prompt goes to the participation's session log, after the conversation the agent joined when
-  the log is new: the thread's messages before it took part (`TurnPrompt.conversationOf`: others'
-  as the user's, each named, the agent's own as its answers). A turn whose prompt the log has
-  already, as a run cut short leaves it, runs again from that prompt, which the log notes. The
-  session resumes from what the participation's last turn saved, or starts anew, named by the
-  participation, either way with the conversation its session log records before the turn.
-- `recordStep` appends each step the turn finishes to the session log, its parts added up
-  (`StreamPart.Step`), and `showDraft` shows readers more of the step being written, as a
-  `TurnDraft` signal.
-- `close` posts the turn's answer, the text of its last step in the session log
+  agent cannot run on it. `start` answers `Idle`, or `Ready` with the turn, the agent's `Runnable`,
+  its prompt and how many messages it tells, and what the participation's session resumes from
+  (`SessionStateStore.Resume`), or none when it starts anew. The prompt (`TurnPrompt.promptOf`) is
+  the others' messages since the agent was last prompted there, through what the turn accepted,
+  each named by its author, and, for a retry, who asked. A running turn, as a run cut short leaves
+  it, is ready again as it was.
+- `joinedConversation` is the conversation the agent joined: the thread's messages before it took
+  part (`TurnPrompt.conversationOf`: others' as the user's, each named, the agent's own as its
+  answers), which a new session log starts with.
+- `showDraft` shows readers more of the step being written, as a `TurnDraft` signal.
+- `close` posts the reply its job gives, the text of the turn's last step
   (`SessionLog.answerOf`), as the agent's own message to the thread's current participants, naming
-  the turn (`turnId` on the message), saves the session, and completes the turn, in one commit. An
-  answer of only space posts nothing, and one the agent may no longer post, as it can no longer
-  open or post in the thread, fails the turn. A turn asked to stop meanwhile stops instead.
+  the turn (`turnId` on the message), saves what the session resumes from, and completes the turn,
+  in one commit. A reply of only space posts nothing, and one the agent may no longer post, as it
+  can no longer open or post in the thread, fails the turn. A turn asked to stop meanwhile stops
+  instead.
 - `fail` and `confirmStopped` end a turn and post nothing.
 
-Each of these keeps a session the turn started in `SessionStateStore`: per participation, the
-harness's agent that ran it last and what that agent returned of its own, how far the agent has
-been prompted, and the selection its last turn ran on, so the agent's next turn in the thread
-resumes on the same harness. The conversation is not there: the session log holds it. Every way a
+Each of these keeps what a session the turn started resumes from in `SessionStateStore`: per
+participation, the harness's agent that ran it last and what that agent returned of its own, how
+far the agent has been prompted, and the selection its last turn ran on, so the agent's next turn in
+the thread resumes on the same harness. The conversation is not there: the session log holds it. Every way a
 turn ends, including a queued turn stopped by a reader, goes through `TurnCommand.endTurn`, which
 in the ending commit publishes the turn's fact and records `turn.ended` in its thread's timeline.
 
@@ -270,7 +273,9 @@ from the journal and every commit, so a host may keep it in a store of its own
 refuses with `Conflict`, `read` past a position, and `waitForAppend`). Its entries
 (`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming its turn,
 `Prompted` with the prompt's texts and how many messages it took in, each `Step`, and
-`Interrupted` when a run stopped short and ran again. `SessionLog.historyOf` rebuilds the
+`Interrupted` when a run stopped short and ran again. The turn's job writes them: what was joined
+when the log is new, the prompt once the turn is ready, and each step it finishes, its parts added
+up (`StreamPart.Step`). `SessionLog.historyOf` rebuilds the
 conversation the harness resumes with: what was joined, then each turn's prompt and the steps of
 its latest run, each as `Session.messagesOfStep` records it. How a turn ended is its record's to
 say, not the log's: what the log holds of a turn is written before the commit that ends it.
@@ -284,10 +289,9 @@ turn's entries into one `SessionLog.reader`, and waits for each append: `Opened`
 as they stand, `Changed` the items each append adds or changes, by index, and `Ended` follows the
 commit that ends the turn, which it follows through `ChangeFeedSource`, once it has read the rest
 of the log and marked the reply the turn's record names. It passes on the turn's `TurnDraft`
-signals as `Drafted`, first what the step being written holds so far: a draft carries only what
-follows the text before it, so `TurnQuery` holds each turn's drafts in memory as they reach the
-process, forgetting a turn's ten minutes after its last, and a reader who starts following
-mid-step begins with them. The drafts and commits subscriptions register before the turn and its
+signals as `Drafted`. Drafts are not kept: a draft continues its part at an offset, so a reader who
+starts following mid-step sees the step from the next draft that starts at its part's beginning, or
+once the step is logged. The drafts and commits subscriptions register before the turn and its
 log are read, so nothing published in between is missed. Each append checks that the reader still
 may read the thread, and so does each commit that changes the reader's groups or grants, or a
 role's permissions. Drafts are not checked one by one: following ends once the commit that took
@@ -632,7 +636,8 @@ original event asks again. Each request names the workspace of the fact that ask
 agent's job names the agent by its membership.
 
 - A **turn job** (`TurnJobs`), one for each agent in each thread, runs the agent's work there,
-  one [turn](#turns) at a time, through `TurnExecution`, and stops its turn when asked. Activity
+  one [turn](#turns) at a time, asking the workspace through `TurnExecution`, and stops its turn
+  when asked. Activity
   that asks the agent for work, and a turn's end or retry, request a run; a request to stop a
   turn, and the end of the agent's participation in the thread or its leaving the thread's group,
   request a stop.

@@ -105,10 +105,10 @@ export const sessionLogs = (harness: Harness) => {
           expect(yield* one.sessionLogs.head(participation)).toBe(1);
 
           // Of two writers that read the log to the same entry, one appends and the other is refused.
-          const outcomes = yield* Effect.all(
-            [one, other].map((bound) =>
+          const outcomes = yield* Effect.forEach(
+            [one, other],
+            (bound) =>
               Effect.result(bound.sessionLogs.append(participation, [step, interrupted], 1)),
-            ),
             { concurrency: "unbounded" },
           );
           expect(outcomes.filter(Result.isSuccess)).toHaveLength(1);
