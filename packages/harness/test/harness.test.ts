@@ -1,5 +1,6 @@
 import { Port } from "@amends/sandbox/Network";
 import { Sandbox } from "@amends/sandbox/Sandbox";
+import * as SandboxError from "@amends/sandbox/SandboxError";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Schema, Stream } from "effect";
 import { Prompt } from "effect/ai";
@@ -308,23 +309,34 @@ describe("Harness", () => {
     }),
   );
 
-  it.effect("needs a sandbox created with the ports the agent listens on", () =>
-    Effect.gen(function* () {
-      const port = Port.make(4096);
-      const opencode = yield* makeFakeAgent("opencode", answersAs("opencode"), { ports: [port] });
-      const harness = Harness.make(opencode.agent);
-      const { sandbox } = yield* makeFakeSandbox;
+  it.effect(
+    "exposes the ports the agent listens on in the sandbox, failing as the sandbox does",
+    () =>
+      Effect.gen(function* () {
+        const port = Port.make(4096);
+        const opencode = yield* makeFakeAgent("opencode", answersAs("opencode"), { ports: [port] });
+        const harness = Harness.make(opencode.agent);
+        const { sandbox, exposed } = yield* makeFakeSandbox;
+        const unexposing = Sandbox.of({
+          ...sandbox,
+          exposePorts: () =>
+            Effect.fail(
+              new SandboxError.SandboxError({
+                provider: "fake",
+                reason: new SandboxError.UnsupportedError({ description: "No ports here" }),
+              }),
+            ),
+        });
 
-      const refused = yield* Effect.flip(harness.startSession({ sandbox, id }));
-      yield* harness.startSession({ sandbox: Sandbox.of({ ...sandbox, ports: [port] }), id });
+        yield* harness.startSession({ sandbox, id });
+        const refused = yield* Effect.flip(harness.startSession({ sandbox: unexposing, id }));
 
-      expect(harness.agent.ports).toEqual([port]);
-      expect(refused.reason._tag).toBe("UnsupportedError");
-      expect(refused.message).toBe(
-        "opencode: opencode listens on ports 4096, which the sandbox was not created with",
-      );
-      expect(opencode.starts).toHaveLength(1);
-    }),
+        expect(harness.agent.ports).toEqual([port]);
+        expect(exposed).toEqual([[port]]);
+        expect(refused.reason._tag).toBe("UnsupportedError");
+        expect(refused.message).toBe("opencode: fake: No ports here");
+        expect(opencode.starts).toHaveLength(1);
+      }),
   );
 
   it.effect("tells how long a name the agent takes for a host tool, when it limits it", () =>

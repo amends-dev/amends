@@ -172,10 +172,14 @@ export interface FakeSandbox {
 
   /** The directories created in the sandbox, in order. */
   readonly directories: ReadonlyArray<string>;
+
+  /** The ports each `exposePorts` exposed, in order. */
+  readonly exposed: ReadonlyArray<ReadonlyArray<Port>>;
 }
 
 export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
   const directories: Array<string> = [];
+  const exposed: Array<ReadonlyArray<Port>> = [];
   const sandbox = Sandbox.of({
     id: SandboxId.make("fake"),
     description: "A fake sandbox",
@@ -186,14 +190,14 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
     childProcessSpawner: ChildProcessSpawner.make(() =>
       Effect.die("The fake sandbox runs no processes"),
     ),
-    ports: [],
-    endpoint: () => Effect.die("The fake sandbox exposes no ports"),
+    exposePorts: (ports) => Effect.sync(() => void exposed.push(ports)),
+    endpoint: () => Effect.die("The fake sandbox reaches no ports"),
     stop: Effect.void,
     destroy: Effect.void,
     setNetworkPolicy: () => Effect.void,
     addRequestTransformations: () => Effect.void,
   });
-  return { sandbox, directories };
+  return { sandbox, directories, exposed };
 });
 
 /** A turn that answers `text` in one step. */

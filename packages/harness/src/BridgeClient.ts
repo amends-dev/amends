@@ -63,7 +63,7 @@ export interface Options {
    */
   readonly template: Template.Template;
 
-  /** The port the bridge listens on in its sandbox, which the sandbox must be created with. */
+  /** The port the bridge listens on in its sandbox, which the agent lists among its `ports`. */
   readonly port: Network.Port;
 
   /** The command that runs the bridge in the sandbox, and its arguments. */

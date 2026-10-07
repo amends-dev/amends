@@ -44,24 +44,24 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
           const created = yield* provider.create({ id, ports: [port] });
           const resumed = yield* provider.resume(id);
 
+          // Reaching the port fails with `NotFoundError` unless the sandbox exposes it.
+          yield* resumed.endpoint(port, "http");
+
           expect(created.id).toBe(id);
           expect(resumed.id).toBe(id);
           expect(resumed.workingDirectory).toBe(created.workingDirectory);
-          expect(resumed.ports).toEqual([port]);
         }),
       fixture.timeout,
     );
 
     it.effect(
-      "describes where to work, and the ports servers are reachable on",
+      "describes where to work",
       () =>
         Effect.gen(function* () {
-          const port = yield* fixture.freePort;
           const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create({ ports: [port] });
+          const sandbox = yield* provider.create();
 
           expect(sandbox.description).toContain(sandbox.workingDirectory);
-          expect(sandbox.description).toContain(String(port));
         }),
       fixture.timeout,
     );

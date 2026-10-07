@@ -20,10 +20,11 @@ into a language model, and `Harness.layer` provides it. Its `agent` is the agent
 adapter describes it, without `startSession`: only the harness starts the agent's sessions.
 `startSession` starts a session: a new one, named by its `id`, or one that goes on from what it last
 saved, given as `resumeFrom`, on this agent or another. A new session given a `history` starts with
-that conversation, as when the agent joins one already under way. The caller creates the sandbox, from the
-agent's `template` and with its `ports`, and owns it: a harness never stops or destroys one. Each
-session works in its own directory there, named by its id, so that its files stay in place when it
-moves from one agent to another.
+that conversation, as when the agent joins one already under way. The caller creates the sandbox,
+from the agent's `template`, and owns it: a harness never stops or destroys one, and only exposes
+the agent's `ports` there, which the sandbox may have been created without, as when its session
+moves from another agent. Each session works in its own directory there, named by its id, so that
+its files stay in place when it moves from one agent to another.
 
 ## Models
 

@@ -966,8 +966,9 @@ template installs there, over a port the sandbox exposes.
 
 Every provider creates sandboxes, from a template that prepares them and with the network they may
 reach, and resumes one it created by its name. A sandbox runs processes and streams their output,
-reads and writes files, exposes a port as a URL with the headers needed to reach it, and stops or
-is destroyed. What a provider cannot do fails as unsupported rather than being assumed, as
+reads and writes files, exposes ports, when it is created or later, each as a URL with the
+headers needed to reach it, and stops or is destroyed. A harness exposes its agent's ports in the
+sandbox a session starts in, so a session that moves to another agent keeps its sandbox. What a provider cannot do fails as unsupported rather than being assumed, as
 enforcing a network policy does where a platform offers none. Platforms differ further: Vercel and
 Cloudflare cannot write to a running process's input, and a local directory provides no
 isolation. Anything the host talks to inside a sandbox therefore listens on a port rather than

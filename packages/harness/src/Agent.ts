@@ -181,7 +181,10 @@ export interface Agent {
   /** Installs the agent in a sandbox. An agent that runs in the host's process has none. */
   readonly template?: Template.Template;
 
-  /** The ports the agent listens on in its sandbox, which the sandbox must be created with. */
+  /**
+   * The ports the agent listens on in its sandbox, which the harness exposes there when a session
+   * starts. A caller may also create the sandbox with them.
+   */
   readonly ports?: ReadonlyArray<Network.Port>;
 
   /**

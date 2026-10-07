@@ -43,10 +43,7 @@ export class Sandbox extends Context.Service<
   {
     readonly id: SandboxId;
 
-    /**
-     * Text for an agent's instructions: what the sandbox is, where to work, and which of its ports
-     * servers are reachable on.
-     */
+    /** Text for an agent's instructions: what the sandbox is, and where to work. */
     readonly description: string;
 
     /**
@@ -63,12 +60,17 @@ export class Sandbox extends Context.Service<
 
     readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
 
-    // TODO: Add `setPorts` to expose ports after creation, once a caller needs ports it did not
-    // ask for at creation.
-    /** The ports the sandbox was created with; `endpoint` reaches any of them. */
-    readonly ports: ReadonlyArray<Port>;
+    /**
+     * Exposes `ports` beside those the sandbox exposes already, at its creation or since, for
+     * `endpoint` to reach them for the rest of the sandbox's life. Exposing a port again succeeds.
+     * Fails with `UnsupportedError` when the provider cannot expose a port once the sandbox exists.
+     */
+    readonly exposePorts: (ports: ReadonlyArray<Port>) => Effect.Effect<void, SandboxError>;
 
-    /** How to reach `port` from outside the sandbox; fails with `NotFoundError` for a port not in `ports`. */
+    /**
+     * How to reach `port` from outside the sandbox; fails with `NotFoundError` for a port the
+     * sandbox does not expose.
+     */
     readonly endpoint: (
       port: Port,
       protocol: EndpointProtocol,

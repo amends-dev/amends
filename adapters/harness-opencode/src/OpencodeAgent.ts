@@ -25,7 +25,7 @@ import * as Template from "./Template.ts";
 // TODO: Keep the endpoints' keys out of the sandbox, giving opencode stand-ins that the sandbox
 // replaces with the keys in the requests that leave it, once a sandbox provider can.
 export interface Options extends Agent.Options {
-  /** The port the bridge listens on in its sandbox, which the sandbox must be created with. */
+  /** The port the bridge listens on in its sandbox, which the harness exposes there. */
   readonly port: Network.Port;
 
   /**
