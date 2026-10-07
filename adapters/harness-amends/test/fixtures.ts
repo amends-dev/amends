@@ -49,12 +49,16 @@ export const makeScriptedModel = (script: Script) =>
     return scripted;
   });
 
-/** The endpoint that stands for the scripted model `id`, which reaches nothing. */
-export const endpointOf = (id: string): ModelEndpoint.ModelEndpoint => ({
+/**
+ * The endpoint that stands for the scripted model `id`, which reaches nothing, with the context
+ * window `contextWindow` when given.
+ */
+export const endpointOf = (id: string, contextWindow?: number): ModelEndpoint.ModelEndpoint => ({
   provider: "scripted",
   model: id,
   protocol: "openai-chat",
   url: "http://scripted.invalid/v1",
+  ...(contextWindow === undefined ? {} : { contextWindow }),
 });
 
 /** Makes the model of `models` that the endpoint of its id, as `endpointOf` gives, stands for. */
@@ -70,23 +74,25 @@ export const scriptedLanguageModels = (models: ReadonlyMap<string, LanguageModel
   });
 
 /**
- * amends's agent on scripted models: `model` by default, and `models` that a turn names. It is made
- * with endpoints that stand for them, which `Models.LanguageModels` turns into the models.
+ * amends's agent on scripted models: `model` by default, with the context window `contextWindow`
+ * when given, and `models` that a turn names. It is made with endpoints that stand for them, which
+ * `Models.LanguageModels` turns into the models.
  */
 export const makeAgent = (
   options: Omit<AmendsAgent.Options, "model" | "models"> & {
     readonly model: LanguageModel.LanguageModel;
+    readonly contextWindow?: number;
     readonly models?: Readonly<Record<string, LanguageModel.LanguageModel>>;
   },
 ) => {
-  const { model, models = {}, ...rest } = options;
+  const { model, contextWindow, models = {}, ...rest } = options;
   const byId = new Map([
     ["default", model],
     ...Object.entries(models).map(([name, named]) => [`named-${name}`, named] as const),
   ]);
   return AmendsAgent.make({
     ...rest,
-    model: endpointOf("default"),
+    model: endpointOf("default", contextWindow),
     models: Object.fromEntries(
       Object.keys(models).map((name) => [name, endpointOf(`named-${name}`)]),
     ),
@@ -127,6 +133,27 @@ export const callTools = (
   Stream.fromIterable<Response.StreamPartEncoded>([
     ...calls.map((call): Response.StreamPartEncoded => ({ type: "tool-call", ...call })),
     { type: "finish", reason: "tool-calls", usage },
+  ]);
+
+/** Whether `request` asks the model to summarize a conversation, as compacting it does. */
+export const asksForSummary = (request: LanguageModel.ProviderOptions) =>
+  request.prompt.content.some(
+    (message) =>
+      message.role === "user" &&
+      message.content.some(
+        (part) => part.type === "text" && part.text.startsWith("Summarize this conversation."),
+      ),
+  );
+
+/** The texts of a request's conversation, a message's parts joined, with each message's role. */
+export const transcriptOf = (request: LanguageModel.ProviderOptions | undefined) =>
+  request?.prompt.content.map((message) => [
+    message.role,
+    typeof message.content === "string"
+      ? message.content
+      : message.content
+          .map((part) => (part.type === "text" ? part.text : `[${part.type}]`))
+          .join(""),
   ]);
 
 /** The results of tool calls in a request's conversation, in order. */

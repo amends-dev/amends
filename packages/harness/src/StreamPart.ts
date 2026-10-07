@@ -11,7 +11,7 @@
  * tools; a caller that needs their types decodes them with the tool's schemas.
  */
 import { Predicate, Schema } from "effect";
-import { Response } from "effect/ai";
+import { Prompt, Response } from "effect/ai";
 
 /** A call to any tool. The agent's own tools run inside the agent and are `providerExecuted`. */
 const ToolCallPart = Schema.Struct({
@@ -60,15 +60,25 @@ export interface FileChangePart extends Schema.Schema.Type<typeof FileChangePart
 
 /**
  * Reports that the agent replaced its conversation so far with a summary, because it was asked to
- * (`manual`) or because the conversation outgrew its context (`auto`). The conversation keeps the
- * summary in place of everything before it, as `Session.recordStep` records it. An agent that
- * compacts during a turn streams the compaction between two steps, so that it starts the step
- * after; `AgentSession.compact` returns one made between turns.
+ * (`manual`) or because the conversation outgrew its context (`auto`). The conversation goes on
+ * from the summary and the messages the agent kept, in place of everything before the compaction,
+ * as `Session.recordStep` records it. An agent that compacts during a turn streams the compaction
+ * between two steps, so that it starts the step after; `AgentSession.compact` returns one made
+ * between turns.
  */
 export const CompactionPart = Schema.Struct({
   type: Schema.tag("compaction"),
   trigger: Schema.Literals(["manual", "auto"]),
+
+  /** What the conversation before `kept` said. */
   summary: Schema.String,
+
+  /**
+   * The latest messages before the compaction, which the conversation keeps as they were after the
+   * summary, as the conversation records them, in their encoded form. None when the summary covers
+   * everything.
+   */
+  kept: Schema.optional(Schema.Array(Schema.toEncoded(Prompt.Message))),
   tokensBefore: Schema.optional(Schema.Int),
   tokensAfter: Schema.optional(Schema.Int),
   metadata: Schema.optional(Response.ProviderMetadata),

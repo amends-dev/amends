@@ -49,6 +49,12 @@ export const ModelEndpoint = Schema.Struct({
 
   /** The most tokens the model writes in a response. Absent for the provider's default. */
   maxOutputTokens: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
+
+  /**
+   * The most tokens a request to the model holds, what it reads and writes together: its context
+   * window, which an agent compacts its conversation to stay within. Absent when unknown.
+   */
+  contextWindow: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThan(0))),
 });
 
 export interface ModelEndpoint extends Schema.Schema.Type<typeof ModelEndpoint> {}

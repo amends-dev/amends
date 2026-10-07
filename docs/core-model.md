@@ -955,9 +955,11 @@ a compaction in a step, so that the conversation a session resumes with starts f
 compaction rather than the log's beginning, and reading it costs what the summary and what
 followed cost. The thread and the log keep everything a summary replaced. An agent compacts by
 itself when its conversation outgrows its context, streaming the compaction between steps, and on
-request between turns; the summary goes into the conversation as a user message. opencode
-compacts by itself; amends's own agent does not compact yet. What a summary keeps verbatim
-remains open.
+request between turns. The compaction holds the summary, which goes into the conversation as a
+user message, and the latest messages the agent kept as they were, which follow it. opencode
+compacts by itself, and its record keeps only the summary. amends's own agent compacts before a
+step once the conversation fills most of its model's context window, keeping the latest messages
+up to half the window, and on request summarizes everything.
 
 ## Agreed: sandbox providers share one contract, separate from harnesses
 

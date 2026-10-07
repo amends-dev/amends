@@ -201,29 +201,34 @@ export interface Session {
  * `conversation` with `step` recorded after it, as `SessionState.history` records a conversation:
  * an assistant message with what the model wrote and the tools it called, followed by a tool
  * message with the results, and none for a step that wrote nothing and called none. A step that
- * compacted the conversation replaces it, and what the step had before, with the summary, as a user
- * message, so that the conversation is the one the agent goes on with.
+ * compacted the conversation replaces it, and what the step had before, with the conversation the
+ * compaction left, so that the conversation is the one the agent goes on with.
  */
 export const recordStep = (conversation: Prompt.Prompt, step: Step): Prompt.Prompt => {
   const compactedAt = step.parts.findLastIndex((part) => part.type === "compaction");
   const compaction = step.parts[compactedAt];
   return compaction?.type === "compaction"
-    ? Prompt.fromMessages([
-        summaryMessageOf(compaction),
-        ...messagesOfParts(step.parts.slice(compactedAt + 1)),
-      ])
+    ? Prompt.concat(
+        conversationAfter(compaction),
+        Prompt.fromMessages(messagesOfParts(step.parts.slice(compactedAt + 1))),
+      )
     : Prompt.concat(conversation, Prompt.fromMessages(messagesOfParts(step.parts)));
 };
 
-/** The message a compacted conversation starts with: the summary of what came before. */
-const summaryMessageOf = (compaction: CompactionPart) =>
-  Prompt.makeMessage("user", {
-    content: [
-      Prompt.makePart("text", {
-        text: `This conversation continues from an earlier part, summarized below.\n\n${compaction.summary}`,
-      }),
-    ],
-  });
+/**
+ * The conversation a compaction leaves: its summary, as a user message, then the messages it kept.
+ * An agent that keeps its own conversation goes on from this one, so that it has what the session
+ * records.
+ */
+export const conversationAfter = (
+  compaction: Pick<CompactionPart, "summary" | "kept">,
+): Prompt.Prompt =>
+  Prompt.concat(
+    Prompt.make(
+      `This conversation continues from an earlier part, summarized below.\n\n${compaction.summary}`,
+    ),
+    compaction.kept ?? [],
+  );
 
 // TODO: Record what the model reasoned, and the files it wrote, once a model can read them back
 // from another: providers read back only the reasoning they produced.

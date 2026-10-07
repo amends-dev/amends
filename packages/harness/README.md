@@ -56,7 +56,9 @@ agent, between turns, to summarize the conversation so far, and returns the `com
 messages, each step's tool calls and results included, beside the agent's own state. The agent that
 last ran the session resumes from its own state; any other loads the conversation.
 A compaction, made by `compact` or by the agent itself during a turn, replaces everything before
-it with its summary, as a user message, so that the conversation is the one the agent goes on with.
+it with its summary, as a user message, followed by the latest messages the agent kept as they
+were, so that the conversation is the one the agent goes on with. `Session.conversationAfter` gives
+that conversation, for an agent that keeps its own.
 `Session.recordStep` records one `Step` in a conversation as the session does, for a caller that
 keeps a session's steps itself and gives the conversation back as `history`, rather than storing
 the whole of it with every turn. `suspendTurn`

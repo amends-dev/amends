@@ -214,6 +214,29 @@ describe("recordStep", () => {
       { role: "assistant", content: [{ type: "text", text: "After." }] },
     ]);
   });
+
+  it("keeps the messages a compaction kept after its summary", () => {
+    const step: Step = {
+      parts: [
+        {
+          type: "compaction",
+          trigger: "auto",
+          summary: "Ada said hello.",
+          kept: [{ role: "user", content: "What is 2 and 3?" }],
+        },
+        { type: "text", text: "5." },
+      ],
+    };
+
+    expect(recordStep(hello, step).content).toMatchObject([
+      {
+        role: "user",
+        content: [{ type: "text", text: expect.stringMatching(/Ada said hello\.$/) }],
+      },
+      { role: "user", content: [{ type: "text", text: "What is 2 and 3?" }] },
+      { role: "assistant", content: [{ type: "text", text: "5." }] },
+    ]);
+  });
 });
 
 describe("GenerateResult", () => {

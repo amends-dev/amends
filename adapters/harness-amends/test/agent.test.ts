@@ -6,12 +6,14 @@ import { Deferred, Effect, Fiber, Path, Schema, Stream } from "effect";
 import { AiError, type LanguageModel, Prompt, type Response, Tool, Toolkit } from "effect/ai";
 import {
   answer,
+  asksForSummary,
   callTool,
   callTools,
   makeAgent,
   makeSandbox,
   makeScriptedModel,
   toolResultsOf,
+  transcriptOf,
 } from "./fixtures.ts";
 
 const id = Agent.SessionId.make("session-one");
@@ -603,7 +605,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
     }),
   );
 
-  it.effect("asks for no approvals and does not compact yet", () =>
+  it.effect("asks for no approvals", () =>
     Effect.gen(function* () {
       const { model } = yield* makeScriptedModel(() => answer("unused"));
       const session = yield* Harness.make(yield* makeAgent({ model })).createSession({ id });
@@ -611,10 +613,144 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       const approval = yield* Effect.flip(
         session.approve({ approvalId: "approval-1", approved: true }),
       );
-      const compaction = yield* Effect.flip(session.compact());
 
       expect(approval.reason._tag).toBe("UnsupportedError");
-      expect(compaction.reason._tag).toBe("UnsupportedError");
+    }),
+  );
+});
+
+layer(BunServices.layer)("AmendsAgent compaction", (it) => {
+  /** An answer of about `tokens` tokens, as the agent estimates them. */
+  const longAnswer = (tokens: number) => answer("x".repeat(tokens * 4));
+
+  it.effect(
+    "compacts before a step once the conversation fills most of the context window, keeping its latest messages",
+    () =>
+      Effect.gen(function* () {
+        const { model, requests } = yield* makeScriptedModel((request) =>
+          asksForSummary(request)
+            ? answer("Ada said hello, and amends answered at length.")
+            : transcriptOf(request)?.at(-1)?.[1] === "hello"
+              ? longAnswer(900)
+              : answer("Again, hello."),
+        );
+        const session = yield* Harness.make(
+          yield* makeAgent({ model, contextWindow: 1_000 }),
+        ).createSession({ id });
+
+        yield* session.generate({ prompt: "hello" });
+        const again = yield* session.generate({ prompt: "again" });
+        const state = yield* throughJson(yield* session.detach);
+
+        const [compaction] = again.parts.filter((part) => part.type === "compaction");
+        expect(again.parts[0]).toBe(compaction);
+        expect(compaction).toMatchObject({
+          trigger: "auto",
+          summary: "Ada said hello, and amends answered at length.",
+          kept: [{ role: "user", content: "again" }],
+        });
+        expect(compaction?.tokensBefore).toBeGreaterThan(800);
+        expect(compaction?.tokensAfter).toBeLessThan(500);
+        // The summary covers the first turn; the step goes on from it and the prompt it kept.
+        expect(transcriptOf(requests[1])?.at(-1)?.[1]).toContain('"content":"hello"');
+        expect(transcriptOf(requests[1])?.at(-1)?.[1]).not.toContain("again");
+        expect(transcriptOf(requests[2])).toEqual([
+          ["user", expect.stringMatching(/amends answered at length\.$/)],
+          ["user", "again"],
+        ]);
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: expect.stringContaining("Ada said") }] },
+          { role: "user", content: [{ type: "text", text: "again" }] },
+          { role: "assistant", content: [{ type: "text", text: "Again, hello." }] },
+        ]);
+      }),
+  );
+
+  it.effect("compacts only on request for a model whose context window it does not know", () =>
+    Effect.gen(function* () {
+      const { model, requests } = yield* makeScriptedModel((request) =>
+        asksForSummary(request) ? answer("Ada said hello twice.") : longAnswer(900),
+      );
+      const session = yield* Harness.make(yield* makeAgent({ model })).createSession({ id });
+
+      yield* session.generate({ prompt: "hello" });
+      yield* session.generate({ prompt: "hello again" });
+      const compaction = yield* session.compact("Keep how often she said it.");
+      yield* session.generate({ prompt: "and now?" });
+
+      expect(requests.filter(asksForSummary)).toHaveLength(1);
+      expect(transcriptOf(requests[2])?.at(-1)?.[1]).toContain("Keep how often she said it.");
+      expect(compaction).toMatchObject({ trigger: "manual", summary: "Ada said hello twice." });
+      expect(compaction.kept).toBeUndefined();
+      expect(transcriptOf(requests[3])).toEqual([
+        ["user", expect.stringMatching(/Ada said hello twice\.$/)],
+        ["user", "and now?"],
+      ]);
+    }),
+  );
+
+  it.effect("continues a suspended turn from the compaction a finished step made", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* makeSandbox;
+      /** Done once the turn's third step is running, which suspend then cuts short. */
+      const thirdStep = yield* Deferred.make<void>();
+      const { model, requests } = yield* makeScriptedModel((request) => {
+        if (asksForSummary(request)) return answer("amends listed the files.");
+        const outputs = toolResultsOf(request).map((result) => JSON.stringify(result));
+        if (outputs.some((output) => output.includes("two"))) {
+          return untilSuspended(thirdStep, answer("done"));
+        }
+        // The first step reads most of the window, so the second starts from a summary.
+        return outputs.length === 0 &&
+          !JSON.stringify(transcriptOf(request)).includes("amends listed")
+          ? callTool("list-1", "bash", { command: `echo ${"z".repeat(3_400)}` })
+          : callTool("log-2", "bash", { command: "echo two" });
+      });
+      const harness = Harness.make(yield* makeAgent({ model, contextWindow: 2_000 }));
+      const session = yield* harness.createSession({ id, sandbox });
+      const reading = yield* Effect.forkChild(
+        Stream.runCollect(session.stream({ prompt: "list the files, then log" })),
+      );
+      yield* Deferred.await(thirdStep);
+      const state = yield* throughJson(yield* session.suspendTurn);
+      yield* Fiber.join(reading);
+
+      const resumed = yield* harness.createSession({ sandbox, resumeFrom: state });
+      const continued = yield* Stream.runCollect(resumed.continueStream({}));
+      const detached = yield* resumed.detach;
+
+      expect(requests.filter(asksForSummary)).toHaveLength(1);
+      expect(continued.some((part) => part.type === "compaction")).toBe(false);
+      expect(rolesOf(requests.at(-1)?.prompt)).toEqual(["user", "assistant", "tool"]);
+      expect(rolesOf(detached.history)).toEqual(["user", "assistant", "tool", "assistant"]);
+    }),
+  );
+
+  it.effect("keeps the tool calls of the steps it keeps with their results", () =>
+    Effect.gen(function* () {
+      const sandbox = yield* makeSandbox;
+      const { model, requests } = yield* makeScriptedModel((request) => {
+        if (asksForSummary(request)) return answer("amends read the notes.");
+        const outputs = toolResultsOf(request).map((result) => JSON.stringify(result));
+        if (outputs.some((output) => output.includes("2 and 3"))) return answer("The sum is 5.");
+        // Each step reads about 1,000 tokens, more than half of what the second leaves.
+        return outputs.length === 0
+          ? callTool("read-1", "bash", { command: `echo ${"z".repeat(2_000)}` })
+          : callTool("read-2", "bash", { command: `echo 2 and 3 ${"y".repeat(1_600)}` });
+      });
+      const session = yield* Harness.make(
+        yield* makeAgent({ model, contextWindow: 2_000 }),
+      ).createSession({ id, sandbox });
+
+      const result = yield* session.generate({ prompt: "add the numbers in the notes" });
+      const state = yield* session.detach;
+
+      const compaction = result.parts.find((part) => part.type === "compaction");
+      // The second step fits in what a compaction keeps, its call with its result; the first does not.
+      expect(compaction?.kept?.map((message) => message.role)).toEqual(["assistant", "tool"]);
+      expect(rolesOf(requests.at(-1)?.prompt)).toEqual(["user", "assistant", "tool"]);
+      expect(rolesOf(state.history)).toEqual(["user", "assistant", "tool", "assistant"]);
+      expect(result.text).toBe("The sum is 5.");
     }),
   );
 });

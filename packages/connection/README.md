@@ -57,7 +57,7 @@ catalog keeps changes shape; `ModelCatalog.layer` reads it.
 connection authenticates with an API key, gives the settings the provider's URLs name, such as a
 Cloudflare account's id, and offers the provider's models in the catalog and no others. Its endpoint
 for a model is where the catalog says the model is served, with the effort and output limit an agent
-asks for, which the model must offer. `ModelIntegrations.openAiCompatible` offers any model of an API
+asks for, which the model must offer, and the model's context window. `ModelIntegrations.openAiCompatible` offers any model of an API
 that serves Chat Completions at the URL a connection gives, unlisted, with a key or none, as a
 provider of the connection's own.
 

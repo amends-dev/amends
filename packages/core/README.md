@@ -275,8 +275,8 @@ refuses with `Conflict`, `read` past a position, and `waitForAppend`). Its entri
 when the log is new, the prompt once the turn is ready, and each step it finishes, its parts added
 up (`StreamPart.Step`). `SessionLog.historyOf` rebuilds the
 conversation the harness resumes with: what was joined, then each turn's prompt and the steps of
-its latest run, each as `Session.recordStep` records it, so that a compaction leaves its summary in
-place of what came before. How a turn ended is its record's to
+its latest run, each as `Session.recordStep` records it, so that a compaction leaves its summary
+and the messages it kept in place of what came before. How a turn ended is its record's to
 say, not the log's: what the log holds of a turn is written before the commit that ends it.
 `SessionLog.reader` reads a turn's entries as the items readers see (`Turn.LogItem`): the prompt,
 each step that wrote text, verbatim, which is the reply once the turn posts it, and interruptions,
