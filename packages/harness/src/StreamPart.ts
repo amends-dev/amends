@@ -86,6 +86,18 @@ export const CompactionPart = Schema.Struct({
 
 export interface CompactionPart extends Schema.Schema.Type<typeof CompactionPart> {}
 
+/**
+ * Starts a turn that runs apart from the host, as in a sandbox, with what `createSession` takes as
+ * the unfinished turn's `agentState`. A caller that keeps it continues the turn with
+ * `continueStream` once the host that ran it is gone, catching up on the steps it does not have.
+ */
+export const TurnStartPart = Schema.Struct({
+  type: Schema.tag("turn-start"),
+  agentState: Schema.Json,
+});
+
+export interface TurnStartPart extends Schema.Schema.Type<typeof TurnStartPart> {}
+
 // TODO: Add a `raw` part carrying the agent's own event as it came, once a caller needs something
 // the translation into these parts leaves out.
 export const StreamPart = Schema.Union([
@@ -110,8 +122,9 @@ export const StreamPart = Schema.Union([
   FinishStepPart,
   FileChangePart,
   CompactionPart,
+  TurnStartPart,
 ]) satisfies Schema.Codec<
-  Response.StreamPartEncoded | FinishStepPart | FileChangePart | CompactionPart
+  Response.StreamPartEncoded | FinishStepPart | FileChangePart | CompactionPart | TurnStartPart
 >;
 
 export type StreamPart = Superset<typeof StreamPart.Type, Response.StreamPartEncoded>;
@@ -216,6 +229,7 @@ const addUpStep = (parts: ReadonlyArray<StreamPart>): Array<StepPart> => {
       case "tool-params-end":
       case "finish-step":
       case "finish":
+      case "turn-start":
         break;
       case "tool-result":
         if (part.preliminary !== true) added.push(part);

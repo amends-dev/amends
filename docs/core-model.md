@@ -856,8 +856,8 @@ require an independent grant for every underlying mutation.
 ### The harness contract owns what agents report
 
 The [harness](../packages/harness/README.md) defines one stream format for every agent's turns:
-the parts an Effect AI provider streams, with the few only agents produce, such as a step's end, a
-file change, and a compaction. Each agent's adapter translates its native interaction into that
+the parts an Effect AI provider streams, with the few only agents produce, such as a turn's start,
+a step's end, a file change, and a compaction. Each agent's adapter translates its native interaction into that
 format: opencode's reads opencode's session events through its bridge, and amends's own agent is a
 loop over Effect AI already. Neither needs to know about threads, turns, or anything else in
 amends.

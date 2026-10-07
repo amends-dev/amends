@@ -64,11 +64,14 @@ keeps a session's steps itself and gives the conversation back as `history`, rat
 the whole of it with every turn. `suspendTurn`
 ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
 once `createSession` resumes the session, from the step that was in flight; another agent runs it
-again from its prompt. `detach` lets go between turns, `stop` stops the agent to start it again
-later, and `destroy` stops it for good.
+again from its prompt. A turn that runs apart from the host, as one behind a bridge does, starts
+with a `turn-start` part carrying what `suspendTurn` would return as the unfinished turn's
+`agentState`, so that a caller that keeps it continues the turn the same way once the host that ran
+it is gone, as after a crash, without suspending it. `detach` lets go between turns, `stop` stops
+the agent to start it again later, and `destroy` stops it for good.
 
-`StreamPart` holds the parts an Effect AI provider streams, in their encoded form, and three that
-only agents produce: `finish-step`, `file-change`, and `compaction`. Tool calls and results keep
+`StreamPart` holds the parts an Effect AI provider streams, in their encoded form, and four that
+only agents produce: `turn-start`, `finish-step`, `file-change`, and `compaction`. Tool calls and results keep
 their params and results as JSON, since an agent runs tools of its own that no toolkit declares.
 `stepsOf` adds a turn's parts up into its `Step`s, as `GenerateResult.steps` has them: each
 step's texts and reasonings whole, its tool calls and final results, and the `finish-step` that
@@ -121,7 +124,10 @@ hosts launched one at once.
   that died, or exited idle, and was launched again has it again. `suspendTurn` keeps which bridge
   runs the turn, so that `continueTurn` starts it again there, even for a host with other settings,
   which goes on in its own bridge once the turn ends; a turn whose bridge is gone runs again from
-  its prompt. The bridge continues a turn it did not finish, but a turn the bridge loses while a
+  its prompt. A turn streams the same as its `turn-start` part first, for a caller that keeps it
+  to continue the turn once the host is gone; a host that starts another turn while one runs, as
+  one that moved on from the turn a gone host ran, has the bridge abort the running one. The bridge
+  continues a turn it did not finish, but a turn the bridge loses while a
   stream reads it fails with `NoTurnError`. A connection that drops is not opened again: requests it dropped are
   sent again over another, for up to 30 seconds, except a tool's result, an approval, and a request
   to compact, which the bridge must not receive twice. A turn is `StartTurn`, under an id the host

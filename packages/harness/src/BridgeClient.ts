@@ -20,7 +20,9 @@
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge
  * whoever reads it, so `suspendTurn` only stops reading, keeping which bridge runs the turn, and
  * `continueTurn` starts the turn again there, which the bridge continues if it did not finish it,
- * as when it died, and reads it again from its start, after the steps the harness has. A session
+ * as when it died, and reads it again from its start, after the steps the harness has. A turn
+ * streams what `suspendTurn` would return as its `turn-start` part first, so that a caller that
+ * keeps it continues the turn the same way once this host is gone without suspending it. A session
  * resumed with other options continues the turn in the bridge that runs it and then goes on in its
  * own; one whose turn's bridge is gone runs the turn again from its prompt in its own. A session
  * whose bridge cannot answer, as when its sandbox is gone, lets go with the state the bridge last
@@ -268,6 +270,15 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
       );
       yield* Ref.set(latestState, agentState);
       yield* RcRef.invalidate(connection);
+      return yield* stateWith(agentState, unfinishedTurn);
+    });
+
+  /**
+   * The state `createSession` takes back: `agentState`, and `unfinishedTurn`, when given, as the
+   * turn to continue in the bridge the session uses.
+   */
+  const stateWith = (agentState: Schema.Json, unfinishedTurn?: Bridge.TurnId) =>
+    Effect.gen(function* () {
       const state: typeof State.Type =
         unfinishedTurn === undefined
           ? { agentState }
@@ -351,12 +362,20 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   const agentSession: Agent.AgentSession = {
     hasUnfinishedTurn,
 
+    // The turn starts with what `suspendTurn` would return, for a caller that keeps it to continue
+    // the turn after this host is gone.
     promptTurn: (turnOptions) =>
       Stream.unwrap(
         Effect.gen(function* () {
           const id = Bridge.TurnId.make(yield* Effect.orDie(crypto.randomUUIDv4));
           const turn = yield* startTurn(id, turnOptions);
-          return turn === undefined ? Stream.empty : readTurn(turn, 0);
+          if (turn === undefined) return Stream.empty;
+          const agentState = yield* send((client) => client.ReadState({ session }));
+          const start: StreamPart = {
+            type: "turn-start",
+            agentState: yield* stateWith(agentState, turn),
+          };
+          return Stream.concat(Stream.make(start), readTurn(turn, 0));
         }),
       ),
 

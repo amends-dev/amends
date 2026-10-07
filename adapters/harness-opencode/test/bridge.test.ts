@@ -4,6 +4,7 @@ import { type Sandbox, Template } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Path, Redacted, Schedule, Schema, Stream } from "effect";
+import { Prompt } from "effect/ai";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { isRunning, makeBridgedAgent, makeProxy, makeSandbox } from "./fixtures.ts";
 
@@ -23,6 +24,24 @@ const answer = (text: string): ReadonlyArray<StreamPart.StreamPart> => [
   { type: "finish-step", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
   { type: "finish", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
 ];
+
+/** The parts of a turn prompted to answer `text`: its start, then the answer. */
+const prompted = (text: string) => [
+  expect.objectContaining({ type: "turn-start" }),
+  ...answer(text),
+];
+
+/** A session state with the turn `prompt` unfinished, from its start `start`, nothing else run. */
+const resumeFromStart = (prompt: string, start: StreamPart.TurnStartPart) => ({
+  id,
+  agent: "fake",
+  history: Prompt.empty,
+  unfinishedTurn: {
+    prompt: Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: prompt })] }),
+    steps: [],
+    agentState: start.agentState,
+  },
+});
 
 /**
  * The fake bridge's template at `version`, which installs the bridge in the sandbox's working
@@ -159,17 +178,25 @@ const release = (sandbox: Sandbox.Sandbox["Service"]) =>
     );
   });
 
-/** Reads `turn` in the background, returning the collecting fiber once it read the first part. */
+/**
+ * Reads `turn` in the background, returning its start and the collecting fiber once it read the
+ * agent's first part.
+ */
 const readFromFirstPart = <E, R>(turn: Stream.Stream<StreamPart.StreamPart, E, R>) =>
   Effect.gen(function* () {
+    const started = yield* Deferred.make<StreamPart.TurnStartPart>();
     const read = yield* Deferred.make<void>();
     const reading = yield* turn.pipe(
-      Stream.tap(() => Deferred.succeed(read, undefined)),
+      Stream.tap((part) =>
+        part.type === "turn-start"
+          ? Deferred.succeed(started, part)
+          : Deferred.succeed(read, undefined),
+      ),
       Stream.runCollect,
       Effect.forkChild,
     );
     yield* Deferred.await(read);
-    return reading;
+    return { reading, start: yield* Deferred.await(started) };
   });
 
 describe("BridgeClient", () => {
@@ -181,7 +208,15 @@ describe("BridgeClient", () => {
 
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
 
-        expect(parts).toEqual(answer("hello"));
+        expect(parts).toEqual(prompted("hello"));
+        // The turn starts with what `suspendTurn` would return: the state and the turn's bridge.
+        expect(parts[0]).toEqual({
+          type: "turn-start",
+          agentState: {
+            agentState: { turns: 1 },
+            unfinishedTurn: { turn: expect.any(String), bridge: expect.any(String) },
+          },
+        });
         expect(yield* linesOf(sandbox, "launches.jsonl")).toEqual([
           {
             pid: expect.any(Number),
@@ -200,7 +235,7 @@ describe("BridgeClient", () => {
         const session = yield* harness.createSession({ sandbox, id });
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply hello" }));
 
-        expect(parts).toEqual(answer("hello"));
+        expect(parts).toEqual(prompted("hello"));
       }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -216,7 +251,7 @@ describe("BridgeClient", () => {
         });
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply again" }));
 
-        expect(parts).toEqual(answer("again"));
+        expect(parts).toEqual(prompted("again"));
         expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(1);
       }).pipe(Effect.provide(TestLayer)),
     );
@@ -235,7 +270,7 @@ describe("BridgeClient", () => {
           yield* greet(yield* makeHarness({ secret: "another secret" }), "session-3"),
         ];
 
-        expect(greetings).toEqual([answer("hello"), answer("hi"), answer("hello")]);
+        expect(greetings).toEqual([prompted("hello"), prompted("hi"), prompted("hello")]);
         expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(3);
         expect(yield* listeningOf(sandbox)).toHaveLength(3);
       }).pipe(Effect.provide(TestLayer)),
@@ -257,7 +292,7 @@ describe("BridgeClient", () => {
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
         const session = yield* harness.createSession({ sandbox, id });
-        const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
+        const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
 
         const state = yield* session.suspendTurn;
         yield* Fiber.join(reading);
@@ -270,13 +305,37 @@ describe("BridgeClient", () => {
       }).pipe(Effect.provide(TestLayer)),
     );
 
+    it.live("continues a turn from its start, for a host that is gone without suspending it", () =>
+      Effect.gen(function* () {
+        const { sandbox, harness } = yield* makeSetup;
+        const session = yield* harness.createSession({ sandbox, id });
+        const { reading, start } = yield* readFromFirstPart(
+          session.stream({ prompt: "wait later" }),
+        );
+
+        // The host that ran the turn is gone, as when it crashed: it neither suspended the turn
+        // nor aborted it, as this one reads on.
+        const otherHarness = yield* makeHarness();
+        const resumed = yield* otherHarness.createSession({
+          sandbox,
+          resumeFrom: resumeFromStart("wait later", start),
+        });
+        yield* release(sandbox);
+        const parts = yield* Stream.runCollect(resumed.continueStream({}));
+
+        expect(parts).toEqual(answer("later"));
+        expect(yield* Fiber.join(reading)).toEqual(prompted("later"));
+        expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(1);
+      }).pipe(Effect.provide(TestLayer)),
+    );
+
     it.live(
       "continues a suspended turn in the bridge that runs it, for a host with other options, then goes on in its own",
       () =>
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
           const session = yield* harness.createSession({ sandbox, id });
-          const reading = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
+          const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait later" }));
 
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
@@ -288,7 +347,7 @@ describe("BridgeClient", () => {
           const { agentState } = yield* resumed.detach;
 
           expect(continued).toEqual(answer("later"));
-          expect(next).toEqual(answer("hi"));
+          expect(next).toEqual(prompted("hi"));
           // The session's own bridge starts it from the state the other gave, of its first turn.
           expect(agentState).toEqual({ agentState: { turns: 2 } });
           expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
@@ -301,7 +360,7 @@ describe("BridgeClient", () => {
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
           const session = yield* harness.createSession({ sandbox, id });
-          const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
+          const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
 
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
@@ -324,7 +383,7 @@ describe("BridgeClient", () => {
         Effect.gen(function* () {
           const { sandbox, harness } = yield* makeSetup;
           const session = yield* harness.createSession({ sandbox, id });
-          const reading = yield* readFromFirstPart(session.stream({ prompt: "wait again" }));
+          const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait again" }));
 
           const state = yield* session.suspendTurn;
           yield* Fiber.join(reading);
@@ -335,7 +394,7 @@ describe("BridgeClient", () => {
           const parts = yield* Stream.runCollect(resumed.continueStream({}));
 
           // Run again from its prompt, rather than continued, which would answer "Continue.".
-          expect(parts).toEqual(answer("again"));
+          expect(parts).toEqual(prompted("again"));
         }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -349,7 +408,7 @@ describe("BridgeClient", () => {
         // was aborted.
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply next" }));
 
-        expect(parts).toEqual(answer("next"));
+        expect(parts).toEqual(prompted("next"));
       }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -368,13 +427,13 @@ describe("BridgeClient", () => {
             }),
         };
         const session = yield* harness.createSession({ sandbox: throughProxy, id });
-        const reading = yield* readFromFirstPart(session.stream({ prompt: "wait across" }));
+        const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait across" }));
 
         yield* proxy.drop;
         yield* release(sandbox);
         const parts = yield* Fiber.join(reading);
 
-        expect(parts).toEqual(answer("across"));
+        expect(parts).toEqual(prompted("across"));
       }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -390,7 +449,7 @@ describe("BridgeClient", () => {
           const parts = yield* Stream.runCollect(session.stream({ prompt: "reply second" }));
           const state = yield* session.stop;
 
-          expect(parts).toEqual(answer("second"));
+          expect(parts).toEqual(prompted("second"));
           expect(state.agentState).toEqual({ agentState: { turns: 2 } });
           expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
         }).pipe(Effect.provide(TestLayer)),
@@ -400,14 +459,14 @@ describe("BridgeClient", () => {
       Effect.gen(function* () {
         const { sandbox, harness } = yield* makeSetup;
         const session = yield* harness.createSession({ sandbox, id });
-        const reading = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
+        const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
 
         yield* killBridge(sandbox);
         const error = yield* Effect.flip(Fiber.join(reading));
         const parts = yield* Stream.runCollect(session.stream({ prompt: "reply next" }));
 
         expect(error._tag === "HarnessError" && error.reason._tag).toBe("NoTurnError");
-        expect(parts).toEqual(answer("next"));
+        expect(parts).toEqual(prompted("next"));
       }).pipe(Effect.provide(TestLayer)),
     );
 
@@ -457,7 +516,7 @@ describe("BridgeClient", () => {
           const state = yield* session.detach;
 
           expect(listedOnceIdle).toEqual([]);
-          expect(parts).toEqual(answer("second"));
+          expect(parts).toEqual(prompted("second"));
           expect(state.agentState).toEqual({ agentState: { turns: 2 } });
           expect(yield* launchedPids(sandbox)).toHaveLength(2);
         }).pipe(Effect.provide(TestLayer)),
@@ -499,9 +558,9 @@ describe("BridgeClient", () => {
           Stream.runCollect(session.stream({ prompt: "reply second" })),
         );
 
-        expect(first).toEqual([answer("first"), answer("first")]);
+        expect(first).toEqual([prompted("first"), prompted("first")]);
         expect(running).toHaveLength(1);
-        expect(second).toEqual([answer("second"), answer("second")]);
+        expect(second).toEqual([prompted("second"), prompted("second")]);
       }).pipe(Effect.provide(TestLayer)),
     );
   });

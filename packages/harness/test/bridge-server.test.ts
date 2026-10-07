@@ -150,28 +150,29 @@ describe("BridgeServer", () => {
     }),
   );
 
-  it.effect("starts a turn once when asked again, and no other while it runs", () =>
+  it.effect("starts a turn once when asked again, and aborts it when another starts", () =>
     Effect.gen(function* () {
       const { parts, fake, client } = yield* setUp;
       yield* client.StartSession(startOptions);
       yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
       yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
-      const refused = yield* Effect.flip(
-        client.StartTurn({ session, turn: secondTurn, options: turnOptions("again") }),
-      );
-      yield* Queue.offerAll(parts, reply("hello"));
-      yield* Queue.end(parts);
-      yield* Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 0 }));
-      expect(refused.reason._tag).toBe("TurnInProgressError");
+      // The turn runs once it reads its first part.
+      yield* Queue.offerAll(parts, reply("hello").slice(0, 1));
+      yield* client
+        .ReadTurn({ session, turn: firstTurn, after: 0 })
+        .pipe(Stream.take(1), Stream.runDrain);
       expect(fake.turns).toHaveLength(1);
 
       yield* client.StartTurn({ session, turn: secondTurn, options: turnOptions("again") });
+      yield* Queue.offerAll(parts, reply("hello"));
+      yield* Queue.end(parts);
       yield* Stream.runDrain(client.ReadTurn({ session, turn: secondTurn, after: 0 }));
       const forgotten = yield* Effect.flip(
         Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 0 })),
       );
 
       expect(fake.turns).toHaveLength(2);
+      expect(fake.turnEnds).toEqual(["interrupted", "finished"]);
       expect(forgotten.reason._tag).toBe("NoTurnError");
     }),
   );

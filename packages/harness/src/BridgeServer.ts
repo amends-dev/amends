@@ -11,7 +11,9 @@
  *
  * Each session the bridge starts runs in a scope of its own until a host stops or destroys it. The
  * bridge runs the session's turns itself, one at a time, in that scope, so that a turn does not end
- * with the connection of the host that started it. It numbers a turn's parts as the turn streams
+ * with the connection of the host that started it; a host that starts another turn has moved on
+ * from the one running, as when the host that started it is gone, so the bridge aborts it rather
+ * than refuse the new turn. It numbers a turn's parts as the turn streams
  * them and keeps them in memory and in a file in its state directory, a line each, followed by how
  * the turn ended. A session keeps only its latest turn, which hosts read from any number while it
  * runs and after it ends. A bridge started again reads a turn from its file. A turn whose file has
@@ -53,7 +55,6 @@ import {
   type HarnessErrorReason,
   NoTurnError,
   NotFoundError,
-  TurnInProgressError,
   UnknownError,
 } from "./HarnessError.ts";
 
@@ -423,11 +424,13 @@ const makeHandlers = Effect.fnUntraced(function* (
             started.turn = turnStart.turn;
             return;
           }
+          // The host asking for another turn has moved on from the one running, as when the host
+          // that started it is gone, so the bridge aborts it rather than refuse the new turn.
           if (
             started.turn !== undefined &&
             (yield* SubscriptionRef.get(started.turn.progress)).end === undefined
           ) {
-            return yield* harnessError(new TurnInProgressError({}));
+            yield* abortTurn(started);
           }
           // A session keeps only its latest turn; a turn it continues keeps the steps it finished.
           const kept = turnStart._tag === "Continue" ? turnStart.parts : [];
