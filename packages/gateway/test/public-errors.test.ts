@@ -1,7 +1,6 @@
 import type { AssignmentService } from "@amends/core/authorization";
 import type { ReadStateService } from "@amends/core/read-state";
 import type { ChangeFeedService } from "@amends/core/change-feed";
-import type { ConnectionService } from "@amends/core/connection";
 import type { ConnectionV2Service } from "@amends/core/connection-v2";
 import type { AgentV2Service } from "@amends/core/agent-v2";
 import type { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
@@ -61,7 +60,6 @@ it("every error a core operation can fail with is public or internal, so none be
   expectTypeOf<Unclassified<AssignmentService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ReadStateService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ChangeFeedService.Interface>>().toEqualTypeOf<never>();
-  expectTypeOf<Unclassified<ConnectionService.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<ConnectionV2Service.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<AgentV2Service.Interface>>().toEqualTypeOf<never>();
   expectTypeOf<Unclassified<GroupService.Interface>>().toEqualTypeOf<never>();

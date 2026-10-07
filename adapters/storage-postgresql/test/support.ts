@@ -20,8 +20,6 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Integrations } from "@amends/connection-v2";
-import { ConnectionCatalog, ConnectionCredentialStore } from "@amends/core/connection";
-import { EnvironmentCatalog } from "@amends/core/environment";
 import { TurnJobs } from "@amends/core/turn";
 import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
@@ -64,7 +62,6 @@ export const bind = (context: Context.Context<WorkspaceStorage.Bindings | TurnJo
   groupMemberships: Context.get(context, GroupMembershipStore.Service),
   groupFollows: Context.get(context, GroupFollowStore.Service),
   readStates: Context.get(context, ReadStateStore.Service),
-  credentials: Context.get(context, ConnectionCredentialStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 /** Workspace views over the database in context, each with its signals. */
@@ -86,8 +83,6 @@ export const core = (bound: Bound) =>
       Layer.mergeAll(
         Layer.succeedContext(bound.context),
         BunCrypto.layer,
-        ConnectionCatalog.layer([]),
-        EnvironmentCatalog.layer(),
         Layer.effect(Integrations.Integrations, Integrations.make([])),
       ),
     ),

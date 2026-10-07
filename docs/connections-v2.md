@@ -2,9 +2,7 @@
 
 Connections v2 are a workspace's links to the integrations its host installs: model providers,
 tool sources, sandbox providers, and harnesses, as [connection-v2](../packages/connection-v2/README.md)
-declares them. They are built beside [Connections](connections.md), which they are to replace, and
-share nothing with them: their own records, keys, HTTP routes, client hooks, screens, and rail
-destination. Nothing uses them yet; turns still run on the old connections and environments.
+declares them. [Agents v2](agents-v2.md) name them for their harness, model, and sandbox.
 
 Both apps own `/workspaces/:id/connections-v2`, reached from the rail's Connections v2, whose
 sidebar lists Models, Tools, Sandboxes, and Harnesses: each connection under what its integration

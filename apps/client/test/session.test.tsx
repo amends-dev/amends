@@ -162,12 +162,9 @@ it("keeps only known nested workspace destinations in sign-in return paths", () 
   expect(returnPath(paths.directDraft("one", ["a", "b c"]))).toBe(
     "/workspaces/one/direct?to=a,b%20c",
   );
-  expect(returnPath(paths.agent("one", "a1", "configuration"))).toBe(
-    "/workspaces/one/agents/a1/configuration",
-  );
-  expect(returnPath(paths.environment("one", "e1"))).toBe("/workspaces/one/environments/e1");
-  expect(returnPath(paths.connection("one", "c1"))).toBe("/workspaces/one/connections/c1");
-  expect(returnPath("/workspaces/one/agents/a1/unknown")).toBe(paths.workspaces);
+  expect(returnPath(paths.agentV2("one", "a1"))).toBe("/workspaces/one/agents-v2/a1");
+  expect(returnPath(paths.connectionV2("one", "c1"))).toBe("/workspaces/one/connections-v2/c1");
+  expect(returnPath("/workspaces/one/agents-v2/a1/unknown")).toBe(paths.workspaces);
   expect(returnPath("/workspaces/one/unknown")).toBe(paths.workspaces);
   expect(returnPath("/workspaces/one/tasks/../../../sign-in")).toBe(paths.workspaces);
   expect(paths.workspacePage("a/b", "triage")).toBe("/workspaces/a%2Fb/triage");

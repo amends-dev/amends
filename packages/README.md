@@ -151,24 +151,14 @@ gateway, adapting the same session token resolution to their own authentication.
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs
 them against itself.
 
-`@amends/connection` is the [connection contract](./connection/README.md): what a connection
-implementation declares for a host's catalog, and the code each capability supplies, such as model
-inference. Core's connection domain checks connections against the declarations; implementations
-live in adapters.
+`@amends/harness-v2` is the [harness contract](./harness-v2/README.md): an agent's sessions and
+turns, streamed in one format whichever agent runs them, and the bridge through which a host drives
+an agent inside a sandbox. `@amends/sandbox-v2` is the sandbox contract every provider implements,
+with the conformance suites each provider runs against itself; it knows nothing of harnesses.
+`@amends/toolkit` gives every kind of [tool source](./toolkit/README.md) one shape.
+`@amends/connection-v2` holds the [integrations](./connection-v2/README.md) a host installs, what
+each gives a workspace's connections, and the model catalog. The agents and sandbox providers
+themselves, with their dependencies, live in `adapters/`.
 
-`@amends/sandbox` is the [sandbox contract](./sandbox/README.md) every sandbox provider implements,
-from a local directory to a hosted service, with capabilities for what providers differ on. It
-knows nothing of harnesses. `@amends/sandbox-conformance` holds the test suites every provider
-adapter runs against itself; the providers live in `adapters/`.
-
-`@amends/environment` is the [environment runtime](./environment/README.md): it composes a harness
-with an optional sandbox, spawns them without history, passes history and input through, and
-applies retention on release. It depends on the harness and sandbox contracts only.
-
-`@amends/harness` is the [harness contract](./harness/README.md): sessions, their capabilities, and
-the events and transcript every harness records, so a turn's log reads the same whichever harness
-ran it. It depends on Effect alone, besides `@effect/vitest` for the
-[conformance suites](./harness/README.md#conformance-suites) every harness runs against itself, such as
-amends's here and opencode's in `adapters/harness-acp`, and it knows nothing of core. `@amends/harness-amends` is
-amends's [own harness](./harness-amends/README.md), an agent loop over Effect AI's `LanguageModel`,
-which ships with `effect`; provider packages and other harnesses' dependencies belong in adapters.
+`@amends/cluster` runs [jobs](./cluster/README.md), the work outside requests, on Effect Cluster,
+with their retries and pruning.

@@ -183,24 +183,7 @@ terminates the child in `finally`; each child uses its own database and an ephem
 port. Tests that need a database run the fixture inside `it.live` over the Effect
 that creates it.
 
-Sandbox providers run the [sandbox conformance suites](../packages/sandbox-conformance/README.md)
-in the `backend` project with live time, since they wait on real processes. The local provider's
-tests run everywhere, each over a temporary directory and a random port, and need `python3`. The
-Daytona provider's tests create real sandboxes, take minutes, and cost money, so they run only with
-`AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, for example from the repository's Git-ignored `.env`;
-otherwise, as in CI, they are reported as skipped. The same flag runs the local host's turns on
-Daytona: one whose model refuses its key, and, with `OPENROUTER_API_KEY` (and optionally
-`OPENROUTER_BASE_URL` and `OPENROUTER_MODEL`) or `ANTHROPIC_API_KEY` too, two that a real model
-answers, on amends's harness and on opencode.
-
-Harnesses run the [harness conformance suites](../packages/harness/README.md#conformance-suites) in the
-`backend` project with live time. Amends's harness runs them everywhere over a scripted Effect AI
-model. opencode runs them over a chat-completions server on a local port, as does a test where that
-model has opencode run a command, and so does the local host's turn on opencode inside a local
-sandbox; all of these need opencode 1.18.23 on the `PATH` and are reported as skipped without it,
-as in CI.
-
-The opencode agent being rebuilt in `adapters/harness-opencode` runs everywhere against a fake of
+The opencode agent in `adapters/harness-opencode` runs everywhere against a fake of
 opencode's server, which the tests script turn by turn. Starting the server, and the bridge program
 a host launches, run everywhere too, against a stand-in for `opencode serve` in
 `test/fake-opencode-server.js`, which the tests install as an executable that runs on the Bun
@@ -221,7 +204,7 @@ also set opencode up as they would from a workspace's connections, to OpenRouter
 it runs on, to the agent, and to this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1`,
 Daytona's.
 
-The sandbox providers being rebuilt in `adapters/sandbox-local-v2` and
+The sandbox providers in `adapters/sandbox-local-v2` and
 `adapters/sandbox-daytona-v2` run the suites `@amends/sandbox-v2/conformance` exports, and
 `packages/sandbox-v2/test` checks the contract's own rules, such as what names a template. The local
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network

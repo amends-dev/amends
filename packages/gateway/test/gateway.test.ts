@@ -1,9 +1,6 @@
-import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
 import { AgentV2Store } from "@amends/core/agent-v2";
-import { AgentStore } from "@amends/core/agent";
 import { SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
-import { EnvironmentStore } from "@amends/core/environment";
 import {
   ThreadStore,
   ThreadParticipationStore,
@@ -239,33 +236,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         }),
       ),
       Context.add(
-        ConnectionStore.Service,
-        ConnectionStore.Service.of({
-          get: unexpected,
-          list: unexpected(),
-          insert: unexpected,
-          update: unexpected,
-        }),
-      ),
-      Context.add(
-        EnvironmentStore.Service,
-        EnvironmentStore.Service.of({
-          get: unexpected,
-          list: unexpected(),
-          insert: unexpected,
-          update: unexpected,
-        }),
-      ),
-      Context.add(
-        AgentStore.Service,
-        AgentStore.Service.of({
-          get: unexpected,
-          list: unexpected(),
-          insert: unexpected,
-          update: unexpected,
-        }),
-      ),
-      Context.add(
         TurnStore.Service,
         TurnStore.Service.of({
           get: unexpected,
@@ -275,14 +245,6 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           listActiveByMember: unexpected,
           insert: unexpected,
           update: unexpected,
-        }),
-      ),
-      Context.add(
-        ConnectionCredentialStore.Service,
-        ConnectionCredentialStore.Service.of({
-          put: unexpected,
-          get: unexpected,
-          remove: unexpected,
         }),
       ),
       Context.add(

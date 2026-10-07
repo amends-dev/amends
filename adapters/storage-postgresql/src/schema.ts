@@ -41,15 +41,7 @@ export const participantKinds = ["Member", "Contact", "Triage"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = [
-  "Workspace",
-  "Member",
-  "Thread",
-  "Group",
-  "Connection",
-  "ConnectionV2",
-  "Environment",
-] as const;
+export const targetKinds = ["Workspace", "Member", "Thread", "Group", "ConnectionV2"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** A notification's state; a human recipient's Seen is also kept in notification_seen. */
 export const notificationStates = [
@@ -67,18 +59,14 @@ const scopeColumns = {
   targetMemberId: text("target_member_id"),
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
-  targetConnectionId: text("target_connection_id"),
   targetConnectionV2Id: text("target_connection_v2_id"),
-  targetEnvironmentId: text("target_environment_id"),
 };
 /** The column holding each kind of target's ID; a workspace target needs none. */
 const targetIds = {
   Member: "targetMemberId",
   Thread: "targetThreadId",
   Group: "targetGroupId",
-  Connection: "targetConnectionId",
   ConnectionV2: "targetConnectionV2Id",
-  Environment: "targetEnvironmentId",
 } as const;
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
   /** Only the named target ID column is set, or none. */
@@ -727,49 +715,6 @@ export const threadActivities = pgTable(
 );
 
 /**
- * Connections to external systems. An implementation declares its own settings, so they are
- * stored as JSON, like a thread activity's kind-specific details; a credential is referenced here
- * and kept in connection_credentials.
- */
-export const connections = pgTable(
-  "connections",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    id: text("id").notNull(),
-    name: text("name").notNull(),
-    implementationId: text("implementation_id").notNull(),
-    settings: jsonb("settings").$type<Record<string, string>>().notNull(),
-    authentication: text("authentication", { enum: ["None", "ApiKey"] }).notNull(),
-    credentialId: text("credential_id"),
-    status: text("status", { enum: memberStatuses }).notNull(),
-    createdBy: text("created_by").notNull(),
-    createdAt: instant("created_at").notNull(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.workspaceId, t.id] }),
-    check(
-      "connections_credential_needs_api_key",
-      sql`${t.authentication} = 'ApiKey' OR ${t.credentialId} IS NULL`,
-    ),
-  ],
-);
-
-/**
- * Connections' credentials, outside the journal and its read models: rebuilding projections
- * keeps them. Each secret is sealed with the host's credential key, bound to its row.
- */
-export const connectionCredentials = pgTable(
-  "connection_credentials",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    id: text("id").notNull(),
-    connectionId: text("connection_id").notNull(),
-    sealed: text("sealed").notNull(),
-  },
-  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
-);
-
-/**
  * Workspaces' connections to the integrations their host installs. An integration declares its own
  * settings, so they are stored as JSON, like a thread activity's kind-specific details; a
  * connection's credential is kept in connection_v2_credentials.
@@ -802,61 +747,6 @@ export const connectionV2Credentials = pgTable(
     sealed: text("sealed").notNull(),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.connectionId] })],
-);
-
-/**
- * Where and how agents run: a harness, and optionally a sandbox. A sandbox's columns are all set or
- * all null; its variables and setup commands are stored as JSON, since both are lists of values.
- */
-export const environments = pgTable(
-  "environments",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    id: text("id").notNull(),
-    name: text("name").notNull(),
-    harnessId: text("harness_id").notNull(),
-    sandboxProviderId: text("sandbox_provider_id"),
-    sandboxHarness: text("sandbox_harness", { enum: ["in-process", "in-sandbox"] }),
-    sandboxConnectionId: text("sandbox_connection_id"),
-    sandboxTemplate: text("sandbox_template"),
-    sandboxEnv: jsonb("sandbox_env").$type<Record<string, string>>(),
-    sandboxSetup: jsonb("sandbox_setup").$type<ReadonlyArray<string>>(),
-    sandboxRetention: text("sandbox_retention", { enum: ["stop", "destroy"] }),
-    status: text("status", { enum: memberStatuses }).notNull(),
-    createdBy: text("created_by"),
-    createdAt: instant("created_at").notNull(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.workspaceId, t.id] }),
-    check(
-      "environments_sandbox_complete",
-      sql`(${t.sandboxProviderId} IS NULL AND ${t.sandboxHarness} IS NULL AND ${t.sandboxConnectionId} IS NULL AND ${t.sandboxTemplate} IS NULL AND ${t.sandboxEnv} IS NULL AND ${t.sandboxSetup} IS NULL AND ${t.sandboxRetention} IS NULL) OR (${t.sandboxProviderId} IS NOT NULL AND ${t.sandboxHarness} IS NOT NULL AND ${t.sandboxEnv} IS NOT NULL AND ${t.sandboxSetup} IS NOT NULL AND ${t.sandboxRetention} IS NOT NULL)`,
-    ),
-  ],
-);
-
-/**
- * Agents' behavioral configuration. Each is one workspace membership, which names it and holds
- * its roles; its model access is a connection, a model, and an optional reasoning level.
- */
-export const agents = pgTable(
-  "agents",
-  {
-    workspaceId: text("workspace_id").notNull(),
-    id: text("id").notNull(),
-    memberId: text("member_id").notNull(),
-    instructions: text("instructions").notNull(),
-    connectionId: text("connection_id").notNull(),
-    model: text("model").notNull(),
-    reasoning: text("reasoning"),
-    environmentId: text("environment_id").notNull(),
-    createdBy: text("created_by").notNull(),
-    createdAt: instant("created_at").notNull(),
-  },
-  (t) => [
-    primaryKey({ columns: [t.workspaceId, t.id] }),
-    uniqueIndex("agents_by_member").on(t.workspaceId, t.memberId),
-  ],
 );
 
 /**

@@ -10,14 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
     "@amends/connection-v2": "workspace:*",
     "@amends/core": "workspace:*",
-    "@amends/environment": "workspace:*",
     "@amends/gateway": "workspace:*",
-    "@amends/harness": "workspace:*",
     "@amends/harness-v2": "workspace:*",
-    "@amends/sandbox": "workspace:*",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"
   }

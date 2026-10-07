@@ -1,19 +1,13 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { AnthropicConnection } from "@amends/connection-anthropic";
 import { ModelCatalog, ModelIntegrations, ToolIntegrations } from "@amends/connection-v2";
-import { OpenAiCompatibleConnection } from "@amends/connection-openai-compatible";
 import { JobPruning } from "@amends/cluster";
 import { TurnJobs } from "@amends/core/turn";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
-import { OpenCodeHarness } from "@amends/harness-acp";
-import { AmendsHarness } from "@amends/harness-amends";
 import { AmendsAgent, Models } from "@amends/harness-amends-v2";
 import { OpencodeAgent } from "@amends/harness-opencode";
-import { DaytonaConnection, DaytonaSandbox } from "@amends/sandbox-daytona";
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona-v2";
-import { LocalSandbox } from "@amends/sandbox-local";
 import { LocalSandboxProvider } from "@amends/sandbox-local-v2";
 import { Network } from "@amends/sandbox-v2";
 import {
@@ -64,26 +58,11 @@ export interface Options {
    */
   readonly credentialKey?: Redacted.Redacted<string> | undefined;
   /**
-   * The directory this machine's sandboxes live in, those of each connection to it in
-   * `connections`; `amends-sandboxes` in the system's temporary directory by default.
+   * The directory this machine's sandboxes live in, a directory for each connection to it;
+   * `amends-sandboxes` in the system's temporary directory by default.
    */
   readonly sandboxDirectory?: string | undefined;
 }
-
-/**
- * What this host installs, as its catalogs declare them: model connections and a Daytona account;
- * amends's harness, in process or in a sandbox, and opencode, in a sandbox; and sandboxes as local
- * directories, for development, and on Daytona.
- */
-export const installed = {
-  connections: [
-    AnthropicConnection.declaration,
-    OpenAiCompatibleConnection.declaration,
-    DaytonaConnection.declaration,
-  ],
-  harnesses: [AmendsHarness.harness.declaration, OpenCodeHarness.declaration],
-  sandboxes: [LocalSandbox.declaration, DaytonaSandbox.declaration],
-};
 
 /**
  * The integrations this host installs, which workspaces connect to: each model provider in the
@@ -166,8 +145,8 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 export const layer = (url: Redacted.Redacted<string>, options: Options = {}): HostLayer => {
   const sandboxDirectory = options.sandboxDirectory ?? join(tmpdir(), "amends-sandboxes");
   const gateway = Layer.unwrap(
-    Effect.map(makeIntegrations(join(sandboxDirectory, "connections")), (integrations) =>
-      Gateway.layer({ ...installed, integrations }),
+    Effect.map(makeIntegrations(sandboxDirectory), (integrations) =>
+      Gateway.layer({ integrations }),
     ),
   );
   // TODO: Run the turn job here, and prune its requests, once it is rebuilt on harness-v2.

@@ -21,8 +21,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   starts each turn as one harness turn on what [agents v2](../packages/core/README.md#agents-v2)
   select, prompted with the thread's messages since the agent's last turn there, keeps the harness
   session of each participation for its next turn, and posts the text of the turn's last step as the
-  reply; a turn that fails or is stopped posts nothing. Agents created before agents v2 run no turns:
-  a turn for one fails. A reader with a turn's log open follows it as a stream of its items and the
+  reply; a turn that fails or is stopped posts nothing. A reader with a turn's log open follows it as a stream of its items and the
   step being written; the text being written is best effort, and a draft missed while reconnecting
   shows once its step finishes. The [turn screens](turns.md) follow, stop, and retry turns in
   threads and show each turn's log; threads have no titles, so the log names a thread by its group.
@@ -30,71 +29,31 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   activity for participants is not built. The active turns read covers at most a hundred active
   turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
   outside the store. Task activity kinds remain design intent.
-- The [harness contract](../packages/harness/README.md), amends's own
-  [in-process harness](../packages/harness-amends/README.md), and the
-  [environment runtime](../packages/environment/README.md) ran agents' turns before harness-v2, and
-  now run none. Only their opt-in live tests call a real model provider. That harness stops rather
-  than answering the model when a response calls a tool it was not offered or holds a part it
-  cannot record, and whether providers accept history with calls to tools a later session no
-  longer offers is unverified.
-- [opencode](../adapters/harness-acp/README.md#opencode) runs through the Agent Client Protocol,
-  only inside a sandbox, which needs release 1.18.23 on the `PATH`; on Daytona an environment's
-  setup installs it. A conversation it continues is written as an opencode session with earlier tool
-  calls and results as text, and without reasoning, and one that starts with a response, or whose
-  last calls await results, is `Unsupported`. ACP names a call by its kind, so its calls are
-  recorded under names such as `execute`. It ignores a session's context limit and does not compact
-  itself: a conversation longer than its model's window is refused by the provider, which the
-  harness recognizes from the refusal's words, and that path has not been run against a real
-  provider. No other ACP agent is installed, and no turn runs on it now.
-- [Environments](../packages/core/README.md#environments) are stored per workspace, each a harness
-  and an optional sandbox under an account connection, and every workspace starts with an
-  in-process one; they are managed over HTTP and on the [Environments page](environments.md).
-  The local host installs amends's own harness and opencode. Amends's runs in process, where a
-  sandbox is only where its tools would act, and none acts there yet, or, as opencode does, inside a
-  local or Daytona sandbox, served by the
-  [harness server](../packages/environment/README.md#the-harness-server), a Daytona one under the
-  workspace's Daytona connection; opt-in live tests run harness sessions there with a real model.
-  No turn runs in an environment now. Environments hold no defaults for
-  optional settings, since no installed harness takes reasoning levels. Model providers suggest
-  models, but the compatibility check accepts any model name, and nothing checks one with its
-  provider.
-- The [sandbox contract](../packages/sandbox/README.md) has two providers, local and Daytona, and
-  the local host installs both for environments, which run nothing now. A harness server in a sandbox listens on a port
-  with a token of its own, and a session a dead host left goes on there for the next run to attach
-  to; a local sandbox's processes end when its host stops cleanly, so there the next run starts the
-  session again. A session no run comes back to keeps its server running until its sandbox stops.
-  The model connection's key reaches the sandbox in the session's start request. An environment's retention
-  can only stop or destroy its sandbox, so no harness context survives a release. Environments
-  do not yet supply the MCP endpoint or a turn's credentials. The [local provider](../adapters/sandbox-local/README.md) isolates nothing and
-  is for tests and development. The [Daytona provider](../adapters/sandbox-daytona/README.md) passes
-  the suites against a real account, but a background process's output arrives only in whole lines
-  there, and a snapshot can take minutes. No provider for E2B, Vercel, or Cloudflare exists;
-  Cloudflare's SDK runs only inside a Worker, so reaching it from a host needs its Bridge Worker.
-- [Connections](../packages/core/README.md#connections) support model inference through API keys
-  only, with the [Anthropic](../adapters/connection-anthropic/README.md) and
-  [OpenAI-compatible](../adapters/connection-openai-compatible/README.md) implementations, managed
-  over HTTP and on the [Connections page](connections.md). There is no OAuth, toolkit or channel
-  support. Readiness is computed from settings and whether a credential is set;
-  nothing checks a key with its provider. Agents check `connection.use` when configured, but
-  nothing resolves a credential for use, since turns run on connections v2. Credentials are sealed with one host
-  key, which nothing rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier credentials.
-- [Connections v2](../packages/core/README.md#connections-v2), which are to replace them, are set up
-  over HTTP and on the [Connections v2 page](connections-v2.md), beside Connections, from the
-  integrations the [local host](../hosts/local/README.md) installs of every kind. They authenticate
-  with an API key or nothing. Agents v2 name them, and turns start on them, though no host runs
-  turns yet; agents and environments still use the old connections. A check's result is not stored.
-- [Agents v2](../packages/core/README.md#agents-v2), which are to replace agents, are created,
-  configured, renamed, and removed over connections v2, in core,
-  [over HTTP](../packages/api-http/README.md#agents-v2), and on the
-  [Agents v2 page](agents-v2.md), beside Agents. A turn starts on what the agent's setup selects,
-  kept for the agent's later turns in the thread: on `Auto`, the harness its previous turn there ran
-  on while a connection still gives it, and otherwise the oldest connection that gives one it can
-  run on.
-- [Agents](../packages/core/README.md#agents) are configured per workspace, each a member with
-  instructions, model access, and a starting environment, over HTTP and on the
-  [Agents page](agents.md); roles are changed in workspace Members. They have no toolkits, skills, memory, or schedules, no defaults of their own for a
-  turn to override, and no profile photos. They run no turns, which run agents v2, and a removed
-  agent's membership cannot be reactivated, as a person's cannot.
+- [Harness v2](../packages/harness-v2/README.md) runs amends's own agent
+  ([harness-amends-v2](../adapters/harness-amends-v2)) and
+  [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
+  no turn runs on either until the turn job is rebuilt. Amends's agent does not summarize a
+  conversation that outgrows its model's context, and opencode's session API takes no
+  instructions for a turn, so opencode refuses a turn that gives some.
+- The [v2 sandbox contract](../packages/sandbox-v2) has two providers: directories on this machine
+  ([sandbox-local-v2](../adapters/sandbox-local-v2)), for development, and
+  [Daytona](../adapters/sandbox-daytona-v2/README.md). No provider for E2B, Vercel, or Cloudflare
+  exists; Cloudflare's SDK runs only inside a Worker, so reaching it from a host needs its Bridge
+  Worker.
+- [Connections v2](../packages/core/README.md#connections-v2) are set up over HTTP and on the
+  [Connections v2 page](connections-v2.md), from the integrations the
+  [local host](../hosts/local/README.md) installs of every kind. They authenticate with an API key
+  or nothing, and there is no OAuth. Agents v2 name them, and turns start on them, though no host
+  runs turns yet. A check's result is not stored. Keys are sealed with one host key, which nothing
+  rotates: a changed `AMENDS_CREDENTIAL_KEY` cannot open earlier keys.
+- [Agents v2](../packages/core/README.md#agents-v2) are created, configured, renamed, and removed
+  over connections v2, in core, [over HTTP](../packages/api-http/README.md#agents-v2), and on the
+  [Agents v2 page](agents-v2.md); roles are changed in workspace Members. A turn starts on what the
+  agent's setup selects, kept for the agent's later turns in the thread: on `Auto`, the harness its
+  previous turn there ran on while a connection still gives it, and otherwise the oldest connection
+  that gives one it can run on. Agents have no toolkits, skills, memory, or schedules, and no
+  profile photos, and the Agents v2 page does not show where an agent is at work. A removed agent's
+  membership cannot be reactivated, as a person's cannot.
 - Core requests [jobs](../packages/core/README.md#jobs) from the facts its commits publish: a turn
   job for each agent in each thread. The local host runs none until the turn job is rebuilt, and
   prunes handled job requests on an Effect Cluster runner. Several host processes over one
@@ -167,7 +126,7 @@ recorded before departures stopped writing to them.
 
 Every workspace starts with a general group that every member joins with the workspace and leaves
 only by leaving the workspace; workspaces created before it existed have none. Agents created on the
-Agents page join it as every member does. The sidebar lists teammates the reader has
+Agents v2 page join it as every member does. The sidebar lists teammates the reader has
 not messaged under Direct messages, capped at six, and opens a first message to them. There is no
 conversation with oneself, since a direct group needs another member.
 
@@ -175,7 +134,7 @@ People are shown by the name they chose in the workspace, or by the identity the
 until they choose one. The apps ask for a name when creating a workspace or accepting an
 invitation, suggesting one from an email address, and the account menu changes it later. Each
 member names only themselves: nobody renames another member, and agents are named by whoever adds
-or configures them on the Agents page. There are no profile photos.
+or configures them on the Agents v2 page. There are no profile photos.
 
 Everyone gets "Create group" on the sidebar's Groups heading and the Groups page (every role holds
 `group.create`): a modal names a team group, picks its people and agents
@@ -228,8 +187,7 @@ placeholder until tasks exist.
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. Search is Jump to, over what the app already
-reads: pages, groups, conversations, people, agents, agents v2, environments, connections, and
-connections v2, by name.
+reads: pages, groups, conversations, people, agents v2, and connections v2, by name.
 Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
 tabs, reactions, and task references have no backend and are not shown.
 
@@ -259,13 +217,12 @@ proposals, since the mocks have no dark error state. Contrast, gamut, font loadi
 have no automated checks: stories are compared with their Lunacy frames in a browser at phone,
 touch, and desktop widths. Right-to-left layouts and forced colors are not reviewed. The
 navigation pattern (a sidebar per rail destination, items as pages in the main content) has Lunacy
-frames only for Agents ("Agents / Light mode / v02 · Navigation"); Environments, Connections, and
-Settings follow it without frames of their own, and their v01 frames still draw the Home sidebar
-and details in the side panel, as the Settings frames still draw Workspace in two columns. Status
-marks and the status color tones follow "Status / Light mode / v01", which draws the Agents
-screens only; the environment and connection tiles, the Direct messages rows, the tooltip, and the
-dark status values follow its rules without frames of their own, and the older frames still draw
-"Ready" and "Configured" labels.
+frames only for Agents ("Agents / Light mode / v02 · Navigation"), which Agents v2 follows;
+Connections v2 and Settings follow it without frames of their own, as the Settings frames still
+draw Workspace in two columns. Status marks and the status color tones follow "Status / Light
+mode / v01", which draws the Agents screens only; the connection tiles, the Direct messages rows,
+the tooltip, and the dark status values follow its rules without frames of their own, and the
+older frames still draw "Ready" and "Configured" labels.
 
 ## Shared client foundation
 

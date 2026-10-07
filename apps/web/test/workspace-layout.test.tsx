@@ -40,7 +40,7 @@ it("retains the shell and an open account menu through directory refresh and rec
     .mockResolvedValueOnce(json(listing("Renamed studio")));
   // The layout also reads the workspace's agents, whose status its sidebar and cards show.
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
-    new URL(new Request(input, init).url).pathname.endsWith("/agents")
+    new URL(new Request(input, init).url).pathname.endsWith("/agents-v2")
       ? new Promise<Response>(() => {})
       : directoryReads(input, init),
   );

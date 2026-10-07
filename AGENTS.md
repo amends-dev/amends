@@ -46,33 +46,23 @@ currently run through TypeScript. Check compatibility before changing this setup
   over the same gateway rather than new gateway methods. `storage-conformance` holds
   the test suites every storage adapter runs against itself through a harness; behavior
   core relies on belongs there, and adapter tests keep only what one adapter stores or
-  fails differently. `harness` is the contract every harness implements: sessions, and the
-  events and transcript a turn's log stores whichever harness ran, so work continues across
-  environments. `harness-amends` is amends's own harness, an agent loop over Effect AI's
-  `LanguageModel`; a harness that needs other dependencies belongs in `adapters/`. Every harness
-  runs the suites `harness` exports from `@amends/harness/conformance` against itself.
-  `sandbox` is the contract every sandbox provider implements, and `sandbox-conformance` the
-  suites each provider adapter runs; a sandbox knows nothing of what harness runs inside it.
-  `environment` runs the environments a workspace stores: it finds the harness and sandbox provider
-  a host installed, spawns and releases the runtime, and starts harness sessions in it with a turn's
-  model access, in process or inside the sandbox through the harness server, whose protocol it
-  also holds.
-  `cluster` runs jobs, the work outside requests, on Effect Cluster: an agent job for each agent,
-  which accepts its work and stops its departed turns, and a turn job for each turn, entities whose
-  requests a commit stores, with their retries and pruning. Jobs enter workspaces through the
-  gateway like any other caller. Its turn runner prepares each turn from core, spawns the turn's environment for its run and
-  starts a harness session in it for each attempt, or attaches to one a run cut short left, records
-  what the harness reports, and closes it;
-  hosts install their harnesses through the environment service and pass the runner their model code.
-  `connection` is the contract connection implementations fulfil: the declaration a host
-  registers in its catalog, and each capability's code, such as model inference.
+  fails differently. `harness-v2` is the contract every harness implements: an agent's sessions
+  and turns, streamed in one format whichever agent runs them, and the bridge through which a host
+  drives an agent inside a sandbox. `sandbox-v2` is the contract every sandbox provider implements,
+  with the suites each provider runs from `@amends/sandbox-v2/conformance`; a sandbox knows nothing
+  of what harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server
+  or an HTTP API, one shape. `connection-v2` holds the integrations a host installs, what each
+  gives a workspace's connections (models, tools, sandboxes, and harnesses), and the model catalog.
+  `cluster` runs jobs, the work outside requests, on Effect Cluster: entities whose requests a
+  commit stores, with their retries and pruning. Jobs enter workspaces through the gateway like
+  any other caller. Its turn job, one for each agent in each thread, is being rebuilt on
+  `harness-v2`.
 - `adapters/*`: implementations of gateway contracts over one external system, with
-  that system's dependencies. `sandbox-local` and `sandbox-daytona` implement the sandbox
-  contract over this machine's directories and over Daytona; `sandbox-daytona` also declares the
-  Daytona account connection its sandboxes run under. `connection-anthropic` and
-  `connection-openai-compatible` implement model-provider connections; hosts register them.
-  `harness-acp` implements harnesses over agents that speak the Agent Client Protocol and run
-  inside a sandbox, a module per agent, starting with opencode. `storage-postgresql` implements workspace storage and
+  that system's dependencies. `harness-amends-v2` is amends's own agent, a loop over Effect AI's
+  `LanguageModel` with the model providers' clients, and `harness-opencode` runs opencode behind its
+  bridge in a sandbox; `sandbox-local-v2` and `sandbox-daytona-v2` implement the sandbox contract
+  over this machine's directories and over Daytona. Each gives the integration a host installs.
+  `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
   per record field, except a thread activity's kind-specific `details`, stored as JSON;
   `storage-memory` implements them in process memory as the reference
@@ -82,8 +72,7 @@ currently run through TypeScript. Check compatibility before changing this setup
   depend on adapters.
 - `hosts/*`: runtime composition, such as the Bun host in `hosts/local`, which serves
   the HTTP API over the PostgreSQL adapter at `AMENDS_DATABASE_URL`, with development
-  sign-in and credentials, and `hosts/harness-server`, the program a host compiles and uploads
-  into a sandbox to run a harness there.
+  sign-in and credentials.
   Hosts may install their runtime's dependencies and consume shared packages. A host
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may

@@ -141,13 +141,14 @@ export const make = Effect.fn("AgentV2Service.make")(function* () {
     return agent;
   });
 
-  /** The agent as the actor sees it, including whether they may configure it. */
+  /** The agent as the actor sees it, including whether they may configure and direct it. */
   const viewForActor = Effect.fnUntraced(function* (record: AgentV2.Record, name: Member.Name) {
-    const [configurable = false] = yield* authorization.permitted([
+    const [configurable = false, usable = false] = yield* authorization.permitted([
       Requirement.make(AgentV2Permissions.Configure, memberTarget(record.memberId)),
+      Requirement.make(AgentV2Permissions.Use, memberTarget(record.memberId)),
     ]);
     const readiness = yield* readinessOf(record, yield* readConnections);
-    return AgentV2.view(record, name, readiness, configurable);
+    return AgentV2.view(record, name, readiness, { configurable, usable });
   });
 
   /**
@@ -201,23 +202,32 @@ export const make = Effect.fn("AgentV2Service.make")(function* () {
       const member = members.get(record.memberId);
       if (member?.status === "active") active.push({ record, name: yield* nameOf(member) });
     }
-    // One grant resolution answers both permissions for every agent.
+    // One grant resolution answers the three permissions for every agent.
     const permitted = yield* authorization.permitted(
       active.flatMap(({ record }) => [
         Requirement.make(AgentV2Permissions.Read, memberTarget(record.memberId)),
         Requirement.make(AgentV2Permissions.Configure, memberTarget(record.memberId)),
+        Requirement.make(AgentV2Permissions.Use, memberTarget(record.memberId)),
       ]),
     );
     const connections = yield* readConnections;
     const views = yield* Effect.forEach(
       active.flatMap((agent, index) =>
-        permitted[index * 2] === true
-          ? [{ ...agent, configurable: permitted[index * 2 + 1] === true }]
+        permitted[index * 3] === true
+          ? [
+              {
+                ...agent,
+                access: {
+                  configurable: permitted[index * 3 + 1] === true,
+                  usable: permitted[index * 3 + 2] === true,
+                },
+              },
+            ]
           : [],
       ),
-      ({ record, name, configurable }) =>
+      ({ record, name, access }) =>
         Effect.map(readinessOf(record, connections), (readiness) =>
-          AgentV2.view(record, name, readiness, configurable),
+          AgentV2.view(record, name, readiness, access),
         ),
     );
     return views.toSorted(

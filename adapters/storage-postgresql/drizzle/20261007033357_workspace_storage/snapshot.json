@@ -1,17 +1,11 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "ab4ef97b-f762-41c3-8897-fecdba28f724",
+  "id": "cb1f4fd4-a7be-4e79-ba6d-b532558d55e0",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
   "ddl": [
-    {
-      "isRlsEnabled": false,
-      "name": "agents",
-      "entityType": "tables",
-      "schema": "public"
-    },
     {
       "isRlsEnabled": false,
       "name": "agents_v2",
@@ -44,31 +38,13 @@
     },
     {
       "isRlsEnabled": false,
-      "name": "connection_credentials",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
       "name": "connection_v2_credentials",
       "entityType": "tables",
       "schema": "public"
     },
     {
       "isRlsEnabled": false,
-      "name": "connections",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
       "name": "connections_v2",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "environments",
       "entityType": "tables",
       "schema": "public"
     },
@@ -197,136 +173,6 @@
       "name": "workspaces",
       "entityType": "tables",
       "schema": "public"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "workspace_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "member_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "instructions",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "connection_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "model",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "reasoning",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "environment_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_by",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "agents"
     },
     {
       "type": "text",
@@ -635,33 +481,7 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "target_connection_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "assignments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
       "name": "target_connection_v2_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "assignments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "target_environment_id",
       "entityType": "columns",
       "schema": "public",
       "table": "assignments"
@@ -859,58 +679,6 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
-      "table": "connection_credentials"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connection_credentials"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "connection_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connection_credentials"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sealed",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connection_credentials"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "workspace_id",
-      "entityType": "columns",
-      "schema": "public",
       "table": "connection_v2_credentials"
     },
     {
@@ -938,136 +706,6 @@
       "entityType": "columns",
       "schema": "public",
       "table": "connection_v2_credentials"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "workspace_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "implementation_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "settings",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "authentication",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "credential_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_by",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "connections"
     },
     {
       "type": "text",
@@ -1185,188 +823,6 @@
       "entityType": "columns",
       "schema": "public",
       "table": "connections_v2"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "workspace_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "harness_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_provider_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_harness",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_connection_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_template",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_env",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "jsonb",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_setup",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "sandbox_retention",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "status",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_by",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
-    },
-    {
-      "type": "timestamp with time zone",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "environments"
     },
     {
       "type": "text",
@@ -3796,34 +3252,6 @@
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "agents_by_member",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "workspace_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        },
-        {
-          "value": "member_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": true,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
       "name": "agents_v2_by_member",
       "entityType": "indexes",
       "schema": "public",
@@ -5275,17 +4703,6 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "agents_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "agents"
-    },
-    {
-      "columns": [
-        "workspace_id",
-        "id"
-      ],
-      "nameExplicit": false,
       "name": "agents_v2_pkey",
       "entityType": "pks",
       "schema": "public",
@@ -5329,17 +4746,6 @@
     {
       "columns": [
         "workspace_id",
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "connection_credentials_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "connection_credentials"
-    },
-    {
-      "columns": [
-        "workspace_id",
         "connection_id"
       ],
       "nameExplicit": false,
@@ -5354,32 +4760,10 @@
         "id"
       ],
       "nameExplicit": false,
-      "name": "connections_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "columns": [
-        "workspace_id",
-        "id"
-      ],
-      "nameExplicit": false,
       "name": "connections_v2_pkey",
       "entityType": "pks",
       "schema": "public",
       "table": "connections_v2"
-    },
-    {
-      "columns": [
-        "workspace_id",
-        "id"
-      ],
-      "nameExplicit": false,
-      "name": "environments_pkey",
-      "entityType": "pks",
-      "schema": "public",
-      "table": "environments"
     },
     {
       "columns": [
@@ -5634,7 +5018,7 @@
       "table": "assignments"
     },
     {
-      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'ConnectionV2' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NOT NULL AND \"target_environment_id\" IS NULL) OR (\"target_kind\" = 'Environment' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_connection_v2_id\" IS NULL AND \"target_environment_id\" IS NOT NULL)))",
+      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_v2_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_v2_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_v2_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_v2_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_v2_id\" IS NULL) OR (\"target_kind\" = 'ConnectionV2' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_v2_id\" IS NOT NULL)))",
       "name": "assignments_scope_agrees",
       "entityType": "checks",
       "schema": "public",
@@ -5646,20 +5030,6 @@
       "entityType": "checks",
       "schema": "public",
       "table": "builtin_role_revisions"
-    },
-    {
-      "value": "\"authentication\" = 'ApiKey' OR \"credential_id\" IS NULL",
-      "name": "connections_credential_needs_api_key",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "connections"
-    },
-    {
-      "value": "(\"sandbox_provider_id\" IS NULL AND \"sandbox_harness\" IS NULL AND \"sandbox_connection_id\" IS NULL AND \"sandbox_template\" IS NULL AND \"sandbox_env\" IS NULL AND \"sandbox_setup\" IS NULL AND \"sandbox_retention\" IS NULL) OR (\"sandbox_provider_id\" IS NOT NULL AND \"sandbox_harness\" IS NOT NULL AND \"sandbox_env\" IS NOT NULL AND \"sandbox_setup\" IS NOT NULL AND \"sandbox_retention\" IS NOT NULL)",
-      "name": "environments_sandbox_complete",
-      "entityType": "checks",
-      "schema": "public",
-      "table": "environments"
     },
     {
       "value": "(\"status\" = 'active' AND \"ended_at\" IS NULL) OR (\"status\" = 'ended' AND \"ended_at\" IS NOT NULL)",

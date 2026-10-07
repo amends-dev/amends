@@ -1,25 +1,15 @@
-import { AgentService } from "./agent/service.ts";
-import { AgentPermissions } from "./agent/permissions.ts";
 import { AgentV2Permissions } from "./agent-v2/permissions.ts";
 import { AgentV2Projection } from "./agent-v2/projection.ts";
 import { AgentV2Service } from "./agent-v2/service.ts";
-import { AgentProjection } from "./agent/projection.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import { AgentV2Query } from "./agent-v2/query.ts";
 import { TurnProjection } from "./turn/projection.ts";
-import { ConnectionService } from "./connection/service.ts";
-import { ConnectionPermissions } from "./connection/permissions.ts";
-import { ConnectionProjection } from "./connection/projection.ts";
 import { ConnectionV2Service } from "./connection-v2/service.ts";
 import { ConnectionV2Permissions } from "./connection-v2/permissions.ts";
 import { ConnectionV2Projection } from "./connection-v2/projection.ts";
-import { EnvironmentService } from "./environment/service.ts";
-import { EnvironmentPermissions } from "./environment/permissions.ts";
-import { EnvironmentProjection } from "./environment/projection.ts";
-import { EnvironmentQuery } from "./environment/query.ts";
 import { ThreadService } from "./thread/service.ts";
 import { ThreadCommand } from "./thread/command.ts";
 import { GroupCommand } from "./group/command.ts";
@@ -101,10 +91,7 @@ export const projections = [
   ThreadMessageProjection.definition,
   ThreadActivityProjection.definition,
   NotificationProjection.definition,
-  ConnectionProjection.definition,
   ConnectionV2Projection.definition,
-  EnvironmentProjection.definition,
-  AgentProjection.definition,
   AgentV2Projection.definition,
   TurnProjection.definition,
 ] as const;
@@ -133,17 +120,6 @@ export const permissions = [
   ThreadMessagePermissions.Publish,
   ThreadParticipationPermissions.Follow,
   AgentV2Permissions.Use,
-  ConnectionPermissions.Create,
-  ConnectionPermissions.Read,
-  ConnectionPermissions.Manage,
-  ConnectionPermissions.Use,
-  EnvironmentPermissions.Create,
-  EnvironmentPermissions.Read,
-  EnvironmentPermissions.Manage,
-  EnvironmentPermissions.Use,
-  AgentPermissions.Create,
-  AgentPermissions.Read,
-  AgentPermissions.Configure,
   ConnectionV2Permissions.Create,
   ConnectionV2Permissions.Read,
   ConnectionV2Permissions.Manage,
@@ -225,10 +201,7 @@ const operations = Layer.mergeAll(
   ReadStateService.layer,
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
-  ConnectionService.layer,
   ConnectionV2Service.layer,
-  EnvironmentService.layer,
-  AgentService.layer.pipe(Layer.provide(MemberService.layer)),
   AgentV2Service.layer,
   TurnService.layer,
 ).pipe(
@@ -238,7 +211,6 @@ const operations = Layer.mergeAll(
       AssignmentCommand.layer,
       memberCommand,
       groupQuery,
-      EnvironmentQuery.layer,
       groupCommand,
       threadQuery,
       threadCommand,

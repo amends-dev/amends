@@ -1,5 +1,4 @@
 import type { TurnState } from "@amends/ui/components/turn-status";
-import type { AgentActivity } from "@amends/ui/screens/agents";
 import type {
   ThreadTurnControls,
   TurnLogActivity,
@@ -407,11 +406,6 @@ export interface TurnActivityView {
   readonly inGroup: (groupId: string) => "working" | "stopping" | "queued" | undefined;
   /** An agent's active turns, by its member ID. */
   readonly ofAgent: (memberId: string) => ReadonlyArray<ActiveTurn>;
-  /**
-   * An agent's current activity, by its member ID: its most pressing state, and where it works,
-   * each thread by its group, as "#general" for a team or the people of a direct group.
-   */
-  readonly agentActivity: (memberId: string) => AgentActivity | undefined;
 }
 
 const urgency = { working: 0, stopping: 1, queued: 2 } as const;
@@ -441,14 +435,5 @@ export function useTurnActivity(workspaceId: string): TurnActivityView {
         .filter((state) => state in urgency)
         .toSorted((left, right) => urgency[left] - urgency[right])[0],
     ofAgent: (memberId) => all().filter((turn) => turn.agent.memberId === memberId),
-    agentActivity: (memberId) => {
-      const turns = all().filter((turn) => turn.agent.memberId === memberId);
-      const [state] = turns
-        .map((turn) => turn.state as keyof typeof urgency)
-        .filter((state) => state in urgency)
-        .toSorted((left, right) => urgency[left] - urgency[right]);
-      if (state === undefined) return undefined;
-      return { state, places: turns.map((turn) => turn.place) };
-    },
   };
 }

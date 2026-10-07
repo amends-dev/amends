@@ -9,9 +9,7 @@ export interface Columns {
   readonly targetMemberId: string | null;
   readonly targetThreadId: string | null;
   readonly targetGroupId: string | null;
-  readonly targetConnectionId: string | null;
   readonly targetConnectionV2Id: string | null;
-  readonly targetEnvironmentId: string | null;
 }
 
 /** Each kind of target's ID column, and the field that ID fills in the target. */
@@ -19,9 +17,7 @@ const targetIds = {
   Member: ["targetMemberId", "memberId"],
   Thread: ["targetThreadId", "threadId"],
   Group: ["targetGroupId", "groupId"],
-  Connection: ["targetConnectionId", "connectionId"],
   ConnectionV2: ["targetConnectionV2Id", "connectionId"],
-  Environment: ["targetEnvironmentId", "environmentId"],
 } as const;
 type TargetIdColumn = (typeof targetIds)[keyof typeof targetIds][0];
 
@@ -29,9 +25,7 @@ const none = {
   targetMemberId: null,
   targetThreadId: null,
   targetGroupId: null,
-  targetConnectionId: null,
   targetConnectionV2Id: null,
-  targetEnvironmentId: null,
 } satisfies Record<TargetIdColumn, null>;
 
 /** A target's columns: its kind, and only its own ID column set. */
@@ -54,12 +48,8 @@ export const encode = (scope: Scope.Value): Columns =>
           Member: ({ memberId }) => target("Member", [targetIds.Member[0], memberId]),
           Thread: ({ threadId }) => target("Thread", [targetIds.Thread[0], threadId]),
           Group: ({ groupId }) => target("Group", [targetIds.Group[0], groupId]),
-          Connection: ({ connectionId }) =>
-            target("Connection", [targetIds.Connection[0], connectionId]),
           ConnectionV2: ({ connectionId }) =>
             target("ConnectionV2", [targetIds.ConnectionV2[0], connectionId]),
-          Environment: ({ environmentId }) =>
-            target("Environment", [targetIds.Environment[0], environmentId]),
         }),
       ),
   });

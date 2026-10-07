@@ -14,21 +14,22 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                                        |
-| --------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.    |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                              |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                    |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                  |
-| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.        |
-| `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage. |
-| `agent`         | Agents' configuration: instructions, model access, and environment, over an agent's workspace membership.        |
-| `turn`          | Agents' turns in threads: accepting work, each turn's log and session, execution steps, and stopping.            |
-| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.         |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                            |
-| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                   |
-| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                            |
-| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.            |
+| Domain          | Ownership                                                                                                               |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.           |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                     |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                           |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                         |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.               |
+| `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage.        |
+| `agent-v2`      | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on. |
+| `connection-v2` | Workspaces' connections to the integrations a host installs, with their settings and keys.                              |
+| `turn`          | Agents' turns in threads: accepting work, each turn's log and session, execution steps, and stopping.                   |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                   |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                          |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                   |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                   |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -146,38 +147,6 @@ member's follow of the group and every thread participation held through the adm
 without thread activity. Workspace-member removal uses it for every admission. See
 [group workflows](../../docs/group-workflows.md).
 
-## Connections
-
-`@amends/core/connection` holds workspace connections: access to an external system through an
-implementation the host installed, described by the [connection contract](../connection/README.md).
-`ConnectionService` lists and reads the connections the actor may read, and creates, renames,
-configures, sets and clears the credential of, and removes them; `implementations` lists the
-declarations this host installed, which every member may see. Reads return `Connection.View`:
-the record without its credential, whether one is set, whether this host installed the
-implementation, its capabilities, readiness for each capability, and `manageable`, whether the
-actor holds `connection.manage` on it. Readiness is `Ready`, or
-`Incomplete` with the required settings and credential it lacks; it is computed on read, from the
-record and the host's `ConnectionCatalog`.
-
-`connection.create` works on the workspace; `connection.read`, `connection.manage`, and
-`connection.use` on each connection, a `Connection` target, so one can be shared narrowly. Members
-read and use connections; administrators and the owner also create and manage them. Configuring an
-agent checks `connection.use` on its model connection. A connection someone may not read is
-`NotFound` to them.
-
-Creating validates the implementation (`UnknownImplementation`), its settings against the
-declaration (`InvalidSettings`), and the authentication method (`UnsupportedAuthentication`), and
-takes no secret, since a request receipt records its input in the journal. `setCredential` takes
-the secret, as `Connection.Secret`, redacted: it stores the secret in `ConnectionCredentialStore`
-and records only its reference, deleting a replaced one, in the same commit. Removal deletes the
-credential and keeps the record for history. No fact, change-feed event, or read carries a secret,
-and replay restores references, not secrets.
-
-`ConnectionStore` is a projection store; `ConnectionCredentialStore` holds secrets outside the
-journal and its read models, writes within commits, and reports `Unavailable` on a host that keeps
-none, which operations surface as `CredentialsUnavailable`. Both are required host bindings, and
-`ConnectionCatalog.Service` is supplied by the gateway from the host's registered declarations.
-
 ## Connections v2
 
 `@amends/core/connection-v2` holds the connections that replace those above, built beside them
@@ -247,76 +216,6 @@ membership, a `Member` target. Members read agents; administrators and the owner
 configure them. `agent.use`, which `AgentV2Permissions.Use` declares, keeps the name it had
 before agents v2, since it means the same: directing an agent, as asking it for work in a thread,
 and stopping or retrying its [turns](#turns), requires.
-
-## Environments
-
-`@amends/core/environment` holds workspace environments: where and how agents run, as a harness and
-an optional sandbox, described by the [harness](../harness/README.md#declarations) and
-[sandbox](../sandbox/README.md#declarations) declarations a host installs in its
-`EnvironmentCatalog`. A sandbox names its provider, where the harness runs (`in-process`, where the
-sandbox is only where its tools act, or `in-sandbox`), the account connection it runs under when
-its provider has one, a template, non-secret variables, setup commands run in order, and a
-retention, `stop` or `destroy`. Model access, instructions, and toolkits belong to agents, and
-credentials to connections.
-
-`EnvironmentService` lists the installed `implementations`, which every member may see, and
-lists, reads, creates, renames, configures, and removes environments. Creating checks the harness
-(`UnknownHarness`), that it can run where asked (`UnsupportedPlacement`), the provider
-(`UnknownSandboxProvider`), and the sandbox settings (`InvalidSandbox`, with issue codes): an
-account connection exactly when the provider runs under one, which the actor may read and use and
-which declares the sandbox capability for this provider, and a template only when the provider
-takes one. The harness, provider, and placement are fixed once created; `configure` replaces the
-rest of the sandbox settings. Reads return `Environment.View` with `manageable` and readiness,
-`Ready` or `Incomplete` with issue codes, from the catalog and the account connection's own
-readiness; nothing contacts the provider. `EnvironmentQuery.assessReadiness` is that one
-assessment, which agents read too when they report whether they can run.
-
-Every workspace starts with `Environment.InProcessId`, amends's own harness in process without a
-sandbox, recorded at initialization with no creator. It is an ordinary environment afterwards.
-`environment.create` works on the workspace, and `environment.read`, `environment.manage`, and
-`environment.use` on each environment, an `Environment` target; members read and use environments,
-and administrators and the owner also create and manage them, raising the built-in roles to
-revision 3. Configuring an agent checks `environment.use` on the environment it starts in.
-
-`EnvironmentCompatibility.check(environment, harness, selection)` is the one answer to whether an
-environment can run a model selection: the environment must be ready, the connection must provide
-model inference and be ready, a harness that speaks provider interfaces must speak the
-connection's, and a requested reasoning level must be one the harness takes. It does not check the
-model against those a connection suggests. Agent setup and environment choices call it; turn setup
-and transfers are meant to share it.
-
-## Agents
-
-`@amends/core/agent` holds agents' configuration. An agent is a workspace member whose identity is
-`Identity.MemberReference` `Agent`: its membership holds its name, status, roles, and group
-admissions, as any member's does, and `Agent.Record` holds what makes it behave, its instructions,
-its model access (a connection, a model identifier, and a reasoning level or null), and the
-environment it starts in. Credentials stay with the connection, and where and how it runs with the
-environment.
-
-`AgentService.create` adds the membership with its name, a workspace-scoped assignment of the
-initial role, admission to the general group, and the agent's record, in one commit. It requires
-`agent.create` on the workspace, and the role goes through `Delegation.requireGrant`, so only the
-owner gives an agent Administrator and nobody gives it Owner. The actor must be able to read and
-use the connection and the environment (`ConnectionUnavailable`, `EnvironmentUnavailable`), and
-`EnvironmentCompatibility.check` must pass except for setup still pending: an environment or
-connection that is not yet ready is saved and shows as the agent's readiness, while one without
-model inference, a harness that does not speak the connection's interface, or a reasoning level it
-does not take is refused (`Incompatible`, with the reasons). `configure` replaces the instructions,
-model access, and environment under the same checks, `rename` renames the membership with the
-name it expects (`Changed`), and `remove` removes the membership through `MemberService.remove`,
-with its delegation rules; the record remains for history. `environmentChoices` answers the check
-for each environment the actor may read and use, for choosing where an agent starts.
-
-Reads return `Agent.View`: the record with its membership's name, the workspace role it holds when
-the reader may read its access, `configurable`, `removable` (configuring it and removing members,
-within the delegation rules), and `usable` for the reader, and readiness, `Ready` or `Incomplete` with issues: the environment or connection is
-gone, or a compatibility reason. Readiness is computed whoever reads it, from the stores and the
-host's catalogs. An agent whose membership ended is `NotFound`. `agent.create` works on the
-workspace; `agent.read`, `agent.configure`, and `agent.use` on the agent's membership, a `Member`
-target. Members read and use agents, and administrators and the owner also create and configure
-them, raising the built-in roles to revision 4. These agents run no turns, which run
-[agents v2](#agents-v2): a turn for one fails.
 
 ## Turns
 
@@ -431,7 +330,7 @@ gateway. External authors use `Performer.Reference.Identity` with a Contact;
 `Performer.Reference.Member` always carries a member identity. Attribution does
 not grant authority, and a contact identity does not select an external reply destination.
 
-`Target.Reference` supports Workspace, Member, Group, and Thread. Group targets carry
+`Target.Reference` supports Workspace, Member, Group, Thread, and ConnectionV2. Group targets carry
 `workspaceId` and `Group.Id`; thread targets carry `workspaceId` and `ThreadId.Id`, exported from
 `@amends/core/thread`. Exact target scopes compare the workspace, kind, and ID; a workspace scope
 covers targets in that workspace. Group and thread actions also require current group membership,
@@ -554,10 +453,11 @@ records the names and permissions that differ, then the revision. It leaves a wo
 same or a later revision alone, so an older host never reverts it. The gateway runs it when it
 boots a workspace. A recorded permission the catalog does not declare, retired or added by a newer
 host, grants nothing, since no requirement can name it, and its holder's other grants stand;
-`Delegation` still loads the roles that record it. Bundle revision 1 is the current bundles:
-Member takes part in conversations and creates, renames, joins, and manages the groups it belongs
-to; Administrator adds people management, invitations, role changes, and `group.moderate` for
-public groups; Owner adds workspace rename and ownership transfer. No role reaches a group from
+`Delegation` still loads the roles that record it. Bundle revision 7 is the current bundles:
+Member takes part in conversations, creates, renames, joins, and manages the groups it belongs to,
+directs agents, reads agents and connections, and uses connections; Administrator adds people
+management, invitations, role changes, `group.moderate` for public groups, and creating and
+configuring agents and connections; Owner adds workspace rename and ownership transfer. No role reaches a group from
 outside it, which group operations enforce by requiring membership as well as the grant. `AssignmentService` provides listing, assignment,
 revocation, and atomic workspace-role replacement, and `permissions`: the declared workspace-target
 permissions the acting member's current grants cover, which needs active membership only, so

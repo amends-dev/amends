@@ -33,15 +33,10 @@ and `WorkspaceDirectoryListing` for public API documentation.
 core's `TurnJobs.Service`, and `Crypto.Crypto`, in the host's scope. It captures
 those stable dependencies and constructs its internal workspace runtime registry
 without opening a workspace or resolving an actor. `options.idleTimeToLive` sets how
-long an unused workspace stays prepared; it defaults to five minutes. `options.connections` lists
-the connection implementations the host installed, as they declare themselves; every workspace's
-core receives them as its `ConnectionCatalog`, so storage bindings exclude it. It defaults to none.
-`options.integrations` lists the integrations the host installs, whose ids must be distinct; every
-workspace's core receives them as connection-v2's `Integrations`, also excluded from storage
-bindings. It defaults to none.
-`options.harnesses` and `options.sandboxes` list the harnesses and sandbox providers the host
-installed; every workspace's core receives them as its `EnvironmentCatalog`, also excluded from
-storage bindings. Each defaults to none. `Gateway.layer(options?)`
+long an unused workspace stays prepared; it defaults to five minutes. `options.integrations` lists
+the integrations the host installs, whose ids must be distinct; every workspace's core receives them
+as connection-v2's `Integrations`, so storage bindings exclude them. It defaults to none.
+`Gateway.layer(options?)`
 delegates to that constructor and provides `Gateway.Service`, owning the registry's scope.
 Direct callers of `Gateway.make()` must keep its scope open for the gateway's lifetime.
 

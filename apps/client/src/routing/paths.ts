@@ -4,10 +4,7 @@ export type WorkspacePage =
   | "inbox"
   | "triage"
   | "tasks"
-  | "agents"
   | "agents-v2"
-  | "environments"
-  | "connections"
   | "connections-v2"
   | "settings";
 export const paths = {
@@ -25,18 +22,9 @@ export const paths = {
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}`,
   thread: (id: string, groupId: string, threadId: string) =>
     `/workspaces/${encodeURIComponent(id)}/groups/${encodeURIComponent(groupId)}/threads/${encodeURIComponent(threadId)}`,
-  /** An agent's page: its Overview, or its Configuration. */
-  agent: (id: string, agentId: string, tab?: "configuration") =>
-    `/workspaces/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentId)}${tab ? `/${tab}` : ""}`,
   /** An agent's page in Agents v2. */
   agentV2: (id: string, agentId: string) =>
     `/workspaces/${encodeURIComponent(id)}/agents-v2/${encodeURIComponent(agentId)}`,
-  /** An environment's page: its Overview, or its Sandbox settings. */
-  environment: (id: string, environmentId: string, tab?: "sandbox") =>
-    `/workspaces/${encodeURIComponent(id)}/environments/${encodeURIComponent(environmentId)}${tab ? `/${tab}` : ""}`,
-  /** A connection's page. */
-  connection: (id: string, connectionId: string) =>
-    `/workspaces/${encodeURIComponent(id)}/connections/${encodeURIComponent(connectionId)}`,
   /** A connection's page in Connections v2. */
   connectionV2: (id: string, connectionId: string) =>
     `/workspaces/${encodeURIComponent(id)}/connections-v2/${encodeURIComponent(connectionId)}`,
@@ -57,7 +45,7 @@ export function returnPath(value: string | undefined): string {
     url.origin !== "https://amends.invalid" ||
     !(
       url.pathname === paths.workspaces ||
-      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|agents(?:\/[^/]+(?:\/configuration)?)?|environments(?:\/[^/]+(?:\/sandbox)?)?|connections(?:\/[^/]+)?|settings(?:\/(?:workspace|members))?|groups(?:\/[^/]+(?:\/threads\/[^/]+)?)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
+      /^\/workspaces\/[^/]+(?:\/(?:triage|tasks|agents-v2(?:\/[^/]+)?|connections-v2(?:\/[^/]+)?|settings(?:\/(?:workspace|members))?|groups(?:\/[^/]+(?:\/threads\/[^/]+)?)?|inbox(?:\/groups\/[^/]+\/threads\/[^/]+)?|direct))?$/.test(
         url.pathname,
       )
     )

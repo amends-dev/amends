@@ -43,19 +43,18 @@ packages/
   api-http/           @amends/api-http: shared HTTP contract
   server-http/        @amends/server-http: HTTP handlers and authentication
   storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
-  connection/         @amends/connection: the connection implementation contract
-  environment/        @amends/environment: spawns a harness with a sandbox and manages its lifecycle
-  harness/            @amends/harness: the harness contract and recorded event standard
-  harness-amends/     @amends/harness-amends: amends's own in-process harness over Effect AI
-  sandbox/            @amends/sandbox: the sandbox provider contract
-  sandbox-conformance/ @amends/sandbox-conformance: test suites every sandbox provider runs
+  cluster/            @amends/cluster: jobs on Effect Cluster, with their retries and pruning
+  connection-v2/      @amends/connection-v2: integrations, connections, and the model catalog
+  harness-v2/         @amends/harness-v2: the harness contract, its stream format, and the bridge
+  sandbox-v2/         @amends/sandbox-v2: the sandbox provider contract and its suites
+  toolkit/            @amends/toolkit: tool sources, such as MCP servers and HTTP APIs
 adapters/
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
   storage-memory/     @amends/storage-memory: in-memory reference storage and directory
-  sandbox-local/      @amends/sandbox-local: sandboxes as local directories, for tests and development
-  sandbox-daytona/    @amends/sandbox-daytona: sandboxes on Daytona
-  connection-anthropic/ @amends/connection-anthropic: Anthropic model connections
-  connection-openai-compatible/ @amends/connection-openai-compatible: chat-completions model connections
+  harness-amends-v2/  @amends/harness-amends-v2: amends's own agent over Effect AI
+  harness-opencode/   @amends/harness-opencode: opencode behind its bridge in a sandbox
+  sandbox-local-v2/   @amends/sandbox-local-v2: sandboxes as local directories, for development
+  sandbox-daytona-v2/ @amends/sandbox-daytona-v2: sandboxes on Daytona
 hosts/
   local/              @amends/host-local: Bun runtime entry point
 apps/

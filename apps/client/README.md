@@ -17,8 +17,7 @@ src/
                   useChanges, refreshResult, the directory read
   session/        the browser session store; DirectoryProvider, useDirectory, useWorkspace
   live/           the change feed: its stream (api.ts), provider, status, and wake detection
-  workspaces/  conversations/  agents/  agents-v2/  connections/  connections-v2/
-  environments/  settings/  turns/
+  workspaces/  conversations/  agents-v2/  connections-v2/  settings/  turns/
                   one folder per feature: api.ts holds its reads and operations over the HTTP
                   contract; the other files are the hooks its screens connect to
   appearance/     AppearanceProvider, independent of the session
@@ -34,7 +33,7 @@ returns, the hook gives the screen's type without its hrefs and with the IDs the
 
 Reads are atoms over the generated client, `client.query` or `client.runtime.atom`, shared by
 every consumer in a credential scope and live while mounted. Each registers an invalidation key
-from `api/keys.ts`: the directory, a workspace resource such as `members` or `agents`, or one
+from `api/keys.ts`: the directory, a workspace resource such as `members` or `agents-v2`, or one
 group's stream, one thread's timeline, and so on. Writes invalidate the keys they change, and the
 [change feed](../../docs/change-feed.md) invalidates the keys each commit affects, so whatever is
 mounted refreshes. Paged reads (group streams, timelines, the inbox) keep their pages in one atom
@@ -62,7 +61,7 @@ A hook exposes such an action as `save: () => void save()`. Unmounting interrupt
 operation; the server may still complete it.
 
 `useChanges({ write, reload, failed, done, outdated })` runs the changes of a page whose changes
-count as done only once their result shows: agents, connections, connections v2, environments, and settings. It
+count as done only once their result shows: agents v2, connections v2, and settings. It
 runs one change at a time, then `reload`s what the page shows. A failure stays with the change it
 belongs to. A stale one (`changed`, `denied`, or `gone`) makes changes wait for `refresh()`, as
 does a change whose result could not be read back (`refresh-failed`); the refresh that shows it

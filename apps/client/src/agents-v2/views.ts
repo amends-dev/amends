@@ -152,6 +152,7 @@ const settled = <A, E>(read: AsyncResult.AsyncResult<A, E>): Cause.Cause<E> | un
 /** An agent as the Agents v2 sidebar lists it. */
 export interface AgentV2ListEntry {
   readonly id: string;
+  readonly memberId: string;
   readonly name: string;
   readonly issues: readonly AgentV2Issue[];
 }
@@ -169,6 +170,7 @@ export function useAgentV2List(workspaceId: string) {
       Option.map(AsyncResult.value(agents?.() ?? AsyncResult.initial()), (views) =>
         views.map((view) => ({
           id: view.id,
+          memberId: view.memberId,
           name: view.name,
           issues: view.readiness._tag === "Ready" ? [] : view.readiness.issues.map(issueOf),
         })),

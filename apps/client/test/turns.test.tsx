@@ -45,15 +45,14 @@ const agents = ["scout", "atlas", "echo"].map((id) => ({
   memberId: `member-${id}`,
   name: id,
   instructions: "",
-  model: { connectionId: "team", model: "model", reasoning: null },
-  environmentId: "in-process",
+  harness: { _tag: "Auto" },
+  model: { connectionId: "team", id: "model" },
+  sandbox: null,
+  readiness: { _tag: "Ready" },
+  configurable: false,
+  usable: id !== "echo",
   createdBy: "owner",
   createdAt: at(0),
-  role: null,
-  configurable: false,
-  removable: false,
-  usable: id !== "echo",
-  readiness: { _tag: "Ready" },
 }));
 
 const activity = (sequence: number, kind: string, subject: string, details: unknown) => ({
@@ -153,7 +152,7 @@ function fixture(options: { readonly atlasLeft?: boolean } = {}) {
     if (path === "/me/workspaces")
       return json({ memberships: [{ workspace, member: owner, people: 4 }], invitations: [] });
     if (path === "/workspaces/one/members") return json(members);
-    if (path === "/workspaces/one/agents") return json(agents);
+    if (path === "/workspaces/one/agents-v2") return json(agents);
     if (path === "/workspaces/one/threads/thread/timeline") {
       const after = Number(url.searchParams.get("afterSequence") ?? 0);
       return json(server.items.filter((item) => item.activity.sequence > after));

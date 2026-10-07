@@ -210,6 +210,27 @@ revisions[6] = {
   ],
 };
 
+// The connections, environments, and agents that agents v2 and connections v2 replaced are gone.
+const replaced = new Set([
+  "connection.create",
+  "connection.read",
+  "connection.manage",
+  "connection.use",
+  "environment.create",
+  "environment.read",
+  "environment.manage",
+  "environment.use",
+  "agent.create",
+  "agent.read",
+  "agent.configure",
+]);
+revisions[7] = Object.fromEntries(
+  Object.entries(revisions[6]!).map(([roleId, names]) => [
+    roleId,
+    names.filter((name) => !replaced.has(name)),
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

@@ -1,7 +1,6 @@
 # Connections v2
 
-What amends connects to, and what it knows of the models it can run. It is being built beside
-`packages/connection`, which it will replace. It depends on Effect, and on the contracts of the
+What amends connects to, and what it knows of the models it can run. It depends on Effect, and on the contracts of the
 [harness](../harness-v2), [sandboxes](../sandbox-v2), and the [toolkit](../toolkit), whose
 `Harness`, `ModelEndpoint`, `SandboxProvider`, and `ToolSource` are what a connection gives.
 

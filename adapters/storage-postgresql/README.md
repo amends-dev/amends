@@ -94,35 +94,21 @@ log ID. It decodes the stored envelope through the same path as journal pages, h
 transaction, and opens none. This supports notification-source reads without scanning the log
 or changing the schema.
 
-`connections` holds connection records, with an implementation's settings as JSON since each
-implementation declares its own, and a check that only an API-key connection references a
-credential. `connection_credentials` holds each secret sealed with the host's credential key,
-outside the read models, so rebuilding projections keeps it. `PostgresStorage.make({ credentialKey })`
-takes that key as 32 bytes of base64 and refuses a malformed one when the host starts; without one
-the store reports `Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row's
-workspace, credential, and connection as additional data, so a sealed value opens only as the
-credential it was stored as. Grant scopes gained `target_connection_id` for connection targets.
-Adding these replaced the development baseline; recreate disposable PostgreSQL databases.
-
 `connections_v2` holds the records of connections v2, with an integration's settings as JSON since
 each integration declares its own. `connection_v2_credentials` holds each connection's credential,
-one for each connection: the JSON of its encoded form, sealed as above and bound to its workspace
-and connection, and replaced in place when its key is. Grant scopes gained
-`target_connection_v2_id` for `ConnectionV2` targets; the development baseline was regenerated.
+one for each connection, outside the read models, so rebuilding projections keeps it: the JSON of
+its encoded form, sealed with the host's credential key and bound to its workspace and connection,
+and replaced in place when its key is. `PostgresStorage.make({ credentialKey })` takes that key as
+32 bytes of base64 and refuses a malformed one when the host starts; without one the store reports
+`Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row as additional data.
+Grant scopes have `target_connection_v2_id` for `ConnectionV2` targets.
 
 `agents_v2` holds the records of agents v2, one row per agent with a unique membership per
 workspace. Each part of its setup is its connection's id as a column: a null
 `harness_connection_id` is `Auto`, a null `model_effort` the model's default, and a null
-`sandbox_connection_id` no sandbox. Adding it regenerated the development baseline; recreate
-disposable PostgreSQL databases.
+`sandbox_connection_id` no sandbox.
 
-`environments` holds environment records: a sandbox's columns are all set or all null, its
-variables and setup commands are JSON, and grant scopes gained `target_environment_id` for
-environment targets. Adding them replaced the development baseline; recreate disposable PostgreSQL
-databases.
-
-`agents` holds agents' configuration, one row per agent with its model access as columns and a
-unique membership per workspace. `turns` holds agents' turns, with a partial unique index that
+`turns` holds agents' turns, with a partial unique index that
 allows one active turn per agent and thread, and the harness, model, and sandbox a turn started on
 as columns set all together or not at all. Each turn holds how far into its thread its input
 reaches, the turn it retries and who asked, both or neither, and its reply as a text array. A

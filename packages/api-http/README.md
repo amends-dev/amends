@@ -74,18 +74,13 @@ so a client can import the complete contract without loading server code.
   generated clients pass `payload: {}`.
 
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
-- `connections`: access to external systems, such as model providers; see
-  [Connections](#connections).
-- `connectionsV2`: the connections that replace them, to the integrations this host installs; see
+- `connectionsV2`: connections to the integrations this host installs; see
   [Connections v2](#connections-v2).
-- `environments`: where and how agents run; see [Environments](#environments).
-- `agents` and `turns`: agents, and their turns on threads; see [Agents](#agents) and
-  [Turns](#turns).
-- `agentsV2`: the agents that replace them, on connections v2; see [Agents v2](#agents-v2).
+- `agentsV2` and `turns`: agents, on connections v2, and their turns on threads; see
+  [Agents v2](#agents-v2) and [Turns](#turns).
 
-`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections`,
-`POST …/connections-v2`, `POST …/environments`, `POST …/agents-v2`, both thread
-starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
+`POST /workspaces`, `POST …/invitations`, `POST …/groups`, `POST …/connections-v2`,
+`POST …/agents-v2`, both thread starts, and `POST …/threads/:threadId/messages` accept an optional `Idempotency-Key` header: a retry with the
 same key returns the first attempt's result, whatever the retry's body. Clients generating the
 typed client pass it in `headers`.
 
@@ -242,33 +237,6 @@ following there are 409s; unfollowing an ended participation or removing an ende
 also a 409. Positions, read times, and what they saw reach the caller's sessions as
 signals on the change feed, and the conversation's facts reach the group's readers as commits.
 
-### Connections
-
-Connection paths sit under `/workspaces/:workspaceId/connections` and require active membership.
-Every member may read connections and the implementations this host installed; the built-in
-administrator tier adds, renames, configures, keys, and removes them. The
-[core connections section](../core/README.md#connections) describes the rules.
-
-| Endpoint                                        | Operation                                                                                                                        |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/connections/implementations`             | The installed implementations' declarations: name, description, capabilities, settings, and ways of authenticating.              |
-| `GET …/connections`                             | The connections the caller may read, by name.                                                                                    |
-| `POST …/connections`                            | Add one from `{ name, implementationId, settings, authentication }`, `ApiKey` or `None`; 201 with it. Its key is set separately. |
-| `GET …/connections/:connectionId`               | One connection.                                                                                                                  |
-| `POST …/connections/:connectionId/rename`       | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `ConnectionService.Changed`.                     |
-| `PUT …/connections/:connectionId/settings`      | Replace its settings from `{ settings }`.                                                                                        |
-| `PUT …/connections/:connectionId/credential`    | Store `{ secret }` as its key, replacing any earlier one.                                                                        |
-| `DELETE …/connections/:connectionId/credential` | Delete its key.                                                                                                                  |
-| `DELETE …/connections/:connectionId`            | Remove it and delete its key; 204.                                                                                               |
-
-A connection reads as `Connection.View`: its settings, whether a key is set but never the key,
-whether this host installed its implementation, readiness for each capability, and `manageable`,
-whether the caller may change it. A connection the caller may not read answers 404 as a missing
-one does. An implementation this host lacks is 422 `UnknownImplementation`, settings it does not
-declare or a required or malformed value are 422 `InvalidSettings`, and a way of authenticating it
-does not take, or a key for a connection that takes none, is 422 `UnsupportedAuthentication`. A
-host without a credential key answers a key with 503 `CredentialsUnavailable`.
-
 ### Connections v2
 
 Paths sit under `/workspaces/:workspaceId/connections-v2` and require active membership. Every
@@ -299,56 +267,6 @@ as does a retried create whose connection was removed since. An integration this
 422 `InvalidConnection`; a key for a connection that authenticates with nothing is 422 `Keyless`. A
 host without a credential key answers a key with 503 `ConnectionV2Service.CredentialsUnavailable`.
 
-### Environments
-
-Environment paths sit under `/workspaces/:workspaceId/environments` and require active membership.
-Every member may read environments and the harnesses and sandbox providers this host installed;
-the built-in administrator tier adds, renames, configures, and removes them. The
-[core environments section](../core/README.md#environments) describes the rules.
-
-| Endpoint                                    | Operation                                                                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `GET …/environments/implementations`        | `{ harnesses, sandboxes }`: the installed declarations.                                                             |
-| `GET …/environments`                        | The environments the caller may read, by name, starting with the in-process one every workspace has.                |
-| `POST …/environments`                       | Add one from `{ name, harnessId, sandbox }`, where `sandbox` is null or its provider, placement, and settings; 201. |
-| `GET …/environments/:environmentId`         | One environment.                                                                                                    |
-| `POST …/environments/:environmentId/rename` | Rename it from `{ name, expectedName }`; a name no longer `expectedName` is 409 `EnvironmentService.Changed`.       |
-| `PUT …/environments/:environmentId/sandbox` | Replace its sandbox settings from `{ sandbox }`: account connection, template, variables, setup, and retention.     |
-| `DELETE …/environments/:environmentId`      | Remove it; 204.                                                                                                     |
-
-An environment reads as `Environment.View`, with `manageable` and its readiness. One the caller may
-not read answers 404. A harness or provider this host lacks is 422 `UnknownHarness` or
-`UnknownSandboxProvider`, a harness that cannot run where asked is 422 `UnsupportedPlacement`, and
-sandbox settings that do not fit the provider, or configuring an environment without a sandbox, is
-422 `InvalidSandbox` with issue codes.
-
-### Agents
-
-Agent paths sit under `/workspaces/:workspaceId/agents` and require active membership. Every member
-may read agents; the built-in administrator tier adds, configures, renames, and removes them. The
-[core agents section](../core/README.md#agents) describes the rules. The models each model
-provider suggests come with the connection implementations, as
-`capabilities.modelInference.models`; an agent may name any other.
-
-| Endpoint                              | Operation                                                                                                                   |
-| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `GET …/agents`                        | The agents the caller may read, by name.                                                                                    |
-| `POST …/agents`                       | Add one from `{ name, instructions, model, environmentId, roleId }`, where `model` is `{ connectionId, model, reasoning }`. |
-| `GET …/agents/environment-choices`    | For `?connectionId=&model=&reasoning=`, each environment the caller may use, with whether it can run that model access.     |
-| `GET …/agents/:agentId`               | One agent.                                                                                                                  |
-| `PUT …/agents/:agentId/configuration` | Replace `{ instructions, model, environmentId }`.                                                                           |
-| `POST …/agents/:agentId/rename`       | Rename its membership from `{ name, expectedName }`; a name no longer `expectedName` is 409 `AgentService.Changed`.         |
-| `DELETE …/agents/:agentId`            | Remove its membership, as removing a member does; 204.                                                                      |
-
-An agent reads as `Agent.View`: its configuration, its membership's `memberId`, name, and role,
-`configurable`, `removable`, and `usable` for the caller, and its readiness. One the caller may not read, or
-whose membership ended, answers 404. A connection or environment that is gone, or that the caller
-may not read and use, is 422 `ConnectionUnavailable` or `EnvironmentUnavailable`, and an
-environment that cannot run the model access is 422 `Incompatible` with its reasons; setup still
-pending, such as a connection without its key, is saved and shows in the readiness. The initial
-role follows the delegation rules: 409 `Delegation.OwnerProtected` for Owner, and 403
-`Delegation.Denied` for Administrator unless the caller owns the workspace.
-
 ### Agents v2
 
 Paths sit under `/workspaces/:workspaceId/agents-v2` and require active membership. Every member
@@ -367,7 +285,8 @@ and removal are its membership's, through `assignments` and `DELETE …/members/
 `harness` is `{ _tag: "Connection", connectionId }` or `{ _tag: "Auto" }`; `model` is
 `{ connectionId, id, effort? }`, a model `GET …/connections-v2/:connectionId/models` offers; and
 `sandbox` is `{ connectionId }` or `null`. An agent reads as `AgentV2.View`: how it is set up, its
-membership's `memberId` and name, `configurable` for the caller, and its readiness, `Ready` or
+membership's `memberId` and name, `configurable` and `usable` (whether the caller may direct it)
+for the caller, and its readiness, `Ready` or
 `Incomplete` with its issues. One the caller may not read, or whose membership ended, answers 404,
 as does a retried create whose agent was removed since. A connection that is missing or removed, or
 that the caller may not read and use, is 422 `AgentV2Service.ConnectionUnavailable` naming the part;

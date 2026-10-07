@@ -5,7 +5,10 @@ perspective. It will grow into an explanation of each core concept: what it does
 exists, what it owns, and how it relates to the others.
 
 This document describes design intent. It does not describe or validate the current
-implementation. The discussion is grounded in the work users want to do and the contracts
+implementation. Its sections on environments, on the first harness contract, and on an agent's
+log of turns predate harness v2 and agents v2: environments were removed, and turns are being
+rebuilt on harness v2, so those sections are superseded where they disagree with
+[known limitations](current-status.md). The discussion is grounded in the work users want to do and the contracts
 of external systems. Existing implementation choices do not constrain the design.
 
 For current behavior, read [workspace workflows](workspace-workflows.md), the
@@ -1038,9 +1041,10 @@ accepts the result of a call an earlier execution left pending. One that restore
 native sessions declares neither, so it cannot be offered as the destination of a transfer whose
 transcript it cannot continue.
 
-The shared schema, the transcript rules, and amends's own in-process harness are implemented in
-[`@amends/harness`](../packages/harness/README.md) and
-[`@amends/harness-amends`](../packages/harness-amends/README.md).
+The shared schema, the transcript rules, and amends's own in-process harness were implemented in
+`@amends/harness` and `@amends/harness-amends`, which [harness v2](../packages/harness-v2/README.md)
+replaced: it records a session's conversation as Effect AI prompts and streams turns as its own
+parts.
 
 ## Agreed: an agent's memory in a thread is one log of its turns
 
@@ -1335,11 +1339,9 @@ memory snapshots; and isolation, which a local directory does not provide. Anyth
 to inside a sandbox therefore listens on a port rather than relying on standard input. A snapshot
 is a reference that only the provider which took it can restore or delete.
 
-The contract and its conformance suites are [`@amends/sandbox`](../packages/sandbox/README.md) and
-[`@amends/sandbox-conformance`](../packages/sandbox-conformance/README.md), with local and Daytona
-providers in `adapters/`. [`@amends/environment`](../packages/environment/README.md) composes a
-harness with a sandbox; retention settings beyond stopping or destroying the sandbox, and harnesses
-running inside sandboxes, remain open.
+The contract and its conformance suites are [`@amends/sandbox-v2`](../packages/sandbox-v2), with
+local and Daytona providers in `adapters/`. Environments, which composed a harness with a sandbox,
+were removed.
 
 ## Agreed: environments store references to provider-managed filesystem snapshots
 

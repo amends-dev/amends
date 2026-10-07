@@ -7,11 +7,8 @@ import { NotificationsGroup } from "./notifications.ts";
 import { SessionGroup } from "./session.ts";
 import { WorkspacesGroup } from "./workspaces.ts";
 import { ChangeFeedGroup } from "./change-feed.ts";
-import { AgentsGroup } from "./agents.ts";
 import { AgentsV2Group } from "./agents-v2.ts";
-import { ConnectionsGroup } from "./connections.ts";
 import { ConnectionsV2Group } from "./connections-v2.ts";
-import { EnvironmentsGroup } from "./environments.ts";
 import { GroupsGroup } from "./groups.ts";
 import { ThreadsGroup } from "./threads.ts";
 import { TurnsGroup } from "./turns.ts";
@@ -27,10 +24,7 @@ export class Api extends HttpApi.make("amends")
   .add(GroupsGroup)
   .add(ThreadsGroup)
   .add(NotificationsGroup)
-  .add(ConnectionsGroup)
   .add(ConnectionsV2Group)
-  .add(EnvironmentsGroup)
-  .add(AgentsGroup)
   .add(AgentsV2Group)
   .add(TurnsGroup)
   .add(ChangeFeedGroup)

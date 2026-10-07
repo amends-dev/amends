@@ -445,11 +445,14 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "true");
   expect(screen.getByRole("navigation", { name: "Workspace" })).toBe(sidebar);
   expect(screen.getByRole("button", { name: "Account: alice" })).toBe(trigger);
-  for (const page of ["Triage", "Environments", "Connections"] as const) {
+  for (const page of ["Triage", "Connections v2"] as const) {
     fireEvent.click(screen.getByRole("link", { name: page }));
     await screen.findByRole("heading", { name: page });
   }
-  expect(screen.getByRole("link", { name: "Connections" })).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("link", { name: "Connections v2" })).toHaveAttribute(
+    "aria-current",
+    "true",
+  );
   history.set({ value: "/workspaces/two/settings", scroll: false });
   await screen.findByRole("heading", { name: "Workspace" });
   // Another workspace gets its own shell, reading its own groups and names.
@@ -457,10 +460,10 @@ it("keeps the sidebar and account trigger mounted across workspace pages, and re
   expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/workspaces/two");
   await screen.findByRole("textbox", { name: "Workspace name" });
   // The directory; each workspace's agents, whose status the layout shows; the first
-  // workspace's Inbox, where it lands, read as unread and as all; its environments with their
-  // harnesses and providers, and its connections, whose providers the Connections page adds; then
-  // the second workspace's settings and ownership. The feed stays separate.
-  expect(fetch).toHaveBeenCalledTimes(11);
+  // workspace's Inbox, where it lands, read as unread and as all; its connections and the
+  // integrations they name; then the second workspace's settings and ownership. The feed stays
+  // separate.
+  expect(fetch).toHaveBeenCalledTimes(9);
   expect(feed.streams.map((stream) => new URL(stream.request.url).pathname)).toEqual([
     "/workspaces/one/changes",
     "/workspaces/two/changes",
@@ -1349,134 +1352,6 @@ it("follows and renames a group from commands typed after /, posting nothing", a
   expect(writes).toEqual(["follow"]);
 });
 
-/** A host with Anthropic installed, answering the Connections page's reads and writes. */
-function connectionsHost() {
-  const anthropic = {
-    id: "anthropic",
-    name: "Anthropic",
-    description: "Claude models through the Anthropic API.",
-    capabilities: { modelInference: { interface: "anthropic-messages" } },
-    settings: [{ key: "baseUrl", label: "API URL", kind: "url", required: false }],
-    authentication: [{ _tag: "ApiKey", label: "API key" }],
-  };
-  let keyed: boolean | undefined;
-  const writes: Array<{ method: string; path: string; body: unknown }> = [];
-  const view = () => ({
-    id: "c1",
-    name: "Anthropic",
-    implementationId: "anthropic",
-    settings: {},
-    authentication: { _tag: "ApiKey", configured: keyed === true },
-    createdBy: "owner-one",
-    createdAt: at,
-    installed: true,
-    capabilities: anthropic.capabilities,
-    manageable: true,
-    readiness: {
-      modelInference: keyed
-        ? { _tag: "Ready" }
-        : { _tag: "Incomplete", settings: [], credential: true },
-    },
-  });
-  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-    const request = new Request(input, init);
-    const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/connections/implementations") return response([anthropic]);
-    if (path === "/workspaces/one/connections" && request.method === "GET")
-      return response(keyed === undefined ? [] : [view()]);
-    if (path === "/workspaces/one/connections" && request.method === "POST") {
-      writes.push({ method: "POST", path, body: await request.json() });
-      keyed = false;
-      return response(view(), 201);
-    }
-    if (path === "/workspaces/one/connections/c1/credential" && request.method === "PUT") {
-      writes.push({ method: "PUT", path, body: await request.json() });
-      keyed = true;
-      return response(view());
-    }
-    return response({
-      memberships: [
-        {
-          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
-          member: {
-            id: "owner-one",
-            workspaceId: "one",
-            identity: { _tag: "Human", id: "alice" },
-            status: "active",
-          },
-          people: 1,
-        },
-      ],
-      invitations: [],
-    });
-  });
-  return { fetch, writes };
-}
-/** Adds Anthropic from the empty page, then its key, in the two steps setup takes. */
-async function addAnthropicWithKey() {
-  const page = await screen.findByRole("heading", { name: "No connections yet" });
-  fireEvent.click(within(page.parentElement!).getByRole("button", { name: "Add connection" }));
-  const chooser = await screen.findByRole("dialog", { name: "Add connection" });
-  fireEvent.click(within(chooser).getByRole("button", { name: /Anthropic/ }));
-  const configure = await screen.findByRole("dialog", { name: "Configure connection" });
-  expect(within(configure).getByRole("textbox", { name: "Connection name" })).toHaveValue(
-    "Anthropic",
-  );
-  fireEvent.click(within(configure).getByRole("button", { name: "Create & continue" }));
-  const key = await screen.findByRole("dialog", { name: "Add API key" });
-  expect(within(key).getByText("Anthropic · Step 2 of 2")).toBeInTheDocument();
-  fireEvent.input(within(key).getByLabelText("API key"), { target: { value: "sk-ant-test" } });
-  fireEvent.click(within(key).getByRole("button", { name: "Save key" }));
-  await within(screen.getByLabelText("Notifications")).findByText("API key saved");
-  await waitFor(() =>
-    expect(screen.queryByRole("dialog", { name: "Add API key" })).not.toBeInTheDocument(),
-  );
-  // The new connection opens as its page.
-  await screen.findByRole("heading", { name: "Anthropic" });
-  // Configured, it shows no status: no setup notice.
-  expect(
-    within(screen.getByRole("main")).queryByText(/to finish setting up/),
-  ).not.toBeInTheDocument();
-}
-
-it("adds a connection, then its key, from the Connections page, opening its page", async () => {
-  const host = connectionsHost();
-  const history = mount(
-    "/workspaces/one/connections",
-    memoryStore(session("alice")).store,
-    host.fetch,
-    undefined,
-    { permissions: ["connection.create"] },
-  );
-  await addAnthropicWithKey();
-  expect(history.get()).toBe("/workspaces/one/connections/c1");
-  expect(host.writes).toEqual([
-    {
-      method: "POST",
-      path: "/workspaces/one/connections",
-      body: {
-        name: "Anthropic",
-        implementationId: "anthropic",
-        settings: {},
-        authentication: "ApiKey",
-      },
-    },
-    {
-      method: "PUT",
-      path: "/workspaces/one/connections/c1/credential",
-      body: { secret: "sk-ant-test" },
-    },
-  ]);
-});
-it("offers adding connections only to those who may", async () => {
-  const host = connectionsHost();
-  mount("/workspaces/one/connections", memoryStore(session("alice")).store, host.fetch);
-  await screen.findByText(
-    "An administrator can add model providers and sandbox accounts for your workspace.",
-  );
-  expect(screen.queryByRole("button", { name: /Add connection/ })).not.toBeInTheDocument();
-});
-
 /** A host installing an MCP integration, answering Connections v2's reads, writes, and checks. */
 function connectionsV2Host() {
   const mcp = {
@@ -1589,92 +1464,6 @@ it("adds a connection with its key from Connections v2, opening its page and che
   expect(host.writes).toEqual(connectionV2Writes);
 });
 
-/** A host listing two agents, one of whose model connection is gone, for the Agents pages. */
-function agentsHost() {
-  const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" };
-  const agent = (id: string, name: string, ready: boolean) => ({
-    id,
-    memberId: `member-${id}`,
-    name,
-    instructions: "Help the team.",
-    model: { connectionId: "c1", model: "claude-sonnet-5", reasoning: null },
-    environmentId: "e1",
-    createdBy: "owner-one",
-    createdAt: "2026-09-25T12:00:00.000Z",
-    role: { id: "builtin:member", name: "Member" },
-    configurable: true,
-    removable: true,
-    usable: true,
-    readiness: ready
-      ? { _tag: "Ready" }
-      : { _tag: "Incomplete", issues: [{ _tag: "ConnectionUnavailable" }] },
-  });
-  return vi.fn<typeof globalThis.fetch>(async (input, init) => {
-    const request = new Request(input, init);
-    const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/agents")
-      return response([agent("a1", "Atlas", true), agent("a2", "Review helper", false)]);
-    if (
-      path === "/workspaces/one/connections" ||
-      path === "/workspaces/one/connections/implementations" ||
-      path === "/workspaces/one/environments"
-    )
-      return response([]);
-    if (path === "/workspaces/one/environments/implementations")
-      return response({ harnesses: [], sandboxes: [] });
-    if (path === "/workspaces/one/settings")
-      return response({
-        workspace,
-        canRename: true,
-        canReadInvitations: true,
-        canInvite: true,
-        roles: [],
-      });
-    return response({
-      memberships: [
-        {
-          workspace,
-          member: {
-            id: "owner-one",
-            workspaceId: "one",
-            identity: { _tag: "Human", id: "alice" },
-            status: "active",
-          },
-          people: 1,
-        },
-      ],
-      invitations: [],
-    });
-  });
-}
-
-it("lists agents in the sidebar, opens each as its page with tabs, and adds from the sidebar", async () => {
-  const history = mount(
-    "/workspaces/one/agents",
-    memoryStore(session("alice")).store,
-    agentsHost(),
-    undefined,
-    { permissions: ["agent.create"] },
-  );
-  const sidebar = within(await screen.findByRole("navigation", { name: "Workspace" }));
-  await sidebar.findByRole("link", { name: /Atlas/ });
-  // The list shows, so the section is current; each agent's row carries its status.
-  expect(sidebar.getByRole("link", { name: "Agents" })).toHaveAttribute("aria-current", "page");
-  expect(sidebar.getByRole("link", { name: "Atlas, Ready" })).toBeInTheDocument();
-  expect(sidebar.getByRole("link", { name: /, Needs setup$/ })).toBeInTheDocument();
-  expect(sidebar.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
-  fireEvent.click(sidebar.getByRole("link", { name: /Atlas/ }));
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one/agents/a1"));
-  const main = within(screen.getByRole("main"));
-  await main.findByRole("heading", { name: "Atlas" });
-  expect(sidebar.getByRole("link", { name: /Atlas/ })).toHaveAttribute("aria-current", "page");
-  fireEvent.click(main.getByRole("link", { name: "Configuration" }));
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one/agents/a1/configuration"));
-  fireEvent.click(sidebar.getByRole("button", { name: "Add agent" }));
-  await screen.findByRole("dialog", { name: "Add agent" });
-  expect(history.get()).toBe("/workspaces/one/agents/a1/configuration?add=agent");
-});
-
 /** A host with two agents v2, one whose sandbox connection was removed, and their connections. */
 function agentsV2Host() {
   const workspace = { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" };
@@ -1691,6 +1480,7 @@ function agentsV2Host() {
         ? { _tag: "Ready" }
         : { _tag: "Incomplete", issues: [{ _tag: "Removed", part: "sandbox" }] },
     configurable: true,
+    usable: true,
     createdBy: "owner-one",
     createdAt: "2026-10-06T12:00:00.000Z",
   });
@@ -1776,209 +1566,4 @@ it("lists agents v2 in the sidebar, opens one with its setup, and adds from the 
   fireEvent.click(sidebar.getByRole("button", { name: "Add agent" }));
   await screen.findByRole("dialog", { name: "Add agent" });
   expect(history.get()).toBe("/workspaces/one/agents-v2/a2?add=agent");
-});
-
-/** A host with Amends and Daytona installed, answering the Environments page and its detour. */
-function environmentsHost() {
-  const daytonaConnection = {
-    id: "daytona",
-    name: "Daytona",
-    description: "A Daytona account that environments run their sandboxes under.",
-    capabilities: { sandbox: { provider: "daytona" } },
-    settings: [
-      { key: "apiUrl", label: "API URL", kind: "url", required: false },
-      { key: "target", label: "Target", kind: "text", required: false },
-    ],
-    authentication: [{ _tag: "ApiKey", label: "API key" }],
-  };
-  const implementations = {
-    harnesses: [
-      {
-        id: "amends",
-        name: "Amends",
-        description: "Amends's own agent loop.",
-        placement: ["in-process"],
-        models: { _tag: "LanguageModel" },
-      },
-    ],
-    sandboxes: [
-      {
-        id: "daytona",
-        name: "Daytona",
-        description: "Isolated containers in your Daytona account.",
-        capabilities: { stdin: true, snapshots: "filesystem", isolated: true },
-        account: true,
-        template: { label: "Snapshot" },
-      },
-    ],
-  };
-  const environments: Array<Record<string, unknown>> = [
-    {
-      id: "in-process",
-      name: "In-process",
-      harnessId: "amends",
-      sandbox: null,
-      createdBy: null,
-      createdAt: at,
-      manageable: true,
-      readiness: { _tag: "Ready" },
-    },
-  ];
-  let account: { keyed: boolean } | undefined;
-  const accountView = () => ({
-    id: "a1",
-    name: "Daytona · Builds",
-    implementationId: "daytona",
-    settings: {},
-    authentication: { _tag: "ApiKey", configured: account?.keyed === true },
-    createdBy: "owner-one",
-    createdAt: at,
-    installed: true,
-    capabilities: daytonaConnection.capabilities,
-    manageable: true,
-    readiness: {
-      sandbox: account?.keyed
-        ? { _tag: "Ready" }
-        : { _tag: "Incomplete", settings: [], credential: true },
-    },
-  });
-  const writes: Array<{ method: string; path: string; body: unknown }> = [];
-  const fetch = vi.fn<typeof globalThis.fetch>(async (input, init) => {
-    const request = new Request(input, init);
-    const path = new URL(request.url).pathname;
-    if (path === "/workspaces/one/environments/implementations") return response(implementations);
-    if (path === "/workspaces/one/environments" && request.method === "GET")
-      return response(environments);
-    if (path === "/workspaces/one/connections/implementations")
-      return response([daytonaConnection]);
-    if (path === "/workspaces/one/connections" && request.method === "GET")
-      return response(account ? [accountView()] : []);
-    if (request.method !== "GET") {
-      const body = await request.json();
-      writes.push({ method: request.method, path, body });
-      if (path === "/workspaces/one/connections") {
-        account = { keyed: false };
-        return response(accountView(), 201);
-      }
-      if (path === "/workspaces/one/connections/a1/credential") {
-        account = { keyed: true };
-        return response(accountView());
-      }
-      if (path === "/workspaces/one/environments") {
-        const input = body as { name: string; sandbox: unknown };
-        const created = {
-          id: "e1",
-          name: input.name,
-          harnessId: "amends",
-          sandbox: input.sandbox,
-          createdBy: "owner-one",
-          createdAt: at,
-          manageable: true,
-          readiness: { _tag: "Ready" },
-        };
-        environments.push(created);
-        return response(created, 201);
-      }
-    }
-    return response({
-      memberships: [
-        {
-          workspace: { id: "one", name: "Studio", createdBy: "alice", ownerMemberId: "owner-one" },
-          member: {
-            id: "owner-one",
-            workspaceId: "one",
-            identity: { _tag: "Human", id: "alice" },
-            status: "active",
-          },
-          people: 1,
-        },
-      ],
-      invitations: [],
-    });
-  });
-  return { fetch, writes };
-}
-/** Adds Release sandbox on Daytona, creating its account and key on the way, then the environment. */
-async function addDaytonaEnvironment() {
-  // The sidebar's + opens Add environment over the page.
-  const sidebar = await screen.findByRole("navigation", { name: "Workspace" });
-  fireEvent.click(await within(sidebar).findByRole("button", { name: "Add environment" }));
-  let dialog = await screen.findByRole("dialog", { name: "Add environment" });
-  fireEvent.input(within(dialog).getByRole("textbox", { name: "Environment name" }), {
-    target: { value: "Release sandbox" },
-  });
-  fireEvent.click(within(dialog).getByRole("radio", { name: /Daytona/ }));
-  fireEvent.click(within(dialog).getByRole("button", { name: "Continue" }));
-  await within(dialog).findByText("No Daytona connections yet");
-  fireEvent.input(within(dialog).getByRole("textbox", { name: "Snapshot · Optional" }), {
-    target: { value: "amends-dev-base" },
-  });
-  fireEvent.click(within(dialog).getByRole("button", { name: "Create Daytona connection" }));
-  const create = await screen.findByRole("dialog", { name: "Create Daytona connection" });
-  expect(within(create).getByText("For Release sandbox · 1 of 2")).toBeInTheDocument();
-  fireEvent.input(within(create).getByRole("textbox", { name: "Connection name" }), {
-    target: { value: "Daytona · Builds" },
-  });
-  fireEvent.click(within(create).getByRole("button", { name: "Create & continue" }));
-  const key = await screen.findByRole("dialog", { name: "Add API key" });
-  fireEvent.input(within(key).getByLabelText("API key"), { target: { value: "dtn-key" } });
-  fireEvent.click(within(key).getByRole("button", { name: "Save key & return" }));
-  dialog = await screen.findByRole("dialog", { name: "Add environment" });
-  await waitFor(() =>
-    expect(within(dialog).getByRole("button", { name: /Daytona account/ })).toHaveTextContent(
-      "Daytona · Builds",
-    ),
-  );
-  expect(within(dialog).getByRole("textbox", { name: "Snapshot · Optional" })).toHaveValue(
-    "amends-dev-base",
-  );
-  fireEvent.click(within(dialog).getByRole("button", { name: "Create environment" }));
-  await within(screen.getByLabelText("Notifications")).findByText("Release sandbox created");
-}
-
-it("adds a Daytona environment from the Environments page, creating its account on the way", async () => {
-  const host = environmentsHost();
-  const history = mount(
-    "/workspaces/one/environments",
-    memoryStore(session("alice")).store,
-    host.fetch,
-    undefined,
-    { permissions: ["environment.create", "connection.create"] },
-  );
-  await addDaytonaEnvironment();
-  await waitFor(() => expect(history.get()).toBe("/workspaces/one/environments/e1"));
-  expect(host.writes).toEqual([
-    {
-      method: "POST",
-      path: "/workspaces/one/connections",
-      body: {
-        name: "Daytona · Builds",
-        implementationId: "daytona",
-        settings: {},
-        authentication: "ApiKey",
-      },
-    },
-    {
-      method: "PUT",
-      path: "/workspaces/one/connections/a1/credential",
-      body: { secret: "dtn-key" },
-    },
-    {
-      method: "POST",
-      path: "/workspaces/one/environments",
-      body: {
-        name: "Release sandbox",
-        harnessId: "amends",
-        sandbox: {
-          providerId: "daytona",
-          harness: "in-process",
-          connectionId: "a1",
-          template: "amends-dev-base",
-          env: {},
-          setup: [],
-          retention: "stop",
-        },
-      },
-    },
-  ]);
 });

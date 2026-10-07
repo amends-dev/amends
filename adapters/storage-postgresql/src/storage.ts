@@ -6,7 +6,6 @@ import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer, Option } from "effect";
 import type { Redacted } from "effect";
-import { Agents } from "./agents.ts";
 import { AgentsV2 } from "./agents-v2.ts";
 import { TurnRecords } from "./turn-records.ts";
 import { Assignments } from "./assignments.ts";
@@ -17,12 +16,9 @@ import { ReadStates } from "./read-states.ts";
 import { PostgresSignalHub } from "./signal-hub.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
-import { ConnectionCredentials } from "./connection-credentials.ts";
-import { Connections } from "./connections.ts";
 import { ConnectionV2Credentials } from "./connection-v2-credentials.ts";
 import { SessionStates } from "./session-states.ts";
 import { ConnectionsV2 } from "./connections-v2.ts";
-import { Environments } from "./environments.ts";
 import { CredentialKey } from "./credential-key.ts";
 import { PostgresDatabase } from "./database.ts";
 import { Invitations } from "./invitations.ts";
@@ -63,13 +59,9 @@ const layerStores = Layer.mergeAll(
   ThreadMessages.layer,
   ThreadActivities.layer,
   ReadStates.layer,
-  Connections.layer,
-  ConnectionCredentials.layer,
   ConnectionsV2.layer,
   ConnectionV2Credentials.layer,
   SessionStates.layer,
-  Environments.layer,
-  Agents.layer,
   AgentsV2.layer,
   TurnRecords.layer,
   PostgresSignalHub.layer,

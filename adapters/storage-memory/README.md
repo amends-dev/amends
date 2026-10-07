@@ -20,10 +20,9 @@ active membership per identity, one agent v2 per membership, one direct group pe
 one active participation per participant, and contiguous thread sequences. Like PostgreSQL, they
 take references to other read models as recorded, so each rebuilds alone. Lists order IDs by their UTF-8 bytes, matching binary collation.
 Commit and entry IDs come from a counter in each storage.
-Connections' credentials sit beside the records, outside the projections a rebuild discards, and
-are held as they are: this adapter is for tests, so it seals nothing. Connections v2 keep one
-credential for each connection the same way, as the JSON of its encoded form, and each
-participation's harness session is kept beside them too, as JSON.
+Connections v2 keep one credential for each connection beside the records, outside the
+projections a rebuild discards, as the JSON of its encoded form: this adapter is for tests, so it
+seals nothing. Each participation's harness session is kept beside them too, as JSON.
 
 ## Transactions
 

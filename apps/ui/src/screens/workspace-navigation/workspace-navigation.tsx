@@ -1,11 +1,8 @@
 import { For, Show, type JSX } from "solid-js";
 import {
   IconList,
-  IconMarkAgents,
   IconMarkChannel,
   IconMarkCommand,
-  IconMarkConnections,
-  IconMarkEnvironments,
   IconMarkHome,
   IconMarkMail,
   IconMarkMarketplace,
@@ -28,20 +25,11 @@ import { Rail } from "../../patterns/rail/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { Sidebar } from "../../patterns/sidebar/index.ts";
 
-export type Destination =
-  | "home"
-  | "agents"
-  | "agents-v2"
-  | "environments"
-  | "connections"
-  | "connections-v2";
+export type Destination = "home" | "agents-v2" | "connections-v2";
 
 const destinations = [
   { id: "home", label: "Home", icon: IconMarkHome },
-  { id: "agents", label: "Agents", icon: IconMarkAgents },
   { id: "agents-v2", label: "Agents v2", icon: IconMarkCommand },
-  { id: "environments", label: "Environments", icon: IconMarkEnvironments },
-  { id: "connections", label: "Connections", icon: IconMarkConnections },
   { id: "connections-v2", label: "Connections v2", icon: IconMarkMarketplace },
 ] as const;
 
@@ -382,7 +370,7 @@ export function HomeSidebar(props: HomeSidebarProps) {
   );
 }
 
-/** One of a destination's items, such as an agent or an environment. */
+/** One of a destination's items, such as an agent or a connection. */
 export interface NavigationEntry extends NavigationLink {
   readonly id: string;
   readonly name: string;
@@ -398,7 +386,7 @@ export interface NavigationEntry extends NavigationLink {
   readonly activity?: "queued" | "working" | "stopping";
   /**
    * Its state: a patch on the avatar, or a mark at the row's end for an item without one, such
-   * as an environment that needs setup. Word it with the destination's status helpers.
+   * as an agent that needs setup. Word it with the destination's status helpers.
    */
   readonly status?: Status;
 }
@@ -429,7 +417,7 @@ export interface DestinationSidebarProps {
 
 /**
  * A destination's sidebar: each section's items, which open in the main content. The same
- * pattern serves Agents, Environments, Connections, and Settings.
+ * pattern serves Agents v2, Connections v2, and Settings.
  */
 export function DestinationSidebar(props: DestinationSidebarProps) {
   return (

@@ -2,9 +2,8 @@
 
 Agents v2 are a workspace's agents on [connections v2](connections-v2.md): each is a member that
 works, as its instructions say, on a harness, a model, and, when it needs one, a sandbox, each
-given by one of the workspace's connections. They are built beside [Agents](agents.md), which they
-are to replace, and share nothing with them: their own records, HTTP routes, client hooks, screens,
-and rail destination. They run no turns yet.
+given by one of the workspace's connections. Turns start on them, though no host runs turns yet
+([known limitations](current-status.md)).
 
 Both apps own `/workspaces/:id/agents-v2`, reached from the rail's Agents v2, whose sidebar lists
 each agent by name with its status patch. `/agents-v2` is the list, with `?tab=needs-setup` for the

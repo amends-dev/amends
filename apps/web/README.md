@@ -63,8 +63,8 @@ live in this app. Vite deduplicates Solid and compiles the shared vanilla-extrac
 
 Page compositions contain no inline styles or local stylesheets. `src/workspace-layout.tsx` builds
 the workspace on the UI Shell: `WorkspaceNavigation` with the account menu around the current
-destination's sidebar (`HomeSidebar`, or `DestinationSidebar` for Agents, Environments,
-Connections, and Settings from the client list hooks), one pane per page in `Shell.Main`, the
+destination's sidebar (`HomeSidebar`, or `DestinationSidebar` for Agents v2, Connections v2, and
+Settings from the client list hooks), one pane per page in `Shell.Main`, the
 thread panel as `ThreadPane`, and the Create group, New message, and Change your name modals, over
 client view hooks. `Profiles.Root` around the shell opens members' cards from `useMemberProfiles`:
 Message goes to the direct conversation with them or drafts a first message, Open agent goes to
@@ -72,8 +72,8 @@ the agent's page, and Change name opens the modal. A sidebar's + asks its page t
 UI screens, as do the Inbox with `useInboxView` and `InboxPane` and Settings with
 `useWorkspaceSettings` and the settings screens. A page may render a `Shell.Aside`, such as
 Settings' member details or an agent's turn log (`src/turn-log.tsx`, shared with the thread
-panel), and it attaches beside the main content. Agents, Environments, and Connections each route
-their list and each item's page to one page component, which owns its dialogs. `src/workspace-actions.ts`
+panel), and it attaches beside the main content. Agents v2 and Connections v2 each route their
+list and each item's page to one page component, which owns its dialogs. `src/workspace-actions.ts`
 lets pages offer the layout's Create group and show toasts. Visual gaps are evaluated and verified in the UI workshop before app
 consumption; `check:packages` rejects app-local styles.
 
@@ -82,12 +82,10 @@ composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
 routes, the responsive shell, groups and threads, and the account menu. The workspace's own
-address redirects to its Inbox, which opens on Unread; Triage and Tasks remain placeholders. `src/pages/connections.tsx` composes the
-[Connections page](../../docs/connections.md) from `useConnections` and UI's Connections screens,
-and `src/pages/environments.tsx` the [Environments page](../../docs/environments.md) from
-`useEnvironments`, detouring through the Connections dialogs to create a sandbox account, and
-`src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from `useAgents`, detouring
-through them to create a model connection. The app-owned [Settings pages](../../docs/workspace-settings.md)
+address redirects to its Inbox, which opens on Unread; Triage and Tasks remain placeholders. `src/pages/connections-v2.tsx` composes the
+[Connections v2 page](../../docs/connections-v2.md) from `useConnectionsV2` and UI's Connections v2
+screens, and `src/pages/agents-v2.tsx` the [Agents v2 page](../../docs/agents-v2.md) from
+`useAgentsV2`. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members sections, which the Settings sidebar lists, and their modals. `src/appearance.ts` supplies
 local mode and palette persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode and chosen palette through the UI Theme.

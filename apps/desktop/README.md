@@ -102,12 +102,10 @@ composition, idempotent retry, directory refresh, and invitation acceptance.
 
 The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
 routes, the responsive shell, groups and threads, and the account menu. The workspace's own
-address redirects to its Inbox, which opens on Unread; Triage and Tasks remain placeholders. `src/pages/connections.tsx` composes the
-[Connections page](../../docs/connections.md) from `useConnections` and UI's Connections screens,
-and `src/pages/environments.tsx` the [Environments page](../../docs/environments.md) from
-`useEnvironments`, detouring through the Connections dialogs to create a sandbox account, and
-`src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from `useAgents`, detouring
-through them to create a model connection. The app-owned [Settings pages](../../docs/workspace-settings.md)
+address redirects to its Inbox, which opens on Unread; Triage and Tasks remain placeholders. `src/pages/connections-v2.tsx` composes the
+[Connections v2 page](../../docs/connections-v2.md) from `useConnectionsV2` and UI's Connections v2
+screens, and `src/pages/agents-v2.tsx` the [Agents v2 page](../../docs/agents-v2.md) from
+`useAgentsV2`. The app-owned [Settings pages](../../docs/workspace-settings.md)
 compose the Workspace and Members sections, which the Settings sidebar lists, and their modals. `src/appearance.ts` supplies
 local mode and palette persistence and system appearance; Application wraps the session
 with AppearanceProvider and applies the resolved mode and chosen palette through the UI Theme.

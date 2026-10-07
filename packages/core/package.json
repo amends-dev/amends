@@ -14,26 +14,19 @@
     "./group": "./src/group/index.ts",
     "./notification": "./src/notification/index.ts",
     "./workspace": "./src/workspace/index.ts",
-    "./agent": "./src/agent/index.ts",
     "./agent-v2": "./src/agent-v2/index.ts",
     "./read-state": "./src/read-state/index.ts",
     "./request": "./src/request/index.ts",
     "./signal": "./src/signal/index.ts",
-    "./connection": "./src/connection/index.ts",
     "./connection-v2": "./src/connection-v2/index.ts",
-    "./environment": "./src/environment/index.ts",
     "./turn": "./src/turn/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
     "@amends/connection-v2": "workspace:*",
-    "@amends/environment": "workspace:*",
-    "@amends/harness": "workspace:*",
     "@amends/harness-v2": "workspace:*",
-    "@amends/sandbox": "workspace:*",
     "@amends/sandbox-v2": "workspace:*",
     "effect": "catalog:"
   }

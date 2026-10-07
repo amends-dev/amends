@@ -114,6 +114,7 @@ const viewOf = (agent: Stored) => ({
   readiness:
     agent.issues.length === 0 ? { _tag: "Ready" } : { _tag: "Incomplete", issues: agent.issues },
   configurable: true,
+  usable: true,
   createdBy: "owner",
   createdAt: "2026-10-06T12:00:00.000Z",
 });

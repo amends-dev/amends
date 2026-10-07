@@ -189,10 +189,7 @@ export function TurnsWorkshop(props: TurnsWorkshopProps) {
   };
   return (
     <Shell.Root>
-      <WorkspaceNavigation
-        {...base}
-        destinations={["home", "agents", "environments", "connections"]}
-      >
+      <WorkspaceNavigation {...base} destinations={["home", "agents-v2", "connections-v2"]}>
         <HomeSidebar
           {...base}
           groups={[

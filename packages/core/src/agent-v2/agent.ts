@@ -177,17 +177,19 @@ export const View = Schema.Struct({
 
   /** Whether the reader may rename it and change how it is set up. */
   configurable: Schema.Boolean,
+  /** Whether the reader may direct it: ask it for work, and stop or retry its turns. */
+  usable: Schema.Boolean,
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
-/** An agent named `name`, as ready as `readiness` says, as a reader sees it. */
+/** An agent named `name`, as ready as `readiness` says, as a reader with `access` sees it. */
 export const view = (
   record: Record,
   name: Member.Name,
   readiness: Readiness,
-  configurable: boolean,
+  access: { readonly configurable: boolean; readonly usable: boolean },
 ): View => ({
   id: record.id,
   memberId: record.memberId,
@@ -197,7 +199,8 @@ export const view = (
   model: record.model,
   sandbox: record.sandbox,
   readiness,
-  configurable,
+  configurable: access.configurable,
+  usable: access.usable,
   createdBy: record.createdBy,
   createdAt: record.createdAt,
 });

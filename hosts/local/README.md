@@ -35,24 +35,16 @@ server proxies `/api` here. `bun run dev` restarts the host when its source chan
 
 `AMENDS_CREDENTIAL_KEY` seals connections' credentials at rest; without it the host stores none,
 and setting one reports `CredentialsUnavailable`. Keep it secret and stable: a changed key cannot
-open credentials sealed with the old one, and nothing rotates them yet. The host installs the
-[Anthropic](../../adapters/connection-anthropic/README.md) and
-[OpenAI-compatible](../../adapters/connection-openai-compatible/README.md) connection
-implementations and a [Daytona](../../adapters/sandbox-daytona/README.md) account connection;
-amends's own [harness](../../packages/harness-amends/README.md), in process or in a sandbox, and
-[opencode](../../adapters/harness-acp/README.md#opencode), in a sandbox; and the
-[local](../../adapters/sandbox-local/README.md) and Daytona sandbox providers, all as
-`LocalHost.installed` declares them, for environments, which run nothing now.
+open credentials sealed with the old one, and nothing rotates them yet.
 
-For [connections v2](../../packages/core/README.md#connections-v2), `LocalHost.makeIntegrations`
-installs the [integrations](../../packages/connection-v2/README.md) workspaces connect to: every
+`LocalHost.makeIntegrations` installs the [integrations](../../packages/connection-v2/README.md) workspaces connect to: every
 model provider in the catalog and any OpenAI-compatible API; MCP servers and HTTP APIs as tools; the
 [local](../../adapters/sandbox-local-v2) sandbox provider, keeping each connection's
-sandboxes under `connections` in the sandbox directory, and
+sandboxes in a directory of its own in the sandbox directory, and
 [Daytona](../../adapters/sandbox-daytona-v2/README.md); and amends's
 [agent](../../adapters/harness-amends-v2) and
-[opencode](../../adapters/harness-opencode/README.md) as harnesses. Their keys are sealed with the
-same `AMENDS_CREDENTIAL_KEY`. Nothing runs a turn on them yet, so opencode's bridge tokens come
+[opencode](../../adapters/harness-opencode/README.md) as harnesses. Connections' keys are sealed with
+`AMENDS_CREDENTIAL_KEY`. Nothing runs a turn on them yet, so opencode's bridge tokens come
 from a secret of this process's own.
 
 The pool size is the most connections the host opens. Four are the host's own: one listens for
@@ -120,15 +112,15 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                                                                                                                         |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                     |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                           |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                                  |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                    |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with job pruning, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `installed` and `makeIntegrations` are what workspaces connect to. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                               |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                     |
+| Module                             | Responsibility                                                                                                                                                                                                                                        |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                    |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                          |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                 |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                   |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with job pruning, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `makeIntegrations` is what workspaces connect to. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                              |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                    |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires

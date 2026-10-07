@@ -11,12 +11,8 @@ import {
   useSession,
   useThreadConversation,
   useThreadFollow,
-  useAgentList,
   useAgentV2List,
-  useAgentStates,
-  useConnectionList,
   useConnectionV2List,
-  useEnvironmentList,
   useThreadTurnControls,
   useTurnActivity,
   useWorkspace,
@@ -33,16 +29,13 @@ import { Profiles } from "@amends/ui/components/profile-card";
 import { Toast } from "@amends/ui/components/toast";
 import { Shell } from "@amends/ui/patterns/shell";
 import { ChangeName } from "@amends/ui/screens/account";
-import { agentStatus } from "@amends/ui/screens/agents";
 import { agentV2Status } from "@amends/ui/screens/agents-v2";
-import { connectionStatus, type ConnectionCapability } from "@amends/ui/screens/connections";
 import {
   capabilityLabels,
   capabilityNouns,
   connectionV2Status,
   type IntegrationCapability,
 } from "@amends/ui/screens/connections-v2";
-import { environmentStatus } from "@amends/ui/screens/environments";
 import { NewMessage } from "@amends/ui/screens/direct";
 import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
 import { JumpTo, type JumpToItem } from "@amends/ui/screens/jump-to";
@@ -54,11 +47,9 @@ import {
   type NavigationSection,
 } from "@amends/ui/screens/workspace-navigation";
 import {
-  IconMarkAgents,
   IconMarkChannel,
   IconMarkCommand,
   IconMarkConnections,
-  IconMarkEnvironments,
   IconMarkMail,
   IconMarkMarketplace,
   IconMarkSettings,
@@ -141,19 +132,13 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
     return current === path(page) || current.startsWith(`${path(page)}/`);
   };
   const destination = (): Destination | undefined =>
-    at("agents")
-      ? "agents"
-      : at("agents-v2")
-        ? "agents-v2"
-        : at("environments")
-          ? "environments"
-          : at("connections")
-            ? "connections"
-            : at("connections-v2")
-              ? "connections-v2"
-              : at("settings")
-                ? undefined
-                : "home";
+    at("agents-v2")
+      ? "agents-v2"
+      : at("connections-v2")
+        ? "connections-v2"
+        : at("settings")
+          ? undefined
+          : "home";
   const groupId = () => conversation()?.params.groupId;
   // A thread opens beside its group's stream, or beside the inbox it was opened from.
   const panel = createMemo(
@@ -184,11 +169,11 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
   const existing = () => (recipients().length > 0 ? groups.directWith(recipients()) : undefined);
   const name = useMemberName(workspaceId, () => setDialog(undefined));
   const profiles = useMemberProfiles(workspaceId);
-  const agentStates = useAgentStates(workspaceId);
-  /** An agent's state as its status, for its profile card and its direct message row. */
+  const agents = useAgentV2List(workspaceId);
+  /** An agent's readiness as its status, for its profile card and its direct message row. */
   const agentStatusOf = (memberId: string) => {
-    const state = agentStates(memberId);
-    return state && agentStatus(state.issues, state.activity);
+    const agent = agents.agents().find((candidate) => candidate.memberId === memberId);
+    return agent && agentV2Status(agent.issues);
   };
   /** A one-to-one conversation's status: the other member's. People have none until presence. */
   const soleStatus = (memberIds: readonly string[]) => {
@@ -223,7 +208,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
         }}
         onOpenAgent={(memberId) => {
           const agentId = profiles(memberId)?.agentId;
-          if (agentId) navigate(paths.agent(workspaceId, agentId));
+          if (agentId) navigate(paths.agentV2(workspaceId, agentId));
         }}
         onChangeName={() => {
           name.reset();
@@ -250,14 +235,7 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
               },
             }}
             homeHref={href(path("home"))}
-            destinations={[
-              "home",
-              "agents",
-              "agents-v2",
-              "environments",
-              "connections",
-              "connections-v2",
-            ]}
+            destinations={["home", "agents-v2", "connections-v2"]}
             destination={destination()}
             destinationHref={(target) => href(path(target))}
             settings={{ href: href(path("settings")), current: at("settings") }}
@@ -339,17 +317,8 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
                   ]}
                 />
               </Match>
-              <Match when={destination() === "agents"}>
-                <AgentsSidebar workspaceId={workspaceId} />
-              </Match>
               <Match when={destination() === "agents-v2"}>
                 <AgentsV2Sidebar workspaceId={workspaceId} />
-              </Match>
-              <Match when={destination() === "environments"}>
-                <EnvironmentsSidebar workspaceId={workspaceId} />
-              </Match>
-              <Match when={destination() === "connections"}>
-                <ConnectionsSidebar workspaceId={workspaceId} />
               </Match>
               <Match when={destination() === "connections-v2"}>
                 <ConnectionsV2Sidebar workspaceId={workspaceId} />
@@ -443,18 +412,15 @@ function Frame(props: ParentProps<{ readonly workspaceId: string }>) {
 type Place = JumpToItem & { readonly path: string };
 
 /**
- * Jump to: pages, groups, conversations, people, and the workspace's agents, environments, and
- * connections, by name. The lists it offers load while it is open.
+ * Jump to: pages, groups, conversations, people, and the workspace's agents and connections, by
+ * name. The lists it offers load while it is open.
  */
 function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: () => void }) {
   const workspaceId = props.workspaceId;
   const navigate = useNavigate();
   const groups = useWorkspaceGroups(workspaceId);
   const people = useWorkspacePeople(workspaceId);
-  const agents = useAgentList(workspaceId);
   const agentsV2 = useAgentV2List(workspaceId);
-  const environments = useEnvironmentList(workspaceId);
-  const connections = useConnectionList(workspaceId);
   const connectionsV2 = useConnectionV2List(workspaceId);
   const page = (target: WorkspacePage) => paths.workspacePage(workspaceId, target);
   const places = createMemo((): readonly Place[] => {
@@ -476,32 +442,11 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
         path: paths.groups(workspaceId),
       },
       {
-        id: "page:agents",
-        label: "Agents",
-        section: "Go to",
-        icon: IconMarkAgents,
-        path: page("agents"),
-      },
-      {
         id: "page:agents-v2",
         label: "Agents v2",
         section: "Go to",
         icon: IconMarkCommand,
         path: page("agents-v2"),
-      },
-      {
-        id: "page:environments",
-        label: "Environments",
-        section: "Go to",
-        icon: IconMarkEnvironments,
-        path: page("environments"),
-      },
-      {
-        id: "page:connections",
-        label: "Connections",
-        section: "Go to",
-        icon: IconMarkConnections,
-        path: page("connections"),
       },
       {
         id: "page:connections-v2",
@@ -558,17 +503,6 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
               : paths.directDraft(workspaceId, [person.id]),
           };
         }),
-      ...agents.agents().map((agent) => ({
-        id: `agent:${agent.id}`,
-        label: agent.name,
-        section: "Agents",
-        person: {
-          name: agent.name,
-          initials: agent.name.trim().charAt(0).toUpperCase(),
-          tone: "lilac" as const,
-        },
-        path: paths.agent(workspaceId, agent.id),
-      })),
       ...agentsV2.agents().map((agent) => ({
         id: `agent-v2:${agent.id}`,
         label: agent.name,
@@ -579,20 +513,6 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
           tone: "lilac" as const,
         },
         path: paths.agentV2(workspaceId, agent.id),
-      })),
-      ...environments.environments().map((environment) => ({
-        id: `environment:${environment.id}`,
-        label: environment.name,
-        section: "Environments",
-        icon: IconMarkEnvironments,
-        path: paths.environment(workspaceId, environment.id),
-      })),
-      ...connections.connections().map((connection) => ({
-        id: `connection:${connection.id}`,
-        label: connection.name,
-        section: "Connections",
-        icon: IconMarkConnections,
-        path: paths.connection(workspaceId, connection.id),
       })),
       ...connectionsV2.connections().map((connection) => ({
         id: `connection-v2:${connection.id}`,
@@ -608,60 +528,12 @@ function JumpToDialog(props: { readonly workspaceId: string; readonly onClose: (
       open
       onClose={props.onClose}
       items={places()}
-      loading={
-        groups.all() === undefined ||
-        agents.loading() ||
-        agentsV2.loading() ||
-        environments.loading()
-      }
+      loading={groups.all() === undefined || agentsV2.loading()}
       onOpen={(id) => {
         const place = places().find((entry) => entry.id === id);
         props.onClose();
         if (place) navigate(place.path);
       }}
-    />
-  );
-}
-
-/**
- * The Agents sidebar: each agent with its status patch, and the logo while it is at work. The title and Browse
- * open the list; + opens Add agent over the current page, by `?add=agent`.
- */
-function AgentsSidebar(props: { readonly workspaceId: string }) {
-  const navigate = useNavigate();
-  const [, setSearch] = useSearchParams<{ add?: string }>();
-  const list = useAgentList(props.workspaceId);
-  const open = useMatch(() => "/workspaces/:workspaceId/agents/:agentId/*rest");
-  const base = paths.workspacePage(props.workspaceId, "agents");
-  return (
-    <DestinationSidebar
-      sections={[
-        {
-          id: "agents",
-          title: "Agents",
-          href: href(base),
-          current: open() === undefined,
-          browse: { label: "Browse agents", onBrowse: () => navigate(base) },
-          create: list.canCreate()
-            ? { label: "Add agent", onCreate: () => setSearch({ add: "agent" }) }
-            : undefined,
-          entries: list.agents().map((agent) => ({
-            id: agent.id,
-            name: agent.name,
-            href: href(paths.agent(props.workspaceId, agent.id)),
-            current: open()?.params.agentId === agent.id,
-            person: {
-              name: agent.name,
-              initials: agent.name.trim().charAt(0).toUpperCase(),
-              tone: "lilac" as const,
-            },
-            activity: agent.activity?.state,
-            status: agentStatus(agent.issues, agent.activity),
-          })),
-          loading: list.loading(),
-          empty: "No agents yet",
-        },
-      ]}
     />
   );
 }
@@ -703,101 +575,6 @@ function AgentsV2Sidebar(props: { readonly workspaceId: string }) {
           loading: list.loading(),
           empty: "No agents yet",
         },
-      ]}
-    />
-  );
-}
-
-/**
- * The Environments sidebar: each environment, marked when it needs setup. The title and Browse open
- * the list; + opens Add environment over the current page, by `?add=environment`.
- */
-function EnvironmentsSidebar(props: { readonly workspaceId: string }) {
-  const navigate = useNavigate();
-  const [, setSearch] = useSearchParams<{ add?: string }>();
-  const list = useEnvironmentList(props.workspaceId);
-  const open = useMatch(() => "/workspaces/:workspaceId/environments/:environmentId/*rest");
-  const base = paths.workspacePage(props.workspaceId, "environments");
-  return (
-    <DestinationSidebar
-      sections={[
-        {
-          id: "environments",
-          title: "Environments",
-          href: href(base),
-          current: open() === undefined,
-          browse: { label: "Browse environments", onBrowse: () => navigate(base) },
-          create: list.canCreate()
-            ? { label: "Add environment", onCreate: () => setSearch({ add: "environment" }) }
-            : undefined,
-          entries: list.environments().map((environment) => ({
-            id: environment.id,
-            name: environment.name,
-            href: href(paths.environment(props.workspaceId, environment.id)),
-            current: open()?.params.environmentId === environment.id,
-            icon: IconMarkEnvironments,
-            status: environmentStatus(environment.issues),
-          })),
-          loading: list.loading(),
-          empty: "No environments yet",
-        },
-      ]}
-    />
-  );
-}
-
-/**
- * The Connections sidebar: model providers, then the accounts sandboxes run under, each marked when
- * it needs setup. A section's title and Browse open the list of that kind; its + opens Add
- * connection over the current page for that kind, by `?add=`.
- */
-function ConnectionsSidebar(props: { readonly workspaceId: string }) {
-  const navigate = useNavigate();
-  const [search, setSearch] = useSearchParams<{ add?: string; kind?: string }>();
-  const list = useConnectionList(props.workspaceId);
-  const open = useMatch(() => "/workspaces/:workspaceId/connections/:connectionId");
-  const browsing = useMatch(() => "/workspaces/:workspaceId/connections");
-  const base = paths.workspacePage(props.workspaceId, "connections");
-  const section = (
-    kind: ConnectionCapability | undefined,
-    title: string,
-    create?: string,
-  ): NavigationSection => ({
-    id: kind ?? "other",
-    title,
-    href: kind && href(`${base}?kind=${kind}`),
-    current: kind !== undefined && browsing() !== undefined && search.kind === kind,
-    browse: kind && {
-      label: `Browse ${title.toLowerCase()}`,
-      onBrowse: () => navigate(`${base}?kind=${kind}`),
-    },
-    create:
-      kind && create && list.canCreate()
-        ? { label: create, onCreate: () => setSearch({ add: kind }) }
-        : undefined,
-    entries: list
-      .connections()
-      .filter((connection) => connection.capability === kind)
-      .map((connection) => ({
-        id: connection.id,
-        name: connection.name,
-        href: href(paths.connection(props.workspaceId, connection.id)),
-        current: open()?.params.connectionId === connection.id,
-        icon: IconMarkConnections,
-        status: connectionStatus(connection),
-      })),
-    loading: list.loading(),
-    empty: kind && "None yet",
-  });
-  return (
-    <DestinationSidebar
-      sections={[
-        section("model-access", "Model providers", "Add model provider"),
-        section("sandboxes", "Sandbox accounts", "Add sandbox account"),
-        // Connections whose provider this host no longer installs give nothing it knows.
-        ...(list.connections().some((connection) => connection.capability === undefined)
-          ? [section(undefined, "Unavailable")]
-          : []),
       ]}
     />
   );
