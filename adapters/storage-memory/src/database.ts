@@ -90,7 +90,12 @@ export interface Interface {
    * it ends, and a standalone append holds its one log.
    */
   readonly logLocks: Map<string, Semaphore.Semaphore>;
-  /** Completed, and replaced, whenever a commit appends; waiting readers observe it. */
+  /**
+   * Each participation's session log by workspace and participation: its entries' JSON in position
+   * order. Session logs take part in no transaction, so they sit beside the workspaces' state.
+   */
+  readonly sessionLogs: Map<string, ReadonlyArray<string>>;
+  /** Completed, and replaced, whenever a commit or a session log appends; waiting readers observe it. */
   appended: Deferred.Deferred<void>;
   /** Every workspace's signals, across every host; signals themselves are never kept. */
   readonly signals: SignalHub.Local;
@@ -226,6 +231,7 @@ export const make = Effect.fn("MemoryDatabase.make")(function* () {
     spaces: new Map(),
     writers: new Map(),
     logLocks: new Map(),
+    sessionLogs: new Map(),
     appended: yield* Deferred.make<void>(),
     signals: yield* SignalHub.makeLocal,
     nextId: (prefix) => `${prefix}-${++issued}`,

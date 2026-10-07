@@ -30,16 +30,17 @@ import {
   TurnFailedError,
   TurnInProgressError,
 } from "../HarnessError.ts";
-import type {
-  ContinueOptions,
-  Session,
-  SessionState,
-  StreamOptions,
-  TurnError,
-  TurnServices,
-  UnfinishedTurn,
+import {
+  type ContinueOptions,
+  messagesOfStep,
+  type Session,
+  type SessionState,
+  type StreamOptions,
+  type TurnError,
+  type TurnServices,
+  type UnfinishedTurn,
 } from "../Session.ts";
-import type { StreamPart } from "../StreamPart.ts";
+import { type StreamPart, stepsOf } from "../StreamPart.ts";
 
 /** Makes the session `Harness.startSession` hands out, over an agent session it started. */
 export const makeSession = Effect.fn("Session.make")(function* (options: {
@@ -548,7 +549,7 @@ const deliver = (state: State, part: StreamPart): [boolean, State] => {
     return [true, { ...state, status: Status.Idle(), history }];
   }
   if (part.type === "finish-step") {
-    const step = Prompt.fromMessages(messagesOfStep(turn.stepParts));
+    const step = Prompt.fromMessages(messagesOfParts(turn.stepParts));
     const next = { ...turn, steps: [...turn.steps, step], stepParts: [] };
     return [true, { ...state, status: Status.Running({ turn: next }) }];
   }
@@ -632,7 +633,7 @@ const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
 const conversationOf = (turn: RunningTurn) =>
   Prompt.concat(
     conversationOfFinishedSteps(turn),
-    Prompt.fromMessages(messagesOfStep(turn.stepParts)),
+    Prompt.fromMessages(messagesOfParts(turn.stepParts)),
   );
 
 /** A turn's prompt and the steps it finished, as the conversation records them. */
@@ -652,83 +653,9 @@ const recordedConversation = ({ status, history }: State): ReadonlyArray<Prompt.
     : history
   ).content;
 
-// TODO: Record what the model reasoned, and the files it wrote, once a model can read them back
-// from another: providers read back only the reasoning they produced.
-/**
- * The messages that record one step of a turn: an assistant message with what the model wrote and
- * the tools it called, followed by a tool message with the results, and none for a step that wrote
- * nothing and called none. In a prompt, a `providerExecuted` call is one the model's provider ran,
- * so every call is recorded as one the model made, whoever ran the tool, which any model reads.
- *
- * A step its turn ended partway through keeps what it wrote so far, and each call it left without a
- * result is answered as interrupted, as Effect AI answers the calls of a response cut short, since
- * models refuse a conversation with a call no result answers.
- */
-const messagesOfStep = (step: ReadonlyArray<StreamPart>): ReadonlyArray<Prompt.Message> => {
-  const said: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
-  const results: Array<Prompt.ToolResultPart> = [];
-  /** The text of each text the step is writing, by its id, until it ends. */
-  const writing = new Map<string, string>();
-  for (const part of step) {
-    switch (part.type) {
-      case "text-delta":
-        writing.set(part.id, (writing.get(part.id) ?? "") + part.delta);
-        break;
-      case "text-end": {
-        const text = writing.get(part.id) ?? "";
-        writing.delete(part.id);
-        if (text !== "") said.push(Prompt.makePart("text", { text }));
-        break;
-      }
-      case "tool-call":
-        said.push(
-          Prompt.makePart("tool-call", {
-            id: part.id,
-            name: part.name,
-            params: part.params,
-            providerExecuted: false,
-          }),
-        );
-        break;
-      case "tool-result":
-        if (part.preliminary !== true) {
-          results.push(
-            Prompt.makePart("tool-result", {
-              id: part.id,
-              name: part.name,
-              isFailure: part.isFailure,
-              result: part.result,
-              providerExecuted: false,
-            }),
-          );
-        }
-        break;
-    }
-  }
-  for (const text of writing.values()) {
-    if (text !== "") said.push(Prompt.makePart("text", { text }));
-  }
-  const answered = new Set(results.map((result) => result.id));
-  for (const part of said) {
-    if (part.type === "tool-call" && !answered.has(part.id)) {
-      results.push(interruptedResultOf(part));
-    }
-  }
-  return [
-    ...(said.length === 0 ? [] : [Prompt.makeMessage("assistant", { content: said })]),
-    ...(results.length === 0 ? [] : [Prompt.makeMessage("tool", { content: results })]),
-  ];
-};
-
-/** The result of a call its turn ended before answering, as Effect AI writes one. */
-const interruptedResultOf = (call: Prompt.ToolCallPart) =>
-  Prompt.makePart("tool-result", {
-    id: call.id,
-    name: call.name,
-    isFailure: true,
-    result: { type: "execution-interrupted", reason: "The turn ended before the tool finished" },
-    providerExecuted: false,
-  });
+/** The messages that record the parts a step delivered, as far as they go. */
+const messagesOfParts = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Prompt.Message> =>
+  stepsOf(parts).flatMap(messagesOfStep);
 
 /** What `approve` answers a request with. */
 type ApprovalResponse = Parameters<AgentSession["approve"]>[0];

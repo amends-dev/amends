@@ -42,7 +42,14 @@ import {
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
 import { AgentV2Store } from "@amends/core/agent-v2";
 import { Integration, Integrations, type ModelCatalog } from "@amends/connection-v2";
-import { SessionStateStore, type Turn, TurnJobs, TurnStore, TurnTimeline } from "@amends/core/turn";
+import {
+  SessionLogStore,
+  SessionStateStore,
+  type Turn,
+  TurnJobs,
+  TurnStore,
+  TurnTimeline,
+} from "@amends/core/turn";
 import { Harness as HarnessV2 } from "@amends/harness-v2";
 import { Gateway, WorkspaceStorage } from "@amends/gateway";
 import { Clock, Context, DateTime, Effect, Layer, Option, Redacted, Result, Schema } from "effect";
@@ -227,6 +234,7 @@ export const bind = (
   agentsV2: Context.get(context, AgentV2Store.Service),
   turns: Context.get(context, TurnStore.Service),
   sessionStates: Context.get(context, SessionStateStore.Service),
+  sessionLogs: Context.get(context, SessionLogStore.Service),
 });
 export type Bound = ReturnType<typeof bind>;
 

@@ -1,7 +1,6 @@
 import { Context, DateTime, Effect, Layer, Option } from "effect";
 import type { Event } from "../journal/event.ts";
 import { Journal } from "../journal/journal.ts";
-import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
@@ -12,7 +11,6 @@ import { Thread } from "../thread/thread.ts";
 import type { ThreadMessageId } from "../thread/message/id.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnFacts } from "./facts.ts";
-import { TurnLog } from "./log.ts";
 import { Turn } from "./turn.ts";
 
 /**
@@ -33,7 +31,7 @@ export type ActivityKind =
   | typeof TurnActivity.Ended;
 
 export type RecordError = ThreadCommand.Error | ThreadStore.Failure;
-export type EndError = Projection.Error | Log.WriteError | RecordError;
+export type EndError = Projection.Error | RecordError;
 export interface Interface {
   /**
    * Record a turn's change in its thread's timeline, in the caller's commit, caused by the turn
@@ -46,9 +44,9 @@ export interface Interface {
     cause: Event.Record,
   ) => Effect.Effect<void, RecordError, Store.Transaction | Publication.Service>;
   /**
-   * End a turn in the caller's commit, everywhere it is told: its fact in the journal, its row in
-   * its thread's timeline, and its log, whose readers it lets go. Callers check that the turn may
-   * end this way.
+   * End a turn in the caller's commit, everywhere it is told: its fact in the journal, which lets
+   * its log's readers go, and its row in its thread's timeline. Callers check that the turn may end
+   * this way.
    */
   readonly endTurn: (
     turn: Turn.Record,
@@ -66,7 +64,6 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
   const threadStore = yield* ThreadStore.Service;
   const threadCommand = yield* ThreadCommand.Service;
   const journal = yield* Journal.Service;
-  const log = yield* Log.Service;
 
   const recordActivity: Interface["recordActivity"] = Effect.fnUntraced(
     function* (thread, kind, details, cause) {
@@ -115,13 +112,6 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
       { turnId: turn.id, outcome: ending.outcome, messageIds, reason, cancelReason },
       event,
     );
-    yield* TurnLog.open(log, turn.id).append({
-      _tag: "Ended",
-      outcome: ending.outcome,
-      reason,
-      cancelReason,
-      messageIds,
-    });
   });
 
   return Service.of({ recordActivity, endTurn });

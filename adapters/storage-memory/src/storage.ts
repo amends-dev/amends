@@ -16,6 +16,7 @@ import { Journal } from "./journal.ts";
 import { Members } from "./members.ts";
 import { Notifications } from "./notifications.ts";
 import { ReadStates } from "./read-states.ts";
+import { SessionLogs } from "./session-logs.ts";
 import { SessionStates } from "./session-states.ts";
 import { MemorySignalHub } from "./signal-hub.ts";
 import { Roles } from "./roles.ts";
@@ -54,6 +55,7 @@ const layerStores = Layer.mergeAll(
   AgentsV2.layer,
   TurnRecords.layer,
   SessionStates.layer,
+  SessionLogs.layer,
   MemorySignalHub.layer,
 );
 

@@ -138,6 +138,7 @@ export const workspaceIsolation = (harness: Harness) => {
                   retry: null,
                   status: "queued",
                   acceptedThroughSequence: 1,
+                  logAfter: 0,
                   selection: null,
                   messageIds: [],
                   failure: null,

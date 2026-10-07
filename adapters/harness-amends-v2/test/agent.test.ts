@@ -356,7 +356,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
     }),
   );
 
-  it.effect("picks a session up from its own state, with the tool calls of earlier turns", () =>
+  it.effect("picks a session up from the conversation it recorded, with earlier tool calls", () =>
     Effect.gen(function* () {
       const sandbox = yield* makeSandbox;
       const earlier = yield* makeScriptedModel((request) =>
@@ -378,6 +378,8 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
       });
       yield* resumed.generate({ prompt: "again" });
 
+      // amends keeps nothing of its own: the session's conversation is all it resumes from.
+      expect(state.agentState).toBeNull();
       expect(rolesOf(later.requests[0]?.prompt)).toEqual([
         "user",
         "assistant",
@@ -410,14 +412,20 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
     }),
   );
 
-  it.effect("refuses a state it did not write", () =>
+  it.effect("refuses an unfinished turn it did not write", () =>
     Effect.gen(function* () {
       const { model } = yield* makeScriptedModel(() => answer("unused"));
       const state: Session.SessionState = {
         id,
         agent: "amends",
         history: Prompt.empty,
-        agentState: { conversation: "not a conversation" },
+        unfinishedTurn: {
+          prompt: Prompt.makeMessage("user", {
+            content: [Prompt.makePart("text", { text: "hi" })],
+          }),
+          steps: [],
+          agentState: { steps: "not steps" },
+        },
       };
 
       const error = yield* Effect.flip(

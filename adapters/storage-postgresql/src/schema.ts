@@ -805,6 +805,7 @@ export const turns = pgTable(
     retriedBy: text("retried_by"),
     status: text("status", { enum: turnStatuses }).notNull(),
     acceptedThroughSequence: integer("accepted_through_sequence").notNull(),
+    logAfter: integer("log_after").notNull(),
     harnessConnectionId: text("harness_connection_id"),
     modelConnectionId: text("model_connection_id"),
     modelId: text("model_id"),
@@ -835,16 +836,18 @@ export const turns = pgTable(
 );
 
 /**
- * Each participation's harness session as its last turn left it, outside the journal and its read
- * models: rebuilding projections keeps them. The session's state is the harness's own, the whole
- * conversation included, so it is stored as JSON.
+ * Each participation's harness session as its last turn left it, beside its conversation, which
+ * session_log_entries keeps; outside the journal and its read models, so rebuilding projections
+ * keeps them. What the harness's agent returned is its own, so it is stored as JSON, and a row
+ * without it has none.
  */
 export const sessionStates = pgTable(
   "session_states",
   {
     workspaceId: text("workspace_id").notNull(),
     participationId: text("participation_id").notNull(),
-    state: jsonb("state").notNull(),
+    agent: text("agent").notNull(),
+    agentState: jsonb("agent_state"),
     promptedThroughSequence: integer("prompted_through_sequence").notNull(),
     harnessConnectionId: text("harness_connection_id").notNull(),
     modelConnectionId: text("model_connection_id").notNull(),
@@ -853,4 +856,28 @@ export const sessionStates = pgTable(
     sandboxConnectionId: text("sandbox_connection_id"),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.participationId] })],
+);
+
+/**
+ * Each participation's session log, outside the journal and its commits: an append is a statement
+ * of its own, and its key keeps a position from being taken twice. Every entry but the conversation
+ * the agent joined names its turn, and keeps what its kind says in `details`, as a thread activity
+ * does.
+ */
+export const sessionLogEntries = pgTable(
+  "session_log_entries",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    participationId: text("participation_id").notNull(),
+    position: integer("position").notNull(),
+    recordedAt: instant("recorded_at").notNull(),
+    kind: text("kind", { enum: ["Joined", "Prompted", "Step", "Interrupted"] }).notNull(),
+    turnId: text("turn_id"),
+    details: jsonb("details").$type<unknown>().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.participationId, t.position] }),
+    check("session_log_positive_position", sql`${t.position} > 0`),
+    check("session_log_entry_turn", sql`(${t.kind} = 'Joined') = (${t.turnId} IS NULL)`),
+  ],
 );

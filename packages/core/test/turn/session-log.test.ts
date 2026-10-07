@@ -1,0 +1,147 @@
+import type { StreamPart } from "@amends/harness-v2";
+import { describe, expect, it } from "@effect/vitest";
+import { DateTime } from "effect";
+import { SessionLog } from "../../src/turn/session-log.ts";
+import { ThreadMessage } from "../../src/thread/message/message.ts";
+import { Turn } from "../../src/turn/turn.ts";
+
+const at = DateTime.makeUnsafe("2026-10-06T12:00:00.000Z");
+const usage = { inputTokens: {}, outputTokens: {} };
+const turnId = Turn.Id.make("turn-1");
+
+/** A step that only reads the notes. */
+const reading: StreamPart.Step = {
+  parts: [{ type: "tool-call", id: "call-read", name: "read", params: {}, providerExecuted: true }],
+  finish: { type: "finish-step", reason: "tool-calls", usage },
+};
+
+/** A step that writes `texts`, around a reasoning. */
+const writing = (...texts: ReadonlyArray<string>): StreamPart.Step => ({
+  parts: [
+    { type: "reasoning", text: "Thinking." },
+    ...texts.map((text) => ({ type: "text" as const, text })),
+  ],
+  finish: { type: "finish-step", reason: "stop", usage },
+});
+
+const step = (id: string, steps: StreamPart.Step, turn = turnId): SessionLog.Entry => ({
+  _tag: "Step",
+  turnId: turn,
+  id,
+  step: steps,
+});
+const prompted = (text = "Ada: What is 2 and 3?", turn = turnId): SessionLog.Entry => ({
+  _tag: "Prompted",
+  turnId: turn,
+  texts: [text],
+  messages: 1,
+});
+const interrupted: SessionLog.Entry = {
+  _tag: "Interrupted",
+  turnId,
+  reason: "The run stopped.",
+};
+
+const itemsOf = (
+  entries: ReadonlyArray<SessionLog.Entry>,
+  ended?: ReadonlyArray<ThreadMessage.Id>,
+) => {
+  const reader = SessionLog.reader();
+  entries.forEach((entry, index) => reader.add({ position: index + 1, recordedAt: at, entry }));
+  if (ended !== undefined) reader.end(ended);
+  return reader.items();
+};
+
+describe("a turn's answer", () => {
+  it("is the text of the last step of its latest run that has parts", () => {
+    expect(
+      SessionLog.answerOf([
+        prompted(),
+        step("one", reading),
+        step("two", writing("The sum ", "is 5.")),
+      ]),
+    ).toBe("The sum is 5.");
+    expect(
+      SessionLog.answerOf([prompted(), step("one", writing("Reading.")), step("two", reading)]),
+    ).toBe("");
+    expect(
+      SessionLog.answerOf([
+        prompted(),
+        step("one", writing("Before.")),
+        interrupted,
+        step("two", reading),
+      ]),
+    ).toBe("");
+    expect(SessionLog.answerOf([prompted()])).toBe("");
+  });
+});
+
+describe("a turn's log items", () => {
+  it("show the prompt, each step that wrote text, and runs that stopped short", () => {
+    expect(
+      itemsOf([prompted(), step("one", reading), step("two", writing("Half")), interrupted]),
+    ).toEqual([
+      { _tag: "InputTaken", at, messages: 1 },
+      { _tag: "Responded", at, responseId: "two", text: "Half", parts: [1], reply: false },
+      { _tag: "Interrupted", at, reason: "The run stopped.", retryable: true },
+    ]);
+  });
+
+  it("mark the response the turn posted as its reply once it ends", () => {
+    const items = itemsOf(
+      [prompted(), step("one", writing("Reading.")), step("two", writing("The sum ", "is 5."))],
+      [ThreadMessage.Id.make("message-1")],
+    );
+
+    expect(items.map((item) => item._tag === "Responded" && item.reply)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    expect(itemsOf([prompted(), step("one", writing("Done."))], [])[1]).toMatchObject({
+      reply: false,
+    });
+  });
+});
+
+describe("the conversation a session log records", () => {
+  it("is the conversation joined, then each turn's prompt and the steps it took", () => {
+    const later = Turn.Id.make("turn-2");
+    const history = SessionLog.historyOf([
+      { _tag: "Joined", conversation: [{ role: "user", texts: ["Ada: Hello."] }] },
+      prompted(),
+      step("one", reading),
+      step("two", writing("The sum is 5.")),
+      prompted("Ada: And 4 and 5?", later),
+      step("three", writing("9."), later),
+    ]);
+
+    expect(history.content.map(({ role }) => role)).toEqual([
+      "user",
+      "user",
+      "assistant",
+      "tool",
+      "assistant",
+      "user",
+      "assistant",
+    ]);
+    expect(history.content[5]).toMatchObject({
+      role: "user",
+      content: [{ type: "text", text: "Ada: And 4 and 5?" }],
+    });
+  });
+
+  it("keeps only the latest run of a turn whose run stopped short", () => {
+    const history = SessionLog.historyOf([
+      prompted(),
+      step("one", writing("Before.")),
+      interrupted,
+      step("two", writing("After.")),
+    ]);
+
+    expect(history.content).toMatchObject([
+      { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
+      { role: "assistant", content: [{ type: "text", text: "After." }] },
+    ]);
+  });
+});

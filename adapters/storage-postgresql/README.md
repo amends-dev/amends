@@ -111,11 +111,18 @@ workspace. Each part of its setup is its connection's id as a column: a null
 `turns` holds agents' turns, with a partial unique index that
 allows one active turn per agent and thread, and the harness, model, and sandbox a turn started on
 as columns set all together or not at all. Each turn holds how far into its thread its input
-reaches, the turn it retries and who asked, both or neither, and its reply as a text array. A
-notification an agent accepted into a turn is `Accepted`, with its turn and time.
-`session_states` holds each participation's harness session as its last turn left it: the
-session's state as JSON, how far into the thread it was prompted, and what it ran on, as columns.
-Like credentials, it is outside the projections a rebuild discards. Changing these replaced the
+reaches, where its entries begin in its session log, the turn it retries and who asked, both or
+neither, and its reply as a text array. A notification an agent accepted into a turn is
+`Accepted`, with its turn and time. `session_states` holds each participation's harness session as
+its last turn left it, beside its conversation: the harness's agent, what that agent returned as
+JSON, how far into the thread it was prompted, and what it ran on, as columns.
+`session_log_entries` holds each participation's session log, keyed by its position, each entry's
+kind and turn as columns and the rest of it as JSON in `details`, as a thread activity's are. Its
+statements run on their own, apart from any transaction the caller is in, since the log takes
+part in no commit: an append checks the log's latest position, and the key refuses a position
+taken meanwhile, which is the store's `Conflict`; it then notifies on the append channel, which
+`waitForAppend` listens on, polling as the journal's readers do. Like credentials, both are
+outside the projections a rebuild discards. Changing these replaced the
 development baseline too; recreate disposable PostgreSQL databases when adopting it.
 
 Fact entries require complete provenance. There are no upgrade migrations,

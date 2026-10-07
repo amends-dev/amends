@@ -1,6 +1,6 @@
 import { ConnectionV2CredentialStore, ConnectionV2Store } from "@amends/core/connection-v2";
 import { AgentV2Store } from "@amends/core/agent-v2";
-import { SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
+import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
 import {
   ThreadStore,
   ThreadParticipationStore,
@@ -273,6 +273,15 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       Context.add(
         SessionStateStore.Service,
         SessionStateStore.Service.of({ get: unexpected, set: unexpected }),
+      ),
+      Context.add(
+        SessionLogStore.Service,
+        SessionLogStore.Service.of({
+          head: unexpected,
+          append: unexpected,
+          read: unexpected,
+          waitForAppend: unexpected,
+        }),
       ),
       Context.add(
         ConnectionV2Store.Service,

@@ -5,7 +5,7 @@ import { Binding } from "./binding.ts";
 import { storeFailure } from "./errors.ts";
 import { Rows } from "./rows.ts";
 
-/** A participation's session as JSON, the conversation it holds included. */
+/** A participation's session as JSON. */
 const rows = Rows.make(Schema.fromJsonString(Schema.toCodecJson(SessionStateStore.Saved)));
 
 /** Each participation's harness session in the workspace's memory, written in its transactions. @category constructors */

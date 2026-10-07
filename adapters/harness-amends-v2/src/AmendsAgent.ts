@@ -5,10 +5,10 @@
  * the agent works with the tools in `Tools`; without one, it answers from its model alone, calling
  * only the host's tools.
  *
- * Its own state is its conversation, tool calls and results included, so a session it resumes goes
- * on as it left off. A turn does not outlive the process running it: `continueTurn` goes on from
- * the steps of a turn `suspendTurn` cut short that the session has, and runs the step in flight
- * again.
+ * It keeps nothing of its own between turns: a session it resumes goes on from the conversation the
+ * session recorded, tool calls and results included. A turn does not outlive the process running
+ * it: `continueTurn` goes on from the steps of a turn `suspendTurn` cut short that the session has,
+ * and runs the step in flight again.
  *
  * `integration` gives the agent to connections, for a host to install.
  */
@@ -41,19 +41,13 @@ export interface Options extends Agent.Options {
   readonly commandTimeout?: Duration.Duration;
 }
 
-/** What `suspendTurn`, `detach`, and `stop` return, for `startSession` to take back. */
-const State = Schema.Struct({
-  /** The finished turns, with their tool calls and results. */
-  conversation: Prompt.Prompt,
+/**
+ * What `suspendTurn` returns, for `startSession` to take back: the steps of the turn it cut short,
+ * each as the messages that record it, as the model saw them.
+ */
+const UnfinishedTurn = Schema.Struct({ steps: Schema.Array(Prompt.Prompt) });
 
-  /** The steps of the turn `suspendTurn` cut short, each as the messages that record it. */
-  unfinishedTurn: Schema.optionalKey(Schema.Array(Prompt.Prompt)),
-});
-
-const StateJson = Schema.toCodecJson(State);
-
-/** What `startSession` takes back, if anything: a state the agent returned. */
-const SavedState = Schema.UndefinedOr(StateJson);
+const UnfinishedTurnJson = Schema.toCodecJson(UnfinishedTurn);
 
 /** The agent, which makes the language model of each of its endpoints with `Models.LanguageModels`. */
 export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
@@ -119,11 +113,8 @@ const startSession = Effect.fn("AmendsAgent.startSession")(function* (
 ) {
   const { workspace } = startOptions;
   const maxSteps = options.maxSteps ?? Number.POSITIVE_INFINITY;
-  const resumed = yield* readState(startOptions.agentState);
-  const suspended = yield* readState(startOptions.unfinishedTurn);
-  const conversation = yield* Ref.make(
-    (resumed ?? suspended)?.conversation ?? startOptions.history,
-  );
+  const suspended = yield* readUnfinishedTurn(startOptions.unfinishedTurn);
+  const conversation = yield* Ref.make(startOptions.history);
   /**
    * The running turn, or the one `suspendTurn` cut short. A turn joins the conversation once the
    * session takes its `finish`, so that a turn which finished before the session had all of it can
@@ -325,27 +316,20 @@ const startSession = Effect.fn("AmendsAgent.startSession")(function* (
   const onceStopped = <A, E>(effect: Effect.Effect<A, E>) =>
     Semaphore.withPermit(turnPermit, effect);
 
-  /**
-   * What the agent returns for `startSession` to take back, with the steps of a turn `suspendTurn`
-   * cut short.
-   */
-  const saveState = (unfinishedTurn?: ReadonlyArray<Prompt.Prompt>) =>
-    Effect.flatMap(Ref.get(conversation), (current) =>
-      Schema.encodeEffect(StateJson)({
-        conversation: current,
-        ...(unfinishedTurn === undefined ? {} : { unfinishedTurn }),
-      }),
-    ).pipe(Effect.orDie);
+  /** What `suspendTurn` returns: the steps of the turn it cut short, none when the turn finished. */
+  const saveUnfinishedTurn = Effect.flatMap(Ref.get(turn), (unfinished) =>
+    Schema.encodeEffect(UnfinishedTurnJson)({ steps: unfinished?.steps ?? [] }),
+  ).pipe(Effect.orDie);
 
   const close = Deferred.succeed(closed, undefined);
 
   const session: Agent.AgentSession = {
-    hasUnfinishedTurn: suspended?.unfinishedTurn !== undefined,
+    hasUnfinishedTurn: suspended !== undefined,
 
     promptTurn: (turnOptions) => runTurn(turnOptions, []),
 
     continueTurn: (turnOptions, finishedSteps) =>
-      runTurn(turnOptions, suspended?.unfinishedTurn?.slice(0, finishedSteps) ?? []),
+      runTurn(turnOptions, suspended?.steps.slice(0, finishedSteps) ?? []),
 
     submitToolResult: ({ id, result, isFailure }) =>
       Effect.flatMap(hostResultOf(id), (deferred) =>
@@ -370,12 +354,13 @@ const startSession = Effect.fn("AmendsAgent.startSession")(function* (
 
     suspendTurn: Effect.andThen(
       Effect.andThen(Ref.set(keepsTurn, true), close),
-      onceStopped(Effect.flatMap(Ref.get(turn), (unfinished) => saveState(unfinished?.steps))),
+      onceStopped(saveUnfinishedTurn),
     ),
 
-    detach: saveState(),
+    // The session records the conversation, which it gives back when it resumes.
+    detach: Effect.succeed(null),
 
-    stop: Effect.andThen(close, onceStopped(Effect.andThen(recordTurn, saveState()))),
+    stop: Effect.andThen(close, onceStopped(Effect.as(recordTurn, null))),
 
     destroy: close,
   };
@@ -547,9 +532,9 @@ const errorPartOf = (error: AiError.AiError) =>
 const answerSchemaOf = (schema: Schema.Top) =>
   Schema.make<Schema.Codec<Record<string, unknown>>>(Schema.toEncoded(schema).ast);
 
-/** Reads a state the agent returned, failing when it is not one. */
-const readState = (json: Schema.Json | undefined) =>
-  Schema.decodeEffect(SavedState)(json).pipe(
+/** Reads what the agent's `suspendTurn` returned, failing when it is not that. */
+const readUnfinishedTurn = (json: Schema.Json | undefined) =>
+  Schema.decodeEffect(Schema.UndefinedOr(UnfinishedTurnJson))(json).pipe(
     Effect.mapError((cause) =>
       harnessError(
         new HarnessError.InvalidOutputError({

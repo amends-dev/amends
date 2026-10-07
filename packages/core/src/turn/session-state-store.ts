@@ -1,4 +1,3 @@
-import { Session } from "@amends/harness-v2";
 import { Context, Schema } from "effect";
 import { AgentV2 } from "../agent-v2/agent.ts";
 import type { Effect, Option } from "effect";
@@ -11,13 +10,15 @@ export class Failure extends Schema.TaggedError<Failure>()("SessionStateStore.Fa
 }) {}
 
 /**
- * What an agent's harness session in a thread was left as when its last turn ended: the
- * session's state, which the next turn resumes from; the thread position through which it was
- * given the thread's messages, which the next turn's prompt follows; and what it ran on, whose
- * harness the next turn keeps on `Auto`, as only that harness reads its own state.
+ * What an agent's harness session in a thread was left as when its last turn ended, beside its
+ * conversation, which the session log keeps: the harness's agent that ran it last, and what that
+ * agent returned of its own, which only it reads; the thread position through which it was given
+ * the thread's messages, which the next turn's prompt follows; and what it ran on, whose harness
+ * the next turn keeps on `Auto`.
  */
 export const Saved = Schema.Struct({
-  state: Session.SessionState,
+  agent: Schema.String,
+  agentState: Schema.optionalKey(Schema.Json),
   promptedThroughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   selection: AgentV2.Selection,
 });
@@ -25,9 +26,9 @@ export interface Saved extends Schema.Schema.Type<typeof Saved> {}
 
 /**
  * Each participation's harness session, as its turns leave it, outside the journal: no fact or
- * view holds a conversation, and rebuilding projections keeps them. Writes join the commit that
- * ends the turn, so a reply and the state it came from are stored together or not at all. A
- * participation that ended keeps its session, and taking part again starts another.
+ * view holds it, and rebuilding projections keeps it. Writes join the commit that ends the turn,
+ * so a reply and the session it came from are stored together or not at all. A participation that
+ * ended keeps its session, and taking part again starts another.
  */
 export interface Interface {
   /** The participation's session as its last turn left it, or none before its first ended. */

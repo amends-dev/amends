@@ -17,6 +17,7 @@ import { PostgresSignalHub } from "./signal-hub.ts";
 import { Binding } from "./binding.ts";
 import { Checkpoints } from "./checkpoints.ts";
 import { ConnectionV2Credentials } from "./connection-v2-credentials.ts";
+import { SessionLogs } from "./session-logs.ts";
 import { SessionStates } from "./session-states.ts";
 import { ConnectionsV2 } from "./connections-v2.ts";
 import { CredentialKey } from "./credential-key.ts";
@@ -62,6 +63,7 @@ const layerStores = Layer.mergeAll(
   ConnectionsV2.layer,
   ConnectionV2Credentials.layer,
   SessionStates.layer,
+  SessionLogs.layer,
   AgentsV2.layer,
   TurnRecords.layer,
   PostgresSignalHub.layer,

@@ -54,7 +54,10 @@ agent to summarize the conversation so far.
 `suspendTurn`, `detach`, and `stop` return a `SessionState` for the caller to store, as JSON with
 `Schema.toCodecJson(Session.SessionState)`. It records the conversation as Effect AI `Prompt`
 messages, each step's tool calls and results included, beside the agent's own state. The agent that
-last ran the session resumes from its own state; any other loads the conversation. `suspendTurn`
+last ran the session resumes from its own state; any other loads the conversation.
+`Session.messagesOfStep` gives the messages that record one `Step`, as the conversation records
+it, for a caller that keeps a session's steps itself and gives the conversation back as `history`,
+rather than storing the whole of it with every turn. `suspendTurn`
 ends the running turn's stream while the agent goes on with it, and `continueStream` finishes it
 once `startSession` resumes the session, from the step that was in flight; another agent runs it
 again from its prompt. `detach` lets go between turns, `stop` stops the agent to start it again

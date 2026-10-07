@@ -64,7 +64,8 @@ currently run through TypeScript. Check compatibility before changing this setup
   over this machine's directories and over Daytona. Each gives the integration a host installs.
   `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
-  per record field, except a thread activity's kind-specific `details`, stored as JSON;
+  per record field, except the kind-specific `details` of a thread activity or a session log
+  entry, stored as JSON;
   `storage-memory` implements them in process memory as the reference
   implementation of the storage contracts, with no dependencies. Both follow one shape:
   a module per store over a workspace binding, merged at the edge.

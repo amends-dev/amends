@@ -33,6 +33,7 @@ export const harness: Harness = {
                 for (const batch of batches) total += 1 + batch.entries.length;
               for (const name of MemoryDatabase.projections) total += space.records[name].size;
             }
+            for (const log of database.sessionLogs.values()) total += log.length;
             return total;
           }),
         });

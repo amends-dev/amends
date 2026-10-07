@@ -1,5 +1,6 @@
 import { Agent, type Session, type StreamPart } from "@amends/harness-v2";
 import { Context, Crypto, Data, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
+import type { Array } from "effect";
 import type { PlatformError } from "effect";
 import type { Prompt } from "effect/ai";
 import type { AgentV2 } from "../agent-v2/agent.ts";
@@ -10,7 +11,6 @@ import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { Performer } from "../identity/performer.ts";
 import { Journal } from "../journal/journal.ts";
-import { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
@@ -34,16 +34,17 @@ import { NotActive, NotFound } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnCommand } from "./command.ts";
 import { TurnFacts } from "./facts.ts";
-import { TurnLog } from "./log.ts";
 import { TurnPrompt } from "./prompt.ts";
+import { SessionLog } from "./session-log.ts";
+import { SessionLogStore } from "./session-log-store.ts";
 import { SessionStateStore } from "./session-state-store.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
 export type Error =
   | TurnStore.Failure
-  | Log.ReadError
-  | Log.WriteError
+  | SessionLogStore.Failure
+  | SessionLogStore.Conflict
   | Schema.SchemaError
   | PlatformError.PlatformError
   | Projection.Error
@@ -66,13 +67,16 @@ export type CloseError =
   | ThreadQuery.ParticipantsError
   | ThreadCommand.Error;
 
-/** Where a turn's harness session starts: from the state its last turn saved, or anew. */
+/**
+ * Where a turn's harness session starts: from the session its last turn saved, or anew, each with
+ * the conversation its session log records before the turn.
+ */
 export type SessionStart =
   | { readonly resumeFrom: Session.SessionState }
   | {
       /** The participation's id, which names the session and the sandbox it works in. */
       readonly id: Agent.SessionId;
-      /** The thread's messages before the agent took part, which the session starts with. */
+      /** The conversation so far, as when the agent joins a thread under way. */
       readonly history: Prompt.Prompt;
     };
 
@@ -91,6 +95,19 @@ export type Start = Data.TaggedEnum<{
 }>;
 export const Start = Data.taggedEnum<Start>();
 
+/** What a turn's session log takes, after `after`, once the commit that starts the turn lands. */
+interface LogWrite {
+  readonly participationId: Turn.Record["participationId"];
+  readonly entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>;
+  readonly after: number;
+}
+
+/** How starting went, in its commit, and what the session log takes after it, if anything. */
+interface Begun {
+  readonly start: Start;
+  readonly log: LogWrite | undefined;
+}
+
 /**
  * How closing went: the turn completed, posting the agent's answer if it had one; it stopped as
  * it was asked to; or the agent could no longer post where it worked, which failed it.
@@ -104,9 +121,11 @@ export const Closing = Data.taggedEnum<Closing>();
 
 /**
  * What a turn's job does with a turn: start it, record each step it takes, show what it is
- * writing, and end it. Each change is its own commit, attributed to the turn's agent. Execution is
- * trusted: it runs what the agent accepted, and closing checks the agent's own access before
- * posting for it.
+ * writing, and end it. Each change to the workspace is its own commit, attributed to the turn's
+ * agent; what the agent is told and each step it takes go to the participation's session log,
+ * after the commit that starts the turn and before the one that ends it, since the log takes part
+ * in no commit. Execution is trusted: it runs what the agent accepted, and closing checks the
+ * agent's own access before posting for it.
  */
 export interface Interface {
   /**
@@ -114,14 +133,18 @@ export interface Interface {
    * accepts the work its notifications from the thread ask for, settling them. A turn asked to
    * stop, or whose participation ended, ends as it stands. A turn starts on what `AgentV2Query`
    * selects for it, kept when it runs again, and a turn that cannot run fails. A queued turn
-   * starts, recording the prompt in its log; a running one, which a run cut short left, runs
-   * again from its prompt, which its log notes.
+   * starts, and its prompt goes to the session log, after the conversation the agent joined when
+   * the log is new; a turn the log has the prompt of already, which a run cut short left, runs
+   * again from that prompt, which the log notes.
    */
   readonly start: (job: {
     readonly memberId: Member.Id;
     readonly threadId: ThreadId.Id;
   }) => Effect.Effect<Start, StartError>;
-  /** Record a step the turn finished, which `id` names as its drafts did. */
+  /**
+   * Record a step the turn finished, which `id` names as its drafts did, after the latest entry of
+   * its session log.
+   */
   readonly recordStep: (
     turnId: Turn.Id,
     step: { readonly id: string; readonly step: StreamPart.Step },
@@ -141,9 +164,9 @@ export interface Interface {
   ) => Effect.Effect<void, Error>;
   /**
    * Close a turn whose harness turn finished, with the session as it left it: post its answer,
-   * the text of its last step, as the agent's reply to the thread's current participants, save
-   * the session, and record completion, in one commit. A turn asked to stop meanwhile stops
-   * instead, keeping the session.
+   * the text of its last step in the session log, as the agent's reply to the thread's current
+   * participants, save the session, and record completion, in one commit. A turn asked to stop
+   * meanwhile stops instead, keeping the session.
    */
   readonly close: (
     turnId: Turn.Id,
@@ -191,6 +214,7 @@ const describeIssue = (issue: AgentV2.Issue): string => {
 export const make = Effect.fn("TurnExecution.make")(function* () {
   const turnStore = yield* TurnStore.Service;
   const sessionStateStore = yield* SessionStateStore.Service;
+  const sessionLogStore = yield* SessionLogStore.Service;
   const notificationStore = yield* NotificationStore.Service;
   const memberStore = yield* MemberStore.Service;
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
@@ -202,7 +226,6 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const agentV2Query = yield* AgentV2Query.Service;
   const authorization = yield* Authorization.Service;
   const journal = yield* Journal.Service;
-  const log = yield* Log.Service;
   const signalHub = yield* SignalHub.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -248,15 +271,42 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     return Option.isNone(participation) || participation.value.status !== "active";
   });
 
-  /** Keep the session the turn left, which the agent's next turn in the thread resumes. */
+  // TODO: Keep a turn `suspendTurn` left unfinished, which the next run continues, once the turn
+  // job suspends turns; the session log has its prompt and the steps it finished.
+  /**
+   * Keep what the session the turn left needs beside its conversation, which the agent's next
+   * turn in the thread resumes with the conversation its session log records.
+   */
   const saveSession = (turn: Turn.Record, state: Session.SessionState) =>
     turn.selection === null
       ? Effect.die("A turn that ran a session has no selection")
       : sessionStateStore.set(turn.participationId, {
-          state,
+          agent: state.agent,
+          ...(state.agentState === undefined ? {} : { agentState: state.agentState }),
           promptedThroughSequence: turn.acceptedThroughSequence,
           selection: turn.selection,
         });
+
+  /** The participation's session log past `after`, oldest first, read a page at a time. */
+  const readSessionLog = Effect.fnUntraced(function* (
+    participationId: Turn.Record["participationId"],
+    after: number,
+  ) {
+    const recorded: Array<SessionLog.Recorded> = [];
+    let from = after;
+    for (;;) {
+      const page = yield* sessionLogStore.read(participationId, { after: from, limit: pageSize });
+      recorded.push(...page);
+      const last = page.at(-1);
+      if (last === undefined || page.length < pageSize) return recorded;
+      from = last.position;
+    }
+  });
+  /** The turn's own entries in its session log, oldest first. */
+  const readTurnEntries = (turn: Turn.Record) =>
+    Effect.map(readSessionLog(turn.participationId, turn.logAfter), (recorded) =>
+      recorded.flatMap(({ entry }) => (SessionLog.isOfTurn(turn.id)(entry) ? [entry] : [])),
+    );
 
   /** The thread's messages in a range of positions, oldest first, read a page at a time. */
   const readMessagesBetween = Effect.fnUntraced(function* (
@@ -374,6 +424,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
       retry: null,
       status: "queued",
       acceptedThroughSequence: Math.max(...accepted.map(({ sequence }) => sequence)),
+      logAfter: yield* sessionLogStore.head(latest.participationId),
       selection: null,
       messageIds: [],
       failure: null,
@@ -409,6 +460,128 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     );
   });
 
+  /** A start that writes nothing to the session log. */
+  const startOnly = (start: Start): Begun => ({ start, log: undefined });
+
+  /**
+   * Begin `turn`, which may run on `selection`, in the caller's commit: ready its harness session
+   * and its prompt, and say what its session log takes. A turn whose prompt the log has already
+   * runs again from it; otherwise the turn is prompted with what it accepted, or ends at once with
+   * nothing to say. Starting a queued turn records that it started.
+   */
+  const beginTurn = Effect.fnUntraced(function* (
+    turn: Turn.Record,
+    selection: AgentV2.Selection,
+    runnable: AgentV2Query.Runnable,
+  ) {
+    const participation = yield* threadParticipationStore.get(turn.participationId);
+    if (Option.isNone(participation)) return yield* Effect.die("A turn's participation is missing");
+    const saved = yield* sessionStateStore.get(turn.participationId);
+    const promptedThrough = Option.match(saved, {
+      onNone: () => participation.value.joinedAtSequence - 1,
+      onSome: ({ promptedThroughSequence }) => promptedThroughSequence,
+    });
+    const logged = yield* readSessionLog(turn.participationId, 0);
+    const before = logged.flatMap(({ entry }) =>
+      SessionLog.isOfTurn(turn.id)(entry) ? [] : [entry],
+    );
+    const loggedPrompt = logged.find(
+      (recorded): recorded is SessionLog.Recorded & { readonly entry: { _tag: "Prompted" } } =>
+        recorded.entry._tag === "Prompted" && recorded.entry.turnId === turn.id,
+    );
+
+    /** What the log takes: an interruption, or the prompt, after the conversation joined. */
+    let entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>;
+    let texts: ReadonlyArray<string>;
+    if (loggedPrompt !== undefined) {
+      texts = loggedPrompt.entry.texts;
+      entries = [
+        {
+          _tag: "Interrupted",
+          turnId: turn.id,
+          reason: "The turn's run stopped before it finished, and it runs again from its prompt.",
+        },
+      ];
+    } else {
+      const said = yield* readSaid(turn.memberId, turn.threadId, {
+        after: promptedThrough,
+        through: turn.acceptedThroughSequence,
+      });
+      const retriedBy =
+        turn.retry === null ? undefined : (yield* readNames([turn.retry.by]))(turn.retry.by);
+      const prompt = TurnPrompt.promptOf(said, retriedBy);
+      // Nothing to say, as when what the turn accepted was all the agent's own.
+      if (prompt === undefined)
+        return startOnly(yield* endAsIdle(turn, { outcome: "completed", messageIds: [] }));
+      // A new log starts with the conversation the agent joined, if any.
+      const joined =
+        logged.length === 0
+          ? TurnPrompt.conversationOf(
+              yield* readSaid(turn.memberId, turn.threadId, { after: 0, through: promptedThrough }),
+            )
+          : [];
+      texts = prompt;
+      const prompted: SessionLog.Entry = {
+        _tag: "Prompted",
+        turnId: turn.id,
+        texts: prompt,
+        messages: said.filter(({ own }) => !own).length,
+      };
+      entries =
+        joined.length === 0 ? [prompted] : [{ _tag: "Joined", conversation: joined }, prompted];
+    }
+    const history = SessionLog.historyOf([
+      ...before,
+      ...entries.filter((entry) => entry._tag === "Joined"),
+    ]);
+    const sessionId = Agent.SessionId.make(turn.participationId);
+    const session: SessionStart = Option.match(saved, {
+      onNone: () => ({ id: sessionId, history }),
+      onSome: ({ agent, agentState }) => ({
+        resumeFrom: {
+          id: sessionId,
+          agent,
+          history,
+          ...(agentState === undefined ? {} : { agentState }),
+        },
+      }),
+    });
+    const prompt = TurnPrompt.userMessageOf(texts);
+    const log: LogWrite = {
+      participationId: turn.participationId,
+      entries,
+      after: logged.at(-1)?.position ?? 0,
+    };
+
+    if (turn.status === "running")
+      return { start: Start.Ready({ turn, runnable, session, prompt }), log } satisfies Begun;
+    const startedAt = yield* DateTime.now;
+    const event = yield* journal.publish(TurnFacts.Started, {
+      workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      memberId: turn.memberId,
+      turnId: turn.id,
+      selection,
+      startedAt,
+    });
+    yield* turnCommand.recordActivity(
+      turn.threadId,
+      TurnActivity.Started,
+      { turnId: turn.id },
+      event,
+    );
+    return {
+      start: Start.Ready({
+        turn: Turn.change(turn, { status: "running", selection, startedAt }),
+        runnable,
+        session,
+        prompt,
+      }),
+      log,
+    } satisfies Begun;
+  });
+
   const start: Interface["start"] = Effect.fn("TurnExecution.start")(function* (job) {
     const member = yield* memberStore.get(job.memberId);
     if (
@@ -418,24 +591,28 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     )
       return Start.Idle();
     const agent = Object.assign(member.value, { identity: member.value.identity });
-    return yield* asAgent(
+    const begun = yield* asAgent(
       agent.id,
       agent.identity,
     )(
       Effect.gen(function* () {
         const active = yield* turnStore.findActive(agent.id, job.threadId);
         const turn = Option.isSome(active) ? active.value : yield* acceptWork(agent, job.threadId);
-        if (turn === undefined) return Start.Idle();
+        if (turn === undefined) return startOnly(Start.Idle());
         if (turn.status === "cancelling")
-          return yield* endAsIdle(turn, {
-            outcome: "cancelled",
-            cancelReason: turn.cancelReason ?? "requested",
-          });
+          return startOnly(
+            yield* endAsIdle(turn, {
+              outcome: "cancelled",
+              cancelReason: turn.cancelReason ?? "requested",
+            }),
+          );
         if (yield* hasDeparted(turn))
-          return yield* endAsIdle(turn, {
-            outcome: "cancelled",
-            cancelReason: "participation-ended",
-          });
+          return startOnly(
+            yield* endAsIdle(turn, {
+              outcome: "cancelled",
+              cancelReason: "participation-ended",
+            }),
+          );
         const failWithIssues = (incomplete: { readonly issues: ReadonlyArray<AgentV2.Issue> }) =>
           endAsIdle(turn, {
             outcome: "failed",
@@ -457,85 +634,25 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
               ),
           }),
         );
-        if (Option.isNone(ready)) return Start.Idle();
-        const { selection, runnable } = ready.value;
-
-        const participation = yield* threadParticipationStore.get(turn.participationId);
-        if (Option.isNone(participation))
-          return yield* Effect.die("A turn's participation is missing");
-        const saved = yield* sessionStateStore.get(turn.participationId);
-        const promptedThrough = Option.match(saved, {
-          onNone: () => participation.value.joinedAtSequence - 1,
-          onSome: ({ promptedThroughSequence }) => promptedThroughSequence,
-        });
-        const said = yield* readSaid(turn.memberId, turn.threadId, {
-          after: promptedThrough,
-          through: turn.acceptedThroughSequence,
-        });
-        const retriedBy =
-          turn.retry === null ? undefined : (yield* readNames([turn.retry.by]))(turn.retry.by);
-        const prompt = TurnPrompt.promptOf(said, retriedBy);
-        // Nothing to say, as when what the turn accepted was all the agent's own.
-        if (prompt === undefined)
-          return yield* endAsIdle(turn, { outcome: "completed", messageIds: [] });
-        const session: SessionStart = Option.isSome(saved)
-          ? { resumeFrom: saved.value.state }
-          : {
-              id: Agent.SessionId.make(turn.participationId),
-              history: TurnPrompt.historyOf(
-                yield* readSaid(turn.memberId, turn.threadId, {
-                  after: 0,
-                  through: promptedThrough,
-                }),
-              ),
-            };
-
-        const handle = TurnLog.open(log, turn.id);
-        if (turn.status === "running") {
-          yield* handle.append({
-            _tag: "Interrupted",
-            reason: "The turn's run stopped before it finished, and it runs again from its prompt.",
-          });
-          return Start.Ready({ turn, runnable, session, prompt });
-        }
-        const startedAt = yield* DateTime.now;
-        const event = yield* journal.publish(TurnFacts.Started, {
-          workspaceId,
-          groupId: turn.groupId,
-          threadId: turn.threadId,
-          memberId: turn.memberId,
-          turnId: turn.id,
-          selection,
-          startedAt,
-        });
-        yield* turnCommand.recordActivity(
-          turn.threadId,
-          TurnActivity.Started,
-          { turnId: turn.id },
-          event,
-        );
-        yield* handle.append({
-          _tag: "Prompted",
-          messages: said.filter(({ own }) => !own).length,
-        });
-        return Start.Ready({
-          turn: Turn.change(turn, { status: "running", selection, startedAt }),
-          runnable,
-          session,
-          prompt,
-        });
+        if (Option.isNone(ready)) return startOnly(Start.Idle());
+        return yield* beginTurn(turn, ready.value.selection, ready.value.runnable);
       }),
     );
+    // The log takes part in no commit: it takes the prompt once the turn has started.
+    if (begun.log !== undefined)
+      yield* sessionLogStore.append(begun.log.participationId, begun.log.entries, begun.log.after);
+    return begun.start;
   });
 
   const recordStep: Interface["recordStep"] = Effect.fn("TurnExecution.recordStep")(
     function* (turnId, recorded) {
       const id = yield* Schema.decodeEffect(Schema.NonEmptyString)(recorded.id);
-      yield* asTurnAgent(turnId)((turn) =>
-        Effect.gen(function* () {
-          yield* requireStatus(turn, ["running", "cancelling"]);
-          yield* TurnLog.open(log, turn.id).append({ _tag: "Step", id, step: recorded.step });
-        }),
+      const turn = yield* requireTurn(turnId);
+      yield* requireStatus(turn, ["running", "cancelling"]);
+      yield* sessionLogStore.append(
+        turn.participationId,
+        [{ _tag: "Step", turnId: turn.id, id, step: recorded.step }],
+        yield* sessionLogStore.head(turn.participationId),
       );
     },
   );
@@ -603,9 +720,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         }
         yield* requireStatus(turn, ["running"]);
         yield* saveSession(turn, state);
-        const answer = TurnLog.answerOf(
-          (yield* TurnLog.readEntries(log, turn.id)).map(({ entry }) => entry),
-        );
+        const answer = SessionLog.answerOf(yield* readTurnEntries(turn));
         const failTurn = (reason: string) =>
           Effect.as(
             turnCommand.endTurn(turn, { outcome: "failed", reason }),

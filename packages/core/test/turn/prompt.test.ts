@@ -12,20 +12,15 @@ describe("a turn's prompt", () => {
       undefined,
     );
 
-    expect(prompt?.content).toMatchObject([
-      { type: "text", text: "Ada: Can you review this?" },
-      { type: "text", text: "Kai: Mine too, please." },
-    ]);
+    expect(prompt).toEqual(["Ada: Can you review this?", "Kai: Mine too, please."]);
   });
 
   it("tells the agent who asked it to try again", () => {
-    expect(TurnPrompt.promptOf([ada("Review this.")], "Kai")?.content).toMatchObject([
-      { type: "text", text: "Ada: Review this." },
-      { type: "text", text: "Kai asked you to try that again." },
+    expect(TurnPrompt.promptOf([ada("Review this.")], "Kai")).toEqual([
+      "Ada: Review this.",
+      "Kai asked you to try that again.",
     ]);
-    expect(TurnPrompt.promptOf([], "Kai")?.content).toMatchObject([
-      { type: "text", text: "Kai asked you to try that again." },
-    ]);
+    expect(TurnPrompt.promptOf([], "Kai")).toEqual(["Kai asked you to try that again."]);
   });
 
   it("is nothing when there is nothing to say", () => {
@@ -36,7 +31,7 @@ describe("a turn's prompt", () => {
 
 describe("the conversation an agent joins", () => {
   it("has others' messages as the user's and the agent's own as its answers, sides alternating", () => {
-    const history = TurnPrompt.historyOf([
+    const conversation = TurnPrompt.conversationOf([
       ada("Hello."),
       kai("Hi all."),
       agent("Hello, both."),
@@ -44,23 +39,11 @@ describe("the conversation an agent joins", () => {
       ada("A review."),
     ]);
 
-    expect(history.content).toMatchObject([
-      {
-        role: "user",
-        content: [
-          { type: "text", text: "Ada: Hello." },
-          { type: "text", text: "Kai: Hi all." },
-        ],
-      },
-      {
-        role: "assistant",
-        content: [
-          { type: "text", text: "Hello, both." },
-          { type: "text", text: "What do you need?" },
-        ],
-      },
-      { role: "user", content: [{ type: "text", text: "Ada: A review." }] },
+    expect(conversation).toEqual([
+      { role: "user", texts: ["Ada: Hello.", "Kai: Hi all."] },
+      { role: "assistant", texts: ["Hello, both.", "What do you need?"] },
+      { role: "user", texts: ["Ada: A review."] },
     ]);
-    expect(TurnPrompt.historyOf([]).content).toEqual([]);
+    expect(TurnPrompt.conversationOf([])).toEqual([]);
   });
 });

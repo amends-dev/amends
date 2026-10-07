@@ -1,24 +1,19 @@
-import { Session } from "@amends/harness-v2";
 import { Store } from "@amends/core/journal";
 import { SessionStateStore } from "@amends/core/turn";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeFailure } from "./errors.ts";
 import { sessionStates } from "./schema.ts";
 
-/** A session's state as the JSON its column holds. */
-const StateJson = Schema.toCodecJson(Session.SessionState);
-const encodeState = Schema.encodeEffect(StateJson);
-const decodeSaved = Schema.decodeUnknownEffect(
-  Schema.Struct({ ...SessionStateStore.Saved.fields, state: StateJson }),
-);
+const decodeSaved = Schema.decodeUnknownEffect(SessionStateStore.Saved);
 
 type Row = typeof sessionStates.$inferSelect;
 
 /** The session a row stores, before its fields are checked. */
 const savedOf = (row: Row) => ({
-  state: row.state,
+  agent: row.agent,
+  ...(row.agentState === null ? {} : { agentState: row.agentState }),
   promptedThroughSequence: row.promptedThroughSequence,
   selection: {
     harness: { connectionId: row.harnessConnectionId },
@@ -30,6 +25,13 @@ const savedOf = (row: Row) => ({
     sandbox: row.sandboxConnectionId === null ? null : { connectionId: row.sandboxConnectionId },
   },
 });
+
+/**
+ * What the agent returned, as its column holds it: JSON, even when it is JSON's `null`, which
+ * the column's SQL NULL would otherwise take for none.
+ */
+const agentStateColumn = (agentState: Schema.Json | undefined) =>
+  agentState === undefined ? null : sql`${JSON.stringify(agentState)}::jsonb`;
 
 /**
  * Each participation's harness session in the workspace's database; writes join the commit that
@@ -62,7 +64,8 @@ export const make = Effect.fn("SessionStates.make")(function* () {
         yield* Store.Transaction;
         const { selection } = saved;
         const columns = {
-          state: yield* encodeState(saved.state),
+          agent: saved.agent,
+          agentState: agentStateColumn(saved.agentState),
           promptedThroughSequence: saved.promptedThroughSequence,
           harnessConnectionId: selection.harness.connectionId,
           modelConnectionId: selection.model.connectionId,

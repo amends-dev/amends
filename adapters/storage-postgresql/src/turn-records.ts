@@ -64,6 +64,7 @@ const toRow = ({ selection, retry, ...record }: Turn.Record): typeof turns.$infe
   retriedBy: retry?.by ?? null,
   status: record.status,
   acceptedThroughSequence: record.acceptedThroughSequence,
+  logAfter: record.logAfter,
   harnessConnectionId: selection?.harness.connectionId ?? null,
   modelConnectionId: selection?.model.connectionId ?? null,
   modelId: selection?.model.id ?? null,

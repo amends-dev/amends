@@ -19,9 +19,10 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   host runs turns yet: the turn job is being rebuilt on [harness-v2](../packages/harness-v2/README.md),
   so the local host accepts its requests and runs nothing, and work waits in agents' inboxes. Core
   starts each turn as one harness turn on what [agents v2](../packages/core/README.md#agents-v2)
-  select, prompted with the thread's messages since the agent's last turn there, keeps the harness
-  session of each participation for its next turn, and posts the text of the turn's last step as the
-  reply; a turn that fails or is stopped posts nothing. A reader with a turn's log open follows it as a stream of its items and the
+  select, prompted with the thread's messages since the agent's last turn there, records the
+  conversation in each participation's session log, from which the agent's next turn there resumes,
+  and posts the text of the turn's last step as the reply; a turn that fails or is stopped posts
+  nothing. Resuming reads the whole session log each turn, since nothing yet compacts a long one. A reader with a turn's log open follows it as a stream of its items and the
   step being written; the text being written is best effort, and a draft missed while reconnecting
   shows once its step finishes. The [turn screens](turns.md) follow, stop, and retry turns in
   threads and show each turn's log; threads have no titles, so the log names a thread by its group.
@@ -380,8 +381,8 @@ level. The locks serialize cooperating writers, but the connection's isolation d
 determines snapshot behavior.
 
 Every journal commit still takes the workspace's lock, so one workspace's conversation writes
-run one at a time, at roughly the rate one commit's statements allow. Turn execution records each
-step in its own commit, so a running turn's steps take their turn with the conversation's writes. The adapter's tests do not
+run one at a time, at roughly the rate one commit's statements allow. A turn's steps go to its
+session log, which takes no lock and no part in commits, so they never wait for those writes. The adapter's tests do not
 establish correctness for arbitrary session/database isolation settings.
 An explicit isolation choice and coverage for changed defaults remain outstanding.
 

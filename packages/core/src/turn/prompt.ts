@@ -3,7 +3,9 @@
  * session has not been given, each named by its author, as one message. An agent that joins a
  * thread already under way starts its session with the messages before it joined, as the
  * conversation so far. Both are pure: the caller reads the messages and names their authors.
+ * What the agent is told is text alone, which its session log keeps as it was told.
  */
+import { Array, Schema } from "effect";
 import { Prompt } from "effect/ai";
 
 /** A message of the thread as the agent is told it. */
@@ -16,25 +18,33 @@ export interface Said {
   readonly text: string;
 }
 
+/**
+ * A message of the conversation the agent is told: others' messages as the user's, and its own as
+ * its answers, each text one part.
+ */
+export const Message = Schema.Struct({
+  role: Schema.Literals(["user", "assistant"]),
+  texts: Schema.NonEmptyArray(Schema.String),
+});
+export interface Message extends Schema.Schema.Type<typeof Message> {}
+
 /** One message's text as the agent is told it: named by its author. */
-const named = (said: Said) => Prompt.makePart("text", { text: `${said.author}: ${said.text}` });
+const named = (said: Said) => `${said.author}: ${said.text}`;
 
 /**
- * A turn's prompt: the thread's messages it takes in, but the agent's own, which it said and
- * knows, and who asked for the turn to run again, when someone retried it. Nothing when it has
- * nothing to say.
+ * A turn's prompt, as its texts: the thread's messages it takes in, but the agent's own, which it
+ * said and knows, and who asked for the turn to run again, when someone retried it. Nothing when it
+ * has nothing to say.
  */
 export const promptOf = (
   messages: ReadonlyArray<Said>,
   retriedBy: string | undefined,
-): Prompt.UserMessage | undefined => {
-  const content = [
+): Array.NonEmptyReadonlyArray<string> | undefined => {
+  const texts = [
     ...messages.filter((said) => !said.own).map(named),
-    ...(retriedBy === undefined
-      ? []
-      : [Prompt.makePart("text", { text: `${retriedBy} asked you to try that again.` })]),
+    ...(retriedBy === undefined ? [] : [`${retriedBy} asked you to try that again.`]),
   ];
-  return content.length === 0 ? undefined : Prompt.makeMessage("user", { content });
+  return Array.isReadonlyArrayNonEmpty(texts) ? texts : undefined;
 };
 
 /**
@@ -43,18 +53,16 @@ export const promptOf = (
  * part, as its answers. Consecutive messages of one side make one message, as models take a
  * conversation whose sides alternate.
  */
-export const historyOf = (messages: ReadonlyArray<Said>): Prompt.Prompt => {
-  const conversation: Array<Prompt.Message> = [];
+export const conversationOf = (messages: ReadonlyArray<Said>): ReadonlyArray<Message> => {
+  const conversation: Array<Message> = [];
   let run: Array<Said> = [];
   const endRun = () => {
-    const [first] = run;
+    const [first, ...rest] = run;
     if (first === undefined) return;
     conversation.push(
       first.own
-        ? Prompt.makeMessage("assistant", {
-            content: run.map((said) => Prompt.makePart("text", { text: said.text })),
-          })
-        : Prompt.makeMessage("user", { content: run.map(named) }),
+        ? { role: "assistant", texts: [first.text, ...rest.map((said) => said.text)] }
+        : { role: "user", texts: [named(first), ...rest.map(named)] },
     );
     run = [];
   };
@@ -63,7 +71,20 @@ export const historyOf = (messages: ReadonlyArray<Said>): Prompt.Prompt => {
     run.push(said);
   }
   endRun();
-  return Prompt.fromMessages(conversation);
+  return conversation;
 };
+
+const textParts = (texts: ReadonlyArray<string>) =>
+  texts.map((text) => Prompt.makePart("text", { text }));
+
+/** A turn's prompt as the agent's harness takes it. */
+export const userMessageOf = (texts: ReadonlyArray<string>): Prompt.UserMessage =>
+  Prompt.makeMessage("user", { content: textParts(texts) });
+
+/** A message of the conversation as the agent's harness takes it. */
+export const promptMessageOf = (message: Message): Prompt.Message =>
+  message.role === "user"
+    ? userMessageOf(message.texts)
+    : Prompt.makeMessage("assistant", { content: textParts(message.texts) });
 
 export * as TurnPrompt from "./prompt.ts";

@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { Schema, Struct } from "effect";
 import { AgentV2 } from "../agent-v2/agent.ts";
 import { GroupId } from "../group/id.ts";
 import { Identity } from "../identity/identity.ts";
@@ -49,7 +49,8 @@ export interface Retry extends Schema.Schema.Type<typeof Retry> {}
 /**
  * One harness turn of an agent in a thread: it prompts the agent with the thread's messages its
  * session has not been given, through `acceptedThroughSequence`, and posts the agent's answer.
- * What the session was given before is its saved state's to say.
+ * What the session was given before is its session log's to say, where the turn's own entries
+ * follow `logAfter`.
  */
 export const Record = Schema.Struct({
   id: Id,
@@ -65,6 +66,11 @@ export const Record = Schema.Struct({
   status: Status,
   /** The thread position the turn's input reaches: the work it accepted. */
   acceptedThroughSequence: Sequence,
+  /**
+   * Where the turn's entries begin in its participation's session log: after this position, which
+   * was the log's latest when the turn was created, or 0 for an empty log.
+   */
+  logAfter: Sequence,
   /** What the turn runs on, recorded when it starts and kept when it runs again. */
   selection: Schema.NullOr(AgentV2.Selection),
   /** The agent's reply, once the turn posted it. */
@@ -102,10 +108,10 @@ export type NotRetryableReason = typeof NotRetryableReason.Type;
 /**
  * A turn as a reader of its thread sees it, with what they may do with it now: ask it to stop,
  * while it is active and not already stopping, or retry it, once it failed or stopped and nothing
- * followed it. Both require directing its agent.
+ * followed it. Both require directing its agent. Where its log begins is for following it alone.
  */
 export const View = Schema.Struct({
-  ...Record.fields,
+  ...Struct.omit(Record.fields, ["logAfter"]),
   stoppable: Schema.Boolean,
   retryable: Schema.Boolean,
 });

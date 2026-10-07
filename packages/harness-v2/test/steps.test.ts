@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { GenerateResult } from "../src/GenerateResult.ts";
+import { messagesOfStep } from "../src/Session.ts";
 import { Step, type StreamPart, stepsOf } from "../src/StreamPart.ts";
 
 const usage = { inputTokens: { total: 10 }, outputTokens: { total: 5 } };
@@ -150,6 +151,47 @@ describe("stepsOf", () => {
       expect(decoded).toEqual(step);
     }),
   );
+});
+
+describe("messagesOfStep", () => {
+  it("records what a step wrote and the tools it called, with their results, as the model's own", () => {
+    const [step] = stepsOf(readingStep);
+
+    expect(messagesOfStep(step!)).toMatchObject([
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Reading the notes." },
+          { type: "tool-call", id: "call-read", name: "read", providerExecuted: false },
+        ],
+      },
+      {
+        role: "tool",
+        content: [
+          { type: "tool-result", id: "call-read", result: "2 and 3", providerExecuted: false },
+        ],
+      },
+    ]);
+  });
+
+  it("answers a call its step ended before as interrupted, and records nothing of an empty step", () => {
+    const [step] = stepsOf([
+      { type: "tool-call", id: "call-write", name: "write", params: { path: "sum.md" } },
+    ]);
+
+    expect(messagesOfStep(step!)[1]).toMatchObject({
+      role: "tool",
+      content: [
+        {
+          type: "tool-result",
+          id: "call-write",
+          isFailure: true,
+          result: { type: "execution-interrupted" },
+        },
+      ],
+    });
+    expect(messagesOfStep({ parts: [{ type: "text", text: "" }] })).toEqual([]);
+  });
 });
 
 describe("GenerateResult", () => {

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "cb1f4fd4-a7be-4e79-ba6d-b532558d55e0",
+  "id": "ae5ba8c1-4863-4399-a430-f13cc967be88",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -123,6 +123,12 @@
     {
       "isRlsEnabled": false,
       "name": "roles",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "session_log_entries",
       "entityType": "tables",
       "schema": "public"
     },
@@ -2200,6 +2206,97 @@
       "name": "workspace_id",
       "entityType": "columns",
       "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "participation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "position",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "recorded_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "turn_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "details",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
       "table": "session_states"
     },
     {
@@ -2216,14 +2313,27 @@
       "table": "session_states"
     },
     {
-      "type": "jsonb",
+      "type": "text",
       "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "state",
+      "name": "agent",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "session_states"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "agent_state",
       "entityType": "columns",
       "schema": "public",
       "table": "session_states"
@@ -3030,6 +3140,19 @@
       "generated": null,
       "identity": null,
       "name": "accepted_through_sequence",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "turns"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "log_after",
       "entityType": "columns",
       "schema": "public",
       "table": "turns"
@@ -4915,6 +5038,18 @@
     {
       "columns": [
         "workspace_id",
+        "participation_id",
+        "position"
+      ],
+      "nameExplicit": false,
+      "name": "session_log_entries_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "columns": [
+        "workspace_id",
         "participation_id"
       ],
       "nameExplicit": false,
@@ -5128,6 +5263,20 @@
       "entityType": "checks",
       "schema": "public",
       "table": "notifications"
+    },
+    {
+      "value": "\"position\" > 0",
+      "name": "session_log_positive_position",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "session_log_entries"
+    },
+    {
+      "value": "(\"kind\" = 'Joined') = (\"turn_id\" IS NULL)",
+      "name": "session_log_entry_turn",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "session_log_entries"
     },
     {
       "value": "\"sequence\" > 0",
