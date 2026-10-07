@@ -11,7 +11,7 @@
  * been idle for a while, or once another bridge of its id has taken its place.
  *
  * The bridge runs each turn itself, so that a turn goes on when a host's connection drops or the
- * host lets go, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
+ * host releases the session, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
  * so that a host reads them from any number: again after its connection drops, or to continue a
  * turn that another host suspended. The agent behind it needs to do neither. A turn the bridge did
  * not finish, as one it ran when it died, it continues when a host starts it again, by prompting

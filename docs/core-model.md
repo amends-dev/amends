@@ -895,7 +895,7 @@ introduces a different meaning or a useful guarantee.
 
 The harness contract defines how a session continues as well as how its turns report. A session
 starts anew, named by its id; anew with a conversation, as when an agent joins a thread already
-under way; or from the state an earlier session saved when it let go between turns, stopped, or
+under way; or from the state an earlier session saved when it was released between turns, stopped, or
 suspended a turn. The agent that saved the state resumes from its own; any other agent loads the
 conversation it records, so a session can move from one harness to another.
 
@@ -1459,7 +1459,7 @@ The cancellation flow:
 3. Distinguish the outstanding cancellation request from confirmation that execution has
    stopped or is prevented from continuing to act as that turn; do not report a completed
    cancellation merely because the request was sent.
-4. The job records the step the turn left unfinished, lets go of the session, and ends the turn
+4. The job records the step the turn left unfinished, releases the session, and ends the turn
    as cancelled, keeping what the session resumes from. The sandbox stays.
 
 Preserve the session log and the effects already produced, including filesystem changes,

@@ -490,6 +490,7 @@ describe("drafts of a step", () => {
   it("hold what each text part wrote past what readers were shown", () => {
     expect(
       TurnRunner.newDrafts(
+        "2.1",
         {
           parts: [
             { type: "reasoning", text: "Thinking." },
@@ -499,6 +500,6 @@ describe("drafts of a step", () => {
         },
         new Map([[1, 4]]),
       ),
-    ).toEqual([{ part: 1, offset: 4, text: "plan is" }]);
+    ).toEqual([{ responseId: "2.1", part: 1, offset: 4, text: "plan is" }]);
   });
 });

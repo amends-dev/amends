@@ -61,7 +61,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     status:
       unfinishedTurn === undefined ? Status.Idle() : Status.Unfinished({ turn: unfinishedTurn }),
     history: options.history,
-    lettingGo: undefined,
+    releasing: undefined,
   });
 
   /**
@@ -109,27 +109,27 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   );
 
   /**
-   * Lets go of the session with `operation`: takes hold of it, so that no turn starts and no other
-   * operation lets go of it meanwhile, asks the agent with `agentCall`, and closes the session.
+   * Releases the session with `operation`: takes hold of it, so that no turn starts and no other
+   * operation releases it meanwhile, asks the agent with `agentCall`, and closes the session.
    * Returns what the agent answered and the session as it was when it closed. When `agentCall`
    * fails, the session releases its hold and stays open.
    */
-  const letGo = Effect.fnUntraced(function* <A>(
-    operation: LetGo,
+  const releaseWith = Effect.fnUntraced(function* <A>(
+    operation: Release,
     agentCall: Effect.Effect<A, HarnessError>,
   ): Effect.fn.Return<readonly [A, State], HarnessError> {
     yield* Effect.flatten(
       Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
         const reason = refusal(current, operation);
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
-        // `destroy` also runs once the session is let go of, or while it is.
-        const holds = current.status._tag !== "Closed" && current.lettingGo === undefined;
-        return [Effect.void, holds ? { ...current, lettingGo: operation } : current];
+        // `destroy` also runs once the session is released, or while it is.
+        const holds = current.status._tag !== "Closed" && current.releasing === undefined;
+        return [Effect.void, holds ? { ...current, releasing: operation } : current];
       }),
     );
     const answer = yield* Effect.onError(agentCall, () =>
       Ref.update(state, (current) =>
-        current.lettingGo === operation ? { ...current, lettingGo: undefined } : current,
+        current.releasing === operation ? { ...current, releasing: undefined } : current,
       ),
     );
     const closed = yield* close;
@@ -139,7 +139,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   /**
    * Streams the parts of the running turn that `agentTurn` streams, with the results of the host's
    * tools it calls. A part is delivered only while the session runs the turn, so once `suspendTurn`
-   * or `stop` let go of it, the session holds every part the caller has. The stream of a turn
+   * or `stop` released it, the session holds every part the caller has. The stream of a turn
    * `stop` or `destroy` aborted ends with an error, and a stream that ends otherwise without the
    * turn's `finish` ends the turn as far as it got.
    */
@@ -158,7 +158,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       ),
       Stream.ensuring(
         Ref.update(state, (current) =>
-          current.status._tag === "Running" && current.lettingGo === undefined
+          current.status._tag === "Running" && current.releasing === undefined
             ? {
                 ...current,
                 status: Status.Idle(),
@@ -258,7 +258,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   /**
    * Streams a `tool-approval-request` for the host's tool `call`, and then `ifApproved`, or the call
    * answered as denied once `approve` refuses it. The request waits in `pendingApprovals` until the
-   * stream ends, whether `approve` answered it or the turn was let go of.
+   * stream ends, whether `approve` answered it or the turn was released.
    */
   const askThenRun = <E, R>(
     call: Response.ToolCallPartEncoded,
@@ -371,7 +371,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   const close = Ref.getAndUpdate(state, (current) => ({
     ...current,
     status: Status.Closed({ abortedTurn: wasAborted(current) }),
-    lettingGo: undefined,
+    releasing: undefined,
   }));
 
   /** What `suspendTurn`, `detach`, and `stop` return. */
@@ -476,11 +476,11 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     compact,
 
     suspendTurn: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* letGo(
+      const [agentState, { status, history }] = yield* releaseWith(
         "suspendTurn",
         agentSession.suspendTurn,
       );
-      // A turn that finished while the agent let go of it is in the conversation already.
+      // A turn that finished while the agent released it is in the conversation already.
       const unfinishedTurn =
         status._tag === "Running"
           ? { prompt: status.turn.prompt, steps: status.turn.steps, agentState }
@@ -489,7 +489,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     }),
 
     detach: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* letGo("detach", agentSession.detach);
+      const [agentState, { status, history }] = yield* releaseWith("detach", agentSession.detach);
       return savedState(
         history,
         agentState,
@@ -498,7 +498,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     }),
 
     stop: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* letGo("stop", agentSession.stop);
+      const [agentState, { status, history }] = yield* releaseWith("stop", agentSession.stop);
       return savedState(
         status._tag === "Running" ? withEndedTurn(history, status.turn) : history,
         agentState,
@@ -506,7 +506,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       );
     }),
 
-    destroy: Effect.asVoid(letGo("destroy", agentSession.destroy)),
+    destroy: Effect.asVoid(releaseWith("destroy", agentSession.destroy)),
   };
   return session;
 });
@@ -520,15 +520,15 @@ interface State {
   readonly history: Prompt.Prompt;
 
   /**
-   * The operation letting go of the session, from when it takes hold until it closes the session.
+   * The operation releasing the session, from when it takes hold until it closes the session.
    * A running turn's stream then ends without its `finish`, and the operation ends the turn itself.
    */
-  readonly lettingGo: LetGo | undefined;
+  readonly releasing: Release | undefined;
 }
 
 /**
  * Where a session is: between turns, holding a turn `suspendTurn` cut short, running a turn,
- * compacting the conversation between turns, or let go of.
+ * compacting the conversation between turns, or released.
  */
 type Status = Data.TaggedEnum<{
   Idle: {};
@@ -544,8 +544,8 @@ type Status = Data.TaggedEnum<{
 const Status = Data.taggedEnum<Status>();
 
 /** Whether `stop` or `destroy` aborted the turn a session ran, before its `finish`. */
-const wasAborted = ({ status, lettingGo }: State) =>
-  (status._tag === "Running" && (lettingGo === "stop" || lettingGo === "destroy")) ||
+const wasAborted = ({ status, releasing }: State) =>
+  (status._tag === "Running" && (releasing === "stop" || releasing === "destroy")) ||
   (status._tag === "Closed" && status.abortedTurn);
 
 /** How the stream of a turn `stop` or `destroy` aborted ends: as a turn that failed. */
@@ -586,22 +586,22 @@ const deliver = (state: State, part: StreamPart): [boolean, State] => {
   return [true, { ...state, status: Status.Running({ turn: next }) }];
 };
 
-/** The operations that let go of a session. */
-type LetGo = "suspendTurn" | "detach" | "stop" | "destroy";
+/** The operations that release a session. */
+type Release = "suspendTurn" | "detach" | "stop" | "destroy";
 
-type Operation = "stream" | "continueStream" | "approve" | "compact" | LetGo;
+type Operation = "stream" | "continueStream" | "approve" | "compact" | Release;
 
 /** Why `operation` cannot run in a session in `state`, or nothing when it can. */
 const refusal = (
-  { status, lettingGo }: State,
+  { status, releasing }: State,
   operation: Operation,
 ): HarnessErrorReason | undefined => {
-  // A session can be destroyed at any time, also once let go of, or while it is.
+  // A session can be destroyed at any time, also once released, or while it is.
   if (operation === "destroy") return undefined;
   if (status._tag === "Closed") return new SessionClosedError({});
-  if (lettingGo !== undefined) {
+  if (releasing !== undefined) {
     return new SessionClosedError({
-      description: `The session is being let go of by ${lettingGo}`,
+      description: `The session is being released by ${releasing}`,
     });
   }
   switch (operation) {

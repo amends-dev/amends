@@ -109,7 +109,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     entry,
   }));
   const endings: Array<Ending> = [];
-  const drafts: Array<TurnExecution.Draft> = [];
+  const drafts: Array<Turn.Draft> = [];
   let active = options.workWaits ?? true;
   let starts = 0;
   const end = (ending: Ending) =>
@@ -199,7 +199,7 @@ export interface ScriptedAgent {
 }
 
 /**
- * An agent in the host's process whose turns stream `script`, and whose state, which letting go of
+ * An agent in the host's process whose turns stream `script`, and whose state, which releasing
  * a session returns, counts its turns. One that `keepsTurns` has the unfinished turn a session is
  * created with, and continues it with `script`.
  */

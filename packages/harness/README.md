@@ -68,7 +68,7 @@ again from its prompt, as `hasUnfinishedTurn` says, for a caller that keeps the 
 set them aside. A turn that runs apart from the host, as one behind a bridge does, starts
 with a `turn-start` part carrying what `suspendTurn` would return as the unfinished turn's
 `agentState`, so that a caller that keeps it continues the turn the same way once the host that ran
-it is gone, as after a crash, without suspending it. `detach` lets go between turns, `stop` stops
+it is gone, as after a crash, without suspending it. `detach` releases the session between turns, `stop` stops
 the agent to start it again later, and `destroy` stops it for good.
 
 `StreamPart` holds the parts an Effect AI provider streams, in their encoded form, and four that
@@ -86,7 +86,7 @@ store a turn's steps. A failure the agent reports arrives as an `error` part; th
 An agent that works in a sandbox is reached only through a bridge there: a program that is all the
 sandbox exposes of the agent, on a port of its own, to hosts that present its token as
 `Authorization: Bearer`. It runs each turn itself, so that a turn goes on when a host's connection
-drops or the host lets go, and numbers and keeps the turn's parts, so that a host reads them from
+drops or the host releases the session, and numbers and keeps the turn's parts, so that a host reads them from
 any number: after reconnecting, or to continue a turn another host suspended. `Bridge.Rpcs` is the
 protocol, over a WebSocket.
 
@@ -133,8 +133,8 @@ hosts launched one at once.
   sent again over another, for up to 30 seconds, except a tool's result, an approval, and a request
   to compact, which the bridge must not receive twice. A turn is `StartTurn`, under an id the host
   picks, and `ReadTurn`, which reads on from the last part read. A session closes its connection
-  when it lets go, or once it has gone unused for a minute. One whose bridge cannot answer, as when
-  its sandbox is gone, lets go with the state it last gave.
+  when it releases the session, or once it has gone unused for a minute. One whose bridge cannot answer, as when
+  its sandbox is gone, releases the session with the state it last gave.
 
 opencode's adapter, in [`adapters/harness-opencode`](../../adapters/harness-opencode), is a bridge
 program, a template that installs it, and an agent whose sessions `BridgeClient.createSession`

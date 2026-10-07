@@ -9,7 +9,7 @@
  * bridge's port in `Bridge.listeningFile`, in the bridge's state directory, exposes the port, and
  * launches the bridge when none answers there.
  *
- * A session connects to its bridge while it uses it, and closes the connection when it lets go, or
+ * A session connects to its bridge while it uses it, and closes the connection when it releases the session, or
  * once it has gone unused for a minute. Each connection launches the bridge when none answers, and
  * starts the session there from the state the bridge last gave, so that a bridge that restarted,
  * as after it died or exited idle, has the session again. A connection that drops is not opened
@@ -25,7 +25,7 @@
  * keeps it continues the turn the same way once this host is gone without suspending it. A session
  * resumed with other options continues the turn in the bridge that runs it and then goes on in its
  * own; one whose turn's bridge is gone runs the turn again from its prompt in its own. A session
- * whose bridge cannot answer, as when its sandbox is gone, lets go with the state the bridge last
+ * whose bridge cannot answer, as when its sandbox is gone, releases the session with the state the bridge last
  * gave.
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox";
@@ -148,10 +148,10 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   const bridge = yield* Ref.make(saved?.unfinishedTurn?.bridge ?? own);
   /**
    * The session's state as the bridge last gave it, which a bridge that restarted starts the
-   * session again from, and which the session lets go with when the bridge cannot answer.
+   * session again from, and which the session is released with when the bridge cannot answer.
    */
   const latestState = yield* Ref.make(saved?.agentState);
-  /** Done once the session starts to let go, ending the running turn's stream. */
+  /** Done once releasing the session starts, ending the running turn's stream. */
   const closed = yield* Deferred.make<void>();
   const destroyed = yield* Ref.make(false);
   /**
@@ -193,7 +193,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
   /**
    * The connection to the bridge, open while a request or a turn's reader uses it, and for a
-   * minute after, so that a session dropped without letting go leaves none open. Opening it
+   * minute after, so that a session dropped without releasing leaves none open. Opening it
    * launches the bridge when none answers, and starts the session there. It outlives the effect
    * that starts the session, in a scope of its own that nothing closes.
    */
@@ -202,11 +202,11 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     idleTimeToLive: "1 minute",
   }).pipe(Scope.provide(yield* Scope.make()));
 
-  /** Lets go of a connection that dropped, for the next request to open another. */
+  /** Releases a connection that dropped, for the next request to open another. */
   const forgetDropped = (error: HarnessError | RpcClientError.RpcClientError) =>
     error._tag === "RpcClientError" ? RcRef.invalidate(connection) : Effect.void;
 
-  /** Sends a request over the connection, letting go of the connection if it dropped. */
+  /** Sends a request over the connection, releasing the connection if it dropped. */
   const sendOver = <A>(
     requestOf: (client: Client) => Effect.Effect<A, HarnessError | RpcClientError.RpcClientError>,
   ) =>
@@ -242,11 +242,11 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   );
 
   /**
-   * Lets go of the bridge with the session's state, as `stateOf` asks the bridge for it, closing
-   * the connection. When the bridge cannot answer, the session lets go with the state the bridge
+   * Disconnects from the bridge with the session's state, as `stateOf` asks the bridge for it, closing
+   * the connection. When the bridge cannot answer, the session is released with the state the bridge
    * last gave.
    */
-  const letGo = (
+  const disconnectWith = (
     stateOf: (
       client: Client,
     ) => Effect.Effect<Schema.Json, HarnessError | RpcClientError.RpcClientError>,
@@ -260,7 +260,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
               ? Effect.fail(error)
               : Effect.as(
                   Effect.logWarning(
-                    `${options.id} lets go of the session with the state its bridge last gave`,
+                    `${options.id} is released with the state its bridge last gave`,
                     error,
                   ),
                   latest,
@@ -292,7 +292,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   /**
    * Streams `turn` from the step after its first `finishedSteps`, until its last part. After the
    * connection drops, it reads on from the last part read. A stream that ends before the turn
-   * finishes aborts the turn, unless the session let go of it, leaving it to run in the bridge.
+   * finishes aborts the turn, unless the session released it, leaving it to run in the bridge.
    */
   const readTurn = (turn: Bridge.TurnId, finishedSteps: number) =>
     Stream.unwrap(
@@ -415,23 +415,23 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     compact: (instructions) => sendOnce((client) => client.Compact({ session, instructions })),
 
     suspendTurn: Effect.flatMap(close, (turn) =>
-      letGo((client) => client.ReadState({ session }), turn),
+      disconnectWith((client) => client.ReadState({ session }), turn),
     ),
 
     detach: Effect.andThen(
       close,
-      letGo((client) => client.ReadState({ session })),
+      disconnectWith((client) => client.ReadState({ session })),
     ),
 
     stop: Effect.andThen(
       close,
-      letGo((client) => client.StopSession({ session })),
+      disconnectWith((client) => client.StopSession({ session })),
     ),
 
     destroy: Effect.gen(function* () {
       yield* close;
       if (yield* Ref.get(destroyed)) return;
-      // A session that let go may have ended in the bridge, or the bridge with its sandbox, so the
+      // A session that was released may have ended in the bridge, or the bridge with its sandbox, so the
       // connection starts it again, from its latest state, to be destroyed.
       yield* send((client) => client.DestroySession({ session }));
       yield* Ref.set(destroyed, true);

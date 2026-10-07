@@ -319,12 +319,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       ),
       Stream.map((signal): Input =>
         Input.Drafted({
-          draft: Turn.LogMessage.cases.Drafted.make({
-            responseId: signal.responseId,
-            part: signal.part,
-            offset: signal.offset,
-            text: signal.text,
-          }),
+          draft: Turn.LogMessage.cases.Drafted.make(signal.draft),
         }),
       ),
     );

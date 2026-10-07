@@ -9,7 +9,7 @@ import { Array, Schema } from "effect";
 import { Prompt } from "effect/ai";
 
 /** A message of the thread as the agent is told it. */
-export interface Said {
+export interface Input {
   /** What the author is called, as the agent is told. */
   readonly author: string;
 
@@ -29,7 +29,7 @@ export const Message = Schema.Struct({
 export interface Message extends Schema.Schema.Type<typeof Message> {}
 
 /** One message's text as the agent is told it: named by its author. */
-const named = (said: Said) => `${said.author}: ${said.text}`;
+const named = (input: Input) => `${input.author}: ${input.text}`;
 
 /**
  * A turn's prompt, as its texts: the thread's messages it takes in, but the agent's own, which it
@@ -37,11 +37,11 @@ const named = (said: Said) => `${said.author}: ${said.text}`;
  * has nothing to say.
  */
 export const promptOf = (
-  messages: ReadonlyArray<Said>,
+  messages: ReadonlyArray<Input>,
   retriedBy: string | undefined,
 ): Array.NonEmptyReadonlyArray<string> | undefined => {
   const texts = [
-    ...messages.filter((said) => !said.own).map(named),
+    ...messages.filter((input) => !input.own).map(named),
     ...(retriedBy === undefined ? [] : [`${retriedBy} asked you to try that again.`]),
   ];
   return Array.isReadonlyArrayNonEmpty(texts) ? texts : undefined;
@@ -53,22 +53,22 @@ export const promptOf = (
  * part, as its answers. Consecutive messages of one side make one message, as models take a
  * conversation whose sides alternate.
  */
-export const conversationOf = (messages: ReadonlyArray<Said>): ReadonlyArray<Message> => {
+export const conversationOf = (messages: ReadonlyArray<Input>): ReadonlyArray<Message> => {
   const conversation: Array<Message> = [];
-  let run: Array<Said> = [];
+  let run: Array<Input> = [];
   const endRun = () => {
     const [first, ...rest] = run;
     if (first === undefined) return;
     conversation.push(
       first.own
-        ? { role: "assistant", texts: [first.text, ...rest.map((said) => said.text)] }
+        ? { role: "assistant", texts: [first.text, ...rest.map((input) => input.text)] }
         : { role: "user", texts: [named(first), ...rest.map(named)] },
     );
     run = [];
   };
-  for (const said of messages) {
-    if (run[0] !== undefined && run[0].own !== said.own) endRun();
-    run.push(said);
+  for (const input of messages) {
+    if (run[0] !== undefined && run[0].own !== input.own) endRun();
+    run.push(input);
   }
   endRun();
   return conversation;

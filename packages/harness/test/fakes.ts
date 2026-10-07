@@ -55,8 +55,8 @@ export interface FakeAgentOptions {
   readonly losesUnfinishedTurns?: boolean;
 
   /**
-   * Runs when the session suspends, detaches, stops, or is destroyed, before the agent lets go.
-   * When it fails, so does the agent, letting go of nothing.
+   * Runs when the session suspends, detaches, stops, or is destroyed, before the agent releases the session.
+   * When it fails, so does the agent, releasing nothing.
    */
   readonly beforeLettingGo?: Effect.Effect<void, HarnessError>;
 
@@ -138,7 +138,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
 /**
  * Reads `turn` in the background, returning the fiber that collects its parts once the reader has
  * the part `reached` accepts. The session delivers a part the agent sent only when it is read, so a
- * test that lets go of a turn after a part waits for the reader, not the agent.
+ * test that releases a turn after a part waits for the reader, not the agent.
  */
 export const readUntil = <E, R>(
   turn: Stream.Stream<StreamPart, E, R>,

@@ -118,6 +118,20 @@ export const View = Schema.Struct({
 export interface View extends Schema.Schema.Type<typeof View> {}
 
 /**
+ * More of a response a turn is writing, before it completes: `text` continues the response's part
+ * at `offset` characters. The turn's job shows drafts to those following the turn's log, and the
+ * completed response in the log replaces them.
+ */
+export const Draft = Schema.Struct({
+  responseId: Schema.NonEmptyString,
+  /** The part's position among the step's parts, as the session log records the step. */
+  part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  text: Schema.String,
+});
+export interface Draft extends Schema.Schema.Type<typeof Draft> {}
+
+/**
  * One entry of a turn's log as its thread's readers see it: the facts of its work, never private
  * reasoning. The agent was prompted with the thread's messages; a step of the turn wrote text,
  * verbatim, and is the reply when it answered the prompt rather than calling tools; or the turn's
@@ -159,12 +173,7 @@ export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
 export const LogMessage = Schema.TaggedUnion({
   Opened: { items: Schema.Array(LogItem) },
   Changed: { changes: Schema.Array(LogChange) },
-  Drafted: {
-    responseId: Schema.NonEmptyString,
-    part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    text: Schema.String,
-  },
+  Drafted: Draft.fields,
   Ended: {},
 }).annotate({ identifier: "TurnLogMessage" });
 export type LogMessage = typeof LogMessage.Type;

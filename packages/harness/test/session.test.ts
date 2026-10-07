@@ -297,7 +297,7 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("destroys a session already let go of, and again after it is destroyed", () =>
+  it.effect("destroys a session already released, and again after it is destroyed", () =>
     Effect.gen(function* () {
       const { session } = yield* createSession(answers);
       yield* session.detach;
@@ -325,7 +325,7 @@ describe("Session", () => {
               ),
               Stream.fromIterable(reply("Done")),
             ),
-          // The turn finishes while the agent lets go of it.
+          // The turn finishes while the agent releases it.
           {
             beforeLettingGo: Effect.andThen(
               Deferred.succeed(answering, undefined),
@@ -694,7 +694,7 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("starts no turn while it lets go", () =>
+  it.effect("starts no turn while it releases the session", () =>
     Effect.gen(function* () {
       const lettingGo = yield* Deferred.make<void>();
       const letGo = yield* Deferred.make<void>();
@@ -717,28 +717,30 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("stays open when the agent fails to let go, so that it can be tried again", () =>
-    Effect.gen(function* () {
-      const attempts = yield* Ref.make(0);
-      const unavailable = new HarnessError({ agent: "codex", reason: new UnavailableError({}) });
-      const { session } = yield* createSession(answers, {
-        beforeLettingGo: Effect.flatMap(
-          Ref.getAndUpdate(attempts, (n) => n + 1),
-          (attempt) => (attempt === 0 ? Effect.fail(unavailable) : Effect.void),
-        ),
-      });
+  it.effect(
+    "stays open when the agent fails to release the session, so that it can be tried again",
+    () =>
+      Effect.gen(function* () {
+        const attempts = yield* Ref.make(0);
+        const unavailable = new HarnessError({ agent: "codex", reason: new UnavailableError({}) });
+        const { session } = yield* createSession(answers, {
+          beforeLettingGo: Effect.flatMap(
+            Ref.getAndUpdate(attempts, (n) => n + 1),
+            (attempt) => (attempt === 0 ? Effect.fail(unavailable) : Effect.void),
+          ),
+        });
 
-      const failed = yield* Effect.flip(session.stop);
-      const result = yield* session.generate({ prompt: "hello" });
-      const state = yield* session.stop;
+        const failed = yield* Effect.flip(session.stop);
+        const result = yield* session.generate({ prompt: "hello" });
+        const state = yield* session.stop;
 
-      expect(failed.reason._tag).toBe("UnavailableError");
-      expect(result.text).toBe("codex answers hello");
-      expect(state.history.content).toMatchObject([
-        { role: "user", content: [{ type: "text", text: "hello" }] },
-        { role: "assistant", content: [{ type: "text", text: "codex answers hello" }] },
-      ]);
-    }),
+        expect(failed.reason._tag).toBe("UnavailableError");
+        expect(result.text).toBe("codex answers hello");
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "hello" }] },
+          { role: "assistant", content: [{ type: "text", text: "codex answers hello" }] },
+        ]);
+      }),
   );
 
   it.effect("refuses to detach while a turn runs", () =>

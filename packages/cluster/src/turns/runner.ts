@@ -38,24 +38,20 @@ export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
   readonly cause: unknown;
 }> {}
 
-/** More of a text part of a step: `text` continues the part at `offset`. */
-export interface Draft {
-  /** The part's position among the step's parts, as the session log records the step. */
-  readonly part: number;
-  readonly offset: number;
-  readonly text: string;
-}
-
-/** The text each text part of `step` has past what `shown` holds, by the part's position. */
+/**
+ * The drafts of the response `responseId`: the text each text part of `step` has past what
+ * `shown` holds, by the part's position.
+ */
 export const newDrafts = (
+  responseId: string,
   step: StreamPart.Step,
   shown: ReadonlyMap<number, number>,
-): ReadonlyArray<Draft> =>
+): ReadonlyArray<Turn.Draft> =>
   step.parts.flatMap((part, index) => {
     if (part.type !== "text") return [];
     const offset = shown.get(index) ?? 0;
     return part.text.length > offset
-      ? [{ part: index, offset, text: part.text.slice(offset) }]
+      ? [{ responseId, part: index, offset, text: part.text.slice(offset) }]
       : [];
   });
 
@@ -67,8 +63,8 @@ export const describeError = (error: unknown): string => {
   return "The agent reported that the turn failed.";
 };
 
-/** What a session it let go of resumes from, as the workspace keeps it. */
-const resumeOf = (state: Session.SessionState): SessionStateStore.Resume =>
+/** What a session the run released resumes from, as the workspace keeps it. */
+const savedOf = (state: Session.SessionState): SessionStateStore.Resume =>
   state.agentState === undefined
     ? { agent: state.agent }
     : { agent: state.agent, agentState: state.agentState };
@@ -117,17 +113,14 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
       const [step] = StreamPart.stepsOf(progress.stepParts);
       progress.shownAt = yield* Clock.currentTimeMillis;
       if (step === undefined) return;
-      const drafts = newDrafts(step, progress.shown);
+      const drafts = newDrafts(stepId(progress.steps), step, progress.shown);
       for (const { part, offset, text } of drafts) progress.shown.set(part, offset + text.length);
       if (drafts.length === 0) return;
       // Drafts are best effort: the step's log entry shows what a missed one held.
       yield* execute((turnExecution) =>
-        Effect.forEach(
-          drafts,
-          (draft) =>
-            turnExecution.showDraft(turnId, { responseId: stepId(progress.steps), ...draft }),
-          { discard: true },
-        ),
+        Effect.forEach(drafts, (draft) => turnExecution.showDraft(turnId, draft), {
+          discard: true,
+        }),
       ).pipe(
         Effect.catchCauseIf(
           (cause) => !Cause.hasInterruptsOnly(cause),
@@ -135,7 +128,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
         ),
       );
     });
-    const takePart = Effect.fnUntraced(function* (part: StreamPart.StreamPart) {
+    const recordPart = Effect.fnUntraced(function* (part: StreamPart.StreamPart) {
       // An agent whose turn runs apart from the run announces one it starts from its prompt; any
       // other starts it with its first part.
       if (part.type === "turn-start" || !progress.started) {
@@ -170,7 +163,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
             ...turnOptions,
           })
         : session.continueStream(turnOptions);
-    yield* Stream.runForEach(turn, takePart);
+    yield* Stream.runForEach(turn, recordPart);
     return progress.reported === undefined
       ? Outcome.Answered()
       : Outcome.Failed({ reason: describeError(progress.reported) });
@@ -178,7 +171,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
 
   /**
    * Start the turn and run it: open its session log, run the agent until the turn ends or is
-   * asked to stop, log the step it left unfinished, let go of the session, and end the turn.
+   * asked to stop, log the step it left unfinished, release the session, and end the turn.
    */
   const runTurn = Effect.fnUntraced(function* (turnId: Turn.Id, stop: Deferred.Deferred<void>) {
     const started = yield* execute((turnExecution) => turnExecution.start(turnId));
@@ -202,7 +195,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
           yield* writer.append([
             { _tag: "Step", turnId, id: `${writer.openedAt}.${progress.steps}`, step: unfinished },
           ]);
-        return { outcome, resume: yield* letGo(progress) };
+        return { outcome, resume: yield* detachSession(progress) };
       }),
     );
     yield* execute((turnExecution) =>
@@ -265,16 +258,16 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
 });
 
 /**
- * What a session the run started resumes from once the run lets go of it: what its agent returned,
- * or, when letting go failed, the agent alone, which then starts from the conversation the log
+ * What a session the run started resumes from once the run releases it: what its agent returned,
+ * or, when releasing failed, the agent alone, which then starts from the conversation the log
  * records. None when the run started no session.
  */
-const letGo = (progress: Progress) => {
+const detachSession = (progress: Progress) => {
   const started = progress.session;
   if (started === undefined) return Effect.undefined;
   return started.session.detach.pipe(
-    Effect.map(resumeOf),
-    Effect.tapError((error) => Effect.logWarning("A turn's session was not let go of", error)),
+    Effect.map(savedOf),
+    Effect.tapError((error) => Effect.logWarning("A turn's session was not released", error)),
     Effect.orElseSucceed((): SessionStateStore.Resume => ({ agent: started.agent })),
   );
 };

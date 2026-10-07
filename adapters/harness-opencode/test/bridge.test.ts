@@ -470,17 +470,19 @@ describe("BridgeClient", () => {
       }).pipe(Effect.provide(TestLayer)),
     );
 
-    it.live("lets go with the state its bridge last gave when its sandbox is gone", () =>
-      Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.createSession({ sandbox, id });
-        yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
+    it.live(
+      "releases the session with the state its bridge last gave when its sandbox is gone",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeSetup;
+          const session = yield* harness.createSession({ sandbox, id });
+          yield* Stream.runDrain(session.stream({ prompt: "reply first" }));
 
-        yield* sandbox.destroy;
-        const state = yield* session.detach;
+          yield* sandbox.destroy;
+          const state = yield* session.detach;
 
-        expect(state.agentState).toEqual({ agentState: { turns: 1 } });
-      }).pipe(Effect.provide(TestLayer)),
+          expect(state.agentState).toEqual({ agentState: { turns: 1 } });
+        }).pipe(Effect.provide(TestLayer)),
     );
 
     it.live("destroys a session it stopped, starting it again in the bridge to do so", () =>

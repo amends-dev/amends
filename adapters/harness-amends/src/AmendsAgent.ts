@@ -151,7 +151,7 @@ const createSession = Effect.fn("AmendsAgent.createSession")(function* (
   const turn = yield* Ref.make<Turn | undefined>(undefined);
   /** Held while a turn runs, so that `suspendTurn` and `stop` read the turn once it has stopped. */
   const turnPermit = yield* Semaphore.make(1);
-  /** Whether `suspendTurn` let go of the session, keeping the running turn for `continueTurn`. */
+  /** Whether `suspendTurn` released the session, keeping the running turn for `continueTurn`. */
   const keepsTurn = yield* Ref.make(false);
   /** Done once the session is suspended, stopped, or destroyed, stopping the running turn. */
   const closed = yield* Deferred.make<void>();

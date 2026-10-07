@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
 import { TurnPrompt } from "../../src/turn/prompt.ts";
 
-const ada = (text: string): TurnPrompt.Said => ({ author: "Ada", own: false, text });
-const kai = (text: string): TurnPrompt.Said => ({ author: "Kai", own: false, text });
-const agent = (text: string): TurnPrompt.Said => ({ author: "Reviewer", own: true, text });
+const ada = (text: string): TurnPrompt.Input => ({ author: "Ada", own: false, text });
+const kai = (text: string): TurnPrompt.Input => ({ author: "Kai", own: false, text });
+const agent = (text: string): TurnPrompt.Input => ({ author: "Reviewer", own: true, text });
 
 describe("a turn's prompt", () => {
   it("names each message by its author, leaving out the agent's own", () => {

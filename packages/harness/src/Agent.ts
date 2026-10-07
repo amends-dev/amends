@@ -153,7 +153,7 @@ export interface AgentSession {
   readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
-   * Lets go of the session between turns while the agent keeps running, returning what
+   * Releases the session between turns while the agent keeps running, returning what
    * `createSession` takes as `agentState`.
    */
   readonly detach: Effect.Effect<Schema.Json, HarnessError>;
@@ -166,7 +166,7 @@ export interface AgentSession {
 
   /**
    * Stops the agent for good, deleting what it keeps of the session. It also destroys a session
-   * `suspendTurn`, `detach`, or `stop` let go of, and destroying it again succeeds.
+   * `suspendTurn`, `detach`, or `stop` released, and destroying it again succeeds.
    */
   readonly destroy: Effect.Effect<void, HarnessError>;
 }

@@ -8,7 +8,7 @@
  * resume the session from it on any agent: the agent that last ran it resumes from its own state,
  * and any other loads the conversation, and runs an unfinished turn again from its prompt.
  *
- * `suspendTurn`, `detach`, `stop`, and `destroy` let go of the session. Each takes hold of it
+ * `suspendTurn`, `detach`, `stop`, and `destroy` release the session. Each takes hold of it
  * before it asks the agent, so that no turn starts meanwhile, and one that fails leaves the session
  * open, to be tried again.
  */
@@ -188,7 +188,7 @@ export interface Session {
    */
   readonly suspendTurn: Effect.Effect<SessionState, HarnessError>;
 
-  /** Lets go of the session between turns while the agent keeps running. */
+  /** Releases the session between turns while the agent keeps running. */
   readonly detach: Effect.Effect<SessionState, HarnessError>;
 
   /**
@@ -198,7 +198,7 @@ export interface Session {
   readonly stop: Effect.Effect<SessionState, HarnessError>;
 
   /**
-   * Stops the agent for good, aborting a running turn. It also destroys a session already let go
+   * Stops the agent for good, aborting a running turn. It also destroys a session already released
    * of, and destroying it again succeeds.
    */
   readonly destroy: Effect.Effect<void, HarnessError>;
@@ -249,15 +249,15 @@ export const conversationAfter = (
  * models refuse a conversation with a call no result answers.
  */
 const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> => {
-  const said: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
+  const assistantParts: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
   const results: Array<Prompt.ToolResultPart> = [];
   for (const part of parts) {
     switch (part.type) {
       case "text":
-        if (part.text !== "") said.push(Prompt.makePart("text", { text: part.text }));
+        if (part.text !== "") assistantParts.push(Prompt.makePart("text", { text: part.text }));
         break;
       case "tool-call":
-        said.push(
+        assistantParts.push(
           Prompt.makePart("tool-call", {
             id: part.id,
             name: part.name,
@@ -280,13 +280,15 @@ const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> =>
     }
   }
   const answered = new Set(results.map((result) => result.id));
-  for (const part of said) {
+  for (const part of assistantParts) {
     if (part.type === "tool-call" && !answered.has(part.id)) {
       results.push(interruptedResultOf(part));
     }
   }
   return [
-    ...(said.length === 0 ? [] : [Prompt.makeMessage("assistant", { content: said })]),
+    ...(assistantParts.length === 0
+      ? []
+      : [Prompt.makeMessage("assistant", { content: assistantParts })]),
     ...(results.length === 0 ? [] : [Prompt.makeMessage("tool", { content: results })]),
   ];
 };

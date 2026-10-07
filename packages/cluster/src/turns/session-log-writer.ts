@@ -61,7 +61,7 @@ export const openingOf = (
       prompt: prompted.texts,
       resumeFrom:
         unfinishedTurnOf(entries, turnId, prompted.texts, id, history) ??
-        resumedOf(ready, id, history),
+        sessionStateOf(ready, id, history),
     };
   }
   const joining: ReadonlyArray<SessionLog.Entry> =
@@ -76,12 +76,12 @@ export const openingOf = (
     }),
     history,
     prompt: ready.prompt,
-    resumeFrom: resumedOf(ready, id, history),
+    resumeFrom: sessionStateOf(ready, id, history),
   };
 };
 
 /** The session as the participation's last turn left it, or none for one that starts anew. */
-const resumedOf = (
+const sessionStateOf = (
   ready: Ready,
   id: Agent.SessionId,
   history: Prompt.Prompt,

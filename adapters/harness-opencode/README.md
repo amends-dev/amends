@@ -93,7 +93,7 @@ opencode, and destroying a session deletes it there.
 program launched by `BridgeClient`, with `test/fake-opencode-server.js` standing in for
 `opencode serve`. `test/bridge.test.ts` has `BridgeClient` launch `test/fake-bridge.ts`, a bridge
 over a stand-in driver, in a local sandbox, and reach it over a WebSocket: launching, reconnecting,
-launching it again after it dies, continuing a turn it lost then, letting go when the sandbox is
+launching it again after it dies, continuing a turn it lost then, releasing the session when the sandbox is
 gone, refusing a wrong token, and continuing on another host. `test/template.test.ts` runs the template
 with its commands answered as a sandbox would answer them. `test/live.test.ts`, and the template's
 live test, which installs Bun and opencode in a temporary home, run only with

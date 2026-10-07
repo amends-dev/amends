@@ -96,7 +96,7 @@ append of the session log, through `inWorkspace`. `runNextTurn` runs one turn at
    what a text part added since the last at its offset: at once, then at most every 100
    milliseconds, and when the text ends. Drafts are best effort, and the step's entry in the log
    replaces them.
-7. End the turn: log the step it left unfinished, let go of the session (`detach`), and `close` it
+7. End the turn: log the step it left unfinished, release the session (`detach`), and `close` it
    with its answer (`SessionLog.answerOf`), `fail` it, when the agent reported a failure or its
    harness, model, connection, or sandbox failed, or `confirmStopped`, each keeping what the session
    resumes from.

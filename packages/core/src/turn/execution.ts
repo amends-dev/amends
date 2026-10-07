@@ -109,15 +109,6 @@ export const Closing = Schema.TaggedUnion({
 });
 export type Closing = typeof Closing.Type;
 
-/** More of a step a turn is writing: `text` continues the response's part at `offset`. */
-export const Draft = Schema.Struct({
-  responseId: Schema.String,
-  part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-  text: Schema.String,
-});
-export interface Draft extends Schema.Schema.Type<typeof Draft> {}
-
 /**
  * What a turn's job asks of the workspace: commands and queries over data, which a job could call
  * from elsewhere. It accepts the agent's work into a turn, starts it with what the agent runs on and
@@ -153,7 +144,7 @@ export interface Interface {
    * and a turn no longer running shows nothing. A reader who starts following midway sees the step
    * from the next draft that starts at its beginning.
    */
-  readonly showDraft: (turnId: Turn.Id, draft: Draft) => Effect.Effect<void, Error>;
+  readonly showDraft: (turnId: Turn.Id, draft: Turn.Draft) => Effect.Effect<void, Error>;
   /**
    * Close a turn whose harness turn finished: post `reply`, the text of its last step, as the
    * agent's message to the thread's current participants, keep what its session resumes from, and
@@ -329,7 +320,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   });
 
   /** The thread's messages in a range, as the agent `memberId` is told them. */
-  const readSaid = Effect.fnUntraced(function* (
+  const readInputs = Effect.fnUntraced(function* (
     memberId: Member.Id,
     threadId: ThreadId.Id,
     range: { readonly after: number; readonly through: number },
@@ -340,7 +331,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         ThreadMessage.Author.isAnyOf(["Member"])(author) ? [author.memberId] : [],
       ),
     );
-    return messages.map(({ author, text }): TurnPrompt.Said =>
+    return messages.map(({ author, text }): TurnPrompt.Input =>
       ThreadMessage.Author.isAnyOf(["Member"])(author)
         ? { author: nameOf(author.memberId), own: author.memberId === memberId, text }
         : { author: "A contact", own: false, text },
@@ -466,7 +457,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   ) {
     const participation = yield* requireParticipation(turn);
     const saved = yield* sessionStateStore.get(turn.participationId);
-    const said = yield* readSaid(turn.memberId, turn.threadId, {
+    const inputs = yield* readInputs(turn.memberId, turn.threadId, {
       after: Option.match(saved, {
         onNone: () => participation.joinedAtSequence - 1,
         onSome: ({ promptedThroughSequence }) => promptedThroughSequence,
@@ -475,14 +466,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     });
     const retriedBy =
       turn.retry === null ? undefined : (yield* readNames([turn.retry.by]))(turn.retry.by);
-    const prompt = TurnPrompt.promptOf(said, retriedBy);
+    const prompt = TurnPrompt.promptOf(inputs, retriedBy);
     // Nothing to say, as when what the turn accepted was all the agent's own.
     if (prompt === undefined)
       return yield* endAsIdle(turn, { outcome: "completed", messageIds: [] });
     const ready = {
       runnable,
       prompt,
-      messages: said.filter(({ own }) => !own).length,
+      messages: inputs.filter(({ own }) => !own).length,
       resume: Option.match(saved, {
         onNone: () => null,
         onSome: ({ agent, agentState }): SessionStateStore.Resume =>
@@ -559,7 +550,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     const turn = yield* requireTurn(turnId);
     const participation = yield* requireParticipation(turn);
     return TurnPrompt.conversationOf(
-      yield* readSaid(turn.memberId, turn.threadId, {
+      yield* readInputs(turn.memberId, turn.threadId, {
         after: 0,
         through: participation.joinedAtSequence - 1,
       }),
@@ -569,17 +560,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const showDraft: Interface["showDraft"] = Effect.fn("TurnExecution.showDraft")(
     function* (turnId, draft) {
       const turn = yield* requireTurn(turnId);
-      if (turn.status !== "running" || draft.text === "" || draft.responseId === "") return;
+      if (turn.status !== "running" || draft.text === "") return;
       yield* signalHub.publish({
         _tag: "TurnDraft",
         workspaceId,
         groupId: turn.groupId,
         threadId: turn.threadId,
         turnId: turn.id,
-        responseId: draft.responseId,
-        part: draft.part,
-        offset: draft.offset,
-        text: draft.text,
+        draft,
       });
     },
   );
