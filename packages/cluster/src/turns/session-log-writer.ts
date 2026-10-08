@@ -7,7 +7,7 @@
 import { SessionLog, SessionLogStore, Turn, TurnExecution } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";
 import { Agent, type Session } from "@amends/harness";
-import { Array, Effect, Option, Schema } from "effect";
+import { Array, Effect, Option, Ref, Schema } from "effect";
 import type { Prompt } from "effect/ai";
 import { inWorkspace } from "./workspace.ts";
 
@@ -136,6 +136,12 @@ const readLog = Effect.fnUntraced(function* (participationId: Turn.Record["parti
   }
 });
 
+/** Where a run's last entry sits in the log, and what the run wrote so far. */
+interface Written {
+  readonly head: number;
+  readonly entries: ReadonlyArray<SessionLog.Entry>;
+}
+
 /**
  * Open the participation's log for a run of `ready`: read it, write the run's opening, and
  * return what the run starts from, where its opening sits in the log, `append`, which writes more
@@ -147,7 +153,7 @@ export const open = Effect.fn("SessionLogWriter.open")(function* (
   workspaceId: Workspace.Id,
   ready: Ready,
 ) {
-  const participationId = ready.turn.participationId;
+  const { participationId, id: turnId } = ready.turn;
   const recorded = yield* inWorkspace(workspaceId, readLog(participationId));
   const entries = recorded.map(({ entry }) => entry);
   const joined =
@@ -155,13 +161,13 @@ export const open = Effect.fn("SessionLogWriter.open")(function* (
       ? yield* inWorkspace(
           workspaceId,
           Effect.flatMap(TurnExecution.Service, (turnExecution) =>
-            turnExecution.joinedConversation(ready.turn.id),
+            turnExecution.joinedConversation(turnId),
           ),
         )
       : [];
-  let head = recorded.at(-1)?.position ?? 0;
-  const written: Array<SessionLog.Entry> = [];
+  const written = yield* Ref.make<Written>({ head: recorded.at(-1)?.position ?? 0, entries: [] });
   const append = Effect.fnUntraced(function* (more: Array.NonEmptyReadonlyArray<SessionLog.Entry>) {
+    const { head } = yield* Ref.get(written);
     const appended = yield* inWorkspace(
       workspaceId,
       Effect.flatMap(SessionLogStore.Service, (sessionLogStore) =>
@@ -171,18 +177,22 @@ export const open = Effect.fn("SessionLogWriter.open")(function* (
         ),
       ),
     );
-    if (Option.isNone(appended)) return yield* new Superseded({ turnId: ready.turn.id });
-    head = appended.value.at(-1)?.position ?? head;
-    written.push(...more);
+    if (Option.isNone(appended)) return yield* new Superseded({ turnId });
+    yield* Ref.update(written, (before) => ({
+      head: appended.value.at(-1)?.position ?? before.head,
+      entries: [...before.entries, ...more],
+    }));
   }, Effect.uninterruptible);
   const opening = openingOf(entries, ready, joined);
   yield* append(opening.entries);
-  const ofTurn = SessionLog.isOfTurn(ready.turn.id);
+  const { head: openedAt } = yield* Ref.get(written);
+  const read = entries.filter(SessionLog.isOfTurn(turnId));
   return {
     opening,
-    openedAt: head,
+    openedAt,
     append,
-    turnEntries: (): ReadonlyArray<SessionLog.Entry> => [...entries.filter(ofTurn), ...written],
+    /** The turn's entries: those read and those the run wrote so far, oldest first. */
+    turnEntries: Effect.map(Ref.get(written), ({ entries }) => [...read, ...entries]),
   };
 });
 

@@ -1,12 +1,20 @@
 /**
- * The agent a turn runs, built from the connections core gives as `AgentQuery.Runnable` with the
- * integrations the host installs: its harness, on its model, and the sandbox its session works in,
- * if it has one.
+ * Starting the session of the agent a turn runs, built from the connections core gives as
+ * `AgentQuery.Runnable` with the integrations the host installs: its harness, on its model, and
+ * the sandbox the session works in, if the agent has one.
  */
 import { Integrations } from "@amends/connection";
 import type { AgentQuery } from "@amends/core/agent";
+import type { Agent, Session } from "@amends/harness";
 import { Sandbox } from "@amends/sandbox";
 import { Effect } from "effect";
+import type { SessionLogWriter } from "./session-log-writer.ts";
+
+/** The session a turn's agent started, and the agent, which what the session resumes from names. */
+export interface Started {
+  readonly session: Session.Session;
+  readonly agent: string;
+}
 
 /** A connection's key, as its integration takes it. */
 const credentialOf = (access: AgentQuery.Access) => access.credential ?? undefined;
@@ -14,46 +22,65 @@ const credentialOf = (access: AgentQuery.Access) => access.credential ?? undefin
 // TODO: Stop a session's sandbox once its agent has been idle there for a while, and destroy it
 // once the participation ends; sandboxes are left running between turns.
 /**
- * Build the agent's harness on its model, and resume the sandbox named for the session, or create
- * it from the harness's template when it does not exist yet, for the scope.
+ * Start the session `sessionId` of the agent `runnable` describes, from what `opening` says it
+ * starts from: build the agent's harness on its model, resume the sandbox named for the session
+ * when the agent has one, and create the session, anew with the conversation so far or from what
+ * an earlier one left.
  */
-export const open = Effect.fn("TurnAgent.open")(function* (
+export const startSession = Effect.fn("TurnAgent.startSession")(function* (
   runnable: AgentQuery.Runnable,
-  sessionId: string,
+  sessionId: Agent.SessionId,
+  opening: SessionLogWriter.Opening,
 ) {
   const integrations = yield* Integrations.Integrations;
   const { model } = runnable;
-  const endpoint = yield* Effect.flatMap(
-    integrations.find(model.connection.integration),
-    (integration) =>
-      integration.modelEndpoint(model.connection, credentialOf(model), {
-        model: model.model.id,
-        ...(model.model.effort === undefined ? {} : { effort: model.model.effort }),
-      }),
+  const modelIntegration = yield* integrations.find(model.connection.integration);
+  const endpoint = yield* modelIntegration.modelEndpoint(model.connection, credentialOf(model), {
+    model: model.model.id,
+    ...(model.model.effort === undefined ? {} : { effort: model.model.effort }),
+  });
+  const harnessIntegration = yield* integrations.find(runnable.harness.connection.integration);
+  const harness = yield* harnessIntegration.harness(
+    runnable.harness.connection,
+    credentialOf(runnable.harness),
+    { model: endpoint },
   );
-  const harness = yield* Effect.flatMap(
-    integrations.find(runnable.harness.connection.integration),
-    (integration) =>
-      integration.harness(runnable.harness.connection, credentialOf(runnable.harness), {
-        model: endpoint,
-      }),
-  );
-  if (runnable.sandbox === null) return { harness, sandbox: undefined };
-  const access = runnable.sandbox;
-  const sandboxProvider = yield* Effect.flatMap(
-    integrations.find(access.connection.integration),
-    (integration) => integration.sandboxProvider(access.connection, credentialOf(access)),
+  const sandbox =
+    runnable.sandbox === null
+      ? undefined
+      : yield* resumeSandbox(runnable.sandbox, sessionId, harness.agent.template);
+  const { history, resumeFrom } = opening;
+  const session = yield* harness.createSession({
+    ...(sandbox === undefined ? {} : { sandbox }),
+    ...(resumeFrom === undefined ? { id: sessionId, history } : { resumeFrom }),
+  });
+  const started: Started = { session, agent: harness.agent.id };
+  return started;
+});
+
+/**
+ * The sandbox named for the session, which `access` reaches: resumed, or created from `template`
+ * when it does not exist yet, for the scope.
+ */
+const resumeSandbox = Effect.fnUntraced(function* (
+  access: AgentQuery.Access,
+  sessionId: Agent.SessionId,
+  template: Agent.Agent["template"],
+) {
+  const integrations = yield* Integrations.Integrations;
+  const sandboxIntegration = yield* integrations.find(access.connection.integration);
+  const sandboxProvider = yield* sandboxIntegration.sandboxProvider(
+    access.connection,
+    credentialOf(access),
   );
   const id = Sandbox.SandboxId.make(sessionId);
-  const sandbox = yield* sandboxProvider.resume(id).pipe(
-    Effect.catchReason("SandboxError", "NotFoundError", () =>
-      sandboxProvider.create({
-        id,
-        ...(harness.agent.template === undefined ? {} : { template: harness.agent.template }),
-      }),
-    ),
-  );
-  return { harness, sandbox };
+  return yield* sandboxProvider
+    .resume(id)
+    .pipe(
+      Effect.catchReason("SandboxError", "NotFoundError", () =>
+        sandboxProvider.create({ id, ...(template === undefined ? {} : { template }) }),
+      ),
+    );
 });
 
 export * as TurnAgent from "./agent.ts";

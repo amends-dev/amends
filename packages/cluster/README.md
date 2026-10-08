@@ -12,7 +12,7 @@ actor does. The [local host](../../hosts/local/README.md) runs them.
 | `jobs/turn-job.ts`            | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
 | `turns/runner.ts`             | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
 | `turns/session-log-writer.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                   |
-| `turns/agent.ts`              | `TurnAgent`: the agent's harness and sandbox, built from what core gives with the host's integrations.                      |
+| `turns/agent.ts`              | `TurnAgent`: starting the session of the agent a turn runs, built from what core gives with the host's integrations.        |
 | `turns/workspace.ts`          | `inWorkspace`, through which a run calls the workspace.                                                                     |
 | `jobs/pruning.ts`             | `JobPruning`, the hourly job that removes handled requests.                                                                 |
 
@@ -80,12 +80,12 @@ append of the session log, through `inWorkspace`. `runNextTurn` runs one turn at
    from: the turn as the agent that last started it keeps it, when that run's `Started` carries
    what continues the turn, with the steps the log has since, or else what the participation's
    last turn left.
-4. Build the agent (`TurnAgent.open`): the model's endpoint and the harness, from their connections'
-   integrations with their keys, and, for an agent with a sandbox, the sandbox named for the
-   participation, resumed, or created from the harness's template when it does not exist yet.
-5. Start the session, named for the participation: anew, or from what the opening says, with the
-   conversation either way.
-6. Stream the turn with the agent's instructions: a turn the agent kept continues after the steps
+4. Start the agent's session (`TurnAgent.startSession`), named for the participation: build the
+   model's endpoint and the harness, from their connections' integrations with their keys, resume
+   the sandbox named for the participation for an agent with one, or create it from the harness's
+   template when it does not exist yet, and create the session, anew, or from what the opening
+   says, with the conversation either way.
+5. Stream the turn with the agent's instructions: a turn the agent kept continues after the steps
    the log has (`continueStream`), and any other starts from its prompt. What the run does with
    each part is one decision, `advance`: from the run's progress so far and the part, the entries
    to append to the log, the drafts to show, and the progress after it, which the loop keeps for
@@ -97,7 +97,7 @@ append of the session log, through `inWorkspace`. `runNextTurn` runs one turn at
    100 milliseconds, and when the text ends. Drafts are best effort, and the step's entry in the
    log replaces them. Recording a part is never cut short: a run stopped meanwhile stops between
    parts, so the progress kept matches the log.
-7. End the turn: log the step it left unfinished, release the session (`detach`), and `close` it
+6. End the turn: log the step it left unfinished, release the session (`detach`), and `close` it
    with its answer (`SessionLog.answerOf`), `fail` it, when the agent reported a failure or its
    harness, model, connection, or sandbox failed, or `confirmStopped`, each keeping what the session
    resumes from.

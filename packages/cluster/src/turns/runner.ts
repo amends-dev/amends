@@ -48,7 +48,10 @@ export type Outcome = Data.TaggedEnum<{
 }>;
 export const Outcome = Data.taggedEnum<Outcome>();
 
-/** A run of the job failed before its turn ended; the turn it ran, if it accepted one, is still active. */
+/**
+ * A run of the job failed before its turn ended; the turn it ran, if it accepted one, is still
+ * active.
+ */
 export class RunFailed extends Data.TaggedError("TurnRunner.RunFailed")<{
   readonly turnId: Turn.Id | undefined;
   readonly cause: unknown;
@@ -72,7 +75,7 @@ export const newDrafts = (
   });
 
 /** An error an agent reported, as the reason its turn failed. */
-export const describeError = (error: unknown): string => {
+const describeError = (error: unknown): string => {
   if (typeof error === "string" && error !== "") return error;
   if (Predicate.hasProperty(error, "message") && typeof error.message === "string")
     return error.message;
@@ -207,7 +210,7 @@ export const advance = (
 export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
   const runs = yield* Semaphore.make(1);
   /** The turn a run holds, and how to ask it to stop. */
-  let running: { readonly turnId: Turn.Id; readonly stop: Deferred.Deferred<void> } | undefined;
+  const running = yield* Ref.make<Running | undefined>(undefined);
   const execute = <A, E>(step: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>) =>
     inWorkspace(job.workspaceId, Effect.flatMap(TurnExecution.Service, step));
 
@@ -239,29 +242,25 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
   const runAgent = Effect.fnUntraced(function* (
     ready: SessionLogWriter.Ready,
     writer: SessionLogWriter.Writer,
-    startedSession: Ref.Ref<StartedSession | undefined>,
+    startedSession: Ref.Ref<TurnAgent.Started | undefined>,
     progress: Ref.Ref<Progress>,
   ) {
     const turnId = ready.turn.id;
     // A participation's session, and the sandbox it works in, are named after it.
     const sessionId = Agent.SessionId.make(ready.turn.participationId);
-    const agent = yield* TurnAgent.open(ready.runnable, sessionId);
-    const { history, resumeFrom } = writer.opening;
-    const session = yield* agent.harness.createSession({
-      ...(agent.sandbox === undefined ? {} : { sandbox: agent.sandbox }),
-      ...(resumeFrom === undefined ? { id: sessionId, history } : { resumeFrom }),
-    });
-    yield* Ref.set(startedSession, { session, agent: agent.harness.agent.id });
+    const started = yield* TurnAgent.startSession(ready.runnable, sessionId, writer.opening);
+    yield* Ref.set(startedSession, started);
+    const { session, agent } = started;
     const run: Run = {
       turnId,
-      agent: agent.harness.agent.id,
+      agent,
       openedAt: writer.openedAt,
       continues: session.hasUnfinishedTurn,
     };
     const instructions = ready.runnable.instructions;
     const turnOptions = instructions === "" ? {} : { instructions };
     const turn =
-      resumeFrom?.unfinishedTurn === undefined
+      writer.opening.resumeFrom?.unfinishedTurn === undefined
         ? session.stream({ prompt: writer.opening.prompt, ...turnOptions })
         : session.continueStream(turnOptions);
     // Recording a part is never cut short: a run stopped meanwhile stops between parts, so that
@@ -281,51 +280,54 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
       : Outcome.Failed({ reason: describeError(reported) });
   });
 
+  /** The agent could not run the turn: its harness, model, connection, or sandbox failed. */
+  const failed = (error: { readonly message: string }) =>
+    Effect.succeed(Outcome.Failed({ reason: error.message }));
+
   /**
    * Start the turn and run it: open its session log, run the agent until the turn ends or is
    * asked to stop, log the step it left unfinished, release the session, and end the turn.
    */
-  const runTurn = Effect.fnUntraced(function* (turnId: Turn.Id, stop: Deferred.Deferred<void>) {
-    const started = yield* execute((turnExecution) => turnExecution.start(turnId));
-    if (started._tag === "Idle") return;
-    const writer = yield* SessionLogWriter.open(job.workspaceId, started);
-    const startedSession = yield* Ref.make<StartedSession | undefined>(undefined);
-    const progress = yield* Ref.make(initialProgress);
-    const { outcome, resume } = yield* Effect.scoped(
-      Effect.gen(function* () {
-        const outcome = yield* runAgent(started, writer, startedSession, progress).pipe(
-          Effect.catchTags({
-            ConnectionError: (error) => Effect.succeed(Outcome.Failed({ reason: error.message })),
-            SandboxError: (error) => Effect.succeed(Outcome.Failed({ reason: error.message })),
-            HarnessError: (error) => Effect.succeed(Outcome.Failed({ reason: error.message })),
-            AiError: (error) => Effect.succeed(Outcome.Failed({ reason: error.message })),
-            PlatformError: (error) => Effect.succeed(Outcome.Failed({ reason: error.message })),
-          }),
-          Effect.raceFirst(Effect.as(Deferred.await(stop), Outcome.Stopped())),
-        );
-        const { stepParts, steps } = yield* Ref.get(progress);
-        const [unfinished] = StreamPart.stepsOf(stepParts);
-        if (unfinished !== undefined)
-          yield* writer.append([
-            { _tag: "Step", turnId, id: stepId(writer.openedAt, steps), step: unfinished },
-          ]);
-        return { outcome, resume: yield* releaseSession(yield* Ref.get(startedSession)) };
-      }),
-    );
-    yield* execute((turnExecution) =>
-      Outcome.$match(outcome, {
-        Answered: () =>
-          resume === undefined
-            ? Effect.die("A turn its agent answered has no session")
-            : turnExecution.close(turnId, {
-                reply: SessionLog.answerOf(writer.turnEntries()),
-                resume,
-              }),
-        Failed: ({ reason }) => turnExecution.fail(turnId, { reason, resume }),
-        Stopped: () => turnExecution.confirmStopped(turnId, { resume }),
-      }),
-    );
-  });
+  const runTurn = Effect.fnUntraced(
+    function* (turnId: Turn.Id, stop: Deferred.Deferred<void>) {
+      const start = yield* execute((turnExecution) => turnExecution.start(turnId));
+      if (start._tag === "Idle") return;
+      const writer = yield* SessionLogWriter.open(job.workspaceId, start);
+      const startedSession = yield* Ref.make<TurnAgent.Started | undefined>(undefined);
+      const progress = yield* Ref.make(initialProgress);
+      const outcome = yield* runAgent(start, writer, startedSession, progress).pipe(
+        Effect.catchTags({
+          ConnectionError: failed,
+          SandboxError: failed,
+          HarnessError: failed,
+          AiError: failed,
+          PlatformError: failed,
+        }),
+        Effect.raceFirst(Effect.as(Deferred.await(stop), Outcome.Stopped())),
+      );
+      const { stepParts, steps } = yield* Ref.get(progress);
+      const [unfinished] = StreamPart.stepsOf(stepParts);
+      if (unfinished !== undefined)
+        yield* writer.append([
+          { _tag: "Step", turnId, id: stepId(writer.openedAt, steps), step: unfinished },
+        ]);
+      const started = yield* Ref.get(startedSession);
+      const resume = yield* releaseSession(started);
+      const entries = yield* writer.turnEntries;
+      yield* execute((turnExecution) =>
+        Outcome.$match(outcome, {
+          Answered: () =>
+            resume === undefined
+              ? Effect.die("A turn its agent answered has no session")
+              : turnExecution.close(turnId, { reply: SessionLog.answerOf(entries), resume }),
+          Failed: ({ reason }) => turnExecution.fail(turnId, { reason, resume }),
+          Stopped: () => turnExecution.confirmStopped(turnId, { resume }),
+        }),
+      );
+    },
+    // The agent's sandbox is reached for the run.
+    Effect.scoped,
+  );
 
   /**
    * Run the agent's next turn in the thread, if work waits for one, after any run in progress:
@@ -339,7 +341,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
       if (Option.isNone(accepted)) return Option.none<Turn.Id>();
       const turnId = accepted.value.id;
       const stop = yield* Deferred.make<void>();
-      running = { turnId, stop };
+      yield* Ref.set(running, { turnId, stop });
       yield* runTurn(turnId, stop).pipe(
         Effect.catchTag("SessionLogWriter.Superseded", () =>
           Effect.logWarning("Turn run superseded by another run of it", {
@@ -349,7 +351,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
         ),
         Effect.mapError((cause) => new RunFailed({ turnId, cause })),
         Effect.catchDefect((cause) => Effect.fail(new RunFailed({ turnId, cause }))),
-        Effect.ensuring(Effect.sync(() => (running = undefined))),
+        Effect.ensuring(Ref.set(running, undefined)),
       );
       return Option.some(turnId);
     }),
@@ -359,10 +361,12 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
    * Stop the turn: the run that holds it stops it, and one no run holds ends as it stands, when it
    * was asked to stop or its participation ended.
    */
-  const stopTurn = (turnId: Turn.Id) =>
-    running?.turnId === turnId
-      ? Effect.asVoid(Deferred.succeed(running.stop, undefined))
-      : execute((turnExecution) => turnExecution.confirmStopped(turnId, {}));
+  const stopTurn = Effect.fnUntraced(function* (turnId: Turn.Id) {
+    const held = yield* Ref.get(running);
+    if (held?.turnId === turnId)
+      return yield* Effect.asVoid(Deferred.succeed(held.stop, undefined));
+    yield* execute((turnExecution) => turnExecution.confirmStopped(turnId, {}));
+  });
 
   /** Fail the turn its job could not run, for `reason`. */
   const giveUp = (turnId: Turn.Id, reason: string) =>
@@ -371,10 +375,10 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
   return { runNextTurn, stopTurn, giveUp };
 });
 
-/** The session a run started, once it did, and the agent that runs it. */
-interface StartedSession {
-  readonly session: Session.Session;
-  readonly agent: string;
+/** The turn a run holds, and how to ask it to stop. */
+interface Running {
+  readonly turnId: Turn.Id;
+  readonly stop: Deferred.Deferred<void>;
 }
 
 /**
@@ -382,7 +386,7 @@ interface StartedSession {
  * releasing failed, the agent alone, which then starts from the conversation the log records.
  * None when the run started no session.
  */
-const releaseSession = (started: StartedSession | undefined) => {
+const releaseSession = (started: TurnAgent.Started | undefined) => {
   if (started === undefined) return Effect.undefined;
   return started.session.detach.pipe(
     Effect.map(savedOf),
