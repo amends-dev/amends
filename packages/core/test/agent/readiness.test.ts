@@ -81,14 +81,11 @@ const connection = (
   createdAt: DateTime.makeUnsafe("2026-10-06T12:00:00.000Z"),
 });
 
-const connectionsOf = (...records: ReadonlyArray<Connection.Record>) =>
-  new Map(records.map((record) => [record.id, record]));
-
 const inProcess = connection("conn-in-process", "in-process");
 const boxed = connection("conn-boxed", "boxed");
 const models = connection("conn-models", "models");
 const boxes = connection("conn-boxes", "boxes");
-const everything = connectionsOf(inProcess, boxed, models, boxes);
+const everything = [inProcess, boxed, models, boxes];
 
 const setup = (fields: Partial<AgentReadiness.Setup> = {}): AgentReadiness.Setup => ({
   harness: { _tag: "Connection", connectionId: inProcess.id },
@@ -106,6 +103,21 @@ const issuesOf = (
   );
 
 describe("an agent's readiness", () => {
+  it("names the connections a setup names, by part: harness, model, then sandbox", () => {
+    expect(AgentReadiness.namedConnections(setup())).toEqual([
+      { part: "harness", connectionId: inProcess.id },
+      { part: "model", connectionId: models.id },
+    ]);
+    expect(
+      AgentReadiness.namedConnections(
+        setup({ harness: { _tag: "Auto" }, sandbox: { connectionId: boxes.id } }),
+      ),
+    ).toEqual([
+      { part: "model", connectionId: models.id },
+      { part: "sandbox", connectionId: boxes.id },
+    ]);
+  });
+
   it.effect("is ready when each connection gives its part as the agent takes it", () =>
     Effect.gen(function* () {
       expect(yield* issuesOf(setup())).toEqual([]);
@@ -127,14 +139,14 @@ describe("an agent's readiness", () => {
 
   it.effect("names the part whose connection was removed or whose integration is gone", () =>
     Effect.gen(function* () {
-      const uninstalled = connectionsOf(
+      const uninstalled = [
         connection("conn-in-process", "retired"),
         connection("conn-models", "retired"),
         connection("conn-boxes", "retired"),
-      );
+      ];
       const everyPart = setup({ sandbox: { connectionId: boxes.id } });
 
-      expect(yield* issuesOf(everyPart, connectionsOf())).toEqual([
+      expect(yield* issuesOf(everyPart, [])).toEqual([
         { _tag: "Removed", part: "harness" },
         { _tag: "Removed", part: "model" },
         { _tag: "Removed", part: "sandbox" },
@@ -160,10 +172,10 @@ describe("an agent's readiness", () => {
       const effortless = yield* issuesOf(
         setup({ model: { connectionId: models.id, id: "model-one", effort: "max" } }),
       );
-      const misconfigured = yield* issuesOf(
-        setup(),
-        connectionsOf(inProcess, connection("conn-models", "models", { zone: "eu" })),
-      );
+      const misconfigured = yield* issuesOf(setup(), [
+        inProcess,
+        connection("conn-models", "models", { zone: "eu" }),
+      ]);
 
       expect(misplaced).toEqual([
         { _tag: "Invalid", part: "harness", description: "Models gives no harnesses" },
@@ -204,20 +216,17 @@ describe("an agent's readiness", () => {
       const noHarness = [{ _tag: "NoHarness" }];
 
       expect(yield* issuesOf(auto)).toEqual([]);
-      expect(yield* issuesOf(auto, connectionsOf(models))).toEqual(noHarness);
+      expect(yield* issuesOf(auto, [models])).toEqual(noHarness);
       // A harness whose agent works only in a sandbox serves only an agent that has one.
-      expect(yield* issuesOf(auto, connectionsOf(boxed, models))).toEqual(noHarness);
-      expect(yield* issuesOf(autoInSandbox, connectionsOf(boxed, models, boxes))).toEqual([]);
+      expect(yield* issuesOf(auto, [boxed, models])).toEqual(noHarness);
+      expect(yield* issuesOf(autoInSandbox, [boxed, models, boxes])).toEqual([]);
       // Nor does a harness whose integration is gone, or no longer takes the connection.
       expect(
-        yield* issuesOf(
-          auto,
-          connectionsOf(
-            connection("conn-retired", "retired"),
-            connection("conn-in-process", "in-process", { zone: "eu" }),
-            models,
-          ),
-        ),
+        yield* issuesOf(auto, [
+          connection("conn-retired", "retired"),
+          connection("conn-in-process", "in-process", { zone: "eu" }),
+          models,
+        ]),
       ).toEqual(noHarness);
     }),
   );
