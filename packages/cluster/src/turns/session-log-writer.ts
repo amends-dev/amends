@@ -4,12 +4,11 @@
  * the log past what it wrote, as one another run replaced after Cluster moved its job, writes
  * nothing more and stops: it is `Superseded`.
  */
-import { SessionLog, SessionLogStore, Turn, TurnExecution } from "@amends/core/turn";
-import type { Workspace } from "@amends/core/workspace";
+import { SessionLog, Turn, type TurnExecution } from "@amends/core/turn";
 import { Agent, type Session } from "@amends/harness";
-import { Array, Effect, Option, Ref, Schema } from "effect";
+import { Array, Effect, Ref, Schema } from "effect";
 import type { Prompt } from "effect/ai";
-import { inWorkspace } from "./workspace.ts";
+import type { TurnWorkspace } from "./workspace.ts";
 
 /** Another run of the turn wrote to its session log after this one: this one stops. */
 export class Superseded extends Schema.TaggedError<Superseded>()("SessionLogWriter.Superseded", {
@@ -122,12 +121,14 @@ const unfinishedTurnOf = (
 /** Entries read at a time. */
 const pageSize = 500;
 
-/** Every entry of the participation's log, oldest first. */
-const readLog = Effect.fnUntraced(function* (participationId: Turn.Record["participationId"]) {
-  const sessionLogStore = yield* SessionLogStore.Service;
+/** Every entry of the participation's log, oldest first, read a page at a time. */
+const readLog = Effect.fnUntraced(function* (
+  workspace: TurnWorkspace.TurnWorkspace,
+  participationId: Turn.Record["participationId"],
+) {
   const recorded: Array<SessionLog.Recorded> = [];
   for (;;) {
-    const page = yield* sessionLogStore.read(participationId, {
+    const page = yield* workspace.readLog(participationId, {
       after: recorded.at(-1)?.position ?? 0,
       limit: pageSize,
     });
@@ -150,36 +151,21 @@ interface Written {
  * run stopped meanwhile stops after it.
  */
 export const open = Effect.fn("SessionLogWriter.open")(function* (
-  workspaceId: Workspace.Id,
+  workspace: TurnWorkspace.TurnWorkspace,
   ready: Ready,
 ) {
   const { participationId, id: turnId } = ready.turn;
-  const recorded = yield* inWorkspace(workspaceId, readLog(participationId));
+  const recorded = yield* readLog(workspace, participationId);
   const entries = recorded.map(({ entry }) => entry);
-  const joined =
-    entries.length === 0
-      ? yield* inWorkspace(
-          workspaceId,
-          Effect.flatMap(TurnExecution.Service, (turnExecution) =>
-            turnExecution.joinedConversation(turnId),
-          ),
-        )
-      : [];
+  const joined = entries.length === 0 ? yield* workspace.joinedConversation(turnId) : [];
   const written = yield* Ref.make<Written>({ head: recorded.at(-1)?.position ?? 0, entries: [] });
   const append = Effect.fnUntraced(function* (more: Array.NonEmptyReadonlyArray<SessionLog.Entry>) {
     const { head } = yield* Ref.get(written);
-    const appended = yield* inWorkspace(
-      workspaceId,
-      Effect.flatMap(SessionLogStore.Service, (sessionLogStore) =>
-        sessionLogStore.append(participationId, more, head).pipe(
-          Effect.asSome,
-          Effect.catchTag("SessionLogStore.Conflict", () => Effect.succeedNone),
-        ),
-      ),
-    );
-    if (Option.isNone(appended)) return yield* new Superseded({ turnId });
+    const appended = yield* workspace
+      .appendLog(participationId, more, head)
+      .pipe(Effect.catchTag("SessionLogStore.Conflict", () => new Superseded({ turnId })));
     yield* Ref.update(written, (before) => ({
-      head: appended.value.at(-1)?.position ?? before.head,
+      head: appended.at(-1)?.position ?? before.head,
       entries: [...before.entries, ...more],
     }));
   }, Effect.uninterruptible);

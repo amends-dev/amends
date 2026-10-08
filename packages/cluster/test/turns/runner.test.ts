@@ -43,7 +43,7 @@ const runnerFor = (
       Layer.succeed(Gateway.Service, workspace.gateway),
       integrationsFor(scripted.agent),
     );
-    const turnRunner = yield* TurnRunner.make(job);
+    const turnRunner = yield* Effect.provide(TurnRunner.make(job), services);
     return {
       workspace,
       scripted,

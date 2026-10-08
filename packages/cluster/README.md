@@ -13,7 +13,7 @@ actor does. The [local host](../../hosts/local/README.md) runs them.
 | `turns/runner.ts`             | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
 | `turns/session-log-writer.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                   |
 | `turns/agent.ts`              | `TurnAgent`: starting the session of the agent a turn runs, built from what core gives with the host's integrations.        |
-| `turns/workspace.ts`          | `inWorkspace`, through which a run calls the workspace.                                                                     |
+| `turns/workspace.ts`          | `TurnWorkspace`: the workspace as a run calls it, each call entering it through the gateway for itself.                     |
 | `jobs/pruning.ts`             | `JobPruning`, the hourly job that removes handled requests.                                                                 |
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and
@@ -65,8 +65,10 @@ not yet handled are kept however old.
 ## Running a turn
 
 `TurnRunner.make(job)` runs one agent's turns in one thread over `Gateway.Service` and the host's
-`Integrations`. Each call into the workspace is a step of core's `TurnExecution`, or a read or
-append of the session log, through `inWorkspace`. `runNextTurn` runs one turn at a time:
+`Integrations`. It calls the workspace through `TurnWorkspace`: core's `TurnExecution` and the
+session log store as a run calls them, each call entering the workspace through the gateway for
+itself, so the runner holds the workspace only while a call runs. `runNextTurn` runs one turn at
+a time:
 
 1. `accept` the agent's active turn in the thread, or a new one that accepts the work that waits;
    with neither, there is nothing to run.

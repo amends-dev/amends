@@ -9,13 +9,7 @@
  * drafts to show. The run's loop performs it, part by part, and keeps the latest progress for the
  * turn's end to read.
  */
-import {
-  SessionLog,
-  type SessionStateStore,
-  type Turn,
-  TurnExecution,
-  type TurnJobs,
-} from "@amends/core/turn";
+import { SessionLog, type SessionStateStore, type Turn, type TurnJobs } from "@amends/core/turn";
 import { Agent, type Session, StreamPart } from "@amends/harness";
 import {
   Array,
@@ -32,7 +26,7 @@ import {
 } from "effect";
 import { TurnAgent } from "./agent.ts";
 import { SessionLogWriter } from "./session-log-writer.ts";
-import { inWorkspace } from "./workspace.ts";
+import { TurnWorkspace } from "./workspace.ts";
 
 /** The least time between two drafts of a step's text, in milliseconds. */
 const draftInterval = 100;
@@ -211,26 +205,19 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
   const runs = yield* Semaphore.make(1);
   /** The turn a run holds, and how to ask it to stop. */
   const running = yield* Ref.make<Running | undefined>(undefined);
-  const execute = <A, E>(step: (turnExecution: TurnExecution.Interface) => Effect.Effect<A, E>) =>
-    inWorkspace(job.workspaceId, Effect.flatMap(TurnExecution.Service, step));
+  const workspace = yield* TurnWorkspace.make(job.workspaceId);
 
   /**
    * Show readers `drafts` of the turn's step, best effort: the step's entry in the log shows what
    * a missed one held.
    */
   const showDrafts = (turnId: Turn.Id, drafts: ReadonlyArray<Turn.Draft>) =>
-    drafts.length === 0
-      ? Effect.void
-      : execute((turnExecution) =>
-          Effect.forEach(drafts, (draft) => turnExecution.showDraft(turnId, draft), {
-            discard: true,
-          }),
-        ).pipe(
-          Effect.catchCauseIf(
-            (cause) => !Cause.hasInterruptsOnly(cause),
-            (cause) => Effect.logWarning("Drafts of a turn's step were not shown", cause),
-          ),
-        );
+    Effect.forEach(drafts, (draft) => workspace.showDraft(turnId, draft), { discard: true }).pipe(
+      Effect.catchCauseIf(
+        (cause) => !Cause.hasInterruptsOnly(cause),
+        (cause) => Effect.logWarning("Drafts of a turn's step were not shown", cause),
+      ),
+    );
 
   /**
    * Run the turn on the agent's harness until it ends or is stopped: start its session, kept in
@@ -290,9 +277,9 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
    */
   const runTurn = Effect.fnUntraced(
     function* (turnId: Turn.Id, stop: Deferred.Deferred<void>) {
-      const start = yield* execute((turnExecution) => turnExecution.start(turnId));
+      const start = yield* workspace.start(turnId);
       if (start._tag === "Idle") return;
-      const writer = yield* SessionLogWriter.open(job.workspaceId, start);
+      const writer = yield* SessionLogWriter.open(workspace, start);
       const startedSession = yield* Ref.make<TurnAgent.Started | undefined>(undefined);
       const progress = yield* Ref.make(initialProgress);
       const outcome = yield* runAgent(start, writer, startedSession, progress).pipe(
@@ -314,16 +301,14 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
       const started = yield* Ref.get(startedSession);
       const resume = yield* releaseSession(started);
       const entries = yield* writer.turnEntries;
-      yield* execute((turnExecution) =>
-        Outcome.$match(outcome, {
-          Answered: () =>
-            resume === undefined
-              ? Effect.die("A turn its agent answered has no session")
-              : turnExecution.close(turnId, { reply: SessionLog.answerOf(entries), resume }),
-          Failed: ({ reason }) => turnExecution.fail(turnId, { reason, resume }),
-          Stopped: () => turnExecution.confirmStopped(turnId, { resume }),
-        }),
-      );
+      yield* Outcome.$match(outcome, {
+        Answered: () =>
+          resume === undefined
+            ? Effect.die("A turn its agent answered has no session")
+            : workspace.close(turnId, { reply: SessionLog.answerOf(entries), resume }),
+        Failed: ({ reason }) => workspace.fail(turnId, { reason, resume }),
+        Stopped: () => workspace.confirmStopped(turnId, { resume }),
+      });
     },
     // The agent's sandbox is reached for the run.
     Effect.scoped,
@@ -335,9 +320,9 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
    */
   const runNextTurn = runs.withPermit(
     Effect.gen(function* () {
-      const accepted = yield* execute((turnExecution) => turnExecution.accept(job)).pipe(
-        Effect.mapError((cause) => new RunFailed({ turnId: undefined, cause })),
-      );
+      const accepted = yield* workspace
+        .accept(job)
+        .pipe(Effect.mapError((cause) => new RunFailed({ turnId: undefined, cause })));
       if (Option.isNone(accepted)) return Option.none<Turn.Id>();
       const turnId = accepted.value.id;
       const stop = yield* Deferred.make<void>();
@@ -365,12 +350,11 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
     const held = yield* Ref.get(running);
     if (held?.turnId === turnId)
       return yield* Effect.asVoid(Deferred.succeed(held.stop, undefined));
-    yield* execute((turnExecution) => turnExecution.confirmStopped(turnId, {}));
+    yield* workspace.confirmStopped(turnId, {});
   });
 
   /** Fail the turn its job could not run, for `reason`. */
-  const giveUp = (turnId: Turn.Id, reason: string) =>
-    execute((turnExecution) => turnExecution.fail(turnId, { reason }));
+  const giveUp = (turnId: Turn.Id, reason: string) => workspace.fail(turnId, { reason });
 
   return { runNextTurn, stopTurn, giveUp };
 });
