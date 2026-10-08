@@ -13,7 +13,7 @@ import {
   type TurnJobs,
 } from "@amends/core/turn";
 import { Member, Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Gateway, GatewayErrors } from "@amends/gateway";
 import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends/harness";
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
@@ -95,6 +95,8 @@ export interface FakeWorkspaceOptions {
   readonly workWaits?: boolean;
   /** How many times starting the turn fails first, as when storage is down. None by default. */
   readonly failedStarts?: number;
+  /** Whether the workspace was ever created. True by default. */
+  readonly created?: boolean;
 }
 
 /**
@@ -168,11 +170,20 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
   const services = Context.make(TurnExecution.Service, turnExecution).pipe(
     Context.add(SessionLogStore.Service, sessionLogStore),
   );
+  let entered = 0;
   const gateway = Gateway.Service.of({
     createWorkspace: () => Effect.die("The fake workspace is never created"),
     asMember: () => Effect.die("The job runs as no member"),
     inWorkspace: (_, program) =>
-      Effect.provideContext(program, services) as Effect.Effect<never, never, never>,
+      Effect.provideContext(
+        Effect.gen(function* () {
+          entered += 1;
+          if (options.created === false)
+            return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+          return yield* program;
+        }),
+        services,
+      ) as Effect.Effect<never, never, never>,
   });
   return {
     gateway,
@@ -181,6 +192,8 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     endings: () => [...endings],
     /** How many times the job started the turn. */
     starts: () => starts,
+    /** How many times a job entered the workspace. */
+    entered: () => entered,
     drafts: () => [...drafts],
     appendElsewhere,
   };

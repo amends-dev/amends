@@ -1,9 +1,9 @@
 import { Commit, Store } from "@amends/core/journal";
-import { Turn, TurnJobs } from "@amends/core/turn";
+import { TurnJobs } from "@amends/core/turn";
 import { Gateway } from "@amends/gateway";
 import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
-import { DateTime, Duration, Effect, Layer, Stream } from "effect";
+import { Duration, Effect, Layer, Stream } from "effect";
 import {
   MessageStorage,
   RunnerHealth,
@@ -144,20 +144,16 @@ describe("a turn job", () => {
         ]);
       }),
   );
-});
 
-describe("after a request failed", () => {
-  const { workspaceId, memberId, threadId } = job;
-  const fields = { workspaceId, memberId, threadId, at: DateTime.makeUnsafe(0), attempt: 0 };
-  it("it is tried again until it failed eight times, then a run gives up its turn", () => {
-    const run = new TurnJob.Run({ ...fields, key: "run" });
-    expect(TurnJob.afterFailure(run, 7, turn.id)).toEqual({ _tag: "Retry" });
-    expect(TurnJob.afterFailure(run, 8, turn.id)).toEqual({ _tag: "GiveUp", turnId: turn.id });
-    expect(TurnJob.afterFailure(run, 8, undefined)).toEqual({ _tag: "Drop" });
-    const stop = new TurnJob.Stop({ ...fields, key: "stop", turnId: turn.id });
-    expect(TurnJob.afterFailure(stop, 8, turn.id)).toEqual({ _tag: "Drop" });
-    // Giving up is tried until it holds.
-    const giveUp = new TurnJob.GiveUp({ ...fields, key: "give-up", turnId: Turn.Id.make("t") });
-    expect(TurnJob.afterFailure(giveUp, 100, turn.id)).toEqual({ _tag: "Retry" });
-  });
+  it.effect("drops a request whose workspace was never created, without trying again", () =>
+    Effect.gen(function* () {
+      const { workspace, layer } = turnJobsFor(Stream.empty, { created: false });
+      yield* Effect.gen(function* () {
+        yield* inCommit("commit-1", (turnJobs) => turnJobs.requestRun(job));
+        yield* until(() => workspace.entered() > 1, "10 seconds");
+      }).pipe(Effect.provide(layer), Effect.scoped);
+      expect(workspace.entered()).toBe(1);
+      expect(workspace.endings()).toEqual([]);
+    }),
+  );
 });

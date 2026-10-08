@@ -7,15 +7,14 @@ delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kind of
 workspaces through the [gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an
 actor does. The [local host](../../hosts/local/README.md) runs them.
 
-| Module                        | What it holds                                                                                                                          |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `jobs/turn-job.ts`            | `TurnJob`: the `amends/TurnJob` entity, its `Run`, `Stop`, and `GiveUp` requests, the requests commits store, and the worker for them. |
-| `turns/runner.ts`             | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                                |
-| `turns/session-log-writer.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                              |
-| `turns/agent.ts`              | `TurnAgent`: the agent's harness and sandbox, built from what core gives with the host's integrations.                                 |
-| `turns/workspace.ts`          | `inWorkspace`, through which a run calls the workspace.                                                                                |
-| `jobs/retry.ts`               | `JobRetry.delay`, the delay before a job's failed request runs again.                                                                  |
-| `jobs/pruning.ts`             | `JobPruning`, the hourly job that removes handled requests.                                                                            |
+| Module                        | What it holds                                                                                                               |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `jobs/turn-job.ts`            | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
+| `turns/runner.ts`             | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
+| `turns/session-log-writer.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                   |
+| `turns/agent.ts`              | `TurnAgent`: the agent's harness and sandbox, built from what core gives with the host's integrations.                      |
+| `turns/workspace.ts`          | `inWorkspace`, through which a run calls the workspace.                                                                     |
+| `jobs/pruning.ts`             | `JobPruning`, the hourly job that removes handled requests.                                                                 |
 
 The package depends on Effect, core, the gateway, and the harness, sandbox, and
 connection contracts. It knows no harness, model provider, or sandbox platform: the host
@@ -31,10 +30,9 @@ redelivers a request whose handling was cut short, so work resumes after a resta
 ### Turn jobs
 
 A turn job is one agent in one thread: an entity, `amends/TurnJob`, keyed by workspace, the agent's
-membership, and the thread, whose requests ask it to run the agent's next turn (`Run`), to stop a
-turn (`Stop`), or to give up a turn its runs kept failing (`GiveUp`). Its runs take turns, while a
-stop reaches the run in progress, so the entity takes its requests side by side and its
-[turn runner](#running-a-turn) runs one turn at a time.
+membership, and the thread, whose requests ask it to run the agent's next turn (`Run`) or to stop
+a turn (`Stop`). Its runs take turns, while a stop reaches the run in progress, so the entity takes
+its requests side by side and its [turn runner](#running-a-turn) runs one turn at a time.
 
 `TurnJob.layerRequests` provides core's `TurnJobs.Service`, through which core's reactions request
 a run or a stop in the commit whose facts ask for it, keyed by the commit, so a commit that asks
@@ -47,13 +45,13 @@ for a job another process runs waits for that process's next read, unless socket
 `TurnJob.layerWorker` registers the entity and handles its requests, and `TurnJob.layer` provides
 both. Every runner over the same storage runs the worker, as Cluster requires of every entity type.
 
-A request that fails asks for what `TurnJob.afterFailure` decides, keyed after its own: another
-after `JobRetry.delay`, which doubles from two seconds up to five minutes, until it failed
-`maxFailures` (eight) times in a row. Then a run that accepted a turn asks to give the turn up,
-which fails it and is tried until it holds, so a turn never stays active with nothing to run it;
-any other request is dropped, its work left for the next request to find. A request whose workspace
-was never created is dropped, and one cut short as its runner shuts down is left to Cluster, which
-delivers it again. Failures are logged.
+A request that fails is tried again where it is, after `TurnJob.retryDelays`, which doubles from
+two seconds up to five minutes, until it holds or has failed `maxFailures` (eight) times in a row.
+Then a run that accepted a turn gives the turn up, which fails it and is tried until it holds, so a
+turn never stays active with nothing to run it; any other request is dropped, its work left for the
+next request to find. The request stays unhandled in storage meanwhile, so one cut short as its
+runner shuts down is left to Cluster, which delivers it again, and its tries start over. A request
+whose workspace was never created is dropped at once. Failures are logged.
 
 ### Pruning
 
@@ -127,6 +125,6 @@ bun run test
 with a scripted agent: the log a run writes, drafts, closing, failing, stopping, running a turn cut
 short again, and a run another one replaced; it also checks `advance`, part by part, on its own.
 `test/jobs/turn-job.test.ts` runs the entity on Cluster in memory: a commit's run and stop
-requests, runs that fail and run again, and giving a turn up.
+requests, runs that fail and run again, giving a turn up, and a workspace never created.
 `test/jobs/pruning.test.ts` checks that pruning runs every hour for the entity types it is given and
 its own runs.
