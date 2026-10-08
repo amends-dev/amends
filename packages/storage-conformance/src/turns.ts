@@ -25,6 +25,7 @@ import { Gateway } from "@amends/gateway";
 import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Redacted, Stream } from "effect";
+import type { Prompt } from "effect/ai";
 import type { Harness as ConformanceHarness } from "./harness.ts";
 import { Operations } from "./operations.ts";
 import {
@@ -77,7 +78,7 @@ const appendToLog = (
 /** Log the prompt a turn started with, as its job does before running it. */
 const logPrompt = (id: Workspace.Id, ready: Ready) =>
   appendToLog(id, ready.turn.participationId, [
-    { _tag: "Prompted", turnId: ready.turn.id, texts: ready.prompt, messages: ready.messages },
+    { _tag: "Prompted", turnId: ready.turn.id, prompt: ready.prompt, messages: ready.messages },
   ]);
 /** Log a step the turn took, as its job does while running it. */
 const logStep = (id: Workspace.Id, turn: Turn.Record, stepId: string, step: StreamPart.Step) =>
@@ -296,9 +297,21 @@ const startReady = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record
       (started) => Effect.die(`Expected a turn ready to run, not ${started._tag}`),
     ),
   );
-/** The conversation the turn's agent joined, as its job reads it for a new session log. */
+/** The texts of a message the agent is told, its parts' in order. */
+const textsOf = (message: Prompt.Message) =>
+  typeof message.content === "string"
+    ? [message.content]
+    : message.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
+/**
+ * The conversation the turn's agent joined, as its job reads it for a new session log: each
+ * message's role and texts.
+ */
 const joinedOf = (id: Workspace.Id, turnId: Turn.Id) =>
-  execute(id, (turnExecution) => turnExecution.joinedConversation(turnId));
+  Effect.map(
+    execute(id, (turnExecution) => turnExecution.joinedConversation(turnId)),
+    (conversation) =>
+      conversation.map((message) => ({ role: message.role, texts: textsOf(message) })),
+  );
 
 export const turns = (harness: ConformanceHarness) => {
   const { runGateway } = Support.make(harness);
@@ -359,7 +372,7 @@ export const turns = (harness: ConformanceHarness) => {
               // and the turn's prompt is what it was asked.
               expect(ready.resume).toBeNull();
               expect(yield* joinedOf(workspace.id, turn.id)).toEqual([]);
-              expect(ready.prompt).toEqual(["Alice: Planner, summarize the plan."]);
+              expect(textsOf(ready.prompt)).toEqual(["Alice: Planner, summarize the plan."]);
               expect(ready.messages).toBe(1);
               expect(yield* bound.notifications.get(asked!.id)).toEqual(
                 Option.some(
@@ -461,7 +474,7 @@ export const turns = (harness: ConformanceHarness) => {
                 selection,
               });
               expect(next.resume).toEqual(resume);
-              expect(next.prompt).toEqual(["Alice: Include the risks too."]);
+              expect(textsOf(next.prompt)).toEqual(["Alice: Include the risks too."]);
               // An answer of nothing posts nothing.
               expect(
                 yield* execute(workspace.id, (turnExecution) =>
@@ -611,7 +624,7 @@ export const turns = (harness: ConformanceHarness) => {
                   { kind: "run", memberId: agent.memberId, threadId },
                 ]);
                 const second = yield* startReady(workspace.id, agent.memberId, threadId);
-                expect(second.prompt).toEqual([
+                expect(textsOf(second.prompt)).toEqual([
                   "Alice: Planner, draft the notes.",
                   "Alice: Please try again.",
                 ]);
@@ -640,7 +653,7 @@ export const turns = (harness: ConformanceHarness) => {
                 // What it took in stays told: the next turn resumes its session from there.
                 const third = yield* startReady(workspace.id, agent.memberId, threadId);
                 expect(third.resume).toEqual(resume);
-                expect(third.prompt).toEqual(["Alice: Actually, just the summary."]);
+                expect(textsOf(third.prompt)).toEqual(["Alice: Actually, just the summary."]);
                 yield* execute(workspace.id, (turnExecution) =>
                   turnExecution.fail(third.turn.id, { reason: "The model is overloaded." }),
                 );
@@ -737,7 +750,7 @@ export const turns = (harness: ConformanceHarness) => {
               ]);
               const ready = yield* startReady(workspace.id, agent.memberId, threadId);
               expect(ready.turn.id).toBe(retried.id);
-              expect(ready.prompt).toEqual([
+              expect(textsOf(ready.prompt)).toEqual([
                 "Alice: Planner, draft the notes.",
                 "Alice asked you to try that again.",
               ]);
@@ -940,7 +953,7 @@ export const turns = (harness: ConformanceHarness) => {
                   texts: ["Alice: Planner, and the budget?", "Alice: The budget grew."],
                 },
               ]);
-              expect(next.prompt).toEqual(["Alice: Planner, come back to this."]);
+              expect(textsOf(next.prompt)).toEqual(["Alice: Planner, come back to this."]);
             }),
           ),
         ),
@@ -974,14 +987,14 @@ export const turns = (harness: ConformanceHarness) => {
               expect(joined).toHaveLength(1);
               expect(joined[0]?.texts).toHaveLength(111);
               expect(joined[0]?.texts[0]).toBe("Alice: Planning the launch.");
-              expect(first.prompt).toEqual(["Alice: Planner, catch up and summarize."]);
+              expect(textsOf(first.prompt)).toEqual(["Alice: Planner, catch up and summarize."]);
               yield* execute(workspace.id, (turnExecution) =>
                 turnExecution.close(first.turn.id, { reply: "", resume }),
               );
               // More than a hundred messages arrive before it is asked again.
               yield* talk(120, "Later note");
               const second = yield* startReady(workspace.id, agent.memberId, threadId);
-              const prompt = second.prompt;
+              const prompt = textsOf(second.prompt);
               expect(prompt).toHaveLength(120);
               expect(prompt[0]).toBe("Alice: Later note 1.");
               expect(prompt.at(-1)).toBe("Alice: Later note 120.");

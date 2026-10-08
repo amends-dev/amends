@@ -10,16 +10,15 @@ import { Schema } from "effect";
 import { Prompt } from "effect/ai";
 import type { ThreadMessageId } from "../thread/message/id.ts";
 import { TurnId } from "./id.ts";
-import { TurnPrompt } from "./prompt.ts";
 import type { Turn } from "./turn.ts";
 
 export const Entry = Schema.TaggedUnion({
   /** The agent joined the thread under way, and its session started with the conversation so far. */
-  Joined: { conversation: Schema.Array(TurnPrompt.Message) },
-  /** A turn prompted the agent with `texts`, which tell it `messages` of the thread's messages. */
+  Joined: { conversation: Schema.Array(Prompt.Message) },
+  /** A turn prompted the agent with `prompt`, which tells it `messages` of the thread's messages. */
   Prompted: {
     turnId: TurnId.Id,
-    texts: Schema.NonEmptyArray(Schema.String),
+    prompt: Prompt.UserMessage,
     messages: Schema.Int,
   },
   /**
@@ -74,16 +73,10 @@ export const historyOf = (entries: ReadonlyArray<Entry>): Prompt.Prompt => {
   for (const entry of entries) {
     switch (entry._tag) {
       case "Joined":
-        conversation = Prompt.concat(
-          conversation,
-          Prompt.fromMessages(entry.conversation.map(TurnPrompt.promptMessageOf)),
-        );
+        conversation = Prompt.concat(conversation, Prompt.fromMessages(entry.conversation));
         break;
       case "Prompted":
-        conversation = Prompt.concat(
-          conversation,
-          Prompt.fromMessages([TurnPrompt.userMessageOf(entry.texts)]),
-        );
+        conversation = Prompt.concat(conversation, Prompt.fromMessages([entry.prompt]));
         turnStart = conversation;
         break;
       case "Started":

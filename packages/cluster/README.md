@@ -73,7 +73,7 @@ append of the session log, through `inWorkspace`. `runNextTurn` runs one turn at
 1. `accept` the agent's active turn in the thread, or a new one that accepts the work that waits;
    with neither, there is nothing to run.
 2. `start` the turn, which answers `Idle` for a turn that ended as it stood, and otherwise `Ready`
-   with the agent's `Runnable`, the prompt's texts, and what its session resumes from.
+   with the agent's `Runnable`, the prompt, and what its session resumes from.
 3. Open the session log (`SessionLogWriter.open`): read the participation's log and write the run's
    opening, the turn's prompt, after the conversation the agent joined when the log is new
    (`joinedConversation`). A log that has the turn's prompt already, as a run cut short leaves it,

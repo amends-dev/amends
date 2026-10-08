@@ -18,6 +18,7 @@ import {
   reading,
   runnableOn,
   turn,
+  userMessage,
   writing,
 } from "./fakes.ts";
 
@@ -70,7 +71,7 @@ describe("a turn's run", () => {
       Effect.gen(function* () {
         const { workspace, scripted, runNextTurn } = yield* runnerFor(
           Stream.fromIterable([...reading, ...writing("The plan ", "is ", "on track."), finish]),
-          { joined: [{ role: "user", texts: ["Kai: We need a plan."] }] },
+          { joined: [userMessage("Kai: We need a plan.")] },
         );
 
         expect(yield* runNextTurn).toEqual(Option.some(turn.id));
@@ -123,7 +124,12 @@ describe("a turn's run", () => {
           {
             resume: { agent: "scripted", agentState: { turns: 4 } },
             logged: [
-              { _tag: "Prompted", turnId: earlier, texts: ["Alice: Hello."], messages: 1 },
+              {
+                _tag: "Prompted",
+                turnId: earlier,
+                prompt: userMessage("Alice: Hello."),
+                messages: 1,
+              },
               {
                 _tag: "Step",
                 turnId: earlier,
@@ -147,9 +153,14 @@ describe("a turn's run", () => {
       const { workspace, scripted, runNextTurn } = yield* runnerFor(
         Stream.fromIterable([...writing("Again."), finish]),
         {
-          prompt: ["Alice: A prompt read again."],
+          prompt: userMessage("Alice: A prompt read again."),
           logged: [
-            { _tag: "Prompted", turnId: turn.id, texts: ["Alice: The prompt told."], messages: 1 },
+            {
+              _tag: "Prompted",
+              turnId: turn.id,
+              prompt: userMessage("Alice: The prompt told."),
+              messages: 1,
+            },
             {
               _tag: "Step",
               turnId: turn.id,
@@ -200,7 +211,12 @@ describe("a turn's run", () => {
 
   /** A log in which a run of the turn, on an agent that keeps the turn, stopped short of its end. */
   const cutShort: ReadonlyArray<SessionLog.Entry> = [
-    { _tag: "Prompted", turnId: turn.id, texts: ["Alice: The prompt told."], messages: 1 },
+    {
+      _tag: "Prompted",
+      turnId: turn.id,
+      prompt: userMessage("Alice: The prompt told."),
+      messages: 1,
+    },
     { _tag: "Started", turnId: turn.id, agent: "scripted", agentState: { turn: "turn-a" } },
     {
       _tag: "Step",
@@ -416,7 +432,7 @@ describe("opening a session log for a run", () => {
   const ready = {
     _tag: "Ready",
     turn,
-    prompt: ["Alice: Go."],
+    prompt: userMessage("Alice: Go."),
     messages: 1,
     resume: null,
   } as unknown as SessionLogWriter.Ready;
@@ -426,7 +442,7 @@ describe("opening a session log for a run", () => {
     expect(opening.entries.map(({ _tag }) => _tag)).toEqual(["Prompted"]);
     expect(opening.resumeFrom).toBeUndefined();
     expect(
-      SessionLogWriter.openingOf([], ready, [{ role: "user", texts: ["Kai: Hi."] }]).entries.map(
+      SessionLogWriter.openingOf([], ready, [userMessage("Kai: Hi.")]).entries.map(
         ({ _tag }) => _tag,
       ),
     ).toEqual(["Joined", "Prompted"]);
@@ -441,7 +457,7 @@ describe("opening a session log for a run", () => {
     });
     const opening = SessionLogWriter.openingOf(
       [
-        { _tag: "Prompted", turnId: turn.id, texts: ["Alice: Go."], messages: 1 },
+        { _tag: "Prompted", turnId: turn.id, prompt: userMessage("Alice: Go."), messages: 1 },
         { _tag: "Started", turnId: turn.id, agent: "codex", agentState: { turn: "turn-a" } },
         step("1.0", "First"),
         { _tag: "Interrupted", turnId: turn.id, reason: "Its run stopped short." },
@@ -458,9 +474,7 @@ describe("opening a session log for a run", () => {
       agent: "opencode",
       history: Prompt.empty,
       unfinishedTurn: {
-        prompt: Prompt.makeMessage("user", {
-          content: [Prompt.makePart("text", { text: "Alice: Go." })],
-        }),
+        prompt: userMessage("Alice: Go."),
         steps: [{ parts: [{ type: "text", text: "Second" }], finish: stepEnd }],
         agentState: { turn: "turn-b" },
       },
@@ -470,7 +484,7 @@ describe("opening a session log for a run", () => {
   it("resumes a turn cut short from what the turn before left, when no agent keeps it", () => {
     const opening = SessionLogWriter.openingOf(
       [
-        { _tag: "Prompted", turnId: turn.id, texts: ["Alice: Go."], messages: 1 },
+        { _tag: "Prompted", turnId: turn.id, prompt: userMessage("Alice: Go."), messages: 1 },
         { _tag: "Started", turnId: turn.id, agent: "amends" },
       ],
       { ...ready, resume: { agent: "amends", agentState: { turns: 2 } } },

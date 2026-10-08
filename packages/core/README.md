@@ -270,7 +270,7 @@ from the journal and every commit, so a host may keep it in a store of its own
 (`SessionLogStore`: `head`, `append` after the position the writer read to, which a log past it
 refuses with `Conflict`, `read` past a position, and `waitForAppend`). Its entries
 (`SessionLog.Entry`) are `Joined`, the conversation the agent joined, and, each naming its turn,
-`Prompted` with the prompt's texts and how many messages it took in, `Started` when a run started
+`Prompted` with the prompt and how many messages it took in, `Started` when a run started
 the turn from its prompt, on which harness agent and with what continues the turn when the agent
 gives that, each `Step`, and `Interrupted` when a run stopped short. The turn's job writes them:
 what was joined when the log is new, the prompt once the turn is ready, the start once the agent's

@@ -4,7 +4,7 @@
  * the log past what it wrote, as one another run replaced after Cluster moved its job, writes
  * nothing more and stops: it is `Superseded`.
  */
-import { SessionLog, SessionLogStore, Turn, TurnExecution, TurnPrompt } from "@amends/core/turn";
+import { SessionLog, SessionLogStore, Turn, TurnExecution } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";
 import { Agent, type Session } from "@amends/harness";
 import { Array, Effect, Option, Schema } from "effect";
@@ -28,8 +28,8 @@ export interface Opening {
   readonly entries: Array.NonEmptyReadonlyArray<SessionLog.Entry>;
   /** The conversation before the turn, which the agent's session starts with. */
   readonly history: Prompt.Prompt;
-  /** The prompt's texts, as the log first recorded them for the turn. */
-  readonly prompt: Array.NonEmptyReadonlyArray<string>;
+  /** The turn's prompt, as the log first recorded it. */
+  readonly prompt: Prompt.UserMessage;
   /**
    * What the session resumes from: the turn as the agent that last started it keeps it, when that
    * run said what continues the turn, for this run to continue after the steps the log has; or
@@ -47,7 +47,7 @@ export interface Opening {
 export const openingOf = (
   entries: ReadonlyArray<SessionLog.Entry>,
   ready: Ready,
-  joined: ReadonlyArray<TurnPrompt.Message>,
+  joined: ReadonlyArray<Prompt.Message>,
 ): Opening => {
   const turnId = ready.turn.id;
   const id = Agent.SessionId.make(ready.turn.participationId);
@@ -58,9 +58,9 @@ export const openingOf = (
     return {
       entries: [{ _tag: "Interrupted", turnId, reason: "Its run stopped short." }],
       history,
-      prompt: prompted.texts,
+      prompt: prompted.prompt,
       resumeFrom:
-        unfinishedTurnOf(entries, turnId, prompted.texts, id, history) ??
+        unfinishedTurnOf(entries, turnId, prompted.prompt, id, history) ??
         sessionStateOf(ready, id, history),
     };
   }
@@ -71,7 +71,7 @@ export const openingOf = (
     entries: Array.append(joining, {
       _tag: "Prompted",
       turnId,
-      texts: ready.prompt,
+      prompt: ready.prompt,
       messages: ready.messages,
     }),
     history,
@@ -95,7 +95,7 @@ const sessionStateOf = (
 const unfinishedTurnOf = (
   entries: ReadonlyArray<SessionLog.Entry>,
   turnId: Turn.Id,
-  texts: ReadonlyArray<string>,
+  prompt: Prompt.UserMessage,
   id: Agent.SessionId,
   history: Prompt.Prompt,
 ): Session.SessionState | undefined => {
@@ -112,7 +112,7 @@ const unfinishedTurnOf = (
     history,
     agent: started.agent,
     unfinishedTurn: {
-      prompt: TurnPrompt.userMessageOf(texts),
+      prompt,
       steps,
       agentState: started.agentState,
     },

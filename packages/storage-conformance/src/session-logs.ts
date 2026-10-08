@@ -2,6 +2,7 @@ import { ThreadParticipation } from "@amends/core/thread";
 import { type SessionLog, Turn } from "@amends/core/turn";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Result } from "effect";
+import { Prompt } from "effect/ai";
 import type { Harness } from "./harness.ts";
 import { forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts";
 
@@ -12,14 +13,23 @@ const usage = { inputTokens: { total: 10 }, outputTokens: { total: 5 } };
 const joined: SessionLog.Entry = {
   _tag: "Joined",
   conversation: [
-    { role: "user", texts: ["Ada: Hello 👋", "Kai: Hi."] },
-    { role: "assistant", texts: ["Hello, both."] },
+    Prompt.makeMessage("user", {
+      content: [
+        Prompt.makePart("text", { text: "Ada: Hello 👋" }),
+        Prompt.makePart("text", { text: "Kai: Hi." }),
+      ],
+    }),
+    Prompt.makeMessage("assistant", {
+      content: [Prompt.makePart("text", { text: "Hello, both." })],
+    }),
   ],
 };
 const prompted: SessionLog.Entry = {
   _tag: "Prompted",
   turnId,
-  texts: ["Ada: What is 2 and 3?"],
+  prompt: Prompt.makeMessage("user", {
+    content: [Prompt.makePart("text", { text: "Ada: What is 2 and 3?" })],
+  }),
   messages: 1,
 };
 /** A step with tagged parts, tool JSON, and provider metadata, as a harness streams them. */

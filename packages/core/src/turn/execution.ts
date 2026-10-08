@@ -1,5 +1,6 @@
 import { Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
+import { Prompt } from "effect/ai";
 import type { Agent } from "../agent/agent.ts";
 import { AgentQuery } from "../agent/query.ts";
 import { Authorization } from "../authorization/authorization.ts";
@@ -86,10 +87,10 @@ export const Start = Schema.TaggedUnion({
     turn: Turn.Record,
     runnable: AgentQuery.Runnable,
     /**
-     * The prompt's texts: the thread's messages the agent was not told yet, through what the turn
+     * The prompt: the thread's messages the agent was not told yet, through what the turn
      * accepted, each named by its author, and who asked when someone retried the turn.
      */
-    prompt: Schema.NonEmptyArray(Schema.String),
+    prompt: Prompt.UserMessage,
     /** How many of the thread's messages the prompt tells. */
     messages: Schema.Int,
     /** What the participation's session resumes from, or none, when it starts anew. */
@@ -138,7 +139,7 @@ export interface Interface {
    */
   readonly joinedConversation: (
     turnId: Turn.Id,
-  ) => Effect.Effect<ReadonlyArray<TurnPrompt.Message>, ReadError>;
+  ) => Effect.Effect<ReadonlyArray<Prompt.Message>, ReadError>;
   /**
    * Show the turn's readers more of a step before it finishes, as a signal: nothing is recorded,
    * and a turn no longer running shows nothing. A reader who starts following midway sees the step

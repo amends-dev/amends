@@ -1,11 +1,15 @@
 import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
+import { Prompt } from "effect/ai";
 import { SessionLog } from "../../src/turn/session-log.ts";
 import { ThreadMessage } from "../../src/thread/message/message.ts";
 import { Turn } from "../../src/turn/turn.ts";
 
 const at = DateTime.makeUnsafe("2026-10-06T12:00:00.000Z");
+/** A user message with the text `text`. */
+const userMessage = (text: string) =>
+  Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text })] });
 const usage = { inputTokens: {}, outputTokens: {} };
 const turnId = Turn.Id.make("turn-1");
 
@@ -42,7 +46,7 @@ const step = (id: string, steps: StreamPart.Step, turn = turnId): SessionLog.Ent
 const prompted = (text = "Ada: What is 2 and 3?", turn = turnId): SessionLog.Entry => ({
   _tag: "Prompted",
   turnId: turn,
-  texts: [text],
+  prompt: userMessage(text),
   messages: 1,
 });
 const interrupted: SessionLog.Entry = {
@@ -135,7 +139,7 @@ describe("the conversation a session log records", () => {
   it("is the conversation joined, then each turn's prompt and the steps it took", () => {
     const later = Turn.Id.make("turn-2");
     const history = SessionLog.historyOf([
-      { _tag: "Joined", conversation: [{ role: "user", texts: ["Ada: Hello."] }] },
+      { _tag: "Joined", conversation: [userMessage("Ada: Hello.")] },
       prompted(),
       step("one", reading),
       step("two", writing("The sum is 5.")),

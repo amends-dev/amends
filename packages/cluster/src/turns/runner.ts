@@ -10,7 +10,6 @@ import {
   type Turn,
   TurnExecution,
   type TurnJobs,
-  TurnPrompt,
 } from "@amends/core/turn";
 import { Agent, type Session, StreamPart } from "@amends/harness";
 import { Cause, Clock, Data, Deferred, Effect, Option, Predicate, Semaphore, Stream } from "effect";
@@ -159,7 +158,7 @@ export const make = Effect.fn("TurnRunner.make")(function* (job: TurnJobs.Job) {
     const turn =
       resumeFrom?.unfinishedTurn === undefined
         ? session.stream({
-            prompt: TurnPrompt.userMessageOf(writer.opening.prompt),
+            prompt: writer.opening.prompt,
             ...turnOptions,
           })
         : session.continueStream(turnOptions);

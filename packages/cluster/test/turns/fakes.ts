@@ -11,12 +11,12 @@ import {
   Turn,
   TurnExecution,
   type TurnJobs,
-  type TurnPrompt,
 } from "@amends/core/turn";
 import { Member, Workspace } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends/harness";
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
+import { Prompt } from "effect/ai";
 
 export const workspaceId = Workspace.Id.make("workspace-1");
 export const job: TurnJobs.Job = {
@@ -82,13 +82,13 @@ export type Ending =
 
 export interface FakeWorkspaceOptions {
   /** The turn's prompt, as starting it gives it. */
-  readonly prompt?: Array.NonEmptyReadonlyArray<string>;
+  readonly prompt?: Prompt.UserMessage;
   /** What the participation's session resumes from, or none for a new one. */
   readonly resume?: SessionStateStore.Resume | null;
   /** What the agent's job is given to run it on. */
   readonly runnable?: AgentQuery.Runnable;
   /** The conversation the agent joined. */
-  readonly joined?: ReadonlyArray<TurnPrompt.Message>;
+  readonly joined?: ReadonlyArray<Prompt.Message>;
   /** What the session log holds before the run. */
   readonly logged?: ReadonlyArray<SessionLog.Entry>;
   /** Whether work waits for the agent. True by default. */
@@ -127,7 +127,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
               ? TurnExecution.Start.cases.Ready.make({
                   turn,
                   runnable: options.runnable ?? runnable,
-                  prompt: options.prompt ?? ["Alice: Planner, summarize the plan."],
+                  prompt: options.prompt ?? userMessage("Alice: Planner, summarize the plan."),
                   messages: 1,
                   resume: options.resume ?? null,
                 })
@@ -295,3 +295,7 @@ export const writing = (...deltas: ReadonlyArray<string>): ReadonlyArray<StreamP
   { type: "finish-step", reason: "stop", usage },
 ];
 export const finish: StreamPart.StreamPart = { type: "finish", reason: "stop", usage };
+
+/** A user message with a text part for each of `texts`, as a turn's prompt is. */
+export const userMessage = (...texts: ReadonlyArray<string>): Prompt.UserMessage =>
+  Prompt.makeMessage("user", { content: texts.map((text) => Prompt.makePart("text", { text })) });
