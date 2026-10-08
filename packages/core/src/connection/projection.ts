@@ -4,15 +4,15 @@ import { Connection } from "./connection.ts";
 import { ConnectionFacts } from "./facts.ts";
 import { ConnectionStore } from "./store.ts";
 
-/** Apply a change to the stored connection it names, which must exist in this workspace. */
-const change = Effect.fnUntraced(function* (
+/** Change the stored connection a fact names, as `changes` says. */
+const update = Effect.fnUntraced(function* (
   connectionId: Connection.Id,
-  apply: (record: Connection.Record) => Connection.Record,
+  changes: Partial<Connection.Record>,
 ) {
   const connectionStore = yield* ConnectionStore.Service;
   const found = yield* connectionStore.get(connectionId);
   if (Option.isNone(found)) return yield* Effect.die("A changed connection is missing");
-  yield* connectionStore.update(apply(found.value));
+  yield* connectionStore.update(Connection.change(found.value, changes));
 });
 
 /** Connections' records; replacing a key changes none. */
@@ -25,15 +25,13 @@ export const definition = Projection.make("connections", { version: 1 })
     }),
   )
   .on(ConnectionFacts.Renamed, ({ payload }) =>
-    change(payload.connectionId, (record) => Connection.change(record, { name: payload.name })),
+    update(payload.connectionId, { name: payload.name }),
   )
   .on(ConnectionFacts.Configured, ({ payload }) =>
-    change(payload.connectionId, (record) =>
-      Connection.change(record, { settings: payload.settings }),
-    ),
+    update(payload.connectionId, { settings: payload.settings }),
   )
   .on(ConnectionFacts.Removed, ({ payload }) =>
-    change(payload.connectionId, (record) => Connection.change(record, { status: "removed" })),
+    update(payload.connectionId, { status: "removed" }),
   );
 
 export * as ConnectionProjection from "./projection.ts";

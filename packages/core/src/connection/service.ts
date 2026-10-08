@@ -1,9 +1,10 @@
 import { type Connection as ConnectionContract, Integrations } from "@amends/connection";
-import { Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import type { Permission } from "../authorization/permission.ts";
 import { Requirement } from "../authorization/requirement.ts";
+import { Target } from "../authorization/target.ts";
 import { Actor } from "../identity/actor.ts";
 import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
@@ -106,9 +107,6 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/connection/service/Service",
 ) {}
 
-const ready: Connection.Readiness = { _tag: "Ready" };
-const uninstalled: Connection.Readiness = { _tag: "Uninstalled" };
-
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */
 export const make = Effect.fn("ConnectionService.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -120,8 +118,9 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const { workspaceId } = yield* Store.Service;
 
   const connectionTarget = (connectionId: Connection.Id) =>
-    ({ _tag: "Connection", workspaceId, connectionId }) as const;
+    Target.Reference.cases.Connection.make({ workspaceId, connectionId });
 
+  /** The integration this host installs as `integration`, or UnknownIntegration. */
   const requireIntegration = (integration: string) =>
     Effect.mapError(integrations.find(integration), () => new UnknownIntegration({ integration }));
 
@@ -129,29 +128,40 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const toInvalidConnection = (error: ConnectionContract.ConnectionError) =>
     new InvalidConnection({ description: error.reason.description });
 
-  /** How ready the connection is, as the integration this host installs now finds it. */
-  const readinessOf = Effect.fnUntraced(function* (record: Connection.Record) {
-    const integration = yield* Effect.option(integrations.find(record.integration));
-    if (Option.isNone(integration)) return uninstalled;
-    const validated = yield* Effect.result(
-      integration.value.validate(Connection.connectionOf(record)),
+  /** Fails unless the integration this host installs takes `record`, as it describes it. */
+  const requireValid = Effect.fnUntraced(function* (record: Connection.Record) {
+    const integration = yield* requireIntegration(record.integration);
+    yield* Effect.mapError(
+      integration.validate(Connection.connectionOf(record)),
+      toInvalidConnection,
     );
-    if (Result.isSuccess(validated)) return ready;
-    const invalid: Connection.Readiness = {
-      _tag: "Invalid",
-      description: validated.failure.reason.description,
-    };
-    return invalid;
+  });
+
+  /** How ready the connection is, as the integration this host installs now finds it. */
+  const readinessOf = Effect.fnUntraced(function* (
+    record: Connection.Record,
+  ): Effect.fn.Return<Connection.Readiness> {
+    const integration = yield* Effect.option(integrations.find(record.integration));
+    if (Option.isNone(integration)) return { _tag: "Uninstalled" };
+    return yield* Effect.match(integration.value.validate(Connection.connectionOf(record)), {
+      onFailure: (error): Connection.Readiness => ({
+        _tag: "Invalid",
+        description: error.reason.description,
+      }),
+      onSuccess: (): Connection.Readiness => ({ _tag: "Ready" }),
+    });
   });
 
   const viewOf = (record: Connection.Record, manageable: boolean) =>
     Effect.map(readinessOf(record), (readiness) => Connection.view(record, readiness, manageable));
 
   /** The connection as the actor sees it, including whether they may manage it. */
-  const viewForActor = (record: Connection.Record) =>
-    authorization
-      .permitted([Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id))])
-      .pipe(Effect.flatMap(([manageable = false]) => viewOf(record, manageable)));
+  const viewForActor = Effect.fnUntraced(function* (record: Connection.Record) {
+    const [manageable = false] = yield* authorization.permitted([
+      Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id)),
+    ]);
+    return yield* viewOf(record, manageable);
+  });
 
   /** The active connection by ID, or NotFound. */
   const requireActiveConnection = Effect.fnUntraced(function* (connectionId: Connection.Id) {
@@ -176,14 +186,34 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     return record;
   });
 
+  /** Store `apiKey` as the connection's key, in place of any it had. */
   const setKey = (connectionId: Connection.Id, apiKey: Connection.ApiKey) =>
     connectionCredentialStore
       .set(connectionId, { apiKey })
       .pipe(
-        Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
-          Effect.fail(new CredentialsUnavailable({ reason })),
+        Effect.catchTag(
+          "ConnectionCredentialStore.Unavailable",
+          ({ reason }) => new CredentialsUnavailable({ reason }),
         ),
       );
+
+  /** The connection's key, read for using it, or nothing for one that authenticates with none. */
+  const credentialOf = Effect.fnUntraced(function* (record: Connection.Record) {
+    if (record.auth !== "apiKey") return undefined;
+    const credential = yield* connectionCredentialStore
+      .get(record.id)
+      .pipe(
+        Effect.catchTag(
+          "ConnectionCredentialStore.Unavailable",
+          ({ reason }) => new CredentialsUnavailable({ reason }),
+        ),
+      );
+    return Option.getOrUndefined(credential);
+  });
+
+  /** Views by name, and by id among connections of one name. */
+  const byName = (left: Connection.View, right: Connection.View) =>
+    left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1);
 
   const listIntegrations = Effect.gen(function* () {
     yield* authorization.require([]);
@@ -200,15 +230,12 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         Requirement.make(ConnectionPermissions.Manage, connectionTarget(record.id)),
       ]),
     );
-    const views = yield* Effect.forEach(
-      active.flatMap((record, index) =>
-        permitted[index * 2] === true ? [{ record, manageable: permitted[index * 2 + 1] }] : [],
-      ),
-      ({ record, manageable }) => viewOf(record, manageable === true),
-    );
-    return views.toSorted(
-      (left, right) => left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1),
-    );
+    const views: Array<Connection.View> = [];
+    for (const [index, record] of active.entries()) {
+      const [readable = false, manageable = false] = permitted.slice(index * 2, index * 2 + 2);
+      if (readable) views.push(yield* viewOf(record, manageable));
+    }
+    return views.toSorted(byName);
   });
 
   const get = Effect.fn("ConnectionService.get")(function* (connectionId: Connection.Id) {
@@ -219,7 +246,8 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
   const models = Effect.fn("ConnectionService.models")(function* (connectionId: Connection.Id) {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     const record = yield* requirePermittedConnection(id, ConnectionPermissions.Read);
-    return (yield* requireIntegration(record.integration)).models;
+    const integration = yield* requireIntegration(record.integration);
+    return integration.models;
   });
 
   const create = Effect.fn("ConnectionService.create")(
@@ -237,13 +265,11 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         ]),
       );
       // A retry returns the connection its first attempt created, unless it was removed since.
-      if (options.requestKey !== undefined) {
-        const retried = yield* connectionStore.get(connectionId);
-        if (Option.isSome(retried)) {
-          if (retried.value.status !== "active") return yield* new NotFound({ connectionId });
-          return yield* viewForActor(retried.value);
-        }
-      }
+      if (
+        options.requestKey !== undefined &&
+        Option.isSome(yield* connectionStore.get(connectionId))
+      )
+        return yield* viewForActor(yield* requireActiveConnection(connectionId));
       const created: Connection.Record = {
         id: connectionId,
         workspaceId,
@@ -255,11 +281,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         createdBy: actor.memberId,
         createdAt: yield* DateTime.now,
       };
-      const integration = yield* requireIntegration(created.integration);
-      yield* Effect.mapError(
-        integration.validate(Connection.connectionOf(created)),
-        toInvalidConnection,
-      );
+      yield* requireValid(created);
       if (request.apiKey !== undefined) yield* setKey(connectionId, request.apiKey);
       yield* journal.publish(ConnectionFacts.Created, created);
       return yield* viewForActor(created);
@@ -299,11 +321,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
         ConnectionPermissions.Manage,
       );
       const configured = Connection.change(record, { settings: request.settings });
-      const integration = yield* requireIntegration(record.integration);
-      yield* Effect.mapError(
-        integration.validate(Connection.connectionOf(configured)),
-        toInvalidConnection,
-      );
+      yield* requireValid(configured);
       yield* journal.publish(ConnectionFacts.Configured, {
         workspaceId,
         connectionId: record.id,
@@ -340,15 +358,7 @@ export const make = Effect.fn("ConnectionService.make")(function* () {
     const id = yield* Schema.decodeEffect(Connection.Id)(connectionId);
     const record = yield* requirePermittedConnection(id, ConnectionPermissions.Manage);
     const integration = yield* requireIntegration(record.integration);
-    const credential =
-      record.auth === "apiKey"
-        ? yield* connectionCredentialStore.get(record.id).pipe(
-            Effect.map(Option.getOrUndefined),
-            Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
-              Effect.fail(new CredentialsUnavailable({ reason })),
-            ),
-          )
-        : undefined;
+    const credential = yield* credentialOf(record);
     return yield* Effect.mapError(
       integration.check(Connection.connectionOf(record), credential),
       toInvalidConnection,
