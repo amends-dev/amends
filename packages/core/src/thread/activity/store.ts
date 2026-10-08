@@ -26,6 +26,7 @@ export const ReadOptions = Schema.Struct({
       "beforeSequence must come after afterSequence",
   ),
 );
+
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 /** How many activities of one kind a thread holds. */
@@ -33,16 +34,19 @@ export const Count = Schema.Struct({
   threadId: ThreadId.Id,
   count: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
 export interface Count extends Schema.Schema.Type<typeof Count> {}
 
 export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityStore.Failure", {
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
 export class Conflict extends Schema.TaggedError<Conflict>()("ThreadActivityStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
+
 /** Internal projection storage. Reads honor the caller transaction; writes require it. */
 export interface Interface {
   readonly get: (
@@ -87,7 +91,9 @@ export interface Interface {
     record: ThreadActivity.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/activity/store/Service",
 ) {}
+
 export * as ThreadActivityStore from "./store.ts";

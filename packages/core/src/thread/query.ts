@@ -22,28 +22,38 @@ import { ThreadActivityStore } from "./activity/store.ts";
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadQuery.NotFound", {
   threadId: Thread.Id,
 }) {}
+
 /** A member who may take part in a group's threads: a current admission and active membership. */
 export interface Eligible {
   readonly admission: GroupMembership.Record;
   readonly member: Member.Record;
 }
+
 export type AccessError =
   | Authorization.Error
   | GroupMembershipStore.Failure
   | ThreadStore.Failure
   | Schema.SchemaError
   | NotFound;
+
 export type ParticipantsError =
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | ThreadParticipationStore.Failure;
+
 export type TimelineError =
   | AccessError
   | ThreadActivityStore.Failure
   | ThreadActivityResolvers.Failure;
+
 export interface Interface {
   /** Audience only. Operations check their action permission separately, inside the commit for writes. */
   readonly requireAccess: (
+    threadId: Thread.Id,
+  ) => Effect.Effect<Thread.Record, AccessError, Actor.Service>;
+
+  /** The thread, under its audience and `thread.read`, as every read of its conversation needs. */
+  readonly requireReadable: (
     threadId: Thread.Id,
   ) => Effect.Effect<Thread.Record, AccessError, Actor.Service>;
   /**
@@ -90,9 +100,11 @@ export interface Interface {
     activityId: ThreadActivity.Id,
   ) => Effect.Effect<Thread.TimelineItem, TimelineError, Actor.Service>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/query/Service",
 ) {}
+
 /** @category constructors */
 export const make = Effect.fn("ThreadQuery.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -113,9 +125,19 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     const thread = found.value;
     yield* groupQuery
       .requireAudience(thread.groupId)
-      .pipe(
-        Effect.catchTag("GroupQuery.NotMember", () => Effect.fail(new NotFound({ threadId: id }))),
-      );
+      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new NotFound({ threadId: id })));
+    return thread;
+  });
+
+  const requireReadable = Effect.fn("ThreadQuery.requireReadable")(function* (threadId: Thread.Id) {
+    const thread = yield* requireAccess(threadId);
+    yield* authorization.require([
+      Requirement.make(ThreadPermissions.Read, {
+        _tag: "Thread",
+        workspaceId,
+        threadId: thread.id,
+      }),
+    ]);
     return thread;
   });
 
@@ -138,6 +160,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     }
     return result;
   });
+
   /**
    * The stored active participations still current: contacts and triage take part without group
    * access, and members need their admission and workspace membership to be active.
@@ -145,22 +168,21 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   const keepCurrent = Effect.fnUntraced(function* (
     rows: ReadonlyArray<ThreadParticipation.Record>,
   ) {
-    const joined = rows.flatMap((p) =>
-      ThreadParticipation.Participant.isAnyOf(["Member"])(p.participant) ? [p.participant] : [],
+    const members = rows.flatMap(({ participant }) =>
+      ThreadParticipation.Participant.isAnyOf(["Member"])(participant) ? [participant] : [],
     );
-    const admissions = new Map(
-      (yield* groupMembershipStore.getMany(joined.map((p) => p.groupMembershipId))).map(
-        (admission) => [admission.id, admission] as const,
-      ),
+    const admissions = yield* groupMembershipStore.getMany(
+      members.map((member) => member.groupMembershipId),
     );
-    const found = yield* getMembersById(joined.map((p) => p.memberId));
-    return rows.filter(
-      (p) =>
-        !ThreadParticipation.Participant.isAnyOf(["Member"])(p.participant) ||
-        (admissions.get(p.participant.groupMembershipId)?.status === "active" &&
-          found.get(p.participant.memberId)?.status === "active"),
-    );
+    const admissionsById = new Map(admissions.map((admission) => [admission.id, admission]));
+    const membersById = yield* getMembersById(members.map((member) => member.memberId));
+    const isCurrent = (participant: ThreadParticipation.Participant) =>
+      !ThreadParticipation.Participant.isAnyOf(["Member"])(participant) ||
+      (admissionsById.get(participant.groupMembershipId)?.status === "active" &&
+        membersById.get(participant.memberId)?.status === "active");
+    return rows.filter(({ participant }) => isCurrent(participant));
   });
+
   /** Read one page of stored active participations: those current, and the cursor after it. */
   const readParticipationPage = Effect.fnUntraced(function* (
     thread: Thread.Record,
@@ -173,6 +195,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
       next: rows.length < options.limit || last === undefined ? undefined : last.id,
     };
   });
+
   /** Store pages a whole-thread read takes at a time. */
   const pageSize = 500;
   const currentParticipants = Effect.fn("ThreadQuery.currentParticipants")(function* (
@@ -190,6 +213,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     } while (after !== undefined);
     return result;
   });
+
   const pageParticipants = Effect.fn("ThreadQuery.pageParticipants")(function* (
     thread: Thread.Record,
     request: ThreadParticipation.ListOptions,
@@ -210,6 +234,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     } while (after !== undefined && result.length < options.limit);
     return result;
   });
+
   const findParticipants = Effect.fn("ThreadQuery.findParticipants")(function* (
     thread: Thread.Record,
     references: ReadonlyArray<ThreadParticipation.Reference>,
@@ -218,18 +243,6 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     return yield* keepCurrent(yield* threadParticipationStore.findActive(thread.id, references));
   });
 
-  /** The thread, under its audience and `thread.read`. */
-  const requireReadable = Effect.fnUntraced(function* (threadId: Thread.Id) {
-    const thread = yield* requireAccess(threadId);
-    yield* authorization.require([
-      Requirement.make(ThreadPermissions.Read, {
-        _tag: "Thread",
-        workspaceId,
-        threadId: thread.id,
-      }),
-    ]);
-    return thread;
-  });
   const readTimeline = Effect.fn("ThreadQuery.readTimeline")(function* (
     threadId: Thread.Id,
     options: ThreadActivityStore.ReadOptions,
@@ -241,6 +254,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
       yield* threadActivityStore.readPage(thread.id, request),
     );
   });
+
   const readTimelineItem = Effect.fn("ThreadQuery.readTimelineItem")(function* (
     activityId: ThreadActivity.Id,
   ) {
@@ -257,6 +271,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
 
   return Service.of({
     requireAccess,
+    requireReadable,
     eligibleMembers,
     currentParticipants,
     pageParticipants,
@@ -265,6 +280,8 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     readTimelineItem,
   });
 });
+
 /** Internal reads shared by thread, turn, read-state, signal, and notification operations. @category layers */
 export const layer = Layer.effect(Service, make());
+
 export * as ThreadQuery from "./query.ts";

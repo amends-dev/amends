@@ -12,9 +12,11 @@ export const Item = Schema.Struct({
   activity: ThreadMessageActivity.Published.Activity,
   message: ThreadMessage.Record,
 });
+
 export interface Item extends Schema.Schema.Type<typeof Item> {}
 
 type PublishedItem = Item;
+
 declare module "../activity/kind.ts" {
   interface Items {
     "message.published": PublishedItem;

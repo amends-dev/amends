@@ -12,4 +12,5 @@ export const Published = Fact.make("thread.message.published", {
   audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Schema.Struct({ ...ThreadMessage.Record.fields, groupId: GroupId.Id }),
 });
+
 export * as ThreadMessageFacts from "./facts.ts";

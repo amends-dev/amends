@@ -22,4 +22,5 @@ export const Recorded = Fact.make("thread.activity.recorded", {
     ),
   }),
 });
+
 export * as ThreadActivityFacts from "./facts.ts";

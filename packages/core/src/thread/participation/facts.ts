@@ -13,6 +13,7 @@ export const Added = Fact.make("thread.participation.added", {
   audience: (payload) => [Group.audienceOf(payload.groupId)],
   payload: Schema.Struct({ ...ThreadParticipation.Admission.fields, groupId: GroupId.Id }),
 });
+
 export const Ended = Fact.make("thread.participation.ended", {
   version: 1,
   subject: (payload) => Subject.make("thread-participation", payload.participationId),
@@ -26,4 +27,5 @@ export const Ended = Fact.make("thread.participation.ended", {
     reason: ThreadParticipation.EndReason,
   }),
 });
+
 export * as ThreadParticipationFacts from "./facts.ts";

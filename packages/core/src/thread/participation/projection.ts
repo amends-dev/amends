@@ -38,4 +38,5 @@ export const definition = Projection.make("thread.participation", { version: 1 }
       yield* threadParticipationStore.endByAdmission(payload.membershipId, provenance.occurredAt);
     }),
   );
+
 export * as ThreadParticipationProjection from "./projection.ts";

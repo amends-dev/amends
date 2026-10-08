@@ -25,4 +25,5 @@ export const definition = Projection.make("threads", { version: 1 })
       });
     }),
   );
+
 export * as ThreadProjection from "./projection.ts";

@@ -9,6 +9,7 @@ import { ThreadActivity } from "./activity.ts";
  */
 // oxlint-disable-next-line typescript/no-empty-interface -- domains extend it by augmentation.
 export interface Items {}
+
 /** One timeline item: an activity with the records it references, as its kind resolves them. */
 export type Item = Items[keyof Items];
 
@@ -39,6 +40,7 @@ export interface Definition<Name extends string = string, D extends Details = De
   /** Pure: the activity's identity within the workspace, or null to leave it repeatable. */
   occurrence(details: D["Type"]): ReadonlyArray<string> | null;
 }
+
 /** An activity of this kind with its details decoded. */
 export type Activity<K extends Definition> = K["Activity"]["Type"];
 
@@ -97,6 +99,12 @@ export const is =
   (activity: ThreadActivity.Record): boolean =>
     activity.kind === kind.name;
 
+/** An activity read as a kind it is not. */
+export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind.Mismatch", {
+  kind: Schema.String,
+  activityId: ThreadActivity.Id,
+}) {}
+
 /** Read an activity as this kind, decoding its details; one of another kind is a Mismatch. */
 export const decode = Effect.fn("ThreadActivityKind.decode")(function* <K extends Definition>(
   kind: K,
@@ -107,12 +115,6 @@ export const decode = Effect.fn("ThreadActivityKind.decode")(function* <K extend
   const details = yield* Schema.decodeEffect(kind.details)(activity.details);
   return Object.assign({}, activity, { details }) as Activity<K>;
 });
-
-/** An activity read as a kind it is not. */
-export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind.Mismatch", {
-  kind: Schema.String,
-  activityId: ThreadActivity.Id,
-}) {}
 
 /**
  * Build a whole activity record from known-valid details, throwing otherwise. For fixtures and

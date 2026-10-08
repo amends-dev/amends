@@ -10,6 +10,7 @@ import { Store } from "../../journal/store.ts";
 import { ThreadCommand } from "../command.ts";
 import { ThreadQuery } from "../query.ts";
 import { ThreadParticipation } from "../participation/participation.ts";
+import type { Member } from "../../workspace/member/member.ts";
 import { ThreadMessage } from "./message.ts";
 import { ThreadMessagePermissions } from "./permissions.ts";
 import { ReadStateCommand } from "../../read-state/command.ts";
@@ -31,10 +32,12 @@ export type Error =
   | ParticipantUnavailable
   | HumanAuthorRequired
   | ThreadMessageStore.Failure;
+
 export type TypingError =
   | Authorization.Error
   | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
   | NotFound;
+
 export interface Interface {
   /**
    * Publish a human reply; join its author and eligible mentions, recording recipients atomically.
@@ -52,11 +55,35 @@ export interface Interface {
    */
   readonly typing: (threadId: Thread.Id) => Effect.Effect<void, TypingError, Actor.Service>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/message/service/Service",
 ) {}
+
+/**
+ * Whom a reply by `authorId` selects to take part: its author, and those it addresses: the
+ * members it mentions, or, without mentions, every current participant, contacts and triage
+ * included.
+ */
+const selectedFor = (
+  authorId: Member.Id,
+  mentions: ReadonlyArray<Member.Id>,
+  current: ReadonlyArray<ThreadParticipation.Record>,
+): ReadonlyArray<ThreadParticipation.Reference> => {
+  const author: ThreadParticipation.Reference = { _tag: "Member", memberId: authorId };
+  const addressed: ReadonlyArray<ThreadParticipation.Reference> =
+    mentions.length === 0
+      ? current.map(({ participant }) => ThreadParticipation.referenceOf(participant))
+      : mentions.map((memberId) => ({ _tag: "Member", memberId }));
+  const byKey = new Map(
+    [author, ...addressed].map((reference) => [ThreadParticipation.keyOf(reference), reference]),
+  );
+  return [...byKey.values()];
+};
+
 /** How long readers show a typing indicator without a repeat. */
 const typingFor = Duration.seconds(6);
+
 /** Typing repeats closer than this are dropped. */
 const typingEvery = Duration.seconds(2);
 
@@ -80,13 +107,15 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       yield* Request.idFor(key, ["thread.reply", workspaceId, actor.memberId]),
     );
   });
+
   /** The thread, once the actor may read it and publish there. */
   const requirePublishable = Effect.fnUntraced(function* (threadId: Thread.Id) {
     const thread = yield* threadQuery
       .requireAccess(threadId)
       .pipe(
-        Effect.catchTag("ThreadQuery.NotFound", (error) =>
-          Effect.fail(new NotFound({ threadId: error.threadId })),
+        Effect.catchTag(
+          "ThreadQuery.NotFound",
+          (error) => new NotFound({ threadId: error.threadId }),
         ),
       );
     yield* authorization.require([
@@ -98,6 +127,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     ]);
     return thread;
   });
+
   /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
   const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessage.Id) =>
     key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId);
@@ -111,29 +141,14 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       const messageId = yield* deriveReplyId(options.requestKey);
       const retried = yield* findRetriedReply(options.requestKey, messageId);
       if (Option.isSome(retried)) return retried.value;
-      // Without mentions a reply addresses every current participant, including contacts and
-      // triage; with them, only the author and those mentioned are read.
+      // Without mentions a reply addresses every current participant; with them, only the
+      // author and those mentioned are read.
       const current =
         request.mentions.length === 0 ? yield* threadQuery.currentParticipants(thread) : [];
-      const author: ThreadParticipation.Reference = {
-        _tag: "Member",
-        memberId: actor.memberId,
-      };
-      const addressed: ReadonlyArray<ThreadParticipation.Reference> =
-        request.mentions.length === 0
-          ? current.map((p) => ThreadParticipation.referenceOf(p.participant))
-          : request.mentions.map((memberId) => ({ _tag: "Member" as const, memberId }));
-      const selected = [
-        ...new Map(
-          [author, ...addressed].map((reference) => [
-            ThreadParticipation.keyOf(reference),
-            reference,
-          ]),
-        ).values(),
-      ];
+      const selected = selectedFor(actor.memberId, request.mentions, current);
       // Current participants already hold a current admission; only the others need checking.
       const participating = new Set(
-        current.flatMap((p) => ThreadParticipation.memberOf(p.participant) ?? []),
+        current.flatMap(({ participant }) => ThreadParticipation.memberOf(participant) ?? []),
       );
       const joining = selected.flatMap((reference) =>
         ThreadParticipation.Reference.isAnyOf(["Member"])(reference) &&
@@ -173,8 +188,9 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           occurredAt: yield* DateTime.now,
         })
         .pipe(
-          Effect.catchTag("ThreadCommand.Unavailable", (error) =>
-            Effect.fail(new ParticipantUnavailable({ memberId: error.memberId })),
+          Effect.catchTag(
+            "ThreadCommand.Unavailable",
+            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
           ),
         );
       // Replying reads the thread through the author's own message.
@@ -189,6 +205,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
+
   /** When each member last said they were typing in each thread, in this process. */
   const lastTyping = new Map<string, number>();
   const typing = Effect.fn("ThreadMessageService.typing")(function* (threadId: Thread.Id) {
@@ -216,5 +233,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   });
   return Service.of({ publish, typing });
 });
+
 export const layer = Layer.effect(Service, make());
+
 export * as ThreadMessageService from "./service.ts";

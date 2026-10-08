@@ -11,4 +11,5 @@ export const definition = Projection.make("thread.activity", { version: 1 }).on(
     yield* threadActivityStore.insert(payload.activity);
   }),
 );
+
 export * as ThreadActivityProjection from "./projection.ts";

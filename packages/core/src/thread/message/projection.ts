@@ -12,4 +12,5 @@ export const definition = Projection.make("thread.message", { version: 1 }).on(
     yield* threadMessageStore.insert(payload);
   }),
 );
+
 export * as ThreadMessageProjection from "./projection.ts";

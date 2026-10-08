@@ -372,6 +372,7 @@ which run inside the caller's commit and publication context. A command may read
 | Method                                                                    | Role                                                                                                  |
 | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                   |
+| `ThreadQuery.requireReadable`                                             | The thread under that access and `thread.read`, as every read of its conversation needs               |
 | `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                |
 | `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                          |
 | `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                   |

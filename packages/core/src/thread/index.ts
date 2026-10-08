@@ -1,32 +1,63 @@
 export { ThreadId } from "./id.ts";
+
 export { Thread } from "./thread.ts";
+
 export { ThreadFacts } from "./facts.ts";
+
 export { ThreadStore } from "./store.ts";
+
 export { ThreadProjection } from "./projection.ts";
+
 export { ThreadMessage } from "./message/message.ts";
+
 export { ThreadMessageService } from "./message/service.ts";
+
 export { ThreadMessagePermissions } from "./message/permissions.ts";
+
 export { ThreadMessageFacts } from "./message/facts.ts";
+
 export { ThreadMessageStore } from "./message/store.ts";
+
 export { ThreadMessageProjection } from "./message/projection.ts";
+
 export { ThreadParticipation } from "./participation/participation.ts";
+
 export { ThreadParticipationService } from "./participation/service.ts";
+
 export { ThreadParticipationPermissions } from "./participation/permissions.ts";
+
 export { ThreadParticipationFacts } from "./participation/facts.ts";
+
 export { ThreadParticipationStore } from "./participation/store.ts";
+
 export { ThreadParticipationProjection } from "./participation/projection.ts";
+
 export { ThreadActivity } from "./activity/activity.ts";
+
 export { ThreadActivityKind } from "./activity/kind.ts";
+
 export { ThreadActivityResolvers } from "./activity/resolvers.ts";
+
 export { ThreadMessageActivity } from "./message/activity.ts";
+
 export { ThreadMessageTimeline } from "./message/timeline.ts";
+
 export { ThreadParticipationActivity } from "./participation/activity.ts";
+
 export { ThreadParticipationTimeline } from "./participation/timeline.ts";
+
 export { ThreadTimeline } from "./timeline.ts";
+
 export { ThreadActivityFacts } from "./activity/facts.ts";
+
 export { ThreadActivityStore } from "./activity/store.ts";
+
 export { ThreadActivityProjection } from "./activity/projection.ts";
+
 export { ThreadService } from "./service.ts";
+
 export { ThreadCommand } from "./command.ts";
+
 export { ThreadQuery } from "./query.ts";
+
 export { ThreadPermissions } from "./permissions.ts";

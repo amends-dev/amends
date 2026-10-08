@@ -26,6 +26,7 @@ export type Error =
   | NotFound
   | AlreadyEnded
   | FixedParticipation;
+
 export interface Interface {
   /** Follow as the acting member. An existing participation is returned without new facts. */
   readonly follow: (
@@ -39,9 +40,11 @@ export interface Interface {
     input: ThreadParticipation.UnfollowInput,
   ) => Effect.Effect<void, Error, Actor.Service>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/participation/service/Service",
 ) {}
+
 export const make = Effect.fn("ThreadParticipationService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const threadQuery = yield* ThreadQuery.Service;
@@ -51,12 +54,14 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
+  /** The thread, under its audience; one outside it is missing to the actor. */
   const requireAccess = (threadId: Thread.Id) =>
     threadQuery
       .requireAccess(threadId)
       .pipe(
-        Effect.catchTag("ThreadQuery.NotFound", (error) =>
-          Effect.fail(new ThreadNotFound({ threadId: error.threadId })),
+        Effect.catchTag(
+          "ThreadQuery.NotFound",
+          (error) => new ThreadNotFound({ threadId: error.threadId }),
         ),
       );
   const follow = Effect.fn("ThreadParticipationService.follow")(
@@ -98,6 +103,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
+
   const unfollow = Effect.fn("ThreadParticipationService.unfollow")(
     function* (input: ThreadParticipation.UnfollowInput) {
       const request = yield* Schema.decodeEffect(ThreadParticipation.UnfollowInput)(input);
@@ -154,5 +160,7 @@ export const make = Effect.fn("ThreadParticipationService.make")(function* () {
   );
   return Service.of({ follow, unfollow });
 });
+
 export const layer = Layer.effect(Service, make());
+
 export * as ThreadParticipationService from "./service.ts";
