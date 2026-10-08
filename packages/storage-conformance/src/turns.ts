@@ -282,7 +282,7 @@ const idle = TurnExecution.Start.cases.Idle.make({});
  */
 const runJob = (id: Workspace.Id, memberId: Member.Id, threadId: Turn.Record["threadId"]) =>
   execute(id, (turnExecution) =>
-    Effect.flatMap(turnExecution.accept({ memberId, threadId }), (accepted) =>
+    Effect.flatMap(turnExecution.accept(memberId, threadId), (accepted) =>
       Option.match(accepted, {
         onNone: () => Effect.succeed(idle),
         onSome: (turn) => turnExecution.start(turn.id),

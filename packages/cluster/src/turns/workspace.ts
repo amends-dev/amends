@@ -39,7 +39,8 @@ export const make = Effect.fnUntraced(function* (workspaceId: Workspace.Id) {
     );
   return {
     /** The agent's active turn in the thread, or a new one that accepts the work that waits. */
-    accept: (job: TurnJobs.Job) => turnExecution((turnExecution) => turnExecution.accept(job)),
+    accept: (job: TurnJobs.Job) =>
+      turnExecution((turnExecution) => turnExecution.accept(job.memberId, job.threadId)),
     /** Start the turn: `Ready` with what runs it, or `Idle` for one that ended as it stood. */
     start: (turnId: Turn.Id) => turnExecution((turnExecution) => turnExecution.start(turnId)),
     /** The conversation the turn's agent joined, for a session log that starts with it. */

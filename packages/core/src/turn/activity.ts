@@ -3,10 +3,9 @@ import { Subject } from "../journal/subject.ts";
 import { ThreadActivityKind } from "../thread/activity/kind.ts";
 import { ThreadMessageId } from "../thread/message/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
-import { TurnId } from "./id.ts";
 import { Turn } from "./turn.ts";
 
-const turnSubject = ({ turnId }: { readonly turnId: TurnId.Id }) => Subject.make("turn", turnId);
+const turnSubject = ({ turnId }: { readonly turnId: Turn.Id }) => Subject.make("turn", turnId);
 
 /**
  * An agent accepted work into a new turn here, or someone asked a failed or stopped one to run
@@ -15,10 +14,10 @@ const turnSubject = ({ turnId }: { readonly turnId: TurnId.Id }) => Subject.make
  */
 export const Created = ThreadActivityKind.make("turn.created", {
   details: Schema.Struct({
-    turnId: TurnId.Id,
+    turnId: Turn.Id,
     /** The agent's membership. */
     memberId: MemberId.Id,
-    retryOf: Schema.NullOr(TurnId.Id),
+    retryOf: Schema.NullOr(Turn.Id),
   }),
   subject: turnSubject,
   newActivity: false,
@@ -27,7 +26,7 @@ export type Created = ThreadActivityKind.Activity<typeof Created>;
 
 /** Execution took the turn: it is working. */
 export const Started = ThreadActivityKind.make("turn.started", {
-  details: Schema.Struct({ turnId: TurnId.Id }),
+  details: Schema.Struct({ turnId: Turn.Id }),
   subject: turnSubject,
   newActivity: false,
 });
@@ -35,7 +34,7 @@ export type Started = ThreadActivityKind.Activity<typeof Started>;
 
 /** Someone asked the working turn to stop, or its agent stopped taking part: it is stopping. */
 export const Stopping = ThreadActivityKind.make("turn.stopping", {
-  details: Schema.Struct({ turnId: TurnId.Id, cancelReason: Turn.CancelReason }),
+  details: Schema.Struct({ turnId: Turn.Id, cancelReason: Turn.CancelReason }),
   subject: turnSubject,
   newActivity: false,
 });
@@ -47,7 +46,7 @@ export type Stopping = ThreadActivityKind.Activity<typeof Stopping>;
  */
 export const Ended = ThreadActivityKind.make("turn.ended", {
   details: Schema.Struct({
-    turnId: TurnId.Id,
+    turnId: Turn.Id,
     outcome: Turn.Outcome,
     messageIds: Schema.Array(ThreadMessageId.Id),
     reason: Schema.NullOr(Schema.String),

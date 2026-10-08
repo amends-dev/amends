@@ -89,6 +89,23 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
 export const change = (record: Record, changes: Partial<Record>): Record =>
   Object.assign({}, record, changes);
 
+/** A new turn, queued until its job starts it, which has run nothing and posted nothing yet. */
+export const queued = (
+  turn: Omit<
+    Record,
+    "status" | "selection" | "messageIds" | "failure" | "cancelReason" | "startedAt" | "finishedAt"
+  >,
+): Record => ({
+  ...turn,
+  status: "queued",
+  selection: null,
+  messageIds: [],
+  failure: null,
+  cancelReason: null,
+  startedAt: null,
+  finishedAt: null,
+});
+
 /** Accepting work: the notifications it settles, and how far the accepted input reaches. */
 export const Acceptance = Schema.Struct({
   notificationIds: Schema.NonEmptyArray(Notification.Id),

@@ -4,15 +4,15 @@ import { TurnFacts } from "./facts.ts";
 import { TurnStore } from "./store.ts";
 import { Turn } from "./turn.ts";
 
-/** The stored turn a fact changes, in this workspace. */
-const stored = Effect.fnUntraced(function* (payload: {
-  readonly workspaceId: Turn.Record["workspaceId"];
-  readonly turnId: Turn.Id;
-}) {
+/** Change the stored turn a fact names, as `changes` says of it as it stands. */
+const update = Effect.fnUntraced(function* (
+  turnId: Turn.Id,
+  changes: (turn: Turn.Record) => Partial<Turn.Record>,
+) {
   const turnStore = yield* TurnStore.Service;
-  const found = yield* turnStore.get(payload.turnId);
+  const found = yield* turnStore.get(turnId);
   if (Option.isNone(found)) return yield* Effect.die("A changed turn is missing");
-  return { store: turnStore, turn: found.value };
+  yield* turnStore.update(Turn.change(found.value, changes(found.value)));
 });
 
 export const definition = Projection.make("turns", { version: 4 })
@@ -34,62 +34,47 @@ export const definition = Projection.make("turns", { version: 4 })
   .on(
     TurnFacts.Started,
     Effect.fn("TurnProjection.started")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, {
-          status: turn.status === "queued" ? "running" : turn.status,
-          selection: payload.selection,
-          startedAt: payload.startedAt,
-        }),
-      );
+      yield* update(payload.turnId, (turn) => ({
+        status: turn.status === "queued" ? "running" : turn.status,
+        selection: payload.selection,
+        startedAt: payload.startedAt,
+      }));
     }),
   )
   .on(
     TurnFacts.CancelRequested,
     Effect.fn("TurnProjection.cancelRequested")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, { status: "cancelling", cancelReason: payload.reason }),
-      );
+      yield* update(payload.turnId, () => ({ status: "cancelling", cancelReason: payload.reason }));
     }),
   )
   .on(
     TurnFacts.Completed,
     Effect.fn("TurnProjection.completed")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, {
-          status: "completed",
-          messageIds: payload.messageIds,
-          finishedAt: payload.finishedAt,
-        }),
-      );
+      yield* update(payload.turnId, () => ({
+        status: "completed",
+        messageIds: payload.messageIds,
+        finishedAt: payload.finishedAt,
+      }));
     }),
   )
   .on(
     TurnFacts.Failed,
     Effect.fn("TurnProjection.failed")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, {
-          status: "failed",
-          failure: payload.reason,
-          finishedAt: payload.finishedAt,
-        }),
-      );
+      yield* update(payload.turnId, () => ({
+        status: "failed",
+        failure: payload.reason,
+        finishedAt: payload.finishedAt,
+      }));
     }),
   )
   .on(
     TurnFacts.Cancelled,
     Effect.fn("TurnProjection.cancelled")(function* ({ payload }) {
-      const { store, turn } = yield* stored(payload);
-      yield* store.update(
-        Turn.change(turn, {
-          status: "cancelled",
-          cancelReason: payload.cancelReason,
-          finishedAt: payload.finishedAt,
-        }),
-      );
+      yield* update(payload.turnId, () => ({
+        status: "cancelled",
+        cancelReason: payload.cancelReason,
+        finishedAt: payload.finishedAt,
+      }));
     }),
   );
 

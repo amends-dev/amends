@@ -9,15 +9,14 @@ import { Session, StreamPart } from "@amends/harness";
 import { Schema } from "effect";
 import { Prompt } from "effect/ai";
 import type { ThreadMessageId } from "../thread/message/id.ts";
-import { TurnId } from "./id.ts";
-import type { Turn } from "./turn.ts";
+import { Turn } from "./turn.ts";
 
 export const Entry = Schema.TaggedUnion({
   /** The agent joined the thread under way, and its session started with the conversation so far. */
   Joined: { conversation: Schema.Array(Prompt.Message) },
   /** A turn prompted the agent with `prompt`, which tells it `messages` of the thread's messages. */
   Prompted: {
-    turnId: TurnId.Id,
+    turnId: Turn.Id,
     prompt: Prompt.UserMessage,
     messages: Schema.Int,
   },
@@ -28,17 +27,17 @@ export const Entry = Schema.TaggedUnion({
    * starts none.
    */
   Started: {
-    turnId: TurnId.Id,
+    turnId: Turn.Id,
     agent: Schema.String,
     agentState: Schema.optionalKey(Schema.Json),
   },
   /** A step of the turn finished, its parts added up. `id` names it, as its drafts do. */
-  Step: { turnId: TurnId.Id, id: Schema.NonEmptyString, step: StreamPart.Step },
+  Step: { turnId: Turn.Id, id: Schema.NonEmptyString, step: StreamPart.Step },
   /**
    * The turn's run stopped before the turn ended. The next run continues the turn from the steps
    * it finished when the agent still has it, and otherwise starts it again from its prompt.
    */
-  Interrupted: { turnId: TurnId.Id, reason: Schema.NonEmptyString },
+  Interrupted: { turnId: Turn.Id, reason: Schema.NonEmptyString },
 });
 export type Entry = typeof Entry.Type;
 
@@ -110,25 +109,38 @@ export const answerOf = (entries: ReadonlyArray<Entry>): string => {
 };
 
 /**
- * Reads a turn's entries as they come: `add` each in order, `end` once the turn ended, with the
- * reply it posted, and `items` says what they show.
+ * Reads a turn's entries from its participation's log as they come: `add` each page in order,
+ * which takes the entries past `position`, the turn's own among them, `end` once the turn ended,
+ * with the reply it posted, and `items` says what they show.
  */
 export interface Reader {
-  readonly add: (recorded: Recorded) => void;
+  readonly add: (recorded: ReadonlyArray<Recorded>) => void;
   readonly end: (messageIds: ReadonlyArray<ThreadMessageId.Id>) => void;
+  /** The latest position of the log the reader took, the turn's entry or another's. */
+  readonly position: () => number;
   readonly items: () => ReadonlyArray<Turn.LogItem>;
 }
 
 /**
- * Each of a turn's entries as its readers see it: the prompt as the messages it took in, each step
- * that wrote text as a response, and each run that stopped short. The response the turn posted is
- * its reply, once the turn ends; steps that only called tools show nothing yet.
+ * Reads the turn's entries past `after`, where its log begins, as its readers see them: the prompt
+ * as the messages it took in, each step that wrote text as a response, and each run that stopped
+ * short. The response the turn posted is its reply, once the turn ends; steps that only called
+ * tools show nothing yet.
  */
-export const reader = (): Reader => {
+export const reader = (turnId: Turn.Id, after: number): Reader => {
+  const ofTurn = isOfTurn(turnId);
   const items: Array<Turn.LogItem> = [];
+  let position = after;
   /** Where the latest run's last response sits among the items. */
   let lastResponse: number | undefined;
-  const add: Reader["add"] = ({ entry, recordedAt: at }) => {
+  const add: Reader["add"] = (recorded) => {
+    for (const entry of recorded) {
+      if (entry.position <= position) continue;
+      position = entry.position;
+      if (ofTurn(entry.entry)) addEntry(entry);
+    }
+  };
+  const addEntry = ({ entry, recordedAt: at }: Recorded) => {
     switch (entry._tag) {
       case "Joined":
       case "Started":
@@ -162,7 +174,19 @@ export const reader = (): Reader => {
     if (messageIds.length > 0 && lastResponse !== undefined && response?._tag === "Responded")
       items[lastResponse] = { ...response, reply: true };
   };
-  return { add, end, items: () => [...items] };
+  return { add, end, position: () => position, items: () => [...items] };
 };
+
+const isSameItem = Schema.toEquivalence(Turn.LogItem);
+
+/** The items of `now` that `before` did not have as they are, each at its index. */
+export const changesSince = (
+  before: ReadonlyArray<Turn.LogItem>,
+  now: ReadonlyArray<Turn.LogItem>,
+): ReadonlyArray<Turn.LogChange> =>
+  now.flatMap((item, index) => {
+    const had = before[index];
+    return had !== undefined && isSameItem(had, item) ? [] : [{ index, item }];
+  });
 
 export * as SessionLog from "./session-log.ts";

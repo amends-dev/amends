@@ -66,8 +66,8 @@ const itemsOf = (
   entries: ReadonlyArray<SessionLog.Entry>,
   ended?: ReadonlyArray<ThreadMessage.Id>,
 ) => {
-  const reader = SessionLog.reader();
-  entries.forEach((entry, index) => reader.add({ position: index + 1, recordedAt: at, entry }));
+  const reader = SessionLog.reader(turnId, 0);
+  reader.add(entries.map((entry, index) => ({ position: index + 1, recordedAt: at, entry })));
   if (ended !== undefined) reader.end(ended);
   return reader.items();
 };
@@ -132,6 +132,29 @@ describe("a turn's log items", () => {
     expect(itemsOf([prompted(), step("one", writing("Done."))], [])[1]).toMatchObject({
       reply: false,
     });
+  });
+
+  it("take the turn's entries past where its log begins, and know how far they read", () => {
+    const other = Turn.Id.make("turn-0");
+    const reader = SessionLog.reader(turnId, 2);
+    const recorded = [prompted("Ada: Earlier.", other), step("a", writing("Old."), other)].map(
+      (entry, index) => ({ position: index + 1, recordedAt: at, entry }),
+    );
+    reader.add([...recorded, { position: 3, recordedAt: at, entry: prompted() }]);
+    reader.add([{ position: 3, recordedAt: at, entry: prompted() }]);
+    reader.add([{ position: 4, recordedAt: at, entry: step("b", writing("Half")) }]);
+    expect(reader.position()).toBe(4);
+    expect(reader.items().map(({ _tag }) => _tag)).toEqual(["InputTaken", "Responded"]);
+  });
+
+  it("change where an item is new or differs from what a reader was sent", () => {
+    const before = itemsOf([prompted(), step("one", writing("Half"))]);
+    const now = itemsOf(
+      [prompted(), step("one", writing("Half")), step("two", writing("Whole."))],
+      [ThreadMessage.Id.make("message-1")],
+    );
+    expect(SessionLog.changesSince(before, now).map(({ index }) => index)).toEqual([2]);
+    expect(SessionLog.changesSince(now, now)).toEqual([]);
   });
 });
 
