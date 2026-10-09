@@ -298,7 +298,9 @@ How bridges run:
 - On the host, a session connects while it uses the bridge and closes the connection when it
   releases the session, or after a minute unused. A connection that drops is not opened again:
   requests it dropped are sent again over another, for up to 30 seconds, except a tool's result, an
-  approval, and a request to compact, which the bridge must not receive twice. `suspendTurn` keeps
+  approval, and a request to compact, which the bridge must not receive twice. A turn whose bridge
+  died while the host read it goes on in the bridge launched after it, which starts the turn again
+  as `continueTurn` does, and the host's stream skips the steps it had read. `suspendTurn` keeps
   which bridge runs the turn, so that `continueTurn` starts it again there, even from a host with
   other settings, which goes on in its own bridge once the turn ends. A session whose bridge cannot
   answer, as when its sandbox is gone, releases with the state the bridge last gave.

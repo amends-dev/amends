@@ -180,23 +180,37 @@ const release = (sandbox: Sandbox.Sandbox["Service"]) =>
   });
 
 /**
+ * Reads `turn` in the background, returning the collecting fiber once it read a part `reached`
+ * accepts.
+ */
+const readUntil = <E, R>(
+  turn: Stream.Stream<StreamPart.StreamPart, E, R>,
+  reached: (part: StreamPart.StreamPart) => boolean,
+) =>
+  Effect.gen(function* () {
+    const read = yield* Deferred.make<void>();
+    const reading = yield* turn.pipe(
+      Stream.tap((part) => (reached(part) ? Deferred.succeed(read, undefined) : Effect.void)),
+      Stream.runCollect,
+      Effect.forkChild,
+    );
+    yield* Deferred.await(read);
+    return reading;
+  });
+
+/**
  * Reads `turn` in the background, returning its start and the collecting fiber once it read the
  * agent's first part.
  */
 const readFromFirstPart = <E, R>(turn: Stream.Stream<StreamPart.StreamPart, E, R>) =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<StreamPart.TurnStartPart>();
-    const read = yield* Deferred.make<void>();
-    const reading = yield* turn.pipe(
-      Stream.tap((part) =>
-        part.type === "turn-start"
-          ? Deferred.succeed(started, part)
-          : Deferred.succeed(read, undefined),
+    const reading = yield* readUntil(
+      Stream.tap(turn, (part) =>
+        part.type === "turn-start" ? Deferred.succeed(started, part) : Effect.void,
       ),
-      Stream.runCollect,
-      Effect.forkChild,
+      (part) => part.type !== "turn-start",
     );
-    yield* Deferred.await(read);
     return { reading, start: yield* Deferred.await(started) };
   });
 
@@ -456,19 +470,33 @@ describe("BridgeClient", () => {
         }).pipe(Effect.provide(TestLayer)),
     );
 
-    it.live("fails a turn its bridge lost when it died, and runs the next in another", () =>
-      Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeSetup;
-        const session = yield* harness.createSession({ sandbox, id });
-        const { reading } = yield* readFromFirstPart(session.stream({ prompt: "wait forever" }));
+    it.live(
+      "continues a turn its bridge lost when it died, after the steps read, in the bridge launched after it",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeSetup;
+          const session = yield* harness.createSession({ sandbox, id });
+          let finishedSteps = 0;
+          const reading = yield* readUntil(session.stream({ prompt: "steps first" }), (part) => {
+            if (part.type === "finish-step") finishedSteps += 1;
+            return finishedSteps === 1 && part.type === "text-start";
+          });
 
-        yield* killBridge(sandbox);
-        const error = yield* Effect.flip(Fiber.join(reading));
-        const parts = yield* Stream.runCollect(session.stream({ prompt: "reply next" }));
+          yield* killBridge(sandbox);
+          const parts = yield* Fiber.join(reading);
+          const next = yield* Stream.runCollect(session.stream({ prompt: "reply next" }));
 
-        expect(error._tag === "HarnessError" && error.reason._tag).toBe("NoTurnError");
-        expect(parts).toEqual(prompted("next"));
-      }).pipe(Effect.provide(TestLayer)),
+          // The bridge continues the turn after the step it kept, which the stream has, and the
+          // step cut short starts over.
+          expect(parts).toEqual([
+            expect.objectContaining({ type: "turn-start" }),
+            ...answer("first").slice(0, 4),
+            { type: "text-start", id: "answer" },
+            ...answer("Continue."),
+          ]);
+          expect(next).toEqual(prompted("next"));
+          expect(yield* linesOf(sandbox, "launches.jsonl")).toHaveLength(2);
+        }).pipe(Effect.provide(TestLayer)),
     );
 
     it.live(
