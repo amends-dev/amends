@@ -13,9 +13,9 @@
  * @since 0.1.0
  */
 import type { Fixture } from "./Fixture.ts";
-import { lifecycle } from "./lifecycle.ts";
-import { network } from "./network.ts";
-import { processes } from "./processes.ts";
+import { lifecycle } from "./internal/lifecycle.ts";
+import { network } from "./internal/network.ts";
+import { processes } from "./internal/processes.ts";
 
 export type { Fixture } from "./Fixture.ts";
 

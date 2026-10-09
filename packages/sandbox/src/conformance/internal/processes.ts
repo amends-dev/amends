@@ -1,10 +1,14 @@
 import { expect, layer } from "@effect/vitest";
 import { type Cause, Effect, Exit, FileSystem, Path, Queue, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { layerServices, type Sandbox } from "../Sandbox.ts";
-import { type Fixture, useProvider } from "./Fixture.ts";
+import { layerServices, type Sandbox } from "../../Sandbox.ts";
+import type { Fixture } from "../Fixture.ts";
+import { providerForTest } from "./fixture.ts";
 
-/** A command that echoes two lines of its input, then exits without waiting for the input to end. */
+/**
+ * A command that echoes two lines of its input, then exits without waiting for the input to
+ * end.
+ */
 const echoTwoLines = ChildProcess.make("sh", [
   "-c",
   'IFS= read -r line; printf "%s\\n" "$line"; IFS= read -r line; printf "%s\\n" "$line"',
@@ -15,8 +19,8 @@ export const processes = <R>(fixture: Fixture<R>) => {
   /** Runs `body` with a new sandbox's files, processes, and paths. */
   const inSandbox = <A, E, R2>(body: (sandbox: Sandbox["Service"]) => Effect.Effect<A, E, R2>) =>
     Effect.gen(function* () {
-      const provider = yield* useProvider(fixture);
-      const sandbox = yield* provider.create();
+      const sandboxProvider = yield* providerForTest(fixture);
+      const sandbox = yield* sandboxProvider.create();
       return yield* body(sandbox).pipe(Effect.provide(layerServices(sandbox)));
     });
 
@@ -95,7 +99,7 @@ export const processes = <R>(fixture: Fixture<R>) => {
         inSandbox(() =>
           Effect.gen(function* () {
             const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-            // Prints the greeting, and whether `HOME`, which the sandbox's own environment sets, is set.
+            // Prints the greeting, and whether `HOME`, from the sandbox's own environment, is set.
             const printEnvironment = (extendEnv: boolean) =>
               spawner.string(
                 ChildProcess.make("/bin/sh", ["-c", 'printf "%s|%s" "$GREETING" "${HOME:+home}"'], {

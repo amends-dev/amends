@@ -2,10 +2,11 @@ import { expect, layer } from "@effect/vitest";
 import { Effect, Exit, Record, Redacted, Schedule } from "effect";
 import { HttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
-import { NetworkPolicy, type Port } from "../Network.ts";
-import { layerServices, type Sandbox } from "../Sandbox.ts";
-import type { SandboxError } from "../SandboxError.ts";
-import { type Fixture, newSandboxId, useProvider } from "./Fixture.ts";
+import { NetworkPolicy, type Port } from "../../Network.ts";
+import { layerServices, type Sandbox } from "../../Sandbox.ts";
+import type { SandboxError } from "../../SandboxError.ts";
+import type { Fixture } from "../Fixture.ts";
+import { newSandboxId, providerForTest } from "./fixture.ts";
 
 /** Whether `change` was applied, or the reason it failed with. */
 const outcomeOf = (change: Effect.Effect<void, SandboxError>) =>
@@ -14,7 +15,7 @@ const outcomeOf = (change: Effect.Effect<void, SandboxError>) =>
     Effect.catch((error) => Effect.succeed(error.reason._tag)),
   );
 
-/** The headers a request the suite sends through an endpoint carries, besides the endpoint's own. */
+/** The headers the suite sends with a request through an endpoint, besides the endpoint's own. */
 const requestHeaders = { authorization: "Bearer conformance", "x-conformance": "passed on" };
 
 /** Reaching a sandbox's ports from outside it, and what the sandbox reaches outside. */
@@ -45,12 +46,12 @@ export const network = <R>(fixture: Fixture<R>) => {
 
   layer(fixture.layer, { excludeTestServices: true })("sandbox network", (it) => {
     it.effect(
-      "reaches a server on a port exposed at creation through the port's endpoint, with the request's headers",
+      "reaches a server on a port exposed at creation, with the request's headers",
       () =>
         Effect.gen(function* () {
           const port = yield* fixture.freePort;
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create({ ports: [port] });
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create({ ports: [port] });
 
           expect(yield* headersThrough(sandbox, port)).toMatchObject(requestHeaders);
         }),
@@ -58,20 +59,21 @@ export const network = <R>(fixture: Fixture<R>) => {
     );
 
     it.effect(
-      "exposes a port after creation for every Sandbox of it, again without harm, or fails with UnsupportedError",
+      "exposes a port after creation to every value of the sandbox, or fails with UnsupportedError",
       () =>
         Effect.gen(function* () {
           const port = yield* fixture.freePort;
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
-          const resumed = yield* provider.resume(sandbox.id);
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
+          const resumed = yield* sandboxProvider.resume(sandbox.id);
 
           const outcome = yield* outcomeOf(resumed.exposePorts([port]));
 
           expect(["applied", "UnsupportedError"]).toContain(outcome);
           if (outcome !== "applied") return;
+          // Exposing a port again succeeds.
           yield* resumed.exposePorts([port]);
-          // The sandbox as it was before the port was exposed through another `Sandbox` of it.
+          // `sandbox` is from before the port was exposed through `resumed`, and sees it too.
           expect(yield* headersThrough(sandbox, port)).toMatchObject(requestHeaders);
         }),
       fixture.timeout,
@@ -82,8 +84,8 @@ export const network = <R>(fixture: Fixture<R>) => {
       () =>
         Effect.gen(function* () {
           const port = yield* fixture.freePort;
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create({ ports: [port] });
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create({ ports: [port] });
 
           const endpoint = yield* sandbox.endpoint(port, "ws");
 
@@ -97,8 +99,8 @@ export const network = <R>(fixture: Fixture<R>) => {
       () =>
         Effect.gen(function* () {
           const port = yield* fixture.freePort;
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
 
           const error = yield* Effect.flip(sandbox.endpoint(port, "http"));
 
@@ -111,15 +113,15 @@ export const network = <R>(fixture: Fixture<R>) => {
       "creates a sandbox under a network policy, or fails with UnsupportedError and creates none",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
 
           const outcome = yield* outcomeOf(
             Effect.asVoid(
-              provider.create({ id, networkPolicy: NetworkPolicy.cases.DenyAll.make({}) }),
+              sandboxProvider.create({ id, networkPolicy: NetworkPolicy.cases.DenyAll.make({}) }),
             ),
           );
-          const resumed = yield* Effect.exit(provider.resume(id));
+          const resumed = yield* Effect.exit(sandboxProvider.resume(id));
 
           expect(["applied", "UnsupportedError"]).toContain(outcome);
           expect(Exit.isSuccess(resumed)).toBe(outcome === "applied");
@@ -131,8 +133,8 @@ export const network = <R>(fixture: Fixture<R>) => {
       "applies a network policy and request transformations, or fails with UnsupportedError",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
 
           const policy = yield* outcomeOf(
             sandbox.setNetworkPolicy(NetworkPolicy.cases.DenyAll.make({})),

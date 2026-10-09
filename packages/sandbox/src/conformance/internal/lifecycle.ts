@@ -1,9 +1,10 @@
 import { expect, layer } from "@effect/vitest";
 import { Data, Deferred, Effect, Fiber, FileSystem, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { layerServices, type Sandbox } from "../Sandbox.ts";
-import { Name } from "../Template.ts";
-import { type Fixture, newIdentity, newSandboxId, useProvider } from "./Fixture.ts";
+import { layerServices, type Sandbox } from "../../Sandbox.ts";
+import { Name } from "../../Template.ts";
+import type { Fixture } from "../Fixture.ts";
+import { newIdentity, newSandboxId, providerForTest } from "./fixture.ts";
 
 class PrepareFailed extends Data.TaggedError("PrepareFailed") {}
 
@@ -21,12 +22,15 @@ const readFile = (sandbox: Sandbox["Service"], name: string) =>
     return yield* fs.readFileString(path.join(sandbox.workingDirectory, name));
   }).pipe(Effect.provide(layerServices(sandbox)));
 
-/** Spawns a long command whose handle is unreferenced, so that it outlives the scope it spawned in. */
+/**
+ * Spawns a long command and unreferences its handle, so that the process outlives the scope it
+ * spawned in.
+ */
 const spawnOutliving = (sandbox: Sandbox["Service"]) =>
   Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const handle = yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
-    // Never referenced again, so the effect that would do so is dropped.
+    // `unref` returns the effect that would reference the process again; nothing here runs it.
     yield* Effect.asVoid(handle.unref);
     return handle;
   }).pipe(Effect.scoped, Effect.provide(layerServices(sandbox)));
@@ -39,10 +43,10 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       () =>
         Effect.gen(function* () {
           const port = yield* fixture.freePort;
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
-          const created = yield* provider.create({ id, ports: [port] });
-          const resumed = yield* provider.resume(id);
+          const created = yield* sandboxProvider.create({ id, ports: [port] });
+          const resumed = yield* sandboxProvider.resume(id);
 
           // Reaching the port fails with `NotFoundError` unless the sandbox exposes it.
           yield* resumed.endpoint(port, "http");
@@ -58,8 +62,8 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "describes where to work",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
 
           expect(sandbox.description).toContain(sandbox.workingDirectory);
         }),
@@ -70,9 +74,9 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "picks a different id for each sandbox created without one",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
-          const first = yield* provider.create();
-          const second = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const first = yield* sandboxProvider.create();
+          const second = yield* sandboxProvider.create();
 
           expect(first.id).not.toBe(second.id);
         }),
@@ -83,15 +87,15 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "fails with AlreadyExistsError for an id in use and keeps that sandbox",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
-          const existing = yield* provider.create({ id });
+          const existing = yield* sandboxProvider.create({ id });
           yield* writeFile(existing, "kept.txt", "kept");
 
-          const error = yield* Effect.flip(provider.create({ id }));
+          const error = yield* Effect.flip(sandboxProvider.create({ id }));
 
           expect(error.reason._tag).toBe("AlreadyExistsError");
-          expect(yield* readFile(yield* provider.resume(id), "kept.txt")).toBe("kept");
+          expect(yield* readFile(yield* sandboxProvider.resume(id), "kept.txt")).toBe("kept");
         }),
       fixture.timeout,
     );
@@ -100,14 +104,14 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "fails with NotFoundError when resuming an unknown id, without creating it",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
 
-          const error = yield* Effect.flip(provider.resume(id));
+          const error = yield* Effect.flip(sandboxProvider.resume(id));
 
           expect(error.reason._tag).toBe("NotFoundError");
           // The id is still free, so resuming created nothing under it.
-          expect((yield* provider.create({ id })).id).toBe(id);
+          expect((yield* sandboxProvider.create({ id })).id).toBe(id);
         }),
       fixture.timeout,
     );
@@ -116,13 +120,13 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "cannot resume a destroyed sandbox, and destroying it again succeeds",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
-          const sandbox = yield* provider.create({ id });
+          const sandbox = yield* sandboxProvider.create({ id });
 
           yield* sandbox.destroy;
           yield* sandbox.destroy;
-          const error = yield* Effect.flip(provider.resume(id));
+          const error = yield* Effect.flip(sandboxProvider.resume(id));
 
           expect(error.reason._tag).toBe("NotFoundError");
         }),
@@ -130,17 +134,17 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
     );
 
     it.effect(
-      "resumes a stopped sandbox with its files, where processes run again, and stopping it again succeeds",
+      "stops a sandbox twice, and resumes it with its files, where processes run again",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
-          const sandbox = yield* provider.create({ id });
+          const sandbox = yield* sandboxProvider.create({ id });
           yield* writeFile(sandbox, "kept.txt", "kept");
 
           yield* sandbox.stop;
           yield* sandbox.stop;
-          const resumed = yield* provider.resume(id);
+          const resumed = yield* sandboxProvider.resume(id);
           const read = yield* Effect.gen(function* () {
             const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
             return yield* spawner.string(ChildProcess.make("cat", ["kept.txt"]));
@@ -156,8 +160,8 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "ends the sandbox's running processes when it stops",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
           const handle = yield* Effect.gen(function* () {
             const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
             return yield* spawner.spawn(ChildProcess.make("sleep", ["60"]));
@@ -174,8 +178,8 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "ends a process that outlived the scope that spawned it when the sandbox stops",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
 
           const handle = yield* spawnOutliving(sandbox);
           const outlived = yield* handle.isRunning;
@@ -191,8 +195,8 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "ends a process that outlived the scope that spawned it when it is destroyed",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
-          const sandbox = yield* provider.create();
+          const sandboxProvider = yield* providerForTest(fixture);
+          const sandbox = yield* sandboxProvider.create();
 
           const handle = yield* spawnOutliving(sandbox);
           yield* sandbox.destroy;
@@ -206,9 +210,9 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "runs the template inside the sandbox before create returns",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
 
-          const sandbox = yield* provider.create({
+          const sandbox = yield* sandboxProvider.create({
             template: {
               name: Name.make("conformance-prepared"),
               identity: yield* newIdentity("prepared"),
@@ -230,11 +234,11 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "fails create with the template's own error, leaving no sandbox behind",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
 
           const error = yield* Effect.flip(
-            provider.create({
+            sandboxProvider.create({
               id,
               template: {
                 name: Name.make("conformance-failing"),
@@ -245,8 +249,10 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
           );
 
           expect(error._tag).toBe("PrepareFailed");
-          expect((yield* Effect.flip(provider.resume(id))).reason._tag).toBe("NotFoundError");
-          expect((yield* provider.create({ id })).id).toBe(id);
+          expect((yield* Effect.flip(sandboxProvider.resume(id))).reason._tag).toBe(
+            "NotFoundError",
+          );
+          expect((yield* sandboxProvider.create({ id })).id).toBe(id);
         }),
       fixture.timeout,
     );
@@ -255,11 +261,11 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
       "leaves no sandbox behind when create is interrupted",
       () =>
         Effect.gen(function* () {
-          const provider = yield* useProvider(fixture);
+          const sandboxProvider = yield* providerForTest(fixture);
           const id = yield* newSandboxId;
           const preparing = yield* Deferred.make<void>();
           const creating = yield* Effect.forkChild(
-            provider.create({
+            sandboxProvider.create({
               id,
               template: {
                 name: Name.make("conformance-endless"),
@@ -272,8 +278,10 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
           yield* Deferred.await(preparing);
           yield* Fiber.interrupt(creating);
 
-          expect((yield* Effect.flip(provider.resume(id))).reason._tag).toBe("NotFoundError");
-          expect((yield* provider.create({ id })).id).toBe(id);
+          expect((yield* Effect.flip(sandboxProvider.resume(id))).reason._tag).toBe(
+            "NotFoundError",
+          );
+          expect((yield* sandboxProvider.create({ id })).id).toBe(id);
         }),
       fixture.timeout,
     );
