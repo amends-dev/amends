@@ -165,6 +165,48 @@ describe("Models.layer", () => {
     }),
   );
 
+  it.effect("sends the headers the endpoint asks for besides its key, on every protocol", () =>
+    Effect.gen(function* () {
+      const headers = { "cf-aig-authorization": Redacted.make("Bearer gateway-token") };
+      const anthropic = yield* askThrough({
+        provider: "anthropic",
+        model: "claude-opus-5-5",
+        protocol: "anthropic-messages",
+        url: "https://gateway.example/anthropic",
+        apiKey: key,
+        headers,
+      });
+      const openai = yield* askThrough({
+        provider: "openai",
+        model: "gpt-5.6",
+        protocol: "openai-responses",
+        url: "https://gateway.example/openai",
+        apiKey: key,
+        headers,
+      });
+      const compatible = yield* askThrough({
+        provider: "openrouter",
+        model: "openai/gpt-5.6",
+        protocol: "openai-chat",
+        url: "https://gateway.example/compat",
+        headers,
+      });
+
+      expect(anthropic.received[0]?.headers).toMatchObject({
+        "x-api-key": "secret-key",
+        "cf-aig-authorization": "Bearer gateway-token",
+      });
+      expect(openai.received[0]?.headers).toMatchObject({
+        authorization: "Bearer secret-key",
+        "cf-aig-authorization": "Bearer gateway-token",
+      });
+      expect(compatible.received[0]?.headers).toMatchObject({
+        "cf-aig-authorization": "Bearer gateway-token",
+      });
+      expect(compatible.received[0]?.headers["authorization"]).toBeUndefined();
+    }),
+  );
+
   it.effect("takes a URL that ends in a slash as the one without it", () =>
     Effect.gen(function* () {
       const urls = [];

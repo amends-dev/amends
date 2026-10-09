@@ -1,8 +1,10 @@
 // A bridge over a stand-in driver, served as opencode's bridge program serves its driver, which
 // `bridge.test.ts` has the bridge client launch, as the command that runs a bridge. A turn follows
 // its prompt: `reply <text>` answers `text`, `wait <text>` starts to answer `text` and finishes
-// once the session's directory has a file named `release`, `greet` answers the `greeting` of the
-// agent's options, and any other prompt, such as the bridge's `Continue.`, is answered with itself.
+// once the session's directory has a file named `release`, `steps <text>` answers `text` in one
+// step and then starts a second step that waits the same way, `greet` answers the `greeting` of
+// the agent's options, and any other prompt, such as the bridge's `Continue.`, is answered with
+// itself.
 // A session's state counts the turns it has run, on from the state it started with, whose
 // conversation the session keeps. Each launch adds a line to `launches.jsonl` in the bridge's
 // working directory, with its process id, its agent's options, and whether its environment holds
@@ -64,7 +66,7 @@ const program = Effect.gen(function* () {
               .join("");
             const [command = "", ...words] = text.split(" ");
             const parts = answer(
-              command === "reply" || command === "wait"
+              command === "reply" || command === "wait" || command === "steps"
                 ? words.join(" ")
                 : command === "greet"
                   ? (agentOptions.greeting ?? "")
@@ -77,13 +79,18 @@ const program = Effect.gen(function* () {
               }),
               Effect.orDie,
             );
+            /** The first `count` parts, then, once released, the rest. */
+            const releasedAfter = (count: number) =>
+              Stream.concat(
+                Stream.fromIterable(parts.slice(0, count)),
+                Stream.unwrap(Effect.as(released, Stream.fromIterable(parts.slice(count)))),
+              );
             const turnParts =
               command === "wait"
-                ? Stream.concat(
-                    Stream.fromIterable(parts.slice(0, 1)),
-                    Stream.unwrap(Effect.as(released, Stream.fromIterable(parts.slice(1)))),
-                  )
-                : Stream.fromIterable(parts);
+                ? releasedAfter(1)
+                : command === "steps"
+                  ? Stream.concat(Stream.fromIterable(parts.slice(0, 4)), releasedAfter(1))
+                  : Stream.fromIterable(parts);
             return Stream.unwrap(
               Effect.as(
                 Ref.update(turns, (count) => count + 1),

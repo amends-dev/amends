@@ -11,17 +11,19 @@
  * been idle for a while, or once another bridge of its id has taken its place.
  *
  * The bridge runs each turn itself, so that a turn goes on when a host's connection drops or the
- * host releases the session, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
- * so that a host reads them from any number: again after its connection drops, or to continue a
- * turn that another host suspended. The agent behind it needs to do neither. A turn the bridge did
- * not finish, as one it ran when it died, it continues when a host starts it again, by prompting
- * the agent with `Continue.` in the conversation that holds the turn, as AI SDK's harness does.
+ * host releases the session, until it finishes or a host aborts it. It numbers each turn's parts
+ * and keeps them, so that a host reads them from any number: again after its connection drops, or
+ * to continue a turn that another host suspended. The agent behind it needs to do neither. A turn
+ * the bridge did not finish, as one it ran when it died, it continues when a host starts it again,
+ * by prompting the agent with `Continue.` in the conversation that holds the turn, as AI SDK's
+ * harness does.
  *
- * An agent's adapter implements `Bridge.Driver`, which drives the agent behind a bridge, and
+ * An agent's adapter implements `Driver`, which drives the agent behind a bridge, and
  * `BridgeServer.serve` serves the driver in the sandbox. The adapter's `Agent.Agent`, which hosts
- * run, reaches it with `BridgeClient.createSession`.
- * `Rpcs` is the protocol between them, over a WebSocket whose host presents the token as
- * `Authorization: Bearer <token>` when it connects.
+ * run, reaches it with `BridgeClient.createSession`. `Rpcs` is the protocol between them, over a
+ * WebSocket whose host presents the token as `Authorization: Bearer <token>` when it connects.
+ *
+ * @since 0.1.0
  */
 import { Network, Sandbox } from "@amends/sandbox";
 import { type Effect, Schema, type Scope, type Stream } from "effect";
@@ -31,7 +33,12 @@ import { type AgentSession, SessionId } from "./Agent.ts";
 import { HarnessError } from "./HarnessError.ts";
 import { CompactionPart, StreamPart } from "./StreamPart.ts";
 
-/** A tool the host runs, as the agent reads it: its name, what it does, and its parameters. */
+/**
+ * A tool the host runs, as the agent reads it: its name, what it does, and its parameters.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const ToolDefinition = Schema.Struct({
   name: Schema.String,
   description: Schema.optional(Schema.String),
@@ -40,19 +47,35 @@ export const ToolDefinition = Schema.Struct({
   parameters: Schema.Json,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface ToolDefinition extends Schema.Schema.Type<typeof ToolDefinition> {}
 
-/** How a turn answers: in text, or in JSON that matches `schema`, a JSON Schema. */
+/**
+ * How a turn answers: in text, or in JSON that matches `schema`, a JSON Schema.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const ResponseFormat = Schema.Union([
   Schema.Struct({ type: Schema.tag("text") }),
   Schema.Struct({ type: Schema.tag("json"), objectName: Schema.String, schema: Schema.Json }),
 ]);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type ResponseFormat = typeof ResponseFormat.Type;
 
 /**
  * A turn's settings, as `Agent.TurnOptions` gives them, with the host's tools and the answer's
  * schema as JSON Schemas, since only data crosses into the sandbox.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const TurnOptions = Schema.Struct({
   prompt: Prompt.UserMessage,
@@ -62,8 +85,19 @@ export const TurnOptions = Schema.Struct({
   responseFormat: ResponseFormat,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface TurnOptions extends Schema.Schema.Type<typeof TurnOptions> {}
 
+/**
+ * What a driver starts a session from: its id, its directory in the sandbox, the conversation so
+ * far, and the state the driver's session last returned.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface CreateSessionOptions {
   readonly id: SessionId;
 
@@ -83,6 +117,9 @@ export interface CreateSessionOptions {
 /**
  * A session a driver started. The bridge runs one turn of it at a time, keeps its turns' parts,
  * and ends it by closing its scope.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface DriverSession {
   /**
@@ -114,7 +151,44 @@ export interface DriverSession {
 /**
  * What an adapter implements to run its agent behind a bridge: it drives the agent in the sandbox,
  * starting its sessions and running their turns, while the bridge keeps the turns, so that a
- * driver needs neither to suspend nor to continue one.
+ * driver needs neither to suspend nor to continue one. `BridgeServer.serve` serves it.
+ *
+ * **Example** (A driver over an agent's own session API)
+ *
+ * ```ts
+ * import { Bridge, StreamPart } from "@amends/harness";
+ * import { Effect, Stream } from "effect";
+ *
+ * // What the adapter has of its agent in the sandbox: a client of the agent's own API.
+ * declare const agent: {
+ *   readonly createSession: (directory: string) => Effect.Effect<string>;
+ *   readonly prompt: (sessionId: string, text: string) => Stream.Stream<StreamPart.StreamPart>;
+ *   readonly deleteSession: (sessionId: string) => Effect.Effect<void>;
+ * };
+ *
+ * const driver: Bridge.Driver = {
+ *   id: "my-agent",
+ *   createSession: (options) =>
+ *     Effect.gen(function* () {
+ *       // A session the bridge starts again finds the agent's own session in `agentState`.
+ *       const kept = typeof options.agentState === "string" ? options.agentState : undefined;
+ *       const sessionId = kept ?? (yield* agent.createSession(options.directory));
+ *       const session: Bridge.DriverSession = {
+ *         keptConversation: kept !== undefined,
+ *         promptTurn: ({ prompt }) => agent.prompt(sessionId, JSON.stringify(prompt.content)),
+ *         submitToolResult: () => Effect.void,
+ *         approve: () => Effect.void,
+ *         compact: () => Effect.die("my-agent compacts only by itself"),
+ *         state: Effect.succeed(sessionId),
+ *         destroy: agent.deleteSession(sessionId),
+ *       };
+ *       return session;
+ *     }),
+ * };
+ * ```
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Driver {
   /** Names the agent it drives, such as `opencode`, as the agent's `Agent.Agent` for hosts does. */
@@ -132,20 +206,39 @@ export interface Driver {
 /**
  * Names a turn, as `Sandbox.isName` checks. The host picks it, so that a request to start the turn
  * that it sends again, not knowing whether the first arrived, starts it once.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const TurnId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("TurnId"));
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type TurnId = typeof TurnId.Type;
 
-/** A part of a turn, numbered from 1 in the order the turn streamed it. */
+/**
+ * A part of a turn, numbered from 1 in the order the turn streamed it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const NumberedPart = Schema.Struct({ seq: Schema.Int, part: StreamPart });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface NumberedPart extends Schema.Schema.Type<typeof NumberedPart> {}
 
 /**
  * The version of `Rpcs` that this package speaks. Every bridge's id includes it, so a host only
  * ever reaches a bridge of its own version. Bump it when hosts or bridges of the version before
  * could not read a change to the protocol.
+ *
+ * @category constants
+ * @since 0.1.0
  */
 export const protocolVersion = 2;
 
@@ -153,25 +246,47 @@ export const protocolVersion = 2;
  * Names a bridge after everything a host launches it with, as `Sandbox.isName` checks, so that a
  * host that would launch the same bridge finds the one running, and a host with other settings
  * launches its own.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const BridgeId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("BridgeId"));
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type BridgeId = typeof BridgeId.Type;
 
 /**
  * What a bridge writes to `listeningFile` in its state directory once it listens, for hosts to find
  * it: the port. It holds no token, as the agent can read every file in the sandbox.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Listening = Schema.Struct({ port: Network.Port });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Listening extends Schema.Schema.Type<typeof Listening> {}
 
-/** The name of the file in a bridge's state directory that `Listening` describes. */
+/**
+ * The name of the file in a bridge's state directory that `Listening` describes.
+ *
+ * @category constants
+ * @since 0.1.0
+ */
 export const listeningFile = "listening.json";
 
 /**
  * Answers which agent the bridge runs, and which bridge it is, for a host to check that it reached
  * the bridge it looked up: a port another bridge listened on may be another's since.
+ *
+ * @category protocols
+ * @since 0.1.0
  */
 export const Hello = Rpc.make("Hello", {
   success: Schema.Struct({ agent: Schema.String, bridge: BridgeId }),
@@ -180,6 +295,13 @@ export const Hello = Rpc.make("Hello", {
 /** The session a request is about. Every request but `StartSession` needs it started. */
 const inSession = { session: SessionId };
 
+/**
+ * The protocol between a host and a bridge: the requests a host sends over its WebSocket, which
+ * `BridgeServer` handles and `BridgeClient` sends.
+ *
+ * @category protocols
+ * @since 0.1.0
+ */
 export class Rpcs extends RpcGroup.make(
   Hello,
 
@@ -230,6 +352,7 @@ export class Rpcs extends RpcGroup.make(
     error: HarnessError,
   }),
 
+  /** Gives the running turn the result of a host tool it called. */
   Rpc.make("SubmitToolResult", {
     payload: {
       ...inSession,
@@ -243,6 +366,7 @@ export class Rpcs extends RpcGroup.make(
     error: HarnessError,
   }),
 
+  /** Answers a `tool-approval-request` of the running turn. */
   Rpc.make("Approve", {
     payload: {
       ...inSession,
@@ -255,6 +379,7 @@ export class Rpcs extends RpcGroup.make(
     error: HarnessError,
   }),
 
+  /** Asks the agent to summarize the conversation so far, between turns, answering with it. */
   Rpc.make("Compact", {
     payload: { ...inSession, instructions: Schema.optional(Schema.String) },
     success: CompactionPart,
@@ -285,6 +410,9 @@ export class Rpcs extends RpcGroup.make(
 /**
  * What a host gives the bridge it launches, on the bridge's standard input, so that neither the
  * agent nor anything else in the sandbox can read the token or the agent's credentials.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const LaunchOptions = Schema.Struct({
   /** The token hosts present when they connect. */
@@ -303,4 +431,8 @@ export const LaunchOptions = Schema.Struct({
   agentOptions: Schema.Json,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface LaunchOptions extends Schema.Schema.Type<typeof LaunchOptions> {}

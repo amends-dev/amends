@@ -41,7 +41,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   the local host runs turns on both. Amends's agent compacts by itself only for a model whose
   context window the catalog knows, not one of an OpenAI-compatible connection. opencode's session
   API takes no instructions for a turn, so opencode refuses a turn that gives some: only an agent
-  without instructions runs on it, and it compacts only by itself.
+  without instructions runs on it, and it compacts only by itself. An agent's own tools run without
+  asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode saying
+  which of them an agent may use and which it asks about, amends's agent runs its `read`, `write`,
+  `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default permissions,
+  its permission requests neither streamed nor answered. A session's `approve` answers only the
+  requests for the host's tools. A running turn takes no further input: a message sent during a
+  turn starts the next, where Claude Code, Codex, and opencode take input while they work, and
+  AI SDK's harness passes it on to them.
 - The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
   [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare

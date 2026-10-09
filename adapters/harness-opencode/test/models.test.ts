@@ -154,17 +154,47 @@ describe("Models.fromEndpoints", () => {
     });
   });
 
-  it("refuses endpoints of one provider with different keys", () => {
-    const refused = refusalOf({
-      model: sonnet,
-      models: { other: { ...sonnet, model: "claude-opus-5-5", apiKey: Redacted.make("another") } },
-    });
+  it("sends a provider's requests with the headers its endpoints ask for", () => {
+    const headers = { "cf-aig-authorization": Redacted.make("Bearer gateway-token") };
+    const models = Result.getOrThrow(
+      Models.fromEndpoints({
+        model: { ...sonnet, headers },
+        models: { other: { ...gptOss, headers } },
+      }),
+    );
 
-    expect(refused).toMatchObject({
-      _tag: "UnsupportedError",
-      description:
-        "opencode presents one key for each provider, and the endpoints for anthropic have different keys",
+    expect(models.providers["anthropic"]).toMatchObject({
+      request: {
+        body: { apiKey: "secret-key" },
+        headers: { "cf-aig-authorization": "Bearer gateway-token" },
+      },
     });
+    expect(models.providers["openrouter"]).toMatchObject({
+      request: { headers: { "cf-aig-authorization": "Bearer gateway-token" } },
+    });
+    expect(models.providers["openrouter"]).not.toHaveProperty("request.body");
+  });
+
+  it("refuses endpoints of one provider with different keys or headers", () => {
+    const differences = [
+      { apiKey: Redacted.make("another") },
+      { headers: { "x-title": Redacted.make("amends") } },
+    ] as const;
+
+    const refusals = differences.map((difference) =>
+      refusalOf({
+        model: sonnet,
+        models: { other: { ...sonnet, model: "claude-opus-5-5", ...difference } },
+      }),
+    );
+
+    for (const refused of refusals) {
+      expect(refused).toMatchObject({
+        _tag: "UnsupportedError",
+        description:
+          "opencode presents one key, with one set of headers, for each provider, and the endpoints for anthropic differ in them",
+      });
+    }
   });
 
   it("refuses endpoints of one model that it is served differently for", () => {

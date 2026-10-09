@@ -42,14 +42,14 @@ export const initial: Turn = {
 // TODO: Translate a prompt that steers the running turn, once the driver sends messages mid-turn.
 /**
  * Translates the turn's next event into the parts it streams and the turn after it. Fails with
- * `InvalidOutputError` for the result of a call the turn did not make.
+ * `AgentContractError` for the result of a call the turn did not make.
  */
 export const translate = (
   turn: Turn,
   event: SessionEvent,
 ): Result.Result<
   readonly [Turn, ReadonlyArray<StreamPart.StreamPart>],
-  HarnessError.InvalidOutputError
+  HarnessError.AgentContractError
 > => {
   if (turn.finished) return Result.succeed([turn, []]);
   switch (event.type) {
@@ -141,7 +141,7 @@ export const translate = (
       const name = turn.toolNames.get(callID);
       if (name === undefined) {
         return Result.fail(
-          new HarnessError.InvalidOutputError({
+          new HarnessError.AgentContractError({
             description: `opencode reported the result of the call ${callID}, which the turn did not make`,
           }),
         );

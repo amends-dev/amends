@@ -157,7 +157,7 @@ describe("stepsOf", () => {
 describe("recordStep", () => {
   const hello = Prompt.make("Hello.");
 
-  it("records what a step wrote and the tools it called, with their results, as the model's own", () => {
+  it("records what a step reasoned and wrote and the tools it called, with their results, as the model's own", () => {
     const [step] = stepsOf(readingStep);
 
     expect(recordStep(hello, step!).content).toMatchObject([
@@ -165,6 +165,7 @@ describe("recordStep", () => {
       {
         role: "assistant",
         content: [
+          { type: "reasoning", text: "The notes have it." },
           { type: "text", text: "Reading the notes." },
           { type: "tool-call", id: "call-read", name: "read", providerExecuted: false },
         ],
@@ -176,6 +177,25 @@ describe("recordStep", () => {
         ],
       },
     ]);
+  });
+
+  it("records what the model reasoned and the files it wrote, with what its provider said", () => {
+    const step: Step = {
+      parts: [
+        { type: "reasoning", text: "Sums.", metadata: { anthropic: { signature: "sig-1" } } },
+        { type: "text", text: "Here it is.", metadata: { openai: { itemId: "msg_1" } } },
+        { type: "file", mediaType: "image/png", data: "iVBORw0KGgo=" },
+      ],
+    };
+
+    expect(recordStep(hello, step).content[1]).toMatchObject({
+      role: "assistant",
+      content: [
+        { type: "reasoning", text: "Sums.", options: { anthropic: { signature: "sig-1" } } },
+        { type: "text", text: "Here it is.", options: { openai: { itemId: "msg_1" } } },
+        { type: "file", mediaType: "image/png", data: "iVBORw0KGgo=" },
+      ],
+    });
   });
 
   it("answers a call its step ended before as interrupted, and records nothing of an empty step", () => {

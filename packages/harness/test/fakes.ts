@@ -1,4 +1,4 @@
-import { Sandbox, SandboxId } from "@amends/sandbox/Sandbox";
+import { Sandbox } from "@amends/sandbox";
 import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import { ChildProcessSpawner } from "effect/process";
@@ -11,7 +11,7 @@ import type {
 } from "../src/Agent.ts";
 import type * as Bridge from "../src/Bridge.ts";
 import type { HarnessError } from "../src/HarnessError.ts";
-import type { StreamPart } from "../src/StreamPart.ts";
+import { afterSteps, type StreamPart } from "../src/StreamPart.ts";
 
 /**
  * The parts a fake agent streams for a turn, given the prompt's text. `toolResult` waits for the
@@ -28,7 +28,7 @@ export interface FakeAgent {
   /** What each `createSession` was given, in order. */
   readonly createdWith: ReadonlyArray<CreateSessionOptions>;
 
-  /** What each turn the agent ran from its prompt was given, in order. */
+  /** What each turn the agent ran from its prompt or continued was given, in order. */
   readonly turns: ReadonlyArray<TurnOptions>;
 
   /** How many steps the harness had of each turn the agent continued, in order. */
@@ -87,12 +87,12 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
         Effect.gen(function* () {
           createdWith.push(sessionOptions);
           /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
-          const closed = yield* Deferred.make<void>();
-          const close = Deferred.succeed(closed, undefined);
+          const released = yield* Deferred.make<void>();
+          const release = Deferred.succeed(released, undefined);
           const beforeLettingGo = options.beforeLettingGo ?? Effect.void;
           const follow = (turn: TurnOptions) =>
             script(textOf(turn.prompt), { toolResult: Queue.take(toolResults) }).pipe(
-              Stream.interruptWhen(Deferred.await(closed)),
+              Stream.interruptWhen(Deferred.await(released)),
             );
           const session: AgentSession = {
             hasUnfinishedTurn:
@@ -104,6 +104,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
               }),
             continueTurn: (turn, finishedSteps) =>
               Stream.suspend(() => {
+                turns.push(turn);
                 continued.push(finishedSteps);
                 return follow(turn).pipe(afterSteps(finishedSteps));
               }),
@@ -121,11 +122,11 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
               }),
             suspendTurn: Effect.andThen(
               beforeLettingGo,
-              Effect.as(close, { agent: id, turn: true }),
+              Effect.as(release, { agent: id, turn: true }),
             ),
             detach: Effect.andThen(beforeLettingGo, Effect.succeed({ agent: id })),
-            stop: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id })),
-            destroy: Effect.andThen(beforeLettingGo, Effect.asVoid(close)),
+            stop: Effect.andThen(beforeLettingGo, Effect.as(release, { agent: id })),
+            destroy: Effect.andThen(beforeLettingGo, Effect.asVoid(release)),
           };
           return session;
         }),
@@ -155,23 +156,12 @@ export const readUntil = <E, R>(
     return reading;
   });
 
-/** Drops the parts of a turn's first `steps` steps. */
-const afterSteps = (steps: number) =>
-  Stream.mapAccum(
-    () => 0,
-    (finished: number, part: StreamPart) =>
-      [
-        part.type === "finish-step" ? finished + 1 : finished,
-        finished < steps ? [] : [part],
-      ] as const,
-  );
-
 /**
  * A sandbox that only creates directories, recording them, for agents that never touch the
  * sandbox. Its other operations are not meant to be reached.
  */
 export interface FakeSandbox {
-  readonly sandbox: Sandbox["Service"];
+  readonly sandbox: Sandbox.Sandbox["Service"];
 
   /** The directories created in the sandbox, in order. */
   readonly directories: ReadonlyArray<string>;
@@ -179,8 +169,8 @@ export interface FakeSandbox {
 
 export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
   const directories: Array<string> = [];
-  const sandbox = Sandbox.of({
-    id: SandboxId.make("fake"),
+  const sandbox = Sandbox.Sandbox.of({
+    id: Sandbox.SandboxId.make("fake"),
     description: "A fake sandbox",
     workingDirectory: "/work",
     fileSystem: FileSystem.makeNoop({

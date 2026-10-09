@@ -1,7 +1,7 @@
 /**
  * The models amends's agent runs on, made from model endpoints: an Effect AI client for the
- * endpoint's protocol, at its URL and with its key, and the endpoint's model on that client, set
- * to the endpoint's effort and output limit.
+ * endpoint's protocol, at its URL, with its key and headers, and the endpoint's model on that
+ * client, set to the endpoint's effort and output limit.
  *
  * The agent makes them with `LanguageModels`, which `layer` provides over the host's `HttpClient`,
  * that the requests go out through. A test provides models of its own in its place.
@@ -13,7 +13,7 @@ import {
   OpenAiClient as ChatClient,
   OpenAiLanguageModel as ChatLanguageModel,
 } from "@effect/ai-openai-compat";
-import { Context, Effect, Layer, Stream } from "effect";
+import { Context, Effect, Layer, Record, Redacted, Stream, flow } from "effect";
 import type { LanguageModel } from "effect/ai";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
@@ -64,8 +64,11 @@ const anthropicModel = Effect.fnUntraced(function* (
     apiUrl: url,
     // The client sends to `/v1/messages` after its URL, while the endpoint's URL is the one that
     // `/messages` follows, which ends in `/v1` for Anthropic's own API.
-    transformClient: HttpClient.mapRequest(
-      HttpClientRequest.updateUrl((requestUrl) => requestUrl.replace(`${url}/v1/`, `${url}/`)),
+    transformClient: flow(
+      HttpClient.mapRequest(
+        HttpClientRequest.updateUrl((requestUrl) => requestUrl.replace(`${url}/v1/`, `${url}/`)),
+      ),
+      withHeaders(endpoint),
     ),
   });
   return yield* AnthropicLanguageModel.make({
@@ -85,7 +88,11 @@ const responsesModel = Effect.fnUntraced(function* (
   endpoint: ModelEndpoint.ModelEndpoint,
   url: string,
 ) {
-  const client = yield* OpenAiClient.make({ apiKey: endpoint.apiKey, apiUrl: url });
+  const client = yield* OpenAiClient.make({
+    apiKey: endpoint.apiKey,
+    apiUrl: url,
+    transformClient: withHeaders(endpoint),
+  });
   return yield* OpenAiLanguageModel.make({
     model: endpoint.model,
     config: {
@@ -105,7 +112,7 @@ const chatModel = Effect.fnUntraced(function* (endpoint: ModelEndpoint.ModelEndp
   const client = yield* ChatClient.make({
     apiKey: endpoint.apiKey,
     apiUrl: url,
-    transformClient: withoutNullServiceTiers,
+    transformClient: flow(withoutNullServiceTiers, withHeaders(endpoint)),
   });
   return yield* ChatLanguageModel.make({
     model: endpoint.model,
@@ -119,6 +126,12 @@ const chatModel = Effect.fnUntraced(function* (endpoint: ModelEndpoint.ModelEndp
     },
   }).pipe(Effect.provideService(ChatClient.OpenAiClient, client));
 });
+
+/** Sends each request with the headers `endpoint` asks for besides its key. */
+const withHeaders = (endpoint: ModelEndpoint.ModelEndpoint) =>
+  HttpClient.mapRequest(
+    HttpClientRequest.setHeaders(Record.map(endpoint.headers ?? {}, Redacted.value)),
+  );
 
 // TODO: Drop this once Effect's Chat Completions client takes a `service_tier` of null, as OpenRouter
 // answers. The client refuses a whole answer that has one, and skips a streamed chunk that has one,

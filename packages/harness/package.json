@@ -1,7 +1,26 @@
 {
   "name": "@amends/harness",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Runs an agent, such as opencode, Codex, Claude Code, or one in your own process over an Effect AI language model, and streams every agent's turns in one format.",
+  "keywords": [
+    "agent",
+    "ai",
+    "effect",
+    "harness",
+    "mcp",
+    "opencode",
+    "sandbox"
+  ],
+  "homepage": "https://github.com/saribmah/amends-v2/tree/main/packages/harness#readme",
+  "bugs": {
+    "url": "https://github.com/saribmah/amends-v2/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saribmah/amends-v2.git",
+    "directory": "packages/harness"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -9,8 +28,12 @@
     "./*": "./src/*.ts",
     "./internal/*": null
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@amends/sandbox": "workspace:*"

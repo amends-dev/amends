@@ -253,7 +253,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         }),
       );
 
-      expect(error._tag === "HarnessError" && error.reason).toMatchObject({
+      expect(error._tag === "AiError" && error.reason).toMatchObject({
         _tag: "StructuredOutputError",
         responseText: "not JSON",
       });
@@ -427,6 +427,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           prompt: Prompt.makeMessage("user", {
             content: [Prompt.makePart("text", { text: "hi" })],
           }),
+          responseFormat: { type: "text" },
           steps: [],
           agentState: { steps: "not steps" },
         },
@@ -436,7 +437,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         Harness.make(yield* makeAgent({ model })).createSession({ resumeFrom: state }),
       );
 
-      expect(error.reason._tag).toBe("InvalidOutputError");
+      expect(error.reason._tag).toBe("AgentContractError");
     }),
   );
 

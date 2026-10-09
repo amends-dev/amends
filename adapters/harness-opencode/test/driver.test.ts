@@ -272,7 +272,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
 
         const error = yield* Effect.flip(runTurn(session, "Build it."));
 
-        expect(error.reason._tag).toBe("InvalidOutputError");
+        expect(error.reason._tag).toBe("AgentContractError");
         expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toHaveLength(1);
       }),
   );

@@ -9,24 +9,27 @@
  * bridge's port in `Bridge.listeningFile`, in the bridge's state directory, exposes the port, and
  * launches the bridge when none answers there.
  *
- * A session connects to its bridge while it uses it, and closes the connection when it releases the session, or
- * once it has gone unused for a minute. Each connection launches the bridge when none answers, and
- * starts the session there from the state the bridge last gave, so that a bridge that restarted,
- * as after it died or exited idle, has the session again. A connection that drops is not opened
- * again: a request it dropped is sent again over another, for up to 30 seconds, as AI SDK's harness
- * reconnects, unless the bridge must not receive it twice.
+ * A session connects to its bridge while it uses it, and closes the connection when it releases
+ * the session, or once it has gone unused for a minute. Each connection launches the bridge when
+ * none answers, and starts the session there from the state the bridge last gave, so that a bridge
+ * that restarted, as after it died or exited idle, has the session again. A connection that drops
+ * is not opened again: a request it dropped is sent again over another, for up to 30 seconds, as
+ * AI SDK's harness reconnects, unless the bridge must not receive it twice.
  *
  * A turn is two requests: `StartTurn`, under an id the host picks, and `ReadTurn`, which reads the
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge
  * whoever reads it, so `suspendTurn` only stops reading, keeping which bridge runs the turn, and
  * `continueTurn` starts the turn again there, which the bridge continues if it did not finish it,
- * as when it died, and reads it again from its start, after the steps the harness has. A turn
- * streams what `suspendTurn` would return as its `turn-start` part first, so that a caller that
- * keeps it continues the turn the same way once this host is gone without suspending it. A session
- * resumed with other options continues the turn in the bridge that runs it and then goes on in its
- * own; one whose turn's bridge is gone runs the turn again from its prompt in its own. A session
- * whose bridge cannot answer, as when its sandbox is gone, releases the session with the state the bridge last
- * gave.
+ * as when it died, and reads it again from its start, after the steps the harness has. A read
+ * whose bridge died starts the turn again the same way, in the bridge launched after it, and goes
+ * on after the steps it had read. A turn streams what `suspendTurn` would return as its
+ * `turn-start` part first, so that a caller that keeps it continues the turn the same way once
+ * this host is gone without suspending it. A session resumed with other options continues the
+ * turn in the bridge that runs it and then goes on in its own; one whose turn's bridge is gone
+ * runs the turn again from its prompt in its own. A session whose bridge cannot answer, as when
+ * its sandbox is gone, releases the session with the state the bridge last gave.
+ *
+ * @since 0.1.0
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox";
 import {
@@ -56,15 +59,20 @@ import * as Bridge from "./Bridge.ts";
 import {
   HarnessError,
   type HarnessErrorReason,
-  InvalidOutputError,
+  AgentContractError,
   NoTurnError,
   UnavailableError,
   UnknownError,
   UnsupportedError,
 } from "./HarnessError.ts";
-import type { StreamPart } from "./StreamPart.ts";
+import { afterSteps, type StreamPart } from "./StreamPart.ts";
 
-/** What an adapter says of its bridge: how to install and launch it, and where to reach it. */
+/**
+ * What an adapter says of its bridge: how to install and launch it, and where to reach it.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** Names the agent, as its `Bridge.Driver` does. The bridge must answer with it. */
   readonly id: string;
@@ -111,6 +119,45 @@ type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientEr
  * Creates a session, as `Agent.createSession` does, of the agent behind the bridge that `options`
  * describes, in the sandbox of the session's workspace. It connects with the `WebSocketConstructor`
  * provided, which must send headers when it opens a connection, as Bun's and Node's do.
+ *
+ * **Example** (An adapter's agent whose sessions run behind its bridge)
+ *
+ * ```ts
+ * import { Agent, BridgeClient } from "@amends/harness";
+ * import type { Sandbox, Template } from "@amends/sandbox";
+ * import { Crypto, Effect, Redacted, Schema } from "effect";
+ * import type { Socket } from "effect/socket";
+ *
+ * // What the adapter brings: the template that installs the agent and its bridge program, the
+ * // bridge's token for a sandbox, and the options the bridge makes its driver with.
+ * declare const template: Template.Template;
+ * declare const tokenOf: (sandboxId: Sandbox.SandboxId) => Redacted.Redacted<string>;
+ * declare const agentOptionsOf: (options: Agent.Options) => Schema.Json;
+ *
+ * export const make = Effect.fnUntraced(function* (options: Agent.Options) {
+ *   // Sessions connect from the host, with its WebSockets and its crypto.
+ *   const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
+ *   const bridge: BridgeClient.Options = {
+ *     id: "my-agent",
+ *     template,
+ *     command: "bun",
+ *     args: ["run", "/opt/my-agent/bridge.ts"],
+ *     token: tokenOf,
+ *     agentOptions: agentOptionsOf(options),
+ *   };
+ *   const agent: Agent.Agent = {
+ *     id: bridge.id,
+ *     requiresSandbox: true,
+ *     template,
+ *     createSession: (sessionOptions) =>
+ *       Effect.provide(BridgeClient.createSession(bridge, sessionOptions), services),
+ *   };
+ *   return agent;
+ * });
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   options: Options,
@@ -134,7 +181,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   ).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        new InvalidOutputError({
+        new AgentContractError({
           description: `${options.id} cannot read the state it was given: ${cause.message}`,
         }),
         cause,
@@ -144,7 +191,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
   /** The turn running, or the one `suspendTurn` cut short, for `continueTurn` to read. */
   const running = yield* Ref.make(saved?.unfinishedTurn?.turn);
-  /** The bridge the session uses: the one that runs the turn `suspendTurn` cut short, or its own. */
+  /** The bridge the session uses: the one running the turn `suspendTurn` cut short, or its own. */
   const bridge = yield* Ref.make(saved?.unfinishedTurn?.bridge ?? own);
   /**
    * The session's state as the bridge last gave it, which a bridge that restarted starts the
@@ -152,17 +199,17 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
    */
   const latestState = yield* Ref.make(saved?.agentState);
   /** Done once releasing the session starts, ending the running turn's stream. */
-  const closed = yield* Deferred.make<void>();
+  const released = yield* Deferred.make<void>();
   const destroyed = yield* Ref.make(false);
   /**
-   * Held while a turn starts and while the session closes, so that a closed session starts none,
+   * Held while a turn starts and while the session is released, so that a released one starts none,
    * and the session closes knowing the turn the bridge runs.
    */
   const admission = yield* Semaphore.make(1);
 
   /**
-   * A client of the session's bridge, or of its own when that bridge is gone, launching its own when
-   * none answers: only the options of its own are the session's to launch.
+   * A client of the session's bridge, or of its own when that bridge is gone, launching its own
+   * when none answers: only the options of its own are the session's to launch.
    */
   const connectToBridge = Effect.gen(function* () {
     const current = yield* Ref.get(bridge);
@@ -233,18 +280,18 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   yield* send(() => Effect.void);
   const hasUnfinishedTurn = (yield* Ref.get(running)) !== undefined;
 
-  /** Closes the session once no turn is starting, returning the turn running then. */
-  const close = Semaphore.withPermit(
+  /** Marks the session released once no turn is starting, returning the turn running then. */
+  const markReleased = Semaphore.withPermit(
     admission,
     Effect.flatMap(Ref.get(running), (turn) =>
-      Effect.as(Deferred.succeed(closed, undefined), turn),
+      Effect.as(Deferred.succeed(released, undefined), turn),
     ),
   );
 
   /**
-   * Disconnects from the bridge with the session's state, as `stateOf` asks the bridge for it, closing
-   * the connection. When the bridge cannot answer, the session is released with the state the bridge
-   * last gave.
+   * Disconnects from the bridge with the session's state, as `stateOf` asks the bridge for it,
+   * closing the connection. When the bridge cannot answer, the session is released with the state
+   * the bridge last gave.
    */
   const disconnectWith = (
     stateOf: (
@@ -290,18 +337,25 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     });
 
   /**
-   * Streams `turn` from the step after its first `finishedSteps`, until its last part. After the
-   * connection drops, it reads on from the last part read. A stream that ends before the turn
-   * finishes aborts the turn, unless the session released it, leaving it to run in the bridge.
+   * Streams `turn`, run with `turnOptions`, from the step after its first `finishedSteps`, until
+   * its last part. After the connection drops, it reads on from the last part read. A bridge that
+   * no longer runs the turn, as one launched after the bridge running it died, starts it again
+   * under its id, as `continueTurn` does, and the stream goes on after the steps it had read. A
+   * stream that ends before the turn finishes aborts the turn, unless the session released it,
+   * leaving it to run in the bridge.
    */
-  const readTurn = (turn: Bridge.TurnId, finishedSteps: number) =>
+  const readTurn = (turn: Bridge.TurnId, turnOptions: Agent.TurnOptions, finishedSteps: number) =>
     Stream.unwrap(
       Effect.gen(function* () {
         const lastSeq = yield* Ref.make(0);
+        /** The steps read to their end, in the bridge's numbering of the turn. */
+        const stepsRead = yield* Ref.make(0);
+        /** The steps of the turn, from its first, that the caller has, which the stream skips. */
+        const stepsToSkip = yield* Ref.make(finishedSteps);
         const finished = yield* Ref.make(false);
         // A turn that finished may have changed the session's state, as by switching its model.
         const afterTurn = Effect.gen(function* () {
-          if (yield* Deferred.isDone(closed)) return;
+          if (yield* Deferred.isDone(released)) return;
           yield* Ref.set(running, undefined);
           if ((yield* Ref.get(bridge)) !== own) {
             // The turn ran in the bridge of the host that started it, with that host's options;
@@ -317,31 +371,58 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
             yield* send((client) => client.AbortTurn({ session, turn }));
           }
         }).pipe(Effect.ignore);
-        // The stream holds the connection while it reads.
-        const readAfterLast = Stream.unwrap(
-          Effect.flatMap(Ref.get(lastSeq), (after) =>
-            Effect.map(RcRef.get(connection), (client) =>
-              client.ReadTurn({ session, turn, after }),
-            ),
-          ),
+        /** Reads the turn's parts after `after`, without those of the steps the caller has. */
+        const readAfter = (client: Client, after: number) =>
+          Stream.unwrap(
+            Effect.gen(function* () {
+              const skip = (yield* Ref.get(stepsToSkip)) - (yield* Ref.get(stepsRead));
+              return client.ReadTurn({ session, turn, after }).pipe(
+                Stream.tap(({ seq, part }) =>
+                  Effect.andThen(
+                    Ref.set(lastSeq, seq),
+                    part.type === "finish-step" ? Ref.update(stepsRead, (n) => n + 1) : Effect.void,
+                  ),
+                ),
+                Stream.map(({ part }) => part),
+                afterSteps(skip),
+              );
+            }),
+          );
+        /**
+         * Reads on from the last part read, holding the connection. A bridge that does not have the
+         * turn running starts it again under its id, which numbers its parts anew, so the read
+         * starts over, skipping the steps it had read.
+         */
+        const readOn = Stream.unwrap(
+          Effect.gen(function* () {
+            const client = yield* RcRef.get(connection);
+            return readAfter(client, yield* Ref.get(lastSeq)).pipe(
+              Stream.catchIf(isLostTurn, () =>
+                Stream.unwrap(
+                  Effect.gen(function* () {
+                    const started = yield* startTurn(turn, turnOptions);
+                    if (started === undefined) return Stream.empty;
+                    yield* Ref.set(stepsToSkip, yield* Ref.getAndSet(stepsRead, 0));
+                    yield* Ref.set(lastSeq, 0);
+                    return readAfter(client, 0);
+                  }),
+                ),
+              ),
+            );
+          }),
         );
-        // TODO: Continue a turn the bridge lost while the stream read it, as when it died, as
-        // `continueTurn` does after `suspendTurn`, rather than fail the stream with `NoTurnError`.
-        return readAfterLast.pipe(
-          Stream.tap(({ seq }) => Ref.set(lastSeq, seq)),
+        return readOn.pipe(
           Stream.tapError(forgetDropped),
           Stream.retry(whileReconnecting),
           Stream.mapError((error) => fromRequestError(options.id, error)),
-          Stream.map(({ part }) => part),
-          afterSteps(finishedSteps),
-          Stream.interruptWhen(Deferred.await(closed)),
+          Stream.interruptWhen(Deferred.await(released)),
           Stream.tap((part) => (part.type === "finish" ? Ref.set(finished, true) : Effect.void)),
           Stream.ensuring(afterTurn),
         );
       }),
     );
 
-  /** Starts `turn` in the bridge, returning it, or nothing once the session has closed. */
+  /** Starts `turn` in the bridge, returning it, or nothing once the session is released. */
   const startTurn = Effect.fnUntraced(function* (
     turn: Bridge.TurnId,
     turnOptions: Agent.TurnOptions,
@@ -350,7 +431,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     return yield* Semaphore.withPermit(
       admission,
       Effect.gen(function* () {
-        if (yield* Deferred.isDone(closed)) return undefined;
+        if (yield* Deferred.isDone(released)) return undefined;
         // Starting the turn again under its id starts it once.
         yield* send((client) => client.StartTurn({ session, turn, options: bridgeOptions }));
         yield* Ref.set(running, turn);
@@ -375,7 +456,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
             type: "turn-start",
             agentState: yield* stateWith(agentState, turn),
           };
-          return Stream.concat(Stream.make(start), readTurn(turn, 0));
+          return Stream.concat(Stream.make(start), readTurn(turn, turnOptions, 0));
         }),
       ),
 
@@ -389,7 +470,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
             return Stream.fail(harnessError(new NoTurnError({ description })));
           }
           const turn = yield* startTurn(unfinished, turnOptions);
-          return turn === undefined ? Stream.empty : readTurn(turn, finishedSteps);
+          return turn === undefined ? Stream.empty : readTurn(turn, turnOptions, finishedSteps);
         }),
       ),
 
@@ -414,25 +495,25 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
     compact: (instructions) => sendOnce((client) => client.Compact({ session, instructions })),
 
-    suspendTurn: Effect.flatMap(close, (turn) =>
+    suspendTurn: Effect.flatMap(markReleased, (turn) =>
       disconnectWith((client) => client.ReadState({ session }), turn),
     ),
 
     detach: Effect.andThen(
-      close,
+      markReleased,
       disconnectWith((client) => client.ReadState({ session })),
     ),
 
     stop: Effect.andThen(
-      close,
+      markReleased,
       disconnectWith((client) => client.StopSession({ session })),
     ),
 
     destroy: Effect.gen(function* () {
-      yield* close;
+      yield* markReleased;
       if (yield* Ref.get(destroyed)) return;
-      // A session that was released may have ended in the bridge, or the bridge with its sandbox, so the
-      // connection starts it again, from its latest state, to be destroyed.
+      // A session that was released may have ended in the bridge, or the bridge with its sandbox,
+      // so the connection starts it again, from its latest state, to be destroyed.
       yield* send((client) => client.DestroySession({ session }));
       yield* Ref.set(destroyed, true);
       yield* RcRef.invalidate(connection);
@@ -442,8 +523,8 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 });
 
 /**
- * A client of the bridge `bridge`, which `options` launch in `sandbox`, over a WebSocket open for as
- * long as the scope is, launching the bridge when none answers.
+ * A client of the bridge `bridge`, which `options` launch in `sandbox`, over a WebSocket open for
+ * as long as the scope is, launching the bridge when none answers.
  */
 const connect = Effect.fnUntraced(function* (
   options: Options,
@@ -457,12 +538,13 @@ const connect = Effect.fnUntraced(function* (
 });
 
 /**
- * A client of the bridge `bridge` in `sandbox`, at the port its `Bridge.listeningFile` names, over a
- * WebSocket open for as long as the scope is, or nothing, with the WebSocket closed, when no bridge
- * answers there as that bridge within 2 seconds: one that exited left its file behind, and another
- * may listen on its port since. A bridge that is not running refuses the WebSocket, so the question
- * fails rather than waits. The WebSocket is not opened again when it drops, so that requests then
- * fail with `RpcClientError` rather than reach a bridge that restarted without the session.
+ * A client of the bridge `bridge` in `sandbox`, at the port its `Bridge.listeningFile` names, over
+ * a WebSocket open for as long as the scope is, or nothing, with the WebSocket closed, when no
+ * bridge answers there as that bridge within 2 seconds: one that exited left its file behind, and
+ * another may listen on its port since. A bridge that is not running refuses the WebSocket, so the
+ * question fails rather than waits. The WebSocket is not opened again when it drops, so that
+ * requests then fail with `RpcClientError` rather than reach a bridge that restarted without the
+ * session.
  */
 const findBridge = Effect.fnUntraced(function* (
   options: Options,
@@ -486,7 +568,9 @@ const findBridge = Effect.fnUntraced(function* (
   );
 });
 
-/** Where the bridge `bridge` of the agent `agent` says it listens, or nothing when it says nothing. */
+/**
+ * Where the bridge `bridge` of the agent `agent` says it listens, or nothing when it says nothing.
+ */
 const readListening = (
   sandbox: Sandbox.Sandbox["Service"],
   agent: string,
@@ -588,8 +672,6 @@ const launch = Effect.fnUntraced(
     }).pipe(Effect.orDie);
     // A sandbox prepared with another version of the template lacks this version's bridge.
     yield* options.template.prepare;
-    // TODO: Keep the bridge's own output in its state directory, for a host to report why the
-    // bridge failed to start.
     const process = yield* spawner.spawn(
       ChildProcess.make(options.command, options.args ?? [], {
         cwd: sandbox.workingDirectory,
@@ -642,6 +724,10 @@ const whileReconnecting = Schedule.spaced("100 millis").pipe(
   Schedule.setInputType<HarnessError | RpcClientError.RpcClientError>(),
   Schedule.tap(({ input }) => (input._tag === "RpcClientError" ? Effect.void : Effect.fail(input))),
 );
+
+/** Whether a request failed because the bridge does not have the turn, as after it died. */
+const isLostTurn = (error: HarnessError | RpcClientError.RpcClientError) =>
+  error._tag === "HarnessError" && error.reason._tag === "NoTurnError";
 
 const fromRequestError = (agent: string, error: HarnessError | RpcClientError.RpcClientError) =>
   error._tag === "HarnessError"
@@ -696,17 +782,6 @@ const bridgeOptionsOf = (agent: string, turnOptions: Agent.TurnOptions) => {
     return bridgeOptions;
   });
 };
-
-/** Drops the parts of a turn's first `steps` steps. */
-const afterSteps = (steps: number) =>
-  Stream.mapAccum(
-    () => 0,
-    (finished: number, part: StreamPart) =>
-      [
-        part.type === "finish-step" ? finished + 1 : finished,
-        finished < steps ? [] : [part],
-      ] as const,
-  );
 
 // Every runtime this package runs on has the WHATWG `TextEncoder`, which no type the package
 // includes declares, and Effect exports no encoder of its own.

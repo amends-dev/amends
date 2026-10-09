@@ -15,6 +15,7 @@ remaining gaps with links to their owning code.
 | [Thread workflows](thread-workflows.md)                              | Starts, replies, participation, reads, notifications, read state, and typing.                                       |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                             |
+| [Publishing](publishing.md)                                          | Building a package's distribution, checking it as a consumer would use it, and publishing it to npm.                |
 | [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                            |
 | [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                     |
 | [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                              |

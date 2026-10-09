@@ -1,11 +1,11 @@
 /**
  * How an agent that works in a sandbox calls the host's tools. The agent is given the relay as an
- * MCP server on the sandbox's loopback, and a token of its own for each session. The tools the server
- * lists are those of the turn the session runs, and each call the agent makes becomes a `tool-call`
- * part of that turn, which the host runs as it runs any host tool and answers with
+ * MCP server on the sandbox's loopback, and a token of its own for each session. The tools the
+ * server lists are those of the turn the session runs, and each call the agent makes becomes a
+ * `tool-call` part of that turn, which the host runs as it runs any host tool and answers with
  * `submitToolResult`. The relay answers the agent's request with the result. While it waits, for
- * the host or for a person's approval, it keeps the request alive with progress notifications, which
- * an agent that has a time limit for a request takes as a sign of life.
+ * the host or for a person's approval, it keeps the request alive with progress notifications,
+ * which an agent that has a time limit for a request takes as a sign of life.
  *
  * Only the host runs the tools, so nothing they need reaches the sandbox. A session's token lets
  * the agent ask the host to run that session's tools, which the host's toolkit and approvals still
@@ -15,9 +15,12 @@
  * it over the `HttpServer` provided, and is what a bridge program uses. A call waits for the host
  * for as long as an approval takes, so the server must not close a connection for being idle, as
  * Bun's does after ten seconds unless its `idleTimeout` is 0.
+ *
+ * @since 0.1.0
  */
 import {
   type Cause,
+  Context,
   Crypto,
   Data,
   Deferred,
@@ -33,7 +36,6 @@ import {
   type Scope,
   Stream,
 } from "effect";
-import { Context } from "effect";
 import { Hex } from "effect/encoding";
 import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http";
 import { NetAddress } from "effect/net";
@@ -42,6 +44,12 @@ import type { ToolDefinition } from "./Bridge.ts";
 import { isPresented } from "./internal/bearer.ts";
 import type { StreamPart } from "./StreamPart.ts";
 
+/**
+ * How long the relay keeps a call alive, and how long it waits for the host.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** How often a request that waits for the host hears from the relay. Ten seconds by default. */
   readonly heartbeat?: Duration.Input;
@@ -53,15 +61,21 @@ export interface Options {
   readonly maxWait?: Duration.Input;
 }
 
-/** A session of an agent, as far as the relay knows it. */
+/**
+ * A session of an agent, as far as the relay knows it: the token the agent presents, the tools of
+ * its running turn, and the results of the calls it made.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface RelaySession {
   /** What the agent's MCP client presents as `Authorization: Bearer`. It names this session. */
   readonly token: Redacted.Redacted<string>;
 
   /**
    * Offers `tools` to the agent for the turn that the scope given runs, and returns the parts that
-   * stream the calls the agent makes of them, until the scope closes. A call the agent makes when no
-   * turn runs, or of a tool the turn did not offer, fails. The tools stay listed after the turn.
+   * stream the calls the agent makes of them, until the scope closes. A call the agent makes when
+   * no turn runs, or of a tool the turn did not offer, fails. The tools stay listed after the turn.
    */
   readonly offerTools: (
     tools: ReadonlyArray<ToolDefinition>,
@@ -74,7 +88,12 @@ export interface RelaySession {
   readonly submitToolResult: AgentSession["submitToolResult"];
 }
 
-/** What the relay answers one MCP message with. */
+/**
+ * What the relay answers one MCP message with.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export type Answer = Data.TaggedEnum<{
   /** The message names no session the relay has. */
   Unauthorized: {};
@@ -88,19 +107,91 @@ export type Answer = Data.TaggedEnum<{
   Events: { readonly messages: Stream.Stream<Schema.Json> };
 }>;
 
+/**
+ * @category models
+ * @since 0.1.0
+ */
 export const Answer = Data.taggedEnum<Answer>();
 
+/**
+ * The relay without a transport, as `make` returns it: it starts sessions and answers the MCP
+ * messages a transport gives it.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Relay {
   /** Starts a session, which lasts until the scope given closes. */
   readonly open: (id: SessionId) => Effect.Effect<RelaySession, never, Scope.Scope>;
 
   /**
-   * Answers an MCP message, as the HTTP request that carried it, with its `Authorization` header and
-   * its body, is answered.
+   * Answers an MCP message, as the HTTP request that carried it, with its `Authorization` header
+   * and its body, is answered.
    */
   readonly answer: (authorization: string | undefined, message: unknown) => Effect.Effect<Answer>;
 }
 
+/**
+ * The relay as a bridge program serves it, for a driver to give its agent: where the agent's MCP
+ * client connects, and the sessions the driver opens.
+ *
+ * **Example** (A driver giving its agent the host's tools through the relay)
+ *
+ * ```ts
+ * import { Bridge, HostToolRelay, StreamPart } from "@amends/harness";
+ * import { Effect, Redacted, Stream } from "effect";
+ *
+ * // What the adapter has of its agent: it is an MCP client over HTTP, configured per session.
+ * declare const agent: {
+ *   readonly createSession: (options: {
+ *     readonly directory: string;
+ *     readonly mcpServers: Record<string, { url: string; headers: Record<string, string> }>;
+ *   }) => Effect.Effect<string>;
+ *   readonly prompt: (sessionId: string, text: string) => Stream.Stream<StreamPart.StreamPart>;
+ * };
+ *
+ * const makeDriver = Effect.gen(function* () {
+ *   const relay = yield* HostToolRelay.HostToolRelay;
+ *   const driver: Bridge.Driver = {
+ *     id: "my-agent",
+ *     createSession: (options) =>
+ *       Effect.gen(function* () {
+ *         const relaySession = yield* relay.open(options.id);
+ *         const sessionId = yield* agent.createSession({
+ *           directory: options.directory,
+ *           mcpServers: {
+ *             host: {
+ *               url: relay.url,
+ *               headers: { authorization: `Bearer ${Redacted.value(relaySession.token)}` },
+ *             },
+ *           },
+ *         });
+ *         const session: Bridge.DriverSession = {
+ *           keptConversation: false,
+ *           // The turn streams the agent's parts and the calls it makes of the host's tools.
+ *           promptTurn: (turn) =>
+ *             Stream.unwrap(
+ *               Effect.map(relaySession.offerTools(turn.tools), (calls) => {
+ *                 const parts = agent.prompt(sessionId, JSON.stringify(turn.prompt.content));
+ *                 return Stream.merge(parts, calls, { haltStrategy: "left" });
+ *               }),
+ *             ).pipe(Stream.scoped),
+ *           submitToolResult: relaySession.submitToolResult,
+ *           approve: () => Effect.void,
+ *           compact: () => Effect.die("my-agent compacts only by itself"),
+ *           state: Effect.succeed(sessionId),
+ *           destroy: Effect.void,
+ *         };
+ *         return session;
+ *       }),
+ *   };
+ *   return driver;
+ * });
+ * ```
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class HostToolRelay extends Context.Service<
   HostToolRelay,
   {
@@ -116,9 +207,16 @@ const protocolVersions = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"
 
 const newestProtocolVersion = "2025-11-25";
 
-const INVALID_REQUEST = -32600;
-const METHOD_NOT_FOUND = -32601;
-const INVALID_PARAMS = -32602;
+/** Where the relay's server answers MCP messages. */
+const path = "/mcp";
+
+/** JSON-RPC's codes for the errors the relay answers with. */
+const errorCode = {
+  parse: -32700,
+  invalidRequest: -32600,
+  methodNotFound: -32601,
+  invalidParams: -32602,
+} as const;
 
 const RequestId = Schema.Union([Schema.String, Schema.Finite]);
 
@@ -169,7 +267,13 @@ interface Entry {
   readonly pending: Ref.Ref<HashMap.HashMap<string, PendingCall>>;
 }
 
-/** Makes the relay, which answers MCP messages without a transport. */
+/**
+ * The relay without a transport, which answers MCP messages. `layer` serves it over HTTP; a bridge
+ * program with a transport of its own gives `answer` each message it receives.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options) {
   const crypto = yield* Crypto.Crypto;
   const heartbeat = options?.heartbeat ?? "10 seconds";
@@ -205,7 +309,9 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
     if (found === undefined) return Answer.Unauthorized();
     const request = yield* Schema.decodeUnknownEffect(Message)(message).pipe(Effect.option);
     if (Option.isNone(request)) {
-      return Answer.Reply({ message: failure(null, INVALID_REQUEST, "Not a JSON-RPC request") });
+      return Answer.Reply({
+        message: failure(null, errorCode.invalidRequest, "Not a JSON-RPC request"),
+      });
     }
     const { id, method, params } = request.value;
     if (id === undefined) {
@@ -223,7 +329,7 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
         return yield* call(found, id, params);
       default:
         return Answer.Reply({
-          message: failure(id, METHOD_NOT_FOUND, `The relay has no method ${method}`),
+          message: failure(id, errorCode.methodNotFound, `The relay has no method ${method}`),
         });
     }
   });
@@ -272,7 +378,9 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
   ) {
     const decoded = yield* Schema.decodeUnknownEffect(CallParams)(params).pipe(Effect.option);
     if (Option.isNone(decoded)) {
-      return Answer.Reply({ message: failure(requestId, INVALID_PARAMS, "Invalid tool call") });
+      return Answer.Reply({
+        message: failure(requestId, errorCode.invalidParams, "Invalid tool call"),
+      });
     }
     const { name, _meta } = decoded.value;
     const running = yield* Ref.get(entry.calls);
@@ -352,7 +460,26 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
   return relay;
 });
 
-/** Serves the relay over the `HttpServer` provided, on that server's own address. */
+/**
+ * Serves the relay over the `HttpServer` provided, at `/mcp` on that server's own address, as a
+ * bridge program does beside its bridge.
+ *
+ * **Example** (Serving the relay from a bridge program on Bun)
+ *
+ * ```ts
+ * import { HostToolRelay } from "@amends/harness";
+ * import { BunHttpServer } from "@effect/platform-bun";
+ * import { Layer } from "effect";
+ *
+ * // A call waits for the host, so the server must not close idle connections.
+ * const RelayLayer = HostToolRelay.layer().pipe(
+ *   Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: 0, idleTimeout: 0 })),
+ * );
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (options?: Options) =>
   Layer.effect(HostToolRelay)(
     Effect.gen(function* () {
@@ -370,7 +497,7 @@ export const layer = (options?: Options) =>
                 Effect.matchEffect({
                   onFailure: () =>
                     Effect.succeed(
-                      HttpServerResponse.jsonUnsafe(failure(null, -32700, "Not JSON"), {
+                      HttpServerResponse.jsonUnsafe(failure(null, errorCode.parse, "Not JSON"), {
                         status: 400,
                       }),
                     ),
@@ -393,8 +520,6 @@ export const layer = (options?: Options) =>
       });
     }),
   );
-
-const path = "/mcp";
 
 /** The HTTP response that carries `answer`. */
 const respond = (answer: Answer) =>

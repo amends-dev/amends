@@ -8,6 +8,8 @@
  * there, named by its id, so that its files stay in place when the session moves from one agent to
  * another. A session needs no sandbox when its agent does not require one, such as for a plain
  * conversation.
+ *
+ * @since 0.1.0
  */
 import { Sandbox } from "@amends/sandbox";
 import { Context, Effect, FileSystem, Layer, Path } from "effect";
@@ -20,6 +22,9 @@ import type * as Session from "./Session.ts";
 /**
  * What a session starts from: the `id` of a new session, with the conversation it starts with if
  * any, or what an earlier one returned.
+ *
+ * @category options
+ * @since 0.1.0
  */
 export type CreateSessionOptions = {
   /**
@@ -47,6 +52,13 @@ export type CreateSessionOptions = {
     }
 );
 
+/**
+ * The service callers run an agent through. `make` builds one from an agent's adapter, and `layer`
+ * provides it to a program that runs one agent.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Harness extends Context.Service<
   Harness,
   {
@@ -58,9 +70,9 @@ export class Harness extends Context.Service<
     readonly agent: Omit<Agent, "createSession">;
 
     /**
-     * Creates a session: a new one, which loads the `history` it is given, or one that goes on where
-     * `resumeFrom` left it. The agent that last ran the session resumes from its own state. Any
-     * other agent loads the conversation instead, and runs an unfinished turn again.
+     * Creates a session: a new one, which loads the `history` it is given, or one that goes on
+     * where `resumeFrom` left it. The agent that last ran the session resumes from its own state.
+     * Any other agent loads the conversation instead, and runs an unfinished turn again.
      */
     readonly createSession: (
       options: CreateSessionOptions,
@@ -68,6 +80,48 @@ export class Harness extends Context.Service<
   }
 >()("@amends/harness/Harness") {}
 
+/**
+ * The harness over `agent`, as its adapter implements it.
+ *
+ * **Example** (Running a turn, saving the session, and resuming it)
+ *
+ * ```ts
+ * import { Agent, Harness, Session } from "@amends/harness";
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { Console, Effect, Schema, Stream } from "effect";
+ *
+ * declare const agent: Agent.Agent; // from an adapter, such as @amends/harness-opencode
+ *
+ * const SessionStateJson = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState));
+ *
+ * const program = Effect.gen(function* () {
+ *   const harness = Harness.make(agent);
+ *   const sandboxes = yield* SandboxProvider.SandboxProvider;
+ *   const sandbox = yield* sandboxes.create({ template: harness.agent.template });
+ *
+ *   const session = yield* harness.createSession({ sandbox, id: Agent.SessionId.make("review") });
+ *   yield* session
+ *     .stream({ prompt: "Summarize README.md" })
+ *     .pipe(
+ *       Stream.runForEach((part) =>
+ *         part.type === "text-delta" ? Console.log(part.delta) : Effect.void,
+ *       ),
+ *     );
+ *
+ *   // Store the session as JSON, and resume it later, on any host and any agent.
+ *   const saved = yield* Schema.encodeEffect(SessionStateJson)(yield* session.detach);
+ *   const resumed = yield* harness.createSession({
+ *     sandbox,
+ *     resumeFrom: yield* Schema.decodeEffect(SessionStateJson)(saved),
+ *   });
+ *   const answer = yield* resumed.generate({ prompt: "Now list its headings" });
+ *   return answer.text;
+ * });
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = (agent: Agent): Harness["Service"] => {
   /** Fails with `UnsupportedError` when the agent requires a sandbox and has none. */
   const checkSandbox = (sandbox: Sandbox.Sandbox["Service"] | undefined) =>
@@ -130,5 +184,27 @@ export const make = (agent: Agent): Harness["Service"] => {
   });
 };
 
-/** A harness over `agent`, for programs that run one agent. */
+/**
+ * A harness over `agent`, for programs that run one agent.
+ *
+ * **Example** (Providing the harness to a program)
+ *
+ * ```ts
+ * import { Agent, Harness } from "@amends/harness";
+ * import { Effect } from "effect";
+ *
+ * declare const agent: Agent.Agent;
+ *
+ * const program = Effect.gen(function* () {
+ *   const harness = yield* Harness.Harness;
+ *   const session = yield* harness.createSession({ id: Agent.SessionId.make("chat") });
+ *   return yield* session.generate({ prompt: "Hello" });
+ * });
+ *
+ * const main = program.pipe(Effect.provide(Harness.layer(agent)));
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (agent: Agent): Layer.Layer<Harness> => Layer.succeed(Harness, make(agent));
