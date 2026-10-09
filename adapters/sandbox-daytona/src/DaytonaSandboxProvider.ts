@@ -13,6 +13,8 @@
  * options set it. A port's endpoint is Daytona's preview URL for it, which takes the sandbox's
  * preview token in a header and passes the request's other headers on. Daytona opens a sandbox's
  * port the first time it gives its preview URL, so exposing a port only records it.
+ *
+ * @since 0.1.0
  */
 import { Network, Sandbox, SandboxError, SandboxProvider, type Template } from "@amends/sandbox";
 import {
@@ -27,6 +29,13 @@ import { makeFileSystem } from "./internal/files.ts";
 import { makeChildProcessSpawner } from "./internal/processes.ts";
 import { claimMinutes, findSnapshot } from "./internal/snapshots.ts";
 
+/**
+ * How the provider reaches Daytona, and what every sandbox it creates gets unless the sandbox's
+ * `ProviderOptions` say otherwise.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The API key of the Daytona organization the sandboxes belong to. */
   readonly apiKey: Redacted.Redacted<string>;
@@ -49,7 +58,25 @@ export interface Options {
 
 /**
  * What a sandbox on Daytona is created with besides the contract's options, under
- * `providerOptions.daytona`, each in place of the provider's own option for this sandbox.
+ * `providerOptions.daytona`, each in place of the provider's own option for this sandbox. An entry
+ * that is not this fails the create with `InvalidOptionsError` before Daytona is asked.
+ *
+ * **Example** (A sandbox from another snapshot, which Daytona stops after an hour idle)
+ *
+ * ```ts
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { Effect } from "effect";
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   return yield* sandboxProvider.create({
+ *     providerOptions: { daytona: { snapshot: "python-3.13", autoStopInterval: 60 } },
+ *   });
+ * });
+ * ```
+ *
+ * @category options
+ * @since 0.1.0
  */
 export const ProviderOptions = Schema.Struct({
   /** The snapshot the sandbox starts from, rather than the provider's. */
@@ -58,6 +85,12 @@ export const ProviderOptions = Schema.Struct({
   /** Minutes without requests to Daytona's API after which Daytona stops the sandbox; 0 never. */
   autoStopInterval: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
 });
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export type ProviderOptions = typeof ProviderOptions.Type;
 
 /** The label that keeps the ports a sandbox exposes. */
 const portsLabel = "amends-ports";
@@ -74,6 +107,30 @@ const deletedStates = new Set(["destroyed", "destroying"]);
 /** States of a sandbox that is not running, from which `stop` has nothing to do. */
 const stoppedStates = new Set(["stopped", "archived"]);
 
+/**
+ * The provider over Daytona's SDK with `options`, in a scope that closes the SDK's client and
+ * leaves snapshots still being made to a later create. It needs Effect's `Crypto` service, as
+ * `BunCrypto.layer` or `NodeCrypto.layer` provide it.
+ *
+ * **Example** (A provider for one piece of work)
+ *
+ * ```ts
+ * import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+ * import { BunCrypto } from "@effect/platform-bun";
+ * import { Effect, Redacted } from "effect";
+ *
+ * declare const apiKey: Redacted.Redacted<string>;
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* DaytonaSandboxProvider.make({ apiKey, target: "eu" });
+ *   const sandbox = yield* sandboxProvider.createScoped();
+ *   return sandbox.workingDirectory;
+ * }).pipe(Effect.scoped, Effect.provide(BunCrypto.layer));
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options: Options) {
   const crypto = yield* Crypto.Crypto;
   // Snapshots of templates are made in the background, until the provider closes.
@@ -328,6 +385,34 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
   return SandboxProvider.make({ create, resume });
 });
 
+/**
+ * Provides the `SandboxProvider` service over Daytona with `options`, as `make` makes it, to a
+ * program that keeps its sandboxes on Daytona.
+ *
+ * **Example** (Sandboxes of the organization whose key the environment holds)
+ *
+ * ```ts
+ * import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { BunCrypto } from "@effect/platform-bun";
+ * import { Config, Effect, Layer } from "effect";
+ *
+ * const sandboxes = Layer.unwrap(
+ *   Effect.map(Config.Redacted("DAYTONA_API_KEY"), (apiKey) =>
+ *     DaytonaSandboxProvider.layer({ apiKey }),
+ *   ),
+ * ).pipe(Layer.provide(BunCrypto.layer));
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   const sandbox = yield* sandboxProvider.create();
+ *   return sandbox.id;
+ * }).pipe(Effect.provide(sandboxes));
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (options: Options) =>
   Layer.effect(SandboxProvider.SandboxProvider, make(options));
 
