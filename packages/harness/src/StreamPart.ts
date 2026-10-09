@@ -130,8 +130,6 @@ export const TurnStartPart = Schema.Struct({
  */
 export interface TurnStartPart extends Schema.Schema.Type<typeof TurnStartPart> {}
 
-// TODO: Add a `raw` part carrying the agent's own event as it came, once a caller needs something
-// the translation into these parts leaves out.
 /**
  * A part of a turn's stream: an Effect AI provider's part in its encoded form, or one of the four
  * only an agent produces.
