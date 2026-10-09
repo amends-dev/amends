@@ -214,7 +214,7 @@ describe("the conversation a session log records", () => {
 
     expect(history.content).toMatchObject([
       { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
-      { role: "assistant", content: [{ type: "text", text: "After." }] },
+      { role: "assistant", content: [{ type: "reasoning" }, { type: "text", text: "After." }] },
     ]);
   });
 
@@ -230,7 +230,7 @@ describe("the conversation a session log records", () => {
 
     expect(history.content).toMatchObject([
       { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
-      { role: "assistant", content: [{ type: "text", text: "After." }] },
+      { role: "assistant", content: [{ type: "reasoning" }, { type: "text", text: "After." }] },
     ]);
   });
 
@@ -245,8 +245,8 @@ describe("the conversation a session log records", () => {
 
     expect(history.content).toMatchObject([
       { role: "user", content: [{ type: "text", text: "Ada: What is 2 and 3?" }] },
-      { role: "assistant", content: [{ type: "text", text: "Before." }] },
-      { role: "assistant", content: [{ type: "text", text: "After." }] },
+      { role: "assistant", content: [{ type: "reasoning" }, { type: "text", text: "Before." }] },
+      { role: "assistant", content: [{ type: "reasoning" }, { type: "text", text: "After." }] },
     ]);
   });
 });
