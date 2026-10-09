@@ -4,8 +4,8 @@
  * key of the organization the sandboxes belong to, and closes the SDK's client with its scope.
  *
  * A sandbox made from a template starts from a snapshot of the template's version once Daytona has
- * made one, and is prepared on its own until then, as `Snapshots` describes; snapshots still being
- * made when the provider's scope closes are left for the next create to make.
+ * made one, and is prepared on its own until then; snapshots still being made when the provider's
+ * scope closes are left for the next create to make.
  *
  * A sandbox runs until it is stopped or destroyed. Daytona stops a sandbox that sees no requests
  * to its API for a while, and requests to the sandbox's ports do not count, so a sandbox would stop
@@ -22,10 +22,10 @@ import {
   type Sandbox as DaytonaSandbox,
 } from "@daytona/sdk";
 import { Crypto, Effect, Exit, Layer, Option, Redacted, Schedule, Schema } from "effect";
-import { call, fromDaytonaError, providerId, sandboxError } from "./Call.ts";
-import * as Files from "./Files.ts";
-import * as Processes from "./Processes.ts";
-import * as Snapshots from "./Snapshots.ts";
+import { call, fromDaytonaError, providerId, sandboxError } from "./internal/call.ts";
+import { makeFileSystem } from "./internal/files.ts";
+import { makeChildProcessSpawner } from "./internal/processes.ts";
+import { claimMinutes, findSnapshot } from "./internal/snapshots.ts";
 
 export interface Options {
   /** The API key of the Daytona organization the sandboxes belong to. */
@@ -107,8 +107,8 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
     return Sandbox.Sandbox.of({
       id,
       workingDirectory,
-      fileSystem: Files.make(sandbox, workingDirectory),
-      childProcessSpawner: yield* Processes.make(sandbox, workingDirectory).pipe(
+      fileSystem: makeFileSystem(sandbox, workingDirectory),
+      childProcessSpawner: yield* makeChildProcessSpawner(sandbox, workingDirectory).pipe(
         Effect.provideService(Crypto.Crypto, crypto),
       ),
       // TODO: Keep a port that another host exposes at the same moment, once Daytona changes one
@@ -227,7 +227,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
         createSandbox(name, {
           labels: { [templateLabel]: template.name },
           autoStopInterval: 0,
-          ttlMinutes: Snapshots.claimMinutes,
+          ttlMinutes: claimMinutes,
           ...(base === undefined ? {} : { snapshot: base }),
         }),
         (sandbox) =>
@@ -277,7 +277,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
     const templateSnapshot =
       template === undefined
         ? Option.none<string>()
-        : yield* Snapshots.find(daytona, scope, template, base, makeSnapshot(template, base)).pipe(
+        : yield* findSnapshot(daytona, scope, template, base, makeSnapshot(template, base)).pipe(
             Effect.provideService(Crypto.Crypto, crypto),
           );
     const snapshot = Option.getOrElse(templateSnapshot, () => base);

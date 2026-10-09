@@ -21,12 +21,6 @@
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
 import {
-  DaytonaAuthenticationError,
-  DaytonaForbiddenError,
-  DaytonaNotFoundError,
-  DaytonaTimeoutError,
-} from "@daytona/sdk";
-import {
   Crypto,
   Data,
   Duration,
@@ -38,6 +32,8 @@ import {
   Stream,
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { callPlatform } from "./call.ts";
+import { quote } from "./shell.ts";
 
 /** What became of a process: running, exited with a code, or ended without one. */
 type Status = Data.TaggedEnum<{
@@ -58,174 +54,181 @@ const delayAfter = (idle: number) => Duration.millis(Math.min(50 * 2 ** idle, 10
 const readLimit = 1024 * 1024;
 
 /** The process spawner of `sandbox`, whose commands start in `workingDirectory`. */
-export const make = Effect.fn("Processes.make")(function* (
-  sandbox: DaytonaSandbox,
-  workingDirectory: string,
-) {
-  const crypto = yield* Crypto.Crypto;
-  // Daytona gives no process ids, so each process is numbered by the spawner that started it.
-  let lastPid = 0;
+export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChildProcessSpawner")(
+  function* (sandbox: DaytonaSandbox, workingDirectory: string) {
+    const crypto = yield* Crypto.Crypto;
+    // Daytona gives no process ids, so each process is numbered by the spawner that started it.
+    let lastPid = 0;
 
-  const spawn = Effect.fnUntraced(function* (command: ChildProcess.Command) {
-    const unsupported = unsupportedOption(command);
-    if (unsupported !== undefined) {
-      return yield* PlatformError.badArgument({
-        module: "ChildProcess",
-        method: "spawn",
-        description: unsupported,
-      });
-    }
-    const session = `amends-process-${yield* crypto.randomUUIDv4}`;
-    const outputDirectory = `/tmp/${session}`;
-    let referenced = true;
-    yield* Effect.acquireRelease(
-      call("spawn", () => sandbox.process.createSession(session)),
-      // Deletes the session, ending the process, and removes its output, which stays when `kill`
-      // has deleted the session already.
-      () =>
-        referenced
-          ? Effect.andThen(
-              Effect.ignore(call("kill", () => sandbox.process.deleteSession(session))),
-              Effect.ignore(
-                call("kill", () =>
-                  sandbox.process.executeCommand(`rm -rf ${quote(outputDirectory)}`),
+    const spawn = Effect.fnUntraced(function* (command: ChildProcess.Command) {
+      const unsupported = unsupportedOption(command);
+      if (unsupported !== undefined) {
+        return yield* PlatformError.badArgument({
+          module: "ChildProcess",
+          method: "spawn",
+          description: unsupported,
+        });
+      }
+      const session = `amends-process-${yield* crypto.randomUUIDv4}`;
+      const outputDirectory = `/tmp/${session}`;
+      let referenced = true;
+      yield* Effect.acquireRelease(
+        callPlatform("ChildProcess", "spawn", () => sandbox.process.createSession(session)),
+        // Deletes the session, ending the process, and removes its output, which stays when `kill`
+        // has deleted the session already.
+        () =>
+          referenced
+            ? Effect.andThen(
+                Effect.ignore(
+                  callPlatform("ChildProcess", "kill", () =>
+                    sandbox.process.deleteSession(session),
+                  ),
                 ),
-              ),
-            )
-          : Effect.void,
-    );
-    const environmentScripts = new Map(
-      standardCommandsOf(command).flatMap((standard, index) =>
-        standard.options.env === undefined
-          ? []
-          : [[standard, `${outputDirectory}/environment-${index}`] as const],
-      ),
-    );
-    // Daytona makes the directory the first script goes in.
-    yield* Effect.forEach(
-      environmentScripts,
-      ([standard, file]) =>
-        call("spawn", () =>
-          sandbox.fs.uploadFile(Buffer.from(environmentScriptOf(standard)), file),
-        ),
-      { discard: true },
-    );
-    const { cmdId } = yield* call("spawn", () =>
-      sandbox.process.executeSessionCommand(session, {
-        // Sessions run the user's shell, zsh on Daytona's own image, whose redirections differ
-        // from sh's. The line runs in sh as a child, since Daytona loses the exit code of a
-        // command that replaces the session's shell.
-        command: `sh -c ${quote(
-          `mkdir -p ${quote(outputDirectory)} && { ${commandLine(command, workingDirectory, environmentScripts)}; } >${quote(`${outputDirectory}/stdout`)} 2>${quote(`${outputDirectory}/stderr`)}`,
-        )}`,
-        runAsync: true,
-        suppressInputEcho: true,
-      }),
-    );
-
-    const readStatus = call("status", () => sandbox.process.getSessionCommand(session, cmdId)).pipe(
-      Effect.map(({ exitCode }) =>
-        exitCode === undefined ? Status.Running() : Status.Exited({ exitCode }),
-      ),
-      Effect.catch((error) => statusAfterFailure(sandbox, error)),
-    );
-    const awaitExit = Effect.repeat(readStatus, {
-      until: (status) => status._tag !== "Running",
-      schedule: untilExit,
-    });
-
-    /** What the process has written to `output` after its first `offset` bytes, up to `readLimit`. */
-    const readOutput = (output: "stdout" | "stderr", offset: number) =>
-      Effect.map(
-        call("read", () =>
-          sandbox.process.executeCommand(
-            `tail -c +${offset + 1} -- ${quote(`${outputDirectory}/${output}`)} 2>/dev/null | head -c ${readLimit} | base64 -w0`,
-          ),
-        ),
-        ({ result }) => new Uint8Array(Buffer.from(result, "base64")),
+                Effect.ignore(
+                  callPlatform("ChildProcess", "kill", () =>
+                    sandbox.process.executeCommand(`rm -rf ${quote(outputDirectory)}`),
+                  ),
+                ),
+              )
+            : Effect.void,
       );
-
-    /**
-     * What the process writes to `output`, read as it grows, and to the end once the process has
-     * ended. While nothing new is written, the file is read again sooner after recent output and
-     * once a second after a while.
-     */
-    const outputOf = (output: "stdout" | "stderr") =>
-      Stream.paginate(
-        { offset: 0, idle: 0, ended: false },
-        Effect.fnUntraced(function* ({ offset, idle, ended }) {
-          const bytes = yield* readOutput(output, offset);
-          if (bytes.length > 0) {
-            return [
-              [bytes],
-              Option.some({ offset: offset + bytes.length, idle: 0, ended }),
-            ] as const;
-          }
-          if (ended) return [[], Option.none()] as const;
-          const status = yield* readStatus;
-          if (status._tag === "Running") yield* Effect.sleep(delayAfter(idle));
-          // A process that has ended wrote all it will, which one more read finds.
-          return [
-            [],
-            Option.some({ offset, idle: idle + 1, ended: status._tag !== "Running" }),
-          ] as const;
+      const environmentScripts = new Map(
+        standardCommandsOf(command).flatMap((standard, index) =>
+          standard.options.env === undefined
+            ? []
+            : [[standard, `${outputDirectory}/environment-${index}`] as const],
+        ),
+      );
+      // Daytona makes the directory the first script goes in.
+      yield* Effect.forEach(
+        environmentScripts,
+        ([standard, file]) =>
+          callPlatform("ChildProcess", "spawn", () =>
+            sandbox.fs.uploadFile(Buffer.from(environmentScriptOf(standard)), file),
+          ),
+        { discard: true },
+      );
+      const { cmdId } = yield* callPlatform("ChildProcess", "spawn", () =>
+        sandbox.process.executeSessionCommand(session, {
+          // Sessions run the user's shell, zsh on Daytona's own image, whose redirections differ
+          // from sh's. The line runs in sh as a child, since Daytona loses the exit code of a
+          // command that replaces the session's shell.
+          command: `sh -c ${quote(
+            `mkdir -p ${quote(outputDirectory)} && { ${commandLine(command, workingDirectory, environmentScripts)}; } >${quote(`${outputDirectory}/stdout`)} 2>${quote(`${outputDirectory}/stderr`)}`,
+          )}`,
+          runAsync: true,
+          suppressInputEcho: true,
         }),
       );
 
-    const input = stdinOf(command);
-    const stdin =
-      input === "ignore"
-        ? Sink.drain
-        : sendLines((lines) =>
-            call("stdin", () => sandbox.process.sendSessionCommandInput(session, cmdId, lines)),
-          );
-    if (Stream.isStream(input)) yield* Effect.forkScoped(Stream.run(input, stdin));
-
-    const stdout = outputStreamOf(command, "stdout", () => outputOf("stdout"));
-    const stderr = outputStreamOf(command, "stderr", () => outputOf("stderr"));
-
-    const reref = Effect.sync(() => {
-      referenced = true;
-    });
-    return ChildProcessSpawner.makeHandle({
-      pid: ChildProcessSpawner.ProcessId(++lastPid),
-      exitCode: Effect.flatMap(awaitExit, (status) =>
-        status._tag === "Exited"
-          ? Effect.succeed(ChildProcessSpawner.ExitCode(status.exitCode))
-          : Effect.fail(
-              PlatformError.systemError({
-                _tag: "Unknown",
-                module: "ChildProcess",
-                method: "exitCode",
-                description: "The process was killed, or ended with its sandbox",
-              }),
-            ),
-      ),
-      isRunning: Effect.map(readStatus, (status) => status._tag === "Running"),
-      // TODO: Send the kill signal asked for, once a caller asks for one other than SIGTERM.
-      // Deleting the session sends SIGTERM to the process and its children, then SIGKILL.
-      kill: () =>
-        call("kill", () => sandbox.process.deleteSession(session)).pipe(
-          Effect.catchIf(
-            (error) => error.reason._tag === "NotFound",
-            () => Effect.void,
-          ),
+      const readStatus = callPlatform("ChildProcess", "status", () =>
+        sandbox.process.getSessionCommand(session, cmdId),
+      ).pipe(
+        Effect.map(({ exitCode }) =>
+          exitCode === undefined ? Status.Running() : Status.Exited({ exitCode }),
         ),
-      stdin,
-      stdout,
-      stderr,
-      all: Stream.merge(stdout, stderr),
-      getInputFd: () => Sink.drain,
-      getOutputFd: () => Stream.empty,
-      unref: Effect.sync(() => {
-        referenced = false;
-        return reref;
-      }),
-    });
-  });
+        Effect.catch((error) => statusAfterFailure(sandbox, error)),
+      );
+      const awaitExit = Effect.repeat(readStatus, {
+        until: (status) => status._tag !== "Running",
+        schedule: untilExit,
+      });
 
-  return ChildProcessSpawner.make(spawn);
-});
+      /** What the process has written to `output` after its first `offset` bytes, up to `readLimit`. */
+      const readOutput = (output: "stdout" | "stderr", offset: number) =>
+        Effect.map(
+          callPlatform("ChildProcess", "read", () =>
+            sandbox.process.executeCommand(
+              `tail -c +${offset + 1} -- ${quote(`${outputDirectory}/${output}`)} 2>/dev/null | head -c ${readLimit} | base64 -w0`,
+            ),
+          ),
+          ({ result }) => new Uint8Array(Buffer.from(result, "base64")),
+        );
+
+      /**
+       * What the process writes to `output`, read as it grows, and to the end once the process has
+       * ended. While nothing new is written, the file is read again sooner after recent output and
+       * once a second after a while.
+       */
+      const outputOf = (output: "stdout" | "stderr") =>
+        Stream.paginate(
+          { offset: 0, idle: 0, ended: false },
+          Effect.fnUntraced(function* ({ offset, idle, ended }) {
+            const bytes = yield* readOutput(output, offset);
+            if (bytes.length > 0) {
+              return [
+                [bytes],
+                Option.some({ offset: offset + bytes.length, idle: 0, ended }),
+              ] as const;
+            }
+            if (ended) return [[], Option.none()] as const;
+            const status = yield* readStatus;
+            if (status._tag === "Running") yield* Effect.sleep(delayAfter(idle));
+            // A process that has ended wrote all it will, which one more read finds.
+            return [
+              [],
+              Option.some({ offset, idle: idle + 1, ended: status._tag !== "Running" }),
+            ] as const;
+          }),
+        );
+
+      const input = stdinOf(command);
+      const stdin =
+        input === "ignore"
+          ? Sink.drain
+          : sendLines((lines) =>
+              callPlatform("ChildProcess", "stdin", () =>
+                sandbox.process.sendSessionCommandInput(session, cmdId, lines),
+              ),
+            );
+      if (Stream.isStream(input)) yield* Effect.forkScoped(Stream.run(input, stdin));
+
+      const stdout = outputStreamOf(command, "stdout", () => outputOf("stdout"));
+      const stderr = outputStreamOf(command, "stderr", () => outputOf("stderr"));
+
+      const reref = Effect.sync(() => {
+        referenced = true;
+      });
+      return ChildProcessSpawner.makeHandle({
+        pid: ChildProcessSpawner.ProcessId(++lastPid),
+        exitCode: Effect.flatMap(awaitExit, (status) =>
+          status._tag === "Exited"
+            ? Effect.succeed(ChildProcessSpawner.ExitCode(status.exitCode))
+            : Effect.fail(
+                PlatformError.systemError({
+                  _tag: "Unknown",
+                  module: "ChildProcess",
+                  method: "exitCode",
+                  description: "The process was killed, or ended with its sandbox",
+                }),
+              ),
+        ),
+        isRunning: Effect.map(readStatus, (status) => status._tag === "Running"),
+        // TODO: Send the kill signal asked for, once a caller asks for one other than SIGTERM.
+        // Deleting the session sends SIGTERM to the process and its children, then SIGKILL.
+        kill: () =>
+          callPlatform("ChildProcess", "kill", () => sandbox.process.deleteSession(session)).pipe(
+            Effect.catchIf(
+              (error) => error.reason._tag === "NotFound",
+              () => Effect.void,
+            ),
+          ),
+        stdin,
+        stdout,
+        stderr,
+        all: Stream.merge(stdout, stderr),
+        getInputFd: () => Sink.drain,
+        getOutputFd: () => Stream.empty,
+        unref: Effect.sync(() => {
+          referenced = false;
+          return reref;
+        }),
+      });
+    });
+
+    return ChildProcessSpawner.make(spawn);
+  },
+);
 
 /**
  * Sends what is written a line at a time, as Daytona takes input, which ends each send with a
@@ -369,28 +372,4 @@ const outputStreamOf = (
   const option = outputOptionOf(command.options[output]);
   if (option === "ignore") return Stream.empty;
   return Sink.isSink(option) ? Stream.transduce(stream(), option) : stream();
-};
-
-const quote = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
-
-/** Calls Daytona, failing with the platform error its failure amounts to. */
-const call = <A>(method: string, request: () => Promise<A>) =>
-  Effect.tryPromise({ try: request, catch: (error) => toPlatformError(method, error) });
-
-const toPlatformError = (method: string, error: unknown) =>
-  PlatformError.systemError({
-    _tag: systemErrorTagOf(error),
-    module: "ChildProcess",
-    method,
-    description: error instanceof Error ? error.message : String(error),
-    cause: error,
-  });
-
-const systemErrorTagOf = (error: unknown): PlatformError.SystemErrorTag => {
-  if (error instanceof DaytonaNotFoundError) return "NotFound";
-  if (error instanceof DaytonaAuthenticationError || error instanceof DaytonaForbiddenError) {
-    return "PermissionDenied";
-  }
-  if (error instanceof DaytonaTimeoutError) return "TimedOut";
-  return "Unknown";
 };

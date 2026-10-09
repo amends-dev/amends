@@ -6,16 +6,15 @@
  * message names, as Effect's own file systems name an `errno`.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
-import {
-  DaytonaAuthenticationError,
-  DaytonaForbiddenError,
-  DaytonaNotFoundError,
-  DaytonaTimeoutError,
-} from "@daytona/sdk";
 import { ByteSize, Effect, FileSystem, Option, PlatformError, Stream } from "effect";
+import { callPlatform, systemErrorTagOf, toPlatformError } from "./call.ts";
+import { quote } from "./shell.ts";
 
 /** The file system of `sandbox`, whose relative paths start in `workingDirectory`. */
-export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSystem.FileSystem => {
+export const makeFileSystem = (
+  sandbox: DaytonaSandbox,
+  workingDirectory: string,
+): FileSystem.FileSystem => {
   const resolve = (path: string) => (path.startsWith("/") ? path : `${workingDirectory}/${path}`);
 
   /**
@@ -31,7 +30,7 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
           // The tools' messages name their errors in English.
           { LC_ALL: "C" },
         ),
-      catch: (error) => toPlatformError(method, args[0], error),
+      catch: (error) => toPlatformError("FileSystem", method, error, args[0]),
     }).pipe(
       Effect.flatMap(({ exitCode, result }) =>
         exitCode === 0
@@ -47,10 +46,6 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
             ),
       ),
     );
-
-  /** Calls Daytona's file API for `path`, failing with the error its failure amounts to. */
-  const call = <A>(method: string, path: string, request: () => Promise<A>) =>
-    Effect.tryPromise({ try: request, catch: (error) => toPlatformError(method, path, error) });
 
   const makeTempDirectory: FileSystem.FileSystem["makeTempDirectory"] = (options) =>
     Effect.map(
@@ -155,7 +150,12 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       ),
     readFile: (path) =>
       Effect.map(
-        call("readFile", resolve(path), () => sandbox.fs.downloadFile(resolve(path))),
+        callPlatform(
+          "FileSystem",
+          "readFile",
+          () => sandbox.fs.downloadFile(resolve(path)),
+          resolve(path),
+        ),
         (buffer) => new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
       ),
     readLink: (path) => run("readLink", 'readlink -vn -- "$1"', [resolve(path)]),
@@ -213,8 +213,15 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
         ].join("; "),
         [resolved],
       );
-      yield* call("writeFile", resolved, () =>
-        sandbox.fs.uploadFile(Buffer.from(data.buffer, data.byteOffset, data.byteLength), resolved),
+      yield* callPlatform(
+        "FileSystem",
+        "writeFile",
+        () =>
+          sandbox.fs.uploadFile(
+            Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+            resolved,
+          ),
+        resolved,
       );
       // A mode applies to the file the write creates, as when a file is opened.
       if (options?.mode !== undefined && created === "created") {
@@ -281,40 +288,5 @@ const secondsOf = (time: Date | number) =>
 const withoutNewline = (printed: string) =>
   printed.endsWith("\n") ? printed.slice(0, -1) : printed;
 
-const quote = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
-
 const unsupported = (method: string, description: string) =>
   PlatformError.badArgument({ module: "FileSystem", method, description });
-
-const toPlatformError = (method: string, path: string | undefined, error: unknown) =>
-  PlatformError.systemError({
-    _tag:
-      error instanceof DaytonaNotFoundError
-        ? "NotFound"
-        : error instanceof DaytonaAuthenticationError || error instanceof DaytonaForbiddenError
-          ? "PermissionDenied"
-          : error instanceof DaytonaTimeoutError
-            ? "TimedOut"
-            : systemErrorTagOf(error instanceof Error ? error.message : String(error)),
-    module: "FileSystem",
-    method,
-    pathOrDescriptor: path,
-    description: error instanceof Error ? error.message : String(error),
-    cause: error,
-  });
-
-/** The error a message of the sandbox's tools, or of Daytona's file API, names. */
-const systemErrorTagOf = (message: string): PlatformError.SystemErrorTag => {
-  if (/no such file or directory|file not found/i.test(message)) return "NotFound";
-  if (/file exists|already exists/i.test(message)) return "AlreadyExists";
-  if (/permission denied|operation not permitted/i.test(message)) return "PermissionDenied";
-  if (
-    /not a directory|is a directory|points to a directory|too many levels of symbolic links/i.test(
-      message,
-    )
-  ) {
-    return "BadResource";
-  }
-  if (/resource busy/i.test(message)) return "Busy";
-  return "Unknown";
-};
