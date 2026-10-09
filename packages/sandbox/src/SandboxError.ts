@@ -5,7 +5,11 @@
  *
  * `SandboxError` says which provider failed and holds the reason, so callers can recover from one
  * reason with `Effect.catchReason("SandboxError", "NotFoundError", ...)`. The operation that failed
- * is the one the caller ran, which its span names.
+ * is the one the caller ran, which its span names. Each reason has a `description`, what happened
+ * in the provider's words, and says with `isRetryable` whether trying again may succeed, as the
+ * reasons of `AiError` do.
+ *
+ * @since 0.1.0
  */
 import { Schema } from "effect";
 
@@ -33,6 +37,12 @@ const withDefaults = <
     }
   };
 
+/**
+ * The provider's credentials are missing, invalid, or not authorized for the operation.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class AuthenticationError extends withDefaults(
   Schema.TaggedError<AuthenticationError>("@amends/sandbox/SandboxError/AuthenticationError")(
     "AuthenticationError",
@@ -44,6 +54,12 @@ export class AuthenticationError extends withDefaults(
   },
 ) {}
 
+/**
+ * The sandbox does not exist, as for an unknown or destroyed id, or it does not expose the port.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NotFoundError extends withDefaults(
   Schema.TaggedError<NotFoundError>("@amends/sandbox/SandboxError/NotFoundError")(
     "NotFoundError",
@@ -52,6 +68,12 @@ export class NotFoundError extends withDefaults(
   { message: "The sandbox does not exist", isRetryable: false },
 ) {}
 
+/**
+ * A sandbox with the id `create` was given exists already.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class AlreadyExistsError extends withDefaults(
   Schema.TaggedError<AlreadyExistsError>("@amends/sandbox/SandboxError/AlreadyExistsError")(
     "AlreadyExistsError",
@@ -60,6 +82,13 @@ export class AlreadyExistsError extends withDefaults(
   { message: "A sandbox with this id already exists", isRetryable: false },
 ) {}
 
+/**
+ * The provider cannot do this on its platform, such as enforce a network policy, transform
+ * requests, or expose a port once the sandbox exists.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnsupportedError extends withDefaults(
   Schema.TaggedError<UnsupportedError>("@amends/sandbox/SandboxError/UnsupportedError")(
     "UnsupportedError",
@@ -68,6 +97,12 @@ export class UnsupportedError extends withDefaults(
   { message: "The provider does not support this operation", isRetryable: false },
 ) {}
 
+/**
+ * The provider cannot be reached right now, or asks for fewer requests. Trying again may succeed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnavailableError extends withDefaults(
   Schema.TaggedError<UnavailableError>("@amends/sandbox/SandboxError/UnavailableError")(
     "UnavailableError",
@@ -76,6 +111,12 @@ export class UnavailableError extends withDefaults(
   { message: "The provider is temporarily unavailable", isRetryable: true },
 ) {}
 
+/**
+ * The provider failed for a reason none of the others names.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnknownError extends withDefaults(
   Schema.TaggedError<UnknownError>("@amends/sandbox/SandboxError/UnknownError")(
     "UnknownError",
@@ -84,6 +125,12 @@ export class UnknownError extends withDefaults(
   { message: "The provider failed", isRetryable: false },
 ) {}
 
+/**
+ * Why a sandbox operation failed: one of the errors above, which `SandboxError.reason` holds.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export const SandboxErrorReason = Schema.Union([
   AuthenticationError,
   NotFoundError,
@@ -93,8 +140,37 @@ export const SandboxErrorReason = Schema.Union([
   UnknownError,
 ]);
 
+/**
+ * @category errors
+ * @since 0.1.0
+ */
 export type SandboxErrorReason = typeof SandboxErrorReason.Type;
 
+/**
+ * The error every operation on a sandbox fails with: which provider failed, and why.
+ *
+ * **Example** (Recovering from one reason)
+ *
+ * ```ts
+ * import { Sandbox, SandboxProvider } from "@amends/sandbox";
+ * import { Effect } from "effect";
+ *
+ * declare const id: Sandbox.SandboxId;
+ *
+ * // The sandbox with this id, created if it does not exist yet.
+ * const sandbox = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   return yield* sandboxProvider
+ *     .resume(id)
+ *     .pipe(
+ *       Effect.catchReason("SandboxError", "NotFoundError", () => sandboxProvider.create({ id })),
+ *     );
+ * });
+ * ```
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class SandboxError extends Schema.TaggedError<SandboxError>("@amends/sandbox/SandboxError")(
   "SandboxError",
   {

@@ -1,7 +1,9 @@
 /**
- * What a provider gives the conformance suites, and what the suites make of it for each test: the
- * provider, tracking the sandboxes the test creates to destroy them when it ends, and names no
- * other test or run uses.
+ * What a provider gives the conformance suites, and what the suites make of it for each test: a
+ * provider that destroys the sandboxes the test created when it ends, and names no other test or
+ * run uses.
+ *
+ * @since 0.1.0
  */
 import { Clock, Effect, type Layer, Random, type Scope } from "effect";
 import type { HttpClient } from "effect/http";
@@ -10,6 +12,13 @@ import type { Port } from "../Network.ts";
 import { type Sandbox, SandboxId } from "../Sandbox.ts";
 import { SandboxProvider } from "../SandboxProvider.ts";
 
+/**
+ * What a provider's tests give `run`: how to make the provider, and what the suites cannot assume
+ * of every platform. `R` is what making the provider needs, which `layer` provides.
+ *
+ * @category testing
+ * @since 0.1.0
+ */
 export interface Fixture<R> {
   /**
    * Provides what the fixture's effects need, and the HTTP client the network suite reaches ports

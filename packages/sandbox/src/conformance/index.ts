@@ -9,6 +9,8 @@
  * and templates it creates as no other test or run does, and destroys its sandboxes when it ends,
  * so that the suites can run against a provider other runs share, such as one account on a hosted
  * platform.
+ *
+ * @since 0.1.0
  */
 import type { Fixture } from "./Fixture.ts";
 import { lifecycle } from "./lifecycle.ts";
@@ -17,7 +19,47 @@ import { processes } from "./processes.ts";
 
 export type { Fixture } from "./Fixture.ts";
 
-/** Runs every suite against the provider `fixture` makes. */
+/**
+ * Runs every suite against the provider `fixture` makes, in the test file that calls it.
+ *
+ * **Example** (A provider's conformance test)
+ *
+ * ```ts
+ * import { Network, SandboxProvider } from "@amends/sandbox";
+ * import * as Conformance from "@amends/sandbox/conformance";
+ * import { Effect, Scope } from "effect";
+ * import { FetchHttpClient } from "effect/http";
+ * import { ChildProcess } from "effect/process";
+ *
+ * declare const makeProvider: Effect.Effect<
+ *   SandboxProvider.SandboxProvider["Service"],
+ *   never,
+ *   Scope.Scope
+ * >;
+ * declare const freePort: Effect.Effect<Network.Port>;
+ *
+ * // Answers each request on `PORT` with its headers, which the network suite checks.
+ * const serveHeaders = `Bun.serve({
+ *   port: Number(process.env.PORT),
+ *   fetch: (request) => Response.json(Object.fromEntries(request.headers)),
+ * })`;
+ *
+ * Conformance.run({
+ *   layer: FetchHttpClient.layer,
+ *   makeProvider,
+ *   freePort,
+ *   serveHeaders: (port) =>
+ *     ChildProcess.make("bun", ["-e", serveHeaders], {
+ *       env: { PORT: String(port) },
+ *       extendEnv: true,
+ *     }),
+ *   timeout: 60_000,
+ * });
+ * ```
+ *
+ * @category testing
+ * @since 0.1.0
+ */
 export const run = <R>(fixture: Fixture<R>) => {
   lifecycle(fixture);
   processes(fixture);

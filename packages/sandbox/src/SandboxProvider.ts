@@ -3,6 +3,8 @@
  * resumes sandboxes it created before. The settings a platform needs, such as credentials or a
  * root directory, go to the provider's layer, so code that creates sandboxes does not depend on
  * which provider it uses.
+ *
+ * @since 0.1.0
  */
 import { Context, type Effect } from "effect";
 import type { NetworkPolicy, Port } from "./Network.ts";
@@ -12,6 +14,13 @@ import type { Template } from "./Template.ts";
 
 // TODO: Add per-create provider options, such as a different image for each sandbox, once a caller
 // needs them. Until then, a second provider layer with different settings covers it.
+/**
+ * What a sandbox is created with: its id, the ports it exposes, the template that prepares it, and
+ * the network policy it starts under. Each has a default.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface CreateOptions<E> {
   /**
    * Names the new sandbox. Creating never looks a sandbox up, so an id already in use fails with
@@ -26,14 +35,48 @@ export interface CreateOptions<E> {
   readonly template?: Template<E>;
 
   /**
-   * The outbound network policy the sandbox starts with, `AllowAll` when omitted, so that nothing
-   * run in it reaches further. The template prepares the sandbox before the policy applies, as
-   * preparing may download what it installs. Fails with `UnsupportedError`, creating nothing, when
-   * the provider cannot enforce the policy, as `Sandbox.setNetworkPolicy` does.
+   * The outbound network policy the sandbox starts under, `AllowAll` when omitted. It is in force
+   * before `create` returns, so nothing run in the sandbox afterwards reaches further than it
+   * allows; the template prepares the sandbox before it applies, as preparing may download what it
+   * installs. Fails with `UnsupportedError`, creating nothing, when the provider cannot enforce the
+   * policy, as `Sandbox.setNetworkPolicy` does.
    */
   readonly networkPolicy?: NetworkPolicy;
 }
 
+/**
+ * Creates sandboxes on one platform and resumes the ones it created before. A program asks for
+ * the service and gets whichever provider's layer it runs under.
+ *
+ * **Example** (Creating a sandbox, stopping it, and resuming it later)
+ *
+ * ```ts
+ * import { Network, Sandbox, SandboxProvider } from "@amends/sandbox";
+ * import { Effect, FileSystem, Path } from "effect";
+ *
+ * const id = Sandbox.SandboxId.make("review-42");
+ * const port = Network.Port.make(3000);
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   const sandbox = yield* sandboxProvider.create({ id, ports: [port] });
+ *   yield* Effect.gen(function* () {
+ *     const fs = yield* FileSystem.FileSystem;
+ *     const path = yield* Path.Path;
+ *     yield* fs.writeFileString(path.join(sandbox.workingDirectory, "notes.md"), "# Review");
+ *   }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+ *   yield* sandbox.stop;
+ *
+ *   // Later, in this process or another: the files are still there, and so is the port.
+ *   const resumed = yield* sandboxProvider.resume(id);
+ *   const endpoint = yield* resumed.endpoint(port, "http");
+ *   return endpoint.url;
+ * });
+ * ```
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class SandboxProvider extends Context.Service<
   SandboxProvider,
   {
