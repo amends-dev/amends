@@ -6,12 +6,14 @@
  *
  * Each sandbox is a directory under the provider's `directory`, named by its id, that holds its
  * settings, the ports it exposes, in `sandbox.json` and the sandbox's files in `workspace`, its
- * working directory. Processes start in the working directory and resolve a relative `cwd` against it.
- * File paths are this machine's paths.
+ * working directory. Processes start in the working directory and resolve a relative `cwd`
+ * against it. File paths are this machine's paths.
  *
  * `stop` and `destroy` end the processes the provider started for the sandbox, through any
  * `Sandbox` value for it, including those that outlived their scopes. A provider made again, as
  * when the host restarts, does not know of processes an earlier one left running.
+ *
+ * @since 0.1.0
  */
 import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox";
 import {
@@ -27,6 +29,12 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+/**
+ * Where the provider keeps its sandboxes.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The directory that holds one directory per sandbox, created if it is missing. */
   readonly directory: string;
@@ -35,6 +43,31 @@ export interface Options {
 /** The settings a sandbox keeps in its `sandbox.json`: the ports it exposes. */
 const Settings = Schema.fromJsonString(Schema.Struct({ ports: Schema.Array(Network.Port) }));
 
+/**
+ * The provider over `options.directory`, which it creates if it is missing. It needs Effect's
+ * `FileSystem`, `Path`, `Crypto`, and `ChildProcessSpawner` services for this machine, as
+ * `BunServices.layer` or `NodeServices.layer` provide them.
+ *
+ * **Example** (A provider for one piece of work, over a temporary directory)
+ *
+ * ```ts
+ * import { LocalSandboxProvider } from "@amends/sandbox-local";
+ * import { BunServices } from "@effect/platform-bun";
+ * import { Effect, FileSystem } from "effect";
+ *
+ * const program = Effect.gen(function* () {
+ *   const fs = yield* FileSystem.FileSystem;
+ *   const sandboxProvider = yield* LocalSandboxProvider.make({
+ *     directory: yield* fs.makeTempDirectoryScoped(),
+ *   });
+ *   const sandbox = yield* sandboxProvider.createScoped();
+ *   return sandbox.workingDirectory;
+ * }).pipe(Effect.scoped, Effect.provide(BunServices.layer));
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: Options) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -206,10 +239,39 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
   return SandboxProvider.make({ create, resume });
 });
 
+/**
+ * Provides the `SandboxProvider` service over `options.directory`, as `make` makes it, to a
+ * program that keeps its sandboxes on this machine.
+ *
+ * **Example** (Sandboxes under a directory of the host's)
+ *
+ * ```ts
+ * import { LocalSandboxProvider } from "@amends/sandbox-local";
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { BunServices } from "@effect/platform-bun";
+ * import { Effect, Layer } from "effect";
+ *
+ * const sandboxes = LocalSandboxProvider.layer({ directory: "/var/lib/amends/sandboxes" }).pipe(
+ *   Layer.provide(BunServices.layer),
+ * );
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   const sandbox = yield* sandboxProvider.create();
+ *   return sandbox.id;
+ * }).pipe(Effect.provide(sandboxes));
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (options: Options) =>
   Layer.effect(SandboxProvider.SandboxProvider, make(options));
 
-/** Resolves the `cwd` of each command in `command` against `workingDirectory`, where a command without one starts. */
+/**
+ * Resolves the `cwd` of each command in `command` against `workingDirectory`, where a command
+ * without one starts.
+ */
 const resolveCwd = (
   path: Path.Path,
   workingDirectory: string,
