@@ -64,7 +64,7 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
         expect(error.reason).toMatchObject({
           _tag: "UnsupportedError",
           description:
-            "opencode presents one key for each provider, and the endpoints for anthropic have different keys",
+            "opencode presents one key, with one set of headers, for each provider, and the endpoints for anthropic differ in them",
         });
       }),
     );

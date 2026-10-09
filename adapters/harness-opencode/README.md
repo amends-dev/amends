@@ -18,11 +18,11 @@ a bridge and a server of its own in a sandbox, and never runs on another's.
 `Models` configures opencode for the endpoints. Each endpoint names its provider and model as
 opencode finds them in models.dev, which tells opencode the rest of the model, such as whether it
 calls tools; the configuration serves the model through the endpoint's protocol, at its URL, with
-its output limit, and under its key, and asks for the endpoint's effort in a variant of the model,
-which the turn's model names. opencode presents one key for each provider and serves a model one
-way, so endpoints that differ there fail `make` with `UnsupportedError`. The keys reach opencode in
-its configuration in the sandbox, where the commands opencode runs can read them. A model that
-models.dev does not list runs without tools.
+its output limit, and under its key and headers, and asks for the endpoint's effort in a variant of
+the model, which the turn's model names. opencode presents one key, with one set of headers, for
+each provider and serves a model one way, so endpoints that differ there fail `make` with
+`UnsupportedError`. The keys and headers reach opencode in its configuration in the sandbox, where
+the commands opencode runs can read them. A model that models.dev does not list runs without tools.
 
 `make` bundles the bridge program with `Bun.build`, so the host runs on Bun, with the adapter's
 sources. It needs `Crypto` and a `Socket.WebSocketConstructor` that sends headers, as Bun's and

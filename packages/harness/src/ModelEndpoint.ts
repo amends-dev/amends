@@ -38,8 +38,6 @@ export const Effort = Schema.Literals(["none", "minimal", "low", "medium", "high
  */
 export type Effort = typeof Effort.Type;
 
-// TODO: Add headers that a provider asks a request to carry besides its key, once a provider that
-// an endpoint is made for needs them.
 /**
  * How an agent reaches one model.
  *
@@ -85,6 +83,12 @@ export const ModelEndpoint = Schema.Struct({
 
   /** The key a request presents, as the protocol presents keys. Absent for an API without one. */
   apiKey: Schema.optionalKey(Schema.Redacted(Schema.String)),
+
+  /**
+   * Headers a request carries besides the key, which a gateway in front of the provider asks for,
+   * such as its own authorization. Absent when the API asks for none.
+   */
+  headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.Redacted(Schema.String))),
 
   /** How hard the model reasons. Absent for the provider's default. */
   effort: Schema.optionalKey(Effort),

@@ -211,7 +211,8 @@ for callers that store a turn's steps.
 
 A `ModelEndpoint` is how an agent reaches a model: the provider and the provider's id for it, as
 models.dev names them, the protocol it is served through, the base URL the protocol's paths
-follow, the key a request presents, and how hard it reasons and how much it may write. Every agent
+follow, the key a request presents and the headers a gateway asks for besides it, and how hard it
+reasons and how much it may write. Every agent
 is made with `Agent.Options`: the endpoint a turn runs on when it names none, and the endpoints a
 turn can name, by name. An adapter extends them with what only its agent takes. An agent in the
 host's process makes an Effect AI language model of each endpoint; an agent in a sandbox is
