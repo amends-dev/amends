@@ -295,7 +295,7 @@ export const start = Effect.fn("Server.start")(
           Effect.catchTag("SchemaError", (cause) =>
             Effect.fail(
               harnessError(
-                new HarnessError.InvalidOutputError({ description: cause.message }),
+                new HarnessError.AgentContractError({ description: cause.message }),
                 cause,
               ),
             ),
@@ -387,7 +387,7 @@ const fromRequestError = (
     case "SchemaError":
     case "SseError":
       return harnessError(
-        new HarnessError.InvalidOutputError({ description: error.message }),
+        new HarnessError.AgentContractError({ description: error.message }),
         error,
       );
     case "Retry":

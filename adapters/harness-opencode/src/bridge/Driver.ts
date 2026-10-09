@@ -380,7 +380,7 @@ const readState = (json: Schema.Json | undefined) =>
   Schema.decodeEffect(Schema.UndefinedOr(StateJson))(json).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        new HarnessError.InvalidOutputError({
+        new HarnessError.AgentContractError({
           description: `opencode cannot read the state it was given: ${cause.message}`,
         }),
         cause,

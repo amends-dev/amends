@@ -23,7 +23,7 @@ import { GenerateObjectResult, GenerateResult } from "../GenerateResult.ts";
 import {
   HarnessError,
   type HarnessErrorReason,
-  InvalidOutputError,
+  AgentContractError,
   NoTurnError,
   SessionReleasedError,
   TurnFailedError,
@@ -219,7 +219,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     const found = toolkit === undefined ? undefined : findTool(toolkit, call.name);
     if (toolkit === undefined || found === undefined) {
       const description = `The agent called ${call.name}, which is not one of the host's tools`;
-      return Stream.fail(harnessError(new InvalidOutputError({ description })));
+      return Stream.fail(harnessError(new AgentContractError({ description })));
     }
     const { name, tool } = found;
     // `handle` decodes the params with the tool's schema and fails on a mismatch, so they need no

@@ -289,7 +289,7 @@ describe("Turn", () => {
       }),
     );
 
-    expect(Result.isFailure(translated) && translated.failure._tag).toBe("InvalidOutputError");
+    expect(Result.isFailure(translated) && translated.failure._tag).toBe("AgentContractError");
   });
 
   it("reports a compaction with its summary", () => {

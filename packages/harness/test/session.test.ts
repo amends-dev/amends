@@ -182,7 +182,7 @@ describe("Session", () => {
   );
 
   it.effect(
-    "fails with InvalidOutputError when the agent calls a tool the host does not have",
+    "fails with AgentContractError when the agent calls a tool the host does not have",
     () =>
       Effect.gen(function* () {
         const { session } = yield* createSession(() =>
@@ -191,7 +191,7 @@ describe("Session", () => {
 
         const error = yield* Effect.flip(session.generate({ prompt: "delete" }));
 
-        expect(error._tag === "HarnessError" && error.reason._tag).toBe("InvalidOutputError");
+        expect(error._tag === "HarnessError" && error.reason._tag).toBe("AgentContractError");
       }),
   );
 

@@ -58,7 +58,7 @@ import * as Bridge from "./Bridge.ts";
 import {
   HarnessError,
   type HarnessErrorReason,
-  InvalidOutputError,
+  AgentContractError,
   NoTurnError,
   UnavailableError,
   UnknownError,
@@ -180,7 +180,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   ).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        new InvalidOutputError({
+        new AgentContractError({
           description: `${options.id} cannot read the state it was given: ${cause.message}`,
         }),
         cause,

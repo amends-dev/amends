@@ -758,7 +758,7 @@ const readUnfinishedTurn = (json: Schema.Json | undefined) =>
   Schema.decodeEffect(Schema.UndefinedOr(UnfinishedTurnJson))(json).pipe(
     Effect.mapError((cause) =>
       harnessError(
-        new HarnessError.InvalidOutputError({
+        new HarnessError.AgentContractError({
           description: `amends cannot read the state it was given: ${cause.message}`,
         }),
         cause,

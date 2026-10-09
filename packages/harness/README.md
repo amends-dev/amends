@@ -231,7 +231,7 @@ const sonnet: ModelEndpoint.ModelEndpoint = {
 
 Every operation fails with `HarnessError`, which names the agent and holds a reason:
 `UnsupportedError`, `NotFoundError`, `SessionReleasedError`, `TurnInProgressError`, `NoTurnError`,
-`TurnFailedError`, `InvalidOutputError`, `UnavailableError`, or `UnknownError`. Each says whether
+`TurnFailedError`, `AgentContractError`, `UnavailableError`, or `UnknownError`. Each says whether
 trying again may succeed, as `isRetryable`, and
 `Effect.catchReason("HarnessError", "UnavailableError", ...)` recovers from one reason. A turn also
 fails with what Effect AI fails with: the `AiError` of a host tool's handler, and, from

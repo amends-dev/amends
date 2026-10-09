@@ -135,15 +135,15 @@ export class TurnFailedError extends Schema.TaggedError<TurnFailedError>(
  * @category errors
  * @since 0.1.0
  */
-export class InvalidOutputError extends Schema.TaggedError<InvalidOutputError>(
-  "@amends/harness/HarnessError/InvalidOutputError",
-)("InvalidOutputError", { description: Schema.optional(Schema.String) }) {
+export class AgentContractError extends Schema.TaggedError<AgentContractError>(
+  "@amends/harness/HarnessError/AgentContractError",
+)("AgentContractError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
   }
 
   override get message(): string {
-    return this.description ?? "The agent sent output the harness cannot read";
+    return this.description ?? "The agent sent the harness something it cannot read";
   }
 }
 
@@ -200,7 +200,7 @@ export const HarnessErrorReason = Schema.Union([
   TurnInProgressError,
   NoTurnError,
   TurnFailedError,
-  InvalidOutputError,
+  AgentContractError,
   UnavailableError,
   UnknownError,
 ]);
