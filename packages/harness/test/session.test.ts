@@ -451,7 +451,7 @@ describe("Session", () => {
   );
 
   it.effect(
-    "runs the host's tools the agent calls together side by side, streaming results in call order",
+    "runs the host's tools the agent calls together side by side, streaming results as they come",
     () =>
       Effect.gen(function* () {
         const opened = yield* Deferred.make<void>();
@@ -485,19 +485,46 @@ describe("Session", () => {
 
         // The turn ends only if Open runs while Wait waits for it.
         expect(fake.submitted).toHaveLength(2);
-        expect(
-          parts.flatMap((part) =>
-            part.type === "tool-call" || part.type === "tool-result"
-              ? [`${part.type} ${part.id}`]
-              : [],
-          ),
-        ).toEqual([
-          "tool-call call-wait",
-          "tool-result call-wait",
-          "tool-call call-open",
-          "tool-result call-open",
+        expect(toolActivity(parts).sort()).toEqual([
+          "call call-open",
+          "call call-wait",
+          "result call-open",
+          "result call-wait",
         ]);
       }),
+  );
+
+  it.effect("ends a step only once the tools it called have answered", () =>
+    Effect.gen(function* () {
+      const { session } = yield* createSession((_prompt, host) =>
+        Stream.concat(
+          Stream.make(
+            { type: "tool-call", id: "call-one", name: "Add", params: { a: 2, b: 3 } },
+            {
+              type: "finish-step",
+              reason: "tool-calls",
+              usage: { inputTokens: {}, outputTokens: {} },
+            },
+          ),
+          Stream.unwrap(
+            Effect.map(host.toolResult, (sum) =>
+              Stream.fromIterable(reply(`The sum is ${String(sum)}`)),
+            ),
+          ),
+        ),
+      );
+
+      const parts = yield* Stream.runCollect(
+        session.stream({ prompt: "add", toolkit: yield* MathToolkit }),
+      );
+
+      // The agent ended the step before the result; the step the caller reads ends after it.
+      expect(parts.map((part) => part.type).slice(0, 3)).toEqual([
+        "tool-call",
+        "tool-result",
+        "finish-step",
+      ]);
+    }).pipe(Effect.provide(MathHandlers)),
   );
 
   it.effect("asks before running a host tool that needs approval, and runs it once approved", () =>
@@ -616,19 +643,70 @@ describe("Session", () => {
         );
 
         // Only the large transfer asks; the conversation the function reads holds the turn's prompt.
-        expect(toolActivity(parts)).toEqual([
-          "call call-small",
-          "result call-small",
-          "call call-large",
+        const activity = toolActivity(parts);
+        expect([...activity].sort()).toEqual([
           "ask call-large",
+          "call call-large",
+          "call call-small",
           "result call-large",
+          "result call-small",
         ]);
+        expect(activity.indexOf("ask call-large")).toBeLessThan(
+          activity.indexOf("result call-large"),
+        );
         expect(fake.submitted).toEqual(["moved 50", "moved 500"]);
         expect(seen).toEqual([
           { amount: 50, toolCallId: "call-small", roles: ["user"] },
           { amount: 500, toolCallId: "call-large", roles: ["user"] },
         ]);
       }),
+  );
+
+  it.effect("asks about the calls the agent makes together at once, answered in any order", () =>
+    Effect.gen(function* () {
+      const { toolkit, runs } = yield* makeDeleteToolkit;
+      const { fake, session } = yield* createSession((_prompt, host) =>
+        Stream.concat(
+          Stream.make(
+            { type: "tool-call", id: "call-a", name: "Delete", params: { path: "a.md" } },
+            { type: "tool-call", id: "call-b", name: "Delete", params: { path: "b.md" } },
+          ),
+          Stream.unwrap(
+            Effect.as(
+              Effect.andThen(host.toolResult, host.toolResult),
+              Stream.fromIterable(reply("Done")),
+            ),
+          ),
+        ),
+      );
+      /** The requests read so far, by the call each is for. */
+      const asked = new Map<string, string>();
+      const approve = (toolCallId: string) =>
+        session.approve({ approvalId: asked.get(toolCallId) ?? "", approved: true });
+
+      const parts = yield* Stream.runCollect(
+        session.stream({ prompt: "clean", toolkit }).pipe(
+          Stream.tap((part) => {
+            if (part.type === "tool-approval-request") asked.set(part.toolCallId, part.approvalId);
+            // Both requests arrive before either is answered: b first, then a once b has run.
+            if (asked.size === 2 && part.type === "tool-approval-request") return approve("call-b");
+            if (part.type === "tool-result" && part.id === "call-b") return approve("call-a");
+            return Effect.void;
+          }),
+        ),
+      );
+
+      const activity = toolActivity(parts);
+      expect(activity.slice(0, 4).sort()).toEqual([
+        "ask call-a",
+        "ask call-b",
+        "call call-a",
+        "call call-b",
+      ]);
+      expect(activity.slice(4)).toEqual(["result call-b", "result call-a"]);
+      expect(fake.submitted).toEqual(["deleted b.md", "deleted a.md"]);
+      expect(yield* Ref.get(runs)).toBe(2);
+    }),
   );
 
   it.effect("denies approval requests in a turn it returns whole, and does not run the tool", () =>

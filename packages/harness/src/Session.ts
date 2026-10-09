@@ -114,7 +114,9 @@ export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
 
   /**
    * The host's tools, with their handlers. When the agent calls one, the session runs its handler,
-   * streams the result as a `tool-result` part, and gives the result back to the agent.
+   * streams the result as a `tool-result` part, and gives the result back to the agent. The tools
+   * of calls the agent makes together run side by side, and their results stream as they come; a
+   * step ends only once the tools it called have answered.
    *
    * A tool that needs approval, by its `needsApproval`, runs only once `approve` allows it: the
    * turn streams a `tool-approval-request` part after the call and waits, while the agent waits for

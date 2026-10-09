@@ -1,9 +1,9 @@
 /**
  * How a session runs the host's tools for the agent. A tool starts on the host as soon as the agent
- * calls it, its results stream after the call, and its final result goes to the agent. A tool that
- * needs approval is asked about first: the turn streams a `tool-approval-request` and waits for
- * `approve`, and a refusal is answered as `execution-denied`. `makeSession` makes these for each
- * session; the package does not export this module.
+ * calls it, its results stream as it gives them, and its final result goes to the agent. A tool
+ * that needs approval is asked about first: the turn streams a `tool-approval-request` and waits
+ * for `approve`, and a refusal is answered as `execution-denied`. `makeSession` makes these for
+ * each session; the package does not export this module.
  */
 import {
   type Cause,
@@ -14,8 +14,8 @@ import {
   Queue,
   Ref,
   Schema,
-  type Scope,
   Stream,
+  SubscriptionRef,
 } from "effect";
 import type { Prompt, Response, Tool, Toolkit } from "effect/ai";
 import type { AgentSession } from "../Agent.ts";
@@ -29,10 +29,10 @@ export type ApprovalResponse = Parameters<AgentSession["approve"]>[0];
 /** The host's tools of one session, which answer the calls the agent makes of them. */
 export interface HostTools {
   /**
-   * The agent's parts, each call of the host's tools followed by the tool's results, or by the
-   * request to approve it first. A host's tool starts as soon as the agent calls it, so the tools
-   * of calls the agent makes together run side by side, while their results, and the requests to
-   * approve them, stream in the order of the calls.
+   * The agent's parts, with the results of the host's tools it calls, and the requests to approve
+   * them, as they come. A host's tool starts as soon as the agent calls it, so the tools of calls
+   * the agent makes together run side by side, and a caller sees every request to approve them at
+   * once. A step ends, as the turn does, only once the tools it called have answered.
    */
   readonly answerCalls: <Tools extends Record<string, Tool.Any>>(
     agentTurn: Stream.Stream<StreamPart, HarnessError>,
@@ -73,33 +73,46 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
     toolkit: Toolkit.WithHandler<Tools> | undefined,
   ): Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>> =>
     Stream.unwrap(
-      Effect.map(Effect.scope, (scope) =>
-        agentTurn.pipe(
-          Stream.mapEffect((part) =>
-            part.type === "tool-call" && part.providerExecuted !== true
-              ? Effect.map(startTool(toolkit, part, scope), (results) =>
-                  Stream.concat(Stream.succeed(part), results),
-                )
-              : Effect.succeed(Stream.succeed(part)),
-          ),
-          // Reads the agent's parts ahead, so that a tool it calls next starts while the results
-          // of an earlier one still stream.
-          Stream.buffer({ capacity: "unbounded" }),
-          Stream.flatten(),
-        ),
-      ),
-    );
+      Effect.gen(function* () {
+        const scope = yield* Effect.scope;
+        /** The agent's parts and the tools' results, in the order they come. */
+        const parts = yield* Queue.unbounded<StreamPart, TurnError<Tools> | Cause.Done>();
+        /** How many tools the agent called have not answered yet. */
+        const answering = yield* SubscriptionRef.make(0);
+        const allAnswered = Stream.runDrain(
+          Stream.takeUntil(SubscriptionRef.changes(answering), (count) => count === 0),
+        );
 
-  /** Starts the tool `call` names in `scope`, returning the stream of its results. */
-  const startTool = Effect.fnUntraced(function* <Tools extends Record<string, Tool.Any>>(
-    toolkit: Toolkit.WithHandler<Tools> | undefined,
-    call: Response.ToolCallPartEncoded,
-    scope: Scope.Scope,
-  ): Effect.fn.Return<Stream.Stream<StreamPart, TurnError<Tools>>, never, TurnServices<Tools>> {
-    const results = yield* Queue.unbounded<StreamPart, TurnError<Tools> | Cause.Done>();
-    yield* runTool(toolkit, call).pipe(Stream.runIntoQueue(results), Effect.forkIn(scope));
-    return Stream.fromQueue(results);
-  });
+        /** Runs the tool `call` names beside the turn, its results into `parts`. */
+        const startTool = (call: Response.ToolCallPartEncoded) =>
+          runTool(toolkit, call).pipe(
+            Stream.runForEach((part) => Queue.offer(parts, part)),
+            Effect.tapCause((cause) => Queue.failCause(parts, cause)),
+            Effect.ensuring(SubscriptionRef.update(answering, (count) => count - 1)),
+            Effect.forkIn(scope),
+          );
+
+        // The agent's parts are read as they come, so that a tool starts as soon as the agent
+        // calls it. A step ends, and the turn, only once the tools called have answered.
+        yield* agentTurn.pipe(
+          Stream.runForEach((part) =>
+            Effect.gen(function* () {
+              if (part.type === "tool-call" && part.providerExecuted !== true) {
+                yield* SubscriptionRef.update(answering, (count) => count + 1);
+                yield* startTool(part);
+              }
+              if (part.type === "finish-step" || part.type === "finish") yield* allAnswered;
+              yield* Queue.offer(parts, part);
+            }),
+          ),
+          Effect.andThen(allAnswered),
+          Effect.andThen(Queue.end(parts)),
+          Effect.tapCause((cause) => Queue.failCause(parts, cause)),
+          Effect.forkIn(scope),
+        );
+        return Stream.fromQueue(parts);
+      }),
+    );
 
   /**
    * Runs the tool `call` names, streaming its results and giving the final one to the agent. A tool
@@ -144,9 +157,6 @@ export const makeHostTools = Effect.fnUntraced(function* (options: {
     );
   };
 
-  // TODO: Ask about the calls an agent makes together all at once, so that a caller can answer a
-  // later call's request before an earlier one's: requests now stream in the order of the calls, as
-  // their results do.
   /**
    * Streams a `tool-approval-request` for `call`, and then `ifApproved`, or the call answered as
    * denied once `approve` refuses it. The request waits in `pendingApprovals` until the stream

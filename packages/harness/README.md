@@ -107,12 +107,15 @@ fail on it with `TurnFailedError`.
 
 A turn's `toolkit` gives the agent the host's tools, an Effect AI `Toolkit` with its handlers. When
 the agent calls one, the session runs its handler on the host, streams the result as a
-`tool-result` part, and gives the agent the result. The agent's own tools run inside the agent, and
-their calls and results stream as `providerExecuted`.
+`tool-result` part, and gives the agent the result. The tools of calls the agent makes together run
+side by side, and their results stream as they come; a step ends only once the tools it called have
+answered. The agent's own tools run inside the agent, and their calls and results stream as
+`providerExecuted`.
 
 A tool with `needsApproval` is asked about first: the turn streams a `tool-approval-request` after
 the call and waits, while the agent waits for the result, until `approve` allows the call or
-refuses it, which answers the agent `execution-denied`.
+refuses it, which answers the agent `execution-denied`. The requests for calls made together arrive
+together, to answer in any order.
 
 ```ts
 import { Agent, Harness } from "@amends/harness";
