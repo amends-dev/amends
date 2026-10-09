@@ -171,8 +171,9 @@ Each of these releases the session, after which it refuses every other operation
 | `stop`        | Stops the agent, aborting a running turn, to start it again later.                 |
 | `destroy`     | Stops the agent for good and deletes what it keeps of the session.                 |
 
-`SessionState` records the conversation as Effect AI `Prompt` messages, each step's tool calls and
-results included, beside the agent's own state and the unfinished turn, if any. The agent that last
+`SessionState` records the conversation as Effect AI `Prompt` messages, as Effect AI records a
+response: each step's reasoning, text, files, and tool calls with their results, with what each
+part's provider said of it, beside the agent's own state and the unfinished turn, if any. The agent that last
 ran the session resumes from its own state; any other loads the conversation, so a session moves
 from one agent to another. A resumed session with an unfinished turn finishes it with
 `continueStream` or `continueGenerate`, from the step that was in flight, or with

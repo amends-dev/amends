@@ -20,7 +20,7 @@ import { Prompt, type Tool } from "effect/ai";
 import { type AgentSession, SessionId } from "./Agent.ts";
 import type { GenerateObjectResult, GenerateResult } from "./GenerateResult.ts";
 import type { HarnessError } from "./HarnessError.ts";
-import { type CompactionPart, Step, type StreamPart } from "./StreamPart.ts";
+import { type CompactionPart, Step, type StepPart, type StreamPart } from "./StreamPart.ts";
 
 /**
  * A turn that `suspendTurn` cut short, kept so that the session can finish it later.
@@ -75,7 +75,8 @@ export const SessionState = Schema.Struct({
   agent: Schema.String,
 
   /**
-   * The conversation so far: each turn's prompt, the tools its steps called, and its answer. A turn
+   * The conversation so far: each turn's prompt, what the model reasoned and wrote, the files it
+   * wrote, and the tools its steps called, with their results. A turn
    * that ended early, as when `stop` aborted it, is kept as far as it got. Once the agent compacts
    * the conversation, its summary stands in for everything before it.
    */
@@ -406,24 +407,46 @@ export const conversationAfter = (
     compaction.kept ?? [],
   );
 
-// TODO: Record what the model reasoned, and the files it wrote, once a model can read them back
-// from another: providers read back only the reasoning they produced.
 /**
- * The messages that record a step's parts. In a prompt, a `providerExecuted` call is one the
- * model's provider ran, so every call is recorded as one the model made, whoever ran the tool,
- * which any model reads.
+ * The messages that record a step's parts, as Effect AI records a response: what the model reasoned
+ * and wrote, the files it wrote, and the tools it called, with their results, each with what its
+ * provider said of it as the part's options, which that provider reads back and any other leaves
+ * out. In a prompt, a `providerExecuted` call is one the model's provider ran, so every call is
+ * recorded as one the model made, whoever ran the tool, which any model reads.
  *
  * A step its turn ended partway through keeps what it wrote so far, and each call it left without a
  * result is answered as interrupted, as Effect AI answers the calls of a response cut short, since
  * models refuse a conversation with a call no result answers.
  */
 const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> => {
-  const assistantParts: Array<Prompt.TextPart | Prompt.ToolCallPart> = [];
+  const assistantParts: Array<
+    Prompt.TextPart | Prompt.ReasoningPart | Prompt.FilePart | Prompt.ToolCallPart
+  > = [];
   const results: Array<Prompt.ToolResultPart> = [];
   for (const part of parts) {
     switch (part.type) {
       case "text":
-        if (part.text !== "") assistantParts.push(Prompt.makePart("text", { text: part.text }));
+        if (part.text !== "") {
+          assistantParts.push(
+            Prompt.makePart("text", { text: part.text, ...optionsOf(part.metadata) }),
+          );
+        }
+        break;
+      case "reasoning":
+        if (part.text !== "") {
+          assistantParts.push(
+            Prompt.makePart("reasoning", { text: part.text, ...optionsOf(part.metadata) }),
+          );
+        }
+        break;
+      case "file":
+        assistantParts.push(
+          Prompt.makePart("file", {
+            mediaType: part.mediaType,
+            data: part.data,
+            ...optionsOf(part.metadata),
+          }),
+        );
         break;
       case "tool-call":
         assistantParts.push(
@@ -432,6 +455,7 @@ const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> =>
             name: part.name,
             params: part.params,
             providerExecuted: false,
+            ...optionsOf(part.metadata),
           }),
         );
         break;
@@ -443,6 +467,7 @@ const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> =>
             isFailure: part.isFailure,
             result: part.result,
             providerExecuted: false,
+            ...optionsOf(part.metadata),
           }),
         );
         break;
@@ -461,6 +486,10 @@ const messagesOfParts = (parts: Step["parts"]): ReadonlyArray<Prompt.Message> =>
     ...(results.length === 0 ? [] : [Prompt.makeMessage("tool", { content: results })]),
   ];
 };
+
+/** What a part's provider said of it, as the options of the part that records it. */
+const optionsOf = (metadata: StepPart["metadata"]) =>
+  metadata === undefined ? {} : { options: metadata };
 
 /** The result of a call its turn ended before answering, as Effect AI writes one. */
 const interruptedResultOf = (call: Prompt.ToolCallPart) =>
