@@ -672,8 +672,6 @@ const launch = Effect.fnUntraced(
     }).pipe(Effect.orDie);
     // A sandbox prepared with another version of the template lacks this version's bridge.
     yield* options.template.prepare;
-    // TODO: Keep the bridge's own output in its state directory, for a host to report why the
-    // bridge failed to start.
     const process = yield* spawner.spawn(
       ChildProcess.make(options.command, options.args ?? [], {
         cwd: sandbox.workingDirectory,
