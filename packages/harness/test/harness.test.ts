@@ -90,6 +90,9 @@ const suspendSlowTurn = (harness: Harness.Harness["Service"], running: Deferred.
     return yield* Schema.decodeEffect(json)(yield* Schema.encodeEffect(json)(state));
   });
 
+/** What a turn that adds answers with. */
+const Sum = Schema.Struct({ sum: Schema.Finite });
+
 const textsOf = (history: Prompt.Prompt) =>
   history.content.map((message) =>
     typeof message.content === "string"
@@ -274,6 +277,90 @@ describe("Harness", () => {
           ...readingMessages,
           { role: "assistant", content: [{ type: "text", text: "codex answers slow" }] },
         ]);
+      }),
+  );
+
+  it.effect("finishes an unfinished turn whole with continueGenerate", () =>
+    Effect.gen(function* () {
+      const running = yield* Deferred.make<void>();
+      const codex = yield* makeFakeAgent("codex", answersAs("codex", running));
+      const harness = Harness.make(codex.agent);
+      const state = yield* suspendSlowTurn(harness, running);
+      const { sandbox } = yield* makeFakeSandbox;
+
+      const session = yield* harness.createSession({ sandbox, resumeFrom: state });
+      const result = yield* session.continueGenerate({});
+
+      expect(state.unfinishedTurn?.responseFormat).toEqual({ type: "text" });
+      expect(codex.continued).toEqual([1]);
+      expect(result.text).toBe("codex answers slow");
+      expect((yield* session.detach).history.content).toMatchObject([
+        { role: "user", content: [{ type: "text", text: "slow" }] },
+        ...readingMessages,
+        { role: "assistant", content: [{ type: "text", text: "codex answers slow" }] },
+      ]);
+    }),
+  );
+
+  it.effect(
+    "records that a suspended turn answers in JSON, which continueStream does not finish",
+    () =>
+      Effect.gen(function* () {
+        const answering = yield* Deferred.make<void>();
+        const codex = yield* makeFakeAgent("codex", () =>
+          Stream.concat(
+            Stream.fromIterable(readingStep),
+            Stream.concat(Stream.fromEffect(Deferred.succeed(answering, undefined)), Stream.never),
+          ).pipe(Stream.filter((part) => typeof part !== "boolean")),
+        );
+        const harness = Harness.make(codex.agent);
+        const { sandbox } = yield* makeFakeSandbox;
+        const session = yield* harness.createSession({ sandbox, id });
+        const turn = yield* Effect.forkChild(
+          session.generateObject({ prompt: "add", schema: Sum, objectName: "Sum" }),
+        );
+        yield* Deferred.await(answering);
+        const state = yield* session.suspendTurn;
+        yield* Fiber.await(turn);
+
+        const resumed = yield* harness.createSession({ sandbox, resumeFrom: state });
+        const refused = yield* Effect.flip(Stream.runCollect(resumed.continueStream({})));
+
+        expect(state.unfinishedTurn?.responseFormat).toEqual({ type: "json", objectName: "Sum" });
+        expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("NoTurnError");
+      }),
+  );
+
+  it.effect(
+    "finishes an unfinished turn that answers in JSON with continueGenerateObject, given the schema again",
+    () =>
+      Effect.gen(function* () {
+        const codex = yield* makeFakeAgent("codex", () => Stream.fromIterable(reply('{"sum":5}')));
+        const { sandbox } = yield* makeFakeSandbox;
+        const session = yield* Harness.make(codex.agent).createSession({
+          sandbox,
+          resumeFrom: {
+            id,
+            agent: "codex",
+            history: Prompt.empty,
+            unfinishedTurn: {
+              prompt: Prompt.makeMessage("user", {
+                content: [Prompt.makePart("text", { text: "add" })],
+              }),
+              responseFormat: { type: "json", objectName: "Sum" },
+              steps: [],
+              agentState: { agent: "codex", turn: true },
+            },
+          },
+        });
+        const refused = yield* Effect.flip(session.continueGenerate({}));
+        const result = yield* session.continueGenerateObject({ schema: Sum });
+        const format = codex.turns[0]?.responseFormat;
+
+        expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("NoTurnError");
+        expect(format?.type === "json" && format.objectName).toBe("Sum");
+        expect(format?.type === "json" && format.schema).toBe(Sum);
+        expect(result.value).toEqual({ sum: 5 });
       }),
   );
 

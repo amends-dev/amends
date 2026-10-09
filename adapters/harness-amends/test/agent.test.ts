@@ -427,6 +427,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
           prompt: Prompt.makeMessage("user", {
             content: [Prompt.makePart("text", { text: "hi" })],
           }),
+          responseFormat: { type: "text" },
           steps: [],
           agentState: { steps: "not steps" },
         },

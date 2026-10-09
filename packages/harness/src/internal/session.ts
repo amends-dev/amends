@@ -7,7 +7,7 @@
 import { Data, Effect, Ref, Schema, Stream } from "effect";
 import { AiError, Prompt, type Tool } from "effect/ai";
 import type { Response } from "effect/ai";
-import type { AgentSession, SessionId } from "../Agent.ts";
+import type { AgentSession, SessionId, TurnOptions } from "../Agent.ts";
 import { GenerateObjectResult, GenerateResult } from "../GenerateResult.ts";
 import {
   HarnessError,
@@ -18,6 +18,7 @@ import {
   TurnInProgressError,
 } from "../HarnessError.ts";
 import {
+  type ContinueObjectOptions,
   type ContinueOptions,
   recordStep,
   type Session,
@@ -65,6 +66,9 @@ const Status = Data.taggedEnum<Status>();
 interface RunningTurn {
   readonly prompt: Prompt.UserMessage;
 
+  /** How the turn answers, as the unfinished turn records it. */
+  readonly responseFormat: UnfinishedTurn["responseFormat"];
+
   /** The steps the turn finished, their parts added up, with those before `suspendTurn`. */
   readonly steps: ReadonlyArray<Step>;
 
@@ -75,7 +79,10 @@ interface RunningTurn {
 /** The operations that release a session. */
 type Release = "suspendTurn" | "detach" | "stop" | "destroy";
 
-type Operation = "stream" | "continueStream" | "approve" | "compact" | Release;
+/** The operations that continue the unfinished turn, each for turns that answer one way. */
+type Continue = "continueStream" | "continueGenerate" | "continueGenerateObject";
+
+type Operation = "stream" | "approve" | "compact" | Continue | Release;
 
 /** Why `operation` cannot run in a session in `state`, or nothing when it can. */
 const refusal = (
@@ -95,16 +102,29 @@ const refusal = (
     case "compact":
       if (status._tag === "Unfinished") {
         return new TurnInProgressError({
-          description: "The session has an unfinished turn, which `continueStream` finishes",
+          description: "The session has an unfinished turn, which a continue operation finishes",
         });
       }
       if (status._tag === "Compacting") return compactingError();
       return status._tag === "Running" ? new TurnInProgressError({}) : undefined;
     case "continueStream":
+    case "continueGenerate":
+    case "continueGenerateObject": {
       if (status._tag === "Running") return new TurnInProgressError({});
-      return status._tag === "Unfinished"
-        ? undefined
-        : new NoTurnError({ description: "The session has no unfinished turn" });
+      if (status._tag !== "Unfinished") {
+        return new NoTurnError({ description: "The session has no unfinished turn" });
+      }
+      // A turn is finished the way it answers: whole and decoded for JSON, otherwise as text.
+      const answersIn = status.turn.responseFormat.type;
+      const finishes = operation === "continueGenerateObject" ? "json" : "text";
+      if (answersIn === finishes) return undefined;
+      return new NoTurnError({
+        description:
+          answersIn === "json"
+            ? "The unfinished turn answers in JSON, which `continueGenerateObject` finishes"
+            : "The unfinished turn answers in text, which `continueStream` or `continueGenerate` finishes",
+      });
+    }
     case "suspendTurn":
       return status._tag === "Running"
         ? undefined
@@ -198,7 +218,11 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   // the turn finished before are not part of it.
   const unfinishedTurn =
     options.unfinishedTurn !== undefined && !agentSession.hasUnfinishedTurn
-      ? { prompt: options.unfinishedTurn.prompt, steps: [] }
+      ? {
+          prompt: options.unfinishedTurn.prompt,
+          responseFormat: options.unfinishedTurn.responseFormat,
+          steps: [],
+        }
       : options.unfinishedTurn;
   const state = yield* Ref.make<State>({
     status:
@@ -223,13 +247,13 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       return reason === undefined ? Effect.void : Effect.fail(harnessError(reason));
     });
 
-  /** Marks the session as running a new turn of `prompt`, failing when it cannot start one now. */
-  const startTurn = (prompt: Prompt.UserMessage) =>
+  /** Marks the session as running a new turn, failing when it cannot start one now. */
+  const startTurn = (prompt: Prompt.UserMessage, responseFormat: RunningTurn["responseFormat"]) =>
     Effect.flatten(
       Ref.modify(state, (current): [Effect.Effect<void, HarnessError>, State] => {
         const reason = refusal(current, "stream");
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
-        const turn = { prompt, steps: [], stepParts: [] };
+        const turn = { prompt, responseFormat, steps: [], stepParts: [] };
         return [Effect.void, { ...current, status: Status.Running({ turn }) }];
       }),
     );
@@ -270,12 +294,12 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
   /** Runs a new turn with the caller's prompt, once the session can start one. */
   const promptTurn = <Tools extends Record<string, Tool.Any>>(
     options: StreamOptions<Tools>,
-    responseFormat: Parameters<AgentSession["promptTurn"]>[0]["responseFormat"],
+    responseFormat: TurnOptions["responseFormat"],
   ) => {
     const prompt = userMessageOf(options.prompt);
     return Stream.unwrap(
       Effect.as(
-        startTurn(prompt),
+        startTurn(prompt, recordedFormatOf(responseFormat)),
         runTurn(
           agentSession.promptTurn({ ...turnOptionsOf(options), prompt, responseFormat }),
           options.toolkit,
@@ -291,6 +315,31 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       ? Effect.succeed(new GenerateResult(parts))
       : Effect.fail(harnessError(new TurnFailedError({ error: error.error })));
   };
+
+  /**
+   * The whole turn with its answer decoded with `schema`. An answer that does not match fails as
+   * Effect AI's `generateObject` fails.
+   */
+  const objectResultOf = Effect.fnUntraced(function* <S extends Schema.Top>(
+    schema: S,
+    parts: ReadonlyArray<StreamPart>,
+  ) {
+    const result = yield* resultOf(parts);
+    const value = yield* Schema.decodeEffect(Schema.fromJsonString(schema))(result.text).pipe(
+      Effect.mapError((error) =>
+        AiError.make({
+          module: "Harness",
+          method: "generateObject",
+          reason: new AiError.StructuredOutputError({
+            description: error.message,
+            responseText: result.text,
+            usage: usageInfoOf(result.usage),
+          }),
+        }),
+      ),
+    );
+    return new GenerateObjectResult(value, parts);
+  });
 
   /**
    * Answers an approval request: one the session made for a host's tool, which it answers once, or
@@ -319,19 +368,52 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       ),
     );
 
-  /** Marks the session as running its unfinished turn and returns the turn, failing without one. */
-  const resumeTurn = Effect.flatten(
-    Ref.modify(state, (current): [Effect.Effect<UnfinishedTurn, HarnessError>, State] => {
-      const { status } = current;
-      const reason = refusal(current, "continueStream");
-      // `refusal` lets the session continue only an unfinished turn.
-      if (reason !== undefined || status._tag !== "Unfinished") {
-        return [Effect.fail(harnessError(reason ?? new NoTurnError({}))), current];
-      }
-      const turn = { prompt: status.turn.prompt, steps: status.turn.steps, stepParts: [] };
-      return [Effect.succeed(status.turn), { ...current, status: Status.Running({ turn }) }];
-    }),
-  );
+  /**
+   * Marks the session as running its unfinished turn for `operation` and returns the turn, failing
+   * when it has none that the operation finishes.
+   */
+  const resumeTurn = (operation: Continue) =>
+    Effect.flatten(
+      Ref.modify(state, (current): [Effect.Effect<UnfinishedTurn, HarnessError>, State] => {
+        const { status } = current;
+        const reason = refusal(current, operation);
+        // `refusal` lets the session continue only an unfinished turn.
+        if (reason !== undefined || status._tag !== "Unfinished") {
+          return [Effect.fail(harnessError(reason ?? new NoTurnError({}))), current];
+        }
+        const turn = {
+          prompt: status.turn.prompt,
+          responseFormat: status.turn.responseFormat,
+          steps: status.turn.steps,
+          stepParts: [],
+        };
+        return [Effect.succeed(status.turn), { ...current, status: Status.Running({ turn }) }];
+      }),
+    );
+
+  /**
+   * Continues the unfinished turn with `operation`, the settings given again, and `schema` for a
+   * turn that answers in JSON: on the agent that cut it short, after the steps it finished, or on
+   * any other from its prompt.
+   */
+  const continueTurn = <Tools extends Record<string, Tool.Any>>(
+    operation: Continue,
+    options: ContinueOptions<Tools>,
+    schema?: Schema.Top,
+  ) =>
+    Stream.unwrap(
+      Effect.map(resumeTurn(operation), (turn) => {
+        const turnOptions = {
+          ...turnOptionsOf(options),
+          prompt: turn.prompt,
+          responseFormat: answerFormatOf(turn.responseFormat, schema),
+        };
+        const agentTurn = agentSession.hasUnfinishedTurn
+          ? agentSession.continueTurn(turnOptions, turn.steps.length)
+          : agentSession.promptTurn(turnOptions);
+        return runTurn(agentTurn, options.toolkit);
+      }),
+    );
 
   /**
    * Asks the agent to compact the conversation, holding the session meanwhile so that no turn
@@ -431,40 +513,27 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
           schema: objectOptions.schema,
         }),
       );
-      const result = yield* resultOf(parts);
-      // An answer that does not match fails as Effect AI's `generateObject` fails.
-      const value = yield* Schema.decodeEffect(Schema.fromJsonString(objectOptions.schema))(
-        result.text,
-      ).pipe(
-        Effect.mapError((error) =>
-          AiError.make({
-            module: "Harness",
-            method: "generateObject",
-            reason: new AiError.StructuredOutputError({
-              description: error.message,
-              responseText: result.text,
-              usage: usageInfoOf(result.usage),
-            }),
-          }),
-        ),
-      );
-      return new GenerateObjectResult(value, parts);
+      return yield* objectResultOf(objectOptions.schema, parts);
     }),
 
-    continueStream: (continueOptions) =>
-      Stream.unwrap(
-        Effect.map(resumeTurn, (turn) => {
-          const turnOptions = {
-            ...turnOptionsOf(continueOptions),
-            prompt: turn.prompt,
-            responseFormat: { type: "text" } as const,
-          };
-          const agentTurn = agentSession.hasUnfinishedTurn
-            ? agentSession.continueTurn(turnOptions, turn.steps.length)
-            : agentSession.promptTurn(turnOptions);
-          return runTurn(agentTurn, continueOptions.toolkit);
-        }),
-      ),
+    continueStream: (continueOptions) => continueTurn("continueStream", continueOptions),
+
+    continueGenerate: Effect.fn("Session.continueGenerate")(function* (continueOptions) {
+      const parts = yield* collectDenyingApprovals(
+        continueTurn("continueGenerate", continueOptions),
+      );
+      return yield* resultOf(parts);
+    }),
+
+    continueGenerateObject: Effect.fn("Session.continueGenerateObject")(function* <
+      S extends Schema.Top,
+      Tools extends Record<string, Tool.Any>,
+    >(objectOptions: ContinueObjectOptions<S, Tools>) {
+      const parts = yield* collectDenyingApprovals(
+        continueTurn("continueGenerateObject", objectOptions, objectOptions.schema),
+      );
+      return yield* objectResultOf(objectOptions.schema, parts);
+    }),
 
     approve,
 
@@ -478,7 +547,12 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       // A turn that finished while the agent released it is in the conversation already.
       const unfinishedTurn =
         status._tag === "Running"
-          ? { prompt: status.turn.prompt, steps: status.turn.steps, agentState }
+          ? {
+              prompt: status.turn.prompt,
+              responseFormat: status.turn.responseFormat,
+              steps: status.turn.steps,
+              agentState,
+            }
           : undefined;
       return savedState(history, undefined, unfinishedTurn);
     }),
@@ -519,6 +593,24 @@ const turnOptionsOf = <Tools extends Record<string, Tool.Any>>(
   model: options.model,
   tools: options.toolkit === undefined ? [] : Object.values<Tool.Any>(options.toolkit.tools),
 });
+
+/** How a turn answers, as the unfinished turn records it: without the schema, which is not data. */
+const recordedFormatOf = (
+  responseFormat: TurnOptions["responseFormat"],
+): RunningTurn["responseFormat"] =>
+  responseFormat.type === "json"
+    ? { type: "json", objectName: responseFormat.objectName }
+    : { type: "text" };
+
+/**
+ * How the agent answers a turn it continues: as the turn answered, with `schema` for an answer in
+ * JSON. `refusal` lets only `continueGenerateObject`, which gives the schema, continue a JSON turn.
+ */
+const answerFormatOf = (
+  recorded: RunningTurn["responseFormat"],
+  schema: Schema.Top | undefined,
+): TurnOptions["responseFormat"] =>
+  recorded.type === "json" && schema !== undefined ? { ...recorded, schema } : { type: "text" };
 
 /** A turn's usage as `AiError` reports it: the prompt's tokens and the completion's. */
 const usageInfoOf = (usage: typeof Response.Usage.Encoded): typeof AiError.UsageInfo.Type => ({

@@ -475,6 +475,7 @@ describe("opening a session log for a run", () => {
       history: Prompt.empty,
       unfinishedTurn: {
         prompt: userMessage("Alice: Go."),
+        responseFormat: { type: "text" },
         steps: [{ parts: [{ type: "text", text: "Second" }], finish: stepEnd }],
         agentState: { turn: "turn-b" },
       },

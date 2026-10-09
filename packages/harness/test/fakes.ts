@@ -28,7 +28,7 @@ export interface FakeAgent {
   /** What each `createSession` was given, in order. */
   readonly createdWith: ReadonlyArray<CreateSessionOptions>;
 
-  /** What each turn the agent ran from its prompt was given, in order. */
+  /** What each turn the agent ran from its prompt or continued was given, in order. */
   readonly turns: ReadonlyArray<TurnOptions>;
 
   /** How many steps the harness had of each turn the agent continued, in order. */
@@ -104,6 +104,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
               }),
             continueTurn: (turn, finishedSteps) =>
               Stream.suspend(() => {
+                turns.push(turn);
                 continued.push(finishedSteps);
                 return follow(turn).pipe(afterSteps(finishedSteps));
               }),

@@ -32,6 +32,16 @@ export const UnfinishedTurn = Schema.Struct({
   prompt: Prompt.UserMessage,
 
   /**
+   * How the turn answers, which decides what finishes it: `continueStream` or `continueGenerate`
+   * for a turn that answers in text, and `continueGenerateObject` for one that answers in JSON,
+   * given the schema again.
+   */
+  responseFormat: Schema.Union([
+    Schema.Struct({ type: Schema.Literal("text") }),
+    Schema.Struct({ type: Schema.Literal("json"), objectName: Schema.String }),
+  ]),
+
+  /**
    * The steps the turn finished before `suspendTurn`, their parts added up. The agent that cut the
    * turn short continues it after them; any other runs the turn again without them.
    */
@@ -86,8 +96,6 @@ export const SessionState = Schema.Struct({
  */
 export interface SessionState extends Schema.Schema.Type<typeof SessionState> {}
 
-// TODO: Add `continueGenerate`, which finishes an unfinished turn and returns it whole, and let
-// `continueStream` finish a turn that answers in JSON, once a caller continues such turns.
 /**
  * What a turn asks, and the tools the host gives it.
  *
@@ -144,6 +152,21 @@ export interface GenerateObjectOptions<
 
   /** Names the object for agents that name the JSON they answer with. Defaults to `output`. */
   readonly objectName?: string;
+}
+
+/**
+ * What an unfinished turn that answers with an object takes to finish: the turn's settings, given
+ * again, and the schema of the answer.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export interface ContinueObjectOptions<
+  S extends Schema.Top,
+  Tools extends Record<string, Tool.Any> = {},
+> extends ContinueOptions<Tools> {
+  /** The schema the turn's answer decodes to, as JSON, as `generateObject` was given it. */
+  readonly schema: S;
 }
 
 /**
@@ -214,8 +237,8 @@ export interface Session {
   readonly id: SessionId;
 
   /**
-   * Whether the agent has the unfinished turn the session resumed with, which `continueStream`
-   * then continues after the steps it finished. Otherwise `continueStream` runs the turn again from
+   * Whether the agent has the unfinished turn the session resumed with, which the continue
+   * operations then continue after the steps it finished. Otherwise they run the turn again from
    * its prompt, without them, for a caller that keeps the steps to set them aside.
    */
   readonly hasUnfinishedTurn: boolean;
@@ -256,11 +279,39 @@ export interface Session {
    * Streams the unfinished turn the session was started with, like `stream`, from the step that was
    * in flight when `suspendTurn` cut it short. That step starts over, so the parts of it delivered
    * before `suspendTurn` are replaced by the ones `continueStream` streams. An agent that does not
-   * have the turn, such as another agent, runs it again from its prompt.
+   * have the turn, such as another agent, runs it again from its prompt. Fails with `NoTurnError`
+   * when the session has no unfinished turn, or when the turn answers in JSON, which
+   * `continueGenerateObject` finishes.
    */
   readonly continueStream: <Tools extends Record<string, Tool.Any> = {}>(
     options: ContinueOptions<Tools>,
   ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
+
+  /**
+   * Finishes the unfinished turn and returns what `continueStream` would stream whole, like
+   * `generate`: from the step that was in flight, or the whole turn run again. The steps before are
+   * in the `UnfinishedTurn` the session resumed with. Like `generate`, it denies every approval
+   * request.
+   */
+  readonly continueGenerate: <Tools extends Record<string, Tool.Any> = {}>(
+    options: ContinueOptions<Tools>,
+  ) => Effect.Effect<GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
+
+  /**
+   * Finishes the unfinished turn that answers in JSON, like `continueGenerate`, and decodes the
+   * answer with `schema`, as `generateObject` does. Fails with `NoTurnError` when the turn answers
+   * in text, which `continueStream` or `continueGenerate` finishes.
+   */
+  readonly continueGenerateObject: <
+    S extends Schema.Top,
+    Tools extends Record<string, Tool.Any> = {},
+  >(
+    options: ContinueObjectOptions<S, Tools>,
+  ) => Effect.Effect<
+    GenerateObjectResult<S["Type"]>,
+    TurnError<Tools>,
+    TurnServices<Tools> | S["DecodingServices"]
+  >;
 
   /**
    * Answers a `tool-approval-request` of the running turn: one the session made for a host tool
@@ -278,8 +329,8 @@ export interface Session {
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns the
-   * session with the turn unfinished, for `continueStream` to finish once
-   * `Harness.createSession` resumes it.
+   * session with the turn unfinished, for `continueStream`, `continueGenerate`, or
+   * `continueGenerateObject` to finish once `Harness.createSession` resumes it.
    */
   readonly suspendTurn: Effect.Effect<SessionState, HarnessError>;
 

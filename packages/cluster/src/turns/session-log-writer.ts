@@ -112,6 +112,7 @@ const unfinishedTurnOf = (
     agent: started.agent,
     unfinishedTurn: {
       prompt,
+      responseFormat: { type: "text" },
       steps,
       agentState: started.agentState,
     },

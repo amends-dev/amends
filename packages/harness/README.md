@@ -172,8 +172,9 @@ Each of these releases the session, after which it refuses every other operation
 results included, beside the agent's own state and the unfinished turn, if any. The agent that last
 ran the session resumes from its own state; any other loads the conversation, so a session moves
 from one agent to another. A resumed session with an unfinished turn finishes it with
-`continueStream`, from the step that was in flight; an agent that no longer has the turn, as
-`hasUnfinishedTurn` says, runs it again from its prompt.
+`continueStream` or `continueGenerate`, from the step that was in flight, or with
+`continueGenerateObject` when the turn answers in JSON, given the schema again; an agent that no
+longer has the turn, as `hasUnfinishedTurn` says, runs it again from its prompt.
 
 A caller that logs a turn's steps itself, rather than storing the whole conversation with every
 turn, rebuilds the conversation with `Session.recordStep`, which records one `Step` as the session

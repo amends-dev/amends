@@ -38,6 +38,7 @@ const resumeFromStart = (prompt: string, start: StreamPart.TurnStartPart) => ({
   history: Prompt.empty,
   unfinishedTurn: {
     prompt: Prompt.makeMessage("user", { content: [Prompt.makePart("text", { text: prompt })] }),
+    responseFormat: { type: "text" } as const,
     steps: [],
     agentState: start.agentState,
   },
