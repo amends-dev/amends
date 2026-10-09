@@ -78,7 +78,9 @@ export const findSnapshot = Effect.fn("DaytonaSandboxProvider.findSnapshot")(fun
     yield* Effect.forkIn(
       Effect.ignore(bringAbout[next], {
         log: "Warn",
-        message: `Failed to ${next.toLowerCase()} the snapshot ${name} of the template ${template.name}`,
+        message:
+          `Failed to ${next.toLowerCase()} the snapshot ${name}` +
+          ` of the template ${template.name}`,
       }),
       scope,
     );
@@ -126,7 +128,7 @@ export const otherVersionsToDelete = (
     )
     .map((snapshot) => snapshot.name);
 
-/** Deletes the template's other versions `otherVersionsToDelete` names; failing to only leaves them. */
+/** Deletes the template's other versions `otherVersionsToDelete` names; a failure leaves them. */
 const deleteOtherVersions = (daytona: Daytona, templateName: string, current: string) =>
   Effect.gen(function* () {
     const snapshots = yield* listSnapshots(daytona);

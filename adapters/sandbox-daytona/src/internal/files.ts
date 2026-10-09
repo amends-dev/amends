@@ -10,6 +10,16 @@ import { ByteSize, Effect, FileSystem, Option, PlatformError, Stream } from "eff
 import { callPlatform, systemErrorTagOf, toPlatformError } from "./call.ts";
 import { quote } from "./shell.ts";
 
+/** Defines `fail path message`, which fails a script with a message of the tools' own. */
+const defineFail = `fail() { printf '%s: %s\\n' "$1" "$2" >&2; exit 1; }`;
+
+/** Fails a script for a path that does not exist, as the tools would. */
+const existing = '[ -e "$1" ] || fail "$1" "No such file or directory"';
+
+/** The flag `flag`, with the space before it, when `condition` holds. */
+const when = (condition: boolean | undefined, flag: string) =>
+  condition === true ? ` ${flag}` : "";
+
 /** The file system of `sandbox`, whose relative paths start in `workingDirectory`. */
 export const makeFileSystem = (
   sandbox: DaytonaSandbox,
@@ -25,7 +35,7 @@ export const makeFileSystem = (
     Effect.tryPromise({
       try: () =>
         sandbox.process.executeCommand(
-          `sh -c ${quote(`fail() { printf '%s: %s\\n' "$1" "$2" >&2; exit 1; }; ${script}`)} sh ${args.map(quote).join(" ")}`,
+          `sh -c ${quote(`${defineFail}; ${script}`)} sh ${args.map(quote).join(" ")}`,
           undefined,
           // The tools' messages name their errors in English.
           { LC_ALL: "C" },
@@ -61,7 +71,10 @@ export const makeFileSystem = (
     Effect.map(
       run(
         "makeTempFile",
-        'directory=$(mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX") && mktemp --suffix="$3" -- "$directory/XXXXXXXXXXXX"',
+        [
+          'directory=$(mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX")',
+          'mktemp --suffix="$3" -- "$directory/XXXXXXXXXXXX"',
+        ].join(" && "),
         [
           options?.directory === undefined ? "" : resolve(options.directory),
           options?.prefix ?? "",
@@ -73,11 +86,9 @@ export const makeFileSystem = (
 
   const remove: FileSystem.FileSystem["remove"] = (path, options) =>
     Effect.asVoid(
-      run(
-        "remove",
-        `rm${options?.recursive === true ? " -r" : ""}${options?.force === true ? " -f" : ""} -- "$1"`,
-        [resolve(path)],
-      ),
+      run("remove", `rm${when(options?.recursive, "-r")}${when(options?.force, "-f")} -- "$1"`, [
+        resolve(path),
+      ]),
     );
 
   return FileSystem.make({
@@ -86,7 +97,7 @@ export const makeFileSystem = (
         run(
           "access",
           [
-            '[ -e "$1" ] || fail "$1" "No such file or directory"',
+            existing,
             ...(options?.readable === true ? ['[ -r "$1" ] || fail "$1" "Permission denied"'] : []),
             ...(options?.writable === true ? ['[ -w "$1" ] || fail "$1" "Permission denied"'] : []),
           ].join("; "),
@@ -98,7 +109,8 @@ export const makeFileSystem = (
       Effect.asVoid(
         run(
           "copy",
-          `cp -RT${options?.overwrite === true ? "" : " --update=none"}${options?.preserveTimestamps === true ? " --preserve=timestamps" : ""} -- "$1" "$2"`,
+          `cp -RT${when(options?.overwrite !== true, "--update=none")}` +
+            `${when(options?.preserveTimestamps, "--preserve=timestamps")} -- "$1" "$2"`,
           [resolve(fromPath), resolve(toPath)],
         ),
       ),
@@ -112,14 +124,14 @@ export const makeFileSystem = (
     glob: () => Effect.fail(unsupported("glob", "A Daytona sandbox's files are not globbed yet")),
     link: (fromPath, toPath) =>
       Effect.asVoid(run("link", 'ln -- "$1" "$2"', [resolve(fromPath), resolve(toPath)])),
-    makeDirectory: (path, options) =>
-      Effect.asVoid(
-        run(
-          "makeDirectory",
-          `mkdir${options?.recursive === true ? " -p" : ""}${options?.mode === undefined ? "" : ` -m ${options.mode.toString(8)}`} -- "$1"`,
-          [resolve(path)],
-        ),
-      ),
+    makeDirectory: (path, options) => {
+      const mode = options?.mode === undefined ? "" : ` -m ${options.mode.toString(8)}`;
+      return Effect.asVoid(
+        run("makeDirectory", `mkdir${when(options?.recursive, "-p")}${mode} -- "$1"`, [
+          resolve(path),
+        ]),
+      );
+    },
     makeTempDirectory,
     makeTempDirectoryScoped: (options) =>
       Effect.acquireRelease(makeTempDirectory(options), (directory) =>
@@ -139,9 +151,10 @@ export const makeFileSystem = (
         run(
           "readDirectory",
           [
-            '[ -e "$1" ] || fail "$1" "No such file or directory"',
+            existing,
             '[ -d "$1" ] || fail "$1" "Not a directory"',
-            `cd -- "$1" && find . -mindepth 1${options?.recursive === true ? "" : " -maxdepth 1"} -printf '%P\\0'`,
+            `cd -- "$1" && find . -mindepth 1${when(options?.recursive !== true, "-maxdepth 1")}` +
+              " -printf '%P\\0'",
           ].join("; "),
           [resolve(path)],
         ),
@@ -176,17 +189,15 @@ export const makeFileSystem = (
       Effect.asVoid(run("symlink", 'ln -s -- "$1" "$2"', [target, resolve(path)])),
     truncate: (path, length) =>
       Effect.asVoid(
-        run(
-          "truncate",
-          `[ -e "$1" ] || fail "$1" "No such file or directory"; truncate -s ${length ?? 0} -- "$1"`,
-          [resolve(path)],
-        ),
+        run("truncate", [existing, `truncate -s ${length ?? 0} -- "$1"`].join("; "), [
+          resolve(path),
+        ]),
       ),
     utimes: (path, atime, mtime) =>
       Effect.asVoid(
         run(
           "utimes",
-          '[ -e "$1" ] || fail "$1" "No such file or directory"; touch -c -a -d "@$2" -- "$1" && touch -c -m -d "@$3" -- "$1"',
+          [existing, 'touch -c -a -d "@$2" -- "$1" && touch -c -m -d "@$3" -- "$1"'].join("; "),
           [resolve(path), secondsOf(atime), secondsOf(mtime)],
         ),
       ),

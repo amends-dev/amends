@@ -277,33 +277,34 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
    * Prepares `template` in a sandbox named `name`, which then becomes the snapshot of that name and
    * is deleted. Succeeds with `false`, making nothing, when another create has claimed the name.
    */
-  const makeSnapshot =
-    <E>(template: Template.Template<E>, base: string | undefined) =>
-    (name: string) =>
-      Effect.acquireUseRelease(
-        createSandbox(name, {
-          labels: { [templateLabel]: template.name },
-          autoStopInterval: 0,
-          ttlMinutes: claimMinutes,
-          ...(base === undefined ? {} : { snapshot: base }),
-        }),
-        (sandbox) =>
-          openSandbox(sandbox, Sandbox.SandboxId.make(name)).pipe(
-            Effect.flatMap((opened) =>
-              template.prepare.pipe(Effect.provide(Sandbox.layerServices(opened))),
-            ),
-            Effect.andThen(call(() => sandbox.createSnapshot(name, snapshotSeconds))),
-            Effect.as(true),
+  const makeSnapshot = <E>(
+    template: Template.Template<E>,
+    base: string | undefined,
+    name: string,
+  ) =>
+    Effect.acquireUseRelease(
+      createSandbox(name, {
+        labels: { [templateLabel]: template.name },
+        autoStopInterval: 0,
+        ttlMinutes: claimMinutes,
+        ...(base === undefined ? {} : { snapshot: base }),
+      }),
+      (sandbox) =>
+        openSandbox(sandbox, Sandbox.SandboxId.make(name)).pipe(
+          Effect.flatMap((opened) =>
+            template.prepare.pipe(Effect.provide(Sandbox.layerServices(opened))),
           ),
-        (sandbox) => Effect.ignore(call(() => sandbox.delete())),
-      ).pipe(
-        Effect.catchIf(
-          (error) =>
-            error instanceof SandboxError.SandboxError &&
-            error.reason._tag === "AlreadyExistsError",
-          () => Effect.succeed(false),
+          Effect.andThen(call(() => sandbox.createSnapshot(name, snapshotSeconds))),
+          Effect.as(true),
         ),
-      );
+      (sandbox) => Effect.ignore(call(() => sandbox.delete())),
+    ).pipe(
+      Effect.catchIf(
+        (error) =>
+          error instanceof SandboxError.SandboxError && error.reason._tag === "AlreadyExistsError",
+        () => Effect.succeed(false),
+      ),
+    );
 
   const create = Effect.fn("DaytonaSandboxProvider.create")(function* <E = never>(
     createOptions: SandboxProvider.CreateOptions<E> = {},
@@ -334,9 +335,9 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
     const templateSnapshot =
       template === undefined
         ? Option.none<string>()
-        : yield* findSnapshot(daytona, scope, template, base, makeSnapshot(template, base)).pipe(
-            Effect.provideService(Crypto.Crypto, crypto),
-          );
+        : yield* findSnapshot(daytona, scope, template, base, (name) =>
+            makeSnapshot(template, base, name),
+          ).pipe(Effect.provideService(Crypto.Crypto, crypto));
     const snapshot = Option.getOrElse(templateSnapshot, () => base);
     // Until the template's snapshot is made, each sandbox is prepared on its own, before its
     // network policy applies, as preparing may download what the template installs.

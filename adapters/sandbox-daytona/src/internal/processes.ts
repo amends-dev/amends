@@ -27,6 +27,7 @@ import {
   Effect,
   Option,
   PlatformError,
+  Ref,
   Schedule,
   Sink,
   Stream,
@@ -58,7 +59,7 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
   function* (sandbox: DaytonaSandbox, workingDirectory: string) {
     const crypto = yield* Crypto.Crypto;
     // Daytona gives no process ids, so each process is numbered by the spawner that started it.
-    let lastPid = 0;
+    const lastPid = yield* Ref.make(0);
 
     const spawn = Effect.fnUntraced(function* (command: ChildProcess.Command) {
       const unsupported = unsupportedOption(command);
@@ -71,26 +72,28 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
       }
       const session = `amends-process-${yield* crypto.randomUUIDv4}`;
       const outputDirectory = `/tmp/${session}`;
-      let referenced = true;
+      const referenced = yield* Ref.make(true);
       yield* Effect.acquireRelease(
         callPlatform("ChildProcess", "spawn", () => sandbox.process.createSession(session)),
         // Deletes the session, ending the process, and removes its output, which stays when `kill`
         // has deleted the session already.
         () =>
-          referenced
-            ? Effect.andThen(
-                Effect.ignore(
-                  callPlatform("ChildProcess", "kill", () =>
-                    sandbox.process.deleteSession(session),
+          Effect.flatMap(Ref.get(referenced), (isReferenced) =>
+            isReferenced
+              ? Effect.andThen(
+                  Effect.ignore(
+                    callPlatform("ChildProcess", "kill", () =>
+                      sandbox.process.deleteSession(session),
+                    ),
                   ),
-                ),
-                Effect.ignore(
-                  callPlatform("ChildProcess", "kill", () =>
-                    sandbox.process.executeCommand(`rm -rf ${quote(outputDirectory)}`),
+                  Effect.ignore(
+                    callPlatform("ChildProcess", "kill", () =>
+                      sandbox.process.executeCommand(`rm -rf ${quote(outputDirectory)}`),
+                    ),
                   ),
-                ),
-              )
-            : Effect.void,
+                )
+              : Effect.void,
+          ),
       );
       const environmentScripts = new Map(
         standardCommandsOf(command).flatMap((standard, index) =>
@@ -108,13 +111,16 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
           ),
         { discard: true },
       );
+      // Sessions run the user's shell, zsh on Daytona's own image, whose redirections differ from
+      // sh's. The line runs in sh as a child, since Daytona loses the exit code of a command that
+      // replaces the session's shell.
+      const line = commandLine(command, workingDirectory, environmentScripts);
+      const stdoutFile = quote(`${outputDirectory}/stdout`);
+      const stderrFile = quote(`${outputDirectory}/stderr`);
       const { cmdId } = yield* callPlatform("ChildProcess", "spawn", () =>
         sandbox.process.executeSessionCommand(session, {
-          // Sessions run the user's shell, zsh on Daytona's own image, whose redirections differ
-          // from sh's. The line runs in sh as a child, since Daytona loses the exit code of a
-          // command that replaces the session's shell.
           command: `sh -c ${quote(
-            `mkdir -p ${quote(outputDirectory)} && { ${commandLine(command, workingDirectory, environmentScripts)}; } >${quote(`${outputDirectory}/stdout`)} 2>${quote(`${outputDirectory}/stderr`)}`,
+            `mkdir -p ${quote(outputDirectory)} && { ${line}; } >${stdoutFile} 2>${stderrFile}`,
           )}`,
           runAsync: true,
           suppressInputEcho: true,
@@ -134,12 +140,16 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
         schedule: untilExit,
       });
 
-      /** What the process has written to `output` after its first `offset` bytes, up to `readLimit`. */
+      /**
+       * What the process has written to `output` after its first `offset` bytes, up to
+       * `readLimit`.
+       */
       const readOutput = (output: "stdout" | "stderr", offset: number) =>
         Effect.map(
           callPlatform("ChildProcess", "read", () =>
             sandbox.process.executeCommand(
-              `tail -c +${offset + 1} -- ${quote(`${outputDirectory}/${output}`)} 2>/dev/null | head -c ${readLimit} | base64 -w0`,
+              `tail -c +${offset + 1} -- ${quote(`${outputDirectory}/${output}`)} 2>/dev/null` +
+                ` | head -c ${readLimit} | base64 -w0`,
             ),
           ),
           ({ result }) => new Uint8Array(Buffer.from(result, "base64")),
@@ -186,11 +196,10 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
       const stdout = outputStreamOf(command, "stdout", () => outputOf("stdout"));
       const stderr = outputStreamOf(command, "stderr", () => outputOf("stderr"));
 
-      const reref = Effect.sync(() => {
-        referenced = true;
-      });
       return ChildProcessSpawner.makeHandle({
-        pid: ChildProcessSpawner.ProcessId(++lastPid),
+        pid: ChildProcessSpawner.ProcessId(
+          yield* Ref.modify(lastPid, (last) => [last + 1, last + 1]),
+        ),
         exitCode: Effect.flatMap(awaitExit, (status) =>
           status._tag === "Exited"
             ? Effect.succeed(ChildProcessSpawner.ExitCode(status.exitCode))
@@ -219,10 +228,7 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
         all: Stream.merge(stdout, stderr),
         getInputFd: () => Sink.drain,
         getOutputFd: () => Stream.empty,
-        unref: Effect.sync(() => {
-          referenced = false;
-          return reref;
-        }),
+        unref: Effect.as(Ref.set(referenced, false), Ref.set(referenced, true)),
       });
     });
 
@@ -302,7 +308,9 @@ const commandLine = (
   if (command._tag === "PipedCommand") {
     const from = command.options.from ?? "stdout";
     const redirect = from === "stdout" ? "" : from === "all" ? " 2>&1" : " 2>&1 >/dev/null";
-    return `${commandLine(command.left, workingDirectory, environmentScripts)}${redirect} | ${commandLine(command.right, workingDirectory, environmentScripts)}`;
+    const left = commandLine(command.left, workingDirectory, environmentScripts);
+    const right = commandLine(command.right, workingDirectory, environmentScripts);
+    return `${left}${redirect} | ${right}`;
   }
   const { cwd, shell, stdout, stderr } = command.options;
   const directory =
