@@ -2,9 +2,9 @@ import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import * as Template from "../src/Template.ts";
 
-describe("Template.Name", () => {
+describe("Template.TemplateName", () => {
   it("takes up to 30 letters, digits, `-`, and `_`, starting with a letter or digit", () => {
-    const isTemplateName = Schema.is(Template.Name);
+    const isTemplateName = Schema.is(Template.TemplateName);
 
     expect(isTemplateName("opencode")).toBe(true);
     expect(isTemplateName("claude_code-2")).toBe(true);

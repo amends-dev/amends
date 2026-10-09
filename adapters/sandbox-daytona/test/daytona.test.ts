@@ -38,7 +38,7 @@ const useTemplate = <E>(prepare: Template.Template<E>["prepare"]) =>
     const crypto = yield* Crypto.Crypto;
     const daytona = yield* useDaytona;
     const template = {
-      name: Template.Name.make("daytona-test"),
+      name: Template.TemplateName.make("daytona-test"),
       identity: yield* crypto.randomUUIDv4,
       prepare,
     };

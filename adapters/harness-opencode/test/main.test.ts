@@ -19,7 +19,11 @@ const makeHarness = (command: string, env: Readonly<Record<string, string>> = {}
   Effect.map(
     makeBridgedAgent({
       id: "opencode",
-      template: { name: Template.Name.make("opencode"), identity: "none", prepare: Effect.void },
+      template: {
+        name: Template.TemplateName.make("opencode"),
+        identity: "none",
+        prepare: Effect.void,
+      },
       command: process.execPath,
       args: [`${import.meta.dirname}/../src/bridge/main.ts`],
       token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),

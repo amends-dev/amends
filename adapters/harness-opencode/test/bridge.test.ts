@@ -49,7 +49,7 @@ const resumeFromStart = (prompt: string, start: StreamPart.TurnStartPart) => ({
  * directory as `bridge-<version>.ts`, a program that runs `fake-bridge.ts`.
  */
 const templateOf = (version: string): Template.Template => ({
-  name: Template.Name.make("fake-bridge"),
+  name: Template.TemplateName.make("fake-bridge"),
   identity: version,
   prepare: Effect.gen(function* () {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;

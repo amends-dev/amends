@@ -18,7 +18,7 @@ import { isName, type SandboxServices } from "./Sandbox.ts";
  * @category schemas
  * @since 0.1.0
  */
-export const Name = Schema.String.check(isName, Schema.isMaxLength(30)).pipe(
+export const TemplateName = Schema.String.check(isName, Schema.isMaxLength(30)).pipe(
   Schema.brand("TemplateName"),
 );
 
@@ -26,7 +26,7 @@ export const Name = Schema.String.check(isName, Schema.isMaxLength(30)).pipe(
  * @category schemas
  * @since 0.1.0
  */
-export type Name = typeof Name.Type;
+export type TemplateName = typeof TemplateName.Type;
 
 // TODO: Add a way to combine several templates into one, with an identity derived from theirs,
 // once the harness prepares one sandbox for several agents.
@@ -44,7 +44,7 @@ export type Name = typeof Name.Type;
  * const version = "3.6.2";
  *
  * const prettier: Template.Template = {
- *   name: Template.Name.make("prettier"),
+ *   name: Template.TemplateName.make("prettier"),
  *   identity: `prettier-${version}`,
  *   prepare: Effect.gen(function* () {
  *     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -63,7 +63,7 @@ export interface Template<E = PlatformError.PlatformError> {
    * Names the template across its versions, such as the agent it installs. Templates with the same
    * name and another identity are older or newer versions of it.
    */
-  readonly name: Name;
+  readonly name: TemplateName;
 
   /**
    * Names what `prepare` produces: templates with the same identity must prepare the same

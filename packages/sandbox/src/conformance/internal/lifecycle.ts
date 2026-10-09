@@ -2,7 +2,7 @@ import { expect, layer } from "@effect/vitest";
 import { Data, Deferred, Effect, Fiber, FileSystem, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { layerServices, type Sandbox } from "../../Sandbox.ts";
-import { Name } from "../../Template.ts";
+import { TemplateName } from "../../Template.ts";
 import type { Fixture } from "../Fixture.ts";
 import { newIdentity, newSandboxId, providerForTest } from "./fixture.ts";
 
@@ -214,7 +214,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
 
           const sandbox = yield* sandboxProvider.create({
             template: {
-              name: Name.make("conformance-prepared"),
+              name: TemplateName.make("conformance-prepared"),
               identity: yield* newIdentity("prepared"),
               prepare: Effect.gen(function* () {
                 const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
@@ -241,7 +241,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             sandboxProvider.create({
               id,
               template: {
-                name: Name.make("conformance-failing"),
+                name: TemplateName.make("conformance-failing"),
                 identity: yield* newIdentity("failing"),
                 prepare: Effect.fail(new PrepareFailed()),
               },
@@ -268,7 +268,7 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
             sandboxProvider.create({
               id,
               template: {
-                name: Name.make("conformance-endless"),
+                name: TemplateName.make("conformance-endless"),
                 identity: yield* newIdentity("endless"),
                 prepare: Deferred.succeed(preparing, undefined).pipe(Effect.andThen(Effect.never)),
               },
