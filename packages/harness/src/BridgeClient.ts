@@ -198,10 +198,10 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
    */
   const latestState = yield* Ref.make(saved?.agentState);
   /** Done once releasing the session starts, ending the running turn's stream. */
-  const closed = yield* Deferred.make<void>();
+  const released = yield* Deferred.make<void>();
   const destroyed = yield* Ref.make(false);
   /**
-   * Held while a turn starts and while the session closes, so that a closed session starts none,
+   * Held while a turn starts and while the session is released, so that a released one starts none,
    * and the session closes knowing the turn the bridge runs.
    */
   const admission = yield* Semaphore.make(1);
@@ -279,11 +279,11 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   yield* send(() => Effect.void);
   const hasUnfinishedTurn = (yield* Ref.get(running)) !== undefined;
 
-  /** Closes the session once no turn is starting, returning the turn running then. */
-  const close = Semaphore.withPermit(
+  /** Marks the session released once no turn is starting, returning the turn running then. */
+  const markReleased = Semaphore.withPermit(
     admission,
     Effect.flatMap(Ref.get(running), (turn) =>
-      Effect.as(Deferred.succeed(closed, undefined), turn),
+      Effect.as(Deferred.succeed(released, undefined), turn),
     ),
   );
 
@@ -347,7 +347,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
         const finished = yield* Ref.make(false);
         // A turn that finished may have changed the session's state, as by switching its model.
         const afterTurn = Effect.gen(function* () {
-          if (yield* Deferred.isDone(closed)) return;
+          if (yield* Deferred.isDone(released)) return;
           yield* Ref.set(running, undefined);
           if ((yield* Ref.get(bridge)) !== own) {
             // The turn ran in the bridge of the host that started it, with that host's options;
@@ -380,14 +380,14 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
           Stream.mapError((error) => fromRequestError(options.id, error)),
           Stream.map(({ part }) => part),
           afterSteps(finishedSteps),
-          Stream.interruptWhen(Deferred.await(closed)),
+          Stream.interruptWhen(Deferred.await(released)),
           Stream.tap((part) => (part.type === "finish" ? Ref.set(finished, true) : Effect.void)),
           Stream.ensuring(afterTurn),
         );
       }),
     );
 
-  /** Starts `turn` in the bridge, returning it, or nothing once the session has closed. */
+  /** Starts `turn` in the bridge, returning it, or nothing once the session is released. */
   const startTurn = Effect.fnUntraced(function* (
     turn: Bridge.TurnId,
     turnOptions: Agent.TurnOptions,
@@ -396,7 +396,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     return yield* Semaphore.withPermit(
       admission,
       Effect.gen(function* () {
-        if (yield* Deferred.isDone(closed)) return undefined;
+        if (yield* Deferred.isDone(released)) return undefined;
         // Starting the turn again under its id starts it once.
         yield* send((client) => client.StartTurn({ session, turn, options: bridgeOptions }));
         yield* Ref.set(running, turn);
@@ -460,22 +460,22 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
     compact: (instructions) => sendOnce((client) => client.Compact({ session, instructions })),
 
-    suspendTurn: Effect.flatMap(close, (turn) =>
+    suspendTurn: Effect.flatMap(markReleased, (turn) =>
       disconnectWith((client) => client.ReadState({ session }), turn),
     ),
 
     detach: Effect.andThen(
-      close,
+      markReleased,
       disconnectWith((client) => client.ReadState({ session })),
     ),
 
     stop: Effect.andThen(
-      close,
+      markReleased,
       disconnectWith((client) => client.StopSession({ session })),
     ),
 
     destroy: Effect.gen(function* () {
-      yield* close;
+      yield* markReleased;
       if (yield* Ref.get(destroyed)) return;
       // A session that was released may have ended in the bridge, or the bridge with its sandbox,
       // so the connection starts it again, from its latest state, to be destroyed.

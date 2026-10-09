@@ -293,7 +293,7 @@ describe("Session", () => {
       expect(parts).toEqual([{ type: "text-start", id: "answer" }]);
       expect(state.unfinishedTurn?.agentState).toEqual({ agent: "codex", turn: true });
       expect(state.history.content).toEqual([]);
-      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("SessionClosedError");
+      expect(refused._tag === "HarnessError" && refused.reason._tag).toBe("SessionReleasedError");
     }),
   );
 
@@ -306,7 +306,7 @@ describe("Session", () => {
       yield* session.destroy;
       const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
 
-      expect(refused.reason._tag).toBe("SessionClosedError");
+      expect(refused.reason._tag).toBe("SessionReleasedError");
     }),
   );
 
@@ -711,7 +711,7 @@ describe("Session", () => {
       yield* Deferred.succeed(letGo, undefined);
       const state = yield* Fiber.join(detaching);
 
-      expect(refused.reason._tag).toBe("SessionClosedError");
+      expect(refused.reason._tag).toBe("SessionReleasedError");
       expect(fake.turns).toEqual([]);
       expect(state.history.content).toEqual([]);
     }),

@@ -25,7 +25,7 @@ import {
   type HarnessErrorReason,
   InvalidOutputError,
   NoTurnError,
-  SessionClosedError,
+  SessionReleasedError,
   StructuredOutputError,
   TurnFailedError,
   TurnInProgressError,
@@ -110,11 +110,11 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
 
   /**
    * Releases the session with `operation`: takes hold of it, so that no turn starts and no other
-   * operation releases it meanwhile, asks the agent with `agentCall`, and closes the session.
-   * Returns what the agent answered and the session as it was when it closed. When `agentCall`
+   * operation releases it meanwhile, asks the agent with `agentCall`, and marks it released.
+   * Returns what the agent answered and the session as it was when released. When `agentCall`
    * fails, the session releases its hold and stays open.
    */
-  const releaseWith = Effect.fnUntraced(function* <A>(
+  const release = Effect.fnUntraced(function* <A>(
     operation: Release,
     agentCall: Effect.Effect<A, HarnessError>,
   ): Effect.fn.Return<readonly [A, State], HarnessError> {
@@ -123,7 +123,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         const reason = refusal(current, operation);
         if (reason !== undefined) return [Effect.fail(harnessError(reason)), current];
         // `destroy` also runs once the session is released, or while it is.
-        const holds = current.status._tag !== "Closed" && current.releasing === undefined;
+        const holds = current.status._tag !== "Released" && current.releasing === undefined;
         return [Effect.void, holds ? { ...current, releasing: operation } : current];
       }),
     );
@@ -132,8 +132,8 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         current.releasing === operation ? { ...current, releasing: undefined } : current,
       ),
     );
-    const closed = yield* close;
-    return [answer, closed] as const;
+    const released = yield* markReleased;
+    return [answer, released] as const;
   });
 
   /**
@@ -367,10 +367,10 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       : Effect.fail(harnessError(new TurnFailedError({ error: error.error })));
   };
 
-  /** Closes the session, returning it as it was when it closed. */
-  const close = Ref.getAndUpdate(state, (current) => ({
+  /** Marks the session released, returning it as it was before. */
+  const markReleased = Ref.getAndUpdate(state, (current) => ({
     ...current,
-    status: Status.Closed({ abortedTurn: wasAborted(current) }),
+    status: Status.Released({ abortedTurn: wasAborted(current) }),
     releasing: undefined,
   }));
 
@@ -476,7 +476,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     compact,
 
     suspendTurn: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* releaseWith(
+      const [agentState, { status, history }] = yield* release(
         "suspendTurn",
         agentSession.suspendTurn,
       );
@@ -489,7 +489,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     }),
 
     detach: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* releaseWith("detach", agentSession.detach);
+      const [agentState, { status, history }] = yield* release("detach", agentSession.detach);
       return savedState(
         history,
         agentState,
@@ -498,7 +498,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
     }),
 
     stop: Effect.gen(function* () {
-      const [agentState, { status, history }] = yield* releaseWith("stop", agentSession.stop);
+      const [agentState, { status, history }] = yield* release("stop", agentSession.stop);
       return savedState(
         status._tag === "Running" ? withEndedTurn(history, status.turn) : history,
         agentState,
@@ -506,7 +506,7 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
       );
     }),
 
-    destroy: Effect.asVoid(releaseWith("destroy", agentSession.destroy)),
+    destroy: Effect.asVoid(release("destroy", agentSession.destroy)),
   };
   return session;
 });
@@ -535,7 +535,7 @@ type Status = Data.TaggedEnum<{
   Unfinished: { readonly turn: UnfinishedTurn };
   Running: { readonly turn: RunningTurn };
   Compacting: {};
-  Closed: {
+  Released: {
     /** Whether `stop` or `destroy` aborted a running turn, before its `finish`. */
     readonly abortedTurn: boolean;
   };
@@ -546,7 +546,7 @@ const Status = Data.taggedEnum<Status>();
 /** Whether `stop` or `destroy` aborted the turn a session ran, before its `finish`. */
 const wasAborted = ({ status, releasing }: State) =>
   (status._tag === "Running" && (releasing === "stop" || releasing === "destroy")) ||
-  (status._tag === "Closed" && status.abortedTurn);
+  (status._tag === "Released" && status.abortedTurn);
 
 /** How the stream of a turn `stop` or `destroy` aborted ends: as a turn that failed. */
 const abortedEnding: ReadonlyArray<StreamPart> = [
@@ -598,9 +598,9 @@ const refusal = (
 ): HarnessErrorReason | undefined => {
   // A session can be destroyed at any time, also once released, or while it is.
   if (operation === "destroy") return undefined;
-  if (status._tag === "Closed") return new SessionClosedError({});
+  if (status._tag === "Released") return new SessionReleasedError({});
   if (releasing !== undefined) {
-    return new SessionClosedError({
+    return new SessionReleasedError({
       description: `The session is being released by ${releasing}`,
     });
   }

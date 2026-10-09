@@ -159,7 +159,7 @@ messages the agent kept as they were.
 ### Releasing a session
 
 Each of these releases the session, after which it refuses every other operation with
-`SessionClosedError`. The first three return a `SessionState`.
+`SessionReleasedError`. The first three return a `SessionState`.
 
 | Operation     | What it does                                                                       |
 | ------------- | ---------------------------------------------------------------------------------- |
@@ -230,7 +230,7 @@ const sonnet: ModelEndpoint.ModelEndpoint = {
 ## Errors
 
 Every operation fails with `HarnessError`, which names the agent and holds a reason:
-`UnsupportedError`, `NotFoundError`, `SessionClosedError`, `TurnInProgressError`, `NoTurnError`,
+`UnsupportedError`, `NotFoundError`, `SessionReleasedError`, `TurnInProgressError`, `NoTurnError`,
 `TurnFailedError`, `InvalidOutputError`, `StructuredOutputError`, `UnavailableError`, or
 `UnknownError`. Each says whether trying again may succeed, as `isRetryable`, and
 `Effect.catchReason("HarnessError", "UnavailableError", ...)` recovers from one reason.

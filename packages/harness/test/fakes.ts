@@ -87,12 +87,12 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
         Effect.gen(function* () {
           createdWith.push(sessionOptions);
           /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
-          const closed = yield* Deferred.make<void>();
-          const close = Deferred.succeed(closed, undefined);
+          const released = yield* Deferred.make<void>();
+          const release = Deferred.succeed(released, undefined);
           const beforeLettingGo = options.beforeLettingGo ?? Effect.void;
           const follow = (turn: TurnOptions) =>
             script(textOf(turn.prompt), { toolResult: Queue.take(toolResults) }).pipe(
-              Stream.interruptWhen(Deferred.await(closed)),
+              Stream.interruptWhen(Deferred.await(released)),
             );
           const session: AgentSession = {
             hasUnfinishedTurn:
@@ -121,11 +121,11 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
               }),
             suspendTurn: Effect.andThen(
               beforeLettingGo,
-              Effect.as(close, { agent: id, turn: true }),
+              Effect.as(release, { agent: id, turn: true }),
             ),
             detach: Effect.andThen(beforeLettingGo, Effect.succeed({ agent: id })),
-            stop: Effect.andThen(beforeLettingGo, Effect.as(close, { agent: id })),
-            destroy: Effect.andThen(beforeLettingGo, Effect.asVoid(close)),
+            stop: Effect.andThen(beforeLettingGo, Effect.as(release, { agent: id })),
+            destroy: Effect.andThen(beforeLettingGo, Effect.asVoid(release)),
           };
           return session;
         }),

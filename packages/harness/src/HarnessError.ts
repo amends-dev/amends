@@ -74,9 +74,9 @@ export class NotFoundError extends withDefaults(
  * @category errors
  * @since 0.1.0
  */
-export class SessionClosedError extends withDefaults(
-  Schema.TaggedError<SessionClosedError>("@amends/harness/HarnessError/SessionClosedError")(
-    "SessionClosedError",
+export class SessionReleasedError extends withDefaults(
+  Schema.TaggedError<SessionReleasedError>("@amends/harness/HarnessError/SessionReleasedError")(
+    "SessionReleasedError",
     described,
   ),
   {
@@ -201,7 +201,7 @@ export class UnknownError extends withDefaults(
 export const HarnessErrorReason = Schema.Union([
   UnsupportedError,
   NotFoundError,
-  SessionClosedError,
+  SessionReleasedError,
   TurnInProgressError,
   NoTurnError,
   TurnFailedError,
