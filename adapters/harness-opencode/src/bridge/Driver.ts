@@ -247,7 +247,6 @@ const createSession = Effect.fn("OpencodeDriver.createSession")(function* (
         ),
       ),
 
-    // TODO: Answer opencode's permission requests, once a permission mode says when it asks.
     approve: () =>
       Effect.fail(
         harnessError(

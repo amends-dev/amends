@@ -67,8 +67,6 @@ export interface Workspace {
   readonly directory: string;
 }
 
-// TODO: Add a permission mode for the agent's own tools, and which of them it may use, once an
-// agent asks for approval before using its own tools.
 /**
  * What `Agent.createSession` starts a session from: its id, where it works, the conversation so
  * far, and what the agent itself returned when the session last ran on it.

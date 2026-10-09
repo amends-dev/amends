@@ -405,7 +405,6 @@ const createSession = Effect.fn("AmendsAgent.createSession")(function* (
         isFailure ? Deferred.fail(deferred, result) : Deferred.succeed(deferred, result),
       ),
 
-    // TODO: Ask the host before running the agent's own tools, once a permission mode says when.
     approve: () =>
       Effect.fail(
         harnessError(
