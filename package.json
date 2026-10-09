@@ -18,7 +18,7 @@
       "@effect/ai-anthropic": "4.0.0",
       "@effect/ai-openai": "4.0.0",
       "@effect/ai-openai-compat": "4.0.0",
-      "@daytona/sdk": "0.220.0"
+      "@daytona/sdk": "0.223.1"
     }
   },
   "type": "module",
