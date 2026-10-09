@@ -168,8 +168,8 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       childProcessSpawner: yield* makeChildProcessSpawner(sandbox, workingDirectory).pipe(
         Effect.provideService(Crypto.Crypto, crypto),
       ),
-      // TODO: Keep a port that another host exposes at the same moment, once Daytona changes one
-      // label at a time: `setLabels` replaces them all, so the last of two changes wins.
+      // Daytona replaces the labels whole, so of two hosts exposing different ports at once, one
+      // loses its port.
       exposePorts: (ports) =>
         retryConflicts(
           Effect.gen(function* () {
@@ -224,21 +224,17 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           () => Effect.void,
         ),
       ),
-      // TODO: Close the moment, just after Daytona answers, in which a sandbox that was denied
-      // everything reaches anything while an allow list replaces the denial, once a sandbox's
-      // policy changes while code that should not get out runs in it. Daytona's runner lifts the
-      // block before it filters by the list, and denies no block together with a list.
+      // Daytona applies the settings a moment after it answers, and lifts a full block before an
+      // allow list takes over.
       setNetworkPolicy: (policy) =>
         Effect.flatMap(networkSettingsOf(policy), (settings) =>
           retryConflicts(call(() => sandbox.updateNetworkSettings(settings))),
         ),
-      // TODO: Set credentials outside the sandbox with Daytona's secrets, which its proxy puts in
-      // outbound requests in place of placeholders, once their matching is checked against ours.
       setRequestTransformations: () =>
         Effect.fail(
           sandboxError(
             new SandboxError.UnsupportedError({
-              description: "The Daytona provider transforms no requests yet",
+              description: "The Daytona provider sets no headers on outbound requests",
             }),
           ),
         ),
@@ -355,9 +351,6 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           preparesHere
             ? template.prepare.pipe(
                 Effect.provide(Sandbox.layerServices(opened)),
-                // TODO: Close the moment after create returns in which a sandbox prepared on its
-                // own still reaches what its policy denies, once code that should not get out runs
-                // in such a sandbox at once: Daytona applies an update a moment after it answers.
                 Effect.andThen(
                   networkSettings === undefined
                     ? Effect.void

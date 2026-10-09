@@ -120,8 +120,7 @@ export const makeFileSystem = (
       Effect.asVoid(run("chmod", `chmod ${mode.toString(8)} -- "$1"`, [resolve(path)])),
     chown: (path, uid, gid) =>
       Effect.asVoid(run("chown", `chown ${uid}:${gid} -- "$1"`, [resolve(path)])),
-    // TODO: Match paths against a pattern, once a caller globs a sandbox's files.
-    glob: () => Effect.fail(unsupported("glob", "A Daytona sandbox's files are not globbed yet")),
+    glob: () => Effect.fail(unsupported("glob", "A Daytona sandbox's files cannot be globbed")),
     link: (fromPath, toPath) =>
       Effect.asVoid(run("link", 'ln -- "$1" "$2"', [resolve(fromPath), resolve(toPath)])),
     makeDirectory: (path, options) => {
@@ -142,8 +141,6 @@ export const makeFileSystem = (
       Effect.acquireRelease(makeTempFile(options), (file) =>
         Effect.orDie(remove(file.slice(0, file.lastIndexOf("/")), { recursive: true })),
       ),
-    // TODO: Open a file to read and write it in parts, once a caller streams a sandbox's file;
-    // `stream` and `sink` open the file too.
     open: () =>
       Effect.fail(unsupported("open", "A Daytona sandbox's files are read and written whole")),
     readDirectory: (path, options) =>
@@ -201,11 +198,9 @@ export const makeFileSystem = (
           [resolve(path), secondsOf(atime), secondsOf(mtime)],
         ),
       ),
-    // TODO: Watch a sandbox's files, once a caller watches them.
-    watch: () => Stream.fail(unsupported("watch", "A Daytona sandbox's files are not watched yet")),
+    watch: () => Stream.fail(unsupported("watch", "A Daytona sandbox's files cannot be watched")),
     writeFile: Effect.fnUntraced(function* (path, data, options) {
       const flag = options?.flag ?? "w";
-      // TODO: Append to a file, once a caller appends to a sandbox's file.
       if (flag !== "w" && flag !== "w+" && flag !== "wx" && flag !== "wx+") {
         return yield* unsupported(
           "writeFile",

@@ -124,12 +124,14 @@ children and then SIGKILL, whatever signal it is asked for.
 
 A file's contents are read and written whole through Daytona's file API, so a read holds the whole
 file in the host's memory, whatever its size, and `open`, which `stream` and `sink` use, fails with
-`BadArgument`. Everything else is done with the sandbox's own tools, one `sh` command each, which
-Daytona answers at once: `stat`, `find`, `mkdir`, `rm`, `mv`, `cp`, `ln`, `mktemp`, and the like,
-so the sandbox needs `sh`, the GNU coreutils, and findutils, as Daytona's own image has. They run
-with `LC_ALL=C`, and a failure is the error the tool's message names, as Effect's own file systems
-name an `errno`. Writing a file checks first that its directory exists, and that the file does not
-when the flag asks so, since Daytona's file API would make the one and write over the other.
+`BadArgument`; so do `glob`, `watch`, and a write with a flag other than `w`, `w+`, `wx`, or
+`wx+`, such as one that appends. Everything else is done with the sandbox's own tools, one `sh`
+command each, which Daytona answers at once: `stat`, `find`, `mkdir`, `rm`, `mv`, `cp`, `ln`,
+`mktemp`, and the like, so the sandbox needs `sh`, the GNU coreutils, and findutils, as Daytona's
+own image has. They run with `LC_ALL=C`, and a failure is the error the tool's message names, as
+Effect's own file systems name an `errno`. Writing a file checks first that its directory exists,
+and that the file does not when the flag asks so, since Daytona's file API would make the one and
+write over the other.
 
 ## Ports and the network
 
@@ -137,17 +139,21 @@ A port's endpoint is Daytona's preview URL for it, which takes the sandbox's pre
 `x-daytona-preview-token` header that the endpoint gives, and passes the request's other headers,
 `Authorization` included, on to the server. WebSockets work through it too. A server reaches it
 only when it listens on every interface. Daytona opens a port the first time it gives the port's
-preview URL, so `exposePorts` only adds the port to the sandbox's label.
+preview URL, so `exposePorts` only adds the port to the sandbox's label; Daytona replaces the labels
+whole, so of two hosts exposing different ports on one sandbox at the same moment, one loses its
+port.
 
 `DenyAll` blocks everything the sandbox sends. An `AllowList` names hosts or CIDR ranges, but not
 both, and denies none, as Daytona does; one Daytona cannot enforce fails with `UnsupportedError`,
 and one that allows nothing blocks everything. Daytona filters hosts through its proxy and DNS.
-Each policy replaces the one before, and Daytona applies it a moment after it answers.
+Each policy replaces the one before, and Daytona applies it a moment after it answers; lifting
+`DenyAll` for an allow list opens the network for a moment before the list applies.
 
 A sandbox created with a policy starts under it, as Daytona applies the policy before it starts
 the sandbox. One its template prepares on its own, before the template's snapshot is made, gets the
 policy once prepared, a moment after. `setRequestTransformations` fails with `UnsupportedError`:
-the provider sets no headers on outbound requests yet.
+Daytona sets credentials at its edge through its secrets, with placeholders it chooses, which the
+contract does not take; see the [known limitations](../../docs/current-status.md).
 
 ## Templates and snapshots
 

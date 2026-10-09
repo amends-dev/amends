@@ -60,7 +60,13 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   transformations have one owner, who replaces the whole set: the host, since the harness gives
   an agent its credentials on the bridge's standard input. A harness that set credentials outside
   the sandbox instead would need to add transformations beside the host's, as AI SDK's adapters
-  do with its additive operation.
+  do with its additive operation. On Daytona, a network policy applies a moment after Daytona
+  answers, and lifting `DenyAll` for an allow list opens the network for a moment, so code that must
+  not reach out runs under the policy its sandbox was created with. Daytona's secrets set
+  credentials outside the sandbox as request transformations promise, but Daytona chooses the
+  placeholder the sandbox sends, where the contract lets the host match its own headers, and a
+  sandbox created without secrets must restart for attached ones to work; the Daytona provider
+  fails with `UnsupportedError` until the contract takes Daytona's shape.
 - [Connections](../packages/core/README.md#connections) are set up over HTTP and on the
   [Connections page](connections.md), from the integrations the
   [local host](../hosts/local/README.md) installs of every kind. They authenticate with an API key

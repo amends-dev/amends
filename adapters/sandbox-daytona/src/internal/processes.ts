@@ -213,8 +213,8 @@ export const makeChildProcessSpawner = Effect.fn("DaytonaSandboxProvider.makeChi
               ),
         ),
         isRunning: Effect.map(readStatus, (status) => status._tag === "Running"),
-        // TODO: Send the kill signal asked for, once a caller asks for one other than SIGTERM.
-        // Deleting the session sends SIGTERM to the process and its children, then SIGKILL.
+        // Deleting the session sends SIGTERM to the process and its children, then SIGKILL,
+        // whatever signal is asked for.
         kill: () =>
           callPlatform("ChildProcess", "kill", () => sandbox.process.deleteSession(session)).pipe(
             Effect.catchIf(
