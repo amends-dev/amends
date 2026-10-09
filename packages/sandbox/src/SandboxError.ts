@@ -68,6 +68,25 @@ export class AlreadyExistsError extends Schema.TaggedError<AlreadyExistsError>(
 }
 
 /**
+ * The options under the provider's id in `CreateOptions.providerOptions` are not what the provider
+ * takes.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class InvalidOptionsError extends Schema.TaggedError<InvalidOptionsError>(
+  "@amends/sandbox/SandboxError/InvalidOptionsError",
+)("InvalidOptionsError", { description: Schema.optional(Schema.String) }) {
+  get isRetryable(): boolean {
+    return false;
+  }
+
+  override get message(): string {
+    return this.description ?? "The provider was given options it does not take";
+  }
+}
+
+/**
  * The provider cannot do this on its platform, such as enforce a network policy, transform
  * requests, or expose a port once the sandbox exists.
  *
@@ -132,6 +151,7 @@ export const SandboxErrorReason = Schema.Union([
   AuthenticationError,
   NotFoundError,
   AlreadyExistsError,
+  InvalidOptionsError,
   UnsupportedError,
   UnavailableError,
   UnknownError,

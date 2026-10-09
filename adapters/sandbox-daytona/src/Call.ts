@@ -16,8 +16,11 @@ import { Effect } from "effect";
 export const call = <A>(request: () => Promise<A>) =>
   Effect.tryPromise({ try: request, catch: fromDaytonaError });
 
+/** The provider's id, which its errors and its entry of `providerOptions` carry. */
+export const providerId = "daytona";
+
 export const sandboxError = (reason: SandboxError.SandboxErrorReason, cause?: unknown) =>
-  new SandboxError.SandboxError({ provider: "daytona", reason, cause });
+  new SandboxError.SandboxError({ provider: providerId, reason, cause });
 
 export const fromDaytonaError = (error: unknown) => sandboxError(reasonOf(error), error);
 

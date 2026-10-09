@@ -84,6 +84,21 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
     );
 
     it.effect(
+      "ignores the provider options of other providers",
+      () =>
+        Effect.gen(function* () {
+          const sandboxProvider = yield* providerForTest(fixture);
+
+          const sandbox = yield* sandboxProvider.create({
+            providerOptions: { "conformance-other-provider": { anything: true } },
+          });
+
+          expect((yield* sandboxProvider.resume(sandbox.id)).id).toBe(sandbox.id);
+        }),
+      fixture.timeout,
+    );
+
+    it.effect(
       "fails with AlreadyExistsError for an id in use and keeps that sandbox",
       () =>
         Effect.gen(function* () {

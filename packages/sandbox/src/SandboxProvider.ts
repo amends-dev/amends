@@ -6,17 +6,46 @@
  *
  * @since 0.1.0
  */
-import { Context, type Effect } from "effect";
+import { Context, type Effect, Schema } from "effect";
 import type { NetworkPolicy, Port } from "./Network.ts";
 import type { Sandbox, SandboxId } from "./Sandbox.ts";
 import type { SandboxError } from "./SandboxError.ts";
 import type { Template } from "./Template.ts";
 
-// TODO: Add per-create provider options, such as a different image for each sandbox, once a caller
-// needs them. Until then, a second provider layer with different settings covers it.
 /**
- * What a sandbox is created with: its id, the ports it exposes, the template that prepares it, and
- * the network policy it starts under. Each has a default.
+ * What only one platform takes on a create, keyed by the provider's id, as `SandboxError.provider`
+ * names it, with JSON values: such as the snapshot a sandbox on Daytona starts from. A provider
+ * decodes its own entry and ignores the others, so one value can name several providers; an entry
+ * that is not what the provider takes fails with `InvalidOptionsError`, creating nothing.
+ *
+ * **Example** (The snapshot a sandbox on Daytona starts from)
+ *
+ * ```ts
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { Effect } from "effect";
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   return yield* sandboxProvider.create({
+ *     providerOptions: { daytona: { snapshot: "python-3.13" } },
+ *   });
+ * });
+ * ```
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const ProviderOptions = Schema.Record(Schema.String, Schema.Json);
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export type ProviderOptions = typeof ProviderOptions.Type;
+
+/**
+ * What a sandbox is created with: its id, the ports it exposes, the template that prepares it, the
+ * network policy it starts under, and what only its provider takes. Each has a default.
  *
  * @category options
  * @since 0.1.0
@@ -42,6 +71,9 @@ export interface CreateOptions<E> {
    * policy, as `Sandbox.setNetworkPolicy` does.
    */
   readonly networkPolicy?: NetworkPolicy;
+
+  /** What only one platform takes, under its provider's id, as `ProviderOptions` describes. */
+  readonly providerOptions?: ProviderOptions;
 }
 
 /**

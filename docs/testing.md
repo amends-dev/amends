@@ -217,7 +217,8 @@ provider's run everywhere. Daytona's, and its own tests of what it asks of Dayto
 policies Daytona enforces, create real sandboxes and cost money, so they run only with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, which Bun reads from the repository's Git-ignored
 `.env`; they take about a minute. Each provider's integration is tested everywhere, Daytona's
-against a fake of Daytona's API in the test's process; with `AMENDS_TEST_DAYTONA=1`, its tests also
+against a fake of Daytona's API in the test's process, which also checks that options Daytona does
+not take fail a create before Daytona is asked; with `AMENDS_TEST_DAYTONA=1`, its tests also
 check a real organization's key and create a sandbox through a connection.
 
 `packages/connection` and `adapters/harness-amends` run everywhere against fakes: a client

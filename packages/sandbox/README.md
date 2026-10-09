@@ -83,7 +83,9 @@ it and keeps its files, and `resume` starts it again with them; `destroy` delete
 again on a sandbox already stopped or destroyed, and resuming a destroyed or unknown id fails with
 `NotFoundError`. A create that fails, including when its template fails or it is interrupted,
 leaves no sandbox behind. Every `Sandbox` value for one sandbox, created or resumed, works on the
-same files, processes, and ports.
+same files, processes, and ports. What only one platform takes, such as the snapshot a sandbox on
+Daytona starts from, goes in `providerOptions` under the provider's id: a provider decodes its own
+entry, ignores the others, and fails with `InvalidOptionsError` for one it cannot take.
 
 An id passes `Sandbox.isName`: letters, digits, `-`, and `_`, starting with a letter or digit, at
 most 63 characters, so that any provider can use it as a directory name or in a URL.
@@ -113,10 +115,10 @@ A provider that cannot enforce a policy or transform requests, as the local one 
 ## Errors
 
 Every operation on a sandbox fails with `SandboxError`, which names the provider and holds a
-reason: `AuthenticationError`, `NotFoundError`, `AlreadyExistsError`, `UnsupportedError`,
-`UnavailableError`, or `UnknownError`. Each says whether trying again may succeed, as
-`isRetryable`, and `Effect.catchReason("SandboxError", "NotFoundError", ...)` recovers from one
-reason. File and process operations inside a sandbox fail with Effect's `PlatformError`.
+reason: `AuthenticationError`, `NotFoundError`, `AlreadyExistsError`, `InvalidOptionsError`,
+`UnsupportedError`, `UnavailableError`, or `UnknownError`. Each says whether trying again may
+succeed, as `isRetryable`, and `Effect.catchReason("SandboxError", "NotFoundError", ...)` recovers
+from one reason. File and process operations inside a sandbox fail with Effect's `PlatformError`.
 
 ## Writing a provider
 
@@ -124,7 +126,8 @@ Implement `SandboxProvider`: `create`, which prepares a new sandbox with its tem
 network policy and removes what it made when that fails, and `resume`, which reattaches to a
 sandbox by its id and starts it again if it was stopped. Each returns a `Sandbox` whose
 `fileSystem` and `childProcessSpawner` are the sandbox's. A provider's layer takes the platform's
-settings, such as credentials or a root directory.
+settings, such as credentials or a root directory, and `create` decodes its own entry of
+`providerOptions` with a schema of what it takes per sandbox, ignoring the entries of others.
 
 Then run the conformance suites in `@amends/sandbox/conformance` against it, so that code written
 against the contract works the same on each provider. A test file calls `run` with a `Fixture`:
