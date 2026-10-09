@@ -180,7 +180,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
         ),
       // TODO: Set credentials outside the sandbox with Daytona's secrets, which its proxy puts in
       // outbound requests in place of placeholders, once their matching is checked against ours.
-      addRequestTransformations: () =>
+      setRequestTransformations: () =>
         Effect.fail(
           sandboxError(
             new SandboxError.UnsupportedError({

@@ -184,7 +184,7 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
     stop: Effect.void,
     destroy: Effect.void,
     setNetworkPolicy: () => Effect.void,
-    addRequestTransformations: () => Effect.void,
+    setRequestTransformations: () => Effect.void,
   });
   return { sandbox, directories };
 });

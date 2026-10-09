@@ -159,7 +159,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
         Effect.andThen(Effect.sync(() => processes.delete(id))),
       ),
       setNetworkPolicy: allowAllOnly,
-      addRequestTransformations: () =>
+      setRequestTransformations: () =>
         Effect.fail(
           sandboxError(
             new SandboxError.UnsupportedError({

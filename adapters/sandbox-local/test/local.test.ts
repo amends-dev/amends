@@ -138,7 +138,7 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
       const sandbox = yield* provider.create();
 
       const error = yield* Effect.flip(
-        sandbox.addRequestTransformations([
+        sandbox.setRequestTransformations([
           {
             host: "api.example.com",
             matchHeaders: {},

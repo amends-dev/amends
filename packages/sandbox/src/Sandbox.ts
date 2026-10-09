@@ -148,14 +148,13 @@ export class Sandbox extends Context.Service<
      */
     readonly setNetworkPolicy: (policy: NetworkPolicy) => Effect.Effect<void, SandboxError>;
 
-    // TODO: Add `setRequestTransformations`, which replaces the whole set, so that an injected
-    // credential can be revoked while the sandbox lives. Added transformations last until then.
     /**
-     * Adds request transformations beside those already set, for the rest of the sandbox's life;
-     * fails with `UnsupportedError` when the provider cannot transform requests outside the
+     * Replaces the request transformations with `transformations`, for the rest of the sandbox's
+     * life: a set without a credential set earlier revokes it, and an empty set revokes them all.
+     * Fails with `UnsupportedError` when the provider cannot transform requests outside the
      * sandbox.
      */
-    readonly addRequestTransformations: (
+    readonly setRequestTransformations: (
       transformations: ReadonlyArray<RequestTransformation>,
     ) => Effect.Effect<void, SandboxError>;
   }

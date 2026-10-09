@@ -105,7 +105,8 @@ WebSocket, and any headers the provider requires; a request with them reaches th
 request's other headers intact. A `NetworkPolicy` says what the sandbox may reach outbound, from
 `AllowAll` to `DenyAll` and an `AllowList` of hosts and CIDR ranges; a sandbox starts under the
 policy `create` is given. A `RequestTransformation` sets headers on outbound requests after they
-leave the sandbox, so that the sandbox holds only a placeholder credential and never the real one.
+leave the sandbox, so that the sandbox holds only a placeholder credential and never the real one;
+`setRequestTransformations` replaces the set, so passing one without a credential revokes it.
 A provider that cannot enforce a policy or transform requests, as the local one cannot, fails with
 `UnsupportedError`, and `create` under a policy it cannot enforce creates nothing.
 

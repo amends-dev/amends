@@ -140,7 +140,7 @@ export const network = <R>(fixture: Fixture<R>) => {
             sandbox.setNetworkPolicy(NetworkPolicy.cases.DenyAll.make({})),
           );
           const transformations = yield* outcomeOf(
-            sandbox.addRequestTransformations([
+            sandbox.setRequestTransformations([
               {
                 host: "api.example.com",
                 matchHeaders: { authorization: "Bearer placeholder" },
