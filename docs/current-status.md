@@ -53,7 +53,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   ([sandbox-local](../adapters/sandbox-local)), for development, and
   [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare
   exists; Cloudflare's SDK runs only inside a Worker, so
-  reaching it from a host needs its Bridge Worker.
+  reaching it from a host needs its Bridge Worker. A sandbox is created from one agent's template,
+  and another agent's template runs in it when that agent first launches there: under the
+  sandbox's network policy, which may deny what it downloads, and paying its install time then,
+  where a snapshot of the whole set of agents would start at once. A sandbox's request
+  transformations have one owner, who replaces the whole set: the host, since the harness gives
+  an agent its credentials on the bridge's standard input. A harness that set credentials outside
+  the sandbox instead would need to add transformations beside the host's, as AI SDK's adapters
+  do with its additive operation.
 - [Connections](../packages/core/README.md#connections) are set up over HTTP and on the
   [Connections page](connections.md), from the integrations the
   [local host](../hosts/local/README.md) installs of every kind. They authenticate with an API key

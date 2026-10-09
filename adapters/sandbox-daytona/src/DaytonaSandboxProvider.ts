@@ -36,7 +36,7 @@ import {
   Schedule,
   Schema,
 } from "effect";
-import { call, fromDaytonaError, sandboxError } from "./Call.ts";
+import { call, fromDaytonaError, providerId, sandboxError } from "./Call.ts";
 import * as Files from "./Files.ts";
 import * as Processes from "./Processes.ts";
 import * as Snapshots from "./Snapshots.ts";
@@ -60,6 +60,18 @@ export interface Options {
    */
   readonly autoStopInterval?: number;
 }
+
+/**
+ * What a sandbox on Daytona is created with besides the contract's options, under
+ * `providerOptions.daytona`, each in place of the provider's own option for this sandbox.
+ */
+export const ProviderOptions = Schema.Struct({
+  /** The snapshot the sandbox starts from, rather than the provider's. */
+  snapshot: Schema.optionalKey(Schema.String),
+
+  /** Minutes without requests to Daytona's API after which Daytona stops the sandbox; 0 never. */
+  autoStopInterval: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
+});
 
 /** The label that keeps the ports a sandbox exposes. */
 const portsLabel = "amends-ports";
@@ -108,7 +120,6 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           );
     return Sandbox.Sandbox.of({
       id,
-      description: describe(workingDirectory),
       workingDirectory,
       fileSystem: Files.make(sandbox, workingDirectory),
       childProcessSpawner: yield* Processes.make(sandbox, workingDirectory).pipe(
@@ -180,7 +191,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
         ),
       // TODO: Set credentials outside the sandbox with Daytona's secrets, which its proxy puts in
       // outbound requests in place of placeholders, once their matching is checked against ours.
-      addRequestTransformations: () =>
+      setRequestTransformations: () =>
         Effect.fail(
           sandboxError(
             new SandboxError.UnsupportedError({
@@ -224,14 +235,14 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
    * is deleted. Succeeds with `false`, making nothing, when another create has claimed the name.
    */
   const makeSnapshot =
-    <E>(template: Template.Template<E>) =>
+    <E>(template: Template.Template<E>, base: string | undefined) =>
     (name: string) =>
       Effect.acquireUseRelease(
         createSandbox(name, {
           labels: { [templateLabel]: template.name },
           autoStopInterval: 0,
           ttlMinutes: Snapshots.claimMinutes,
-          ...(options.snapshot === undefined ? {} : { snapshot: options.snapshot }),
+          ...(base === undefined ? {} : { snapshot: base }),
         }),
         (sandbox) =>
           openSandbox(sandbox, Sandbox.SandboxId.make(name)).pipe(
@@ -265,27 +276,32 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       );
     const ports = createOptions.ports ?? [];
     const { template, networkPolicy } = createOptions;
+    // Options Daytona does not take fail before anything is created.
+    const providerOptions = yield* Schema.decodeUnknownEffect(ProviderOptions)(
+      createOptions.providerOptions?.[providerId] ?? {},
+    ).pipe(
+      Effect.mapError((error) =>
+        sandboxError(new SandboxError.InvalidOptionsError({ description: error.message }), error),
+      ),
+    );
+    const base = providerOptions.snapshot ?? options.snapshot;
     // A policy Daytona cannot enforce fails before anything is created.
     const networkSettings =
       networkPolicy === undefined ? undefined : yield* networkSettingsOf(networkPolicy);
     const templateSnapshot =
       template === undefined
         ? Option.none<string>()
-        : yield* Snapshots.find(
-            daytona,
-            scope,
-            template,
-            options.snapshot,
-            makeSnapshot(template),
-          ).pipe(Effect.provideService(Crypto.Crypto, crypto));
-    const snapshot = Option.getOrElse(templateSnapshot, () => options.snapshot);
+        : yield* Snapshots.find(daytona, scope, template, base, makeSnapshot(template, base)).pipe(
+            Effect.provideService(Crypto.Crypto, crypto),
+          );
+    const snapshot = Option.getOrElse(templateSnapshot, () => base);
     // Until the template's snapshot is made, each sandbox is prepared on its own, before its
     // network policy applies, as preparing may download what the template installs.
     const preparesHere = template !== undefined && Option.isNone(templateSnapshot);
     return yield* Effect.acquireUseRelease(
       createSandbox(id, {
         labels: { [portsLabel]: ports.join(",") },
-        autoStopInterval: options.autoStopInterval ?? 0,
+        autoStopInterval: providerOptions.autoStopInterval ?? options.autoStopInterval ?? 0,
         ...(snapshot === undefined ? {} : { snapshot }),
         // Daytona applies a policy it is created with before the sandbox starts.
         ...(preparesHere ? {} : networkSettings),
@@ -323,7 +339,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
     return yield* openSandbox(sandbox, id);
   });
 
-  return SandboxProvider.SandboxProvider.of({ create, resume });
+  return SandboxProvider.make({ create, resume });
 });
 
 export const layer = (options: Options) =>
@@ -427,9 +443,6 @@ const networkSettingsOf = (policy: Network.NetworkPolicy) => {
     }
   }
 };
-
-const describe = (workingDirectory: string) =>
-  `Work in ${workingDirectory}, on a Linux machine of your own in Daytona's cloud, where commands start.`;
 
 /**
  * Retries a change to a sandbox that Daytona refused because another change to it was in progress,

@@ -59,7 +59,7 @@ layer(BunServices.layer)("Snapshots.nameOf", (it) => {
   it.effect("names a version by its template's name and a digest of its identity and base", () =>
     Effect.gen(function* () {
       const template = {
-        name: Template.Name.make("opencode"),
+        name: Template.TemplateName.make("opencode"),
         identity: "one",
         prepare: Effect.void,
       };
@@ -76,7 +76,7 @@ layer(BunServices.layer)("Snapshots.nameOf", (it) => {
   it.effect("names a version of a template with the longest name as a sandbox can be named", () =>
     Effect.gen(function* () {
       const template = {
-        name: Template.Name.make("a".repeat(30)),
+        name: Template.TemplateName.make("a".repeat(30)),
         identity: "one",
         prepare: Effect.void,
       };

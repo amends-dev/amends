@@ -7,35 +7,36 @@ remaining gaps with links to their owning code.
 
 ## Current implementation
 
-| Guide                                                                | Scope                                                                                                               |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                           |
-| [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                  |
-| [Group workflows](group-workflows.md)                                | Team groups: creation, public groups and joining, reads, membership, and following.                                 |
-| [Thread workflows](thread-workflows.md)                              | Starts, replies, participation, reads, notifications, read state, and typing.                                       |
-| [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers. |
-| [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                             |
-| [Publishing](publishing.md)                                          | Building a package's distribution, checking it as a consumer would use it, and publishing it to npm.                |
-| [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                            |
-| [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                     |
-| [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                              |
-| [HTTP contract](../packages/api-http/README.md)                      | Endpoint groups, wire formats, authentication, and SSE semantics.                                                   |
-| [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                    |
-| [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                          |
-| [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                        |
-| [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.            |
-| [Connections](../packages/connection/README.md)                      | Integrations a host installs, the connections workspaces make to them, and the model catalog.                       |
-| [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                     |
-| [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for the harness contract, behind its bridge in a sandbox.                                      |
-| [Daytona sandboxes](../adapters/sandbox-daytona/README.md)           | Sandboxes on Daytona for the sandbox contract, and running their tests with an API key.                             |
-| [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.            |
-| [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                    |
-| [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                        |
-| [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                              |
-| [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                            |
-| [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                      |
-| [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, view hooks, and route helpers.                                         |
-| [UI](../apps/ui/README.md)                                           | Pattern-based design system from the Lunacy mocks, with every app screen.                                           |
+| Guide                                                                | Scope                                                                                                                           |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                                       |
+| [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                              |
+| [Group workflows](group-workflows.md)                                | Team groups: creation, public groups and joining, reads, membership, and following.                                             |
+| [Thread workflows](thread-workflows.md)                              | Starts, replies, participation, reads, notifications, read state, and typing.                                                   |
+| [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers.             |
+| [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                                         |
+| [Publishing](publishing.md)                                          | Building a package's distribution, checking it as a consumer would use it, and publishing it to npm.                            |
+| [Shared packages](../packages/README.md)                             | Package boundaries, names, and construction conventions.                                                                        |
+| [Core](../packages/core/README.md)                                   | Implemented domains, operation boundaries, and public services.                                                                 |
+| [Gateway](../packages/gateway/README.md)                             | Workspace boot, identity resolution, host contracts, and bus lifetime.                                                          |
+| [HTTP contract](../packages/api-http/README.md)                      | Endpoint groups, wire formats, authentication, and SSE semantics.                                                               |
+| [HTTP server](../packages/server-http/README.md)                     | Handler registration, request scopes, and authentication wiring.                                                                |
+| [Adapters](../adapters/README.md)                                    | Store validation, construction, and migration conventions.                                                                      |
+| [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                                    |
+| [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.                        |
+| [Sandbox](../packages/sandbox/README.md)                             | The sandbox contract: Effect's file system and processes inside, ports, network, lifecycle, and the suites every provider runs. |
+| [Connections](../packages/connection/README.md)                      | Integrations a host installs, the connections workspaces make to them, and the model catalog.                                   |
+| [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                                 |
+| [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for the harness contract, behind its bridge in a sandbox.                                                  |
+| [Daytona sandboxes](../adapters/sandbox-daytona/README.md)           | Sandboxes on Daytona for the sandbox contract, and running their tests with an API key.                                         |
+| [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.                        |
+| [Memory storage](../adapters/storage-memory/README.md)               | The in-memory reference implementation of the storage contracts.                                                                |
+| [PostgreSQL](../adapters/storage-postgresql/README.md)               | Schema, locking, composition, and database-specific testing.                                                                    |
+| [Hosts](../hosts/README.md) / [local host](../hosts/local/README.md) | Runtime composition, configuration, startup, and development identity.                                                          |
+| [Apps](../apps/README.md) / [web](../apps/web/README.md)             | Platform-owned routing and composition of client and UI.                                                                        |
+| [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                                  |
+| [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, view hooks, and route helpers.                                                     |
+| [UI](../apps/ui/README.md)                                           | Pattern-based design system from the Lunacy mocks, with every app screen.                                                       |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
 drawings, generation, and visual review in the UI workshop.

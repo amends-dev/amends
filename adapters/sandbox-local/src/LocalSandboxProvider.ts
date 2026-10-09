@@ -123,7 +123,6 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     const running = processesOf(id);
     return Sandbox.Sandbox.of({
       id,
-      description: describe(paths.workspace),
       workingDirectory: paths.workspace,
       fileSystem: fs,
       childProcessSpawner: ChildProcessSpawner.make((command) =>
@@ -159,7 +158,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
         Effect.andThen(Effect.sync(() => processes.delete(id))),
       ),
       setNetworkPolicy: allowAllOnly,
-      addRequestTransformations: () =>
+      setRequestTransformations: () =>
         Effect.fail(
           sandboxError(
             new SandboxError.UnsupportedError({
@@ -208,7 +207,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     return openSandbox(id);
   });
 
-  return SandboxProvider.SandboxProvider.of({ create, resume });
+  return SandboxProvider.make({ create, resume });
 });
 
 export const layer = (options: Options) =>
@@ -296,9 +295,6 @@ const endProcesses = (running: Set<ChildProcessSpawner.ChildProcessHandle>) =>
       ).pipe(Effect.andThen(Effect.sync(() => running.delete(handle)))),
     { concurrency: "unbounded", discard: true },
   );
-
-const describe = (workingDirectory: string) =>
-  `Work in ${workingDirectory}, a directory on this machine, where commands start.`;
 
 /** Succeeds for `AllowAll` only, the network a local sandbox has, as it shares this machine's. */
 const allowAllOnly = (policy: Network.NetworkPolicy) =>

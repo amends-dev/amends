@@ -9,6 +9,8 @@
  * ends with the scope that spawned it, unless its handle's `unref` lets it outlive that scope, as a
  * server that should keep running after the host lets go does; it then runs until the sandbox
  * stops.
+ *
+ * @since 0.1.0
  */
 import { Context, Effect, FileSystem, Layer, Path, Schema } from "effect";
 import { ChildProcessSpawner } from "effect/process";
@@ -23,28 +25,73 @@ import type { SandboxError } from "./SandboxError.ts";
 
 /**
  * Checks a name of letters, digits, `-`, and `_`, starting with a letter or digit and at most 63
- * characters long, which any provider can use as a directory name or in a URL.
+ * characters long, which any provider can use as a directory name or in a URL. What lives in a
+ * sandbox, such as a session, is named under the same check, so that its name can name a
+ * directory there.
+ *
+ * @category validation
+ * @since 0.1.0
  */
 export const isName = Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$/);
 
-/** Names a sandbox, as `isName` checks. */
+/**
+ * Names a sandbox, as `isName` checks. A provider resumes a sandbox by it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const SandboxId = Schema.String.check(isName).pipe(Schema.brand("SandboxId"));
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type SandboxId = typeof SandboxId.Type;
 
-/** The Effect services a sandbox provides to code that runs inside it. */
+/**
+ * The Effect services a sandbox provides to code that runs inside it: its files, its processes,
+ * and paths. `layerServices` provides them.
+ *
+ * @category utility types
+ * @since 0.1.0
+ */
 export type SandboxServices =
   | FileSystem.FileSystem
   | Path.Path
   | ChildProcessSpawner.ChildProcessSpawner;
 
+/**
+ * One sandbox, as its provider's `create` or `resume` returns it. Every value for the same
+ * sandbox, created or resumed, works on the same files, processes, and ports.
+ *
+ * **Example** (Running a command and reading a file inside a sandbox)
+ *
+ * ```ts
+ * import { Sandbox } from "@amends/sandbox";
+ * import { Effect, FileSystem, Path } from "effect";
+ * import { ChildProcess, ChildProcessSpawner } from "effect/process";
+ *
+ * declare const sandbox: Sandbox.Sandbox["Service"];
+ *
+ * // Commands start in the working directory; file paths are absolute.
+ * const greeting = Effect.gen(function* () {
+ *   const fs = yield* FileSystem.FileSystem;
+ *   const path = yield* Path.Path;
+ *   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+ *
+ *   yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]));
+ *   return yield* fs.readFileString(path.join(sandbox.workingDirectory, "greeting.txt"));
+ * }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+ * ```
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class Sandbox extends Context.Service<
   Sandbox,
   {
+    /** Names the sandbox; its provider resumes it by this id. */
     readonly id: SandboxId;
-
-    /** Text for an agent's instructions: what the sandbox is, and where to work. */
-    readonly description: string;
 
     /**
      * The absolute directory that commands start in when they set no `cwd`, and that a relative
@@ -58,12 +105,16 @@ export class Sandbox extends Context.Service<
      */
     readonly fileSystem: FileSystem.FileSystem;
 
+    /**
+     * The sandbox's processes. A command starts in `workingDirectory` unless it sets a `cwd`, and
+     * gets the environment it is given, or the sandbox's with it when it extends the environment.
+     */
     readonly childProcessSpawner: ChildProcessSpawner.ChildProcessSpawner["Service"];
 
     /**
-     * Exposes `ports` beside those the sandbox exposes already, at its creation or since, for
-     * `endpoint` to reach them for the rest of the sandbox's life. Exposing a port again succeeds.
-     * Fails with `UnsupportedError` when the provider cannot expose a port once the sandbox exists.
+     * Exposes `ports`, besides those exposed at creation or since, so that `endpoint` reaches them
+     * for the rest of the sandbox's life. Exposing a port again succeeds. Fails with
+     * `UnsupportedError` when the provider cannot expose a port once the sandbox exists.
      */
     readonly exposePorts: (ports: ReadonlyArray<Port>) => Effect.Effect<void, SandboxError>;
 
@@ -88,16 +139,19 @@ export class Sandbox extends Context.Service<
      */
     readonly destroy: Effect.Effect<void, SandboxError>;
 
-    /** Replaces the outbound network policy; fails with `UnsupportedError` when the provider cannot enforce one. */
+    /**
+     * Replaces the outbound network policy; fails with `UnsupportedError` when the provider cannot
+     * enforce one.
+     */
     readonly setNetworkPolicy: (policy: NetworkPolicy) => Effect.Effect<void, SandboxError>;
 
-    // TODO: Add `setRequestTransformations`, which replaces the whole set, so that an injected
-    // credential can be revoked while the sandbox lives. Added transformations last until then.
     /**
-     * Adds request transformations beside those already set, for the rest of the sandbox's life;
-     * fails with `UnsupportedError` when the provider cannot transform requests outside the sandbox.
+     * Replaces the request transformations with `transformations`, for the rest of the sandbox's
+     * life: a set without a credential set earlier revokes it, and an empty set revokes them all.
+     * Fails with `UnsupportedError` when the provider cannot transform requests outside the
+     * sandbox.
      */
-    readonly addRequestTransformations: (
+    readonly setRequestTransformations: (
       transformations: ReadonlyArray<RequestTransformation>,
     ) => Effect.Effect<void, SandboxError>;
   }
@@ -105,7 +159,11 @@ export class Sandbox extends Context.Service<
 
 /**
  * Provides the sandbox's files, processes, and paths to Effect code, without the `Sandbox` service
- * itself: code given only this layer can work in the sandbox but cannot stop it or change its network.
+ * itself: code given only this layer can work in the sandbox but cannot stop it or change its
+ * network.
+ *
+ * @category layers
+ * @since 0.1.0
  */
 export const layerServices = (sandbox: Sandbox["Service"]): Layer.Layer<SandboxServices> =>
   Layer.mergeAll(

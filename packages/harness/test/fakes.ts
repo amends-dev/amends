@@ -171,7 +171,6 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
   const directories: Array<string> = [];
   const sandbox = Sandbox.Sandbox.of({
     id: Sandbox.SandboxId.make("fake"),
-    description: "A fake sandbox",
     workingDirectory: "/work",
     fileSystem: FileSystem.makeNoop({
       makeDirectory: (path) => Effect.sync(() => void directories.push(path)),
@@ -184,7 +183,7 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
     stop: Effect.void,
     destroy: Effect.void,
     setNetworkPolicy: () => Effect.void,
-    addRequestTransformations: () => Effect.void,
+    setRequestTransformations: () => Effect.void,
   });
   return { sandbox, directories };
 });

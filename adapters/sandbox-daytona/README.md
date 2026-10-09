@@ -18,6 +18,11 @@ the provider's scope. The options are:
   sandbox. It is 0 by default, which never stops one: requests to a sandbox's ports do not count,
   so a sandbox would otherwise stop under an agent that only serves a host through a port.
 
+A create takes, under `providerOptions.daytona`, a `snapshot` and an `autoStopInterval` for that
+sandbox in place of the provider's; `DaytonaSandboxProvider.ProviderOptions` is their schema, and
+anything else there fails the create with `InvalidOptionsError` before Daytona is asked. A
+template's snapshot is made from the snapshot the sandbox starts from, so each base has its own.
+
 The code that runs in a sandbox needs `sh` and the GNU coreutils and findutils, as Daytona's own
 image has.
 
