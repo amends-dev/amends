@@ -119,9 +119,9 @@ export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
    * A tool that needs approval, by its `needsApproval`, runs only once `approve` allows it: the
    * turn streams a `tool-approval-request` part after the call and waits, while the agent waits for
    * the result. A call `approve` refuses is answered as `execution-denied`, a failure the agent
-   * reads.
-   * `needsApproval` as a function reads the call's decoded params and the conversation as the
-   * session has recorded it, which lacks the parts the caller has not read yet.
+   * reads. `needsApproval` as a function reads the call's decoded params and the conversation as
+   * the session has recorded it: the turns before, the prompt, and the steps the caller has read to
+   * their end, not the step the call is in.
    */
   readonly toolkit?: Toolkit.WithHandler<Tools>;
 }

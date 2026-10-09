@@ -194,8 +194,6 @@ const withEndedTurn = (history: Prompt.Prompt, turn: RunningTurn) =>
 /** The steps of a turn as far as the session delivered them, the one it is taking last. */
 const stepsSoFar = (turn: RunningTurn) => [...turn.steps, ...stepsOf(turn.stepParts)];
 
-// TODO: Give `needsApproval` the parts of the step its call is in, and of the steps the caller has
-// not read yet, by deciding at the call's delivery rather than when the session reads the call.
 /**
  * The conversation as the session has recorded it: the turns before, and the running turn's prompt
  * and finished steps. The session reads the agent's parts ahead of the caller, so a step the caller
