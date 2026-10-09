@@ -64,7 +64,7 @@ import {
   UnknownError,
   UnsupportedError,
 } from "./HarnessError.ts";
-import type { StreamPart } from "./StreamPart.ts";
+import { afterSteps, type StreamPart } from "./StreamPart.ts";
 
 /**
  * What an adapter says of its bridge: how to install and launch it, and where to reach it.
@@ -745,17 +745,6 @@ const bridgeOptionsOf = (agent: string, turnOptions: Agent.TurnOptions) => {
     return bridgeOptions;
   });
 };
-
-/** Drops the parts of a turn's first `steps` steps. */
-const afterSteps = (steps: number) =>
-  Stream.mapAccum(
-    () => 0,
-    (finished: number, part: StreamPart) =>
-      [
-        part.type === "finish-step" ? finished + 1 : finished,
-        finished < steps ? [] : [part],
-      ] as const,
-  );
 
 // Every runtime this package runs on has the WHATWG `TextEncoder`, which no type the package
 // includes declares, and Effect exports no encoder of its own.

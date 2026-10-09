@@ -207,9 +207,16 @@ const protocolVersions = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"
 
 const newestProtocolVersion = "2025-11-25";
 
-const INVALID_REQUEST = -32600;
-const METHOD_NOT_FOUND = -32601;
-const INVALID_PARAMS = -32602;
+/** Where the relay's server answers MCP messages. */
+const path = "/mcp";
+
+/** JSON-RPC's codes for the errors the relay answers with. */
+const errorCode = {
+  parse: -32700,
+  invalidRequest: -32600,
+  methodNotFound: -32601,
+  invalidParams: -32602,
+} as const;
 
 const RequestId = Schema.Union([Schema.String, Schema.Finite]);
 
@@ -302,7 +309,9 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
     if (found === undefined) return Answer.Unauthorized();
     const request = yield* Schema.decodeUnknownEffect(Message)(message).pipe(Effect.option);
     if (Option.isNone(request)) {
-      return Answer.Reply({ message: failure(null, INVALID_REQUEST, "Not a JSON-RPC request") });
+      return Answer.Reply({
+        message: failure(null, errorCode.invalidRequest, "Not a JSON-RPC request"),
+      });
     }
     const { id, method, params } = request.value;
     if (id === undefined) {
@@ -320,7 +329,7 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
         return yield* call(found, id, params);
       default:
         return Answer.Reply({
-          message: failure(id, METHOD_NOT_FOUND, `The relay has no method ${method}`),
+          message: failure(id, errorCode.methodNotFound, `The relay has no method ${method}`),
         });
     }
   });
@@ -369,7 +378,9 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
   ) {
     const decoded = yield* Schema.decodeUnknownEffect(CallParams)(params).pipe(Effect.option);
     if (Option.isNone(decoded)) {
-      return Answer.Reply({ message: failure(requestId, INVALID_PARAMS, "Invalid tool call") });
+      return Answer.Reply({
+        message: failure(requestId, errorCode.invalidParams, "Invalid tool call"),
+      });
     }
     const { name, _meta } = decoded.value;
     const running = yield* Ref.get(entry.calls);
@@ -486,7 +497,7 @@ export const layer = (options?: Options) =>
                 Effect.matchEffect({
                   onFailure: () =>
                     Effect.succeed(
-                      HttpServerResponse.jsonUnsafe(failure(null, -32700, "Not JSON"), {
+                      HttpServerResponse.jsonUnsafe(failure(null, errorCode.parse, "Not JSON"), {
                         status: 400,
                       }),
                     ),
@@ -509,8 +520,6 @@ export const layer = (options?: Options) =>
       });
     }),
   );
-
-const path = "/mcp";
 
 /** The HTTP response that carries `answer`. */
 const respond = (answer: Answer) =>

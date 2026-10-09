@@ -1,4 +1,4 @@
-import { Sandbox, SandboxId } from "@amends/sandbox/Sandbox";
+import { Sandbox } from "@amends/sandbox";
 import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import { ChildProcessSpawner } from "effect/process";
@@ -11,7 +11,7 @@ import type {
 } from "../src/Agent.ts";
 import type * as Bridge from "../src/Bridge.ts";
 import type { HarnessError } from "../src/HarnessError.ts";
-import type { StreamPart } from "../src/StreamPart.ts";
+import { afterSteps, type StreamPart } from "../src/StreamPart.ts";
 
 /**
  * The parts a fake agent streams for a turn, given the prompt's text. `toolResult` waits for the
@@ -155,23 +155,12 @@ export const readUntil = <E, R>(
     return reading;
   });
 
-/** Drops the parts of a turn's first `steps` steps. */
-const afterSteps = (steps: number) =>
-  Stream.mapAccum(
-    () => 0,
-    (finished: number, part: StreamPart) =>
-      [
-        part.type === "finish-step" ? finished + 1 : finished,
-        finished < steps ? [] : [part],
-      ] as const,
-  );
-
 /**
  * A sandbox that only creates directories, recording them, for agents that never touch the
  * sandbox. Its other operations are not meant to be reached.
  */
 export interface FakeSandbox {
-  readonly sandbox: Sandbox["Service"];
+  readonly sandbox: Sandbox.Sandbox["Service"];
 
   /** The directories created in the sandbox, in order. */
   readonly directories: ReadonlyArray<string>;
@@ -179,8 +168,8 @@ export interface FakeSandbox {
 
 export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
   const directories: Array<string> = [];
-  const sandbox = Sandbox.of({
-    id: SandboxId.make("fake"),
+  const sandbox = Sandbox.Sandbox.of({
+    id: Sandbox.SandboxId.make("fake"),
     description: "A fake sandbox",
     workingDirectory: "/work",
     fileSystem: FileSystem.makeNoop({

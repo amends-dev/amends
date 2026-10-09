@@ -247,7 +247,8 @@ installs it in one, and `createSession`, which starts an `AgentSession`, a new o
 up from what an earlier session returned. A session runs each turn with `promptTurn`, streaming
 `StreamPart`s until its `finish` part. `suspendTurn`, `detach`, and `stop` return the agent's own
 state as JSON, which `createSession` takes back; `continueTurn` finishes a turn `suspendTurn` cut
-short, given how many steps the harness already has. The harness runs one turn at a time and
+short, given how many steps the harness already has, which `StreamPart.afterSteps` drops from a
+turn the agent streams again. The harness runs one turn at a time and
 releases the session once, so an agent never sees a turn start while another runs.
 
 `@amends/harness-amends` is such an agent: a loop over an Effect AI `LanguageModel`, with the

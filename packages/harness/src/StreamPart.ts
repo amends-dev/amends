@@ -12,7 +12,7 @@
  *
  * @since 0.1.0
  */
-import { Predicate, Schema } from "effect";
+import { Predicate, Schema, Stream } from "effect";
 import { Prompt, Response } from "effect/ai";
 
 /** A call to any tool. The agent's own tools run inside the agent and are `providerExecuted`. */
@@ -266,6 +266,23 @@ export const stepsOf = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Step> =
   const unfinished = addUpStep(stepParts);
   return unfinished.length === 0 ? steps : [...steps, { parts: unfinished }];
 };
+
+/**
+ * Drops the parts of a turn's first `steps` steps, for an agent whose turn kept running to stream
+ * it again from the step after those the harness already has, as `continueTurn` asks.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const afterSteps = (steps: number) =>
+  Stream.mapAccum(
+    () => 0,
+    (finished: number, part: StreamPart) =>
+      [
+        part.type === "finish-step" ? finished + 1 : finished,
+        finished < steps ? [] : [part],
+      ] as const,
+  );
 
 /**
  * The parts of one step as they add up. A text or a reasoning sits where it started, with the

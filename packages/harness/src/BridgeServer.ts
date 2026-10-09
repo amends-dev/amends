@@ -100,6 +100,17 @@ export interface Activity {
 }
 
 /**
+ * What the handlers take of `serve`'s options, with the activity they record.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export interface HandlerOptions extends Pick<Options, "stateDirectory" | "bridge"> {
+  /** Where the handlers record the turns they run and when a host was last active. */
+  readonly activity?: Ref.Ref<Activity>;
+}
+
+/**
  * Serves `driver`'s sessions over a WebSocket at `/`, on the `HttpServer` provided, and writes the
  * server's port to `Bridge.listeningFile`, until the bridge has been idle for its idle timeout or
  * another bridge of its id takes its place. The sessions end, aborting their turns, when the scope
@@ -162,7 +173,7 @@ export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options
   );
   const { address } = yield* HttpServer.HttpServer;
   if (address._tag === "UnixPathAddress") {
-    return yield* Effect.die("A bridge listens on a port, not on a Unix socket");
+    return yield* Effect.die(new Error("A bridge listens on a port, not on a Unix socket"));
   }
   const port = Network.Port.make(address.port);
   const file = path.join(options.stateDirectory, Bridge.listeningFile);
@@ -193,14 +204,8 @@ export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options
  * @category layers
  * @since 0.1.0
  */
-export const layerHandlers = (
-  driver: Bridge.Driver,
-  options: {
-    readonly stateDirectory: string;
-    readonly bridge: Bridge.BridgeId;
-    readonly activity?: Ref.Ref<Activity>;
-  },
-) => Bridge.Rpcs.toLayer(makeHandlers(driver, options));
+export const layerHandlers = (driver: Bridge.Driver, options: HandlerOptions) =>
+  Bridge.Rpcs.toLayer(makeHandlers(driver, options));
 
 /**
  * What the host that launched the bridge gave it on standard input, as one line of JSON. The bridge
@@ -283,14 +288,7 @@ const continuePrompt = Prompt.makeMessage("user", {
   content: [Prompt.makePart("text", { text: "Continue." })],
 });
 
-const makeHandlers = Effect.fnUntraced(function* (
-  driver: Bridge.Driver,
-  options: {
-    readonly stateDirectory: string;
-    readonly bridge: Bridge.BridgeId;
-    readonly activity?: Ref.Ref<Activity>;
-  },
-) {
+const makeHandlers = Effect.fnUntraced(function* (driver: Bridge.Driver, options: HandlerOptions) {
   const { stateDirectory, bridge } = options;
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
