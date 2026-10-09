@@ -9,6 +9,7 @@ export class Failure extends Schema.TaggedError<Failure>()("GroupStore.Failure",
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
 export class Conflict extends Schema.TaggedError<Conflict>()("GroupStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,

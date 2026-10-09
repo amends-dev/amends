@@ -9,12 +9,14 @@ export class InactiveMember extends Schema.TaggedError<InactiveMember>()(
     memberId: Member.Id,
   },
 ) {}
+
 export class MemberNotFound extends Schema.TaggedError<MemberNotFound>()(
   "GroupService.MemberNotFound",
   {
     memberId: Member.Id,
   },
 ) {}
+
 /** Missing groups and groups outside the caller's audience share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("GroupService.NotFound", {
   groupId: Group.Id,

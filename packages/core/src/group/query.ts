@@ -9,11 +9,13 @@ import { GroupMembershipStore } from "./membership/store.ts";
 export class NotMember extends Schema.TaggedError<NotMember>()("GroupQuery.NotMember", {
   groupId: GroupId.Id,
 }) {}
+
 export type AudienceError =
   | Authorization.Error
   | GroupMembershipStore.Failure
   | Schema.SchemaError
   | NotMember;
+
 export interface Interface {
   /**
    * Require current workspace and group membership, returning the actor's active admission.
@@ -24,9 +26,11 @@ export interface Interface {
     groupId: GroupId.Id,
   ) => Effect.Effect<GroupMembership.Record, AudienceError, Actor.Service>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/query/Service",
 ) {}
+
 /** Capture bound services; check the acting member and current admission on every call. @category constructors */
 export const make = Effect.fn("GroupQuery.make")(function* () {
   const authorization = yield* Authorization.Service;
@@ -43,6 +47,8 @@ export const make = Effect.fn("GroupQuery.make")(function* () {
 
   return Service.of({ requireAudience });
 });
+
 /** Internal reads shared by group, thread, and read-state operations. @category layers */
 export const layer = Layer.effect(Service, make());
+
 export * as GroupQuery from "./query.ts";

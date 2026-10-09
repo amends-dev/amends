@@ -36,6 +36,7 @@ export type Error =
   | NotFollowable
   | MemberUnavailable
   | AgentRequired;
+
 export interface Interface {
   /**
    * Follow a team group, so that threads started there afterwards admit the member. Members follow
@@ -50,6 +51,7 @@ export interface Interface {
    */
   readonly unfollow: (input: GroupFollow.Input) => Effect.Effect<void, Error, Actor.Service>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/follow/service/Service",
 ) {}
@@ -75,8 +77,9 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     const own = yield* groupQuery
       .requireAudience(request.groupId)
       .pipe(
-        Effect.catchTag("GroupQuery.NotMember", () =>
-          Effect.fail(new GroupNotFound({ groupId: request.groupId })),
+        Effect.catchTag(
+          "GroupQuery.NotMember",
+          () => new GroupNotFound({ groupId: request.groupId }),
         ),
       );
     const foundGroup = yield* groupStore.get(request.groupId);
@@ -138,16 +141,18 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
+
   const unfollow = Effect.fn("GroupFollowService.unfollow")(
     function* (input: GroupFollow.Input) {
       const admission = yield* authorizeFollowChange(input, false);
       const existing = yield* groupFollowStore.findActive(admission.id);
       if (Option.isNone(existing)) return;
+      const follow = existing.value;
       yield* journal.publish(GroupFollowFacts.Ended, {
         workspaceId,
-        groupId: existing.value.groupId,
-        followId: existing.value.id,
-        memberId: existing.value.memberId,
+        groupId: follow.groupId,
+        followId: follow.id,
+        memberId: follow.memberId,
       });
     },
     Publication.withActor,
@@ -156,6 +161,8 @@ export const make = Effect.fn("GroupFollowService.make")(function* () {
   );
   return Service.of({ follow, unfollow });
 });
+
 /** @category layers */
 export const layer = Layer.effect(Service, make());
+
 export * as GroupFollowService from "./service.ts";

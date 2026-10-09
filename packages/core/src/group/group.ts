@@ -1,4 +1,4 @@
-import { Schema } from "effect";
+import { DateTime, Schema } from "effect";
 import { Audience } from "../journal/audience.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -6,10 +6,14 @@ import { Text } from "../text/text.ts";
 import { GroupId } from "./id.ts";
 
 export const Id = GroupId.Id;
+
 export type Id = GroupId.Id;
+
 /** A team group's name as recorded; names chosen now are `NewName`. */
 export const Name = Schema.Trimmed.check(Schema.isMinLength(1));
+
 export type Name = typeof Name.Type;
+
 /** A name chosen for a team group: 1 to 80 characters, without hidden ones. */
 export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isName);
 
@@ -18,6 +22,7 @@ export const NewName = Name.check(Schema.isMaxLength(Text.nameLength), Text.isNa
  * may find and join a public one. Either way, only members read its threads.
  */
 export const Visibility = Schema.Literals(["Private", "Public"]);
+
 export type Visibility = typeof Visibility.Type;
 
 /** A team group's membership is managed; its name identifies it to people. */
@@ -30,6 +35,7 @@ export const TeamRecord = Schema.Struct({
   createdBy: MemberId.Id,
   createdAt: Schema.DateTimeUtcFromString,
 });
+
 export interface TeamRecord extends Schema.Schema.Type<typeof TeamRecord> {}
 
 /**
@@ -39,8 +45,10 @@ export interface TeamRecord extends Schema.Schema.Type<typeof TeamRecord> {}
  * or is removed from it. It may be renamed.
  */
 export const GeneralId = Id.make("general");
+
 /** The general group's name when a workspace is created. */
 export const generalName: Name = "general";
+
 /** Whether a group is its workspace's general group. */
 export const isGeneral = (group: { readonly id: string }) => group.id === GeneralId;
 
@@ -72,9 +80,11 @@ export const DirectRecord = Schema.Struct({
       "A direct group's creator must be one of its members",
   ),
 );
+
 export interface DirectRecord extends Schema.Schema.Type<typeof DirectRecord> {}
 
 export const Record = Schema.Union([TeamRecord, DirectRecord]);
+
 export type Record = typeof Record.Type;
 
 /** Order a direct group's requested members canonically, removing repeats. */
@@ -85,12 +95,12 @@ export const directMembers = <Id extends string>(memberIds: ReadonlyArray<Id>): 
 export const directKey = (memberIds: ReadonlyArray<string>): string =>
   JSON.stringify(directMembers(memberIds));
 
-/** The creator is admitted only when explicitly included. Empty groups are allowed. */
 /** When any of a group's threads last had content activity. */
 export const Latest = Schema.Struct({
   groupId: GroupId.Id,
   occurredAt: Schema.DateTimeUtcFromString,
 });
+
 export interface Latest extends Schema.Schema.Type<typeof Latest> {}
 
 /** A page of the reader's groups in group-ID order, after the exclusive cursor. */
@@ -98,6 +108,7 @@ export const ListOptions = Schema.Struct({
   after: Schema.optionalKey(GroupId.Id),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
 export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 
 /**
@@ -123,24 +134,84 @@ export const ListItem = Schema.Struct({
   /** The reader may rename the group: a team group whose name they may change. */
   renamable: Schema.Boolean,
 });
+
 export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
+
+/** What a reader's grants on a group let them do to it, as one grant resolution answers them. */
+export interface Grants {
+  readonly manage: boolean;
+  readonly rename: boolean;
+  readonly moderate: boolean;
+}
+
+/** A group's activity as it stands to one reader. */
+export interface Activity {
+  readonly latestActivityAt: DateTime.Utc | null;
+  readonly readAt: DateTime.Utc | null;
+  readonly following: boolean;
+  readonly pending: number;
+}
+
+/**
+ * Whether a group whose latest message was at `latestActivityAt` has activity new to a reader who
+ * last read it at `readAt`, or, never having read it, was admitted at `admittedAt`.
+ */
+export const hasNewActivity = (
+  latestActivityAt: DateTime.Utc | null,
+  readAt: DateTime.Utc | null,
+  admittedAt: DateTime.Utc,
+): boolean =>
+  latestActivityAt !== null && DateTime.isGreaterThan(latestActivityAt, readAt ?? admittedAt);
+
+/**
+ * `group` as a reader admitted at `admittedAt` lists it, with its `activity` as it stands to them
+ * and what their `grants` let them do: a direct group keeps the members it started with and is
+ * named by them, so none of it; any member tidies a private group, while removing people from a
+ * public one is moderation.
+ */
+export const listItem = (
+  group: Record,
+  admittedAt: DateTime.Utc,
+  activity: Activity,
+  grants: Grants,
+): ListItem => {
+  const team = group.kind === "Team";
+  return {
+    group,
+    latestActivityAt: activity.latestActivityAt,
+    readAt: activity.readAt,
+    newActivity: hasNewActivity(activity.latestActivityAt, activity.readAt, admittedAt),
+    following: activity.following,
+    pending: activity.pending,
+    manageable: team && grants.manage,
+    membersRemovable: team && grants.manage && (group.visibility === "Private" || grants.moderate),
+    renamable: team && grants.rename,
+  };
+};
 
 /**
  * A team group's new name, and the name the renamer last saw, so a rename made meanwhile is not
  * silently replaced.
  */
 export const RenameInput = Schema.Struct({ groupId: Id, name: NewName, expectedName: Name });
+
 export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
+
 /** What renaming a team group records. */
 export const Renamed = Schema.Struct({ workspaceId: WorkspaceId.Id, groupId: Id, name: Name });
+
 export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
 
-/** A new team group, private unless it says otherwise. */
+/**
+ * A new team group, private unless it says otherwise, with its first members: its creator is
+ * admitted only when listed, and the list may be empty.
+ */
 export const CreateTeamInput = Schema.Struct({
   name: NewName,
   memberIds: Schema.UniqueArray(MemberId.Id),
   visibility: Schema.optionalKey(Visibility),
 });
+
 export interface CreateTeamInput extends Schema.Schema.Type<typeof CreateTeamInput> {}
 
 /**
@@ -152,13 +223,16 @@ export const PublicItem = Schema.Struct({
   members: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   joined: Schema.Boolean,
 });
+
 export interface PublicItem extends Schema.Schema.Type<typeof PublicItem> {}
+
 /** How many members each of several groups has, and whether one member is among them. */
 export const Summary = Schema.Struct({
   groupId: Id,
   members: Schema.Int.check(Schema.isGreaterThan(0)),
   joined: Schema.Boolean,
 });
+
 export interface Summary extends Schema.Schema.Type<typeof Summary> {}
 
 /** The readers of one group: its current members. */

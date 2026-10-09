@@ -1,4 +1,4 @@
-import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { Context, Crypto, DateTime, Effect, Layer, Option, Order, Schema } from "effect";
 import { Request } from "../request/request.ts";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
@@ -37,8 +37,10 @@ export type Error =
   | Projection.Error
   | MemberNotFound
   | InactiveMember;
+
 /** A retried creation reads back the group its first attempt created. */
 export type CreateError = Error | GroupStore.Failure | NotFound;
+
 export type RenameError =
   | Error
   | GroupStore.Failure
@@ -121,6 +123,13 @@ export const make = Effect.fn("GroupService.make")(function* () {
     Target.Reference.cases.Workspace.make({ workspaceId }),
   );
 
+  /** The group, or NotFound when it is not stored. */
+  const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
+    const found = yield* groupStore.get(groupId);
+    if (Option.isNone(found)) return yield* new NotFound({ groupId });
+    return found.value;
+  });
+
   const createTeam = Effect.fn("GroupService.createTeam")(
     function* (input: Group.CreateTeamInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.CreateTeamInput))(input);
@@ -165,24 +174,18 @@ export const make = Effect.fn("GroupService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
-  /** The group, or NotFound when it is not stored. */
-  const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
-    const found = yield* groupStore.get(groupId);
-    if (Option.isNone(found)) return yield* new NotFound({ groupId });
-    return found.value;
-  });
+
   const get = Effect.fn("GroupService.get")(function* (groupId: Group.Id) {
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
     yield* groupQuery
       .requireAudience(id)
-      .pipe(
-        Effect.catchTag("GroupQuery.NotMember", () => Effect.fail(new NotFound({ groupId: id }))),
-      );
+      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new NotFound({ groupId: id })));
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);
     return yield* requireGroup(id);
   });
+
   const rename = Effect.fn("GroupService.rename")(
     function* (input: Group.RenameInput) {
       const request = yield* Schema.decodeEffect(Schema.toType(Group.RenameInput))(input);
@@ -197,9 +200,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
       yield* groupQuery
         .requireAudience(request.groupId)
         .pipe(
-          Effect.catchTag("GroupQuery.NotMember", () =>
-            Effect.fail(new NotFound({ groupId: request.groupId })),
-          ),
+          Effect.catchTag("GroupQuery.NotMember", () => new NotFound({ groupId: request.groupId })),
         );
       const group = yield* requireGroup(request.groupId);
       if (group.kind !== "Team") return yield* new NotRenamable({ groupId: group.id });
@@ -216,6 +217,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
+
   /** List items for one page of the actor's admissions, keyed by group, in a fixed number of reads. */
   const buildListItems = Effect.fnUntraced(function* (
     actor: Actor.Value,
@@ -236,13 +238,18 @@ export const make = Effect.fn("GroupService.make")(function* () {
         Requirement.make(GroupPermissions.Moderate, { _tag: "Group", workspaceId, groupId }),
       ]),
     );
-    /** The groups whose requirement at this offset, of the four asked for each, is permitted. */
-    const permittedGroups = (offset: number) =>
-      new Set(candidates.filter((_, index) => allowed[index * 4 + offset] === true));
-    const ids = [...permittedGroups(0)];
-    const managed = permittedGroups(1),
-      renamers = permittedGroups(2),
-      moderators = permittedGroups(3);
+    const grants = new Map(
+      candidates.map((groupId, index) => {
+        const [read = false, manage = false, rename = false, moderate = false] = allowed.slice(
+          index * 4,
+          index * 4 + 4,
+        );
+        return [groupId, { read, manage, rename, moderate }] as const;
+      }),
+    );
+    const ids = candidates
+      .filter((groupId) => grants.get(groupId)?.read === true)
+      .toSorted(Order.String);
     const records = new Map(
       (yield* groupStore.getMany(ids)).map((group) => [group.id, group] as const),
     );
@@ -266,36 +273,23 @@ export const make = Effect.fn("GroupService.make")(function* () {
       )).map((value) => [value.groupId, value.count] as const),
     );
     const items: Array<Group.ListItem> = [];
-    for (const groupId of ids.toSorted((left, right) =>
-      left < right ? -1 : left > right ? 1 : 0,
-    )) {
+    for (const groupId of ids) {
       // A membership whose group is no longer stored is skipped, as a missing group reads.
       const group = records.get(groupId);
       const admission = admissions.get(groupId);
-      if (group === undefined || admission === undefined) continue;
-      const latestActivityAt = latest.get(groupId) ?? null;
-      const readAt = readTimes.get(groupId) ?? null;
-      items.push({
-        group,
-        latestActivityAt,
-        readAt,
-        newActivity:
-          latestActivityAt !== null &&
-          DateTime.isGreaterThan(latestActivityAt, readAt ?? admission.admittedAt),
+      const grant = grants.get(groupId);
+      if (group === undefined || admission === undefined || grant === undefined) continue;
+      const activity: Group.Activity = {
+        latestActivityAt: latest.get(groupId) ?? null,
+        readAt: readTimes.get(groupId) ?? null,
         following: following.has(admission.id),
         pending: pending.get(groupId) ?? 0,
-        // Direct groups keep the members they started with, and are named by them.
-        manageable: group.kind === "Team" && managed.has(groupId),
-        // Any member tidies a private group; removing people from a public one is moderation.
-        membersRemovable:
-          group.kind === "Team" &&
-          managed.has(groupId) &&
-          (group.visibility === "Private" || moderators.has(groupId)),
-        renamable: group.kind === "Team" && renamers.has(groupId),
-      });
+      };
+      items.push(Group.listItem(group, admission.admittedAt, activity, grant));
     }
     return items;
   });
+
   const listMine = Effect.fn("GroupService.listMine")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
     yield* authorization.require([]);
@@ -320,6 +314,7 @@ export const make = Effect.fn("GroupService.make")(function* () {
     }
     return items;
   });
+
   const listPublic = Effect.fn("GroupService.listPublic")(function* (input: Group.ListOptions) {
     const options = yield* Schema.decodeEffect(Group.ListOptions)(input);
     yield* authorization.require([]);
@@ -348,13 +343,11 @@ export const make = Effect.fn("GroupService.make")(function* () {
           (summary) => [summary.groupId, summary] as const,
         ),
       );
-      for (const group of joinable)
-        if (items.length < options.limit)
-          items.push({
-            group,
-            members: summaries.get(group.id)?.members ?? 0,
-            joined: summaries.get(group.id)?.joined ?? false,
-          });
+      for (const group of joinable) {
+        if (items.length === options.limit) break;
+        const summary = summaries.get(group.id);
+        items.push({ group, members: summary?.members ?? 0, joined: summary?.joined ?? false });
+      }
       after = page.at(-1)?.id;
       if (page.length < options.limit) break;
     }

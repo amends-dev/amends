@@ -10,6 +10,7 @@ export class Failure extends Schema.TaggedError<Failure>()("GroupFollowStore.Fai
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
 export class Conflict extends Schema.TaggedError<Conflict>()("GroupFollowStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
@@ -44,7 +45,9 @@ export interface Interface {
     endedAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/follow/store/Service",
 ) {}
+
 export * as GroupFollowStore from "./store.ts";

@@ -30,6 +30,7 @@ import {
   MemberNotFound,
   NotFound,
 } from "./errors.ts";
+
 export {
   AlreadyMember,
   AlreadyRemoved,
@@ -114,23 +115,8 @@ export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/membership/service/Service",
 ) {}
 
-const decodeInput = Schema.decodeEffect(GroupMembership.AddInput);
-const decodeRemovalInput = Schema.decodeEffect(GroupMembership.RemoveInput);
-
 /** Capture workspace dependencies; resolve authority and transaction state per operation. @category constructors */
-export const make = Effect.fn("GroupMembershipService.make")(function* (): Effect.fn.Return<
-  Interface,
-  never,
-  | Authorization.Service
-  | GroupStore.Service
-  | MemberStore.Service
-  | GroupMembershipStore.Service
-  | GroupCommand.Service
-  | GroupQuery.Service
-  | Journal.Service
-  | Crypto.Crypto
-  | Store.Service
-> {
+export const make = Effect.fn("GroupMembershipService.make")(function* () {
   const authorization = yield* Authorization.Service;
   const groupStore = yield* GroupStore.Service;
   const memberStore = yield* MemberStore.Service;
@@ -151,16 +137,16 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
     ]);
     yield* groupQuery
       .requireAudience(groupId)
-      .pipe(
-        Effect.catchTag("GroupQuery.NotMember", () => Effect.fail(new GroupNotFound({ groupId }))),
-      );
+      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
   });
+
   /** The group, or GroupNotFound when it is not stored. */
   const requireGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const foundGroup = yield* groupStore.get(groupId);
     if (Option.isNone(foundGroup)) return yield* new GroupNotFound({ groupId });
     return foundGroup.value;
   });
+
   /** The group, when it is a team: a direct group keeps the members it started with. */
   const requireTeamGroup = Effect.fnUntraced(function* (groupId: Group.Id) {
     const group = yield* requireGroup(groupId);
@@ -173,9 +159,10 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
     const admitted = yield* groupCommand.admitMember(groupId, memberId, yield* DateTime.now);
     return admitted.membership;
   });
+
   const add = Effect.fn("GroupMembershipService.add")(
     function* (input: GroupMembership.AddInput) {
-      const { groupId, memberId } = yield* decodeInput(input);
+      const { groupId, memberId } = yield* Schema.decodeEffect(GroupMembership.AddInput)(input);
       yield* requireManagement(groupId);
       yield* requireTeamGroup(groupId);
 
@@ -190,6 +177,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
+
   const join = Effect.fn("GroupMembershipService.join")(
     function* (input: Group.Id) {
       const groupId = yield* Schema.decodeEffect(Group.Id)(input);
@@ -219,6 +207,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
       return yield* new NotFound(input);
     return found.value;
   });
+
   /** End an active admission for the given reason, returning it as removed. */
   const endMembership = Effect.fnUntraced(function* (
     membership: GroupMembership.Record,
@@ -240,23 +229,17 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
       },
       occurredAt,
     );
-    return {
-      id: membership.id,
-      workspaceId,
-      groupId: membership.groupId,
-      memberId: membership.memberId,
-      admittedAt: membership.admittedAt,
-      status: "removed",
-    } satisfies GroupMembership.Record;
+    return Object.assign({}, membership, { status: "removed" as const });
   });
+
   const remove = Effect.fn("GroupMembershipService.remove")(
     function* (input: GroupMembership.RemoveInput) {
-      const checked = yield* decodeRemovalInput(input);
+      const checked = yield* Schema.decodeEffect(GroupMembership.RemoveInput)(input);
       yield* requireManagement(checked.groupId);
       const group = yield* requireTeamGroup(checked.groupId);
       const membership = yield* requireMembership(checked);
-      // Removing someone from a public group is moderation; a private one is its members' to tidy.
       if (Group.isGeneral(group)) return yield* new GeneralMembership({ groupId: group.id });
+      // Removing someone from a public group is moderation; a private one is its members' to tidy.
       const actor = yield* Actor.Service;
       if (group.visibility === "Public" && membership.memberId !== actor.memberId)
         yield* authorization.require([
@@ -271,9 +254,10 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
     Effect.provideService(Crypto.Crypto, crypto),
     journal.commit,
   );
+
   const leave = Effect.fn("GroupMembershipService.leave")(
     function* (input: GroupMembership.LeaveInput) {
-      const checked = yield* decodeRemovalInput(input);
+      const checked = yield* Schema.decodeEffect(GroupMembership.LeaveInput)(input);
       yield* authorization.require([]);
       const actor = yield* Actor.Service;
       const membership = yield* requireMembership(checked);
@@ -304,20 +288,21 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
       );
       if (page.length === 0) break;
       // One read for the page's members; only admissions of active members are current.
-      const found = new Map(
-        (yield* memberStore.getMany([
-          ...new Set(page.map((membership) => membership.memberId)),
-        ])).map((member) => [member.id, member] as const),
-      );
+      const members = yield* memberStore.getMany([
+        ...new Set(page.map((membership) => membership.memberId)),
+      ]);
+      const membersById = new Map(members.map((member) => [member.id, member]));
       for (const membership of page) {
+        // The next page starts after the last admission seen, current or not.
         after = membership.id;
-        if (found.get(membership.memberId)?.status === "active" && active.length < options.limit)
-          active.push(membership);
+        if (active.length === options.limit) continue;
+        if (membersById.get(membership.memberId)?.status === "active") active.push(membership);
       }
       if (page.length < options.limit) break;
     }
     return active;
   });
+
   const listCurrent = Effect.fn("GroupMembershipService.listCurrent")(function* (
     groupId: Group.Id,
     options: GroupMembership.ListOptions,
@@ -325,11 +310,7 @@ export const make = Effect.fn("GroupMembershipService.make")(function* (): Effec
     const id = yield* Schema.decodeEffect(Group.Id)(groupId);
     yield* groupQuery
       .requireAudience(id)
-      .pipe(
-        Effect.catchTag("GroupQuery.NotMember", () =>
-          Effect.fail(new GroupNotFound({ groupId: id })),
-        ),
-      );
+      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId: id })));
     yield* authorization.require([
       Requirement.make(GroupPermissions.Read, { _tag: "Group", workspaceId, groupId: id }),
     ]);

@@ -11,6 +11,7 @@ export class Failure extends Schema.TaggedError<Failure>()("GroupMembershipStore
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
 export class Conflict extends Schema.TaggedError<Conflict>()("GroupMembershipStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
