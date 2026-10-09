@@ -239,9 +239,10 @@ export interface Session {
   ) => Effect.Effect<GenerateResult, TurnError<Tools>, TurnServices<Tools>>;
 
   /**
-   * Runs a turn that answers in JSON and decodes the answer with `schema`. Fails with
-   * `StructuredOutputError` when the answer does not decode, and with `UnsupportedError` when the
-   * agent cannot answer in JSON. Like `generate`, it denies every approval request.
+   * Runs a turn that answers in JSON and decodes the answer with `schema`. An answer that does not
+   * decode fails as Effect AI's `generateObject` fails, with an `AiError` whose reason is
+   * `StructuredOutputError`; an agent that cannot answer in JSON fails with `UnsupportedError`.
+   * Like `generate`, it denies every approval request.
    */
   readonly generateObject: <S extends Schema.Top, Tools extends Record<string, Tool.Any> = {}>(
     options: GenerateObjectOptions<S, Tools>,

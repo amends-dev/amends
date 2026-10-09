@@ -211,22 +211,25 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("fails with StructuredOutputError, keeping the answer, when it does not decode", () =>
-    Effect.gen(function* () {
-      const { session } = yield* createSession(() => Stream.fromIterable(reply("not JSON")));
+  it.effect(
+    "fails as Effect AI's generateObject does, keeping the answer that did not decode",
+    () =>
+      Effect.gen(function* () {
+        const { session } = yield* createSession(() => Stream.fromIterable(reply("not JSON")));
 
-      const error = yield* Effect.flip(
-        session.generateObject({
-          prompt: "answer",
-          schema: Schema.Struct({ answer: Schema.Finite }),
-        }),
-      );
+        const error = yield* Effect.flip(
+          session.generateObject({
+            prompt: "answer",
+            schema: Schema.Struct({ answer: Schema.Finite }),
+          }),
+        );
 
-      expect(error._tag === "HarnessError" && error.reason).toMatchObject({
-        _tag: "StructuredOutputError",
-        responseText: "not JSON",
-      });
-    }),
+        expect(error._tag === "AiError" && error.reason).toMatchObject({
+          _tag: "StructuredOutputError",
+          responseText: "not JSON",
+        });
+        expect(error.message).toContain("Harness.generateObject");
+      }),
   );
 
   it.effect(

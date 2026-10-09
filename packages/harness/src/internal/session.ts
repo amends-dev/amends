@@ -17,7 +17,7 @@ import {
   Stream,
 } from "effect";
 import type { Response, Toolkit } from "effect/ai";
-import { Prompt, type Tool } from "effect/ai";
+import { AiError, Prompt, type Tool } from "effect/ai";
 import type { AgentSession, SessionId } from "../Agent.ts";
 import { GenerateObjectResult, GenerateResult } from "../GenerateResult.ts";
 import {
@@ -26,7 +26,6 @@ import {
   InvalidOutputError,
   NoTurnError,
   SessionReleasedError,
-  StructuredOutputError,
   TurnFailedError,
   TurnInProgressError,
 } from "../HarnessError.ts";
@@ -439,18 +438,20 @@ export const makeSession = Effect.fn("Session.make")(function* (options: {
         }),
       );
       const result = yield* resultOf(parts);
+      // An answer that does not match fails as Effect AI's `generateObject` fails.
       const value = yield* Schema.decodeEffect(Schema.fromJsonString(objectOptions.schema))(
         result.text,
       ).pipe(
-        Effect.mapError((cause) =>
-          harnessError(
-            new StructuredOutputError({
-              description: cause.message,
+        Effect.mapError((error) =>
+          AiError.make({
+            module: "Harness",
+            method: "generateObject",
+            reason: new AiError.StructuredOutputError({
+              description: error.message,
               responseText: result.text,
-              usage: result.usage,
+              usage: usageInfoOf(result.usage),
             }),
-            cause,
-          ),
+          }),
         ),
       );
       return new GenerateObjectResult(value, parts);
@@ -638,6 +639,12 @@ const refusal = (
 
 const compactingError = () =>
   new TurnInProgressError({ description: "The session is compacting its conversation" });
+
+/** A turn's usage as `AiError` reports it: the prompt's tokens and the completion's. */
+const usageInfoOf = (usage: typeof Response.Usage.Encoded): typeof AiError.UsageInfo.Type => ({
+  ...(usage.inputTokens.total === undefined ? {} : { promptTokens: usage.inputTokens.total }),
+  ...(usage.outputTokens.total === undefined ? {} : { completionTokens: usage.outputTokens.total }),
+});
 
 const userMessageOf = (prompt: string | Prompt.UserMessage): Prompt.UserMessage =>
   typeof prompt === "string"
