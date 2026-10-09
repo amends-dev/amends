@@ -7,10 +7,12 @@ import type { ThreadActivityKind } from "./kind.ts";
 export class Failure extends Schema.TaggedError<Failure>()("ThreadActivityResolvers.Failure", {
   cause: Schema.Defect(),
 }) {}
+
 /** No resolver is registered for a recorded kind, as when a newer host recorded it. */
 export class Unknown extends Schema.TaggedError<Unknown>()("ThreadActivityResolvers.Unknown", {
   kind: Schema.String,
 }) {}
+
 export type Error = Failure;
 
 /**
@@ -32,6 +34,7 @@ export interface Interface {
     activities: ReadonlyArray<ThreadActivity.Record>,
   ) => Effect.Effect<ReadonlyArray<ThreadActivityKind.Item>, Error>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/activity/resolvers/Service",
 ) {}

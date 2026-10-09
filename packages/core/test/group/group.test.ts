@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Schema } from "effect";
+import { DateTime, Schema } from "effect";
 import { Group } from "../../src/group/group.ts";
 import { GroupMembership } from "../../src/group/membership/membership.ts";
 import { Scope } from "../../src/authorization/scope.ts";
@@ -99,4 +99,58 @@ it("exact group grants stay separate from other groups, workspaces, and same-ID 
     Target.Reference.cases.Thread.make({ workspaceId, threadId: ThreadId.Id.make("same") }),
   ])
     expect(Scope.covers(exact, other)).toBe(false);
+});
+
+it("lists a group with what is new to its reader and what their grants let them do", () => {
+  const at = (minute: number) => {
+    const minutes = String(minute).padStart(2, "0");
+    return DateTime.makeUnsafe(`2026-10-09T12:${minutes}:00.000Z`);
+  };
+  const team: Group.Record = {
+    id: Group.Id.make("team"),
+    workspaceId: WorkspaceId.Id.make("workspace"),
+    kind: "Team",
+    visibility: "Public",
+    name: "Team",
+    createdBy: Member.Id.make("alice"),
+    createdAt: at(0),
+  };
+  const direct: Group.Record = {
+    id: Group.Id.make("direct"),
+    workspaceId: team.workspaceId,
+    kind: "Direct",
+    memberIds: [Member.Id.make("alice"), Member.Id.make("bob")],
+    createdBy: Member.Id.make("alice"),
+    createdAt: at(0),
+  };
+  const quiet = { latestActivityAt: null, readAt: null, following: false, pending: 0 };
+  const all = { manage: true, rename: true, moderate: true };
+
+  // New activity is a message after the reader last read, or after they joined if they never did.
+  expect(Group.hasNewActivity(null, null, at(1))).toBe(false);
+  expect(Group.hasNewActivity(at(2), null, at(1))).toBe(true);
+  expect(Group.hasNewActivity(at(2), null, at(3))).toBe(false);
+  expect(Group.hasNewActivity(at(2), at(1), at(0))).toBe(true);
+  expect(Group.hasNewActivity(at(2), at(2), at(0))).toBe(false);
+
+  expect(Group.listItem(team, at(1), { ...quiet, latestActivityAt: at(2) }, all)).toMatchObject({
+    newActivity: true,
+    manageable: true,
+    membersRemovable: true,
+    renamable: true,
+  });
+  // Removing people from a public group is moderation; in a private group any manager may.
+  expect(Group.listItem(team, at(1), quiet, { ...all, moderate: false }).membersRemovable).toBe(
+    false,
+  );
+  expect(
+    Group.listItem({ ...team, visibility: "Private" }, at(1), quiet, { ...all, moderate: false })
+      .membersRemovable,
+  ).toBe(true);
+  // A direct group keeps its members and is named by them.
+  expect(Group.listItem(direct, at(1), quiet, all)).toMatchObject({
+    manageable: false,
+    membersRemovable: false,
+    renamable: false,
+  });
 });

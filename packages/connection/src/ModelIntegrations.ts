@@ -89,6 +89,7 @@ const providerIntegration = (provider: ModelCatalog.Provider, client: HttpClient
           model: model.id,
           protocol: model.protocol,
           url: urlWith(model.url, settings),
+          ...(model.limits.context > 0 ? { contextWindow: model.limits.context } : {}),
           ...withOptions(apiKey, options),
         });
       },

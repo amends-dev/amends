@@ -272,10 +272,7 @@ it("maps conversation facts and signals to the reads of their groups and threads
         groupId: "group-one",
         threadId: "thread-one",
         turnId: "turn-one",
-        responseId: "response-one",
-        part: 0,
-        offset: 0,
-        text: "Draft",
+        draft: { responseId: "response-one", part: 0, offset: 0, text: "Draft" },
       }),
     ),
   ).toEqual([]);

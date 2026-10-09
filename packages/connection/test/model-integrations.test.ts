@@ -107,24 +107,27 @@ layer(ModelCatalog.layer)("ModelIntegrations", (it) => {
     }),
   );
 
-  it.effect("reaches a catalog model where the catalog says, with the connection's key", () =>
-    Effect.gen(function* () {
-      const endpoint = yield* endpointOf("anthropic", {
-        model: "claude-opus-5-5",
-        effort: "max",
-        maxOutputTokens: 64_000,
-      });
+  it.effect(
+    "reaches a catalog model where the catalog says, with the connection's key and the model's context window",
+    () =>
+      Effect.gen(function* () {
+        const endpoint = yield* endpointOf("anthropic", {
+          model: "claude-opus-5-5",
+          effort: "max",
+          maxOutputTokens: 64_000,
+        });
 
-      expect(endpoint).toEqual({
-        provider: "anthropic",
-        model: "claude-opus-5-5",
-        protocol: "anthropic-messages",
-        url: "https://api.anthropic.com/v1",
-        apiKey: key,
-        effort: "max",
-        maxOutputTokens: 64_000,
-      });
-    }),
+        expect(endpoint).toEqual({
+          provider: "anthropic",
+          model: "claude-opus-5-5",
+          protocol: "anthropic-messages",
+          url: "https://api.anthropic.com/v1",
+          apiKey: key,
+          effort: "max",
+          maxOutputTokens: 64_000,
+          contextWindow: 1_000_000,
+        });
+      }),
   );
 
   it.effect("puts the settings a provider's URLs name in them", () =>

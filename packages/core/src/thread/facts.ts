@@ -9,4 +9,5 @@ export const Created = Fact.make("thread.created", {
   occurrence: (payload) => [payload.id],
   payload: Thread.Record,
 });
+
 export * as ThreadFacts from "./facts.ts";

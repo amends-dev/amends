@@ -10,10 +10,12 @@ export class Failure extends Schema.TaggedError<Failure>()("ThreadParticipationS
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
 export class Conflict extends Schema.TaggedError<Conflict>()("ThreadParticipationStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
+
 /** Internal projection storage. Reads honor the caller transaction; writes require it. */
 export interface Interface {
   readonly get: (
@@ -70,7 +72,9 @@ export interface Interface {
     record: ThreadParticipation.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/participation/store/Service",
 ) {}
+
 export * as ThreadParticipationStore from "./store.ts";

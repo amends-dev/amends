@@ -29,11 +29,13 @@ import { ThreadParticipationFacts } from "./participation/facts.ts";
 export class Unavailable extends Schema.TaggedError<Unavailable>()("ThreadCommand.Unavailable", {
   memberId: Member.Id,
 }) {}
+
 /** The thread's next position is not the one the caller accounted for. */
 export class PositionChanged extends Schema.TaggedError<PositionChanged>()(
   "ThreadCommand.PositionChanged",
   { expected: Schema.Int, actual: Schema.Int },
 ) {}
+
 export type Error =
   | ThreadQuery.ParticipantsError
   | ThreadStore.Failure
@@ -55,7 +57,9 @@ export const First = Schema.TaggedUnion({
     mentions: Schema.UniqueArray(Member.Id),
   },
 });
+
 export type First = typeof First.Type;
+
 export const CreateInput = Schema.Struct({
   /** The caller names the thread, so a keyed request can name the same one on its retry. */
   threadId: Thread.Id,
@@ -65,7 +69,9 @@ export const CreateInput = Schema.Struct({
   first: First,
   occurredAt: Schema.DateTimeUtcFromString,
 });
+
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
+
 /** A created thread and the activity that places its opening message, for the starting workflow. */
 export interface Created extends Thread.Started {
   readonly activity: ThreadMessageActivity.Published;
@@ -84,7 +90,9 @@ export const MessageInput = Schema.Struct({
   /** The agent's turn posting it as a reply, if one is. */
   turnId: Schema.optionalKey(TurnId.Id),
 });
+
 export interface MessageInput extends Schema.Schema.Type<typeof MessageInput> {}
+
 /** A published message and the timeline activity that places it, for the publishing workflow. */
 export interface MessagePublished {
   readonly message: ThreadMessage.Record;
@@ -96,12 +104,14 @@ export interface Admitted {
   readonly participants: ReadonlyArray<ThreadParticipation.Record>;
   readonly added: ReadonlyArray<Event.Type<typeof ThreadParticipationFacts.Added>>;
 }
+
 /** Where the activity will appear, and who takes part there. */
 export interface ActivityContext {
   readonly thread: Thread.Record;
   readonly sequence: number;
   readonly admitted: Admitted;
 }
+
 /** What the owning domain's step records, after publishing the fact the activity reports. */
 export interface ActivityStep<A, K extends ThreadActivityKind.Definition> {
   readonly value: A;
@@ -111,6 +121,7 @@ export interface ActivityStep<A, K extends ThreadActivityKind.Definition> {
   /** The fact the activity reports; the activity records it as its cause. */
   readonly cause: Event.Record;
 }
+
 export interface ActivityInput<A, K extends ThreadActivityKind.Definition, E, R> {
   readonly thread: Thread.Record;
   readonly occurredAt: DateTime.Utc;
@@ -120,6 +131,7 @@ export interface ActivityInput<A, K extends ThreadActivityKind.Definition, E, R>
   readonly admit?: ReadonlyArray<ThreadParticipation.Reference>;
   readonly step: (context: ActivityContext) => Effect.Effect<ActivityStep<A, K>, E, R>;
 }
+
 export interface ActivityPublished<A> {
   readonly value: A;
   readonly event: Event.Type<typeof ThreadActivityFacts.Recorded>;
@@ -152,15 +164,54 @@ export interface Interface {
     input: ActivityInput<A, K, E, R>,
   ) => Effect.Effect<ActivityPublished<A>, E | Error, R | Store.Transaction | Publication.Service>;
 }
+
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/command/Service",
 ) {}
+
 /** The participant an author publishes as. */
 const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.Reference =>
   ThreadMessage.Author.isAnyOf(["Member"])(author)
     ? { _tag: "Member", memberId: author.memberId }
     : { _tag: "Contact", contactId: author.contactId };
+
+/**
+ * Whom a message notifies, of the participants selected for it. Mentions address members; without
+ * them the message reaches every selected participant. A message never notifies its own author,
+ * and an agent's message asks no work of other agents, so agents cannot keep setting each other to
+ * work.
+ */
+const recipientsOf = (
+  input: MessageInput,
+  participants: ReadonlyArray<ThreadParticipation.Record>,
+): ReadonlyArray<ThreadActivity.Recipient> => {
+  const author = ThreadParticipation.keyOf(authorAsParticipant(input.author));
+  const writer = participants.find(
+    ({ participant }) => ThreadParticipation.keyOf(participant) === author,
+  )?.participant;
+  const byAgent =
+    Predicate.isTagged(writer, "Member") &&
+    Identity.MemberReference.isAnyOf(["Agent"])(writer.identity);
+  const addressed = (participant: ThreadParticipation.Participant) => {
+    if (ThreadParticipation.keyOf(participant) === author) return false;
+    const memberId = ThreadParticipation.memberOf(participant);
+    return (
+      input.mentions.length === 0 || (memberId !== undefined && input.mentions.includes(memberId))
+    );
+  };
+  return participants
+    .filter(({ participant }) => addressed(participant))
+    .map(({ id, participant }) => {
+      const recipient = ThreadParticipation.recipientOf(participant);
+      return {
+        participationId: id,
+        recipient,
+        requestsWork: Notification.Recipient.isAnyOf(["Agent"])(recipient) && !byAgent,
+      };
+    });
+};
+
 /** @category constructors */
 export const make = Effect.fn("ThreadCommand.make")(function* () {
   const threadQuery = yield* ThreadQuery.Service;
@@ -176,6 +227,26 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     const latest = yield* threadActivityStore.latest(threadId);
     return Option.isNone(latest) ? 1 : latest.value.sequence + 1;
   });
+
+  /**
+   * The participant a reference admits: a member through the current admission `candidates` give
+   * them, which they must have, or a contact or triage as named.
+   */
+  const participantOf = Effect.fnUntraced(function* (
+    reference: ThreadParticipation.Reference,
+    candidates: ReadonlyMap<Member.Id, ThreadQuery.Eligible>,
+  ): Effect.fn.Return<ThreadParticipation.Participant, Unavailable> {
+    if (!ThreadParticipation.Reference.isAnyOf(["Member"])(reference)) return reference;
+    const candidate = candidates.get(reference.memberId);
+    if (candidate === undefined) return yield* new Unavailable({ memberId: reference.memberId });
+    return {
+      _tag: "Member",
+      memberId: reference.memberId,
+      groupMembershipId: candidate.admission.id,
+      identity: candidate.member.identity,
+    };
+  });
+
   /**
    * Admit participants at a position. Members need a current group admission; contacts and
    * triage take part without one. Current participants are reused.
@@ -210,18 +281,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
         result.push(previous);
         continue;
       }
-      let participant: ThreadParticipation.Participant;
-      if (ThreadParticipation.Reference.isAnyOf(["Member"])(reference)) {
-        const candidate = candidates.get(reference.memberId);
-        if (candidate === undefined)
-          return yield* new Unavailable({ memberId: reference.memberId });
-        participant = {
-          _tag: "Member",
-          memberId: reference.memberId,
-          groupMembershipId: candidate.admission.id,
-          identity: candidate.member.identity,
-        };
-      } else participant = reference;
+      const participant = yield* participantOf(reference, candidates);
       const admitted: typeof ThreadParticipation.Admission.Type = {
         id: ThreadParticipation.Id.make(yield* crypto.randomUUIDv4),
         workspaceId,
@@ -242,6 +302,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     }
     return { participants: result, added } satisfies Admitted;
   });
+
   /** Record an activity of one kind at its position, with the recipients it selects. */
   const recordActivity = Effect.fn("ThreadCommand.recordActivity")(function* <
     K extends ThreadActivityKind.Definition,
@@ -254,8 +315,9 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     readonly recipients: ReadonlyArray<ThreadActivity.Recipient>;
   }) {
     yield* Store.Transaction;
+    const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details);
     const activity: ThreadActivity.Record = {
-      ...(yield* ThreadActivityKind.prepare(input.kind, input.details)),
+      ...prepared,
       id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
       workspaceId,
       threadId: input.thread.id,
@@ -281,12 +343,9 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     const sequence = yield* nextSequence(thread.id);
     if (input.expectedSequence !== undefined && input.expectedSequence !== sequence)
       return yield* new PositionChanged({ expected: input.expectedSequence, actual: sequence });
-    const admitted: Admitted =
-      input.admit === undefined || input.admit.length === 0
-        ? { participants: [], added: [] }
-        : yield* admitParticipants(thread, input.admit, sequence, occurredAt).pipe(
-            Publication.withOccurredAt(occurredAt),
-          );
+    const admitted = yield* admitParticipants(thread, input.admit ?? [], sequence, occurredAt).pipe(
+      Publication.withOccurredAt(occurredAt),
+    );
     const step = yield* input.step({ thread, sequence, admitted });
     const event = yield* recordActivity({
       thread,
@@ -335,38 +394,11 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
               Object.assign({ groupId: thread.groupId }, message),
             )
             .pipe(Publication.withOccurredAt(input.occurredAt));
-          // Mentions address members; without them the message reaches every selected participant.
-          // A message never notifies its own author, and an agent's message asks no work of other
-          // agents, so agents cannot keep setting each other to work.
-          const author = ThreadParticipation.keyOf(authorAsParticipant(input.author));
-          const writer = admitted.participants.find(
-            (p) => ThreadParticipation.keyOf(p.participant) === author,
-          )?.participant;
-          const byAgent =
-            Predicate.isTagged(writer, "Member") &&
-            Identity.MemberReference.isAnyOf(["Agent"])(writer.identity);
-          const recipients = admitted.participants
-            .filter((p) => {
-              if (ThreadParticipation.keyOf(p.participant) === author) return false;
-              const memberId = ThreadParticipation.memberOf(p.participant);
-              return (
-                input.mentions.length === 0 ||
-                (memberId !== undefined && input.mentions.includes(memberId))
-              );
-            })
-            .map((p) => {
-              const recipient = ThreadParticipation.recipientOf(p.participant);
-              return {
-                participationId: p.id,
-                recipient,
-                requestsWork: Notification.Recipient.isAnyOf(["Agent"])(recipient) && !byAgent,
-              };
-            });
           return {
             value: message,
             kind: ThreadMessageActivity.Published,
             details: { messageId: message.id },
-            recipients,
+            recipients: recipientsOf(input, admitted.participants),
             cause: fact,
           };
         }),
@@ -403,6 +435,8 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
 
   return Service.of({ create, publishMessage, publishActivity });
 });
+
 /** Internal writes shared by thread and turn operations: callers own authorization and the commit. @category layers */
 export const layer = Layer.effect(Service, make());
+
 export * as ThreadCommand from "./command.ts";

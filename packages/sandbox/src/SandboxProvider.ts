@@ -19,7 +19,7 @@ export interface CreateOptions<E> {
    */
   readonly id?: SandboxId;
 
-  /** The ports to expose; `Sandbox.endpoint` reaches only these. */
+  /** The ports to expose from the start; `Sandbox.exposePorts` exposes more later. */
   readonly ports?: ReadonlyArray<Port>;
 
   /** Prepares the sandbox before `create` returns it. */

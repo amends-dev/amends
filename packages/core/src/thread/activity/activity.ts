@@ -5,7 +5,9 @@ import { ThreadParticipationId } from "../participation/id.ts";
 import { WorkspaceId } from "../../workspace/id.ts";
 import { Notification } from "../../notification/notification.ts";
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("ThreadActivityId"));
+
 export type Id = typeof Id.Type;
+
 /**
  * An activity kind: a dotted name its owning domain chooses, such as `message.published` or
  * `turn.started`. The kind's definition gives the activity's details their meaning.
@@ -13,7 +15,9 @@ export type Id = typeof Id.Type;
 export const Kind = Schema.String.check(
   Schema.isPattern(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/),
 ).pipe(Schema.brand("ThreadActivityKind"));
+
 export type Kind = typeof Kind.Type;
+
 export const Common = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
@@ -21,6 +25,7 @@ export const Common = Schema.Struct({
   sequence: Schema.Int.check(Schema.isGreaterThan(0)),
   occurredAt: Schema.DateTimeUtcFromString,
 });
+
 /**
  * One item of a thread's timeline, in the shape every kind shares. Storage, facts, and the change
  * feed carry it as it is, so adding a kind changes none of them; its definition reads its details.
@@ -37,7 +42,9 @@ export const Record = Schema.Struct({
   /** The change the activity reports, in its kind's encoded form. */
   details: Schema.Json,
 });
+
 export interface Record extends Schema.Schema.Type<typeof Record> {}
+
 /** Historical recipient selection, recorded with the activity rather than recomputed on replay. */
 export const Recipient = Schema.Struct({
   participationId: ThreadParticipationId.Id,
@@ -48,5 +55,7 @@ export const Recipient = Schema.Struct({
    */
   requestsWork: Schema.Boolean,
 });
+
 export interface Recipient extends Schema.Schema.Type<typeof Recipient> {}
+
 export * as ThreadActivity from "./activity.ts";

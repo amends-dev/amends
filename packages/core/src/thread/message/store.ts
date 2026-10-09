@@ -8,10 +8,12 @@ export class Failure extends Schema.TaggedError<Failure>()("ThreadMessageStore.F
   operation: Schema.String,
   cause: Schema.Defect(),
 }) {}
+
 export class Conflict extends Schema.TaggedError<Conflict>()("ThreadMessageStore.Conflict", {
   operation: Schema.String,
   message: Schema.String,
 }) {}
+
 /** Internal projection storage. Reads honor the caller transaction; writes require it. */
 export interface Interface {
   readonly get: (
@@ -32,7 +34,9 @@ export interface Interface {
     record: ThreadMessage.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
+
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/thread/message/store/Service",
 ) {}
+
 export * as ThreadMessageStore from "./store.ts";

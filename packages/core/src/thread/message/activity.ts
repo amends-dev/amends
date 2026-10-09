@@ -9,6 +9,7 @@ export const Published = ThreadActivityKind.make("message.published", {
   subject: ({ messageId }) => Subject.make("message", messageId),
   newActivity: true,
 });
+
 export type Published = ThreadActivityKind.Activity<typeof Published>;
 
 export * as ThreadMessageActivity from "./activity.ts";

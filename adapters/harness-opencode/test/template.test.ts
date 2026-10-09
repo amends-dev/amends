@@ -7,7 +7,7 @@ import { Effect, FileSystem, Layer, Path, Redacted } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as Template from "../src/Template.ts";
 import { makeScriptedCommands } from "./fakes.ts";
-import { freePort, makeBridgedAgent, makeSandbox } from "./fixtures.ts";
+import { makeBridgedAgent, makeSandbox } from "./fixtures.ts";
 
 /**
  * `make` bundles the bridge program with the Bun running the tests. The template it gives runs on
@@ -190,8 +190,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const home = yield* fs.makeTempDirectoryScoped();
-        const port = yield* freePort;
-        const local = yield* makeSandbox(port);
+        const local = yield* makeSandbox();
         const sandbox: Sandbox.Sandbox["Service"] = {
           ...local,
           childProcessSpawner: withHome(local.childProcessSpawner, home),
@@ -211,7 +210,6 @@ describe.skipIf(!enabled)("Template on this machine", () => {
           yield* makeBridgedAgent({
             id: "opencode",
             template: installation.template,
-            port,
             command: installation.command,
             args: installation.args,
             token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
@@ -224,7 +222,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
             },
           }),
         );
-        const session = yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+        const session = yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
         yield* session.destroy;
       }).pipe(Effect.provide(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))),
     180_000,

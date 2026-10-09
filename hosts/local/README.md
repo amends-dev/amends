@@ -78,9 +78,7 @@ requests handled more than seven days ago.
 
 The host runs [turn jobs](../../packages/core/README.md#jobs) as
 [cluster](../../packages/cluster/README.md)'s `TurnJob`, entering workspaces through its gateway,
-and builds each turn's harness, model, and sandbox from the integrations it installs. Local
-sandboxes share this machine's ports, so only one sandbox that listens on a port, such as one
-running opencode's bridge, can run on the local provider at a time.
+and builds each turn's harness, model, and sandbox from the integrations it installs.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
 share out the jobs, and when one stops answering, the others take its

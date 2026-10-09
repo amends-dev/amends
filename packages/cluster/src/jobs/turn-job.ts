@@ -1,84 +1,45 @@
 /**
  * Turn jobs on Effect Cluster: one for each agent in each thread, an entity whose persisted
- * requests ask it to run the agent's work there, to stop its turn, or to give up a turn its runs
- * kept failing. A commit stores a request with itself, and the runner that owns the entity handles
- * it when it arrives. Cluster keeps an entity on one runner at a time and redelivers a request whose
- * handling was cut short, so a turn cut short runs again. The job's runs take turns, while a stop
+ * requests ask it to run the agent's work there or to stop its turn. A commit stores a request
+ * with itself, and the runner that owns the entity handles it when it arrives. Cluster keeps an
+ * entity on one runner at a time and redelivers a request whose handling was cut short, so a turn
+ * cut short runs again. A request that fails is tried again where it is, after a delay that grows,
+ * until it holds or has failed `maxFailures` times. The job's runs take turns, while a stop
  * reaches the run in progress.
  */
 import { Store } from "@amends/core/journal";
 import { ThreadId } from "@amends/core/thread";
 import { Turn, TurnJobs } from "@amends/core/turn";
 import { Member, Workspace } from "@amends/core/workspace";
-import {
-  Cause,
-  DateTime,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  Predicate,
-  PrimaryKey,
-  Schema,
-} from "effect";
-import { ClusterSchema, DeliverAt, Entity, Sharding } from "effect/cluster";
+import { Effect, Layer, Predicate, PrimaryKey, Ref, Schedule, Schema } from "effect";
+import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";
 import { TurnRunner } from "../turns/runner.ts";
-import { JobRetry } from "./retry.ts";
 
 /**
- * When a request is to be handled, and which it is among the job's: Cluster keeps one request per
- * key, so a commit that asks twice, or a handler that asks again after a crash, stores one.
+ * Which request this is among the job's: Cluster keeps one request per key, so a commit that asks
+ * twice stores one.
  */
-const scheduling = {
-  key: Schema.String,
-  at: Schema.DateTimeUtcFromMillis,
-  /** Failed attempts before this one, for its delay. */
-  attempt: Schema.Int,
-};
+const keyed = { key: Schema.String };
 
-/**
- * A request to run the agent's next turn in the thread. One that runs again after failed runs
- * names the turn they ran, if they accepted one.
- */
+/** A request to run the agent's next turn in the thread. */
 export class Run extends Schema.Class<Run>("amends/TurnJob/Run")({
   ...TurnJobs.Job.fields,
-  ...scheduling,
-  turnId: Schema.optionalKey(Turn.Id),
+  ...keyed,
 }) {
   [PrimaryKey.symbol]() {
     return this.key;
-  }
-  [DeliverAt.symbol]() {
-    return this.at;
   }
 }
 
 /** A request to stop the turn, which was asked to stop or whose agent no longer takes part. */
 export class Stop extends Schema.Class<Stop>("amends/TurnJob/Stop")({
   ...TurnJobs.Job.fields,
-  ...scheduling,
+  ...keyed,
   turnId: Turn.Id,
 }) {
   [PrimaryKey.symbol]() {
     return this.key;
-  }
-  [DeliverAt.symbol]() {
-    return this.at;
-  }
-}
-
-/** A request to fail the turn the job's runs kept failing to run. */
-export class GiveUp extends Schema.Class<GiveUp>("amends/TurnJob/GiveUp")({
-  ...TurnJobs.Job.fields,
-  ...scheduling,
-  turnId: Turn.Id,
-}) {
-  [PrimaryKey.symbol]() {
-    return this.key;
-  }
-  [DeliverAt.symbol]() {
-    return this.at;
   }
 }
 
@@ -86,7 +47,6 @@ export class GiveUp extends Schema.Class<GiveUp>("amends/TurnJob/GiveUp")({
 export const entity = Entity.make("amends/TurnJob", [
   Rpc.make("Run", { payload: Run }).annotate(ClusterSchema.Persisted, true),
   Rpc.make("Stop", { payload: Stop }).annotate(ClusterSchema.Persisted, true),
-  Rpc.make("GiveUp", { payload: GiveUp }).annotate(ClusterSchema.Persisted, true),
 ]);
 
 /** The entity of a job. */
@@ -105,42 +65,24 @@ const jobOf = (entityId: string): TurnJobs.Job => {
 /** A request that fails this many times in a row is not tried again. */
 export const maxFailures = 8;
 
-/** A request the job handles. */
-export type Request = Run | Stop | GiveUp;
-
-/** What follows a request that failed. */
-export type Next =
-  | { readonly _tag: "Retry" }
-  | { readonly _tag: "GiveUp"; readonly turnId: Turn.Id }
-  | { readonly _tag: "Drop" };
-
 /**
- * What follows `request` once it failed `failures` times in a row: it is tried again after a
- * delay, until `maxFailures`; then a run that ran `turnId` gives the turn up, and any other request
- * is dropped, its work left for the next request to find. Giving up is tried until it holds, so a
- * turn never stays active with nothing to run it.
+ * How long a request waits before it is tried again, after each failure: doubling from two
+ * seconds, up to five minutes.
  */
-export const afterFailure = (
-  request: Request,
-  failures: number,
-  turnId: Turn.Id | undefined,
-): Next => {
-  if (request instanceof GiveUp || failures < maxFailures) return { _tag: "Retry" };
-  return request instanceof Run && turnId !== undefined
-    ? { _tag: "GiveUp", turnId }
-    : { _tag: "Drop" };
-};
+export const retryDelays = Schedule.min([
+  Schedule.exponential("2 seconds"),
+  Schedule.spaced("5 minutes"),
+]);
 
-/** The error a request failed with, if it failed with one. */
-const errorOf = (cause: Cause.Cause<unknown>) =>
-  Option.getOrUndefined(Cause.findErrorOption(cause));
+/** A request the job handles. */
+export type Request = Run | Stop;
 
 /** Whether a request failed because its workspace was never created. */
-const isWorkspaceNotFound = (cause: Cause.Cause<unknown>) => {
-  const error = errorOf(cause);
-  const reason = error instanceof TurnRunner.RunFailed ? error.cause : error;
-  return Predicate.isTagged(reason, "Gateway.WorkspaceNotFound");
-};
+const isWorkspaceNotFound = (error: unknown) =>
+  Predicate.isTagged(
+    error instanceof TurnRunner.RunFailed ? error.cause : error,
+    "Gateway.WorkspaceNotFound",
+  );
 
 /**
  * Requests stored by Cluster. Sent inside a commit, a request shares its transaction when Cluster's
@@ -160,14 +102,7 @@ export const layerRequests = Layer.effect(
     return TurnJobs.Service.of({
       requestRun: Effect.fnUntraced(function* ({ workspaceId, memberId, threadId }) {
         const storeTransaction = yield* Store.Transaction;
-        const run = new Run({
-          workspaceId,
-          memberId,
-          threadId,
-          key: `run:${storeTransaction.id}`,
-          at: yield* DateTime.now,
-          attempt: 0,
-        });
+        const run = new Run({ workspaceId, memberId, threadId, key: `run:${storeTransaction.id}` });
         yield* turnJobClient(entityId(run))
           .Run(run, { discard: true })
           .pipe(Effect.mapError(failure));
@@ -181,8 +116,6 @@ export const layerRequests = Layer.effect(
           threadId,
           turnId,
           key: `stop:${turnId}:${storeTransaction.id}`,
-          at: yield* DateTime.now,
-          attempt: 0,
         });
         yield* turnJobClient(entityId(stop))
           .Stop(stop, { discard: true })
@@ -195,9 +128,11 @@ export const layerRequests = Layer.effect(
 
 /**
  * Handle each request when it arrives, through the job's turn runner: run the agent's next turn,
- * stop its turn, or give the turn up. A request that fails asks again for what `afterFailure`
- * decides, under a key made from its own, and a request whose workspace was never created is
- * dropped. Failures are logged.
+ * or stop its turn. A request that fails is tried again after `retryDelays`, until it holds or
+ * has failed `maxFailures` times; then a run that accepted a turn gives the turn up, which is
+ * tried until it holds, so a turn never stays active with nothing to run it, and any other request
+ * is dropped, its work left for the next request to find. A request whose workspace was never
+ * created is dropped at once. Failures are logged.
  *
  * @category layers
  */
@@ -206,104 +141,81 @@ export const layerWorker = entity.toLayer(
     const job = jobOf((yield* Entity.CurrentAddress).entityId);
     const { workspaceId, memberId, threadId } = job;
     const turnRunner = yield* TurnRunner.make(job);
-    const client = (yield* entity.client)(entityId(job));
-    const send = (request: Request) =>
-      Effect.orDie(
-        request instanceof Run
-          ? client.Run(request, { discard: true })
-          : request instanceof Stop
-            ? client.Stop(request, { discard: true })
-            : client.GiveUp(request, { discard: true }),
+    /** What a log says of `request`: its job and key. */
+    const named = (request: Request) => ({ workspaceId, memberId, threadId, request: request.key });
+
+    /**
+     * Do `work` for `request`, trying again after each failure, `times` more at most, as long as
+     * its workspace exists. A failure that would have been a defect is one to try again like any
+     * other, rather than one that restarts the entity.
+     */
+    const retrying = <A, E, R>(request: Request, work: Effect.Effect<A, E, R>, times?: number) =>
+      work.pipe(
+        Effect.catchDefect((defect) => Effect.fail(defect)),
+        Effect.tapError((error) =>
+          Effect.gen(function* () {
+            // Each try runs with the schedule's metadata: how many tries came before it.
+            const { attempt } = yield* Schedule.CurrentMetadata;
+            yield* Effect.logWarning("Turn job request failed", {
+              ...named(request),
+              failures: attempt + 1,
+              error,
+            });
+          }),
+        ),
+        Effect.retry({
+          schedule: retryDelays,
+          while: (error) => !isWorkspaceNotFound(error),
+          ...(times === undefined ? {} : { times }),
+        }),
       );
 
-    /** Ask again for what follows `request`, which failed with `cause` running `turnId`. */
-    const askAgain = Effect.fnUntraced(function* (
-      request: Request,
-      cause: Cause.Cause<unknown>,
-      turnId: Turn.Id | undefined,
-    ) {
-      // A runner shutting down leaves the request to Cluster, which delivers it again.
-      if (Cause.hasInterruptsOnly(cause)) return yield* Effect.interrupt;
-      const fields = { workspaceId, memberId, threadId, request: request.key };
-      if (isWorkspaceNotFound(cause))
-        return yield* Effect.logError(
-          "Turn job request dropped: its workspace was not found",
-          fields,
-        );
-      const failures = request.attempt + 1;
-      const next = afterFailure(request, failures, turnId);
-      yield* Effect.logWarning("Turn job request failed", {
-        ...fields,
-        failures,
-        next: next._tag,
-        cause,
-      });
-      const now = yield* DateTime.now;
-      switch (next._tag) {
-        case "Drop":
-          return;
-        case "GiveUp":
-          return yield* send(
-            new GiveUp({
-              workspaceId,
-              memberId,
-              threadId,
-              turnId: next.turnId,
-              key: `${request.key}/give-up`,
-              at: now,
-              attempt: 0,
-            }),
-          );
-        case "Retry": {
-          const retry = {
-            key: `${request.key}/retry-${failures}`,
-            at: DateTime.addDuration(now, JobRetry.delay(failures)),
-            attempt: failures,
-          };
-          if (request instanceof Run)
-            return yield* send(
-              new Run({
-                workspaceId,
-                memberId,
-                threadId,
-                ...retry,
-                ...(turnId === undefined ? {} : { turnId }),
-              }),
-            );
-          if (request instanceof Stop)
-            return yield* send(
-              new Stop({ workspaceId, memberId, threadId, ...retry, turnId: request.turnId }),
-            );
-          return yield* send(
-            new GiveUp({ workspaceId, memberId, threadId, ...retry, turnId: request.turnId }),
-          );
-        }
-      }
+    /** Leave the request's work for the next request to find, as it failed with `error` for good. */
+    const drop = (request: Request, error: unknown) =>
+      Effect.logError(
+        isWorkspaceNotFound(error)
+          ? "Turn job request dropped: its workspace was not found"
+          : "Turn job request dropped: it kept failing",
+        { ...named(request), error },
+      );
+
+    /** Give the turn up, as the request's runs kept failing to run it, trying until it holds. */
+    const giveUp = (request: Run, turnId: Turn.Id) =>
+      retrying(request, turnRunner.giveUp(turnId, "Its turn job kept failing to run it.")).pipe(
+        Effect.catch((error) => drop(request, error)),
+      );
+
+    /**
+     * Run the agent's next turn, trying again after each failed run until `maxFailures`. Then the
+     * turn a run accepted, if one did, is given up, and otherwise the request is dropped.
+     */
+    const runNextTurn = Effect.fnUntraced(function* (request: Run) {
+      /** The turn the runs accepted, once one did; a later run may fail before finding it again. */
+      const accepted = yield* Ref.make<Turn.Id | undefined>(undefined);
+      const run = turnRunner.runNextTurn.pipe(
+        Effect.tapError((error) => Ref.update(accepted, (turnId) => error.turnId ?? turnId)),
+      );
+      yield* retrying(request, run, maxFailures - 1).pipe(
+        Effect.catch(
+          Effect.fnUntraced(function* (error) {
+            const turnId = yield* Ref.get(accepted);
+            if (turnId === undefined || isWorkspaceNotFound(error))
+              return yield* drop(request, error);
+            yield* giveUp(request, turnId);
+          }),
+        ),
+      );
     });
 
-    /** Handle `request` by `work`, asking again for what follows when it fails. */
-    const handle = <E, R>(
-      request: Request,
-      work: Effect.Effect<unknown, E, R>,
-      turnIdOf: (error: E | undefined) => Turn.Id | undefined,
-    ) =>
-      Effect.flatMap(Effect.exit(work), (exit) =>
-        Exit.isSuccess(exit)
-          ? Effect.void
-          : askAgain(request, exit.cause, turnIdOf(errorOf(exit.cause) as E | undefined)),
+    /** Stop the turn, trying again after each failure until `maxFailures`; then it is dropped. */
+    const stopTurn = (request: Stop) =>
+      retrying(request, turnRunner.stopTurn(request.turnId), maxFailures - 1).pipe(
+        Effect.catch((error) => drop(request, error)),
       );
 
     return entity.of({
-      Run: ({ payload: run }) =>
-        handle(run, turnRunner.runNextTurn, (error) => error?.turnId ?? run.turnId),
-      Stop: ({ payload: stop }) =>
-        handle(stop, turnRunner.stopTurn(stop.turnId), () => stop.turnId),
-      GiveUp: ({ payload: giveUp }) =>
-        handle(
-          giveUp,
-          turnRunner.giveUp(giveUp.turnId, "Its turn job kept failing to run it."),
-          () => giveUp.turnId,
-        ),
+      Run: ({ payload: run }) => runNextTurn(run),
+      Stop: ({ payload: stop }) => stopTurn(stop),
     });
   }),
   { concurrency: "unbounded", maxIdleTime: "1 minute" },

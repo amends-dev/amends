@@ -10,17 +10,17 @@
  * `StreamPart`s until its `finish` part, and interrupting the stream aborts the turn. The harness
  * runs one turn of a session at a time, so an agent never sees a turn start while another runs.
  * A session outlives the process that started it: the agent keeps running after `detach` or
- * `suspendTurn`, and `startSession` picks the session up again from what those returned.
+ * `suspendTurn`, and `createSession` picks the session up again from what those returned.
  *
  * Every agent is made with `Options`, the models it runs on, which its adapter extends with what
  * only that agent takes.
  */
-import { type Network, Sandbox, type Template } from "@amends/sandbox";
+import { Sandbox, type Template } from "@amends/sandbox";
 import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
 import type { ModelEndpoint } from "./ModelEndpoint.ts";
-import type { StreamPart } from "./StreamPart.ts";
+import type { CompactionPart, StreamPart } from "./StreamPart.ts";
 
 /**
  * What every agent is made with: the model a turn runs on when it names none, and the models a turn
@@ -44,13 +44,13 @@ export interface Workspace {
   /** The sandbox, prepared with the agent's `template`. The agent never stops or destroys it. */
   readonly sandbox: Sandbox.Sandbox["Service"];
 
-  /** The absolute directory in the sandbox for this session. It exists before `startSession`. */
+  /** The absolute directory in the sandbox for this session. It exists before `createSession`. */
   readonly directory: string;
 }
 
 // TODO: Add a permission mode for the agent's own tools, and which of them it may use, once an
 // agent asks for approval before using its own tools.
-export interface StartSessionOptions {
+export interface CreateSessionOptions {
   readonly id: SessionId;
 
   /** Where the agent works. Absent only for an agent that does not require a sandbox. */
@@ -139,34 +139,34 @@ export interface AgentSession {
   ) => Effect.Effect<void, HarnessError>;
 
   /**
-   * Asks the agent to replace its conversation so far with a summary, guided by `instructions`. The
-   * summary arrives as a `compaction` part. Fails with `UnsupportedError` when the agent compacts
-   * only by itself.
+   * Replaces the conversation so far with a summary, guided by `instructions`, and returns the
+   * compaction. The session asks only between turns. Fails with `UnsupportedError` when the agent
+   * compacts only by itself.
    */
-  readonly compact: (instructions?: string) => Effect.Effect<void, HarnessError>;
+  readonly compact: (instructions?: string) => Effect.Effect<CompactionPart, HarnessError>;
 
   /**
    * Ends the running turn's stream, while the agent keeps working where it can, and returns what
-   * `startSession` takes as `unfinishedTurn` to continue the turn after any step whose
+   * `createSession` takes as `unfinishedTurn` to continue the turn after any step whose
    * `finish-step` it delivered.
    */
   readonly suspendTurn: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
-   * Lets go of the session between turns while the agent keeps running, returning what
-   * `startSession` takes as `agentState`.
+   * Releases the session between turns while the agent keeps running, returning what
+   * `createSession` takes as `agentState`.
    */
   readonly detach: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
-   * Stops the agent, returning what `startSession` takes as `agentState` to start it again with its
+   * Stops the agent, returning what `createSession` takes as `agentState` to start it again with its
    * conversation.
    */
   readonly stop: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
    * Stops the agent for good, deleting what it keeps of the session. It also destroys a session
-   * `suspendTurn`, `detach`, or `stop` let go of, and destroying it again succeeds.
+   * `suspendTurn`, `detach`, or `stop` released, and destroying it again succeeds.
    */
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
@@ -181,9 +181,6 @@ export interface Agent {
   /** Installs the agent in a sandbox. An agent that runs in the host's process has none. */
   readonly template?: Template.Template;
 
-  /** The ports the agent listens on in its sandbox, which the sandbox must be created with. */
-  readonly ports?: ReadonlyArray<Network.Port>;
-
   /**
    * The longest name of a host tool the agent takes, for an agent that adds to the names it is given
    * and so leaves a model API's 64 characters too few. A host names its tools to fit, with
@@ -191,8 +188,8 @@ export interface Agent {
    */
   readonly maxToolNameLength?: number;
 
-  /** Starts a session: a new one, or one picked up again from what an earlier session returned. */
-  readonly startSession: (
-    options: StartSessionOptions,
+  /** Creates a session: a new one, or one picked up again from what an earlier session returned. */
+  readonly createSession: (
+    options: CreateSessionOptions,
   ) => Effect.Effect<AgentSession, HarnessError>;
 }

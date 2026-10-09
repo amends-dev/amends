@@ -9,9 +9,11 @@ export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>
     memberId: Member.Id,
   },
 ) {}
+
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadMessageService.NotFound", {
   threadId: ThreadId.Id,
 }) {}
+
 export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(
   "ThreadMessageService.ParticipantUnavailable",
   {

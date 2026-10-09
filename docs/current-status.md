@@ -22,8 +22,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   thread's messages since the agent's last turn there, and posts the reply its job gives, the text
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
   conversation in each participation's session log, from which the agent's next turn there
-  resumes; resuming reads the whole log each turn, since nothing yet compacts a long one. A turn
-  cut short runs again from its prompt rather than continuing, and a session's sandbox is left
+  resumes; resuming reads the whole log each turn and goes on from its latest compaction. A turn
+  whose run stopped short continues where its agent kept it, as opencode does behind its bridge,
+  and runs again from its prompt otherwise, and a session's sandbox is left
   running between turns, never stopped or destroyed. A reader with a turn's log open follows it as
   a stream of its items and the step being written; the text being written is best effort, and a
   reader who starts following midway, or misses a draft while reconnecting, sees a step's text
@@ -37,14 +38,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - The [harness](../packages/harness/README.md) runs amends's own agent
   ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
-  the local host runs turns on both. Amends's agent does not summarize a conversation that
-  outgrows its model's context, and opencode's session API takes no instructions for a turn, so
-  opencode refuses a turn that gives some: only an agent without instructions runs on it.
+  the local host runs turns on both. Amends's agent compacts by itself only for a model whose
+  context window the catalog knows, not one of an OpenAI-compatible connection. opencode's session
+  API takes no instructions for a turn, so opencode refuses a turn that gives some: only an agent
+  without instructions runs on it, and it compacts only by itself.
 - The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
-  [Daytona](../adapters/sandbox-daytona/README.md). Local sandboxes share this machine's ports,
-  so only one that listens on a port, such as one running opencode's bridge, runs at a time. No
-  provider for E2B, Vercel, or Cloudflare exists; Cloudflare's SDK runs only inside a Worker, so
+  [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare
+  exists; Cloudflare's SDK runs only inside a Worker, so
   reaching it from a host needs its Bridge Worker.
 - [Connections](../packages/core/README.md#connections) are set up over HTTP and on the
   [Connections page](connections.md), from the integrations the

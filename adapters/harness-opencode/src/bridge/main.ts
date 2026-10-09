@@ -1,8 +1,8 @@
 /**
  * opencode's bridge program, which a host launches in its sandbox. It reads the launch options the
  * host gave it on standard input, makes opencode's driver from the agent options among them, and
- * serves the driver to hosts until a host asks it to exit. opencode's server exiting by itself ends
- * it too, for the next host to launch both again.
+ * serves the driver to hosts until it exits idle or another bridge takes its place. opencode's
+ * server exiting by itself ends it too, for the next host to launch both again.
  *
  * The driver runs the opencode installed beside the program, as the template installs it, unless
  * the agent options name another command.

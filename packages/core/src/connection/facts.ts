@@ -37,7 +37,7 @@ export const KeyReplaced = Fact.make("connection.key-replaced", {
   audience: workspace,
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
-  payload: Connection.Change,
+  payload: Connection.Reference,
 });
 
 /** Removed from use, with its key; its record remains. */
@@ -46,7 +46,7 @@ export const Removed = Fact.make("connection.removed", {
   version: 1,
   subject: (payload) => Subject.make("connection", payload.connectionId),
   occurrence: (payload) => [payload.connectionId],
-  payload: Connection.Change,
+  payload: Connection.Reference,
 });
 
 export * as ConnectionFacts from "./facts.ts";

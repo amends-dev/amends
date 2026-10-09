@@ -54,7 +54,7 @@ export class NotFoundError extends withDefaults(
 ) {}
 
 /**
- * The session was let go of: `Harness.startSession` picks it up again from what that returned, as
+ * The session was released: `Harness.createSession` picks it up again from what that returned, as
  * `resumeFrom`.
  */
 export class SessionClosedError extends withDefaults(

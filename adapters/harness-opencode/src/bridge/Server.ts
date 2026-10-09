@@ -55,7 +55,7 @@ export interface Server {
   /** Completes when the server exits, which it does before the scope closes only when it fails. */
   readonly exited: Effect.Effect<void>;
 
-  /** Starts a session working in `directory`, returning its id. */
+  /** Creates a session working in `directory`, returning its id. */
   readonly createSession: (options: {
     readonly directory: string;
     readonly model?: ModelRef;

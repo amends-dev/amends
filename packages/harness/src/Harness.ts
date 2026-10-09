@@ -21,7 +21,7 @@ import type * as Session from "./Session.ts";
  * What a session starts from: the `id` of a new session, with the conversation it starts with if
  * any, or what an earlier one returned.
  */
-export type StartSessionOptions = {
+export type CreateSessionOptions = {
   /**
    * The sandbox the agent works in, created from the agent's `template`. Required when the agent
    * `requiresSandbox`. A sandbox other than the one a resumed session last ran in has the
@@ -53,32 +53,32 @@ export class Harness extends Context.Service<
     /**
      * The agent the harness runs, as its adapter describes it: its id, the sandbox it works in, and
      * the names of tools it takes. Only the harness starts its sessions. Starting one fails with
-     * `UnsupportedError` without a sandbox when the agent `requiresSandbox`, or in a sandbox
-     * created without the agent's `ports`.
+     * `UnsupportedError` without a sandbox when the agent `requiresSandbox`.
      */
-    readonly agent: Omit<Agent, "startSession">;
+    readonly agent: Omit<Agent, "createSession">;
 
     /**
-     * Starts a session: a new one, which loads the `history` it is given, or one that goes on where
+     * Creates a session: a new one, which loads the `history` it is given, or one that goes on where
      * `resumeFrom` left it. The agent that last ran the session resumes from its own state. Any
      * other agent loads the conversation instead, and runs an unfinished turn again.
      */
-    readonly startSession: (
-      options: StartSessionOptions,
+    readonly createSession: (
+      options: CreateSessionOptions,
     ) => Effect.Effect<Session.Session, HarnessError>;
   }
 >()("@amends/harness/Harness") {}
 
 export const make = (agent: Agent): Harness["Service"] => {
-  /** Fails with `UnsupportedError` when the agent cannot work in `sandbox`. */
-  const checkSandbox = (sandbox: Sandbox.Sandbox["Service"] | undefined) => {
-    const description = sandboxRefusal(agent, sandbox);
-    return description === undefined
-      ? Effect.void
-      : Effect.fail(
-          new HarnessError({ agent: agent.id, reason: new UnsupportedError({ description }) }),
-        );
-  };
+  /** Fails with `UnsupportedError` when the agent requires a sandbox and has none. */
+  const checkSandbox = (sandbox: Sandbox.Sandbox["Service"] | undefined) =>
+    sandbox === undefined && agent.requiresSandbox
+      ? Effect.fail(
+          new HarnessError({
+            agent: agent.id,
+            reason: new UnsupportedError({ description: `${agent.id} works in a sandbox` }),
+          }),
+        )
+      : Effect.void;
 
   /** The session's workspace in `sandbox`, creating its directory if it does not exist yet. */
   const makeWorkspace = Effect.fnUntraced(
@@ -103,7 +103,7 @@ export const make = (agent: Agent): Harness["Service"] => {
   return Harness.of({
     agent,
 
-    startSession: Effect.fn("Harness.startSession")(function* (options) {
+    createSession: Effect.fn("Harness.createSession")(function* (options) {
       const { sandbox, resumeFrom } = options;
       const id = options.resumeFrom === undefined ? options.id : options.resumeFrom.id;
       yield* checkSandbox(sandbox);
@@ -112,7 +112,7 @@ export const make = (agent: Agent): Harness["Service"] => {
       // An agent's own state means something only to the agent that wrote it. Any other agent
       // starts from the conversation, and the session runs an unfinished turn again on it.
       const own = resumeFrom !== undefined && resumeFrom.agent === agent.id;
-      const agentSession = yield* agent.startSession({
+      const agentSession = yield* agent.createSession({
         id,
         workspace,
         history,
@@ -128,23 +128,6 @@ export const make = (agent: Agent): Harness["Service"] => {
       });
     }),
   });
-};
-
-/**
- * Why `agent` cannot work in `sandbox`, or nothing when it can: it requires a sandbox and has none,
- * or listens on ports the sandbox was not created with.
- */
-const sandboxRefusal = (
-  agent: Agent,
-  sandbox: Sandbox.Sandbox["Service"] | undefined,
-): string | undefined => {
-  if (sandbox === undefined) {
-    return agent.requiresSandbox ? `${agent.id} works in a sandbox` : undefined;
-  }
-  const missing = (agent.ports ?? []).filter((port) => !sandbox.ports.includes(port));
-  return missing.length === 0
-    ? undefined
-    : `${agent.id} listens on ports ${missing.join(", ")}, which the sandbox was not created with`;
 };
 
 /** A harness over `agent`, for programs that run one agent. */

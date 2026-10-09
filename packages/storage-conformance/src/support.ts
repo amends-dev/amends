@@ -89,7 +89,7 @@ const idleHarness = (id: string, requiresSandbox: boolean) =>
     AgentHarness.make({
       id,
       requiresSandbox,
-      startSession: () => Effect.die("No suite starts a session"),
+      createSession: () => Effect.die("No suite starts a session"),
     }),
   );
 

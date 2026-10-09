@@ -99,13 +99,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
   const memberTarget = (memberId: Member.Id) =>
     Target.Reference.cases.Member.make({ workspaceId, memberId });
   const connectionTarget = (connectionId: Connection.Id) =>
-    ({ _tag: "Connection", workspaceId, connectionId }) as const;
-
-  /** The workspace's connections that are not removed, by id, which agents' setups name. */
-  const readConnections = Effect.map(
-    connectionStore.listActive,
-    (records): AgentReadiness.Connections => new Map(records.map((record) => [record.id, record])),
-  );
+    Target.Reference.cases.Connection.make({ workspaceId, connectionId });
 
   /** Whether the agent can run as it is set up, as the host's integrations find its connections. */
   const readinessOf = (record: Agent.Record, connections: AgentReadiness.Connections) =>
@@ -146,7 +140,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
       Requirement.make(AgentPermissions.Configure, memberTarget(record.memberId)),
       Requirement.make(AgentPermissions.Use, memberTarget(record.memberId)),
     ]);
-    const readiness = yield* readinessOf(record, yield* readConnections);
+    const readiness = yield* readinessOf(record, yield* connectionStore.listActive);
     return Agent.view(record, name, readiness, { configurable, usable });
   });
 
@@ -156,18 +150,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
    * connection that gives one can be added after it.
    */
   const checkSetup = Effect.fnUntraced(function* (setup: AgentReadiness.Setup) {
-    const named: ReadonlyArray<{
-      readonly part: Agent.Part;
-      readonly connectionId: Connection.Id;
-    }> = [
-      ...(setup.harness._tag === "Connection"
-        ? [{ part: "harness" as const, connectionId: setup.harness.connectionId }]
-        : []),
-      { part: "model", connectionId: setup.model.connectionId },
-      ...(setup.sandbox === null
-        ? []
-        : [{ part: "sandbox" as const, connectionId: setup.sandbox.connectionId }]),
-    ];
+    const named = AgentReadiness.namedConnections(setup);
     // One grant resolution answers both permissions for every connection named.
     const permitted = yield* authorization.permitted(
       named.flatMap(({ connectionId }) => [
@@ -175,10 +158,11 @@ export const make = Effect.fn("AgentService.make")(function* () {
         Requirement.make(ConnectionPermissions.Use, connectionTarget(connectionId)),
       ]),
     );
-    const connections = yield* readConnections;
+    const connections = yield* connectionStore.listActive;
     for (const [index, { part, connectionId }] of named.entries()) {
-      const usable = permitted[index * 2] === true && permitted[index * 2 + 1] === true;
-      if (!usable || !connections.has(connectionId))
+      const [readable = false, usable = false] = permitted.slice(index * 2, index * 2 + 2);
+      const active = connections.some((connection) => connection.id === connectionId);
+      if (!readable || !usable || !active)
         return yield* new ConnectionUnavailable({ part, connectionId });
     }
     const issues = (yield* AgentReadiness.issuesOf(setup, connections, integrations)).filter(
@@ -187,51 +171,46 @@ export const make = Effect.fn("AgentService.make")(function* () {
     if (Array.isReadonlyArrayNonEmpty(issues)) return yield* new Incomplete({ issues });
   });
 
-  const list = Effect.gen(function* () {
-    yield* authorization.require([]);
+  /** The agents whose membership lasts, each with its name, in no particular order. */
+  const activeAgents = Effect.gen(function* () {
     const records = yield* agentStore.list;
-    const members = new Map(
-      (yield* memberStore.getMany(records.map((record) => record.memberId))).map((member) => [
-        member.id,
-        member,
-      ]),
-    );
+    const members = yield* memberStore.getMany(records.map((record) => record.memberId));
+    const membersById = new Map(members.map((member) => [member.id, member]));
     const active: Array<{ readonly record: Agent.Record; readonly name: Member.Name }> = [];
     for (const record of records) {
-      const member = members.get(record.memberId);
+      const member = membersById.get(record.memberId);
       if (member?.status === "active") active.push({ record, name: yield* nameOf(member) });
     }
+    return active;
+  });
+
+  /** Views by name, and by id among agents of one name. */
+  const byName = (left: Agent.View, right: Agent.View) =>
+    left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1);
+
+  const list = Effect.gen(function* () {
+    yield* authorization.require([]);
+    const agents = yield* activeAgents;
     // One grant resolution answers the three permissions for every agent.
     const permitted = yield* authorization.permitted(
-      active.flatMap(({ record }) => [
+      agents.flatMap(({ record }) => [
         Requirement.make(AgentPermissions.Read, memberTarget(record.memberId)),
         Requirement.make(AgentPermissions.Configure, memberTarget(record.memberId)),
         Requirement.make(AgentPermissions.Use, memberTarget(record.memberId)),
       ]),
     );
-    const connections = yield* readConnections;
-    const views = yield* Effect.forEach(
-      active.flatMap((agent, index) =>
-        permitted[index * 3] === true
-          ? [
-              {
-                ...agent,
-                access: {
-                  configurable: permitted[index * 3 + 1] === true,
-                  usable: permitted[index * 3 + 2] === true,
-                },
-              },
-            ]
-          : [],
-      ),
-      ({ record, name, access }) =>
-        Effect.map(readinessOf(record, connections), (readiness) =>
-          Agent.view(record, name, readiness, access),
-        ),
-    );
-    return views.toSorted(
-      (left, right) => left.name.localeCompare(right.name) || (left.id < right.id ? -1 : 1),
-    );
+    const connections = yield* connectionStore.listActive;
+    const views: Array<Agent.View> = [];
+    for (const [index, { record, name }] of agents.entries()) {
+      const [readable = false, configurable = false, usable = false] = permitted.slice(
+        index * 3,
+        index * 3 + 3,
+      );
+      if (!readable) continue;
+      const readiness = yield* readinessOf(record, connections);
+      views.push(Agent.view(record, name, readiness, { configurable, usable }));
+    }
+    return views.toSorted(byName);
   }).pipe(Effect.withSpan("AgentService.list"));
 
   const get = Effect.fn("AgentService.get")(function* (agentId: Agent.Id) {
@@ -298,8 +277,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         model: request.model,
         sandbox: request.sandbox,
       };
-      const configured = Agent.change(record, configuration);
-      if (sameConfiguration(configuration, record)) return yield* viewForActor(configured, name);
+      if (sameConfiguration(configuration, record)) return yield* viewForActor(record, name);
       yield* checkSetup(configuration);
       yield* journal.publish(AgentFacts.Configured, {
         workspaceId,
@@ -310,7 +288,7 @@ export const make = Effect.fn("AgentService.make")(function* () {
         model: configuration.model,
         sandbox: configuration.sandbox,
       });
-      return yield* viewForActor(configured, name);
+      return yield* viewForActor(Agent.change(record, configuration), name);
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

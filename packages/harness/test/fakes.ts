@@ -1,4 +1,3 @@
-import type { Port } from "@amends/sandbox/Network";
 import { Sandbox, SandboxId } from "@amends/sandbox/Sandbox";
 import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
@@ -7,7 +6,7 @@ import type {
   Agent,
   AgentSession,
   SessionId,
-  StartSessionOptions,
+  CreateSessionOptions,
   TurnOptions,
 } from "../src/Agent.ts";
 import type * as Bridge from "../src/Bridge.ts";
@@ -26,8 +25,8 @@ export type Script = (
 export interface FakeAgent {
   readonly agent: Agent;
 
-  /** What each `startSession` was given, in order. */
-  readonly starts: ReadonlyArray<StartSessionOptions>;
+  /** What each `createSession` was given, in order. */
+  readonly createdWith: ReadonlyArray<CreateSessionOptions>;
 
   /** What each turn the agent ran from its prompt was given, in order. */
   readonly turns: ReadonlyArray<TurnOptions>;
@@ -46,9 +45,6 @@ export interface FakeAgentOptions {
   /** Whether every session needs a sandbox, as most agents do. True by default. */
   readonly requiresSandbox?: boolean;
 
-  /** The ports the agent listens on in its sandbox. None by default. */
-  readonly ports?: ReadonlyArray<Port>;
-
   /** The longest name of a host tool the agent takes. No limit by default. */
   readonly maxToolNameLength?: number;
 
@@ -59,21 +55,24 @@ export interface FakeAgentOptions {
   readonly losesUnfinishedTurns?: boolean;
 
   /**
-   * Runs when the session suspends, detaches, stops, or is destroyed, before the agent lets go.
-   * When it fails, so does the agent, letting go of nothing.
+   * Runs when the session suspends, detaches, stops, or is destroyed, before the agent releases the session.
+   * When it fails, so does the agent, releasing nothing.
    */
   readonly beforeLettingGo?: Effect.Effect<void, HarnessError>;
+
+  /** Runs when the session compacts, before the agent summarizes. When it fails, so does `compact`. */
+  readonly beforeCompacting?: Effect.Effect<void, HarnessError>;
 }
 
 /**
  * An agent whose turns follow `script`, recording what the harness asks of it. Its own state, which
  * `suspendTurn`, `detach`, and `stop` return, names the agent, so tests can tell whose state
- * reached `startSession`. Like an agent whose turn keeps running, `continueTurn` follows the script
+ * reached `createSession`. Like an agent whose turn keeps running, `continueTurn` follows the script
  * for the turn again after the steps the harness has.
  */
 export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOptions = {}) =>
   Effect.gen(function* () {
-    const starts: Array<StartSessionOptions> = [];
+    const createdWith: Array<CreateSessionOptions> = [];
     const turns: Array<TurnOptions> = [];
     const continued: Array<number> = [];
     const submitted: Array<unknown> = [];
@@ -83,11 +82,10 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
     const agent: Agent = {
       id,
       requiresSandbox: options.requiresSandbox ?? true,
-      ports: options.ports,
       maxToolNameLength: options.maxToolNameLength,
-      startSession: (startOptions) =>
+      createSession: (sessionOptions) =>
         Effect.gen(function* () {
-          starts.push(startOptions);
+          createdWith.push(sessionOptions);
           /** Done once the session is suspended, stopped, or destroyed, ending the running turn. */
           const closed = yield* Deferred.make<void>();
           const close = Deferred.succeed(closed, undefined);
@@ -98,7 +96,7 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
             );
           const session: AgentSession = {
             hasUnfinishedTurn:
-              startOptions.unfinishedTurn !== undefined && options.losesUnfinishedTurns !== true,
+              sessionOptions.unfinishedTurn !== undefined && options.losesUnfinishedTurns !== true,
             promptTurn: (turn) =>
               Stream.suspend(() => {
                 turns.push(turn);
@@ -115,7 +113,12 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
                 Queue.offer(toolResults, result.result),
               ),
             approve: (response) => Effect.sync(() => void approvals.push(response)),
-            compact: () => Effect.void,
+            compact: (instructions) =>
+              Effect.as(options.beforeCompacting ?? Effect.void, {
+                type: "compaction",
+                trigger: "manual",
+                summary: `codex summarizes${instructions === undefined ? "" : `, ${instructions}`}`,
+              }),
             suspendTurn: Effect.andThen(
               beforeLettingGo,
               Effect.as(close, { agent: id, turn: true }),
@@ -128,14 +131,14 @@ export const makeFakeAgent = (id: string, script: Script, options: FakeAgentOpti
         }),
     };
 
-    const fake: FakeAgent = { agent, starts, turns, continued, submitted, approvals };
+    const fake: FakeAgent = { agent, createdWith, turns, continued, submitted, approvals };
     return fake;
   });
 
 /**
  * Reads `turn` in the background, returning the fiber that collects its parts once the reader has
  * the part `reached` accepts. The session delivers a part the agent sent only when it is read, so a
- * test that lets go of a turn after a part waits for the reader, not the agent.
+ * test that releases a turn after a part waits for the reader, not the agent.
  */
 export const readUntil = <E, R>(
   turn: Stream.Stream<StreamPart, E, R>,
@@ -186,8 +189,8 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
     childProcessSpawner: ChildProcessSpawner.make(() =>
       Effect.die("The fake sandbox runs no processes"),
     ),
-    ports: [],
-    endpoint: () => Effect.die("The fake sandbox exposes no ports"),
+    exposePorts: () => Effect.void,
+    endpoint: () => Effect.die("The fake sandbox reaches no ports"),
     stop: Effect.void,
     destroy: Effect.void,
     setNetworkPolicy: () => Effect.void,
@@ -210,14 +213,14 @@ const textOf = (message: Prompt.UserMessage) =>
 
 /**
  * A driver whose turns stream what `script` gives for the prompt's text, recording what the bridge
- * asks of it. A session's state names it and how many sessions the driver started, so tests can
- * tell which start a state came from, and a session started from a state keeps its conversation.
+ * asks of it. A session's state names it and how many sessions the driver created, so tests can
+ * tell which creation a state came from, and a session started from a state keeps its conversation.
  */
 export interface FakeDriver {
   readonly driver: Bridge.Driver;
 
-  /** What each `startSession` was given, in order. */
-  readonly starts: ReadonlyArray<Bridge.StartSessionOptions>;
+  /** What each `createSession` was given, in order. */
+  readonly createdWith: ReadonlyArray<Bridge.CreateSessionOptions>;
 
   /** What each turn was given, in order. */
   readonly turns: ReadonlyArray<Bridge.TurnOptions>;
@@ -239,7 +242,7 @@ export const makeFakeDriver = (
   script: (prompt: string) => Stream.Stream<StreamPart, HarnessError>,
 ) =>
   Effect.sync(() => {
-    const starts: Array<Bridge.StartSessionOptions> = [];
+    const createdWith: Array<Bridge.CreateSessionOptions> = [];
     const turns: Array<Bridge.TurnOptions> = [];
     const turnEnds: Array<"finished" | "failed" | "interrupted"> = [];
     const submitted: Array<unknown> = [];
@@ -248,11 +251,11 @@ export const makeFakeDriver = (
 
     const driver: Bridge.Driver = {
       id: "fake",
-      startSession: (options) =>
+      createSession: (options) =>
         Effect.gen(function* () {
-          starts.push(options);
+          createdWith.push(options);
           yield* Effect.addFinalizer(() => Effect.sync(() => ended.push(options.id)));
-          const startNumber = starts.length;
+          const created = createdWith.length;
           const session: Bridge.DriverSession = {
             keptConversation: options.agentState !== undefined,
             promptTurn: (turn) =>
@@ -274,15 +277,15 @@ export const makeFakeDriver = (
               }),
             submitToolResult: (result) => Effect.sync(() => void submitted.push(result.result)),
             approve: () => Effect.void,
-            compact: () => Effect.void,
-            state: Effect.succeed({ session: options.id, start: startNumber }),
+            compact: () => Effect.succeed({ type: "compaction", trigger: "manual", summary: "" }),
+            state: Effect.succeed({ session: options.id, created }),
             destroy: Effect.sync(() => void destroyed.push(options.id)),
           };
           return session;
         }),
     };
 
-    const fake: FakeDriver = { driver, starts, turns, turnEnds, submitted, ended, destroyed };
+    const fake: FakeDriver = { driver, createdWith, turns, turnEnds, submitted, ended, destroyed };
     return fake;
   });
 

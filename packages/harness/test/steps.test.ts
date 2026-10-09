@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Schema } from "effect";
 import { GenerateResult } from "../src/GenerateResult.ts";
-import { messagesOfStep } from "../src/Session.ts";
+import { Prompt } from "effect/ai";
+import { recordStep } from "../src/Session.ts";
 import { Step, type StreamPart, stepsOf } from "../src/StreamPart.ts";
 
 const usage = { inputTokens: { total: 10 }, outputTokens: { total: 5 } };
@@ -153,11 +154,14 @@ describe("stepsOf", () => {
   );
 });
 
-describe("messagesOfStep", () => {
+describe("recordStep", () => {
+  const hello = Prompt.make("Hello.");
+
   it("records what a step wrote and the tools it called, with their results, as the model's own", () => {
     const [step] = stepsOf(readingStep);
 
-    expect(messagesOfStep(step!)).toMatchObject([
+    expect(recordStep(hello, step!).content).toMatchObject([
+      { role: "user" },
       {
         role: "assistant",
         content: [
@@ -179,7 +183,7 @@ describe("messagesOfStep", () => {
       { type: "tool-call", id: "call-write", name: "write", params: { path: "sum.md" } },
     ]);
 
-    expect(messagesOfStep(step!)[1]).toMatchObject({
+    expect(recordStep(hello, step!).content[2]).toMatchObject({
       role: "tool",
       content: [
         {
@@ -190,7 +194,48 @@ describe("messagesOfStep", () => {
         },
       ],
     });
-    expect(messagesOfStep({ parts: [{ type: "text", text: "" }] })).toEqual([]);
+    expect(recordStep(hello, { parts: [{ type: "text", text: "" }] })).toEqual(hello);
+  });
+
+  it("replaces the conversation, and what the step had before, with the summary of a compaction", () => {
+    const step: Step = {
+      parts: [
+        { type: "text", text: "Before." },
+        { type: "compaction", trigger: "auto", summary: "Ada said hello." },
+        { type: "text", text: "After." },
+      ],
+    };
+
+    expect(recordStep(hello, step).content).toMatchObject([
+      {
+        role: "user",
+        content: [{ type: "text", text: expect.stringMatching(/\n\nAda said hello\.$/) }],
+      },
+      { role: "assistant", content: [{ type: "text", text: "After." }] },
+    ]);
+  });
+
+  it("keeps the messages a compaction kept after its summary", () => {
+    const step: Step = {
+      parts: [
+        {
+          type: "compaction",
+          trigger: "auto",
+          summary: "Ada said hello.",
+          kept: [{ role: "user", content: "What is 2 and 3?" }],
+        },
+        { type: "text", text: "5." },
+      ],
+    };
+
+    expect(recordStep(hello, step).content).toMatchObject([
+      {
+        role: "user",
+        content: [{ type: "text", text: expect.stringMatching(/Ada said hello\.$/) }],
+      },
+      { role: "user", content: [{ type: "text", text: "What is 2 and 3?" }] },
+      { role: "assistant", content: [{ type: "text", text: "5." }] },
+    ]);
   });
 });
 

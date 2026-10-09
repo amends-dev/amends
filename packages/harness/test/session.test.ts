@@ -64,12 +64,12 @@ const readingMessages = [
   },
 ];
 
-/** Starts a session on a fake agent following `script`. */
-const startSession = (script: Script, options?: FakeAgentOptions) =>
+/** Creates a session on a fake agent following `script`. */
+const createSession = (script: Script, options?: FakeAgentOptions) =>
   Effect.gen(function* () {
     const fake = yield* makeFakeAgent("codex", script, options);
     const { sandbox } = yield* makeFakeSandbox;
-    const session = yield* Harness.make(fake.agent).startSession({ sandbox, id });
+    const session = yield* Harness.make(fake.agent).createSession({ sandbox, id });
     return { fake, session };
   });
 
@@ -138,7 +138,7 @@ const toolActivity = (parts: Iterable<StreamPart>) =>
 describe("Session", () => {
   it.effect("streams a turn's parts as the agent sends them, and returns the whole turn", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(answers);
+      const { session } = yield* createSession(answers);
 
       const parts = yield* Stream.runCollect(session.stream({ prompt: "hello" }));
       const result = yield* session.generate({ prompt: "again" });
@@ -151,7 +151,7 @@ describe("Session", () => {
 
   it.effect("runs the host's tool the agent calls and gives the agent its result", () =>
     Effect.gen(function* () {
-      const { fake, session } = yield* startSession((_prompt, host) =>
+      const { fake, session } = yield* createSession((_prompt, host) =>
         Stream.concat(
           Stream.make({ type: "tool-call", id: "call-one", name: "Add", params: { a: 2, b: 3 } }),
           Stream.unwrap(
@@ -185,7 +185,7 @@ describe("Session", () => {
     "fails with InvalidOutputError when the agent calls a tool the host does not have",
     () =>
       Effect.gen(function* () {
-        const { session } = yield* startSession(() =>
+        const { session } = yield* createSession(() =>
           Stream.make({ type: "tool-call", id: "call-one", name: "Delete", params: {} }),
         );
 
@@ -197,7 +197,7 @@ describe("Session", () => {
 
   it.effect("asks for JSON and decodes the answer with the schema", () =>
     Effect.gen(function* () {
-      const { fake, session } = yield* startSession(() =>
+      const { fake, session } = yield* createSession(() =>
         Stream.fromIterable(reply('{"answer":42}')),
       );
 
@@ -213,7 +213,7 @@ describe("Session", () => {
 
   it.effect("fails with StructuredOutputError, keeping the answer, when it does not decode", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(() => Stream.fromIterable(reply("not JSON")));
+      const { session } = yield* createSession(() => Stream.fromIterable(reply("not JSON")));
 
       const error = yield* Effect.flip(
         session.generateObject({
@@ -234,7 +234,7 @@ describe("Session", () => {
     () =>
       Effect.gen(function* () {
         const failure = { message: "The key was rejected" };
-        const { session } = yield* startSession(() =>
+        const { session } = yield* createSession(() =>
           Stream.make(
             { type: "error", error: failure },
             { type: "finish", reason: "error", usage: { inputTokens: {}, outputTokens: {} } },
@@ -257,7 +257,7 @@ describe("Session", () => {
     () =>
       Effect.gen(function* () {
         const running = yield* Deferred.make<void>();
-        const { session } = yield* startSession((prompt, host) =>
+        const { session } = yield* createSession((prompt, host) =>
           prompt === "slow"
             ? Stream.concat(
                 Stream.fromEffectDrain(Deferred.succeed(running, undefined)),
@@ -281,7 +281,7 @@ describe("Session", () => {
 
   it.effect("suspends a running turn, ending its stream, and returns it unfinished", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(() =>
+      const { session } = yield* createSession(() =>
         Stream.concat(Stream.make({ type: "text-start", id: "answer" }), Stream.never),
       );
 
@@ -297,9 +297,9 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("destroys a session already let go of, and again after it is destroyed", () =>
+  it.effect("destroys a session already released, and again after it is destroyed", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(answers);
+      const { session } = yield* createSession(answers);
       yield* session.detach;
 
       yield* session.destroy;
@@ -317,7 +317,7 @@ describe("Session", () => {
         const started = yield* Deferred.make<void>();
         const answering = yield* Deferred.make<void>();
         const answered = yield* Deferred.make<void>();
-        const { session } = yield* startSession(
+        const { session } = yield* createSession(
           () =>
             Stream.concat(
               Stream.fromEffectDrain(
@@ -325,7 +325,7 @@ describe("Session", () => {
               ),
               Stream.fromIterable(reply("Done")),
             ),
-          // The turn finishes while the agent lets go of it.
+          // The turn finishes while the agent releases it.
           {
             beforeLettingGo: Effect.andThen(
               Deferred.succeed(answering, undefined),
@@ -354,7 +354,7 @@ describe("Session", () => {
 
   it.effect("ends a turn stop aborted with an error, keeping it as far as it got", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(() =>
+      const { session } = yield* createSession(() =>
         Stream.concat(
           Stream.fromIterable<StreamPart>([
             ...readingStep,
@@ -389,7 +389,7 @@ describe("Session", () => {
     "keeps a turn the caller stopped reading in the conversation, answering the call it left",
     () =>
       Effect.gen(function* () {
-        const { session } = yield* startSession(() =>
+        const { session } = yield* createSession(() =>
           Stream.concat(Stream.fromIterable(readingStep.slice(0, 4)), Stream.never),
         );
 
@@ -425,7 +425,7 @@ describe("Session", () => {
 
   it.effect("answers the calls of a turn that failed partway through a step", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(() =>
+      const { session } = yield* createSession(() =>
         Stream.fromIterable<StreamPart>([
           ...readingStep.slice(0, 4),
           { type: "error", error: { message: "The connection broke" } },
@@ -463,7 +463,7 @@ describe("Session", () => {
             }),
           ),
         );
-        const { fake, session } = yield* startSession((_prompt, host) =>
+        const { fake, session } = yield* createSession((_prompt, host) =>
           Stream.concat(
             Stream.make(
               { type: "tool-call", id: "call-wait", name: "Wait", params: {} },
@@ -500,7 +500,7 @@ describe("Session", () => {
   it.effect("asks before running a host tool that needs approval, and runs it once approved", () =>
     Effect.gen(function* () {
       const { toolkit, runs } = yield* makeDeleteToolkit;
-      const { fake, session } = yield* startSession(callingDelete);
+      const { fake, session } = yield* createSession(callingDelete);
       const whenAsked: Array<{ readonly runs: number; readonly submitted: number }> = [];
 
       const parts = yield* Stream.runCollect(
@@ -531,7 +531,7 @@ describe("Session", () => {
   it.effect("answers a call that approve refuses as denied, and does not run the tool", () =>
     Effect.gen(function* () {
       const { toolkit, runs } = yield* makeDeleteToolkit;
-      const { fake, session } = yield* startSession(callingDelete);
+      const { fake, session } = yield* createSession(callingDelete);
 
       const parts = yield* Stream.runCollect(
         session
@@ -556,7 +556,7 @@ describe("Session", () => {
   it.effect("gives a refusal without a reason one the agent can read", () =>
     Effect.gen(function* () {
       const { toolkit } = yield* makeDeleteToolkit;
-      const { fake, session } = yield* startSession(callingDelete);
+      const { fake, session } = yield* createSession(callingDelete);
 
       yield* Stream.runDrain(
         session.stream({ prompt: "clean", toolkit }).pipe(answering(session, { approved: false })),
@@ -593,7 +593,7 @@ describe("Session", () => {
             }),
           ),
         );
-        const { fake, session } = yield* startSession((_prompt, host) =>
+        const { fake, session } = yield* createSession((_prompt, host) =>
           Stream.concat(
             Stream.make(
               { type: "tool-call", id: "call-small", name: "Transfer", params: { amount: 50 } },
@@ -631,7 +631,7 @@ describe("Session", () => {
   it.effect("denies approval requests in a turn it returns whole, and does not run the tool", () =>
     Effect.gen(function* () {
       const { toolkit, runs } = yield* makeDeleteToolkit;
-      const { fake, session } = yield* startSession(callingDelete);
+      const { fake, session } = yield* createSession(callingDelete);
 
       const result = yield* session.generate({ prompt: "clean", toolkit });
 
@@ -646,7 +646,7 @@ describe("Session", () => {
   it.effect("passes on approvals it did not ask for, also once the stream that asked ended", () =>
     Effect.gen(function* () {
       const { toolkit, runs } = yield* makeDeleteToolkit;
-      const { fake, session } = yield* startSession(callingDelete);
+      const { fake, session } = yield* createSession(callingDelete);
       const asked = yield* Deferred.make<string>();
       const reading = yield* Effect.forkChild(
         Stream.runDrain(
@@ -678,7 +678,7 @@ describe("Session", () => {
 
   it.effect("leaves a turn the agent refused before it began out of the conversation", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(() =>
+      const { session } = yield* createSession(() =>
         Stream.fail(
           new HarnessError({
             agent: "codex",
@@ -694,11 +694,11 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("starts no turn while it lets go", () =>
+  it.effect("starts no turn while it releases the session", () =>
     Effect.gen(function* () {
       const lettingGo = yield* Deferred.make<void>();
       const letGo = yield* Deferred.make<void>();
-      const { fake, session } = yield* startSession(answers, {
+      const { fake, session } = yield* createSession(answers, {
         beforeLettingGo: Effect.andThen(
           Deferred.succeed(lettingGo, undefined),
           Deferred.await(letGo),
@@ -717,34 +717,36 @@ describe("Session", () => {
     }),
   );
 
-  it.effect("stays open when the agent fails to let go, so that it can be tried again", () =>
-    Effect.gen(function* () {
-      const attempts = yield* Ref.make(0);
-      const unavailable = new HarnessError({ agent: "codex", reason: new UnavailableError({}) });
-      const { session } = yield* startSession(answers, {
-        beforeLettingGo: Effect.flatMap(
-          Ref.getAndUpdate(attempts, (n) => n + 1),
-          (attempt) => (attempt === 0 ? Effect.fail(unavailable) : Effect.void),
-        ),
-      });
+  it.effect(
+    "stays open when the agent fails to release the session, so that it can be tried again",
+    () =>
+      Effect.gen(function* () {
+        const attempts = yield* Ref.make(0);
+        const unavailable = new HarnessError({ agent: "codex", reason: new UnavailableError({}) });
+        const { session } = yield* createSession(answers, {
+          beforeLettingGo: Effect.flatMap(
+            Ref.getAndUpdate(attempts, (n) => n + 1),
+            (attempt) => (attempt === 0 ? Effect.fail(unavailable) : Effect.void),
+          ),
+        });
 
-      const failed = yield* Effect.flip(session.stop);
-      const result = yield* session.generate({ prompt: "hello" });
-      const state = yield* session.stop;
+        const failed = yield* Effect.flip(session.stop);
+        const result = yield* session.generate({ prompt: "hello" });
+        const state = yield* session.stop;
 
-      expect(failed.reason._tag).toBe("UnavailableError");
-      expect(result.text).toBe("codex answers hello");
-      expect(state.history.content).toMatchObject([
-        { role: "user", content: [{ type: "text", text: "hello" }] },
-        { role: "assistant", content: [{ type: "text", text: "codex answers hello" }] },
-      ]);
-    }),
+        expect(failed.reason._tag).toBe("UnavailableError");
+        expect(result.text).toBe("codex answers hello");
+        expect(state.history.content).toMatchObject([
+          { role: "user", content: [{ type: "text", text: "hello" }] },
+          { role: "assistant", content: [{ type: "text", text: "codex answers hello" }] },
+        ]);
+      }),
   );
 
   it.effect("refuses to detach while a turn runs", () =>
     Effect.gen(function* () {
       const running = yield* Deferred.make<void>();
-      const { session } = yield* startSession(() =>
+      const { session } = yield* createSession(() =>
         Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
       );
 
@@ -765,7 +767,7 @@ describe("Session", () => {
           ...readingStep,
           { type: "tool-call", id: "call-add", name: "Add", params: { a: 2, b: 3 } },
         ];
-        const { session } = yield* startSession((_prompt, host) =>
+        const { session } = yield* createSession((_prompt, host) =>
           Stream.concat(
             Stream.fromIterable(readStep),
             Stream.unwrap(
@@ -845,7 +847,7 @@ describe("Session", () => {
 
   it.effect("records each finished turn's prompt and answer in the conversation it returns", () =>
     Effect.gen(function* () {
-      const { session } = yield* startSession(answers);
+      const { session } = yield* createSession(answers);
 
       yield* session.generate({ prompt: "hello" });
       yield* session.generate({ prompt: "again" });
@@ -865,6 +867,130 @@ describe("Session", () => {
         ["assistant", "codex answers again"],
       ]);
       expect(state.agentState).toEqual({ agent: "codex" });
+    }),
+  );
+});
+
+describe("Session compaction", () => {
+  /** The user message a compacted conversation starts with, holding `summary`. */
+  const summaryMessage = (summary: string) => ({
+    role: "user",
+    content: [{ type: "text", text: expect.stringMatching(new RegExp(`\n\n${summary}$`)) }],
+  });
+
+  it.effect("keeps a compaction the agent makes during a turn in place of what came before", () =>
+    Effect.gen(function* () {
+      const { session } = yield* createSession((prompt, host) =>
+        prompt === "long"
+          ? Stream.fromIterable([
+              ...readingStep,
+              { type: "compaction", trigger: "auto", summary: "codex read the notes" },
+              ...reply("The sum is 5"),
+            ])
+          : answers(prompt, host),
+      );
+
+      yield* session.generate({ prompt: "hello" });
+      const parts = yield* Stream.runCollect(session.stream({ prompt: "long" }));
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(parts).toContainEqual({
+        type: "compaction",
+        trigger: "auto",
+        summary: "codex read the notes",
+      });
+      expect(state.history.content).toMatchObject([
+        summaryMessage("codex read the notes"),
+        { role: "assistant", content: [{ type: "text", text: "The sum is 5" }] },
+        { role: "user", content: [{ type: "text", text: "again" }] },
+        { role: "assistant", content: [{ type: "text", text: "codex answers again" }] },
+      ]);
+    }),
+  );
+
+  it.effect("compacts between turns, and the conversation goes on from the summary", () =>
+    Effect.gen(function* () {
+      const { session } = yield* createSession(answers);
+
+      yield* session.generate({ prompt: "hello" });
+      const compaction = yield* session.compact("keep the greeting");
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(compaction).toEqual({
+        type: "compaction",
+        trigger: "manual",
+        summary: "codex summarizes, keep the greeting",
+      });
+      expect(state.history.content).toMatchObject([
+        summaryMessage("codex summarizes, keep the greeting"),
+        { role: "user", content: [{ type: "text", text: "again" }] },
+        { role: "assistant", content: [{ type: "text", text: "codex answers again" }] },
+      ]);
+    }),
+  );
+
+  it.effect("refuses to compact while a turn runs", () =>
+    Effect.gen(function* () {
+      const running = yield* Deferred.make<void>();
+      const { session } = yield* createSession(() =>
+        Stream.concat(Stream.fromEffectDrain(Deferred.succeed(running, undefined)), Stream.never),
+      );
+
+      yield* Stream.runCollect(session.stream({ prompt: "slow" })).pipe(Effect.forkChild);
+      yield* Deferred.await(running);
+      const refused = yield* Effect.flip(session.compact());
+
+      expect(refused.reason._tag).toBe("TurnInProgressError");
+    }),
+  );
+
+  it.effect("starts no turn while it compacts", () =>
+    Effect.gen(function* () {
+      const compacting = yield* Deferred.make<void>();
+      const compacted = yield* Deferred.make<void>();
+      const { fake, session } = yield* createSession(answers, {
+        beforeCompacting: Effect.andThen(
+          Deferred.succeed(compacting, undefined),
+          Deferred.await(compacted),
+        ),
+      });
+
+      const compaction = yield* Effect.forkChild(session.compact());
+      yield* Deferred.await(compacting);
+      const refused = yield* Effect.flip(session.generate({ prompt: "hello" }));
+      yield* Deferred.succeed(compacted, undefined);
+      yield* Fiber.join(compaction);
+      const result = yield* session.generate({ prompt: "again" });
+
+      expect(refused.reason._tag).toBe("TurnInProgressError");
+      expect(fake.turns.map((turn) => turn.prompt.content)).toMatchObject([
+        [{ type: "text", text: "again" }],
+      ]);
+      expect(result.text).toBe("codex answers again");
+    }),
+  );
+
+  it.effect("keeps the conversation as it was when the agent fails to compact", () =>
+    Effect.gen(function* () {
+      const unsupported = new HarnessError({ agent: "codex", reason: new UnsupportedError({}) });
+      const { session } = yield* createSession(answers, {
+        beforeCompacting: Effect.fail(unsupported),
+      });
+
+      yield* session.generate({ prompt: "hello" });
+      const failed = yield* Effect.flip(session.compact());
+      yield* session.generate({ prompt: "again" });
+      const state = yield* session.detach;
+
+      expect(failed.reason._tag).toBe("UnsupportedError");
+      expect(state.history.content.map((message) => message.role)).toEqual([
+        "user",
+        "assistant",
+        "user",
+        "assistant",
+      ]);
     }),
   );
 });

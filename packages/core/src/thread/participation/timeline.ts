@@ -12,16 +12,21 @@ export const FollowedItem = Schema.Struct({
   activity: ThreadParticipationActivity.Followed.Activity,
   participant: ThreadParticipation.Summary,
 });
+
 export interface FollowedItem extends Schema.Schema.Type<typeof FollowedItem> {}
+
 /** A participation ending, with the participant's public summary. */
 export const EndedItem = Schema.Struct({
   activity: ThreadParticipationActivity.Ended.Activity,
   participant: ThreadParticipation.Summary,
 });
+
 export interface EndedItem extends Schema.Schema.Type<typeof EndedItem> {}
 
 type Followed = FollowedItem;
+
 type Ended = EndedItem;
+
 declare module "../activity/kind.ts" {
   interface Items {
     "participation.followed": Followed;

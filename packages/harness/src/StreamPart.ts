@@ -11,7 +11,7 @@
  * tools; a caller that needs their types decodes them with the tool's schemas.
  */
 import { Predicate, Schema } from "effect";
-import { Response } from "effect/ai";
+import { Prompt, Response } from "effect/ai";
 
 /** A call to any tool. The agent's own tools run inside the agent and are `providerExecuted`. */
 const ToolCallPart = Schema.Struct({
@@ -60,18 +60,43 @@ export interface FileChangePart extends Schema.Schema.Type<typeof FileChangePart
 
 /**
  * Reports that the agent replaced its conversation so far with a summary, because it was asked to
- * (`manual`) or because the conversation outgrew its context (`auto`).
+ * (`manual`) or because the conversation outgrew its context (`auto`). The conversation goes on
+ * from the summary and the messages the agent kept, in place of everything before the compaction,
+ * as `Session.recordStep` records it. An agent that compacts during a turn streams the compaction
+ * between two steps, so that it starts the step after; `AgentSession.compact` returns one made
+ * between turns.
  */
 export const CompactionPart = Schema.Struct({
   type: Schema.tag("compaction"),
   trigger: Schema.Literals(["manual", "auto"]),
+
+  /** What the conversation before `kept` said. */
   summary: Schema.String,
+
+  /**
+   * The latest messages before the compaction, which the conversation keeps as they were after the
+   * summary, as the conversation records them, in their encoded form. None when the summary covers
+   * everything.
+   */
+  kept: Schema.optional(Schema.Array(Schema.toEncoded(Prompt.Message))),
   tokensBefore: Schema.optional(Schema.Int),
   tokensAfter: Schema.optional(Schema.Int),
   metadata: Schema.optional(Response.ProviderMetadata),
 });
 
 export interface CompactionPart extends Schema.Schema.Type<typeof CompactionPart> {}
+
+/**
+ * Starts a turn that runs apart from the host, as in a sandbox, with what `createSession` takes as
+ * the unfinished turn's `agentState`. A caller that keeps it continues the turn with
+ * `continueStream` once the host that ran it is gone, catching up on the steps it does not have.
+ */
+export const TurnStartPart = Schema.Struct({
+  type: Schema.tag("turn-start"),
+  agentState: Schema.Json,
+});
+
+export interface TurnStartPart extends Schema.Schema.Type<typeof TurnStartPart> {}
 
 // TODO: Add a `raw` part carrying the agent's own event as it came, once a caller needs something
 // the translation into these parts leaves out.
@@ -97,8 +122,9 @@ export const StreamPart = Schema.Union([
   FinishStepPart,
   FileChangePart,
   CompactionPart,
+  TurnStartPart,
 ]) satisfies Schema.Codec<
-  Response.StreamPartEncoded | FinishStepPart | FileChangePart | CompactionPart
+  Response.StreamPartEncoded | FinishStepPart | FileChangePart | CompactionPart | TurnStartPart
 >;
 
 export type StreamPart = Superset<typeof StreamPart.Type, Response.StreamPartEncoded>;
@@ -203,6 +229,7 @@ const addUpStep = (parts: ReadonlyArray<StreamPart>): Array<StepPart> => {
       case "tool-params-end":
       case "finish-step":
       case "finish":
+      case "turn-start":
         break;
       case "tool-result":
         if (part.preliminary !== true) added.push(part);

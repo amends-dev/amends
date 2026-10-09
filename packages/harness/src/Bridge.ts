@@ -1,11 +1,17 @@
 /**
  * A bridge is the program through which hosts reach an agent that works in a sandbox, such as
- * opencode, Codex, or Claude Code. One bridge runs for the agent in each sandbox and serves every
- * session there. It is all the sandbox exposes of the agent: it listens on the agent's port, behind
- * a token that only hosts know, and runs the agent where nothing outside the sandbox reaches it.
+ * opencode, Codex, or Claude Code. It is all the sandbox exposes of the agent: it listens on a port
+ * of its own, behind a token that only hosts know, and runs the agent where nothing outside the
+ * sandbox reaches it.
+ *
+ * A bridge is named by its `BridgeId`, which hosts derive from everything they launch it with, and
+ * serves every session that hosts start with those settings. A host finds the bridge by its id, in
+ * the `listening.json` the bridge writes in its state directory, and launches it when none answers
+ * there; a host with other settings runs a bridge of its own beside it. A bridge exits once it has
+ * been idle for a while, or once another bridge of its id has taken its place.
  *
  * The bridge runs each turn itself, so that a turn goes on when a host's connection drops or the
- * host lets go, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
+ * host releases the session, until it finishes or a host aborts it. It numbers each turn's parts and keeps them,
  * so that a host reads them from any number: again after its connection drops, or to continue a
  * turn that another host suspended. The agent behind it needs to do neither. A turn the bridge did
  * not finish, as one it ran when it died, it continues when a host starts it again, by prompting
@@ -13,10 +19,9 @@
  *
  * An agent's adapter implements `Bridge.Driver`, which drives the agent behind a bridge, and
  * `BridgeServer.serve` serves the driver in the sandbox. The adapter's `Agent.Agent`, which hosts
- * run, reaches it with `BridgeClient.startSession`.
+ * run, reaches it with `BridgeClient.createSession`.
  * `Rpcs` is the protocol between them, over a WebSocket whose host presents the token as
- * `Authorization: Bearer <token>` when it connects. A host replaces a bridge that speaks an older
- * version of it with its own, and refuses one that speaks a newer.
+ * `Authorization: Bearer <token>` when it connects.
  */
 import { Network, Sandbox } from "@amends/sandbox";
 import { type Effect, Schema, type Scope, type Stream } from "effect";
@@ -24,7 +29,7 @@ import { Prompt } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
 import { type AgentSession, SessionId } from "./Agent.ts";
 import { HarnessError } from "./HarnessError.ts";
-import { StreamPart } from "./StreamPart.ts";
+import { CompactionPart, StreamPart } from "./StreamPart.ts";
 
 /** A tool the host runs, as the agent reads it: its name, what it does, and its parameters. */
 export const ToolDefinition = Schema.Struct({
@@ -59,10 +64,10 @@ export const TurnOptions = Schema.Struct({
 
 export interface TurnOptions extends Schema.Schema.Type<typeof TurnOptions> {}
 
-export interface StartSessionOptions {
+export interface CreateSessionOptions {
   readonly id: SessionId;
 
-  /** The absolute directory the session works in. It exists before `startSession`. */
+  /** The absolute directory the session works in. It exists before `createSession`. */
   readonly directory: string;
 
   /**
@@ -97,7 +102,7 @@ export interface DriverSession {
   readonly compact: AgentSession["compact"];
 
   /**
-   * What `startSession` takes as `agentState` to start the session again, as a restarted bridge
+   * What `createSession` takes as `agentState` to start the session again, as a restarted bridge
    * does.
    */
   readonly state: Effect.Effect<Schema.Json, HarnessError>;
@@ -116,11 +121,11 @@ export interface Driver {
   readonly id: string;
 
   /**
-   * Starts a session: a new one, or one started again from its `state`. The session runs until its
+   * Creates a session: a new one, or one created again from its `state`. The session runs until its
    * scope closes, when a host stops or destroys it, or the bridge exits.
    */
-  readonly startSession: (
-    options: StartSessionOptions,
+  readonly createSession: (
+    options: CreateSessionOptions,
   ) => Effect.Effect<DriverSession, HarnessError, Scope.Scope>;
 }
 
@@ -138,32 +143,45 @@ export const NumberedPart = Schema.Struct({ seq: Schema.Int, part: StreamPart })
 export interface NumberedPart extends Schema.Schema.Type<typeof NumberedPart> {}
 
 /**
- * The version of `Rpcs` that this package speaks. Bump it when hosts or bridges of the version
- * before could not read a change to the protocol.
+ * The version of `Rpcs` that this package speaks. Every bridge's id includes it, so a host only
+ * ever reaches a bridge of its own version. Bump it when hosts or bridges of the version before
+ * could not read a change to the protocol.
  */
-export const protocolVersion = 1;
+export const protocolVersion = 2;
 
 /**
- * Answers which agent the bridge runs, and the version of the protocol it speaks, once it is
- * listening. Every version of the protocol keeps it as it is, as it keeps `Exit`, for hosts and
- * bridges of different versions to settle which bridge runs.
+ * Names a bridge after everything a host launches it with, as `Sandbox.isName` checks, so that a
+ * host that would launch the same bridge finds the one running, and a host with other settings
+ * launches its own.
+ */
+export const BridgeId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("BridgeId"));
+
+export type BridgeId = typeof BridgeId.Type;
+
+/**
+ * What a bridge writes to `listeningFile` in its state directory once it listens, for hosts to find
+ * it: the port. It holds no token, as the agent can read every file in the sandbox.
+ */
+export const Listening = Schema.Struct({ port: Network.Port });
+
+export interface Listening extends Schema.Schema.Type<typeof Listening> {}
+
+/** The name of the file in a bridge's state directory that `Listening` describes. */
+export const listeningFile = "listening.json";
+
+/**
+ * Answers which agent the bridge runs, and which bridge it is, for a host to check that it reached
+ * the bridge it looked up: a port another bridge listened on may be another's since.
  */
 export const Hello = Rpc.make("Hello", {
-  success: Schema.Struct({ agent: Schema.String, protocolVersion: Schema.Int }),
+  success: Schema.Struct({ agent: Schema.String, bridge: BridgeId }),
 });
-
-/**
- * Ends every session, aborting its turn, and exits the bridge, for a host that speaks a newer
- * version of the protocol to launch its own. The bridge may exit before it answers.
- */
-export const Exit = Rpc.make("Exit");
 
 /** The session a request is about. Every request but `StartSession` needs it started. */
 const inSession = { session: SessionId };
 
 export class Rpcs extends RpcGroup.make(
   Hello,
-  Exit,
 
   /**
    * Starts the session, or takes up the one the bridge is running, which ignores `history` and
@@ -239,6 +257,7 @@ export class Rpcs extends RpcGroup.make(
 
   Rpc.make("Compact", {
     payload: { ...inSession, instructions: Schema.optional(Schema.String) },
+    success: CompactionPart,
     error: HarnessError,
   }),
 
@@ -271,10 +290,13 @@ export const LaunchOptions = Schema.Struct({
   /** The token hosts present when they connect. */
   token: Schema.String,
 
-  /** The port the bridge listens on, on every interface of the sandbox. */
-  port: Network.Port,
+  /** The bridge's id, which `Hello` answers. */
+  bridge: BridgeId,
 
-  /** The absolute directory the bridge keeps its turns in, outside every session's directory. */
+  /**
+   * The absolute directory, outside every session's directory, that the bridge keeps its turns in,
+   * and writes `listeningFile` to.
+   */
   stateDirectory: Schema.String,
 
   /** The adapter's own options, such as the agent's configuration and its model providers' keys. */

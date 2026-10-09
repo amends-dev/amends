@@ -89,6 +89,23 @@ export interface Record extends Schema.Schema.Type<typeof Record> {}
 export const change = (record: Record, changes: Partial<Record>): Record =>
   Object.assign({}, record, changes);
 
+/** A new turn, queued until its job starts it, which has run nothing and posted nothing yet. */
+export const queued = (
+  turn: Omit<
+    Record,
+    "status" | "selection" | "messageIds" | "failure" | "cancelReason" | "startedAt" | "finishedAt"
+  >,
+): Record => ({
+  ...turn,
+  status: "queued",
+  selection: null,
+  messageIds: [],
+  failure: null,
+  cancelReason: null,
+  startedAt: null,
+  finishedAt: null,
+});
+
 /** Accepting work: the notifications it settles, and how far the accepted input reaches. */
 export const Acceptance = Schema.Struct({
   notificationIds: Schema.NonEmptyArray(Notification.Id),
@@ -116,6 +133,20 @@ export const View = Schema.Struct({
   retryable: Schema.Boolean,
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
+
+/**
+ * More of a response a turn is writing, before it completes: `text` continues the response's part
+ * at `offset` characters. The turn's job shows drafts to those following the turn's log, and the
+ * completed response in the log replaces them.
+ */
+export const Draft = Schema.Struct({
+  responseId: Schema.NonEmptyString,
+  /** The part's position among the step's parts, as the session log records the step. */
+  part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  text: Schema.String,
+});
+export interface Draft extends Schema.Schema.Type<typeof Draft> {}
 
 /**
  * One entry of a turn's log as its thread's readers see it: the facts of its work, never private
@@ -159,12 +190,7 @@ export interface LogChange extends Schema.Schema.Type<typeof LogChange> {}
 export const LogMessage = Schema.TaggedUnion({
   Opened: { items: Schema.Array(LogItem) },
   Changed: { changes: Schema.Array(LogChange) },
-  Drafted: {
-    responseId: Schema.NonEmptyString,
-    part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    text: Schema.String,
-  },
+  Drafted: Draft.fields,
   Ended: {},
 }).annotate({ identifier: "TurnLogMessage" });
 export type LogMessage = typeof LogMessage.Type;

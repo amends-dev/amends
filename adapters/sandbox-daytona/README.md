@@ -24,8 +24,8 @@ image has.
 ## Sandboxes
 
 Daytona names each sandbox by its id, which `create` picks as a UUID when it is given none; an id
-in use fails with `AlreadyExistsError`. The sandbox's ports are kept in its `amends-ports` label,
-for `resume` to read. A create that fails, or is interrupted, deletes the sandbox it made.
+in use fails with `AlreadyExistsError`. The ports a sandbox exposes are kept in its `amends-ports`
+label. A create that fails, or is interrupted, deletes the sandbox it made.
 
 `resume` starts a stopped sandbox, and fails with `NotFoundError` for one Daytona has destroyed or
 is destroying. `stop` and `destroy` succeed for a sandbox already stopped or destroyed, including
@@ -78,7 +78,8 @@ asks so, since Daytona's file API would make the one and write over the other.
 A port's endpoint is Daytona's preview URL for it, which takes the sandbox's preview token in the
 `x-daytona-preview-token` header that the endpoint gives, and passes the request's other headers,
 `Authorization` included, on to the server. WebSockets work through it too. A server reaches it
-only when it listens on every interface.
+only when it listens on every interface. Daytona opens a port the first time it gives the port's
+preview URL, so `exposePorts` only adds the port to the sandbox's label.
 
 `DenyAll` blocks everything the sandbox sends. An `AllowList` names hosts or CIDR ranges, but not
 both, and denies none, as Daytona does; one Daytona cannot enforce fails with `UnsupportedError`,

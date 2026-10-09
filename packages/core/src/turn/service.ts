@@ -7,6 +7,7 @@ import {
   Layer,
   Option,
   Predicate,
+  Ref,
   Schema,
   Stream,
   Struct,
@@ -199,7 +200,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
     Effect.map(toViews([turn]), (views) => views[0] as Turn.View);
 
   const get = Effect.fn("TurnService.get")(function* (turnId: Turn.Id) {
-    return yield* toView(yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId)));
+    const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
+    return yield* toView(turn);
   });
 
   const decodeLimit = Schema.decodeEffect(
@@ -228,7 +230,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
     return yield* toViews(active.filter((turn) => readable.has(turn.threadId)));
   });
 
-  const isSameItem = Schema.toEquivalence(Turn.LogItem);
   const toLogUnavailable = () => new Turn.LogUnavailable({});
 
   const watchLog = Effect.fn("TurnService.watchLog")(function* (turnId: Turn.Id) {
@@ -248,38 +249,18 @@ export const make = Effect.fn("TurnService.make")(function* () {
       Effect.mapError(toLogUnavailable),
     );
 
-    const reader = SessionLog.reader();
-    /** The latest position of the session log the reader took, the turn's entry or another's. */
-    let taken = turn.logAfter;
-    const takeEntries = (recorded: ReadonlyArray<SessionLog.Recorded>) => {
-      for (const entry of recorded) {
-        if (entry.position <= taken) continue;
-        taken = entry.position;
-        if (SessionLog.isOfTurn(turn.id)(entry.entry)) reader.add(entry);
-      }
-    };
-    /** Read what the log holds past what was taken, until it is all read. */
+    const reader = SessionLog.reader(turn.id, turn.logAfter);
+    /** Read what the log holds past what the reader took, until it is all read. */
     const readLogSoFar = Effect.gen(function* () {
       for (;;) {
         const page = yield* sessionLogStore.read(turn.participationId, {
-          after: taken,
+          after: reader.position(),
           limit: logPage,
         });
-        takeEntries(page);
+        reader.add(page);
         if (page.length < logPage) return;
       }
     });
-    // The items as sent, so a change is told apart from what the reader has.
-    let sent: ReadonlyArray<Turn.LogItem> = [];
-    const changeMessages = (): ReadonlyArray<Turn.LogMessage> => {
-      const items = reader.items();
-      const changes = items.flatMap((item, index) => {
-        const before = sent[index];
-        return before !== undefined && isSameItem(before, item) ? [] : [{ index, item }];
-      });
-      sent = items;
-      return changes.length === 0 ? [] : [Turn.LogMessage.cases.Changed.make({ changes })];
-    };
     const endedMessage = Turn.LogMessage.cases.Ended.make({});
 
     yield* readLogSoFar;
@@ -290,8 +271,21 @@ export const make = Effect.fn("TurnService.make")(function* () {
         endedMessage,
       );
     }
-    sent = reader.items();
-    const openedMessage = Turn.LogMessage.cases.Opened.make({ items: sent });
+    const openedMessage = Turn.LogMessage.cases.Opened.make({ items: reader.items() });
+    /** The items as sent, so that a change is told apart from what the reader has. */
+    const sent = yield* Ref.make(openedMessage.items);
+    /** What the items changed since they were last sent, if anything. */
+    const changeMessages = Ref.modify(
+      sent,
+      (before): [ReadonlyArray<Turn.LogMessage>, ReadonlyArray<Turn.LogItem>] => {
+        const items = reader.items();
+        const changes = SessionLog.changesSince(before, items);
+        return [
+          changes.length === 0 ? [] : [Turn.LogMessage.cases.Changed.make({ changes })],
+          items,
+        ];
+      },
+    );
 
     type Input = Data.TaggedEnum<{
       Logged: { readonly recorded: ReadonlyArray<SessionLog.Recorded> };
@@ -302,7 +296,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
     const Input = Data.taggedEnum<Input>();
     // The session log as it grows past the first read, on a position of its own.
     const loggedInputs = Stream.paginate(
-      taken,
+      reader.position(),
       Effect.fnUntraced(function* (after: number) {
         yield* sessionLogStore.waitForAppend(turn.participationId, after);
         const page = yield* sessionLogStore.read(turn.participationId, { after, limit: logPage });
@@ -319,12 +313,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       ),
       Stream.map((signal): Input =>
         Input.Drafted({
-          draft: Turn.LogMessage.cases.Drafted.make({
-            responseId: signal.responseId,
-            part: signal.part,
-            offset: signal.offset,
-            text: signal.text,
-          }),
+          draft: Turn.LogMessage.cases.Drafted.make(signal.draft),
         }),
       ),
     );
@@ -349,7 +338,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       yield* readLogSoFar;
       const ended = yield* turnStore.get(turn.id);
       reader.end(Option.match(ended, { onNone: () => [], onSome: ({ messageIds }) => messageIds }));
-      return [...changeMessages(), endedMessage];
+      return [...(yield* changeMessages), endedMessage];
     }).pipe(Effect.mapError(toLogUnavailable));
     /**
      * What each input tells the reader, one at a time, so reads and what was sent agree. Once the
@@ -363,10 +352,8 @@ export const make = Effect.fn("TurnService.make")(function* () {
         AccessChanged: () => Effect.as(checkStillReadable, []),
         Logged: ({ recorded }) =>
           checkStillReadable.pipe(
-            Effect.map(() => {
-              takeEntries(recorded);
-              return changeMessages();
-            }),
+            Effect.andThen(Effect.sync(() => reader.add(recorded))),
+            Effect.andThen(changeMessages),
           ),
         Ended: () => Effect.andThen(checkStillReadable, readEnding),
       });
@@ -446,7 +433,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       // that has not moved, so it is the agent's latest there.
       const now = yield* DateTime.now;
       const actor = yield* Actor.Service;
-      const created: Turn.Record = {
+      const created = Turn.queued({
         id: retryId,
         workspaceId,
         groupId: turn.groupId,
@@ -455,19 +442,12 @@ export const make = Effect.fn("TurnService.make")(function* () {
         memberId: turn.memberId,
         participationId: turn.participationId,
         retry: { of: turn.id, by: actor.memberId },
-        status: "queued",
         acceptedThroughSequence: turn.acceptedThroughSequence,
         logAfter: yield* sessionLogStore.head(turn.participationId),
-        selection: null,
-        messageIds: [],
-        failure: null,
-        cancelReason: null,
         createdAt: DateTime.isGreaterThan(now, turn.createdAt)
           ? now
           : DateTime.add(turn.createdAt, { milliseconds: 1 }),
-        startedAt: null,
-        finishedAt: null,
-      };
+      });
       const event = yield* journal.publish(TurnFacts.Retried, created);
       yield* turnCommand.recordActivity(
         created.threadId,

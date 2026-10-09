@@ -2,6 +2,7 @@ import { ThreadParticipation } from "@amends/core/thread";
 import { type SessionLog, Turn } from "@amends/core/turn";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Result } from "effect";
+import { Prompt } from "effect/ai";
 import type { Harness } from "./harness.ts";
 import { forWorkspace, otherWorkspaceId, workspaceId } from "./support.ts";
 
@@ -12,14 +13,23 @@ const usage = { inputTokens: { total: 10 }, outputTokens: { total: 5 } };
 const joined: SessionLog.Entry = {
   _tag: "Joined",
   conversation: [
-    { role: "user", texts: ["Ada: Hello 👋", "Kai: Hi."] },
-    { role: "assistant", texts: ["Hello, both."] },
+    Prompt.makeMessage("user", {
+      content: [
+        Prompt.makePart("text", { text: "Ada: Hello 👋" }),
+        Prompt.makePart("text", { text: "Kai: Hi." }),
+      ],
+    }),
+    Prompt.makeMessage("assistant", {
+      content: [Prompt.makePart("text", { text: "Hello, both." })],
+    }),
   ],
 };
 const prompted: SessionLog.Entry = {
   _tag: "Prompted",
   turnId,
-  texts: ["Ada: What is 2 and 3?"],
+  prompt: Prompt.makeMessage("user", {
+    content: [Prompt.makePart("text", { text: "Ada: What is 2 and 3?" })],
+  }),
   messages: 1,
 };
 /** A step with tagged parts, tool JSON, and provider metadata, as a harness streams them. */
@@ -55,6 +65,12 @@ const step: SessionLog.Entry = {
     finish: { type: "finish-step", reason: "tool-calls", usage },
   },
 };
+const started: SessionLog.Entry = {
+  _tag: "Started",
+  turnId,
+  agent: "opencode",
+  agentState: { session: "ses_1", turn: { id: "turn-1", bridge: "bridge-1" } },
+};
 const interrupted: SessionLog.Entry = { _tag: "Interrupted", turnId, reason: "The run stopped." };
 
 /** Each participation's session log: append-only, apart from every commit. */
@@ -70,14 +86,19 @@ export const sessionLogs = (harness: Harness) => {
             expect(yield* sessionLogs.read(participation, { after: 0, limit: 10 })).toEqual([]);
 
             const first = yield* sessionLogs.append(participation, [joined, prompted], 0);
-            const second = yield* sessionLogs.append(participation, [step, interrupted], 2);
+            const second = yield* sessionLogs.append(
+              participation,
+              [started, step, interrupted],
+              2,
+            );
             expect([...first, ...second].map(({ position, entry }) => [position, entry])).toEqual([
               [1, joined],
               [2, prompted],
-              [3, step],
-              [4, interrupted],
+              [3, started],
+              [4, step],
+              [5, interrupted],
             ]);
-            expect(yield* sessionLogs.head(participation)).toBe(4);
+            expect(yield* sessionLogs.head(participation)).toBe(5);
             // Reads give each entry back as it was recorded, from past a position, a page at a time.
             expect(yield* sessionLogs.read(participation, { after: 0, limit: 10 })).toEqual([
               ...first,
@@ -87,7 +108,7 @@ export const sessionLogs = (harness: Harness) => {
               first[1],
               second[0],
             ]);
-            expect(yield* sessionLogs.read(participation, { after: 4, limit: 10 })).toEqual([]);
+            expect(yield* sessionLogs.read(participation, { after: 5, limit: 10 })).toEqual([]);
           }),
         ),
     );

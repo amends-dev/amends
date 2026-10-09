@@ -17,6 +17,7 @@ export const Item = Schema.Union([
   TurnTimeline.StoppingItem,
   TurnTimeline.EndedItem,
 ]);
+
 export type Item = typeof Item.Type;
 
 export * as ThreadTimeline from "./timeline.ts";

@@ -11,7 +11,8 @@
  * to its API for a while, and requests to the sandbox's ports do not count, so a sandbox would stop
  * under an agent that only serves a host through a port; the provider turns that off unless the
  * options set it. A port's endpoint is Daytona's preview URL for it, which takes the sandbox's
- * preview token in a header and passes the request's other headers on.
+ * preview token in a header and passes the request's other headers on. Daytona opens a sandbox's
+ * port the first time it gives its preview URL, so exposing a port only records it.
  *
  * `integration` gives the sandboxes of Daytona organizations to connections.
  */
@@ -60,7 +61,7 @@ export interface Options {
   readonly autoStopInterval?: number;
 }
 
-/** The label that keeps a sandbox's ports, for `resume` to read. */
+/** The label that keeps the ports a sandbox exposes. */
 const portsLabel = "amends-ports";
 
 /** The label that names the template a sandbox prepares a version of. */
@@ -92,40 +93,63 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
     ),
   );
 
-  const openSandbox = Effect.fnUntraced(function* (
-    sandbox: DaytonaSandbox,
-    id: Sandbox.SandboxId,
-    ports: ReadonlyArray<Network.Port>,
-  ) {
+  const openSandbox = Effect.fnUntraced(function* (sandbox: DaytonaSandbox, id: Sandbox.SandboxId) {
     const workingDirectory = (yield* call(() => sandbox.getWorkDir())) ?? "/";
+    /**
+     * Whether the sandbox exposes `port`, as its label said when last read, or says now, for a
+     * port exposed through another `Sandbox` of it since.
+     */
+    const isExposed = (port: Network.Port) =>
+      portsOf(sandbox.labels).includes(port)
+        ? Effect.succeed(true)
+        : Effect.map(
+            call(() => sandbox.refreshData()),
+            () => portsOf(sandbox.labels).includes(port),
+          );
     return Sandbox.Sandbox.of({
       id,
-      description: describe(workingDirectory, ports),
+      description: describe(workingDirectory),
       workingDirectory,
       fileSystem: Files.make(sandbox, workingDirectory),
       childProcessSpawner: yield* Processes.make(sandbox, workingDirectory).pipe(
         Effect.provideService(Crypto.Crypto, crypto),
       ),
-      ports,
-      endpoint: (port, protocol) =>
-        ports.includes(port)
-          ? Effect.map(
-              call(() => sandbox.getPreviewLink(port)),
-              (link): Network.Endpoint => ({
-                url: protocol === "ws" ? link.url.replace(/^http/, "ws") : link.url,
-                headers:
-                  link.token === undefined
-                    ? {}
-                    : { "x-daytona-preview-token": Redacted.make(link.token) },
+      // TODO: Keep a port that another host exposes at the same moment, once Daytona changes one
+      // label at a time: `setLabels` replaces them all, so the last of two changes wins.
+      exposePorts: (ports) =>
+        retryConflicts(
+          Effect.gen(function* () {
+            yield* call(() => sandbox.refreshData());
+            const exposed = portsOf(sandbox.labels);
+            const added = ports.filter((port) => !exposed.includes(port));
+            if (added.length === 0) return;
+            yield* call(() =>
+              sandbox.setLabels({
+                ...sandbox.labels,
+                [portsLabel]: [...exposed, ...added].join(","),
               }),
-            )
-          : Effect.fail(
-              sandboxError(
-                new SandboxError.NotFoundError({
-                  description: `Port ${port} was not exposed when the sandbox was created`,
+            );
+          }),
+        ),
+      endpoint: (port, protocol) =>
+        Effect.flatMap(isExposed(port), (exposed) =>
+          exposed
+            ? Effect.map(
+                call(() => sandbox.getPreviewLink(port)),
+                (link): Network.Endpoint => ({
+                  url: protocol === "ws" ? link.url.replace(/^http/, "ws") : link.url,
+                  headers:
+                    link.token === undefined
+                      ? {}
+                      : { "x-daytona-preview-token": Redacted.make(link.token) },
                 }),
+              )
+            : Effect.fail(
+                sandboxError(
+                  new SandboxError.NotFoundError({ description: `Port ${port} is not exposed` }),
+                ),
               ),
-            ),
+        ),
       // A sandbox another call is stopping or destroying refuses the request until it has, and
       // is then found stopped or destroyed when the request is retried.
       stop: retryConflicts(
@@ -210,7 +234,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           ...(options.snapshot === undefined ? {} : { snapshot: options.snapshot }),
         }),
         (sandbox) =>
-          openSandbox(sandbox, Sandbox.SandboxId.make(name), []).pipe(
+          openSandbox(sandbox, Sandbox.SandboxId.make(name)).pipe(
             Effect.flatMap((opened) =>
               template.prepare.pipe(Effect.provide(Sandbox.layerServices(opened))),
             ),
@@ -267,7 +291,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
         ...(preparesHere ? {} : networkSettings),
       }),
       (sandbox) =>
-        Effect.tap(openSandbox(sandbox, id, ports), (opened) =>
+        Effect.tap(openSandbox(sandbox, id), (opened) =>
           preparesHere
             ? template.prepare.pipe(
                 Effect.provide(Sandbox.layerServices(opened)),
@@ -296,7 +320,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
       );
     }
     if (sandbox.state !== "started") yield* retryConflicts(call(() => sandbox.start()));
-    return yield* openSandbox(sandbox, id, portsOf(sandbox.labels));
+    return yield* openSandbox(sandbox, id);
   });
 
   return SandboxProvider.SandboxProvider.of({ create, resume });
@@ -404,13 +428,8 @@ const networkSettingsOf = (policy: Network.NetworkPolicy) => {
   }
 };
 
-const describe = (workingDirectory: string, ports: ReadonlyArray<Network.Port>) =>
-  [
-    `Work in ${workingDirectory}, on a Linux machine of your own in Daytona's cloud, where commands start.`,
-    ...(ports.length === 0
-      ? []
-      : [`Servers on ports ${ports.join(", ")} that listen on every interface are reachable.`]),
-  ].join(" ");
+const describe = (workingDirectory: string) =>
+  `Work in ${workingDirectory}, on a Linux machine of your own in Daytona's cloud, where commands start.`;
 
 /**
  * Retries a change to a sandbox that Daytona refused because another change to it was in progress,

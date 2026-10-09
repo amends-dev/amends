@@ -11,12 +11,12 @@ import {
   Turn,
   TurnExecution,
   type TurnJobs,
-  type TurnPrompt,
 } from "@amends/core/turn";
 import { Member, Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Gateway, GatewayErrors } from "@amends/gateway";
 import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends/harness";
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
+import { Prompt } from "effect/ai";
 
 export const workspaceId = Workspace.Id.make("workspace-1");
 export const job: TurnJobs.Job = {
@@ -82,19 +82,21 @@ export type Ending =
 
 export interface FakeWorkspaceOptions {
   /** The turn's prompt, as starting it gives it. */
-  readonly prompt?: Array.NonEmptyReadonlyArray<string>;
+  readonly prompt?: Prompt.UserMessage;
   /** What the participation's session resumes from, or none for a new one. */
   readonly resume?: SessionStateStore.Resume | null;
   /** What the agent's job is given to run it on. */
   readonly runnable?: AgentQuery.Runnable;
   /** The conversation the agent joined. */
-  readonly joined?: ReadonlyArray<TurnPrompt.Message>;
+  readonly joined?: ReadonlyArray<Prompt.Message>;
   /** What the session log holds before the run. */
   readonly logged?: ReadonlyArray<SessionLog.Entry>;
   /** Whether work waits for the agent. True by default. */
   readonly workWaits?: boolean;
   /** How many times starting the turn fails first, as when storage is down. None by default. */
   readonly failedStarts?: number;
+  /** Whether the workspace was ever created. True by default. */
+  readonly created?: boolean;
 }
 
 /**
@@ -109,7 +111,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     entry,
   }));
   const endings: Array<Ending> = [];
-  const drafts: Array<TurnExecution.Draft> = [];
+  const drafts: Array<Turn.Draft> = [];
   let active = options.workWaits ?? true;
   let starts = 0;
   const end = (ending: Ending) =>
@@ -127,7 +129,7 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
               ? TurnExecution.Start.cases.Ready.make({
                   turn,
                   runnable: options.runnable ?? runnable,
-                  prompt: options.prompt ?? ["Alice: Planner, summarize the plan."],
+                  prompt: options.prompt ?? userMessage("Alice: Planner, summarize the plan."),
                   messages: 1,
                   resume: options.resume ?? null,
                 })
@@ -168,11 +170,20 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
   const services = Context.make(TurnExecution.Service, turnExecution).pipe(
     Context.add(SessionLogStore.Service, sessionLogStore),
   );
+  let entered = 0;
   const gateway = Gateway.Service.of({
     createWorkspace: () => Effect.die("The fake workspace is never created"),
     asMember: () => Effect.die("The job runs as no member"),
     inWorkspace: (_, program) =>
-      Effect.provideContext(program, services) as Effect.Effect<never, never, never>,
+      Effect.provideContext(
+        Effect.gen(function* () {
+          entered += 1;
+          if (options.created === false)
+            return yield* new GatewayErrors.WorkspaceNotFound({ workspaceId });
+          return yield* program;
+        }),
+        services,
+      ) as Effect.Effect<never, never, never>,
   });
   return {
     gateway,
@@ -181,6 +192,8 @@ export const makeFakeWorkspace = (options: FakeWorkspaceOptions = {}) => {
     endings: () => [...endings],
     /** How many times the job started the turn. */
     starts: () => starts,
+    /** How many times a job entered the workspace. */
+    entered: () => entered,
     drafts: () => [...drafts],
     appendElsewhere,
   };
@@ -190,38 +203,47 @@ export type FakeWorkspace = ReturnType<typeof makeFakeWorkspace>;
 
 export interface ScriptedAgent {
   readonly agent: Agent.Agent;
-  /** What each `startSession` was given, in order. */
-  readonly starts: ReadonlyArray<Agent.StartSessionOptions>;
+  /** What each `createSession` was given, in order. */
+  readonly createdWith: ReadonlyArray<Agent.CreateSessionOptions>;
   /** What each turn was given, in order. */
   readonly turns: ReadonlyArray<Agent.TurnOptions>;
+  /** How many finished steps each continued turn was told of, in order. */
+  readonly continued: ReadonlyArray<number>;
 }
 
 /**
- * An agent in the host's process whose turns stream `script`, and whose state, which letting go of
- * a session returns, counts its turns.
+ * An agent in the host's process whose turns stream `script`, and whose state, which releasing
+ * a session returns, counts its turns. One that `keepsTurns` has the unfinished turn a session is
+ * created with, and continues it with `script`.
  */
 export const makeScriptedAgent = (
   script: Stream.Stream<StreamPart.StreamPart, HarnessError.HarnessError>,
+  { keepsTurns = false }: { readonly keepsTurns?: boolean } = {},
 ): ScriptedAgent => {
-  const starts: Array<Agent.StartSessionOptions> = [];
+  const createdWith: Array<Agent.CreateSessionOptions> = [];
   const turns: Array<Agent.TurnOptions> = [];
+  const continued: Array<number> = [];
   const agent: Agent.Agent = {
     id: "scripted",
     requiresSandbox: false,
-    startSession: (options) =>
+    createSession: (options) =>
       Effect.sync(() => {
-        starts.push(options);
+        createdWith.push(options);
         return {
-          hasUnfinishedTurn: false,
+          hasUnfinishedTurn: keepsTurns && options.unfinishedTurn !== undefined,
           promptTurn: (options) =>
             Stream.suspend(() => {
               turns.push(options);
               return script;
             }),
-          continueTurn: () => Stream.die("The scripted agent continues no turn"),
+          continueTurn: (_, finishedSteps) =>
+            Stream.suspend(() => {
+              continued.push(finishedSteps);
+              return script;
+            }),
           submitToolResult: () => Effect.die("The scripted agent calls no host tool"),
           approve: () => Effect.die("The scripted agent asks for no approval"),
-          compact: () => Effect.void,
+          compact: () => Effect.succeed({ type: "compaction", trigger: "manual", summary: "" }),
           suspendTurn: Effect.die("The scripted agent suspends no turn"),
           detach: Effect.sync(() => ({ turns: turns.length })),
           stop: Effect.sync(() => ({ turns: turns.length })),
@@ -229,7 +251,7 @@ export const makeScriptedAgent = (
         };
       }),
   };
-  return { agent, starts, turns };
+  return { agent, createdWith, turns, continued };
 };
 
 /** The integrations a host installs for the scripted agent: models, and the agent's harness. */
@@ -286,3 +308,7 @@ export const writing = (...deltas: ReadonlyArray<string>): ReadonlyArray<StreamP
   { type: "finish-step", reason: "stop", usage },
 ];
 export const finish: StreamPart.StreamPart = { type: "finish", reason: "stop", usage };
+
+/** A user message with a text part for each of `texts`, as a turn's prompt is. */
+export const userMessage = (...texts: ReadonlyArray<string>): Prompt.UserMessage =>
+  Prompt.makeMessage("user", { content: texts.map((text) => Prompt.makePart("text", { text })) });

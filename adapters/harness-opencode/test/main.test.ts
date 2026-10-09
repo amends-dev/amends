@@ -1,17 +1,10 @@
 import { Harness } from "@amends/harness";
 import { SessionId } from "@amends/harness/Agent";
-import { type Network, Template } from "@amends/sandbox";
+import { Template } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Layer, Redacted, Schedule } from "effect";
-import {
-  freePort,
-  installStandIn,
-  isRunning,
-  makeBridgedAgent,
-  makeSandbox,
-  startsIn,
-} from "./fixtures.ts";
+import { installStandIn, isRunning, makeBridgedAgent, makeSandbox, startsIn } from "./fixtures.ts";
 
 /**
  * The bridge client launches opencode's bridge program, `main.ts`, in a sandbox on this machine, as
@@ -21,17 +14,12 @@ const TestLayer = Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstru
 
 const config = { autoupdate: false };
 
-/** A harness over opencode's bridge program on `port`, which runs opencode as `command`. */
-const makeHarness = (
-  port: Network.Port,
-  command: string,
-  env: Readonly<Record<string, string>> = {},
-) =>
+/** A harness over opencode's bridge program, which runs opencode as `command`. */
+const makeHarness = (command: string, env: Readonly<Record<string, string>> = {}) =>
   Effect.map(
     makeBridgedAgent({
       id: "opencode",
       template: { name: Template.Name.make("opencode"), identity: "none", prepare: Effect.void },
-      port,
       command: process.execPath,
       args: [`${import.meta.dirname}/../src/bridge/main.ts`],
       token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
@@ -50,11 +38,10 @@ describe("opencode's bridge program", () => {
   it.live("starts opencode's server with the agent options when a session starts", () =>
     Effect.gen(function* () {
       const { command, directory } = yield* installStandIn;
-      const port = yield* freePort;
-      const sandbox = yield* makeSandbox(port);
-      const harness = yield* makeHarness(port, command);
+      const sandbox = yield* makeSandbox();
+      const harness = yield* makeHarness(command);
 
-      yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+      yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
 
       expect(yield* startsIn(directory)).toMatchObject([
         { args: ["serve", "--hostname=127.0.0.1", "--port=0"], config, greeting: "hello" },
@@ -65,21 +52,20 @@ describe("opencode's bridge program", () => {
   it.live("exits when opencode's server exits by itself, for the next host to launch both", () =>
     Effect.gen(function* () {
       const { command, directory } = yield* installStandIn;
-      const port = yield* freePort;
-      const sandbox = yield* makeSandbox(port);
-      const harness = yield* makeHarness(port, command, { FAKE_OPENCODE_EXIT_AFTER: "200" });
-      yield* harness.startSession({ sandbox, id: SessionId.make("session-1") });
+      const sandbox = yield* makeSandbox();
+      const harness = yield* makeHarness(command, { FAKE_OPENCODE_EXIT_AFTER: "200" });
+      yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
       const [started] = yield* startsIn(directory);
       // The server runs until the bridge has learned that it exited.
       yield* isRunning(started?.pid ?? 0).pipe(
         Effect.repeat({ while: (running) => running, schedule: Schedule.spaced("50 millis") }),
       );
-      const nextHarness = yield* makeHarness(port, command);
+      const nextHarness = yield* makeHarness(command);
 
       // A bridge still running would start no second server, but fail the session on the one that
       // exited, until it exits too; the bridge the next host launches then starts its own.
       yield* nextHarness
-        .startSession({ sandbox, id: SessionId.make("session-2") })
+        .createSession({ sandbox, id: SessionId.make("session-2") })
         .pipe(
           Effect.retry(
             Schedule.spaced("200 millis").pipe(Schedule.upTo({ duration: "10 seconds" })),

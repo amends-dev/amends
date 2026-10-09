@@ -18,24 +18,30 @@ import { GroupMembershipFacts } from "./membership/facts.ts";
 export class Unavailable extends Schema.TaggedError<Unavailable>()("GroupCommand.Unavailable", {
   memberId: Member.Id,
 }) {}
+
 export type AdmitError = PlatformError.PlatformError | Log.WriteError | Projection.Error;
+
 export type RemoveError = Log.WriteError | Projection.Error;
+
 export type EstablishError =
   | Unavailable
   | GroupStore.Failure
   | MemberStore.Failure
   | Schema.SchemaError
   | AdmitError;
+
 export interface Established {
   readonly group: Group.DirectRecord;
   /** This call created the group, rather than finding it. */
   readonly created: boolean;
 }
+
 export interface Admitted {
   readonly membership: GroupMembership.Record;
   /** The fact that admitted the member, for what it causes. */
   readonly event: Event.Type<typeof GroupMembershipFacts.Added>;
 }
+
 export interface Interface {
   /**
    * Admit a member to a group, as of the given time. The caller checks that the member is active
@@ -66,10 +72,12 @@ export interface Interface {
     occurredAt: DateTime.Utc,
   ) => Effect.Effect<Established, EstablishError, Store.Transaction | Publication.Service>;
 }
+
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
   "@amends/core/group/command/Service",
 ) {}
+
 /** Capture domain dependencies without capturing actor or transaction authority. @category constructors */
 export const make = Effect.fn("GroupCommand.make")(function* () {
   const groupStore = yield* GroupStore.Service;
@@ -145,6 +153,8 @@ export const make = Effect.fn("GroupCommand.make")(function* () {
 
   return Service.of({ admitMember, removeMembership, establishDirect });
 });
+
 /** Internal writes shared by group, thread, and member operations: callers own authorization and the commit. @category layers */
 export const layer = Layer.effect(Service, make());
+
 export * as GroupCommand from "./command.ts";

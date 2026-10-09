@@ -13,6 +13,7 @@ export const Followed = ThreadActivityKind.make("participation.followed", {
   subject,
   newActivity: false,
 });
+
 export type Followed = ThreadActivityKind.Activity<typeof Followed>;
 
 /** A participation ended, for the reason recorded. */
@@ -24,6 +25,7 @@ export const Ended = ThreadActivityKind.make("participation.ended", {
   subject,
   newActivity: false,
 });
+
 export type Ended = ThreadActivityKind.Activity<typeof Ended>;
 
 export * as ThreadParticipationActivity from "./activity.ts";

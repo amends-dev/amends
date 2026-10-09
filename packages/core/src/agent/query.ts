@@ -78,10 +78,6 @@ const setupOf = (selection: Agent.Selection): AgentReadiness.Setup => ({
   sandbox: selection.sandbox,
 });
 
-/** `issues` as a failure, or nothing when there are none. */
-const requireNoIssues = (issues: ReadonlyArray<Agent.Issue>) =>
-  Array.isReadonlyArrayNonEmpty(issues) ? Effect.fail(new Incomplete({ issues })) : Effect.void;
-
 /** A connection's failure to give `part`, as the issue it is to the agent. */
 const invalid = (part: Agent.Part, description: string) =>
   new Incomplete({ issues: [{ _tag: "Invalid", part, description }] });
@@ -97,22 +93,40 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
   /** The agent whose membership `memberId` is, while it lasts. */
   const requireAgent = Effect.fnUntraced(function* (memberId: MemberId.Id) {
     const member = yield* memberStore.get(memberId);
-    if (
-      Option.isNone(member) ||
-      member.value.status !== "active" ||
-      !Identity.MemberReference.isAnyOf(["Agent"])(member.value.identity)
-    )
+    if (Option.isNone(member) || member.value.status !== "active")
       return yield* new NotFound({ memberId });
-    const found = yield* agentStore.get(member.value.identity.id);
+    const { identity } = member.value;
+    if (!Identity.MemberReference.isAnyOf(["Agent"])(identity))
+      return yield* new NotFound({ memberId });
+    const found = yield* agentStore.get(identity.id);
     if (Option.isNone(found)) return yield* new NotFound({ memberId });
     return found.value;
   });
 
-  /** The workspace's connections that are not removed, by id. */
-  const readConnections = Effect.map(
-    connectionStore.listActive,
-    (records): AgentReadiness.Connections => new Map(records.map((record) => [record.id, record])),
-  );
+  /** Fails unless an agent set up as `setup` can run over `connections`. */
+  const requireRunnable = Effect.fnUntraced(function* (
+    setup: AgentReadiness.Setup,
+    connections: AgentReadiness.Connections,
+  ) {
+    const issues = yield* AgentReadiness.issuesOf(setup, connections, integrations);
+    if (Array.isReadonlyArrayNonEmpty(issues)) return yield* new Incomplete({ issues });
+  });
+
+  /**
+   * The connection whose harness the agent runs on: the one its setup names, or, on `Auto`, the
+   * one chosen among those it can run on, which fails when there is none.
+   */
+  const harnessFor = Effect.fnUntraced(function* (
+    record: Agent.Record,
+    connections: AgentReadiness.Connections,
+    previous: Agent.Selection | undefined,
+  ) {
+    if (record.harness._tag === "Connection") return record.harness.connectionId;
+    const choices = yield* AgentReadiness.harnessesToChoose(record, connections, integrations);
+    const chosen = AgentReadiness.chooseHarness(choices, previous?.harness.connectionId);
+    if (chosen === undefined) return yield* new Incomplete({ issues: [{ _tag: "NoHarness" }] });
+    return chosen;
+  });
 
   /**
    * The connection for `part` as its integration takes it, with the key it holds. Fails for `part`
@@ -137,7 +151,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
       .get(connectionId)
       .pipe(
         Effect.catchTag("ConnectionCredentialStore.Unavailable", ({ reason }) =>
-          Effect.fail(invalid(part, reason)),
+          invalid(part, reason),
         ),
       );
     if (Option.isNone(credential))
@@ -150,22 +164,13 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     previous: Agent.Selection | undefined,
   ) {
     const record = yield* requireAgent(memberId);
-    const connections = yield* readConnections;
-    yield* requireNoIssues(yield* AgentReadiness.issuesOf(record, connections, integrations));
-    const harness =
-      record.harness._tag === "Connection"
-        ? record.harness.connectionId
-        : AgentReadiness.chooseHarness(
-            yield* AgentReadiness.harnessesToChoose(record, connections, integrations),
-            previous?.harness.connectionId,
-          );
-    // Readiness found a harness to choose, which `chooseHarness` then gives.
-    if (harness === undefined) return yield* new Incomplete({ issues: [{ _tag: "NoHarness" }] });
+    const connections = yield* connectionStore.listActive;
     const selection: Agent.Selection = {
-      harness: { connectionId: harness },
+      harness: { connectionId: yield* harnessFor(record, connections, previous) },
       model: record.model,
       sandbox: record.sandbox,
     };
+    yield* requireRunnable(setupOf(selection), connections);
     return selection;
   });
 
@@ -174,21 +179,19 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     selection: Agent.Selection,
   ) {
     const record = yield* requireAgent(memberId);
-    const connections = yield* readConnections;
-    yield* requireNoIssues(
-      yield* AgentReadiness.issuesOf(setupOf(selection), connections, integrations),
-    );
+    const connections = yield* connectionStore.listActive;
+    yield* requireRunnable(setupOf(selection), connections);
+    const harness = yield* accessFor("harness", selection.harness.connectionId, connections);
+    const model = yield* accessFor("model", selection.model.connectionId, connections);
+    const sandbox =
+      selection.sandbox === null
+        ? null
+        : yield* accessFor("sandbox", selection.sandbox.connectionId, connections);
     const runnable: Runnable = {
       instructions: record.instructions,
-      harness: yield* accessFor("harness", selection.harness.connectionId, connections),
-      model: {
-        ...(yield* accessFor("model", selection.model.connectionId, connections)),
-        model: selection.model,
-      },
-      sandbox:
-        selection.sandbox === null
-          ? null
-          : yield* accessFor("sandbox", selection.sandbox.connectionId, connections),
+      harness,
+      model: { ...model, model: selection.model },
+      sandbox,
     };
     return runnable;
   });

@@ -856,8 +856,8 @@ require an independent grant for every underlying mutation.
 ### The harness contract owns what agents report
 
 The [harness](../packages/harness/README.md) defines one stream format for every agent's turns:
-the parts an Effect AI provider streams, with the few only agents produce, such as a step's end, a
-file change, and a compaction. Each agent's adapter translates its native interaction into that
+the parts an Effect AI provider streams, with the few only agents produce, such as a turn's start,
+a step's end, a file change, and a compaction. Each agent's adapter translates its native interaction into that
 format: opencode's reads opencode's session events through its bridge, and amends's own agent is a
 loop over Effect AI already. Neither needs to know about threads, turns, or anything else in
 amends.
@@ -895,7 +895,7 @@ introduces a different meaning or a useful guarantee.
 
 The harness contract defines how a session continues as well as how its turns report. A session
 starts anew, named by its id; anew with a conversation, as when an agent joins a thread already
-under way; or from the state an earlier session saved when it let go between turns, stopped, or
+under way; or from the state an earlier session saved when it was released between turns, stopped, or
 suspended a turn. The agent that saved the state resumes from its own; any other agent loads the
 conversation it records, so a session can move from one harness to another.
 
@@ -953,8 +953,13 @@ they are appended, with the step being written as drafts that are not kept.
 A conversation can outgrow its model's context. Summarizing it is the harness's work, reported as
 a compaction in a step, so that the conversation a session resumes with starts from the latest
 compaction rather than the log's beginning, and reading it costs what the summary and what
-followed cost. The thread and the log keep everything a summary replaced. How a harness decides to
-compact, and what a summary keeps verbatim, remain open; nothing compacts yet.
+followed cost. The thread and the log keep everything a summary replaced. An agent compacts by
+itself when its conversation outgrows its context, streaming the compaction between steps, and on
+request between turns. The compaction holds the summary, which goes into the conversation as a
+user message, and the latest messages the agent kept as they were, which follow it. opencode
+compacts by itself, and its record keeps only the summary. amends's own agent compacts before a
+step once the conversation fills most of its model's context window, keeping the latest messages
+up to half the window, and on request summarizes everything.
 
 ## Agreed: sandbox providers share one contract, separate from harnesses
 
@@ -966,8 +971,10 @@ template installs there, over a port the sandbox exposes.
 
 Every provider creates sandboxes, from a template that prepares them and with the network they may
 reach, and resumes one it created by its name. A sandbox runs processes and streams their output,
-reads and writes files, exposes a port as a URL with the headers needed to reach it, and stops or
-is destroyed. What a provider cannot do fails as unsupported rather than being assumed, as
+reads and writes files, exposes ports, when it is created or later, each as a URL with the
+headers needed to reach it, and stops or is destroyed. An agent's bridge listens on a port the
+sandbox picks, which its harness exposes as it connects, so a session that moves to another agent
+keeps its sandbox. What a provider cannot do fails as unsupported rather than being assumed, as
 enforcing a network policy does where a platform offers none. Platforms differ further: Vercel and
 Cloudflare cannot write to a running process's input, and a local directory provides no
 isolation. Anything the host talks to inside a sandbox therefore listens on a port rather than
@@ -1452,7 +1459,7 @@ The cancellation flow:
 3. Distinguish the outstanding cancellation request from confirmation that execution has
    stopped or is prevented from continuing to act as that turn; do not report a completed
    cancellation merely because the request was sent.
-4. The job records the step the turn left unfinished, lets go of the session, and ends the turn
+4. The job records the step the turn left unfinished, releases the session, and ends the turn
    as cancelled, keeping what the session resumes from. The sandbox stays.
 
 Preserve the session log and the effects already produced, including filesystem changes,

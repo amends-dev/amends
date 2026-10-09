@@ -13,7 +13,6 @@ import { AmendsAgent, Models } from "@amends/harness-amends";
 import { OpencodeAgent } from "@amends/harness-opencode";
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
 import { LocalSandboxProvider } from "@amends/sandbox-local";
-import { Network } from "@amends/sandbox";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
@@ -90,8 +89,6 @@ const bridgeSecretOf = (credentialKey: Redacted.Redacted<string> | undefined) =>
  */
 export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
-    // TODO: Give the bridges in this machine's sandboxes ports of their own: local sandboxes share
-    // this machine's ports, so a second opencode sandbox here cannot listen on the bridge's.
     const bridgeSecret = bridgeSecretOf(credentialKey);
     return [
       ...(yield* ModelIntegrations.catalogProviders),
@@ -102,7 +99,6 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
       yield* DaytonaSandboxProvider.integration,
       yield* AmendsAgent.integration(),
       yield* OpencodeAgent.integration({
-        port: Network.Port.make(4096),
         token: (sandboxId) =>
           Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),
       }),

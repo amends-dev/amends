@@ -378,7 +378,7 @@ export const gateway = (harness: Harness) => {
               const threadId = Thread.Id.make("thread");
               // A member that is no agent has no work to accept.
               const acceptWork = Effect.flatMap(TurnExecution.Service, (turnExecution) =>
-                turnExecution.accept({ memberId: workspace.ownerMemberId, threadId }),
+                turnExecution.accept(workspace.ownerMemberId, threadId),
               );
               expect(yield* Effect.scoped(gateway.inWorkspace(workspace.id, acceptWork))).toEqual(
                 Option.none(),

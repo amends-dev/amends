@@ -9,18 +9,22 @@ export class DirectMembersRequired extends Schema.TaggedError<DirectMembersRequi
   "ThreadService.DirectMembersRequired",
   {},
 ) {}
+
 export class GroupNotFound extends Schema.TaggedError<GroupNotFound>()(
   "ThreadService.GroupNotFound",
   { groupId: Group.Id },
 ) {}
+
 export class HumanAuthorRequired extends Schema.TaggedError<HumanAuthorRequired>()(
   "ThreadService.HumanAuthorRequired",
   { memberId: Member.Id },
 ) {}
+
 /** Missing, foreign, and outside-audience threads share this outcome. */
 export class NotFound extends Schema.TaggedError<NotFound>()("ThreadService.NotFound", {
   threadId: Thread.Id,
 }) {}
+
 export class ParticipantUnavailable extends Schema.TaggedError<ParticipantUnavailable>()(
   "ThreadService.ParticipantUnavailable",
   { memberId: Member.Id },

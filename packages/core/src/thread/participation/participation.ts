@@ -7,7 +7,9 @@ import { GroupMembership } from "../../group/membership/membership.ts";
 import { Identity } from "../../identity/identity.ts";
 import { Notification } from "../../notification/notification.ts";
 export const Id = ThreadParticipationId.Id;
+
 export type Id = ThreadParticipationId.Id;
+
 /**
  * Who takes part. Members participate through their current group admission; contacts and
  * triage take part without group access.
@@ -21,7 +23,9 @@ export const Participant = Schema.TaggedUnion({
   Contact: { contactId: Identity.ContactId },
   Triage: {},
 });
+
 export type Participant = typeof Participant.Type;
+
 /** The notification recipient that a participant routes to. */
 export const recipientOf = (participant: Participant): Notification.Recipient =>
   Participant.match(participant, {
@@ -30,6 +34,7 @@ export const recipientOf = (participant: Participant): Notification.Recipient =>
     Contact: ({ contactId }): Notification.Recipient => ({ _tag: "Contact", id: contactId }),
     Triage: (): Notification.Recipient => ({ _tag: "Triage" }),
   });
+
 /** Active participation is unique per member, contact, or the thread's triage participant. */
 export const keyOf = (participant: Participant | Reference): string =>
   Reference.isAnyOf(["Member"])(participant)
@@ -54,12 +59,15 @@ export const Record = Schema.Struct({
       "Participation status and departure time must agree",
   ),
 );
+
 export interface Record extends Schema.Schema.Type<typeof Record> {}
+
 export const Admission = Schema.Struct({
   ...Record.fields,
   status: Schema.Literal("active"),
   endedAt: Schema.Null,
 });
+
 /**
  * A participant without routing identities or admission linkage: the public view of who takes
  * part, and how a workflow names the participants to admit.
@@ -69,22 +77,28 @@ export const Reference = Schema.TaggedUnion({
   Contact: { contactId: Identity.ContactId },
   Triage: {},
 });
+
 export type Reference = typeof Reference.Type;
+
 /** The member behind a participant or its reference, when it is one. */
 export const memberOf = (participant: Participant | Reference): MemberId.Id | undefined =>
   Reference.isAnyOf(["Member"])(participant) ? participant.memberId : undefined;
+
 export const referenceOf = (participant: Participant): Reference =>
   Participant.match(participant, {
     Member: ({ memberId }): Reference => ({ _tag: "Member", memberId }),
     Contact: ({ contactId }): Reference => ({ _tag: "Contact", contactId }),
     Triage: (): Reference => ({ _tag: "Triage" }),
   });
+
 /** A page of current participants in binary participation-ID order, after the exclusive cursor. */
 export const ListOptions = Schema.Struct({
   after: Schema.optionalKey(Id),
   limit: Schema.Int.check(Schema.isGreaterThan(0)),
 });
+
 export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
+
 /** Public current-participant view. */
 export const Summary = Schema.Struct({
   id: Id,
@@ -94,7 +108,9 @@ export const Summary = Schema.Struct({
   joinedAt: Record.fields.joinedAt,
   joinedAtSequence: Record.fields.joinedAtSequence,
 });
+
 export interface Summary extends Schema.Schema.Type<typeof Summary> {}
+
 export const toSummary = (record: Record): Summary => ({
   id: record.id,
   workspaceId: record.workspaceId,
@@ -103,14 +119,19 @@ export const toSummary = (record: Record): Summary => ({
   joinedAt: record.joinedAt,
   joinedAtSequence: record.joinedAtSequence,
 });
+
 export const UnfollowInput = Schema.Struct({ threadId: ThreadId.Id, participationId: Id });
+
 export interface UnfollowInput extends Schema.Schema.Type<typeof UnfollowInput> {}
+
 /** Ends one specific participation, retaining its original joining boundary. */
 export const Departure = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   ...UnfollowInput.fields,
 });
+
 export interface Departure extends Schema.Schema.Type<typeof Departure> {}
+
 /**
  * Why a participation ended. Only unfollowing records an ending now; the departure reasons name
  * endings recorded before a group departure ended participations itself, and stay readable.
@@ -121,5 +142,7 @@ export const EndReason = Schema.Literals([
   "group-removed",
   "workspace-removed",
 ]);
+
 export type EndReason = typeof EndReason.Type;
+
 export * as ThreadParticipation from "./participation.ts";

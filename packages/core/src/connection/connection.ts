@@ -114,9 +114,9 @@ export const Configured = Schema.Struct({
   settings: Settings,
 });
 export interface Configured extends Schema.Schema.Type<typeof Configured> {}
-/** What replacing a connection's key or removing a connection records. */
-export const Change = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id });
-export interface Change extends Schema.Schema.Type<typeof Change> {}
+/** A connection, as a fact that records no more of it names it: its key replaced, or removed. */
+export const Reference = Schema.Struct({ workspaceId: WorkspaceId.Id, connectionId: Id });
+export interface Reference extends Schema.Schema.Type<typeof Reference> {}
 
 /**
  * Whether a connection can be used as it is: `Invalid` when its integration no longer takes its

@@ -4,9 +4,9 @@
  * write the whole machine and see its environment variables, so it suits development, tests, and
  * agents you would trust on this machine anyway.
  *
- * Each sandbox is a directory under the provider's `directory`, named by its id, that holds the
- * settings `resume` needs in `sandbox.json` and the sandbox's files in `workspace`, its working
- * directory. Processes start in the working directory and resolve a relative `cwd` against it.
+ * Each sandbox is a directory under the provider's `directory`, named by its id, that holds its
+ * settings, the ports it exposes, in `sandbox.json` and the sandbox's files in `workspace`, its
+ * working directory. Processes start in the working directory and resolve a relative `cwd` against it.
  * File paths are this machine's paths.
  *
  * `stop` and `destroy` end the processes the provider started for the sandbox, through any
@@ -18,7 +18,17 @@
  */
 import { Connection, Integration } from "@amends/connection";
 import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox";
-import { Crypto, Effect, FileSystem, Layer, Path, type PlatformError, Schema, Scope } from "effect";
+import {
+  Crypto,
+  Effect,
+  FileSystem,
+  Layer,
+  Path,
+  type PlatformError,
+  Schema,
+  Scope,
+  Semaphore,
+} from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 export interface Options {
@@ -26,7 +36,7 @@ export interface Options {
   readonly directory: string;
 }
 
-/** The settings `create` stores in a sandbox's `sandbox.json` for `resume` to read. */
+/** The settings a sandbox keeps in its `sandbox.json`: the ports it exposes. */
 const Settings = Schema.fromJsonString(Schema.Struct({ ports: Schema.Array(Network.Port) }));
 
 export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: Options) {
@@ -37,6 +47,8 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
 
   const directory = path.resolve(options.directory);
   yield* fs.makeDirectory(directory, { recursive: true });
+  /** Held while a sandbox's settings change, so that ports exposed together are all kept. */
+  const settingsLock = yield* Semaphore.make(1);
 
   const pathsOf = (id: Sandbox.SandboxId) => {
     const root = path.join(directory, id);
@@ -83,31 +95,63 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     return handle;
   });
 
-  const openSandbox = (
-    id: Sandbox.SandboxId,
-    ports: ReadonlyArray<Network.Port>,
-  ): Sandbox.Sandbox["Service"] => {
+  /** The ports the sandbox `id` exposes, as its settings keep them. */
+  const readPorts = Effect.fnUntraced(function* (id: Sandbox.SandboxId) {
+    const settings = yield* fs
+      .readFileString(pathsOf(id).settings)
+      .pipe(Effect.mapError(fromPlatformError));
+    const { ports } = yield* Schema.decodeEffect(Settings)(settings).pipe(
+      Effect.mapError((cause) =>
+        sandboxError(
+          new SandboxError.UnknownError({ description: "The sandbox's settings are unreadable" }),
+          cause,
+        ),
+      ),
+    );
+    return ports;
+  });
+
+  /** Keeps `ports` as the ports the sandbox `id` exposes. */
+  const writePorts = (id: Sandbox.SandboxId, ports: ReadonlyArray<Network.Port>) =>
+    // Ports are already valid, so encoding them cannot fail.
+    Effect.flatMap(Effect.orDie(Schema.encodeEffect(Settings)({ ports })), (settings) =>
+      fs.writeFileString(pathsOf(id).settings, settings),
+    );
+
+  const openSandbox = (id: Sandbox.SandboxId): Sandbox.Sandbox["Service"] => {
     const paths = pathsOf(id);
     const running = processesOf(id);
     return Sandbox.Sandbox.of({
       id,
-      description: describe(paths.workspace, ports),
+      description: describe(paths.workspace),
       workingDirectory: paths.workspace,
       fileSystem: fs,
       childProcessSpawner: ChildProcessSpawner.make((command) =>
         spawnInto(running, resolveCwd(path, paths.workspace, command)),
       ),
-      ports,
+      // A port is this machine's, so exposing it only records it.
+      exposePorts: (ports) =>
+        Semaphore.withPermit(
+          settingsLock,
+          Effect.gen(function* () {
+            const exposed = yield* readPorts(id);
+            const added = ports.filter((port) => !exposed.includes(port));
+            if (added.length === 0) return;
+            yield* writePorts(id, [...exposed, ...added]).pipe(Effect.mapError(fromPlatformError));
+          }),
+        ),
       endpoint: (port, protocol) =>
-        ports.includes(port)
-          ? Effect.succeed({ url: `${protocol}://127.0.0.1:${port}`, headers: {} })
-          : Effect.fail(
-              sandboxError(
-                new SandboxError.NotFoundError({
-                  description: `Port ${port} was not exposed when the sandbox was created`,
-                }),
+        Effect.flatMap(readPorts(id), (exposed) =>
+          exposed.includes(port)
+            ? Effect.succeed({ url: `${protocol}://127.0.0.1:${port}`, headers: {} })
+            : Effect.fail(
+                sandboxError(
+                  new SandboxError.NotFoundError({
+                    description: `Port ${port} is not exposed`,
+                  }),
+                ),
               ),
-            ),
+        ),
       stop: endProcesses(running).pipe(Effect.mapError(fromPlatformError)),
       destroy: endProcesses(running).pipe(
         Effect.andThen(fs.remove(paths.root, { recursive: true, force: true })),
@@ -139,11 +183,9 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     // Creating the sandbox's directory claims its id, failing when the id is taken.
     yield* fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError));
     return yield* Effect.gen(function* () {
-      // Ports are already valid, so encoding them cannot fail.
-      const settings = yield* Schema.encodeEffect(Settings)({ ports }).pipe(Effect.orDie);
       yield* fs.makeDirectory(paths.workspace);
-      yield* fs.writeFileString(paths.settings, settings);
-      return openSandbox(id, ports);
+      yield* writePorts(id, ports);
+      return openSandbox(id);
     }).pipe(
       Effect.mapError(fromPlatformError),
       // TODO: Prepare each template identity once and copy its workspace into new sandboxes, as a
@@ -161,18 +203,9 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
   });
 
   const resume = Effect.fn("LocalSandboxProvider.resume")(function* (id: Sandbox.SandboxId) {
-    const settings = yield* fs
-      .readFileString(pathsOf(id).settings)
-      .pipe(Effect.mapError(fromPlatformError));
-    const { ports } = yield* Schema.decodeEffect(Settings)(settings).pipe(
-      Effect.mapError((cause) =>
-        sandboxError(
-          new SandboxError.UnknownError({ description: "The sandbox's settings are unreadable" }),
-          cause,
-        ),
-      ),
-    );
-    return openSandbox(id, ports);
+    // A sandbox without readable settings is not one this provider created.
+    yield* readPorts(id);
+    return openSandbox(id);
   });
 
   return SandboxProvider.SandboxProvider.of({ create, resume });
@@ -264,11 +297,8 @@ const endProcesses = (running: Set<ChildProcessSpawner.ChildProcessHandle>) =>
     { concurrency: "unbounded", discard: true },
   );
 
-const describe = (workingDirectory: string, ports: ReadonlyArray<Network.Port>) =>
-  [
-    `Work in ${workingDirectory}, a directory on this machine, where commands start.`,
-    ...(ports.length === 0 ? [] : [`Servers on ports ${ports.join(", ")} are reachable.`]),
-  ].join(" ");
+const describe = (workingDirectory: string) =>
+  `Work in ${workingDirectory}, a directory on this machine, where commands start.`;
 
 /** Succeeds for `AllowAll` only, the network a local sandbox has, as it shares this machine's. */
 const allowAllOnly = (policy: Network.NetworkPolicy) =>

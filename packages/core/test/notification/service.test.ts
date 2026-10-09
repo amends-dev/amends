@@ -118,6 +118,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     Layer.provide(
       Layer.succeed(ThreadQuery.Service, {
         requireAccess: unexpected,
+        requireReadable: unexpected,
         eligibleMembers: unexpected,
         currentParticipants: unexpected,
         pageParticipants: unexpected,

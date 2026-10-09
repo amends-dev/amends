@@ -1,19 +1,20 @@
 import { describe, expect, it } from "@effect/vitest";
 import {
   type Cause,
-  Deferred,
   Effect,
   Exit,
   FileSystem,
   Layer,
   Path,
   Queue,
+  Ref,
   Scope,
   Stdio,
   Stream,
 } from "effect";
 import { Prompt } from "effect/ai";
 import { RpcTest } from "effect/rpc";
+import { TestClock } from "effect/testing";
 import { SessionId } from "../src/Agent.ts";
 import * as Bridge from "../src/Bridge.ts";
 import * as BridgeServer from "../src/BridgeServer.ts";
@@ -21,6 +22,7 @@ import { HarnessError, UnavailableError } from "../src/HarnessError.ts";
 import type { StreamPart } from "../src/StreamPart.ts";
 import { makeFakeDriver, makeMemoryFileSystem, reply } from "./fakes.ts";
 
+const bridge = Bridge.BridgeId.make("bridge-1");
 const session = SessionId.make("session-1");
 const firstTurn = Bridge.TurnId.make("turn-1");
 const secondTurn = Bridge.TurnId.make("turn-2");
@@ -38,17 +40,21 @@ const numbered = (parts: ReadonlyArray<StreamPart>, from = 1) =>
 
 /**
  * Starts a bridge for `driver` that keeps its turns in `fileSystem` and runs until `scope` closes,
- * returning a host's client of it. `exit` is what the bridge does when a host asks it to exit.
+ * recording its activity in `activity` if given, and returns a host's client of it.
  */
 const startBridge = (
   driver: Bridge.Driver,
   fileSystem: FileSystem.FileSystem,
   scope: Scope.Scope,
-  exit: Effect.Effect<unknown> = Effect.void,
+  activity?: Ref.Ref<BridgeServer.Activity>,
 ) =>
   Effect.gen(function* () {
     const handlers = yield* Layer.buildWithScope(
-      BridgeServer.layerHandlers(driver, { stateDirectory: "/state", exit }).pipe(
+      BridgeServer.layerHandlers(driver, {
+        stateDirectory: "/state",
+        bridge,
+        ...(activity === undefined ? {} : { activity }),
+      }).pipe(
         Layer.provide(Layer.merge(Layer.succeed(FileSystem.FileSystem, fileSystem), Path.layer)),
       ),
       scope,
@@ -62,26 +68,46 @@ const setUp = Effect.gen(function* () {
   const fake = yield* makeFakeDriver(() => Stream.fromQueue(parts));
   const { fileSystem, files } = yield* makeMemoryFileSystem;
   const bridgeScope = yield* Scope.make();
-  const exitAsked = yield* Deferred.make<void>();
-  const client = yield* startBridge(
-    fake.driver,
-    fileSystem,
-    bridgeScope,
-    Deferred.succeed(exitAsked, undefined),
-  );
-  return { parts, fake, fileSystem, files, bridgeScope, exitAsked, client };
+  const activity = yield* Ref.make<BridgeServer.Activity>({ turns: 0, lastActiveAt: -1 });
+  const client = yield* startBridge(fake.driver, fileSystem, bridgeScope, activity);
+  return { parts, fake, fileSystem, files, bridgeScope, activity, client };
 });
 
 describe("BridgeServer", () => {
-  it.effect("answers its agent and protocol version, and exits when a host asks it to", () =>
+  it.effect("answers its agent and which bridge it is", () =>
     Effect.gen(function* () {
-      const { exitAsked, client } = yield* setUp;
+      const { client } = yield* setUp;
 
       const hello = yield* client.Hello();
-      yield* client.Exit();
 
-      expect(hello).toEqual({ agent: "fake", protocolVersion: Bridge.protocolVersion });
-      expect(yield* Deferred.isDone(exitAsked)).toBe(true);
+      expect(hello).toEqual({ agent: "fake", bridge });
+    }),
+  );
+
+  it.effect("counts the turns it runs, and when a host or a turn was last active", () =>
+    Effect.gen(function* () {
+      const { parts, activity, client } = yield* setUp;
+
+      yield* TestClock.setTime(1_000);
+      yield* client.StartSession(startOptions);
+      const started = yield* Ref.get(activity);
+      yield* TestClock.setTime(2_000);
+      yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
+      // The turn counts from when it runs, which its first part shows.
+      yield* Queue.offerAll(parts, reply("hello").slice(0, 1));
+      yield* client
+        .ReadTurn({ session, turn: firstTurn, after: 0 })
+        .pipe(Stream.take(1), Stream.runDrain);
+      const running = yield* Ref.get(activity);
+      yield* TestClock.setTime(3_000);
+      yield* Queue.offerAll(parts, reply("hello").slice(1));
+      yield* Queue.end(parts);
+      yield* Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 1 }));
+      const ended = yield* Ref.get(activity);
+
+      expect(started).toEqual({ turns: 0, lastActiveAt: 1_000 });
+      expect(running).toEqual({ turns: 1, lastActiveAt: 2_000 });
+      expect(ended).toEqual({ turns: 0, lastActiveAt: 3_000 });
     }),
   );
 
@@ -124,28 +150,29 @@ describe("BridgeServer", () => {
     }),
   );
 
-  it.effect("starts a turn once when asked again, and no other while it runs", () =>
+  it.effect("starts a turn once when asked again, and aborts it when another starts", () =>
     Effect.gen(function* () {
       const { parts, fake, client } = yield* setUp;
       yield* client.StartSession(startOptions);
       yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
       yield* client.StartTurn({ session, turn: firstTurn, options: turnOptions("hi") });
-      const refused = yield* Effect.flip(
-        client.StartTurn({ session, turn: secondTurn, options: turnOptions("again") }),
-      );
-      yield* Queue.offerAll(parts, reply("hello"));
-      yield* Queue.end(parts);
-      yield* Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 0 }));
-      expect(refused.reason._tag).toBe("TurnInProgressError");
+      // The turn runs once it reads its first part.
+      yield* Queue.offerAll(parts, reply("hello").slice(0, 1));
+      yield* client
+        .ReadTurn({ session, turn: firstTurn, after: 0 })
+        .pipe(Stream.take(1), Stream.runDrain);
       expect(fake.turns).toHaveLength(1);
 
       yield* client.StartTurn({ session, turn: secondTurn, options: turnOptions("again") });
+      yield* Queue.offerAll(parts, reply("hello"));
+      yield* Queue.end(parts);
       yield* Stream.runDrain(client.ReadTurn({ session, turn: secondTurn, after: 0 }));
       const forgotten = yield* Effect.flip(
         Stream.runDrain(client.ReadTurn({ session, turn: firstTurn, after: 0 })),
       );
 
       expect(fake.turns).toHaveLength(2);
+      expect(fake.turnEnds).toEqual(["interrupted", "finished"]);
       expect(forgotten.reason._tag).toBe("NoTurnError");
     }),
   );
@@ -218,7 +245,7 @@ describe("BridgeServer", () => {
           restarted.ReadTurn({ session, turn: firstTurn, after: 0 }),
         );
 
-        expect(fake.starts[1]?.agentState).toEqual({ session, start: 1 });
+        expect(fake.createdWith[1]?.agentState).toEqual({ session, created: 1 });
         expect(hasUnfinishedTurn).toBe(true);
         expect(fake.turns).toHaveLength(1);
         expect(read).toEqual(numbered(reply("hello")));
@@ -292,8 +319,8 @@ describe("BridgeServer", () => {
       const started = yield* client.StartSession(startOptions);
       const takenUp = yield* client.StartSession(startOptions);
 
-      expect(fake.starts).toHaveLength(1);
-      expect(started).toEqual({ hasUnfinishedTurn: false, agentState: { session, start: 1 } });
+      expect(fake.createdWith).toHaveLength(1);
+      expect(started).toEqual({ hasUnfinishedTurn: false, agentState: { session, created: 1 } });
       expect(takenUp).toEqual(started);
     }),
   );
@@ -325,7 +352,7 @@ describe("BridgeServer", () => {
       const state = yield* client.StopSession({ session });
       const afterStop = yield* Effect.flip(client.ReadState({ session }));
 
-      expect(state).toEqual({ session, start: 1 });
+      expect(state).toEqual({ session, created: 1 });
       expect(fake.turnEnds).toEqual(["interrupted"]);
       expect(fake.ended).toEqual([session]);
       expect(afterStop.reason._tag).toBe("NotFoundError");
@@ -354,7 +381,7 @@ describe("BridgeServer", () => {
     Effect.gen(function* () {
       const launch = {
         token: "the host's token",
-        port: 4500,
+        bridge: "bridge-1",
         stateDirectory: "/state",
         agentOptions: { model: "a/b" },
       };

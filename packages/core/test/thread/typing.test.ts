@@ -59,6 +59,7 @@ const run = <A, E>(
         readable.has(threadId)
           ? Effect.succeed(thread(threadId))
           : Effect.fail(new ThreadQuery.NotFound({ threadId })),
+      requireReadable: unexpected,
       eligibleMembers: unexpected,
       currentParticipants: unexpected,
       pageParticipants: unexpected,

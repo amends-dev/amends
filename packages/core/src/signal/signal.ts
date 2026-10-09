@@ -7,6 +7,7 @@ import { Notification } from "../notification/notification.ts";
 import { ThreadId } from "../thread/id.ts";
 import { ThreadPermissions } from "../thread/permissions.ts";
 import { TurnId } from "../turn/id.ts";
+import { Turn } from "../turn/turn.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberId } from "../workspace/member/id.ts";
@@ -58,10 +59,7 @@ export const Value = Schema.TaggedUnion({
     groupId: GroupId.Id,
     threadId: ThreadId.Id,
     turnId: TurnId.Id,
-    responseId: Schema.NonEmptyString,
-    part: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    offset: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
-    text: Schema.String,
+    draft: Turn.Draft,
   },
 }).annotate({ identifier: "Signal" });
 export type Value = typeof Value.Type;
