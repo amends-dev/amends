@@ -185,8 +185,6 @@ export class UnknownError extends Schema.TaggedError<UnknownError>(
   }
 }
 
-// TODO: Add a HistoryUnavailableError reason with reading the agent's own history, for an agent
-// whose store the harness cannot reach from where it runs.
 /**
  * Why a harness failed: one of the errors above, which `HarnessError.reason` holds.
  *

@@ -127,8 +127,6 @@ export interface TurnOptions {
   readonly responseFormat: LanguageModel.ProviderOptions["responseFormat"];
 }
 
-// TODO: Add `readHistory`, which reads the conversation from the agent's own store, including turns
-// the harness did not run, such as ones a person continued in the agent's own interface.
 // TODO: Add `sendMessage`, which gives the running turn another user message, for agents that take
 // input while they work.
 /**
