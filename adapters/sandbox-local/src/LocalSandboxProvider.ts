@@ -19,6 +19,7 @@ import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox
 import {
   Crypto,
   Effect,
+  Exit,
   FileSystem,
   Layer,
   Path,
@@ -95,11 +96,6 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
    * `Sandbox` value started them.
    */
   const processes = new Map<Sandbox.SandboxId, Set<ChildProcessSpawner.ChildProcessHandle>>();
-  const processesOf = (id: Sandbox.SandboxId) => {
-    const running = processes.get(id) ?? new Set();
-    processes.set(id, running);
-    return running;
-  };
 
   /**
    * Spawns `command`, keeping its process in `running` while it runs. When the caller's scope
@@ -149,7 +145,8 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
 
   const openSandbox = (id: Sandbox.SandboxId): Sandbox.Sandbox["Service"] => {
     const paths = pathsOf(id);
-    const running = processesOf(id);
+    const running = processes.get(id) ?? new Set<ChildProcessSpawner.ChildProcessHandle>();
+    processes.set(id, running);
     return Sandbox.Sandbox.of({
       id,
       workingDirectory: paths.workspace,
@@ -208,25 +205,26 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     const paths = pathsOf(id);
     if (createOptions.networkPolicy !== undefined) yield* allowAllOnly(createOptions.networkPolicy);
 
-    // Creating the sandbox's directory claims its id, failing when the id is taken.
-    yield* fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError));
-    return yield* Effect.gen(function* () {
-      yield* fs.makeDirectory(paths.workspace);
-      yield* writePorts(id, ports);
-      return openSandbox(id);
-    }).pipe(
-      Effect.mapError(fromPlatformError),
-      // TODO: Prepare each template identity once and copy its workspace into new sandboxes, as a
-      // snapshot would, once preparing on every create is too slow.
-      Effect.tap((sandbox) =>
-        createOptions.template === undefined
+    return yield* Effect.acquireUseRelease(
+      // Creating the sandbox's directory claims its id, failing when the id is taken.
+      fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError)),
+      () =>
+        Effect.gen(function* () {
+          yield* fs.makeDirectory(paths.workspace).pipe(Effect.mapError(fromPlatformError));
+          yield* writePorts(id, ports).pipe(Effect.mapError(fromPlatformError));
+          const sandbox = openSandbox(id);
+          // TODO: Prepare each template identity once and copy its workspace into new sandboxes,
+          // as a snapshot would, once preparing on every create is too slow.
+          if (createOptions.template !== undefined) {
+            yield* Effect.provide(createOptions.template.prepare, Sandbox.layerServices(sandbox));
+          }
+          return sandbox;
+        }),
+      // A failed create, interrupted or not, leaves no sandbox behind to resume.
+      (_, exit) =>
+        Exit.isSuccess(exit)
           ? Effect.void
-          : createOptions.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox))),
-      ),
-      // A failed create leaves no sandbox behind to resume.
-      Effect.onError(() =>
-        fs.remove(paths.root, { recursive: true, force: true }).pipe(Effect.ignore),
-      ),
+          : Effect.ignore(fs.remove(paths.root, { recursive: true, force: true })),
     );
   });
 
