@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit && bun run --workspaces typecheck",
     "test": "bun run --bun vitest run",
     "check:packages": "bun run scripts/check-packages.ts",
+    "dist": "bun run scripts/dist.ts",
     "check:icons": "bun run --filter @amends/icons check:generated",
     "lint": "oxlint --disable-nested-config --deny-warnings .",
     "lint:fix": "oxlint --disable-nested-config --fix --deny-warnings .",

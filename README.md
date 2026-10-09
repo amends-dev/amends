@@ -104,17 +104,18 @@ The project pins TypeScript **7.0.2**, Oxlint **1.83.0**, Oxfmt **0.68.0**,
 `oxlint-tsgolint` **7.0.2001**, and `@effect/tsgo` **0.45.0**. The root
 `package.json` is the source of truth for these pins.
 
-| Command                  | Purpose                                                             |
-| ------------------------ | ------------------------------------------------------------------- |
-| `bun run typecheck`      | TypeScript 7 checks plus Effect diagnostics                         |
-| `bun run lint`           | Oxlint with type-aware rules; warnings fail the check               |
-| `bun run lint:fix`       | Apply safe lint fixes                                               |
-| `bun run format`         | Format project files with Oxfmt                                     |
-| `bun run format:check`   | Check formatting without writing files                              |
-| `bun run check`          | Validate dependencies, generated icons, types, lint, and formatting |
-| `bun run check:icons`    | Verify generated icons without writing files                        |
-| `bun run check:packages` | Validate shared-package dependency boundaries                       |
-| `bun run test`           | Run backend, PostgreSQL, and all frontend workspace tests           |
+| Command                  | Purpose                                                                                 |
+| ------------------------ | --------------------------------------------------------------------------------------- |
+| `bun run typecheck`      | TypeScript 7 checks plus Effect diagnostics                                             |
+| `bun run lint`           | Oxlint with type-aware rules; warnings fail the check                                   |
+| `bun run lint:fix`       | Apply safe lint fixes                                                                   |
+| `bun run format`         | Format project files with Oxfmt                                                         |
+| `bun run format:check`   | Check formatting without writing files                                                  |
+| `bun run check`          | Validate dependencies, generated icons, types, lint, and formatting                     |
+| `bun run check:icons`    | Verify generated icons without writing files                                            |
+| `bun run check:packages` | Validate shared-package dependency boundaries                                           |
+| `bun run dist`           | Build, check, or publish a package's distribution; see [publishing](docs/publishing.md) |
+| `bun run test`           | Run backend, PostgreSQL, and all frontend workspace tests                               |
 
 Following the [Effect devtools guide](https://effect.website/docs/v4/getting-started/devtools),
 `bun install` runs `effect-tsgo patch` via `prepare`. This patches the local
