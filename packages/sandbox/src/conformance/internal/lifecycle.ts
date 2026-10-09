@@ -59,18 +59,6 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
     );
 
     it.effect(
-      "describes where to work",
-      () =>
-        Effect.gen(function* () {
-          const sandboxProvider = yield* providerForTest(fixture);
-          const sandbox = yield* sandboxProvider.create();
-
-          expect(sandbox.description).toContain(sandbox.workingDirectory);
-        }),
-      fixture.timeout,
-    );
-
-    it.effect(
       "picks a different id for each sandbox created without one",
       () =>
         Effect.gen(function* () {

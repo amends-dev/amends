@@ -120,7 +120,6 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
           );
     return Sandbox.Sandbox.of({
       id,
-      description: describe(workingDirectory),
       workingDirectory,
       fileSystem: Files.make(sandbox, workingDirectory),
       childProcessSpawner: yield* Processes.make(sandbox, workingDirectory).pipe(
@@ -444,9 +443,6 @@ const networkSettingsOf = (policy: Network.NetworkPolicy) => {
     }
   }
 };
-
-const describe = (workingDirectory: string) =>
-  `Work in ${workingDirectory}, on a Linux machine of your own in Daytona's cloud, where commands start.`;
 
 /**
  * Retries a change to a sandbox that Daytona refused because another change to it was in progress,

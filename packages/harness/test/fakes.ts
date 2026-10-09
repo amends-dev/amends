@@ -171,7 +171,6 @@ export const makeFakeSandbox = Effect.sync((): FakeSandbox => {
   const directories: Array<string> = [];
   const sandbox = Sandbox.Sandbox.of({
     id: Sandbox.SandboxId.make("fake"),
-    description: "A fake sandbox",
     workingDirectory: "/work",
     fileSystem: FileSystem.makeNoop({
       makeDirectory: (path) => Effect.sync(() => void directories.push(path)),
