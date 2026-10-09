@@ -98,8 +98,10 @@ A `Template` prepares a new sandbox, for example by installing an agent, so that
 from it start ready. Its `prepare` runs inside the new sandbox, with the sandbox's services; its
 `name` holds across versions, and its `identity` names what `prepare` produces. A provider that
 can snapshot, as Daytona can, prepares once per identity and creates later sandboxes from the
-snapshot; one that cannot runs `prepare` on every create. The documentation of `Template` shows
-one that installs a tool.
+snapshot; one that cannot runs `prepare` on every create. `prepare` also runs in a sandbox prepared
+before, by this or another version of the template, as when an agent launches in a sandbox created
+for another, and leaves it ready without redoing what is there. The documentation of `Template`
+shows one that installs a tool.
 
 ## Ports and the network
 

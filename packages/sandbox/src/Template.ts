@@ -3,7 +3,8 @@
  * that sandboxes created from it start ready. A provider that can snapshot runs `prepare` once
  * per `identity` and creates later sandboxes from that snapshot; the snapshot replaces the one of
  * an older version of the template, which has the same `name`. A provider that cannot snapshot
- * runs `prepare` on every create.
+ * runs `prepare` on every create. A template also runs in a sandbox prepared before, by its own or
+ * another version, when an agent needs it there, and keeps what such a sandbox has.
  *
  * @since 0.1.0
  */
@@ -28,8 +29,6 @@ export const TemplateName = Schema.String.check(isName, Schema.isMaxLength(30)).
  */
 export type TemplateName = typeof TemplateName.Type;
 
-// TODO: Add a way to combine several templates into one, with an identity derived from theirs,
-// once the harness prepares one sandbox for several agents.
 /**
  * What prepares a sandbox, and how a provider tells versions of it apart. `E` is what `prepare`
  * fails with, which `create` fails with too.
@@ -72,8 +71,11 @@ export interface Template<E = PlatformError.PlatformError> {
   readonly identity: string;
 
   /**
-   * Runs inside the new sandbox, where `FileSystem`, `Path`, and `ChildProcessSpawner` are the
-   * sandbox's. Anything it needs from the host is read beforehand and captured.
+   * Runs inside the sandbox, where `FileSystem`, `Path`, and `ChildProcessSpawner` are the
+   * sandbox's: in a new sandbox before `create` returns, and again in one prepared before, by this
+   * or another version of the template, as when an agent launches in a sandbox created for
+   * another. It leaves such a sandbox ready without redoing what is there. Anything it needs from
+   * the host is read beforehand and captured.
    */
   readonly prepare: Effect.Effect<void, E, SandboxServices>;
 }
