@@ -127,8 +127,6 @@ export interface TurnOptions {
   readonly responseFormat: LanguageModel.ProviderOptions["responseFormat"];
 }
 
-// TODO: Add `sendMessage`, which gives the running turn another user message, for agents that take
-// input while they work.
 /**
  * One conversation with the agent, as its adapter runs it. The harness calls one operation at a
  * time: it runs a turn to its `finish` before it starts another, and releases the session with

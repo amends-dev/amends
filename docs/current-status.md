@@ -46,7 +46,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   which of them an agent may use and which it asks about, amends's agent runs its `read`, `write`,
   `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default permissions,
   its permission requests neither streamed nor answered. A session's `approve` answers only the
-  requests for the host's tools.
+  requests for the host's tools. A running turn takes no further input: a message sent during a
+  turn starts the next, where Claude Code, Codex, and opencode take input while they work, and
+  AI SDK's harness passes it on to them.
 - The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
   [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare
