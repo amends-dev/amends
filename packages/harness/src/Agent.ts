@@ -80,8 +80,6 @@ export interface CreateSessionOptions {
   /** Where the agent works. Absent only for an agent that does not require a sandbox. */
   readonly workspace?: Workspace;
 
-  // TODO: Add a helper that writes a conversation as text into the first turn's instructions, for
-  // agents that cannot load one natively.
   /**
    * The conversation so far, empty for a new session. An agent that last ran this session, and is
    * given `agentState` or `unfinishedTurn`, has it already. Any other agent loads it before its
