@@ -89,8 +89,6 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     };
   };
 
-  // TODO: Keep the processes that outlive their scopes in the sandbox's directory, so that a
-  // provider made after the host restarts ends them too, once a host restarts while one runs.
   /**
    * The processes running in each sandbox, so that `stop` and `destroy` end them whichever
    * `Sandbox` value started them.
@@ -213,8 +211,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
           yield* fs.makeDirectory(paths.workspace).pipe(Effect.mapError(fromPlatformError));
           yield* writePorts(id, ports).pipe(Effect.mapError(fromPlatformError));
           const sandbox = openSandbox(id);
-          // TODO: Prepare each template identity once and copy its workspace into new sandboxes,
-          // as a snapshot would, once preparing on every create is too slow.
+          // The provider takes no snapshots, so a template prepares every sandbox on its own.
           if (createOptions.template !== undefined) {
             yield* Effect.provide(createOptions.template.prepare, Sandbox.layerServices(sandbox));
           }
