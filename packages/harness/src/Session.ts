@@ -11,6 +11,8 @@
  * `suspendTurn`, `detach`, `stop`, and `destroy` release the session. Each takes hold of it
  * before it asks the agent, so that no turn starts meanwhile, and one that fails leaves the session
  * open, to be tried again.
+ *
+ * @since 0.1.0
  */
 import { type Effect, Schema, type Stream } from "effect";
 import type { AiError, Toolkit } from "effect/ai";
@@ -20,7 +22,12 @@ import type { GenerateObjectResult, GenerateResult } from "./GenerateResult.ts";
 import type { HarnessError } from "./HarnessError.ts";
 import { type CompactionPart, Step, type StreamPart } from "./StreamPart.ts";
 
-/** A turn that `suspendTurn` cut short, kept so that the session can finish it later. */
+/**
+ * A turn that `suspendTurn` cut short, kept so that the session can finish it later.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const UnfinishedTurn = Schema.Struct({
   prompt: Prompt.UserMessage,
 
@@ -37,8 +44,20 @@ export const UnfinishedTurn = Schema.Struct({
   agentState: Schema.optionalKey(Schema.Json),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface UnfinishedTurn extends Schema.Schema.Type<typeof UnfinishedTurn> {}
 
+/**
+ * A session as `suspendTurn`, `detach`, and `stop` return it, for the caller to store and give
+ * `Harness.createSession` back as `resumeFrom`. `Schema.toCodecJson(SessionState)` stores it as
+ * JSON.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const SessionState = Schema.Struct({
   id: SessionId,
 
@@ -61,15 +80,25 @@ export const SessionState = Schema.Struct({
   unfinishedTurn: Schema.optional(UnfinishedTurn),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface SessionState extends Schema.Schema.Type<typeof SessionState> {}
 
 // TODO: Add `continueGenerate`, which finishes an unfinished turn and returns it whole, and let
 // `continueStream` finish a turn that answers in JSON, once a caller continues such turns.
+/**
+ * What a turn asks, and the tools the host gives it.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
   /** What the turn asks: text, or a user message that can also carry files. */
   readonly prompt: string | Prompt.UserMessage;
 
-  /** Instructions for this turn, given as system or developer instructions where the agent has them. */
+  /** Instructions for this turn, as system or developer instructions where the agent has them. */
   readonly instructions?: string;
 
   /** The model for this turn, as the agent names models. The agent's default when omitted. */
@@ -79,21 +108,33 @@ export interface StreamOptions<Tools extends Record<string, Tool.Any> = {}> {
    * The host's tools, with their handlers. When the agent calls one, the session runs its handler,
    * streams the result as a `tool-result` part, and gives the result back to the agent.
    *
-   * A tool that needs approval, by its `needsApproval`, runs only once `approve` allows it: the turn
-   * streams a `tool-approval-request` part after the call and waits, while the agent waits for the
-   * result. A call `approve` refuses is answered as `execution-denied`, a failure the agent reads.
+   * A tool that needs approval, by its `needsApproval`, runs only once `approve` allows it: the
+   * turn streams a `tool-approval-request` part after the call and waits, while the agent waits for
+   * the result. A call `approve` refuses is answered as `execution-denied`, a failure the agent
+   * reads.
    * `needsApproval` as a function reads the call's decoded params and the conversation as the
    * session has recorded it, which lacks the parts the caller has not read yet.
    */
   readonly toolkit?: Toolkit.WithHandler<Tools>;
 }
 
-/** The settings the unfinished turn started with, given again for an agent that runs it again. */
+/**
+ * The settings the unfinished turn started with, given again for an agent that runs it again.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export type ContinueOptions<Tools extends Record<string, Tool.Any> = {}> = Omit<
   StreamOptions<Tools>,
   "prompt"
 >;
 
+/**
+ * What a turn that answers with an object asks: a turn's settings, and the schema of the answer.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface GenerateObjectOptions<
   S extends Schema.Top,
   Tools extends Record<string, Tool.Any> = {},
@@ -105,17 +146,70 @@ export interface GenerateObjectOptions<
   readonly objectName?: string;
 }
 
-/** What a turn fails with: the harness's errors, and those of the host's tools the agent called. */
+/**
+ * What a turn fails with: the harness's errors, and those of the host's tools the agent called.
+ *
+ * @category utility types
+ * @since 0.1.0
+ */
 export type TurnError<Tools extends Record<string, Tool.Any>> =
   | HarnessError
   | AiError.AiError
   | Tool.HandlerError<Tools[keyof Tools]>;
 
-/** What the host's tools that a turn can call need. */
+/**
+ * What the host's tools that a turn can call need.
+ *
+ * @category utility types
+ * @since 0.1.0
+ */
 export type TurnServices<Tools extends Record<string, Tool.Any>> = Tool.HandlerServices<
   Tools[keyof Tools]
 >;
 
+/**
+ * One conversation with an agent, as callers hold it. Turns run one at a time, each as a stream of
+ * `StreamPart`s or returned whole, and the session is released once, with `suspendTurn`, `detach`,
+ * `stop`, or `destroy`.
+ *
+ * **Example** (A turn with a host tool that needs approval)
+ *
+ * ```ts
+ * import { Agent, Harness } from "@amends/harness";
+ * import { Effect, Schema, Stream } from "effect";
+ * import { Tool, Toolkit } from "effect/ai";
+ *
+ * const Delete = Tool.make("Delete", {
+ *   description: "Deletes a file in the workspace",
+ *   parameters: Schema.Struct({ path: Schema.String }),
+ *   success: Schema.String,
+ *   needsApproval: true,
+ * });
+ * const Tools = Toolkit.make(Delete);
+ *
+ * const program = Effect.gen(function* () {
+ *   const harness = yield* Harness.Harness;
+ *   const toolkit = yield* Tools.pipe(
+ *     Effect.provide(Tools.toLayer({ Delete: ({ path }) => Effect.succeed(`deleted ${path}`) })),
+ *   );
+ *   const session = yield* harness.createSession({ id: Agent.SessionId.make("cleanup") });
+ *   // The session streams a request before it runs `Delete`; answering it lets the tool run.
+ *   yield* session
+ *     .stream({ prompt: "Delete the build output", toolkit })
+ *     .pipe(
+ *       Stream.runForEach((part) =>
+ *         part.type === "tool-approval-request"
+ *           ? session.approve({ approvalId: part.approvalId, approved: true })
+ *           : Effect.void,
+ *       ),
+ *     );
+ *   return yield* session.detach;
+ * });
+ * ```
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Session {
   readonly id: SessionId;
 
@@ -128,17 +222,17 @@ export interface Session {
 
   /**
    * Runs a turn, streaming its parts until `finish`. Interrupting the stream aborts the turn, which
-   * the conversation keeps as far as it got. A failure the agent reports arrives as an `error` part,
-   * and the turn finishes with `error`.
+   * the conversation keeps as far as it got. A failure the agent reports arrives as an `error`
+   * part, and the turn finishes with `error`.
    */
   readonly stream: <Tools extends Record<string, Tool.Any> = {}>(
     options: StreamOptions<Tools>,
   ) => Stream.Stream<StreamPart, TurnError<Tools>, TurnServices<Tools>>;
 
   /**
-   * Runs a turn and returns it whole. Fails with `TurnFailedError` when the agent reports a failure.
-   * Nothing can answer an approval request before the turn ends, so each is denied; `stream` is the
-   * way to ask.
+   * Runs a turn and returns it whole. Fails with `TurnFailedError` when the agent reports a
+   * failure. Nothing can answer an approval request before the turn ends, so each is denied;
+   * `stream` is the way to ask.
    */
   readonly generate: <Tools extends Record<string, Tool.Any> = {}>(
     options: StreamOptions<Tools>,
@@ -198,8 +292,8 @@ export interface Session {
   readonly stop: Effect.Effect<SessionState, HarnessError>;
 
   /**
-   * Stops the agent for good, aborting a running turn. It also destroys a session already released
-   * of, and destroying it again succeeds.
+   * Stops the agent for good, aborting a running turn. It also destroys a session already released,
+   * and destroying it again succeeds.
    */
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
@@ -210,6 +304,24 @@ export interface Session {
  * message with the results, and none for a step that wrote nothing and called none. A step that
  * compacted the conversation replaces it, and what the step had before, with the conversation the
  * compaction left, so that the conversation is the one the agent goes on with.
+ *
+ * It is for a caller that keeps a session's steps itself, as a log, and rebuilds the conversation
+ * to give `Harness.createSession` as `history`, rather than storing it whole with every turn.
+ *
+ * **Example** (Rebuilding a conversation from logged steps)
+ *
+ * ```ts
+ * import { Session, StreamPart } from "@amends/harness";
+ * import { Prompt } from "effect/ai";
+ *
+ * declare const prompt: Prompt.UserMessage;
+ * declare const steps: ReadonlyArray<StreamPart.Step>; // as StreamPart.stepsOf adds a turn up
+ *
+ * const history = steps.reduce(Session.recordStep, Prompt.fromMessages([prompt]));
+ * ```
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const recordStep = (conversation: Prompt.Prompt, step: Step): Prompt.Prompt => {
   const compactedAt = step.parts.findLastIndex((part) => part.type === "compaction");
@@ -226,6 +338,9 @@ export const recordStep = (conversation: Prompt.Prompt, step: Step): Prompt.Prom
  * The conversation a compaction leaves: its summary, as a user message, then the messages it kept.
  * An agent that keeps its own conversation goes on from this one, so that it has what the session
  * records.
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const conversationAfter = (
   compaction: Pick<CompactionPart, "summary" | "kept">,

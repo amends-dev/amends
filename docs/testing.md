@@ -183,6 +183,12 @@ terminates the child in `finally`; each child uses its own database and an ephem
 port. Tests that need a database run the fixture inside `it.live` over the Effect
 that creates it.
 
+The harness in `packages/harness` runs everywhere: sessions over fake agents from `test/fakes.ts`,
+the bridge's handlers over a fake driver and a file system in memory, without a transport, and the
+host tool relay without a transport, with the test clock for its progress notifications and its
+time limit. The bridge over a real WebSocket, launched in a local sandbox, and the relay's HTTP
+server are tested in the opencode adapter.
+
 The opencode agent in `adapters/harness-opencode` runs everywhere against a fake of
 opencode's server, which the tests script turn by turn. Starting the server, and the bridge program
 a host launches, run everywhere too, against a stand-in for `opencode serve` in

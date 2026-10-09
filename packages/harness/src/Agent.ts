@@ -1,19 +1,22 @@
 /**
- * An agent is what a harness runs: opencode, Codex, Claude Code, or a loop of our own over an
- * Effect AI `LanguageModel`. Each agent's adapter implements `Agent`, and `Harness.make` turns it
- * into the `Harness` service callers use, which adds whole-turn results, objects, the host's tools,
- * and the record of the conversation that lets a session move from one agent to another.
+ * An agent is what a harness runs: opencode, Codex, Claude Code, or an agent in the host's own
+ * process over an Effect AI `LanguageModel`. Each agent's adapter implements `Agent`, and
+ * `Harness.make` turns it into the `Harness` service callers use, which adds whole-turn results,
+ * objects, the host's tools, and the record of the conversation that lets a session move from one
+ * agent to another.
  *
  * An agent session is one conversation with the agent. An agent that runs in a sandbox, as most
  * do, `requiresSandbox`; one that runs in the host's process can also work without one, answering
- * from its model alone. Each turn streams
- * `StreamPart`s until its `finish` part, and interrupting the stream aborts the turn. The harness
- * runs one turn of a session at a time, so an agent never sees a turn start while another runs.
- * A session outlives the process that started it: the agent keeps running after `detach` or
- * `suspendTurn`, and `createSession` picks the session up again from what those returned.
+ * from its model alone. Each turn streams `StreamPart`s until its `finish` part, and interrupting
+ * the stream aborts the turn. The harness runs one turn of a session at a time, so an agent never
+ * sees a turn start while another runs. A session outlives the process that started it: the agent
+ * keeps running after `detach` or `suspendTurn`, and `createSession` picks the session up again
+ * from what those returned.
  *
  * Every agent is made with `Options`, the models it runs on, which its adapter extends with what
  * only that agent takes.
+ *
+ * @since 0.1.0
  */
 import { Sandbox, type Template } from "@amends/sandbox";
 import { type Effect, Schema, type Stream } from "effect";
@@ -24,7 +27,11 @@ import type { CompactionPart, StreamPart } from "./StreamPart.ts";
 
 /**
  * What every agent is made with: the model a turn runs on when it names none, and the models a turn
- * can name, by name. A turn that names another fails with `UnsupportedError`.
+ * can name, by name. A turn that names another fails with `UnsupportedError`. An adapter's own
+ * options extend these with what only its agent takes.
+ *
+ * @category options
+ * @since 0.1.0
  */
 export interface Options {
   readonly model: ModelEndpoint;
@@ -34,12 +41,24 @@ export interface Options {
 /**
  * Names a session, as `Sandbox.isName` checks, so that it can name the session's directory in the
  * sandbox and the agent's own session.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const SessionId = Schema.String.check(Sandbox.isName).pipe(Schema.brand("SessionId"));
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type SessionId = typeof SessionId.Type;
 
-/** Where an agent works for a session: a sandbox, and the session's directory in it. */
+/**
+ * Where an agent works for a session: a sandbox, and the session's directory in it.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Workspace {
   /** The sandbox, prepared with the agent's `template`. The agent never stops or destroys it. */
   readonly sandbox: Sandbox.Sandbox["Service"];
@@ -50,6 +69,13 @@ export interface Workspace {
 
 // TODO: Add a permission mode for the agent's own tools, and which of them it may use, once an
 // agent asks for approval before using its own tools.
+/**
+ * What `Agent.createSession` starts a session from: its id, where it works, the conversation so
+ * far, and what the agent itself returned when the session last ran on it.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface CreateSessionOptions {
   readonly id: SessionId;
 
@@ -77,11 +103,18 @@ export interface CreateSessionOptions {
 }
 
 // TODO: Add skills, which the agent loads before the turn, once an agent supports them.
+/**
+ * A turn's settings, as the session gives them to the agent: what the turn asks, its instructions,
+ * its model, the host's tools, and how it answers.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface TurnOptions {
-  /** What the turn asks. Earlier turns are in the agent's own conversation and are not sent again. */
+  /** What the turn asks. Earlier turns are in the agent's own conversation and not sent again. */
   readonly prompt: Prompt.UserMessage;
 
-  /** Instructions for this turn, given as system or developer instructions where the agent has them. */
+  /** Instructions for this turn, as system or developer instructions where the agent has them. */
   readonly instructions?: string;
 
   /** The model for this turn, as the agent names models. The agent's default when omitted. */
@@ -89,12 +122,13 @@ export interface TurnOptions {
 
   /**
    * Tools the host runs. When the agent calls one, the turn streams a `tool-call` part that is not
-   * `providerExecuted` and waits for `submitToolResult`. The host may ask for approval before it runs
-   * a tool; the agent waits for the result either way, and gets `execution-denied` for a refusal.
+   * `providerExecuted` and waits for `submitToolResult`. The host may ask for approval before it
+   * runs a tool; the agent waits for the result either way, and gets `execution-denied` for a
+   * refusal.
    */
   readonly tools: ReadonlyArray<Tool.Any>;
 
-  /** How the turn answers. JSON fails with `UnsupportedError` when the agent cannot answer in JSON. */
+  /** How the turn answers. JSON fails with `UnsupportedError` when the agent cannot answer so. */
   readonly responseFormat: LanguageModel.ProviderOptions["responseFormat"];
 }
 
@@ -102,6 +136,14 @@ export interface TurnOptions {
 // the harness did not run, such as ones a person continued in the agent's own interface.
 // TODO: Add `sendMessage`, which gives the running turn another user message, for agents that take
 // input while they work.
+/**
+ * One conversation with the agent, as its adapter runs it. The harness calls one operation at a
+ * time: it runs a turn to its `finish` before it starts another, and releases the session with
+ * `suspendTurn`, `detach`, `stop`, or `destroy` once, after which it calls nothing else.
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface AgentSession {
   /**
    * Whether the session started with the turn `suspendTurn` cut short, for `continueTurn` to
@@ -159,8 +201,8 @@ export interface AgentSession {
   readonly detach: Effect.Effect<Schema.Json, HarnessError>;
 
   /**
-   * Stops the agent, returning what `createSession` takes as `agentState` to start it again with its
-   * conversation.
+   * Stops the agent, returning what `createSession` takes as `agentState` to start it again with
+   * its conversation.
    */
   readonly stop: Effect.Effect<Schema.Json, HarnessError>;
 
@@ -171,6 +213,55 @@ export interface AgentSession {
   readonly destroy: Effect.Effect<void, HarnessError>;
 }
 
+/**
+ * What an adapter implements for its agent: how the agent is named and installed, and how its
+ * sessions start. `Harness.make` runs it.
+ *
+ * **Example** (An agent that answers from its model alone)
+ *
+ * ```ts
+ * import { Agent, Harness, HarnessError } from "@amends/harness";
+ * import { Effect, Stream } from "effect";
+ *
+ * const echo: Agent.Agent = {
+ *   id: "echo",
+ *   requiresSandbox: false,
+ *   createSession: (options) =>
+ *     Effect.succeed<Agent.AgentSession>({
+ *       hasUnfinishedTurn: false,
+ *       promptTurn: ({ prompt }) =>
+ *         Stream.make(
+ *           { type: "text-start", id: "answer" },
+ *           { type: "text-delta", id: "answer", delta: JSON.stringify(prompt.content) },
+ *           { type: "text-end", id: "answer" },
+ *           { type: "finish-step", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
+ *           { type: "finish", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
+ *         ),
+ *       continueTurn: () => Stream.empty,
+ *       submitToolResult: () => Effect.void,
+ *       approve: () => unsupported("echo never asks for approval"),
+ *       compact: () => unsupported("echo keeps no conversation to compact"),
+ *       suspendTurn: Effect.succeed(null),
+ *       detach: Effect.succeed(null),
+ *       stop: Effect.succeed(null),
+ *       destroy: Effect.void,
+ *     }),
+ * };
+ *
+ * const unsupported = (description: string) =>
+ *   Effect.fail(
+ *     new HarnessError.HarnessError({
+ *       agent: "echo",
+ *       reason: new HarnessError.UnsupportedError({ description }),
+ *     }),
+ *   );
+ *
+ * const harness = Harness.make(echo);
+ * ```
+ *
+ * @category models
+ * @since 0.1.0
+ */
 export interface Agent {
   /** Names the agent, such as `opencode`. Errors and saved sessions carry it. */
   readonly id: string;
@@ -182,9 +273,8 @@ export interface Agent {
   readonly template?: Template.Template;
 
   /**
-   * The longest name of a host tool the agent takes, for an agent that adds to the names it is given
-   * and so leaves a model API's 64 characters too few. A host names its tools to fit, with
-   * `Assembly.toolkit`'s `maxNameLength`.
+   * The longest name of a host tool the agent takes, for an agent that adds to the names it is
+   * given and so leaves a model API's 64 characters too few. A host names its tools to fit.
    */
   readonly maxToolNameLength?: number;
 

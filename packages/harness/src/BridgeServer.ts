@@ -13,12 +13,14 @@
  * bridge runs the session's turns itself, one at a time, in that scope, so that a turn does not end
  * with the connection of the host that started it; a host that starts another turn has moved on
  * from the one running, as when the host that started it is gone, so the bridge aborts it rather
- * than refuse the new turn. It numbers a turn's parts as the turn streams
- * them and keeps them in memory and in a file in its state directory, a line each, followed by how
- * the turn ended. A session keeps only its latest turn, which hosts read from any number while it
- * runs and after it ends. A bridge started again reads a turn from its file. A turn whose file has
- * no end, which the bridge ran when it died, ended then, aborted. A turn the bridge aborted that a
- * host starts again continues, in the conversation the agent kept, from the steps it finished.
+ * than refuse the new turn. It numbers a turn's parts as the turn streams them and keeps them in
+ * memory and in a file in its state directory, a line each, followed by how the turn ended. A
+ * session keeps only its latest turn, which hosts read from any number while it runs and after it
+ * ends. A bridge started again reads a turn from its file. A turn whose file has no end, which the
+ * bridge ran when it died, ended then, aborted. A turn the bridge aborted that a host starts again
+ * continues, in the conversation the agent kept, from the steps it finished.
+ *
+ * @since 0.1.0
  */
 import { Network } from "@amends/sandbox";
 import {
@@ -58,6 +60,13 @@ import {
   UnknownError,
 } from "./HarnessError.ts";
 
+/**
+ * What `serve` serves a driver with: the bridge's token, its id, its state directory, as the
+ * host's `Bridge.LaunchOptions` give them, and how long it waits idle before it exits.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The token hosts present when they connect. */
   readonly token: Redacted.Redacted<string>;
@@ -81,6 +90,9 @@ export interface Options {
 /**
  * How busy a bridge is: how many turns it runs, and when a host last started a session or a turn
  * there, or a turn last ended, in milliseconds since the epoch.
+ *
+ * @category models
+ * @since 0.1.0
  */
 export interface Activity {
   readonly turns: number;
@@ -92,6 +104,40 @@ export interface Activity {
  * server's port to `Bridge.listeningFile`, until the bridge has been idle for its idle timeout or
  * another bridge of its id takes its place. The sessions end, aborting their turns, when the scope
  * closes.
+ *
+ * **Example** (A bridge program on Bun)
+ *
+ * ```ts
+ * import { Bridge, BridgeServer } from "@amends/harness";
+ * import { BunHttpServer, BunRuntime, BunServices } from "@effect/platform-bun";
+ * import { Effect, Layer, Redacted, Schema } from "effect";
+ *
+ * // The adapter's driver, made from the agent options the host launched the bridge with.
+ * declare const makeDriver: (agentOptions: Schema.Json) => Effect.Effect<Bridge.Driver>;
+ *
+ * const program = Effect.gen(function* () {
+ *   const launch = yield* BridgeServer.readLaunchOptions;
+ *   const driver = yield* makeDriver(launch.agentOptions);
+ *   yield* BridgeServer.serve(driver, {
+ *     token: Redacted.make(launch.token),
+ *     bridge: launch.bridge,
+ *     stateDirectory: launch.stateDirectory,
+ *   });
+ * });
+ *
+ * // The sandbox picks the port; the bridge writes it where hosts look for it.
+ * BunRuntime.runMain(
+ *   program.pipe(
+ *     Effect.scoped,
+ *     Effect.provide(
+ *       Layer.merge(BunHttpServer.layer({ hostname: "0.0.0.0", port: 0 }), BunServices.layer),
+ *     ),
+ *   ),
+ * );
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options: Options) {
   const fs = yield* FileSystem.FileSystem;
@@ -140,7 +186,12 @@ export const serve = Effect.fnUntraced(function* (driver: Bridge.Driver, options
 
 /**
  * Handles `Bridge.Rpcs` for `driver`'s sessions, over whichever transport serves them, recording in
- * `activity` the turns they run and when a host was last active.
+ * `activity` the turns they run and when a host was last active. `serve` provides it to an
+ * `RpcServer` over a WebSocket; a test, or a bridge with a transport of its own, provides it to
+ * another.
+ *
+ * @category layers
+ * @since 0.1.0
  */
 export const layerHandlers = (
   driver: Bridge.Driver,
@@ -154,6 +205,9 @@ export const layerHandlers = (
 /**
  * What the host that launched the bridge gave it on standard input, as one line of JSON. The bridge
  * reads no further, since a sandbox may never end a process's standard input, as Daytona does not.
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const readLaunchOptions = Effect.gen(function* () {
   const stdio = yield* Stdio.Stdio;
@@ -215,7 +269,7 @@ type TurnStart = Data.TaggedEnum<{
   /** Not again: the bridge started the turn and did not abort it. */
   Started: { readonly turn: Turn };
 
-  /** By prompting the agent to continue the turn, which keeps the parts of the steps it finished. */
+  /** By prompting the agent to continue the turn, keeping the parts of the steps it finished. */
   Continue: { readonly parts: ReadonlyArray<Bridge.NumberedPart> };
 
   /** From its prompt, as a turn the bridge does not have. */
@@ -224,7 +278,7 @@ type TurnStart = Data.TaggedEnum<{
 
 const TurnStart = Data.taggedEnum<TurnStart>();
 
-/** What the bridge prompts an agent with to continue a turn it aborted, as AI SDK's harness does. */
+/** What the bridge prompts an agent with to continue a turn it aborted, as AI SDK's harness. */
 const continuePrompt = Prompt.makeMessage("user", {
   content: [Prompt.makePart("text", { text: "Continue." })],
 });
@@ -293,7 +347,7 @@ const makeHandlers = Effect.fnUntraced(function* (
         : Effect.succeed(started);
     });
 
-  /** Creates a session in a scope of its own, which closes again if the driver fails to create it. */
+  /** Creates a session in a scope of its own, closed again if the driver fails to create it. */
   const createSession = Effect.fnUntraced(function* (options: Bridge.CreateSessionOptions) {
     const scope = yield* Scope.fork(bridgeScope);
     const driverSession = yield* driver.createSession(options).pipe(

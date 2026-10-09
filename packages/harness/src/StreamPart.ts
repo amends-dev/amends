@@ -1,14 +1,16 @@
 /**
  * The parts a harness streams for a turn. They are the parts an Effect AI language model provider
- * streams, in the encoded form `LanguageModel.make` takes from providers, and three that only an
- * agent produces: a step finishing, a file changing, and the conversation being compacted. Code
- * that reads a provider's stream reads a harness's, and the parts cross the sandbox boundary as
- * they are.
+ * streams, in the encoded form `LanguageModel.make` takes from providers, and four that only an
+ * agent produces: a turn starting apart from the host, a step finishing, a file changing, and the
+ * conversation being compacted. Code that reads a provider's stream reads a harness's, and the
+ * parts cross the sandbox boundary as they are.
  *
  * Tool calls and results name any tool and keep its params and result as they came. An agent runs
  * tools of its own that no toolkit declares, while Effect AI's decoded tool parts exist only for
  * the tools of a toolkit. Params and results are therefore `unknown`, as JSON, even for the host's
  * tools; a caller that needs their types decodes them with the tool's schemas.
+ *
+ * @since 0.1.0
  */
 import { Predicate, Schema } from "effect";
 import { Prompt, Response } from "effect/ai";
@@ -38,6 +40,9 @@ const ToolResultPart = Schema.Struct({
 /**
  * Ends one step of a turn: one response from the model and the tool calls it made. A turn takes
  * one or more steps, and its `finish` part reports the whole turn's usage.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const FinishStepPart = Schema.Struct({
   type: Schema.tag("finish-step"),
@@ -46,9 +51,18 @@ export const FinishStepPart = Schema.Struct({
   metadata: Schema.optional(Response.ProviderMetadata),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface FinishStepPart extends Schema.Schema.Type<typeof FinishStepPart> {}
 
-/** Reports that the agent created, modified, or deleted a file in the sandbox. */
+/**
+ * Reports that the agent created, modified, or deleted a file in the sandbox.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const FileChangePart = Schema.Struct({
   type: Schema.tag("file-change"),
   event: Schema.Literals(["create", "modify", "delete"]),
@@ -56,6 +70,10 @@ export const FileChangePart = Schema.Struct({
   metadata: Schema.optional(Response.ProviderMetadata),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface FileChangePart extends Schema.Schema.Type<typeof FileChangePart> {}
 
 /**
@@ -65,6 +83,9 @@ export interface FileChangePart extends Schema.Schema.Type<typeof FileChangePart
  * as `Session.recordStep` records it. An agent that compacts during a turn streams the compaction
  * between two steps, so that it starts the step after; `AgentSession.compact` returns one made
  * between turns.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const CompactionPart = Schema.Struct({
   type: Schema.tag("compaction"),
@@ -84,22 +105,40 @@ export const CompactionPart = Schema.Struct({
   metadata: Schema.optional(Response.ProviderMetadata),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface CompactionPart extends Schema.Schema.Type<typeof CompactionPart> {}
 
 /**
  * Starts a turn that runs apart from the host, as in a sandbox, with what `createSession` takes as
  * the unfinished turn's `agentState`. A caller that keeps it continues the turn with
  * `continueStream` once the host that ran it is gone, catching up on the steps it does not have.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const TurnStartPart = Schema.Struct({
   type: Schema.tag("turn-start"),
   agentState: Schema.Json,
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface TurnStartPart extends Schema.Schema.Type<typeof TurnStartPart> {}
 
 // TODO: Add a `raw` part carrying the agent's own event as it came, once a caller needs something
 // the translation into these parts leaves out.
+/**
+ * A part of a turn's stream: an Effect AI provider's part in its encoded form, or one of the four
+ * only an agent produces.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
 export const StreamPart = Schema.Union([
   Schema.toEncoded(Response.TextStartPart),
   Schema.toEncoded(Response.TextDeltaPart),
@@ -127,18 +166,26 @@ export const StreamPart = Schema.Union([
   Response.StreamPartEncoded | FinishStepPart | FileChangePart | CompactionPart | TurnStartPart
 >;
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type StreamPart = Superset<typeof StreamPart.Type, Response.StreamPartEncoded>;
 
 /**
- * `Whole`, which the compiler checks contains every `Subset`, so that a part Effect AI adds cannot go
- * missing from `StreamPart`.
+ * `Whole`, which the compiler checks contains every `Subset`, so that a part Effect AI adds cannot
+ * go missing from `StreamPart`.
  */
 type Superset<Whole, Subset extends Whole> = Whole | Subset;
 
 /**
- * A part of a step as the step's stream adds up: a text or a reasoning whole rather than its deltas,
- * a tool call without the params it streamed on its way, and a tool's final result. These are the
- * parts Effect AI's `generateText` returns for a response, and those only an agent produces.
+ * A part of a step as the step's stream adds up: a text or a reasoning whole rather than its
+ * deltas, a tool call without the params it streamed on its way, and a tool's final result. These
+ * are the parts Effect AI's `generateText` returns for a response, and those only an agent
+ * produces.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const StepPart = Schema.Union([
   Schema.toEncoded(Response.TextPart),
@@ -155,24 +202,55 @@ export const StepPart = Schema.Union([
   CompactionPart,
 ]);
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export type StepPart = typeof StepPart.Type;
 
 /**
  * One step of a turn: what the model wrote, the tools it called and their results, in the order
  * the step streamed them, and the `finish-step` part that ended it. A step the turn ended partway
- * through, by failing or being stopped, has what it streamed so far and no `finish`.
+ * through, by failing or being stopped, has what it streamed so far and no `finish`. A step is
+ * JSON, for callers that store a turn's steps.
+ *
+ * @category schemas
+ * @since 0.1.0
  */
 export const Step = Schema.Struct({
   parts: Schema.Array(StepPart),
   finish: Schema.optional(FinishStepPart),
 });
 
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
 export interface Step extends Schema.Schema.Type<typeof Step> {}
 
 /**
  * A turn's steps, from its parts as far as they go, split at their `finish-step` parts. The turn's
  * `finish` part ends the turn rather than a step, so no step holds it. A step the parts end before
  * its `finish-step` comes last when it has parts.
+ *
+ * **Example** (Adding a turn's parts up into steps)
+ *
+ * ```ts
+ * import { StreamPart } from "@amends/harness";
+ *
+ * const steps = StreamPart.stepsOf([
+ *   { type: "text-start", id: "answer" },
+ *   { type: "text-delta", id: "answer", delta: "Hello, " },
+ *   { type: "text-delta", id: "answer", delta: "world." },
+ *   { type: "text-end", id: "answer" },
+ *   { type: "finish-step", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
+ *   { type: "finish", reason: "stop", usage: { inputTokens: {}, outputTokens: {} } },
+ * ]);
+ * // steps[0].parts is [{ type: "text", text: "Hello, world." }]
+ * ```
+ *
+ * @category utils
+ * @since 0.1.0
  */
 export const stepsOf = (parts: ReadonlyArray<StreamPart>): ReadonlyArray<Step> => {
   const steps: Array<Step> = [];

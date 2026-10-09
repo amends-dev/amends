@@ -2,12 +2,14 @@
  * Errors a harness reports when it cannot do what it was asked: start or resume a session, run or
  * continue a turn, or change the session's lifecycle. A failure the agent reports during a turn,
  * such as its model rejecting a key, arrives in the turn's stream as an `error` part, and the turn
- * finishes with the reason `error`. Only `generate` and `generateObject`, which return a whole turn,
- * fail on it, with `TurnFailedError`.
+ * finishes with the reason `error`. Only `generate` and `generateObject`, which return a whole
+ * turn, fail on it, with `TurnFailedError`.
  *
  * `HarnessError` says which agent failed and holds the reason, so callers can recover from one
  * reason with `Effect.catchReason("HarnessError", "NotFoundError", ...)`. The operation that failed
  * is the one the caller ran, which its span names.
+ *
+ * @since 0.1.0
  */
 import { Schema } from "effect";
 import { Response } from "effect/ai";
@@ -36,6 +38,13 @@ const withDefaults = <
     }
   };
 
+/**
+ * The agent cannot do what it was asked, such as answer in JSON, compact on request, or work
+ * without a sandbox.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnsupportedError extends withDefaults(
   Schema.TaggedError<UnsupportedError>("@amends/harness/HarnessError/UnsupportedError")(
     "UnsupportedError",
@@ -44,7 +53,12 @@ export class UnsupportedError extends withDefaults(
   { message: "The harness does not support this operation", isRetryable: false },
 ) {}
 
-/** Something the agent was asked about does not exist, such as a session it lost. */
+/**
+ * Something the agent was asked about does not exist, such as a session it lost.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NotFoundError extends withDefaults(
   Schema.TaggedError<NotFoundError>("@amends/harness/HarnessError/NotFoundError")(
     "NotFoundError",
@@ -56,6 +70,9 @@ export class NotFoundError extends withDefaults(
 /**
  * The session was released: `Harness.createSession` picks it up again from what that returned, as
  * `resumeFrom`.
+ *
+ * @category errors
+ * @since 0.1.0
  */
 export class SessionClosedError extends withDefaults(
   Schema.TaggedError<SessionClosedError>("@amends/harness/HarnessError/SessionClosedError")(
@@ -68,6 +85,13 @@ export class SessionClosedError extends withDefaults(
   },
 ) {}
 
+/**
+ * The session runs a turn, or holds one `suspendTurn` cut short, so it cannot start another,
+ * detach, or compact until the turn ends.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class TurnInProgressError extends withDefaults(
   Schema.TaggedError<TurnInProgressError>("@amends/harness/HarnessError/TurnInProgressError")(
     "TurnInProgressError",
@@ -76,7 +100,12 @@ export class TurnInProgressError extends withDefaults(
   { message: "The session is already running a turn", isRetryable: false },
 ) {}
 
-/** The session has no turn for the operation: none running to suspend, or none to continue. */
+/**
+ * The session has no turn for the operation: none running to suspend, or none to continue.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class NoTurnError extends withDefaults(
   Schema.TaggedError<NoTurnError>("@amends/harness/HarnessError/NoTurnError")(
     "NoTurnError",
@@ -85,7 +114,12 @@ export class NoTurnError extends withDefaults(
   { message: "The session has no turn for this", isRetryable: false },
 ) {}
 
-/** The agent reported that the turn failed, with the error of its `error` part. */
+/**
+ * The agent reported that the turn failed, with the error of its `error` part.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class TurnFailedError extends withDefaults(
   Schema.TaggedError<TurnFailedError>("@amends/harness/HarnessError/TurnFailedError")(
     "TurnFailedError",
@@ -94,7 +128,12 @@ export class TurnFailedError extends withDefaults(
   { message: "The agent reported that the turn failed", isRetryable: false },
 ) {}
 
-/** The agent sent output the harness cannot read, such as an event it cannot translate. */
+/**
+ * The agent sent output the harness cannot read, such as an event it cannot translate.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class InvalidOutputError extends withDefaults(
   Schema.TaggedError<InvalidOutputError>("@amends/harness/HarnessError/InvalidOutputError")(
     "InvalidOutputError",
@@ -103,7 +142,12 @@ export class InvalidOutputError extends withDefaults(
   { message: "The agent sent output the harness cannot read", isRetryable: false },
 ) {}
 
-/** The agent's answer to a request for an object did not match its schema. Asking again may succeed. */
+/**
+ * The agent's answer to a request for an object did not match its schema. Asking again may succeed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class StructuredOutputError extends withDefaults(
   Schema.TaggedError<StructuredOutputError>("@amends/harness/HarnessError/StructuredOutputError")(
     "StructuredOutputError",
@@ -116,6 +160,13 @@ export class StructuredOutputError extends withDefaults(
   { message: "The agent's answer did not match the requested schema", isRetryable: true },
 ) {}
 
+/**
+ * The agent cannot be reached right now, as when its bridge does not answer or its sandbox is
+ * gone. Trying again may succeed.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnavailableError extends withDefaults(
   Schema.TaggedError<UnavailableError>("@amends/harness/HarnessError/UnavailableError")(
     "UnavailableError",
@@ -124,6 +175,13 @@ export class UnavailableError extends withDefaults(
   { message: "The agent cannot be reached right now", isRetryable: true },
 ) {}
 
+/**
+ * The harness failed for a reason none of the others names, such as a sandbox it could not make
+ * a directory in.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class UnknownError extends withDefaults(
   Schema.TaggedError<UnknownError>("@amends/harness/HarnessError/UnknownError")(
     "UnknownError",
@@ -134,6 +192,12 @@ export class UnknownError extends withDefaults(
 
 // TODO: Add a HistoryUnavailableError reason with reading the agent's own history, for an agent
 // whose store the harness cannot reach from where it runs.
+/**
+ * Why a harness failed: one of the errors above, which `HarnessError.reason` holds.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export const HarnessErrorReason = Schema.Union([
   UnsupportedError,
   NotFoundError,
@@ -147,8 +211,34 @@ export const HarnessErrorReason = Schema.Union([
   UnknownError,
 ]);
 
+/**
+ * @category errors
+ * @since 0.1.0
+ */
 export type HarnessErrorReason = typeof HarnessErrorReason.Type;
 
+/**
+ * The error every harness operation fails with: which agent failed, and why.
+ *
+ * **Example** (Recovering from one reason)
+ *
+ * ```ts
+ * import { Session } from "@amends/harness";
+ * import { Effect } from "effect";
+ *
+ * declare const session: Session.Session;
+ *
+ * const answer = session.generate({ prompt: "Hello" }).pipe(
+ *   Effect.map((result) => result.text),
+ *   Effect.catchReason("HarnessError", "UnavailableError", (error) =>
+ *     Effect.succeed(`The agent is away: ${error.message}`),
+ *   ),
+ * );
+ * ```
+ *
+ * @category errors
+ * @since 0.1.0
+ */
 export class HarnessError extends Schema.TaggedError<HarnessError>("@amends/harness/HarnessError")(
   "HarnessError",
   {

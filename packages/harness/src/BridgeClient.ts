@@ -9,12 +9,12 @@
  * bridge's port in `Bridge.listeningFile`, in the bridge's state directory, exposes the port, and
  * launches the bridge when none answers there.
  *
- * A session connects to its bridge while it uses it, and closes the connection when it releases the session, or
- * once it has gone unused for a minute. Each connection launches the bridge when none answers, and
- * starts the session there from the state the bridge last gave, so that a bridge that restarted,
- * as after it died or exited idle, has the session again. A connection that drops is not opened
- * again: a request it dropped is sent again over another, for up to 30 seconds, as AI SDK's harness
- * reconnects, unless the bridge must not receive it twice.
+ * A session connects to its bridge while it uses it, and closes the connection when it releases
+ * the session, or once it has gone unused for a minute. Each connection launches the bridge when
+ * none answers, and starts the session there from the state the bridge last gave, so that a bridge
+ * that restarted, as after it died or exited idle, has the session again. A connection that drops
+ * is not opened again: a request it dropped is sent again over another, for up to 30 seconds, as
+ * AI SDK's harness reconnects, unless the bridge must not receive it twice.
  *
  * A turn is two requests: `StartTurn`, under an id the host picks, and `ReadTurn`, which reads the
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge
@@ -25,8 +25,10 @@
  * keeps it continues the turn the same way once this host is gone without suspending it. A session
  * resumed with other options continues the turn in the bridge that runs it and then goes on in its
  * own; one whose turn's bridge is gone runs the turn again from its prompt in its own. A session
- * whose bridge cannot answer, as when its sandbox is gone, releases the session with the state the bridge last
- * gave.
+ * whose bridge cannot answer, as when its sandbox is gone, releases the session with the state the
+ * bridge last gave.
+ *
+ * @since 0.1.0
  */
 import { type Network, Sandbox, type Template } from "@amends/sandbox";
 import {
@@ -64,7 +66,12 @@ import {
 } from "./HarnessError.ts";
 import type { StreamPart } from "./StreamPart.ts";
 
-/** What an adapter says of its bridge: how to install and launch it, and where to reach it. */
+/**
+ * What an adapter says of its bridge: how to install and launch it, and where to reach it.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** Names the agent, as its `Bridge.Driver` does. The bridge must answer with it. */
   readonly id: string;
@@ -111,6 +118,45 @@ type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientEr
  * Creates a session, as `Agent.createSession` does, of the agent behind the bridge that `options`
  * describes, in the sandbox of the session's workspace. It connects with the `WebSocketConstructor`
  * provided, which must send headers when it opens a connection, as Bun's and Node's do.
+ *
+ * **Example** (An adapter's agent whose sessions run behind its bridge)
+ *
+ * ```ts
+ * import { Agent, BridgeClient } from "@amends/harness";
+ * import type { Sandbox, Template } from "@amends/sandbox";
+ * import { Crypto, Effect, Redacted, Schema } from "effect";
+ * import type { Socket } from "effect/socket";
+ *
+ * // What the adapter brings: the template that installs the agent and its bridge program, the
+ * // bridge's token for a sandbox, and the options the bridge makes its driver with.
+ * declare const template: Template.Template;
+ * declare const tokenOf: (sandboxId: Sandbox.SandboxId) => Redacted.Redacted<string>;
+ * declare const agentOptionsOf: (options: Agent.Options) => Schema.Json;
+ *
+ * export const make = Effect.fnUntraced(function* (options: Agent.Options) {
+ *   // Sessions connect from the host, with its WebSockets and its crypto.
+ *   const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
+ *   const bridge: BridgeClient.Options = {
+ *     id: "my-agent",
+ *     template,
+ *     command: "bun",
+ *     args: ["run", "/opt/my-agent/bridge.ts"],
+ *     token: tokenOf,
+ *     agentOptions: agentOptionsOf(options),
+ *   };
+ *   const agent: Agent.Agent = {
+ *     id: bridge.id,
+ *     requiresSandbox: true,
+ *     template,
+ *     createSession: (sessionOptions) =>
+ *       Effect.provide(BridgeClient.createSession(bridge, sessionOptions), services),
+ *   };
+ *   return agent;
+ * });
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
  */
 export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   options: Options,
@@ -144,7 +190,7 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 
   /** The turn running, or the one `suspendTurn` cut short, for `continueTurn` to read. */
   const running = yield* Ref.make(saved?.unfinishedTurn?.turn);
-  /** The bridge the session uses: the one that runs the turn `suspendTurn` cut short, or its own. */
+  /** The bridge the session uses: the one running the turn `suspendTurn` cut short, or its own. */
   const bridge = yield* Ref.make(saved?.unfinishedTurn?.bridge ?? own);
   /**
    * The session's state as the bridge last gave it, which a bridge that restarted starts the
@@ -161,8 +207,8 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   const admission = yield* Semaphore.make(1);
 
   /**
-   * A client of the session's bridge, or of its own when that bridge is gone, launching its own when
-   * none answers: only the options of its own are the session's to launch.
+   * A client of the session's bridge, or of its own when that bridge is gone, launching its own
+   * when none answers: only the options of its own are the session's to launch.
    */
   const connectToBridge = Effect.gen(function* () {
     const current = yield* Ref.get(bridge);
@@ -242,9 +288,9 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
   );
 
   /**
-   * Disconnects from the bridge with the session's state, as `stateOf` asks the bridge for it, closing
-   * the connection. When the bridge cannot answer, the session is released with the state the bridge
-   * last gave.
+   * Disconnects from the bridge with the session's state, as `stateOf` asks the bridge for it,
+   * closing the connection. When the bridge cannot answer, the session is released with the state
+   * the bridge last gave.
    */
   const disconnectWith = (
     stateOf: (
@@ -431,8 +477,8 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
     destroy: Effect.gen(function* () {
       yield* close;
       if (yield* Ref.get(destroyed)) return;
-      // A session that was released may have ended in the bridge, or the bridge with its sandbox, so the
-      // connection starts it again, from its latest state, to be destroyed.
+      // A session that was released may have ended in the bridge, or the bridge with its sandbox,
+      // so the connection starts it again, from its latest state, to be destroyed.
       yield* send((client) => client.DestroySession({ session }));
       yield* Ref.set(destroyed, true);
       yield* RcRef.invalidate(connection);
@@ -442,8 +488,8 @@ export const createSession = Effect.fn("BridgeClient.createSession")(function* (
 });
 
 /**
- * A client of the bridge `bridge`, which `options` launch in `sandbox`, over a WebSocket open for as
- * long as the scope is, launching the bridge when none answers.
+ * A client of the bridge `bridge`, which `options` launch in `sandbox`, over a WebSocket open for
+ * as long as the scope is, launching the bridge when none answers.
  */
 const connect = Effect.fnUntraced(function* (
   options: Options,
@@ -457,12 +503,13 @@ const connect = Effect.fnUntraced(function* (
 });
 
 /**
- * A client of the bridge `bridge` in `sandbox`, at the port its `Bridge.listeningFile` names, over a
- * WebSocket open for as long as the scope is, or nothing, with the WebSocket closed, when no bridge
- * answers there as that bridge within 2 seconds: one that exited left its file behind, and another
- * may listen on its port since. A bridge that is not running refuses the WebSocket, so the question
- * fails rather than waits. The WebSocket is not opened again when it drops, so that requests then
- * fail with `RpcClientError` rather than reach a bridge that restarted without the session.
+ * A client of the bridge `bridge` in `sandbox`, at the port its `Bridge.listeningFile` names, over
+ * a WebSocket open for as long as the scope is, or nothing, with the WebSocket closed, when no
+ * bridge answers there as that bridge within 2 seconds: one that exited left its file behind, and
+ * another may listen on its port since. A bridge that is not running refuses the WebSocket, so the
+ * question fails rather than waits. The WebSocket is not opened again when it drops, so that
+ * requests then fail with `RpcClientError` rather than reach a bridge that restarted without the
+ * session.
  */
 const findBridge = Effect.fnUntraced(function* (
   options: Options,
@@ -486,7 +533,9 @@ const findBridge = Effect.fnUntraced(function* (
   );
 });
 
-/** Where the bridge `bridge` of the agent `agent` says it listens, or nothing when it says nothing. */
+/**
+ * Where the bridge `bridge` of the agent `agent` says it listens, or nothing when it says nothing.
+ */
 const readListening = (
   sandbox: Sandbox.Sandbox["Service"],
   agent: string,
