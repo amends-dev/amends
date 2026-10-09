@@ -9,6 +9,8 @@
  * anything the sandbox can. `bash` kills a command that outruns its timeout. A tool that cannot do
  * what it was asked, such as an `edit` whose text is not in the file, answers the model with why,
  * so the model can try again, instead of failing the turn.
+ *
+ * @since 0.1.0
  */
 import type { Agent } from "@amends/harness";
 import { Sandbox } from "@amends/sandbox";
@@ -17,6 +19,12 @@ import { Tool, Toolkit } from "effect/ai";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 // TODO: Add `offset` and `limit`, which read part of a long file, once files outgrow a turn.
+/**
+ * Reads a text file in the session's directory, answering with its contents.
+ *
+ * @category tools
+ * @since 0.1.0
+ */
 export const Read = Tool.make("read", {
   description: "Reads a text file and returns its contents.",
   parameters: Schema.Struct({ file_path: Schema.String }),
@@ -25,6 +33,13 @@ export const Read = Tool.make("read", {
   failureMode: "return",
 });
 
+/**
+ * Writes a text file in the session's directory, replacing one that exists and creating the
+ * directories it needs.
+ *
+ * @category tools
+ * @since 0.1.0
+ */
 export const Write = Tool.make("write", {
   description: "Writes a text file, replacing it if it exists and creating its directories if not.",
   parameters: Schema.Struct({ file_path: Schema.String, content: Schema.String }),
@@ -34,6 +49,13 @@ export const Write = Tool.make("write", {
 });
 
 // TODO: Add `replace_all`, which replaces every occurrence, once a model needs to rename things.
+/**
+ * Replaces one occurrence of a text in a file in the session's directory, answering with why when
+ * the text is not there once.
+ *
+ * @category tools
+ * @since 0.1.0
+ */
 export const Edit = Tool.make("edit", {
   description:
     "Replaces `old_string` in a text file with `new_string`. `old_string` must appear exactly once: " +
@@ -48,6 +70,14 @@ export const Edit = Tool.make("edit", {
   failureMode: "return",
 });
 
+/**
+ * Runs a shell command in the session's directory, answering with its exit code and its output,
+ * stdout and stderr interleaved, of which long output keeps its start and end. A command that
+ * outruns the timeout is killed.
+ *
+ * @category tools
+ * @since 0.1.0
+ */
 export const Bash = Tool.make("bash", {
   description:
     "Runs a shell command in the session's directory and returns its exit code and its output, " +
@@ -61,18 +91,58 @@ export const Bash = Tool.make("bash", {
 
 // TODO: Add `grep` and `glob`, which AI SDK's harnesses also share, once `bash` is not enough to
 // search with.
+/**
+ * The agent's tools, as the toolkit a turn offers the model with the handlers `layer` gives them.
+ *
+ * @category tools
+ * @since 0.1.0
+ */
 export const toolkit = Toolkit.make(Read, Write, Edit, Bash);
 
-/** How long a `bash` command runs before it is killed, unless the layer is given another. */
+/**
+ * How long a `bash` command runs before it is killed, unless the layer is given another.
+ *
+ * @category constants
+ * @since 0.1.0
+ */
 export const defaultCommandTimeout = Duration.minutes(2);
 
-/** The most characters of a command's output `bash` returns: the start and end, half each. */
+/**
+ * The most characters of a command's output `bash` returns: the start and end, half each.
+ *
+ * @category constants
+ * @since 0.1.0
+ */
 export const maxOutputLength = 30_000;
 
 /** How long a killed command has to exit before it is killed by force. */
 const killGracePeriod = Duration.seconds(2);
 
-/** The tools' handlers, working in `workspace`. */
+/**
+ * The tools' handlers, working in `workspace`: its sandbox's file system and processes, in its
+ * directory. `commandTimeout` is how long a `bash` command runs before it is killed,
+ * `defaultCommandTimeout` by default.
+ *
+ * **Example** (Running a command in a session's directory, as the model would)
+ *
+ * ```ts
+ * import { Tools } from "@amends/harness-amends";
+ * import type { Agent } from "@amends/harness";
+ * import { Effect, Stream } from "effect";
+ *
+ * declare const workspace: Agent.Workspace; // the session's sandbox and directory
+ *
+ * const program = Effect.gen(function* () {
+ *   const toolkit = yield* Effect.provide(Tools.toolkit, Tools.layer(workspace));
+ *   const handled = yield* toolkit.handle("bash", { command: "ls" });
+ *   const [result] = yield* Stream.runCollect(handled);
+ *   return result?.encodedResult;
+ * });
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (
   workspace: Agent.Workspace,
   options: { readonly commandTimeout?: Duration.Duration | undefined } = {},

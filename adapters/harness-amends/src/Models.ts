@@ -1,10 +1,12 @@
 /**
- * The models amends's agent runs on, made from model endpoints: an Effect AI client for the
- * endpoint's protocol, at its URL, with its key and headers, and the endpoint's model on that
- * client, set to the endpoint's effort and output limit.
+ * The models the agent runs on, made from model endpoints: an Effect AI client for the endpoint's
+ * protocol, at its URL, with its key and headers, and the endpoint's model on that client, set to
+ * the endpoint's effort and output limit.
  *
  * The agent makes them with `LanguageModels`, which `layer` provides over the host's `HttpClient`,
  * that the requests go out through. A test provides models of its own in its place.
+ *
+ * @since 0.1.0
  */
 import type { ModelEndpoint } from "@amends/harness";
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
@@ -17,6 +19,13 @@ import { Context, Effect, Layer, Record, Redacted, Stream, flow } from "effect";
 import type { LanguageModel } from "effect/ai";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
+/**
+ * Makes the language model an endpoint reaches. The agent takes it as a service, so that a test
+ * provides models of its own in place of the providers' clients.
+ *
+ * @category services
+ * @since 0.1.0
+ */
 export class LanguageModels extends Context.Service<
   LanguageModels,
   {
@@ -27,7 +36,37 @@ export class LanguageModels extends Context.Service<
   }
 >()("@amends/harness-amends/Models/LanguageModels") {}
 
-/** Makes language models whose requests go out through the host's `HttpClient`. */
+/**
+ * Provides `LanguageModels` over the `HttpClient` the requests go out through, such as
+ * `FetchHttpClient.layer`.
+ *
+ * **Example** (Generating text on OpenRouter with the model of an endpoint)
+ *
+ * ```ts
+ * import { Models } from "@amends/harness-amends";
+ * import { Config, Effect, Layer } from "effect";
+ * import { LanguageModel } from "effect/ai";
+ * import { FetchHttpClient } from "effect/http";
+ *
+ * const program = Effect.gen(function* () {
+ *   const languageModels = yield* Models.LanguageModels;
+ *   const model = yield* languageModels.make({
+ *     provider: "openrouter",
+ *     model: "nvidia/nemotron-3-super-120b-a12b:free",
+ *     protocol: "openai-chat",
+ *     url: "https://openrouter.ai/api/v1",
+ *     apiKey: yield* Config.Redacted("OPENROUTER_API_KEY"),
+ *   });
+ *   const response = yield* LanguageModel.generateText({ prompt: "Say hi" }).pipe(
+ *     Effect.provideService(LanguageModel.LanguageModel, model),
+ *   );
+ *   return response.text;
+ * }).pipe(Effect.provide(Models.layer.pipe(Layer.provide(FetchHttpClient.layer))));
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = Layer.effect(
   LanguageModels,
   Effect.map(HttpClient.HttpClient, (client) =>

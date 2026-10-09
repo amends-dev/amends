@@ -1,5 +1,5 @@
 /**
- * amends's own agent: a loop over an Effect AI `LanguageModel` that runs in the host's process. Each
+ * The agent `amends`: a loop over an Effect AI `LanguageModel` that runs in the host's process. Each
  * step streams the model's response to the conversation so far while Effect AI runs the tools the
  * model calls, and a turn takes steps until the model answers without calling a tool. With a sandbox
  * the agent works with the tools in `Tools`; without one, it answers from its model alone, calling
@@ -14,6 +14,8 @@
  * compacts it: the model summarizes all but the latest messages, which the conversation keeps as
  * they were. `compact` summarizes all of it, between turns. A model whose endpoint does not know its
  * context window is compacted only on request.
+ *
+ * @since 0.1.0
  */
 import {
   type Agent,
@@ -41,6 +43,13 @@ import * as Tools from "./Tools.ts";
 
 // TODO: Add instructions of the agent's own, telling the model where it works and how it works
 // there, once the tools' descriptions are not enough.
+/**
+ * What the agent is made with: the endpoints its turns run on, as `Agent.Options` give them, and
+ * what only this agent takes.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options extends Agent.Options {
   /** The most steps a turn takes, ending it even while the model calls tools. Unlimited by default. */
   readonly maxSteps?: number;
@@ -70,7 +79,39 @@ interface UnfinishedTurn extends Schema.Schema.Type<typeof UnfinishedTurn> {}
 
 const UnfinishedTurnJson = Schema.toCodecJson(UnfinishedTurn);
 
-/** The agent, which makes the language model of each of its endpoints with `Models.LanguageModels`. */
+/**
+ * The agent, which makes the language model of each of its endpoints with `Models.LanguageModels`,
+ * as `Models.layer` provides it over the `HttpClient` the requests go out through.
+ *
+ * **Example** (A turn on Anthropic's API, in the host's process)
+ *
+ * ```ts
+ * import { AmendsAgent, Models } from "@amends/harness-amends";
+ * import { Agent, Harness } from "@amends/harness";
+ * import { Config, Effect, Layer } from "effect";
+ * import { FetchHttpClient } from "effect/http";
+ *
+ * const program = Effect.gen(function* () {
+ *   const agent = yield* AmendsAgent.make({
+ *     model: {
+ *       provider: "anthropic",
+ *       model: "claude-sonnet-5-5",
+ *       protocol: "anthropic-messages",
+ *       url: "https://api.anthropic.com/v1",
+ *       apiKey: yield* Config.Redacted("ANTHROPIC_API_KEY"),
+ *       contextWindow: 200_000,
+ *     },
+ *   });
+ *   const harness = Harness.make(agent);
+ *   const session = yield* harness.createSession({ id: Agent.SessionId.make("hello") });
+ *   const answer = yield* session.generate({ prompt: "Say hello in one word." });
+ *   return answer.text;
+ * }).pipe(Effect.provide(Models.layer.pipe(Layer.provide(FetchHttpClient.layer))));
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
   const languageModels = yield* Models.LanguageModels;
   const modelOf = (endpoint: ModelEndpoint.ModelEndpoint) =>

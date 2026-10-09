@@ -28,6 +28,7 @@ remaining gaps with links to their owning code.
 | [Connections](../packages/connection/README.md)                      | Integrations a host installs, the connections workspaces make to them, and the model catalog.                                   |
 | [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                                 |
 | [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for the harness contract, behind its bridge in a sandbox.                                                  |
+| [amends agent](../adapters/harness-amends/README.md)                 | An agent in the host's own process for the harness contract, over an Effect AI language model.                                  |
 | [Local sandboxes](../adapters/sandbox-local/README.md)               | Sandboxes as directories on this machine for the sandbox contract, for development and tests.                                   |
 | [Daytona sandboxes](../adapters/sandbox-daytona/README.md)           | Sandboxes on Daytona for the sandbox contract, and running their tests with an API key.                                         |
 | [Cluster](../packages/cluster/README.md)                             | Work outside requests on Effect Cluster: the turn job that runs agents' turns, job retries, and pruning.                        |
