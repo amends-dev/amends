@@ -100,7 +100,6 @@ export interface CreateSessionOptions {
   readonly unfinishedTurn?: Schema.Json;
 }
 
-// TODO: Add skills, which the agent loads before the turn, once an agent supports them.
 /**
  * A turn's settings, as the session gives them to the agent: what the turn asks, its instructions,
  * its model, the host's tools, and how it answers.
