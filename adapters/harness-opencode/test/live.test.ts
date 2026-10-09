@@ -139,10 +139,7 @@ const daytonaSandboxes: Sandboxes = {
       const provider = yield* DaytonaSandboxProvider.make({
         apiKey: Redacted.make(process.env.DAYTONA_API_KEY ?? ""),
       });
-      return yield* Effect.acquireRelease(
-        provider.create(template === undefined ? {} : { template }),
-        (sandbox) => Effect.ignore(sandbox.destroy),
-      );
+      return yield* provider.createScoped(template === undefined ? {} : { template });
     }),
 };
 

@@ -6,7 +6,7 @@
  *
  * @since 0.1.0
  */
-import { Context, type Effect, Schema } from "effect";
+import { Context, Effect, Schema, type Scope } from "effect";
 import type { NetworkPolicy, Port } from "./Network.ts";
 import type { Sandbox, SandboxId } from "./Sandbox.ts";
 import type { SandboxError } from "./SandboxError.ts";
@@ -78,7 +78,8 @@ export interface CreateOptions<E> {
 
 /**
  * Creates sandboxes on one platform and resumes the ones it created before. A program asks for
- * the service and gets whichever provider's layer it runs under.
+ * the service and gets whichever provider's layer it runs under. `make` builds the service from a
+ * provider's `create` and `resume`.
  *
  * **Example** (Creating a sandbox, stopping it, and resuming it later)
  *
@@ -112,8 +113,6 @@ export interface CreateOptions<E> {
 export class SandboxProvider extends Context.Service<
   SandboxProvider,
   {
-    // TODO: Add a scoped create that destroys the sandbox when its scope closes, once tests or the
-    // harness need one.
     /**
      * Creates and starts a sandbox, which runs until `stop` or `destroy`. A create that fails,
      * including when its template fails or it is interrupted, first removes what it made, so no
@@ -124,9 +123,54 @@ export class SandboxProvider extends Context.Service<
     ) => Effect.Effect<Sandbox["Service"], SandboxError | E>;
 
     /**
+     * Creates and starts a sandbox that is destroyed when the scope closes, however it closes, for
+     * work that must leave no sandbox behind, as `FileSystem.makeTempDirectoryScoped` leaves no
+     * directory. Failing to destroy it is a defect.
+     */
+    readonly createScoped: <E = never>(
+      options?: CreateOptions<E>,
+    ) => Effect.Effect<Sandbox["Service"], SandboxError | E, Scope.Scope>;
+
+    /**
      * Reattaches to a sandbox this provider created, starting it again if it was stopped. It never
      * creates one: an unknown or destroyed id fails with `NotFoundError`.
      */
     readonly resume: (id: SandboxId) => Effect.Effect<Sandbox["Service"], SandboxError>;
   }
 >()("@amends/sandbox/SandboxProvider") {}
+
+/**
+ * The service over a provider's `create` and `resume`, with `createScoped` derived from them, as
+ * `ChildProcessSpawner.make` derives the rest of that service from `spawn`.
+ *
+ * **Example** (A sandbox for one piece of work)
+ *
+ * ```ts
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { Effect } from "effect";
+ *
+ * declare const create: SandboxProvider.SandboxProvider["Service"]["create"];
+ * declare const resume: SandboxProvider.SandboxProvider["Service"]["resume"];
+ *
+ * const sandboxProvider = SandboxProvider.make({ create, resume });
+ *
+ * // The sandbox is destroyed when the scope closes, however it closes.
+ * const program = Effect.scoped(
+ *   Effect.gen(function* () {
+ *     const sandbox = yield* sandboxProvider.createScoped();
+ *     return sandbox.workingDirectory;
+ *   }),
+ * );
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = (
+  provider: Pick<SandboxProvider["Service"], "create" | "resume">,
+): SandboxProvider["Service"] =>
+  SandboxProvider.of({
+    ...provider,
+    createScoped: (options) =>
+      Effect.acquireRelease(provider.create(options), (sandbox) => Effect.orDie(sandbox.destroy)),
+  });

@@ -340,7 +340,7 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
     return yield* openSandbox(sandbox, id);
   });
 
-  return SandboxProvider.SandboxProvider.of({ create, resume });
+  return SandboxProvider.make({ create, resume });
 });
 
 export const layer = (options: Options) =>

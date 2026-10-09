@@ -84,6 +84,26 @@ export const lifecycle = <R>(fixture: Fixture<R>) =>
     );
 
     it.effect(
+      "destroys a sandbox created in a scope when the scope closes",
+      () =>
+        Effect.gen(function* () {
+          const sandboxProvider = yield* providerForTest(fixture);
+          const id = yield* newSandboxId;
+
+          const workingDirectory = yield* Effect.scoped(
+            Effect.map(sandboxProvider.createScoped({ id }), (sandbox) => sandbox.workingDirectory),
+          );
+
+          expect(workingDirectory).not.toBe("");
+          expect((yield* Effect.flip(sandboxProvider.resume(id))).reason._tag).toBe(
+            "NotFoundError",
+          );
+          expect((yield* sandboxProvider.create({ id })).id).toBe(id);
+        }),
+      fixture.timeout,
+    );
+
+    it.effect(
       "ignores the provider options of other providers",
       () =>
         Effect.gen(function* () {

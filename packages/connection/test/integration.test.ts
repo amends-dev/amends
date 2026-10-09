@@ -16,7 +16,7 @@ const given: Array<Integration.Access<{ readonly region: string }>> = [];
 /** The options each harness the integration made was given. */
 const madeWith: Array<Agent.Options> = [];
 
-const provider = SandboxProvider.SandboxProvider.of({
+const provider = SandboxProvider.make({
   create: () => Effect.die("unused"),
   resume: () => Effect.die("unused"),
 });

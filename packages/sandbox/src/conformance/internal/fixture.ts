@@ -4,7 +4,7 @@
  */
 import { Clock, Effect, Random } from "effect";
 import { type Sandbox, SandboxId } from "../../Sandbox.ts";
-import { SandboxProvider } from "../../SandboxProvider.ts";
+import { make } from "../../SandboxProvider.ts";
 import type { Fixture } from "../Fixture.ts";
 
 /**
@@ -26,7 +26,7 @@ export const providerForTest = <R>(fixture: Fixture<R>) =>
         { concurrency: "unbounded", discard: true },
       ),
     );
-    return SandboxProvider.of({
+    return make({
       create: (options) =>
         Effect.tap(sandboxProvider.create(options), (sandbox) =>
           Effect.sync(() => created.add(sandbox.id)),

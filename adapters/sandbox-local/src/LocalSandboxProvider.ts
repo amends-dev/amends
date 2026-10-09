@@ -208,7 +208,7 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     return openSandbox(id);
   });
 
-  return SandboxProvider.SandboxProvider.of({ create, resume });
+  return SandboxProvider.make({ create, resume });
 });
 
 export const layer = (options: Options) =>

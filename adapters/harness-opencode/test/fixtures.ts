@@ -15,9 +15,7 @@ export const makeSandbox = (template?: Template.Template) =>
     const provider = yield* LocalSandboxProvider.make({
       directory: yield* fs.makeTempDirectoryScoped(),
     });
-    const sandbox = yield* provider.create(template === undefined ? {} : { template });
-    yield* Effect.addFinalizer(() => Effect.ignore(sandbox.destroy));
-    return sandbox;
+    return yield* provider.createScoped(template === undefined ? {} : { template });
   });
 
 /**
