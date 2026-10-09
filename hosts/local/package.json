@@ -20,12 +20,12 @@
     "@amends/sandbox-local": "workspace:*",
     "@amends/server-http": "workspace:*",
     "@amends/storage-postgresql": "workspace:*",
+    "@daytona/sdk": "catalog:",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
     "@amends/api-http": "workspace:*",
-    "@daytona/sdk": "0.218.0",
     "@effect/sql-pg": "catalog:"
   }
 }

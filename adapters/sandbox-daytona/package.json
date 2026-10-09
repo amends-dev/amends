@@ -12,9 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
     "@amends/sandbox": "workspace:*",
-    "@daytona/sdk": "0.220.0"
+    "@daytona/sdk": "catalog:"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",

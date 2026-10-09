@@ -13,29 +13,15 @@
  * options set it. A port's endpoint is Daytona's preview URL for it, which takes the sandbox's
  * preview token in a header and passes the request's other headers on. Daytona opens a sandbox's
  * port the first time it gives its preview URL, so exposing a port only records it.
- *
- * `integration` gives the sandboxes of Daytona organizations to connections.
  */
-import { Connection, Integration } from "@amends/connection";
 import { Network, Sandbox, SandboxError, SandboxProvider, type Template } from "@amends/sandbox";
 import {
   type CreateSandboxFromSnapshotParams,
   Daytona,
   DaytonaConflictError,
-  DaytonaInternalServerError,
   type Sandbox as DaytonaSandbox,
 } from "@daytona/sdk";
-import {
-  type Cause,
-  Crypto,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  Redacted,
-  Schedule,
-  Schema,
-} from "effect";
+import { Crypto, Effect, Exit, Layer, Option, Redacted, Schedule, Schema } from "effect";
 import { call, fromDaytonaError, providerId, sandboxError } from "./Call.ts";
 import * as Files from "./Files.ts";
 import * as Processes from "./Processes.ts";
@@ -344,67 +330,6 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
 
 export const layer = (options: Options) =>
   Layer.effect(SandboxProvider.SandboxProvider, make(options));
-
-/**
- * The integration of Daytona. A connection to it is an organization, which authenticates with its
- * API key, and may give Daytona's API, when it is not that of Daytona's own cloud, and the region to
- * create sandboxes in. Checking a connection asks Daytona for one of the organization's sandboxes,
- * which it lists only for a valid key, and creates nothing.
- */
-export const integration = Effect.map(Crypto.Crypto, (crypto) =>
-  Integration.make({
-    id: "daytona",
-    name: "Daytona",
-    docs: "https://www.daytona.io/docs",
-    settings: Schema.Struct({
-      apiUrl: Schema.optionalKey(Schema.NonEmptyString).annotate({
-        title: "API URL",
-        description: "Daytona's API, when it is not that of Daytona's own cloud.",
-      }),
-      target: Schema.optionalKey(Schema.NonEmptyString).annotate({
-        title: "Target",
-        description: "The region to create sandboxes in, rather than the organization's.",
-      }),
-    }),
-    auth: ["apiKey"],
-    sandboxes: ({ settings, apiKey }) =>
-      make({ apiKey, ...settings }).pipe(Effect.provideService(Crypto.Crypto, crypto)),
-    check: ({ settings, apiKey }) =>
-      Effect.acquireDisposable(
-        Effect.sync(() => new Daytona({ apiKey: Redacted.value(apiKey), ...settings })),
-      ).pipe(
-        Effect.flatMap((daytona) => call(() => daytona.list({ limit: 1 }).next())),
-        Effect.as<Connection.Health>({ status: "healthy" }),
-        Effect.timeout("15 seconds"),
-        Effect.catch((error) => Effect.succeed(healthOfFailure(error))),
-        Effect.scoped,
-      ),
-  }),
-);
-
-/**
- * What Daytona's failing to list an organization's sandboxes says of the connection: refusing the
- * key, being unable to answer now, as when it fails itself, or anything else, as not knowing the
- * request.
- */
-const healthOfFailure = (
-  error: SandboxError.SandboxError | Cause.TimeoutError,
-): Connection.Health => {
-  if (!(error instanceof SandboxError.SandboxError)) {
-    return { status: "unavailable", description: "Daytona did not answer in 15 seconds" };
-  }
-  const { reason } = error;
-  switch (reason._tag) {
-    case "AuthenticationError":
-      return { status: "unauthorized", description: reason.message };
-    case "UnavailableError":
-      return { status: "unavailable", description: reason.message };
-    default:
-      return error.cause instanceof DaytonaInternalServerError
-        ? { status: "unavailable", description: reason.message }
-        : { status: "misconfigured", description: reason.message };
-  }
-};
 
 /** The ports a sandbox's label names. */
 const portsOf = (labels: Readonly<Record<string, string>>): ReadonlyArray<Network.Port> =>

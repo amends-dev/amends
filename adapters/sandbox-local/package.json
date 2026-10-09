@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
     "@amends/sandbox": "workspace:*"
   },
   "devDependencies": {

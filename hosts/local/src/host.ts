@@ -11,8 +11,6 @@ import { JobPruning, TurnJob } from "@amends/cluster";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { AmendsAgent, Models } from "@amends/harness-amends";
 import { OpencodeAgent } from "@amends/harness-opencode";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { LocalSandboxProvider } from "@amends/sandbox-local";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
@@ -29,6 +27,7 @@ import {
 } from "effect/cluster";
 import { FetchHttpClient } from "effect/http";
 import type { SqlClient } from "effect/sql";
+import { SandboxIntegrations } from "./sandbox-integrations.ts";
 
 /** Gateway and directory owned by one host lifetime. */
 export type HostLayer = Layer.Layer<Gateway.Service | WorkspaceDirectory.Service, unknown>;
@@ -95,8 +94,8 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
       yield* ModelIntegrations.openAiCompatible,
       yield* ToolIntegrations.mcp,
       yield* ToolIntegrations.openApi,
-      yield* LocalSandboxProvider.integration({ directory }),
-      yield* DaytonaSandboxProvider.integration,
+      yield* SandboxIntegrations.local({ directory }),
+      yield* SandboxIntegrations.daytona,
       yield* AmendsAgent.integration(),
       yield* OpencodeAgent.integration({
         token: (sandboxId) =>

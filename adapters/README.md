@@ -7,12 +7,15 @@ live outside `packages/`. Hosts compose them; shared packages never depend on th
 
 `sandbox-local/` and `sandbox-daytona/` implement the
 [sandbox contract](../packages/sandbox): the first with directories on this machine, for
-development, and the second over Daytona's hosted sandboxes. Both run its conformance suites.
+development, and the second over Daytona's hosted sandboxes. Both run its conformance suites, and
+depend on the contract and their platform's SDK alone; the
+[local host](../hosts/local/README.md) declares their
+[integrations](../packages/connection/README.md).
 
 `harness-amends/` is amends's own agent for the [harness contract](../packages/harness/README.md), a
 loop over an Effect AI `LanguageModel` with the model providers' clients, and `harness-opencode/`
-runs opencode behind its bridge in a sandbox. Each of these four gives the
-[integration](../packages/connection/README.md) a host installs.
+runs opencode behind its bridge in a sandbox. Each of these two gives the integration a host
+installs.
 
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client

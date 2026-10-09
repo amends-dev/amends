@@ -56,6 +56,24 @@ export const Health = Schema.Struct({
 
 export interface Health extends Schema.Schema.Type<typeof Health> {}
 
+/**
+ * What an answer of `status` from `url` says of the connection: refusing the key, not knowing the
+ * request, or being unable to answer it now. Any other answer, as one that says the request is
+ * incomplete, comes once the key is taken.
+ */
+export const healthOf = (status: number, url: string): Health => {
+  if (status === 401 || status === 403) {
+    return { status: "unauthorized", description: `${url} refused the key (${status})` };
+  }
+  if (status === 408 || status === 429 || status >= 500) {
+    return { status: "unavailable", description: `${url} could not answer now (${status})` };
+  }
+  if (status === 404 || status === 405) {
+    return { status: "misconfigured", description: `${url} serves no such request (${status})` };
+  }
+  return { status: "healthy" };
+};
+
 const described = { description: Schema.String };
 
 /** The host has no integration of the id a connection names. */

@@ -12,11 +12,7 @@
  * `stop` and `destroy` end the processes the provider started for the sandbox, through any
  * `Sandbox` value for it, including those that outlived their scopes. A provider made again, as
  * when the host restarts, does not know of processes an earlier one left running.
- *
- * `integration` gives the sandboxes of this machine to connections, under a directory the host
- * gives it, for a workspace cannot say where on the host's disk its sandboxes go.
  */
-import { Connection, Integration } from "@amends/connection";
 import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox";
 import {
   Crypto,
@@ -212,64 +208,6 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
 
 export const layer = (options: Options) =>
   Layer.effect(SandboxProvider.SandboxProvider, make(options));
-
-export interface IntegrationOptions {
-  /** The directory that holds one directory per connection, which holds its sandboxes. */
-  readonly directory: string;
-}
-
-/** Whether a connection's id can name the directory of the connection's sandboxes. */
-const isDirectoryName = (id: string): boolean => Schema.is(Schema.String.check(Sandbox.isName))(id);
-
-/**
- * The integration of this machine's sandboxes. A connection to it gives no settings and no
- * credential, and keeps its sandboxes in a directory of its own, named by its id, so that it never
- * resumes another's. Checking a connection makes that directory.
- */
-export const integration = Effect.fn("LocalSandboxProvider.integration")(function* (
-  options: IntegrationOptions,
-) {
-  const context = yield* Effect.context<
-    FileSystem.FileSystem | Path.Path | Crypto.Crypto | ChildProcessSpawner.ChildProcessSpawner
-  >();
-  const path = yield* Path.Path;
-
-  /** The provider of the sandboxes of `connection`. */
-  const providerOf = ({ connection }: Integration.Access<unknown, "none">) =>
-    Effect.gen(function* () {
-      if (!isDirectoryName(connection.id)) {
-        return yield* new Connection.InvalidConnectionError({
-          description: `The id of ${connection.name}, ${connection.id}, cannot name a directory`,
-        });
-      }
-      return yield* make({ directory: path.join(options.directory, connection.id) }).pipe(
-        Effect.provideContext(context),
-        Effect.mapError(
-          (error) =>
-            new Connection.UnavailableError({
-              description: `The sandboxes of ${connection.name} cannot be kept: ${error.message}`,
-            }),
-        ),
-      );
-    });
-
-  return Integration.make({
-    id: "local",
-    name: "This machine",
-    auth: ["none"],
-    sandboxes: providerOf,
-    check: (access) =>
-      providerOf(access).pipe(
-        Effect.as<Connection.Health>({ status: "healthy" }),
-        Effect.catch((reason) =>
-          Effect.succeed<Connection.Health>({
-            status: reason._tag === "UnavailableError" ? "unavailable" : "misconfigured",
-            description: reason.description,
-          }),
-        ),
-      ),
-  });
-});
 
 /** Resolves the `cwd` of each command in `command` against `workingDirectory`, where a command without one starts. */
 const resolveCwd = (
