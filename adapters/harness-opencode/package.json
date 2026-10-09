@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
     "@amends/harness": "workspace:*",
     "@amends/sandbox": "workspace:*",
     "@effect/platform-bun": "catalog:"

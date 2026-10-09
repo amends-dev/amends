@@ -21,7 +21,6 @@
       "name": "@amends/harness-amends",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
         "@effect/ai-anthropic": "catalog:",
@@ -30,7 +29,6 @@
       },
       "devDependencies": {
         "@amends/sandbox-local": "workspace:*",
-        "@amends/toolkit": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -43,7 +41,6 @@
       "name": "@amends/harness-opencode",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
         "@effect/platform-bun": "catalog:",
@@ -241,6 +238,7 @@
         "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
+        "@amends/harness": "workspace:*",
         "@amends/harness-amends": "workspace:*",
         "@amends/harness-opencode": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -254,6 +252,7 @@
       },
       "devDependencies": {
         "@amends/api-http": "workspace:*",
+        "@amends/toolkit": "workspace:*",
         "@effect/sql-pg": "catalog:",
       },
     },

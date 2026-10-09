@@ -13,14 +13,10 @@
  * Before each step, once the conversation fills most of the model's context window, the agent
  * compacts it: the model summarizes all but the latest messages, which the conversation keeps as
  * they were. `compact` summarizes all of it, between turns. A model whose endpoint does not know its
- * context window is compacted for only on request.
- *
- * `integration` gives the agent to connections, for a host to install.
+ * context window is compacted only on request.
  */
-import { Integration } from "@amends/connection";
 import {
   type Agent,
-  Harness,
   HarnessError,
   type ModelEndpoint,
   Session,
@@ -107,31 +103,6 @@ export const make = Effect.fn("AmendsAgent.make")(function* (options: Options) {
     createSession: (sessionOptions) => createSession(options, modelFor, sessionOptions),
   };
   return agent;
-});
-
-/**
- * The integration of amends's agent, for a host to install with what the agent takes besides its
- * models. A connection to it gives no settings and no credential, and reaches nothing, so it is
- * always healthy.
- */
-export const integration = Effect.fn("AmendsAgent.integration")(function* (
-  options: Omit<Options, keyof Agent.Options> = {},
-) {
-  const languageModels = yield* Models.LanguageModels;
-  return Integration.make({
-    id: "amends",
-    name: "amends",
-    auth: ["none"],
-    harnesses: {
-      requiresSandbox: false,
-      harness: (_access, agentOptions) =>
-        make({ ...options, ...agentOptions }).pipe(
-          Effect.map(Harness.make),
-          Effect.provideService(Models.LanguageModels, languageModels),
-        ),
-    },
-    check: () => Effect.succeed({ status: "healthy" }),
-  });
 });
 
 const createSession = Effect.fn("AmendsAgent.createSession")(function* (

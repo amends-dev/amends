@@ -28,14 +28,6 @@ the commands opencode runs can read them. A model that models.dev does not list 
 sources. It needs `Crypto` and a `Socket.WebSocketConstructor` that sends headers, as Bun's and
 Node's do. The caller creates each sandbox with the `template` of the harness's `agent`.
 
-`OpencodeAgent.integration` is the integration of opencode, for a host to install with what the
-agent takes besides its models: the `token` function, and opencode's `config` and `env`.
-It bundles the bridge once, when it is made, and needs what `make` does, and says that opencode
-requires a sandbox. A connection to it gives no settings and no credential, and is always healthy,
-as it reaches nothing; its harness runs on the endpoints it is given, which connections to model
-providers give, and refuses endpoints that opencode cannot serve together with `UnsupportedError`. Its id is `opencode-agent`, as `opencode` is
-the id of OpenCode Zen, a provider of models in the catalog.
-
 ## In the sandbox
 
 The template installs Bun 1.3.14 and opencode 1.18.23 in the sandbox's home, under

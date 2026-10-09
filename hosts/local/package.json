@@ -13,6 +13,7 @@
     "@amends/connection": "workspace:*",
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",
+    "@amends/harness": "workspace:*",
     "@amends/harness-amends": "workspace:*",
     "@amends/harness-opencode": "workspace:*",
     "@amends/sandbox": "workspace:*",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@amends/api-http": "workspace:*",
+    "@amends/toolkit": "workspace:*",
     "@effect/sql-pg": "catalog:"
   }
 }
