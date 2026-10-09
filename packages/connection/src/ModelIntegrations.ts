@@ -18,7 +18,7 @@
 import type { ModelEndpoint } from "@amends/harness";
 import { Effect, Redacted, Result, Schema } from "effect";
 import { HttpClient, HttpClientRequest, type HttpClientResponse } from "effect/http";
-import { type Health, UnsupportedError } from "./Connection.ts";
+import { type Health, healthOf, UnsupportedError } from "./Connection.ts";
 import * as Integration from "./Integration.ts";
 import * as ModelCatalog from "./ModelCatalog.ts";
 
@@ -188,21 +188,3 @@ const checkWith = (
       description: `Nothing answered at ${url}`,
     })),
   );
-
-/**
- * What an answer of `status` from `url` says of the connection: refusing the key, not knowing the
- * request, or being unable to answer it now. Any other answer, as one that says the request is
- * incomplete, comes once the key is taken.
- */
-export const healthOf = (status: number, url: string): Health => {
-  if (status === 401 || status === 403) {
-    return { status: "unauthorized", description: `${url} refused the key (${status})` };
-  }
-  if (status === 408 || status === 429 || status >= 500) {
-    return { status: "unavailable", description: `${url} could not answer now (${status})` };
-  }
-  if (status === 404 || status === 405) {
-    return { status: "misconfigured", description: `${url} serves no such request (${status})` };
-  }
-  return { status: "healthy" };
-};

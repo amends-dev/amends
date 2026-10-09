@@ -41,7 +41,9 @@ open credentials sealed with the old one, and nothing rotates them yet.
 model provider in the catalog and any OpenAI-compatible API; MCP servers and HTTP APIs as tools; the
 [local](../../adapters/sandbox-local) sandbox provider, keeping each connection's
 sandboxes in a directory of its own in the sandbox directory, and
-[Daytona](../../adapters/sandbox-daytona/README.md); and amends's
+[Daytona](../../adapters/sandbox-daytona/README.md), whose integrations `SandboxIntegrations`
+declares, a connection to Daytona being an organization reached with its API key, checked by
+listing one of its sandboxes; and amends's
 [agent](../../adapters/harness-amends) and
 [opencode](../../adapters/harness-opencode/README.md) as harnesses. Connections' keys are sealed with
 `AMENDS_CREDENTIAL_KEY`, and opencode's bridge tokens are derived from it, so a host reaches a

@@ -6,21 +6,20 @@
  *
  * Each sandbox is a directory under the provider's `directory`, named by its id, that holds its
  * settings, the ports it exposes, in `sandbox.json` and the sandbox's files in `workspace`, its
- * working directory. Processes start in the working directory and resolve a relative `cwd` against it.
- * File paths are this machine's paths.
+ * working directory. Processes start in the working directory and resolve a relative `cwd`
+ * against it. File paths are this machine's paths.
  *
  * `stop` and `destroy` end the processes the provider started for the sandbox, through any
  * `Sandbox` value for it, including those that outlived their scopes. A provider made again, as
  * when the host restarts, does not know of processes an earlier one left running.
  *
- * `integration` gives the sandboxes of this machine to connections, under a directory the host
- * gives it, for a workspace cannot say where on the host's disk its sandboxes go.
+ * @since 0.1.0
  */
-import { Connection, Integration } from "@amends/connection";
 import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox";
 import {
   Crypto,
   Effect,
+  Exit,
   FileSystem,
   Layer,
   Path,
@@ -31,6 +30,12 @@ import {
 } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
+/**
+ * Where the provider keeps its sandboxes.
+ *
+ * @category options
+ * @since 0.1.0
+ */
 export interface Options {
   /** The directory that holds one directory per sandbox, created if it is missing. */
   readonly directory: string;
@@ -39,6 +44,31 @@ export interface Options {
 /** The settings a sandbox keeps in its `sandbox.json`: the ports it exposes. */
 const Settings = Schema.fromJsonString(Schema.Struct({ ports: Schema.Array(Network.Port) }));
 
+/**
+ * The provider over `options.directory`, which it creates if it is missing. It needs Effect's
+ * `FileSystem`, `Path`, `Crypto`, and `ChildProcessSpawner` services for this machine, as
+ * `BunServices.layer` or `NodeServices.layer` provide them.
+ *
+ * **Example** (A provider for one piece of work, over a temporary directory)
+ *
+ * ```ts
+ * import { LocalSandboxProvider } from "@amends/sandbox-local";
+ * import { BunServices } from "@effect/platform-bun";
+ * import { Effect, FileSystem } from "effect";
+ *
+ * const program = Effect.gen(function* () {
+ *   const fs = yield* FileSystem.FileSystem;
+ *   const sandboxProvider = yield* LocalSandboxProvider.make({
+ *     directory: yield* fs.makeTempDirectoryScoped(),
+ *   });
+ *   const sandbox = yield* sandboxProvider.createScoped();
+ *   return sandbox.workingDirectory;
+ * }).pipe(Effect.scoped, Effect.provide(BunServices.layer));
+ * ```
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
 export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: Options) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
@@ -59,18 +89,11 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     };
   };
 
-  // TODO: Keep the processes that outlive their scopes in the sandbox's directory, so that a
-  // provider made after the host restarts ends them too, once a host restarts while one runs.
   /**
    * The processes running in each sandbox, so that `stop` and `destroy` end them whichever
    * `Sandbox` value started them.
    */
   const processes = new Map<Sandbox.SandboxId, Set<ChildProcessSpawner.ChildProcessHandle>>();
-  const processesOf = (id: Sandbox.SandboxId) => {
-    const running = processes.get(id) ?? new Set();
-    processes.set(id, running);
-    return running;
-  };
 
   /**
    * Spawns `command`, keeping its process in `running` while it runs. When the caller's scope
@@ -120,7 +143,8 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
 
   const openSandbox = (id: Sandbox.SandboxId): Sandbox.Sandbox["Service"] => {
     const paths = pathsOf(id);
-    const running = processesOf(id);
+    const running = processes.get(id) ?? new Set<ChildProcessSpawner.ChildProcessHandle>();
+    processes.set(id, running);
     return Sandbox.Sandbox.of({
       id,
       workingDirectory: paths.workspace,
@@ -179,25 +203,25 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
     const paths = pathsOf(id);
     if (createOptions.networkPolicy !== undefined) yield* allowAllOnly(createOptions.networkPolicy);
 
-    // Creating the sandbox's directory claims its id, failing when the id is taken.
-    yield* fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError));
-    return yield* Effect.gen(function* () {
-      yield* fs.makeDirectory(paths.workspace);
-      yield* writePorts(id, ports);
-      return openSandbox(id);
-    }).pipe(
-      Effect.mapError(fromPlatformError),
-      // TODO: Prepare each template identity once and copy its workspace into new sandboxes, as a
-      // snapshot would, once preparing on every create is too slow.
-      Effect.tap((sandbox) =>
-        createOptions.template === undefined
+    return yield* Effect.acquireUseRelease(
+      // Creating the sandbox's directory claims its id, failing when the id is taken.
+      fs.makeDirectory(paths.root).pipe(Effect.mapError(fromPlatformError)),
+      () =>
+        Effect.gen(function* () {
+          yield* fs.makeDirectory(paths.workspace).pipe(Effect.mapError(fromPlatformError));
+          yield* writePorts(id, ports).pipe(Effect.mapError(fromPlatformError));
+          const sandbox = openSandbox(id);
+          // The provider takes no snapshots, so a template prepares every sandbox on its own.
+          if (createOptions.template !== undefined) {
+            yield* Effect.provide(createOptions.template.prepare, Sandbox.layerServices(sandbox));
+          }
+          return sandbox;
+        }),
+      // A failed create, interrupted or not, leaves no sandbox behind to resume.
+      (_, exit) =>
+        Exit.isSuccess(exit)
           ? Effect.void
-          : createOptions.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox))),
-      ),
-      // A failed create leaves no sandbox behind to resume.
-      Effect.onError(() =>
-        fs.remove(paths.root, { recursive: true, force: true }).pipe(Effect.ignore),
-      ),
+          : Effect.ignore(fs.remove(paths.root, { recursive: true, force: true })),
     );
   });
 
@@ -210,68 +234,39 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
   return SandboxProvider.make({ create, resume });
 });
 
+/**
+ * Provides the `SandboxProvider` service over `options.directory`, as `make` makes it, to a
+ * program that keeps its sandboxes on this machine.
+ *
+ * **Example** (Sandboxes under a directory of the host's)
+ *
+ * ```ts
+ * import { LocalSandboxProvider } from "@amends/sandbox-local";
+ * import { SandboxProvider } from "@amends/sandbox";
+ * import { BunServices } from "@effect/platform-bun";
+ * import { Effect, Layer } from "effect";
+ *
+ * const sandboxes = LocalSandboxProvider.layer({ directory: "/var/lib/amends/sandboxes" }).pipe(
+ *   Layer.provide(BunServices.layer),
+ * );
+ *
+ * const program = Effect.gen(function* () {
+ *   const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+ *   const sandbox = yield* sandboxProvider.create();
+ *   return sandbox.id;
+ * }).pipe(Effect.provide(sandboxes));
+ * ```
+ *
+ * @category layers
+ * @since 0.1.0
+ */
 export const layer = (options: Options) =>
   Layer.effect(SandboxProvider.SandboxProvider, make(options));
 
-export interface IntegrationOptions {
-  /** The directory that holds one directory per connection, which holds its sandboxes. */
-  readonly directory: string;
-}
-
-/** Whether a connection's id can name the directory of the connection's sandboxes. */
-const isDirectoryName = (id: string): boolean => Schema.is(Schema.String.check(Sandbox.isName))(id);
-
 /**
- * The integration of this machine's sandboxes. A connection to it gives no settings and no
- * credential, and keeps its sandboxes in a directory of its own, named by its id, so that it never
- * resumes another's. Checking a connection makes that directory.
+ * Resolves the `cwd` of each command in `command` against `workingDirectory`, where a command
+ * without one starts.
  */
-export const integration = Effect.fn("LocalSandboxProvider.integration")(function* (
-  options: IntegrationOptions,
-) {
-  const context = yield* Effect.context<
-    FileSystem.FileSystem | Path.Path | Crypto.Crypto | ChildProcessSpawner.ChildProcessSpawner
-  >();
-  const path = yield* Path.Path;
-
-  /** The provider of the sandboxes of `connection`. */
-  const providerOf = ({ connection }: Integration.Access<unknown, "none">) =>
-    Effect.gen(function* () {
-      if (!isDirectoryName(connection.id)) {
-        return yield* new Connection.InvalidConnectionError({
-          description: `The id of ${connection.name}, ${connection.id}, cannot name a directory`,
-        });
-      }
-      return yield* make({ directory: path.join(options.directory, connection.id) }).pipe(
-        Effect.provideContext(context),
-        Effect.mapError(
-          (error) =>
-            new Connection.UnavailableError({
-              description: `The sandboxes of ${connection.name} cannot be kept: ${error.message}`,
-            }),
-        ),
-      );
-    });
-
-  return Integration.make({
-    id: "local",
-    name: "This machine",
-    auth: ["none"],
-    sandboxes: providerOf,
-    check: (access) =>
-      providerOf(access).pipe(
-        Effect.as<Connection.Health>({ status: "healthy" }),
-        Effect.catch((reason) =>
-          Effect.succeed<Connection.Health>({
-            status: reason._tag === "UnavailableError" ? "unavailable" : "misconfigured",
-            description: reason.description,
-          }),
-        ),
-      ),
-  });
-});
-
-/** Resolves the `cwd` of each command in `command` against `workingDirectory`, where a command without one starts. */
 const resolveCwd = (
   path: Path.Path,
   workingDirectory: string,

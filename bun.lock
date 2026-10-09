@@ -60,11 +60,10 @@
     },
     "adapters/sandbox-daytona": {
       "name": "@amends/sandbox-daytona",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
         "@amends/sandbox": "workspace:*",
-        "@daytona/sdk": "0.220.0",
+        "@daytona/sdk": "catalog:",
       },
       "devDependencies": {
         "@effect/platform-bun": "catalog:",
@@ -77,9 +76,8 @@
     },
     "adapters/sandbox-local": {
       "name": "@amends/sandbox-local",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
         "@amends/sandbox": "workspace:*",
       },
       "devDependencies": {
@@ -250,12 +248,12 @@
         "@amends/sandbox-local": "workspace:*",
         "@amends/server-http": "workspace:*",
         "@amends/storage-postgresql": "workspace:*",
+        "@daytona/sdk": "catalog:",
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
         "@amends/api-http": "workspace:*",
-        "@daytona/sdk": "0.218.0",
         "@effect/sql-pg": "catalog:",
       },
     },
@@ -317,7 +315,7 @@
     },
     "packages/harness": {
       "name": "@amends/harness",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@amends/sandbox": "workspace:*",
       },
@@ -331,7 +329,7 @@
     },
     "packages/sandbox": {
       "name": "@amends/sandbox",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -386,6 +384,7 @@
     "vite-node": "5.0.0",
   },
   "catalog": {
+    "@daytona/sdk": "0.223.1",
     "@effect/ai-anthropic": "4.0.0",
     "@effect/ai-openai": "4.0.0",
     "@effect/ai-openai-compat": "4.0.0",
@@ -523,13 +522,13 @@
 
     "@corvu/utils": ["@corvu/utils@0.4.2", "", { "dependencies": { "@floating-ui/dom": "^1.6.11" }, "peerDependencies": { "solid-js": "^1.8" } }, "sha512-Ox2kYyxy7NoXdKWdHeDEjZxClwzO4SKM8plAaVwmAJPxHMqA0rLOoAsa+hBDwRLpctf+ZRnAd/ykguuJidnaTA=="],
 
-    "@daytona/analytics-api-client": ["@daytona/analytics-api-client@0.218.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-RFptNzzabMADIiSmqeZc0Y9Lan5hLBhh/lkuhKMUsCx7fdj8GpUdWZ46xdPCQQ/2qa4wafeU63V8US6FPyCJsg=="],
+    "@daytona/analytics-api-client": ["@daytona/analytics-api-client@0.223.1", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-LntjeNKKHpjzpCwgGbfYRvQ733b7SLfGpeM5ZTA12YK82YfvssGPDRkfo7xi88ndsbYteE+L9TpqYx3aH3WncA=="],
 
-    "@daytona/api-client": ["@daytona/api-client@0.218.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-eWUW/KjcV3Hrq1KI1izfLR1QilRadBFMrdl2M5rFZhrgXBecgQ4PA2kb276w2uQq9gQWvYrrh8l7DSPQiBN13Q=="],
+    "@daytona/api-client": ["@daytona/api-client@0.223.1", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-p/NaCr3NbKUKPwqDBJBHHvToUMqh7QIyHT5rENzJYSrs9RCMfsifbtTpe0nHyOokfZhIceHWFcOtT2JwJYmSKQ=="],
 
-    "@daytona/sdk": ["@daytona/sdk@0.218.0", "", { "dependencies": { "@aws-sdk/client-s3": "^3.1131.0", "@aws-sdk/lib-storage": "^3.1131.0", "@daytona/analytics-api-client": "0.218.0", "@daytona/api-client": "0.218.0", "@daytona/toolbox-api-client": "0.218.0", "@iarna/toml": "^2.2.5", "@opentelemetry/api": "^1.9.1", "@opentelemetry/exporter-trace-otlp-http": "^0.222.0", "@opentelemetry/instrumentation-http": "^0.222.0", "@opentelemetry/otlp-exporter-base": "0.222.0", "@opentelemetry/resources": "2.11.0", "@opentelemetry/sdk-node": "^0.222.0", "@opentelemetry/sdk-trace-base": "^2.11.0", "@opentelemetry/semantic-conventions": "^1.43.0", "axios": "^1.20.0", "busboy": "^1.0.0", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.8.2", "socket.io-client": "^4.8.1", "tar": "^7.5.22", "tslib": "2.8.1", "ws": "^8.21.3" } }, "sha512-dPlUCg26+3zPln58L+QWhV1kd/k4DTzv2Qf5mpad8ZIGm0t9vaSLQ0P2klVrtoKV0s6fTlJ9vqmj1GiCdciZZA=="],
+    "@daytona/sdk": ["@daytona/sdk@0.223.1", "", { "dependencies": { "@aws-sdk/client-s3": "^3.1141.0", "@aws-sdk/lib-storage": "^3.1141.0", "@daytona/analytics-api-client": "0.223.1", "@daytona/api-client": "0.223.1", "@daytona/toolbox-api-client": "0.223.1", "@iarna/toml": "^2.2.5", "@opentelemetry/api": "^1.9.1", "@opentelemetry/exporter-trace-otlp-http": "^0.222.0", "@opentelemetry/instrumentation-http": "^0.222.0", "@opentelemetry/otlp-exporter-base": "0.222.0", "@opentelemetry/resources": "2.11.0", "@opentelemetry/sdk-node": "^0.222.0", "@opentelemetry/sdk-trace-base": "^2.11.0", "@opentelemetry/semantic-conventions": "^1.43.0", "axios": "^1.20.0", "busboy": "^1.0.0", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.11.0", "socket.io-client": "^4.8.4", "tar": "^7.5.22", "tslib": "2.8.1", "ws": "^8.22.0" } }, "sha512-Ja6bacvUBuODjKcWGczZn6k9w+7veIces4k2tdizPUndj3pjgnHrphq/TbdIvJfKtz91yQ+S4mKoKaeuKQLc7g=="],
 
-    "@daytona/toolbox-api-client": ["@daytona/toolbox-api-client@0.218.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-8ZI4Mc9xEan1hAkEJVvSxvJbnGkIhc4JhA5o6woBOs5MVHwOnXepqozeBl73CkxgEUl3ZLS9c8TOf95UYZ9aeA=="],
+    "@daytona/toolbox-api-client": ["@daytona/toolbox-api-client@0.223.1", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-Sl91T6kLIfilU5njZWGzU8KAeHtOfv6pw6iPO1JmX8UhjqfriOy6exPyCxSiBpmyZsQy0eL80IecdbTZPvnmcQ=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.12.1", "", {}, "sha512-yHwomvolVafvUXhy5TdiJVkuNCxXn+bKOs2aWiWEQh/5YaV97Oa/abJz3dmx7lxgIUsUlS1Jl4mEfvJPo3YsVw=="],
 
@@ -1657,7 +1656,7 @@
 
     "seroval-plugins": ["seroval-plugins@1.5.6", "", { "peerDependencies": { "seroval": "^1.0" } }, "sha512-HXuLAX2pu/UByPpaeo/TaMfvMIi+1QqIoPJYCcAtU8QkVNwgR6MPlGuCQTErV1JwraaMbYaWVIBX7mppzGLATQ=="],
 
-    "shell-quote": ["shell-quote@1.10.0", "", {}, "sha512-w1aiOKwKuRgtwAReIIj89puqg+I7GvX4IbLrvmhXbzQsj1+Zwi4VO3+fa6ZF91TWSjIxoEkKnMeHcLEODK5ZXA=="],
+    "shell-quote": ["shell-quote@1.12.0", "", {}, "sha512-PcByqNyT/38F2kDNi006HAMRJaULuBzq/FOsw3qdZvX/GA9W/jamDaRskgHjubHiftXK5sIFxLNkvrXUwcof6Q=="],
 
     "siginfo": ["siginfo@2.0.0", "", {}, "sha512-ybx0WO1/8bSBLEWXZvEd7gMW3Sn3JFlW3TvX1nREbDLRNQNaeNN8WK0meBwPdAaOI7TtRRRJn/Es1zhrrCHu7g=="],
 
@@ -1773,13 +1772,13 @@
 
     "yocto-queue": ["yocto-queue@0.1.0", "", {}, "sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q=="],
 
-    "@amends/sandbox-daytona/@daytona/sdk": ["@daytona/sdk@0.220.0", "", { "dependencies": { "@aws-sdk/client-s3": "^3.1136.0", "@aws-sdk/lib-storage": "^3.1136.0", "@daytona/analytics-api-client": "0.220.0", "@daytona/api-client": "0.220.0", "@daytona/toolbox-api-client": "0.220.0", "@iarna/toml": "^2.2.5", "@opentelemetry/api": "^1.9.1", "@opentelemetry/exporter-trace-otlp-http": "^0.222.0", "@opentelemetry/instrumentation-http": "^0.222.0", "@opentelemetry/otlp-exporter-base": "0.222.0", "@opentelemetry/resources": "2.11.0", "@opentelemetry/sdk-node": "^0.222.0", "@opentelemetry/sdk-trace-base": "^2.11.0", "@opentelemetry/semantic-conventions": "^1.43.0", "axios": "^1.20.0", "busboy": "^1.0.0", "expand-tilde": "^2.0.2", "fast-glob": "^3.3.0", "form-data": "^4.0.4", "isomorphic-ws": "^5.0.0", "pathe": "^2.0.3", "shell-quote": "^1.8.2", "socket.io-client": "^4.8.1", "tar": "^7.5.22", "tslib": "2.8.1", "ws": "^8.21.3" } }, "sha512-PJio3vbDwRApzlsK6AGO7r4CHJcF9PI5DWuUW2yUnA2MVJSh/jotS0onKBv6boC5F+oboljTibUMxrwVPIrOlQ=="],
-
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
     "@babel/helper-compilation-targets/lru-cache": ["lru-cache@5.1.1", "", { "dependencies": { "yallist": "^3.0.2" } }, "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="],
 
     "@babel/helper-compilation-targets/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
+
+    "@daytona/sdk/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
 
     "@effect/platform-node-shared/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
 
@@ -1810,14 +1809,6 @@
     "vite-node/es-module-lexer": ["es-module-lexer@1.7.0", "", {}, "sha512-jEQoCwk8hyb2AZziIOLhDqpm5+2ww5uIE6lkO/6jcOCusfk6LhMHpXXfBLXTZ7Ydyt0j4VoUQv6uGNYbdW+kBA=="],
 
     "wrap-ansi/ansi-styles": ["ansi-styles@4.3.0", "", { "dependencies": { "color-convert": "^2.0.1" } }, "sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg=="],
-
-    "@amends/sandbox-daytona/@daytona/sdk/@daytona/analytics-api-client": ["@daytona/analytics-api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-3BGYILzjo2aFTJhLd6XBXlNEQBSo9Zr2Nj31OdX9o50fMRVUwVydF6ekIGkPGSLwskz6b6xxg5BSS+f9dbrxCQ=="],
-
-    "@amends/sandbox-daytona/@daytona/sdk/@daytona/api-client": ["@daytona/api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-XaMEtiQCaIHc3T7y3HUqx1A5eWSnd+FJvhpSHDwP3Snu9Nnhy4t+K2LHBWgJQn9dGtWXsdOsbB9K0BqpmFJtyA=="],
-
-    "@amends/sandbox-daytona/@daytona/sdk/@daytona/toolbox-api-client": ["@daytona/toolbox-api-client@0.220.0", "", { "dependencies": { "axios": "^1.6.1" } }, "sha512-Kn94AOxhGQil0XygOOR26SaCkndE4dOtxYS0hLbqrTxcP3H1uq1HGFGSRkHFQNkaR8eL9QwFUPSMqd0Vr3A64A=="],
-
-    "@amends/sandbox-daytona/@daytona/sdk/ws": ["ws@8.22.0", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg=="],
 
     "@babel/helper-compilation-targets/lru-cache/yallist": ["yallist@3.1.1", "", {}, "sha512-a4UGQaWPH59mOXUYnAG2ewncQS4i4F43Tv3JoAM+s2VDAmS9NsK8GpDMLrCHPksFT7h3K6TOoUNn2pb7RoXx4g=="],
 

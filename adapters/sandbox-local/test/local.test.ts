@@ -12,7 +12,7 @@ const port = Network.Port.make(3000);
 const makeLocalProvider = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const directory = yield* fs.makeTempDirectoryScoped();
-  return { directory, provider: yield* LocalSandboxProvider.make({ directory }) };
+  return { directory, sandboxProvider: yield* LocalSandboxProvider.make({ directory }) };
 });
 
 const spawnSleep = (sandbox: Sandbox.Sandbox["Service"]) =>
@@ -28,9 +28,9 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
-        const { directory, provider } = yield* makeLocalProvider;
+        const { directory, sandboxProvider } = yield* makeLocalProvider;
 
-        const sandbox = yield* provider.create({ id, ports: [port] });
+        const sandbox = yield* sandboxProvider.create({ id, ports: [port] });
 
         expect(sandbox.workingDirectory).toBe(path.join(directory, id, "workspace"));
         expect(yield* fs.exists(sandbox.workingDirectory)).toBe(true);
@@ -44,9 +44,9 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
 
   it.effect("names a sandbox created without an id with a UUID", () =>
     Effect.gen(function* () {
-      const { provider } = yield* makeLocalProvider;
+      const { sandboxProvider } = yield* makeLocalProvider;
 
-      const sandbox = yield* provider.create();
+      const sandbox = yield* sandboxProvider.create();
 
       expect(sandbox.id).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
@@ -58,8 +58,8 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
-      const { directory, provider } = yield* makeLocalProvider;
-      const sandbox = yield* provider.create();
+      const { directory, sandboxProvider } = yield* makeLocalProvider;
+      const sandbox = yield* sandboxProvider.create();
       const workingDirectory = yield* fs.realPath(sandbox.workingDirectory);
       yield* fs.makeDirectory(path.join(workingDirectory, "sub"));
 
@@ -85,9 +85,9 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
 
   it.effect("stops processes started through another value for the same sandbox", () =>
     Effect.gen(function* () {
-      const { provider } = yield* makeLocalProvider;
-      const created = yield* provider.create({ id });
-      const resumed = yield* provider.resume(id);
+      const { sandboxProvider } = yield* makeLocalProvider;
+      const created = yield* sandboxProvider.create({ id });
+      const resumed = yield* sandboxProvider.resume(id);
       const handle = yield* spawnSleep(resumed);
 
       yield* created.stop;
@@ -98,8 +98,8 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
 
   it.effect("reaches ports on this machine's loopback address without headers", () =>
     Effect.gen(function* () {
-      const { provider } = yield* makeLocalProvider;
-      const sandbox = yield* provider.create({ ports: [port] });
+      const { sandboxProvider } = yield* makeLocalProvider;
+      const sandbox = yield* sandboxProvider.create({ ports: [port] });
 
       expect(yield* sandbox.endpoint(port, "http")).toEqual({
         url: "http://127.0.0.1:3000",
@@ -110,8 +110,8 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
 
   it.effect("accepts only the network policy it already has, allowing everything", () =>
     Effect.gen(function* () {
-      const { provider } = yield* makeLocalProvider;
-      const sandbox = yield* provider.create();
+      const { sandboxProvider } = yield* makeLocalProvider;
+      const sandbox = yield* sandboxProvider.create();
 
       yield* sandbox.setNetworkPolicy(Network.NetworkPolicy.cases.AllowAll.make({}));
       const denyAll = yield* Effect.flip(
@@ -134,8 +134,8 @@ layer(BunServices.layer)("LocalSandboxProvider", (it) => {
 
   it.effect("cannot transform requests", () =>
     Effect.gen(function* () {
-      const { provider } = yield* makeLocalProvider;
-      const sandbox = yield* provider.create();
+      const { sandboxProvider } = yield* makeLocalProvider;
+      const sandbox = yield* sandboxProvider.create();
 
       const error = yield* Effect.flip(
         sandbox.setRequestTransformations([

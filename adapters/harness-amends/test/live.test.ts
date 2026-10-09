@@ -22,8 +22,8 @@ import * as Models from "../src/Models.ts";
  * `OPENROUTER_API_KEY`, as `bun --env-file=hosts/local/.env` gives it; `AMENDS_TEST_MODELS_MODEL`
  * names another of OpenRouter's models. Anthropic and OpenAI are reached with a key they refuse,
  * which shows that a request found their API, without spending anything. The agent is also set up as
- * a host sets it up from a workspace's connections: to OpenRouter, to the agent, to an MCP server on
- * this machine, and to this machine's sandboxes.
+ * a host sets it up from a workspace's connections: to OpenRouter, to the agent, and to an MCP
+ * server on this machine; and works in a sandbox on this machine.
  */
 const enabled = process.env.AMENDS_TEST_MODELS === "1";
 const openRouterKey = process.env.OPENROUTER_API_KEY ?? "";
@@ -162,15 +162,12 @@ const connectionTo = (
 
 const openRouter = connectionTo("openrouter", "OpenRouter", "apiKey");
 const agent = connectionTo("amends", "amends", "none");
-const thisMachine = connectionTo("local", "This machine", "none");
 
-/** The integrations a host installs, with a directory for the local sandboxes until the scope closes. */
+/** The integrations a host installs. */
 const installIntegrations = Effect.gen(function* () {
-  const fs = yield* FileSystem.FileSystem;
   return yield* Integrations.make([
     ...(yield* ModelIntegrations.catalogProviders),
     yield* ToolIntegrations.mcp,
-    yield* LocalSandboxProvider.integration({ directory: yield* fs.makeTempDirectoryScoped() }),
     yield* AmendsAgent.integration(),
   ]);
 });
@@ -243,21 +240,18 @@ describe.skipIf(!enabled)("amends's agent set up from connections", () => {
   );
 
   it.live(
-    "works in a sandbox of a sandbox connection, running a command there",
+    "works in a sandbox on this machine, running a command there",
     () =>
       Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
         const path = yield* Path.Path;
         const integrations = yield* installIntegrations;
         const harness = yield* makeHarness(integrations);
-        const provider = yield* (yield* integrations.find(thisMachine.integration)).sandboxProvider(
-          thisMachine,
-          undefined,
-        );
-        const sandbox = yield* Effect.acquireRelease(
-          provider.create(
-            harness.agent.template === undefined ? {} : { template: harness.agent.template },
-          ),
-          (created) => Effect.ignore(created.destroy),
+        const sandboxProvider = yield* LocalSandboxProvider.make({
+          directory: yield* fs.makeTempDirectoryScoped(),
+        });
+        const sandbox = yield* sandboxProvider.createScoped(
+          harness.agent.template === undefined ? {} : { template: harness.agent.template },
         );
         const session = yield* harness.createSession({ sandbox, id });
 

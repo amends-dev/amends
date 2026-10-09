@@ -17,7 +17,7 @@ import { SandboxError, type Template } from "@amends/sandbox";
 import { type Daytona, type Snapshot, SnapshotState } from "@daytona/sdk";
 import { Clock, Crypto, Duration, Effect, Option, type Scope } from "effect";
 import { Hex } from "effect/encoding";
-import { call, sandboxError } from "./Call.ts";
+import { call, sandboxError } from "./call.ts";
 
 /** How many minutes the sandbox making a version's snapshot lives at most, and so claims it. */
 export const claimMinutes = 30;
@@ -29,7 +29,7 @@ const otherVersionsKeptFor = Duration.days(1);
  * The name of the snapshot of `template`'s version, prepared in a sandbox that started from the
  * snapshot `base`, or from Daytona's default: the template's name, and a digest of the rest.
  */
-export const nameOf = Effect.fnUntraced(function* <E>(
+export const snapshotNameOf = Effect.fnUntraced(function* <E>(
   template: Template.Template<E>,
   base: string | undefined,
 ) {
@@ -50,14 +50,14 @@ export const nameOf = Effect.fnUntraced(function* <E>(
  * succeeds with `false` and makes nothing when another create has claimed the version; activating
  * the snapshot; or deleting one Daytona failed to make, for a later create to make again.
  */
-export const find = Effect.fn("Snapshots.find")(function* <E>(
+export const findSnapshot = Effect.fn("DaytonaSandboxProvider.findSnapshot")(function* <E>(
   daytona: Daytona,
   scope: Scope.Scope,
   template: Template.Template<E>,
   base: string | undefined,
   make: (name: string) => Effect.Effect<boolean, E | SandboxError.SandboxError>,
 ) {
-  const name = yield* nameOf(template, base);
+  const name = yield* snapshotNameOf(template, base);
   const state = yield* call(() => daytona.snapshot.get(name)).pipe(
     Effect.map((snapshot) => Option.some(snapshot.state)),
     Effect.catchIf(
@@ -78,7 +78,9 @@ export const find = Effect.fn("Snapshots.find")(function* <E>(
     yield* Effect.forkIn(
       Effect.ignore(bringAbout[next], {
         log: "Warn",
-        message: `Failed to ${next.toLowerCase()} the snapshot ${name} of the template ${template.name}`,
+        message:
+          `Failed to ${next.toLowerCase()} the snapshot ${name}` +
+          ` of the template ${template.name}`,
       }),
       scope,
     );
@@ -126,7 +128,7 @@ export const otherVersionsToDelete = (
     )
     .map((snapshot) => snapshot.name);
 
-/** Deletes the template's other versions `otherVersionsToDelete` names; failing to only leaves them. */
+/** Deletes the template's other versions `otherVersionsToDelete` names; a failure leaves them. */
 const deleteOtherVersions = (daytona: Daytona, templateName: string, current: string) =>
   Effect.gen(function* () {
     const snapshots = yield* listSnapshots(daytona);

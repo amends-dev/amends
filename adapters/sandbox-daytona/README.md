@@ -1,30 +1,82 @@
-# Daytona sandbox provider
+# @amends/sandbox-daytona
 
-A provider for the [sandbox contract](../../packages/sandbox) that creates each sandbox in
-Daytona's cloud, a Linux machine of its own. It reaches Daytona through Daytona's SDK,
-`@daytona/sdk` 0.220.0, with the API key of the organization the sandboxes belong to.
+Sandboxes on [Daytona](https://www.daytona.io) for the [`@amends/sandbox`](../../packages/sandbox)
+contract. Each sandbox is a Linux machine of its own in Daytona's cloud, which Daytona names by the
+sandbox's id. The provider reaches Daytona through its SDK with the API key of the organization
+the sandboxes belong to, makes a snapshot of each template version so that later sandboxes start
+ready, and reaches a sandbox's ports through Daytona's preview URLs. It runs on Bun or Node, as
+Daytona's SDK does; [`@amends/sandbox-local`](../sandbox-local) runs the same code in directories
+on this machine.
 
-## Running it
+## Install
 
-`DaytonaSandboxProvider.layer(options)` provides the `SandboxProvider`, and `make(options)` makes
-one in a scope; both need `Crypto`. The SDK's client keeps a connection open, so it closes with
-the provider's scope. The options are:
+```sh
+bun add @amends/sandbox-daytona @amends/sandbox effect
+```
 
-- `apiKey`, the organization's API key, redacted.
-- `apiUrl`, Daytona's API when it is not that of Daytona's own cloud.
-- `target`, the region to create sandboxes in, rather than the organization's.
-- `snapshot`, the snapshot sandboxes start from, rather than Daytona's default.
-- `autoStopInterval`, the minutes without requests to Daytona's API after which Daytona stops a
-  sandbox. It is 0 by default, which never stops one: requests to a sandbox's ports do not count,
-  so a sandbox would otherwise stop under an agent that only serves a host through a port.
+The provider needs Effect's `Crypto` service, as `BunCrypto.layer` from `@effect/platform-bun` or
+`NodeCrypto.layer` from `@effect/platform-node` provide it, and the API key of a Daytona
+organization.
+
+## Quick start
+
+`DaytonaSandboxProvider.layer` provides the contract's `SandboxProvider` service over an
+organization's API key. A program then creates sandboxes, works inside them with Effect's own
+`FileSystem` and `ChildProcessSpawner`, reaches their ports, and resumes them later by id, as it
+would on any provider.
+
+```ts
+import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+import { Network, Sandbox, SandboxProvider } from "@amends/sandbox";
+import { BunCrypto } from "@effect/platform-bun";
+import { Config, Effect, FileSystem, Layer } from "effect";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
+
+const sandboxes = Layer.unwrap(
+  Effect.map(Config.Redacted("DAYTONA_API_KEY"), (apiKey) =>
+    DaytonaSandboxProvider.layer({ apiKey }),
+  ),
+).pipe(Layer.provide(BunCrypto.layer));
+
+const port = Network.Port.make(3000);
+
+const program = Effect.gen(function* () {
+  const sandboxProvider = yield* SandboxProvider.SandboxProvider;
+  const sandbox = yield* sandboxProvider.create({ ports: [port] });
+
+  // Commands start in the working directory, /home/daytona on Daytona's image.
+  const greeting = yield* Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+    yield* spawner.exitCode(ChildProcess.make("sh", ["-c", "echo hello > greeting.txt"]));
+    return yield* fs.readFileString(`${sandbox.workingDirectory}/greeting.txt`);
+  }).pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+
+  // A server on the port, listening on every interface, is reached at Daytona's preview URL
+  // with the headers the endpoint gives.
+  const endpoint = yield* sandbox.endpoint(port, "http");
+
+  // The sandbox runs until it is stopped, keeps its files stopped, and is resumed by its id.
+  yield* sandbox.stop;
+  return { greeting, url: endpoint.url, sandboxId: sandbox.id };
+}).pipe(Effect.provide(sandboxes));
+```
+
+`DaytonaSandboxProvider.make` makes the provider in a scope, for code that composes it itself.
+
+## Options
+
+Besides the organization's `apiKey`, the options may give `apiUrl`, Daytona's API when it is not
+that of Daytona's own cloud; `target`, the region to create sandboxes in, rather than the
+organization's; `snapshot`, the snapshot sandboxes start from, rather than Daytona's default; and
+`autoStopInterval`, the minutes without requests to Daytona's API after which Daytona stops a
+sandbox. It is 0 by default, which never stops one: requests to a sandbox's ports do not count, so
+a sandbox would otherwise stop under an agent that only serves a host through a port.
 
 A create takes, under `providerOptions.daytona`, a `snapshot` and an `autoStopInterval` for that
 sandbox in place of the provider's; `DaytonaSandboxProvider.ProviderOptions` is their schema, and
 anything else there fails the create with `InvalidOptionsError` before Daytona is asked. A
 template's snapshot is made from the snapshot the sandbox starts from, so each base has its own.
-
-The code that runs in a sandbox needs `sh` and the GNU coreutils and findutils, as Daytona's own
-image has.
 
 ## Sandboxes
 
@@ -72,11 +124,14 @@ children and then SIGKILL, whatever signal it is asked for.
 
 A file's contents are read and written whole through Daytona's file API, so a read holds the whole
 file in the host's memory, whatever its size, and `open`, which `stream` and `sink` use, fails with
-`BadArgument`. Everything else is done with the sandbox's own tools, one `sh` command each, which
-Daytona answers at once: `stat`, `find`, `mkdir`, `rm`, `mv`, `cp`, `ln`, `mktemp`, and the like. They run with `LC_ALL=C`, and a
-failure is the error the tool's message names, as Effect's own file systems name an `errno`.
-Writing a file checks first that its directory exists, and that the file does not when the flag
-asks so, since Daytona's file API would make the one and write over the other.
+`BadArgument`; so do `glob`, `watch`, and a write with a flag other than `w`, `w+`, `wx`, or
+`wx+`, such as one that appends. Everything else is done with the sandbox's own tools, one `sh`
+command each, which Daytona answers at once: `stat`, `find`, `mkdir`, `rm`, `mv`, `cp`, `ln`,
+`mktemp`, and the like, so the sandbox needs `sh`, the GNU coreutils, and findutils, as Daytona's
+own image has. They run with `LC_ALL=C`, and a failure is the error the tool's message names, as
+Effect's own file systems name an `errno`. Writing a file checks first that its directory exists,
+and that the file does not when the flag asks so, since Daytona's file API would make the one and
+write over the other.
 
 ## Ports and the network
 
@@ -84,16 +139,21 @@ A port's endpoint is Daytona's preview URL for it, which takes the sandbox's pre
 `x-daytona-preview-token` header that the endpoint gives, and passes the request's other headers,
 `Authorization` included, on to the server. WebSockets work through it too. A server reaches it
 only when it listens on every interface. Daytona opens a port the first time it gives the port's
-preview URL, so `exposePorts` only adds the port to the sandbox's label.
+preview URL, so `exposePorts` only adds the port to the sandbox's label; Daytona replaces the labels
+whole, so of two hosts exposing different ports on one sandbox at the same moment, one loses its
+port.
 
 `DenyAll` blocks everything the sandbox sends. An `AllowList` names hosts or CIDR ranges, but not
 both, and denies none, as Daytona does; one Daytona cannot enforce fails with `UnsupportedError`,
 and one that allows nothing blocks everything. Daytona filters hosts through its proxy and DNS.
-Each policy replaces the one before, and Daytona applies it a moment after it answers.
+Each policy replaces the one before, and Daytona applies it a moment after it answers; lifting
+`DenyAll` for an allow list opens the network for a moment before the list applies.
 
 A sandbox created with a policy starts under it, as Daytona applies the policy before it starts
 the sandbox. One its template prepares on its own, before the template's snapshot is made, gets the
-policy once prepared, a moment after.
+policy once prepared, a moment after. `setRequestTransformations` fails with `UnsupportedError`:
+Daytona sets credentials at its edge through its secrets, with placeholders it chooses, which the
+contract does not take; see the [known limitations](../../docs/current-status.md).
 
 ## Templates and snapshots
 
@@ -113,32 +173,16 @@ snapshot, it deletes those of the template's other versions that no sandbox has 
 day, so a version that hosts still start sandboxes from, as while they are upgraded one by one,
 stays.
 
-## Connections
+## Development
 
-`DaytonaSandboxProvider.integration` is the integration of Daytona, for a host to install; it needs
-`Crypto`. A connection to it is an organization: it authenticates with the organization's API key,
-and its settings may give `apiUrl` and `target`, as the provider's options do. A connection that
-gives neither gets what Daytona's SDK reads from the host's environment, `DAYTONA_API_URL` and
-`DAYTONA_TARGET`, or else Daytona's own cloud and the organization's region. Its sandboxes start
-from Daytona's default snapshot and never stop on their own.
-
-Checking a connection asks Daytona for one of the organization's sandboxes, which it lists only for
-a valid key, and creates nothing. A key Daytona refuses makes the connection unauthorized; an API
-that does not know the request, misconfigured; and one that does not answer, fails, or answers that
-it cannot now, unavailable.
-
-## Testing
-
-`test/snapshots.test.ts` runs everywhere: what to do about a snapshot in each state, which other
-versions to delete, and how versions are named. So does `test/integration.test.ts`, against a fake
-of Daytona's API in the test's process, except for checking a real organization's key and creating a
-sandbox through a connection. The rest create real sandboxes and cost money, so
-they run only with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`. `test/conformance.test.ts` runs
-the suites `@amends/sandbox/conformance` exports, and deletes the snapshots of their templates
-when it ends. `test/daytona.test.ts` checks what the provider asks of Daytona: that sandboxes do
-not stop on their own, that one snapshot is made of a version that several hosts create sandboxes
-from at once, that a failing template leaves neither its sandbox nor a snapshot, the network
-policies Daytona enforces and those it cannot, when a sandbox created with one is under it, that a
-command's environment stays out of Daytona's record of its session, and destroying a sandbox from
-several callers at once. It deletes, when it ends, what its templates
-left being made in the background. [Testing](../../docs/testing.md) says how to run them.
+Run the package's tests with `bun run test adapters/sandbox-daytona`. What to do about a snapshot
+in each state, which other versions to delete, how versions are named, and that options Daytona
+does not take fail a create before Daytona is asked run everywhere. The rest create real sandboxes
+and cost money, so they run only with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`: the
+conformance suites of `@amends/sandbox`, which delete the snapshots of their templates when they
+end, and what the provider asks of Daytona, such as that sandboxes do not stop on their own, that
+one snapshot is made of a version several hosts create sandboxes from at once, that a failing
+template leaves neither its sandbox nor a snapshot, the network policies Daytona enforces and those
+it cannot, and that a command's environment stays out of Daytona's record of its session. See
+[testing](../../docs/testing.md). `bun run dist check adapters/sandbox-daytona` builds the package
+as npm gets it and checks it as a consumer; see [publishing](../../docs/publishing.md).

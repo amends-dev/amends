@@ -1,11 +1,11 @@
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import * as Snapshots from "@amends/sandbox-daytona/Snapshots";
 import { type Network, type Sandbox, type SandboxProvider, Template } from "@amends/sandbox";
 import { Daytona, DaytonaNotFoundError } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { afterAll, describe, expect, layer } from "@effect/vitest";
 import { Crypto, Data, Effect, Redacted, Ref, Schedule, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
+import { snapshotNameOf } from "../src/internal/snapshots.ts";
 
 /**
  * What the Daytona provider does beyond the conformance suites: what it asks of Daytona, how it
@@ -42,7 +42,7 @@ const useTemplate = <E>(prepare: Template.Template<E>["prepare"]) =>
       identity: yield* crypto.randomUUIDv4,
       prepare,
     };
-    const snapshot = yield* Snapshots.nameOf(template, undefined);
+    const snapshot = yield* snapshotNameOf(template, undefined);
     yield* Effect.addFinalizer(() =>
       Effect.ignore(Effect.tryPromise(() => daytona.snapshot.delete(snapshot))),
     );

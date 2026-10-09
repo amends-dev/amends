@@ -6,16 +6,25 @@
  * message names, as Effect's own file systems name an `errno`.
  */
 import type { Sandbox as DaytonaSandbox } from "@daytona/sdk";
-import {
-  DaytonaAuthenticationError,
-  DaytonaForbiddenError,
-  DaytonaNotFoundError,
-  DaytonaTimeoutError,
-} from "@daytona/sdk";
 import { ByteSize, Effect, FileSystem, Option, PlatformError, Stream } from "effect";
+import { callPlatform, systemErrorTagOf, toPlatformError } from "./call.ts";
+import { quote } from "./shell.ts";
+
+/** Defines `fail path message`, which fails a script with a message of the tools' own. */
+const defineFail = `fail() { printf '%s: %s\\n' "$1" "$2" >&2; exit 1; }`;
+
+/** Fails a script for a path that does not exist, as the tools would. */
+const existing = '[ -e "$1" ] || fail "$1" "No such file or directory"';
+
+/** The flag `flag`, with the space before it, when `condition` holds. */
+const when = (condition: boolean | undefined, flag: string) =>
+  condition === true ? ` ${flag}` : "";
 
 /** The file system of `sandbox`, whose relative paths start in `workingDirectory`. */
-export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSystem.FileSystem => {
+export const makeFileSystem = (
+  sandbox: DaytonaSandbox,
+  workingDirectory: string,
+): FileSystem.FileSystem => {
   const resolve = (path: string) => (path.startsWith("/") ? path : `${workingDirectory}/${path}`);
 
   /**
@@ -26,12 +35,12 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
     Effect.tryPromise({
       try: () =>
         sandbox.process.executeCommand(
-          `sh -c ${quote(`fail() { printf '%s: %s\\n' "$1" "$2" >&2; exit 1; }; ${script}`)} sh ${args.map(quote).join(" ")}`,
+          `sh -c ${quote(`${defineFail}; ${script}`)} sh ${args.map(quote).join(" ")}`,
           undefined,
           // The tools' messages name their errors in English.
           { LC_ALL: "C" },
         ),
-      catch: (error) => toPlatformError(method, args[0], error),
+      catch: (error) => toPlatformError("FileSystem", method, error, args[0]),
     }).pipe(
       Effect.flatMap(({ exitCode, result }) =>
         exitCode === 0
@@ -48,10 +57,6 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       ),
     );
 
-  /** Calls Daytona's file API for `path`, failing with the error its failure amounts to. */
-  const call = <A>(method: string, path: string, request: () => Promise<A>) =>
-    Effect.tryPromise({ try: request, catch: (error) => toPlatformError(method, path, error) });
-
   const makeTempDirectory: FileSystem.FileSystem["makeTempDirectory"] = (options) =>
     Effect.map(
       run("makeTempDirectory", 'mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX"', [
@@ -66,7 +71,10 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
     Effect.map(
       run(
         "makeTempFile",
-        'directory=$(mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX") && mktemp --suffix="$3" -- "$directory/XXXXXXXXXXXX"',
+        [
+          'directory=$(mktemp -d -- "${1:-${TMPDIR:-/tmp}}/${2}XXXXXX")',
+          'mktemp --suffix="$3" -- "$directory/XXXXXXXXXXXX"',
+        ].join(" && "),
         [
           options?.directory === undefined ? "" : resolve(options.directory),
           options?.prefix ?? "",
@@ -78,11 +86,9 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
 
   const remove: FileSystem.FileSystem["remove"] = (path, options) =>
     Effect.asVoid(
-      run(
-        "remove",
-        `rm${options?.recursive === true ? " -r" : ""}${options?.force === true ? " -f" : ""} -- "$1"`,
-        [resolve(path)],
-      ),
+      run("remove", `rm${when(options?.recursive, "-r")}${when(options?.force, "-f")} -- "$1"`, [
+        resolve(path),
+      ]),
     );
 
   return FileSystem.make({
@@ -91,7 +97,7 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
         run(
           "access",
           [
-            '[ -e "$1" ] || fail "$1" "No such file or directory"',
+            existing,
             ...(options?.readable === true ? ['[ -r "$1" ] || fail "$1" "Permission denied"'] : []),
             ...(options?.writable === true ? ['[ -w "$1" ] || fail "$1" "Permission denied"'] : []),
           ].join("; "),
@@ -103,7 +109,8 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       Effect.asVoid(
         run(
           "copy",
-          `cp -RT${options?.overwrite === true ? "" : " --update=none"}${options?.preserveTimestamps === true ? " --preserve=timestamps" : ""} -- "$1" "$2"`,
+          `cp -RT${when(options?.overwrite !== true, "--update=none")}` +
+            `${when(options?.preserveTimestamps, "--preserve=timestamps")} -- "$1" "$2"`,
           [resolve(fromPath), resolve(toPath)],
         ),
       ),
@@ -113,18 +120,17 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       Effect.asVoid(run("chmod", `chmod ${mode.toString(8)} -- "$1"`, [resolve(path)])),
     chown: (path, uid, gid) =>
       Effect.asVoid(run("chown", `chown ${uid}:${gid} -- "$1"`, [resolve(path)])),
-    // TODO: Match paths against a pattern, once a caller globs a sandbox's files.
-    glob: () => Effect.fail(unsupported("glob", "A Daytona sandbox's files are not globbed yet")),
+    glob: () => Effect.fail(unsupported("glob", "A Daytona sandbox's files cannot be globbed")),
     link: (fromPath, toPath) =>
       Effect.asVoid(run("link", 'ln -- "$1" "$2"', [resolve(fromPath), resolve(toPath)])),
-    makeDirectory: (path, options) =>
-      Effect.asVoid(
-        run(
-          "makeDirectory",
-          `mkdir${options?.recursive === true ? " -p" : ""}${options?.mode === undefined ? "" : ` -m ${options.mode.toString(8)}`} -- "$1"`,
-          [resolve(path)],
-        ),
-      ),
+    makeDirectory: (path, options) => {
+      const mode = options?.mode === undefined ? "" : ` -m ${options.mode.toString(8)}`;
+      return Effect.asVoid(
+        run("makeDirectory", `mkdir${when(options?.recursive, "-p")}${mode} -- "$1"`, [
+          resolve(path),
+        ]),
+      );
+    },
     makeTempDirectory,
     makeTempDirectoryScoped: (options) =>
       Effect.acquireRelease(makeTempDirectory(options), (directory) =>
@@ -135,8 +141,6 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       Effect.acquireRelease(makeTempFile(options), (file) =>
         Effect.orDie(remove(file.slice(0, file.lastIndexOf("/")), { recursive: true })),
       ),
-    // TODO: Open a file to read and write it in parts, once a caller streams a sandbox's file;
-    // `stream` and `sink` open the file too.
     open: () =>
       Effect.fail(unsupported("open", "A Daytona sandbox's files are read and written whole")),
     readDirectory: (path, options) =>
@@ -144,9 +148,10 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
         run(
           "readDirectory",
           [
-            '[ -e "$1" ] || fail "$1" "No such file or directory"',
+            existing,
             '[ -d "$1" ] || fail "$1" "Not a directory"',
-            `cd -- "$1" && find . -mindepth 1${options?.recursive === true ? "" : " -maxdepth 1"} -printf '%P\\0'`,
+            `cd -- "$1" && find . -mindepth 1${when(options?.recursive !== true, "-maxdepth 1")}` +
+              " -printf '%P\\0'",
           ].join("; "),
           [resolve(path)],
         ),
@@ -155,7 +160,12 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       ),
     readFile: (path) =>
       Effect.map(
-        call("readFile", resolve(path), () => sandbox.fs.downloadFile(resolve(path))),
+        callPlatform(
+          "FileSystem",
+          "readFile",
+          () => sandbox.fs.downloadFile(resolve(path)),
+          resolve(path),
+        ),
         (buffer) => new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
       ),
     readLink: (path) => run("readLink", 'readlink -vn -- "$1"', [resolve(path)]),
@@ -176,25 +186,21 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
       Effect.asVoid(run("symlink", 'ln -s -- "$1" "$2"', [target, resolve(path)])),
     truncate: (path, length) =>
       Effect.asVoid(
-        run(
-          "truncate",
-          `[ -e "$1" ] || fail "$1" "No such file or directory"; truncate -s ${length ?? 0} -- "$1"`,
-          [resolve(path)],
-        ),
+        run("truncate", [existing, `truncate -s ${length ?? 0} -- "$1"`].join("; "), [
+          resolve(path),
+        ]),
       ),
     utimes: (path, atime, mtime) =>
       Effect.asVoid(
         run(
           "utimes",
-          '[ -e "$1" ] || fail "$1" "No such file or directory"; touch -c -a -d "@$2" -- "$1" && touch -c -m -d "@$3" -- "$1"',
+          [existing, 'touch -c -a -d "@$2" -- "$1" && touch -c -m -d "@$3" -- "$1"'].join("; "),
           [resolve(path), secondsOf(atime), secondsOf(mtime)],
         ),
       ),
-    // TODO: Watch a sandbox's files, once a caller watches them.
-    watch: () => Stream.fail(unsupported("watch", "A Daytona sandbox's files are not watched yet")),
+    watch: () => Stream.fail(unsupported("watch", "A Daytona sandbox's files cannot be watched")),
     writeFile: Effect.fnUntraced(function* (path, data, options) {
       const flag = options?.flag ?? "w";
-      // TODO: Append to a file, once a caller appends to a sandbox's file.
       if (flag !== "w" && flag !== "w+" && flag !== "wx" && flag !== "wx+") {
         return yield* unsupported(
           "writeFile",
@@ -213,8 +219,15 @@ export const make = (sandbox: DaytonaSandbox, workingDirectory: string): FileSys
         ].join("; "),
         [resolved],
       );
-      yield* call("writeFile", resolved, () =>
-        sandbox.fs.uploadFile(Buffer.from(data.buffer, data.byteOffset, data.byteLength), resolved),
+      yield* callPlatform(
+        "FileSystem",
+        "writeFile",
+        () =>
+          sandbox.fs.uploadFile(
+            Buffer.from(data.buffer, data.byteOffset, data.byteLength),
+            resolved,
+          ),
+        resolved,
       );
       // A mode applies to the file the write creates, as when a file is opened.
       if (options?.mode !== undefined && created === "created") {
@@ -281,40 +294,5 @@ const secondsOf = (time: Date | number) =>
 const withoutNewline = (printed: string) =>
   printed.endsWith("\n") ? printed.slice(0, -1) : printed;
 
-const quote = (word: string) => `'${word.replaceAll("'", `'\\''`)}'`;
-
 const unsupported = (method: string, description: string) =>
   PlatformError.badArgument({ module: "FileSystem", method, description });
-
-const toPlatformError = (method: string, path: string | undefined, error: unknown) =>
-  PlatformError.systemError({
-    _tag:
-      error instanceof DaytonaNotFoundError
-        ? "NotFound"
-        : error instanceof DaytonaAuthenticationError || error instanceof DaytonaForbiddenError
-          ? "PermissionDenied"
-          : error instanceof DaytonaTimeoutError
-            ? "TimedOut"
-            : systemErrorTagOf(error instanceof Error ? error.message : String(error)),
-    module: "FileSystem",
-    method,
-    pathOrDescriptor: path,
-    description: error instanceof Error ? error.message : String(error),
-    cause: error,
-  });
-
-/** The error a message of the sandbox's tools, or of Daytona's file API, names. */
-const systemErrorTagOf = (message: string): PlatformError.SystemErrorTag => {
-  if (/no such file or directory|file not found/i.test(message)) return "NotFound";
-  if (/file exists|already exists/i.test(message)) return "AlreadyExists";
-  if (/permission denied|operation not permitted/i.test(message)) return "PermissionDenied";
-  if (
-    /not a directory|is a directory|points to a directory|too many levels of symbolic links/i.test(
-      message,
-    )
-  ) {
-    return "BadResource";
-  }
-  if (/resource busy/i.test(message)) return "Busy";
-  return "Unknown";
-};

@@ -60,8 +60,9 @@ currently run through TypeScript. Check compatibility before changing this setup
 - `adapters/*`: implementations of gateway contracts over one external system, with
   that system's dependencies. `harness-amends` is amends's own agent, a loop over Effect AI's
   `LanguageModel` with the model providers' clients, and `harness-opencode` runs opencode behind its
-  bridge in a sandbox; `sandbox-local` and `sandbox-daytona` implement the sandbox contract
-  over this machine's directories and over Daytona. Each gives the integration a host installs.
+  bridge in a sandbox; each gives the integration a host installs. `sandbox-local` and
+  `sandbox-daytona` implement the sandbox contract over this machine's directories and over
+  Daytona, and depend on it and their platform's SDK alone; the host declares their integrations.
   `storage-postgresql` implements workspace storage and
   the workspace directory over PostgreSQL with Drizzle and `@effect/sql-pg`, one column
   per record field, except the kind-specific `details` of a thread activity or a session log

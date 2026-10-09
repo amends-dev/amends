@@ -40,10 +40,12 @@ and `check` its `Health`. They fail with
 take, `UnsupportedError` for what it does not give, and `UnavailableError`, which may pass.
 
 `Integrations` holds those a host installs, for a connection to find its own by id: the built-in
-ones it chooses, and those of the harnesses and sandbox providers it runs, which their adapters
-declare, such as `OpencodeAgent.integration` and `DaytonaSandboxProvider.integration`. What only the
-host decides, such as where a local sandbox keeps its files, it gives an integration when it
-installs it; a connection's settings are what a workspace gives.
+ones it chooses, those of the harnesses it runs, which their adapters declare, such as
+`OpencodeAgent.integration`, and those of the sandbox providers it runs, which the host declares
+itself, as the local host's `SandboxIntegrations` does. What only the host decides, such as where a
+local sandbox keeps its files, it gives an integration when it installs it; a connection's settings
+are what a workspace gives. `Connection.healthOf` says what an HTTP status an integration's check
+got says of the connection, for integrations that check over HTTP.
 
 ## Models
 

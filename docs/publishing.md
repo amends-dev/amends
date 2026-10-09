@@ -1,7 +1,8 @@
 # Publishing
 
-The shared packages that other developers use, `@amends/harness` and `@amends/sandbox` so far,
-are published to npm from this repository. The repository's manifests keep pointing at sources,
+The packages that other developers use, `@amends/harness`, `@amends/sandbox`, and the sandbox
+providers `@amends/sandbox-local` and `@amends/sandbox-daytona` so far, are published to npm from
+this repository. The repository's manifests keep pointing at sources,
 which the workspace consumes as they are; what npm gets is a package's distribution, which
 `bun run dist` builds, checks, and publishes.
 
@@ -41,4 +42,5 @@ provides one, and Bun reads it.
 ## Order and versions
 
 Publish a package after the workspace packages it depends on: `@amends/sandbox` before
-`@amends/harness`. Bump a package's `version` by hand before publishing it, and tag the commit.
+`@amends/harness` and the sandbox providers. Bump a package's `version` by hand before publishing
+it, and tag the commit.

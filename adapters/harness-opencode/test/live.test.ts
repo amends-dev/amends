@@ -8,7 +8,6 @@ import {
 } from "@amends/harness";
 import { SessionId } from "@amends/harness/Agent";
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { LocalSandboxProvider } from "@amends/sandbox-local";
 import type { Sandbox, Template } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
@@ -40,8 +39,8 @@ import { makeSandbox } from "./fixtures.ts";
  * free one of opencode's own provider, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names
  * another of the catalog's, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
  * Hosts also set opencode up from a workspace's connections, to OpenRouter, whose free model it runs
- * on with the key in `OPENROUTER_API_KEY`, as `bun --env-file=hosts/local/.env` gives it, to the
- * agent, and to sandboxes.
+ * on with the key in `OPENROUTER_API_KEY`, as `bun --env-file=hosts/local/.env` gives it, and to
+ * the agent, in a sandbox of this machine's or Daytona's.
  */
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
 const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "opencode/fledge-alpha-free";
@@ -544,36 +543,24 @@ const connectionTo = (
 const openRouter = connectionTo("openrouter", "OpenRouter", "apiKey");
 const agent = connectionTo("opencode-agent", "opencode", "none");
 
-/** A connection to sandboxes, its credential, and how opencode works in them. */
-interface SandboxConnection {
-  readonly connection: Connection.Connection;
-  readonly credential: Connection.Credential | undefined;
-  readonly sandboxes: Sandboxes;
-}
-
 /**
- * What hosts do with opencode set up from connections, in a sandbox of `sandbox`'s, which is
+ * What hosts do with opencode set up from connections, in a new sandbox of `sandboxes`, which is
  * destroyed when the scope closes.
  */
 const describeConnections = (
   title: string,
   enabled: boolean,
-  sandbox: SandboxConnection,
+  sandboxes: Sandboxes,
   timeout: number,
 ) =>
   describe.skipIf(!enabled)(title, () => {
     it.live(
-      "runs a turn on a model connection, in a sandbox of a sandbox connection",
+      "runs a turn on a model connection, in a sandbox",
       () =>
         Effect.gen(function* () {
-          const fs = yield* FileSystem.FileSystem;
-          const env = yield* sandbox.sandboxes.env;
+          const env = yield* sandboxes.env;
           const integrations = yield* Integrations.make([
             ...(yield* ModelIntegrations.catalogProviders),
-            yield* LocalSandboxProvider.integration({
-              directory: yield* fs.makeTempDirectoryScoped(),
-            }),
-            yield* DaytonaSandboxProvider.integration,
             yield* OpencodeAgent.integration({
               token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
               config,
@@ -591,16 +578,8 @@ const describeConnections = (
             undefined,
             { model },
           );
-          const provider = yield* (yield* integrations.find(
-            sandbox.connection.integration,
-          )).sandboxProvider(sandbox.connection, sandbox.credential);
-          const created = yield* Effect.acquireRelease(
-            provider.create(
-              harness.agent.template === undefined ? {} : { template: harness.agent.template },
-            ),
-            (made) => Effect.ignore(made.destroy),
-          );
-          const session = yield* harness.createSession({ sandbox: created, id });
+          const sandbox = yield* sandboxes.create(harness.agent.template);
+          const session = yield* harness.createSession({ sandbox, id });
 
           const result = yield* session.generate({
             prompt:
@@ -619,11 +598,7 @@ const describeConnections = (
 describeConnections(
   "opencode set up from connections, in this machine's sandboxes",
   enabled && openRouterKey !== undefined,
-  {
-    connection: connectionTo("local", "This machine", "none"),
-    credential: undefined,
-    sandboxes: localSandboxes,
-  },
+  localSandboxes,
   timeout,
 );
 
@@ -634,10 +609,6 @@ describeConnections(
     openRouterKey !== undefined &&
     process.env.AMENDS_TEST_DAYTONA === "1" &&
     process.env.DAYTONA_API_KEY !== undefined,
-  {
-    connection: connectionTo("daytona", "Our organization", "apiKey"),
-    credential: { apiKey: Redacted.make(process.env.DAYTONA_API_KEY ?? "") },
-    sandboxes: daytonaSandboxes,
-  },
+  daytonaSandboxes,
   300_000,
 );
