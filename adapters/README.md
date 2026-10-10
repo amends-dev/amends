@@ -1,154 +1,80 @@
 # Adapters
 
-Each `adapters/<name>/` directory is a Bun workspace that implements gateway
-contracts over one external system, such as a database. Adapters consume shared
-packages and may install the dependencies their system needs, which is why they
-live outside `packages/`. Hosts compose them; shared packages never depend on them.
+An adapter implements one contract over one external system, such as a database, a sandbox
+platform, or an agent, and installs that system's dependencies, which is why it lives outside
+[packages](../packages/README.md). Hosts compose adapters; shared packages never depend on them.
 
-`sandbox-local/` and `sandbox-daytona/` implement the
-[sandbox contract](../packages/sandbox): the first with directories on this machine, for
-development, and the second over Daytona's hosted sandboxes. Both run its conformance suites, and
-depend on the contract and their platform's SDK alone; the
-[local host](../hosts/local/README.md) declares their
-[integrations](../packages/connection/README.md).
+| Adapter                                              | What it implements                                                      | Published |
+| ---------------------------------------------------- | ----------------------------------------------------------------------- | --------- |
+| [`harness-amends`](harness-amends/README.md)         | amends's own agent, a loop over an Effect AI language model             | npm       |
+| [`harness-opencode`](harness-opencode/README.md)     | opencode as an agent, behind its bridge in a sandbox                    | npm       |
+| [`sandbox-local`](sandbox-local/README.md)           | Sandboxes as directories on this machine, for development and tests     | npm       |
+| [`sandbox-daytona`](sandbox-daytona/README.md)       | Sandboxes on Daytona                                                    | npm       |
+| [`storage-postgresql`](storage-postgresql/README.md) | Workspace storage and the workspace directory over PostgreSQL           | No        |
+| [`storage-memory`](storage-memory/README.md)         | The same contracts in process memory, as their reference implementation | No        |
 
-`harness-amends/` is amends's own agent for the [harness contract](../packages/harness/README.md), a
-loop over an Effect AI `LanguageModel` with the model providers' clients, and `harness-opencode/`
-runs opencode behind its bridge in a sandbox. Both depend on the harness and sandbox contracts and
-their platform's clients alone; the [local host](../hosts/local/README.md) declares their
-[integrations](../packages/connection/README.md).
+Each adapter extends `../../tsconfig.base.json`, enables its own runtime's types, and has a
+`typecheck` script.
 
-`storage-postgresql/` implements the gateway's workspace storage and workspace
-directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client
-and one column per record field, except the kind-specific details of a thread activity or a
-session log entry, which it stores as JSON; the local host uses it. `storage-memory/` implements
-them in process memory with no dependencies: it is the reference implementation of
-the storage contracts and no host uses it. Each README covers running and testing.
-The adapters share one shape: one module per store
-over a workspace binding that owns the transaction boundary, merged into the
-storage contract at the edge.
+## Agents and sandbox providers
 
-Each adapter extends `../../tsconfig.base.json`, enables its own runtime types, and
-provides a `typecheck` script.
+The agents implement the [harness contract](../packages/harness/README.md) and the sandbox
+providers the [sandbox contract](../packages/sandbox/README.md), whose conformance suites each
+provider runs against itself. Each depends on its contract and its platform's own client alone. The
+[local host](../hosts/local/README.md) declares the integrations workspaces connect to them through;
+[contributing](../CONTRIBUTING.md#adding-an-integration) describes adding another.
 
-## Organization and naming
+## Storage adapters
 
-Keep one focused module per store and matching filenames across adapters.
-Database setup, workspace binding, directory reads, and storage composition are
-separate responsibilities. Add a feature directory when a store needs several
-related modules. Database tables and migrations belong to the adapter; domain
-models and store contracts belong to core.
+The storage adapters implement the gateway's workspace storage, its signal hub, and the workspace
+directory. The PostgreSQL adapter, which the local host uses, stores one column per record field,
+except the kind-specific details of a thread activity or a session log entry, which it stores as
+JSON. The memory adapter keeps everything in process memory, with no dependencies, and no host uses
+it.
 
-Use the same representation vocabulary across adapters:
+Both have one shape. A workspace binding owns one workspace's view of the database and its
+transaction boundary. Each store is a module over that binding, implementing core's store
+contract, with matching filenames in both adapters, such as `thread-messages.ts`. `layerWorkspace`
+merges the stores over one binding, and each adapter's storage module, `PostgresStorage` or
+`MemoryStorage`, builds those views on demand as `WorkspaceStorage.Service`. Database tables and migrations belong to the adapter; domain records
+and store contracts belong to core. Each adapter's root `layer` composes workspace storage, the
+directory, and the signal hub, which relays signals between hosts over the same storage, and
+leaves the database itself to the host. The PostgreSQL adapter also keeps up the tables Effect
+Cluster stores its messages in, as `PostgresClusterStorage`, pruning those the host has handled.
 
-| Name                 | Meaning                                                                                              |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| `Interface`          | A context service's contract, including `PostgresDatabase.Interface` and `MemoryDatabase.Interface`. |
-| `DrizzleClient`      | PostgreSQL's Drizzle facade, distinct from its Effect SQL client.                                    |
-| `TransactionHandle`  | The native transaction handle exposed to core.                                                       |
-| `TransactionState`   | Mutable ownership and lifetime state for one transaction.                                            |
-| `CurrentTransaction` | The invocation context used by a workspace binding's guard.                                          |
-| `Row` / `Rows`       | A selected database row or collection, such as `BatchHeaderRow` and `EntryRows`.                     |
-| `Columns`            | A selection or write mapping, such as `recordColumns`.                                               |
-| `Record`             | A validated domain value from core.                                                                  |
-| `EncodedRecord`      | A record's encoded representation, assembled before schema decoding.                                 |
+### Validation
 
-Private row schemas do not need public schema identifiers. Conversion helpers
-such as `toEncodedRecord` assemble data; schema decoding validates it. Keep the
-distinction visible in names and return types.
+A store validates a record against core's schema before turning it into columns or JSON, with
+`Schema.decodeEffect(Schema.toType(...))`: a TypeScript type does not enforce a schema's
+refinements. Validation comes before any mapping that loses information, so a record whose workspace
+a row implies still passes its whole check first.
 
-Package roots expose database, storage, directory, and composed layers. Workspace
-bindings, their transaction context, raw tables, and the intermediate store-layer
-merge remain internal. Use `Storage.layerWorkspace(...)` to build the complete
-set of stores over a binding. Preserve service keys, table names, encoded fields,
-and migration identifiers when reorganizing source.
+- A rejected value becomes the store's `Conflict`, through `storeConflict`, as does a workspace
+  mismatch, an invalid initial state, or a conditional write that lost.
+- An encoding failure after validation, or a failure of the database itself, is a `Failure`; a
+  malformed stored row fails when it is read.
+- Every write runs in the active workspace transaction, so a failed validation leaves no partial
+  rows, and an unhandled failure rolls the transaction back.
 
-## Validation at the storage boundary
+### Construction
 
-Validate decoded domain records before converting them into JSON or SQL columns.
-Use the matching core schema through `Schema.decodeEffect(Schema.toType(...))`;
-a TypeScript type alone does not enforce schema refinements. Validate edited
-fields against the owning record's field schemas. Validate terminal invitation
-states, checkpoint keys/cursors, and native append input before writing them.
+Adapters follow the [shared construction conventions](../packages/README.md#constructors-and-layers).
+In the PostgreSQL adapter, `PostgresDatabase.make()` applies the current schema baseline to an
+Effect SQL client it is given, without opening a connection, and `PostgresDatabase.layer(config)`
+opens the client's pool and delegates to it. The binding, `PostgresStorage`, and
+`PostgresDirectory` construct over the database service, and each store over the binding. The memory adapter's `MemoryDatabase.make()` creates empty storage, and
+`MemoryConnection` stands for one host's connection to it.
 
-Validation must precede any lossy mapping. PostgreSQL stores a scope's workspace
-on its containing row, so assignments and invitations must pass their complete
-record checks before that workspace ID is omitted from scope columns. Successful
-writes must preserve the submitted value's meaning.
-
-Rejected write values become the store's `Conflict` through `storeConflict`.
-Workspace mismatches, invalid initial states, and conditional-write conflicts
-also remain `Conflict`. Encoding failures after validation and infrastructure
-failures remain `Failure`; malformed stored rows fail during reads. Keep these
-categories consistent between adapters and with the core contracts.
-
-Run all writes under the active workspace transaction. Validation failures leave
-no partial rows; callers can handle a validation conflict before another write,
-while an unhandled failure rolls back the enclosing transaction. Database-rejected
-statements still follow the database's transaction semantics, including
-PostgreSQL's aborted-transaction behavior.
-
-## Constructors and layers
-
-Follow the [shared-package conventions](../packages/README.md#constructors-and-layers):
-`make` constructs an implementation and `layer` provides it. Every service module
-exports both, with one construction path. Constructors acquire stable dependencies
-inside their Effect and return the implemented contract's `Service.of(...)` value.
-They retain their acquisition errors and dependencies in the Effect type.
-
-The PostgreSQL adapter uses these construction boundaries:
-
-| Module        | `make` constructs                                        | Dependencies                   |
-| ------------- | -------------------------------------------------------- | ------------------------------ |
-| Database      | A database facade after applying the current baseline    | An existing Effect SQL client  |
-| Binding       | One workspace's database view and transaction operations | The adapter's database service |
-| Store modules | Implementations of core's store contracts                | The workspace binding          |
-| Storage       | The gateway's workspace-storage implementation           | The adapter's database service |
-| Directory     | The gateway's cross-workspace directory                  | The adapter's database service |
-
-`Database.make()` initializes a supplied client; it does not open a connection
-or pool. `Database.layer(config)` supplies the driver's client layer and delegates
-initialization to `make`. It exposes the database and the underlying SQL client
-services, which refer to the same connection or pool. A schema-initialization failure prevents the database service from being returned.
-Reopening a database already using the current baseline preserves its data.
-
-The memory adapter keeps the same binding, store, storage, and directory modules. Its
-`MemoryDatabase.make()` constructs empty storage, and `MemoryConnection` stands for one
-host's connection over it, which the binding, storage, and directory depend on.
-
-Acquire the database once and share it across workspace views. Direct callers must
-keep the client's owning scope alive while using the database, bindings, or stores.
-The database layer manages the driver scope when it opens the connection or pool.
-
-The storage modules merge stores in a private `layerStores` composition and export
-`layerWorkspace(workspaceId, ...)` for stores over one binding. Their `make`
-constructs `WorkspaceStorage.Service`; `forWorkspace` builds these inexpensive
-views on demand. Those views acquire no resources of their own, so their build
-scope can close immediately while the database's scope remains alive. Adding
-scoped resources to a view requires revisiting that lifetime contract.
-
-Each adapter's root `layer` composes workspace storage, the directory, and the signal hub,
-which relays ephemeral signals between the hosts over the same storage and stores nothing. It
-leaves the database dependency to the host. Composition-only exports need no additional
-`make`. Public layer variants use the `layer...` prefix. Public constructors and
-layers have `@category constructors` and `@category layers` documentation.
-
-Helpers that construct reusable values use specific names, such as
-`makeRecordDecoder`. Schema declarations, SQL queries, record conversions, and
-error mappings retain their library or operation names. Workspace identity is
-captured during construction; the current transaction is checked during each
-operation. Constructors do not create workspaces or cache an actor or transaction.
+A host acquires the database once and shares it across workspace views, which acquire nothing of
+their own. Workspace identity is fixed when a view is built, and the current transaction is checked
+on each operation.
 
 ## Testing and migrations
 
-Every adapter runs the [conformance suites](../packages/storage-conformance/README.md)
-through a harness in `test/harness.ts`, one suite per test file. Behavior core relies on
-belongs in those suites; an adapter's own tests keep what only it has, such as columns,
-query plans, and driver failure injection. The store-contract suite calls stores directly,
-so core's application validation cannot hide an adapter's missing checks. The PostgreSQL
-adapter owns its database fixtures in `test/support.ts`.
+Every storage adapter runs the [conformance suites](../packages/storage-conformance/README.md)
+through `test/harness.ts`, one suite per test file. Behavior core relies on belongs in those suites;
+an adapter's own tests keep what only it has, such as columns, query plans, or a driver's failures.
 
-During local development, keep one initial schema baseline per adapter. PostgreSQL's
-generated baseline lives in `drizzle/`. Regenerate it when the schema changes and reset
-development databases. Do not add upgrade chains, backfills, or legacy decoding
-paths to preserve disposable local data.
+Each storage adapter keeps one schema baseline: PostgreSQL's generated baseline is in
+`storage-postgresql/drizzle/`. Regenerate it when the schema changes, and reset development
+databases; amends is in early development and carries no upgrade path for old local data.

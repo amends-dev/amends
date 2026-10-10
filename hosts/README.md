@@ -1,74 +1,47 @@
-# Application hosts
+# Hosts
 
-Each `hosts/<name>/` directory is a Bun workspace that runs the application in a
-particular environment. Hosts compose shared packages and provide runtime layers,
-storage, transports, and other platform adapters. They may use dependencies needed
-by their runtime.
+A host runs amends in one environment. It composes the shared packages with the adapters it
+chooses, implements the gateway's contracts that belong to its environment, such as sign-in, and
+serves the protocols clients speak. It may install whatever its runtime needs; shared packages
+never depend on a host.
 
-`local/` is the Bun host. Run it from the repository root with `bun run start`
-or `bun run dev`. It implements no storage itself: it composes the PostgreSQL
-adapter over the database at `AMENDS_DATABASE_URL` and provides development sign-in
-and credentials. A future Cloudflare host belongs in `hosts/cloudflare/`.
+[`local`](local/README.md) is the only host so far: it serves the HTTP API on Bun over the
+PostgreSQL adapter, with development sign-in and credentials. Run it from the repository root with
+`bun run start`, or `bun run dev` to restart it as its source changes.
 
-Each host extends `../../tsconfig.base.json`, enables its own runtime types, and
-provides a `typecheck` script. Shared packages cannot import hosts.
+## What a host depends on
 
-A host depends on the gateway, whose contracts it implements, and on the handler
-packages it serves, such as `@amends-dev/server-http`. It does not depend on protocol
-contract packages such as `@amends-dev/api-http`: those are for clients, and the
-handler package owns their server-side pieces, including authentication. A host's
-tests may take a contract package as a development dependency to act as a client.
+A host depends on the [gateway](../packages/gateway/README.md), whose contracts it implements, and
+on the handler packages it serves, such as `@amends-dev/server-http`, which owns its protocol's
+server side, authentication included. It does not depend on a protocol's contract package, such as
+`@amends-dev/api-http`, which is for clients; a host's tests may take one as a development
+dependency to act as a client.
 
-## Constructors and layers
+Each host extends `../../tsconfig.base.json`, enables its own runtime's types, and has a
+`typecheck` script.
 
-Use the [shared construction conventions](../packages/README.md#constructors-and-layers).
-`make` constructs a host-owned implementation; `layer` provides it or composes
-existing layers. Named layer exports start with `layer`, such as `layerRoutes`.
-Each implementation owns its `make` constructor and returns the gateway contract's
-`Service.of(...)`.
-Use `Layer.sync` for lazy synchronous construction and `Layer.effect` for effectful
-construction. Constructors own defaults, state allocation, and initialization.
+## Construction
 
-Group related implementations in a capability directory when they need several
-modules. The local host's `authentication/` contains `DevelopmentSignIn`,
-`DevelopmentSessionTokens`, and their composition, `DevelopmentAuthentication`.
-The names describe the development trust model; another host can supply different
-implementations of the same gateway contracts.
+Hosts follow the [shared construction conventions](../packages/README.md#constructors-and-layers):
+`make` constructs an implementation and returns the gateway contract's `Service.of(...)`, and
+`layer` provides it. Related implementations share a directory: the local host's `authentication/`
+holds `DevelopmentSignIn`, `DevelopmentSessionTokens`, and `DevelopmentAuthentication`, which
+composes them. Their names say whom they trust, so another host supplies its own implementations of
+the same contracts.
 
-`DevelopmentSignIn.make(deliver?)` constructs sign-in with fresh pending-code
-state; `DevelopmentSessionTokens.make()` constructs the token resolver.
-Their respective `layer` exports delegate to those constructors.
-`DevelopmentAuthentication.layer(deliver?)` composes both services. Token
-and code validation happen during operations. Construction issues no token or code.
+Modules that only compose expose layers alone. The local host's `LocalHost.layer` composes the
+gateway, the storage adapter, the integrations, and the jobs, and `LocalServer.layer` adds sign-in,
+credentials, and the HTTP server. `LocalConfig.load()` reads and validates the configuration
+before anything is acquired, and `src/index.ts` alone launches the server, so importing any other
+module reads no setting and starts nothing.
 
-`LocalHost` and `LocalServer` are composition modules, so they expose layers without
-additional `make` wrappers. `LocalHost.layer` composes the gateway, directory,
-PostgreSQL adapter, cryptography, and jobs on an Effect Cluster runner over the
-adapter's pool. The gateway owns prepared workspace runtimes in its host
-scope. Each runtime boots lazily, replays, and stays prepared while in use and for an idle
-period afterwards; requests resolve identity and open operation scopes over the prepared
-services.
-`LocalServer.layerRoutes`
-registers the API and documentation; `LocalServer.layer` adds sign-in, credentials,
-and the Bun HTTP server. `LocalHost.HostLayer` names the layer supplied to the
-server. Database and server resources belong to the layer scope.
+## Testing
 
-`LocalConfig.load()` reads and validates Effect configuration before resource
-acquisition. `src/index.ts` selects the host layer and launches the server through
-`BunRuntime.runMain`. Keep execution at that entry point so importing configuration,
-constructor, or layer modules does not read settings or launch the application.
-Document constructor exports with `@category constructors` and layer exports
-with `@category layers`.
+Test a host's configuration, its defaults, invalid values, and what it selects, without opening
+resources. A setting left out may take a default, but one set empty must not silently select
+another database, and configuration errors keep credentials redacted.
 
-## Tests and configuration
-
-Test configuration defaults, invalid values, and backend selection without opening
-resources. The local host accepts port `0` for an ephemeral listener. Missing
-settings may use defaults; explicitly empty settings must not silently select a
-different database. Keep credentials redacted in configuration errors.
-
-Mutable delivery state belongs to each HTTP fixture. Subprocess fixtures own
-temporary storage and an ephemeral port, remove inherited database selection,
-and disable environment-file loading. Drain stdout and stderr concurrently, bound
-startup, and terminate the child even when startup or the test callback fails.
-The [local host guide](./local/README.md) describes its configuration and verification.
+A test that starts the host as a subprocess owns its temporary storage and a free port, clears any
+inherited database setting, and turns off environment-file loading. It drains standard output and
+error together, bounds startup, and stops the process even when startup or the test fails. The
+[local host guide](local/README.md) describes verifying a running host.

@@ -1,9 +1,9 @@
 # @amends-dev/harness
 
-Runs an agent, such as opencode, Codex, Claude Code, or one in your own process over an Effect AI
-`LanguageModel`, and streams every agent's turns in one format, so your code does not depend on
-which agent works for it. It is to agents what Effect AI is to model providers. The package depends
-only on Effect and on [`@amends-dev/sandbox`](../sandbox), the sandboxes agents work in.
+Runs an agent, such as opencode or one in your own process over an Effect AI `LanguageModel`, and
+streams every agent's turns in one format, so your code does not depend on which agent works for it.
+It is to agents what Effect AI is to model providers. The package depends only on Effect and on
+[`@amends-dev/sandbox`](../sandbox), the sandboxes agents work in.
 
 ## Install
 
@@ -173,9 +173,9 @@ Each of these releases the session, after which it refuses every other operation
 
 `SessionState` records the conversation as Effect AI `Prompt` messages, as Effect AI records a
 response: each step's reasoning, text, files, and tool calls with their results, with what each
-part's provider said of it, beside the agent's own state and the unfinished turn, if any. The agent that last
-ran the session resumes from its own state; any other loads the conversation, so a session moves
-from one agent to another. A resumed session with an unfinished turn finishes it with
+part's provider said of it, beside the agent's own state and the unfinished turn, if any. The agent
+that last ran the session resumes from its own state; any other loads the conversation, so a session
+moves from one agent to another. A resumed session with an unfinished turn finishes it with
 `continueStream` or `continueGenerate`, from the step that was in flight, or with
 `continueGenerateObject` when the turn answers in JSON, given the schema again; an agent that no
 longer has the turn, as `hasUnfinishedTurn` says, runs it again from its prompt.

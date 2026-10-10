@@ -77,15 +77,14 @@ const program = Effect.gen(function* () {
 );
 ```
 
-`config` is opencode's configuration, as its `opencode.json` takes it, whose providers the
-models' replace: `provider` for `OpencodeAgent`, as opencode 1 names them, and `providers` for
+`config` is opencode's configuration, as its `opencode.json` takes it, whose providers the models'
+replace: `provider` for `OpencodeAgent`, as opencode 1 names them, and `providers` for
 `Opencode2Agent`, as opencode 2 does. `env` is the environment variables opencode's server runs
-with. Both take effect when the bridge starts the server. All of the options, the keys included, name
-the bridge, so an agent made with other options gets a bridge and a server of its own in a
-sandbox, and never runs on another's.
-[`@amends-dev/harness`](../../packages/harness/README.md) says how sessions, turns, and releasing a
-session work, which these agents do as any agent does. `Opencode2Agent.make` takes the same
-options.
+with. Both take effect when the bridge starts the server. All of the options, the keys included,
+name the bridge, so an agent made with other options gets a bridge and a server of its own in a
+sandbox, and never runs on another's. [`@amends-dev/harness`](../../packages/harness/README.md) says
+how sessions, turns, and releasing a session work, which these agents do as any agent does.
+`Opencode2Agent.make` takes the same options.
 
 ## In the sandbox
 
@@ -213,13 +212,13 @@ agent cannot read; and `UnknownError` for the rest.
 
 ## Development
 
-Run the package's tests with `bun run test adapters/harness-opencode`: each agent's sessions
-against a fake of opencode's server, scripted turn by turn, and the translation of its events and
-conversations, under `test/v1` and `test/v2`; the
-server and the bridge program as real processes, with `test/fake-opencode-server.js` standing in
-for `opencode serve`; the bridge launched by `BridgeClient` in a sandbox on this machine and
-reached over a WebSocket; and the template with its commands answered as a sandbox would answer
-them. With `AMENDS_TEST_OPENCODE=1`, the live tests run `opencode` and `opencode2`
-from this machine's `PATH` under the agents, whose turns OpenCode Zen's free model answers. See [testing](../../docs/testing.md).
-`bun run dist check adapters/harness-opencode` builds the package as npm gets it and checks it as
-a consumer; see [publishing](../../docs/publishing.md).
+Run the package's tests with `bun run test adapters/harness-opencode`: each agent's sessions against
+a fake of opencode's server, scripted turn by turn, and the translation of its events and
+conversations, under `test/v1` and `test/v2`; the server and the bridge program as real processes,
+with `test/fake-opencode-server.js` standing in for `opencode serve`; the bridge launched by
+`BridgeClient` in a sandbox on this machine and reached over a WebSocket; and the template with its
+commands answered as a sandbox would answer them. With `AMENDS_TEST_OPENCODE=1`, the live tests run
+`opencode` and `opencode2` from this machine's `PATH` under the agents, whose turns OpenCode Zen's
+free model answers. See [testing](../../docs/testing.md).
+`bun run dist check adapters/harness-opencode` builds the package as npm gets it and checks it as a
+consumer; see [publishing](../../docs/publishing.md).
