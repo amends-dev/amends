@@ -74,64 +74,6 @@ export type Error =
   | Projection.Error;
 
 /**
- * The activity that opens a thread. Task and other opening kinds join this union with their
- * workflows.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const First = Schema.TaggedUnion({
-  Message: {
-    /** The caller names the message, as it names the thread. */
-    messageId: ThreadMessage.Id,
-    author: ThreadMessage.Author,
-    text: ThreadMessage.Text,
-    mentions: Schema.UniqueArray(Member.Id),
-  },
-});
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export type First = typeof First.Type;
-
-/**
- * What creates a thread: its ID and group, its title and origin if it has them, who takes part
- * from the start, and its opening activity.
- *
- * @category options
- * @since 0.1.0
- */
-export const CreateInput = Schema.Struct({
-  /** The caller names the thread, so a keyed request can name the same one on its retry. */
-  threadId: Thread.Id,
-  groupId: Group.Id,
-  title: Thread.Record.fields.title,
-  origin: Thread.Record.fields.origin,
-  /** Everyone who takes part from the first activity; group membership enrolls no one else. */
-  participants: Schema.Array(ThreadParticipation.Reference),
-  first: First,
-  occurredAt: Schema.DateTimeUtcFromString,
-});
-
-/**
- * @category options
- * @since 0.1.0
- */
-export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
-
-/**
- * A created thread and the activity that places its opening message, for the starting workflow.
- *
- * @category models
- * @since 0.1.0
- */
-export interface Created extends Thread.Started {
-  readonly activity: ThreadMessageActivity.Published;
-}
-
-/**
  * What publishes a message: the message, who wrote it, whom it addresses, and everyone who takes
  * part through it.
  *
@@ -166,6 +108,48 @@ export interface MessageInput extends Schema.Schema.Type<typeof MessageInput> {}
  */
 export interface MessagePublished {
   readonly message: ThreadMessage.Record;
+  readonly activity: ThreadMessageActivity.Published;
+}
+
+/**
+ * What creates a thread: its ID and group, its title and origin if it has them, who takes part
+ * from the start, and the message it opens with, at sequence 1. Whatever else the thread is
+ * created as is recorded after that message, in the same commit.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const CreateInput = Schema.Struct({
+  /** The caller names the thread, so a keyed request can name the same one on its retry. */
+  threadId: Thread.Id,
+  groupId: Group.Id,
+  title: Thread.Record.fields.title,
+  origin: Thread.Record.fields.origin,
+  /** Everyone who takes part from the first activity; group membership enrolls no one else. */
+  participants: Schema.Array(ThreadParticipation.Reference),
+  /** The opening message, whose author is the thread's creator. */
+  message: Schema.Struct({
+    messageId: MessageInput.fields.messageId,
+    author: MessageInput.fields.author,
+    text: MessageInput.fields.text,
+    mentions: MessageInput.fields.mentions,
+  }),
+  occurredAt: Schema.DateTimeUtcFromString,
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
+
+/**
+ * A created thread and the activity that places its opening message, for the starting workflow.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export interface Created extends Thread.Started {
   readonly activity: ThreadMessageActivity.Published;
 }
 
@@ -247,8 +231,9 @@ export interface Interface {
   /**
    * Create a thread, as every workflow that opens one does: record the thread, admit its starting
    * participants at the first position, and publish the opening message with its recipients, so
-   * no thread exists without participants or activity. The caller owns authorization and the
-   * choice of participants.
+   * no thread exists without participants or activity. A workflow that creates the thread as
+   * something more, such as a task, records that next in the same commit. The caller owns
+   * authorization and the choice of participants.
    */
   readonly create: (
     input: CreateInput,
@@ -527,25 +512,22 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   });
 
   const create = Effect.fn("ThreadCommand.create")(function* (input: CreateInput) {
-    const { first, occurredAt } = input;
+    const { message, occurredAt } = input;
     const thread: Thread.Record = {
       id: input.threadId,
       workspaceId,
       groupId: input.groupId,
       title: input.title,
       origin: input.origin,
-      createdBy: first.author,
+      createdBy: message.author,
       createdAt: occurredAt,
     };
     const created = yield* journal
       .publish(ThreadFacts.Created, thread)
       .pipe(Publication.withOccurredAt(occurredAt));
     const published = yield* publishMessage({
-      messageId: first.messageId,
+      ...message,
       threadId: thread.id,
-      author: first.author,
-      text: first.text,
-      mentions: first.mentions,
       participants: input.participants,
       occurredAt,
     }).pipe(Publication.withCause(created, occurredAt));

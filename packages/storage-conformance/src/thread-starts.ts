@@ -296,8 +296,7 @@ export const threadStarts = (harness: Harness) => {
                           title: null,
                           origin: null,
                           participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],
-                          first: {
-                            _tag: "Message",
+                          message: {
                             messageId: ThreadMessage.Id.make("late-order-opening"),
                             author: { _tag: "Contact", contactId },
                             text: "My order is late",

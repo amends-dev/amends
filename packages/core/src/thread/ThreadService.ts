@@ -306,8 +306,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         title: opening.title ?? null,
         origin: null,
         participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
-        first: {
-          _tag: "Message",
+        message: {
           messageId: ids.messageId,
           author: { _tag: "Member", memberId: author.memberId },
           text: opening.text,
