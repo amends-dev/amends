@@ -26,8 +26,9 @@ import {
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import * as Driver from "../src/internal/bridge/Driver.ts";
+import { createSession } from "../src/internal/bridge/v2/Session.ts";
 import { modelsOf } from "../src/internal/models.ts";
-import * as OpencodeAgent from "../src/OpencodeAgent.ts";
+import * as Opencode2Agent from "../src/Opencode2Agent.ts";
 import { makeSandbox } from "./fixtures.ts";
 
 /**
@@ -83,20 +84,24 @@ const makeLiveDriver = (endpoints?: Parameters<typeof modelsOf>[0]) =>
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* fs.makeTempDirectoryScoped();
     const models = Result.getOrThrow(modelsOf(endpoints ?? { model: endpoint, models: {} }));
-    const driver = yield* Driver.make({
-      model: models.model,
-      models: models.models,
-      command: "opencode",
-      config: { ...config, providers: models.providers },
-      env: yield* makeOpencodeEnv,
-    });
+    const driver = yield* Driver.make(
+      "opencode2",
+      {
+        model: models.model,
+        models: models.models,
+        command: "opencode",
+        config: { ...config, providers: models.providers },
+        env: yield* makeOpencodeEnv,
+      },
+      createSession,
+    );
     return { driver, directory };
   });
 
 /** The sandboxes hosts run opencode in, and opencode's environment. */
 interface Sandboxes {
   readonly env: Effect.Effect<
-    OpencodeAgent.Options["env"],
+    Opencode2Agent.Options["env"],
     unknown,
     Scope.Scope | FileSystem.FileSystem | Path.Path
   >;
@@ -135,7 +140,7 @@ const makeLiveHosts = (sandboxes: Sandboxes) =>
     const env = yield* sandboxes.env;
     const model = endpoint;
     const makeHarness = Effect.map(
-      OpencodeAgent.make({
+      Opencode2Agent.make({
         model,
         token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
         config,

@@ -78,8 +78,8 @@ describe("Template", () => {
     "launches the bridge from where the template installs it, under the same identity",
     () =>
       Effect.gen(function* () {
-        const installation = yield* makeInstallation();
-        const again = yield* makeInstallation();
+        const installation = yield* makeInstallation(2);
+        const again = yield* makeInstallation(2);
         const [programs, bundle] = installation.template.identity.split("-");
 
         expect(again.template.identity).toBe(installation.template.identity);
@@ -96,7 +96,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* makeInstallation();
+      const installation = yield* makeInstallation(2);
       const { bridge } = launchedFrom(installation);
       yield* fs.makeDirectory(path.join(home, path.dirname(bridge)), { recursive: true });
       yield* fs.writeFileString(path.join(home, bridge), "the bridge program");
@@ -115,7 +115,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* makeInstallation();
+      const installation = yield* makeInstallation(2);
       const { bridge } = launchedFrom(installation);
       yield* fs.makeDirectory(path.join(home, path.dirname(bridge)), { recursive: true });
 
@@ -136,7 +136,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* makeInstallation();
+      const installation = yield* makeInstallation(2);
 
       const commands = makeSandboxCommands(home, (command) =>
         command === "uname" ? { output: "FreeBSD amd64\n" } : {},
@@ -157,7 +157,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* makeInstallation();
+      const installation = yield* makeInstallation(2);
 
       const commands = makeSandboxCommands(home, (command) =>
         command === "uname"
@@ -195,7 +195,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
           ...local,
           childProcessSpawner: withHome(local.childProcessSpawner, home),
         };
-        const installation = yield* makeInstallation();
+        const installation = yield* makeInstallation(2);
 
         yield* installation.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
@@ -208,7 +208,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
         ]);
         const harness = Harness.make(
           yield* makeBridgedAgent({
-            id: "opencode",
+            id: "opencode2",
             template: installation.template,
             command: installation.command,
             args: installation.args,

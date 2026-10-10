@@ -1,5 +1,5 @@
 /**
- * The events opencode records for a session in its v2 session API: the prompts the session took,
+ * The events opencode records for a session in opencode 2's session API: the prompts the session took,
  * the steps of each turn, and the reasoning, text, and tool calls of each step. opencode numbers a
  * session's events from 0 and keeps them, so a client reads them again from any number, and another
  * opencode server rebuilds the session by replaying them.
@@ -11,6 +11,7 @@
  * streams while a step runs are not kept.
  */
 import { Schema } from "effect";
+import { ModelRef } from "../Driver.ts";
 
 /** Where an event falls in its session's numbered events. */
 const Durable = Schema.Struct({
@@ -36,15 +37,6 @@ const inSession = {
 
 /** What the model's provider reported beside a part, by provider, such as a reasoning signature. */
 const ProviderMetadata = Schema.Record(Schema.String, Schema.Json);
-
-/** A model, as opencode names one: its provider, its id there, and a variant such as `high`. */
-export const ModelRef = Schema.Struct({
-  id: Schema.String,
-  providerID: Schema.String,
-  variant: Schema.optionalKey(Schema.String),
-});
-
-export interface ModelRef extends Schema.Schema.Type<typeof ModelRef> {}
 
 /** Where an attachment was mentioned in the prompt's text. */
 const PromptSource = Schema.Struct({

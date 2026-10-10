@@ -1,9 +1,10 @@
 import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Result } from "effect";
-import type { SessionEvent } from "../src/internal/bridge/SessionEvent.ts";
-import * as Turn from "../src/internal/bridge/Turn.ts";
-import { makeEvents, tokens } from "./fixtures.ts";
+import type { SessionEvent } from "../../src/internal/bridge/v2/Event.ts";
+import * as Turn from "../../src/internal/bridge/v2/Turn.ts";
+import { tokens } from "../fixtures.ts";
+import { makeEvents } from "./fakes.ts";
 
 /** Translates `events` in order, returning the turn after them and the parts they streamed. */
 const translateAll = (events: ReadonlyArray<SessionEvent>) => {

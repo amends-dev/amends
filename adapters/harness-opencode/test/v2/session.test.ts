@@ -7,14 +7,11 @@ import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
-import * as Driver from "../src/internal/bridge/Driver.ts";
-import {
-  type FakeOpencodeOptions,
-  type FakeTurn,
-  makeFakeOpencode,
-  makeFakeServerProcesses,
-} from "./fakes.ts";
-import { tokens } from "./fixtures.ts";
+import * as Driver from "../../src/internal/bridge/Driver.ts";
+import { createSession as createOpencodeSession } from "../../src/internal/bridge/v2/Session.ts";
+import { makeFakeServerProcesses } from "../fakes.ts";
+import { tokens } from "../fixtures.ts";
+import { type FakeOpencodeOptions, type FakeTurn, makeFakeOpencode } from "./fakes.ts";
 
 const id = SessionId.make("session-one");
 const directory = "/work/session-one";
@@ -34,17 +31,21 @@ const makeDriver = (
     const processes = yield* makeFakeServerProcesses(`http://127.0.0.1:${fake.port}`, {
       failing: options.failingStarts,
     });
-    const driver = yield* Driver.make({
-      model: { providerID: "opencode", id: "default-model" },
-      models: {
-        other: { providerID: "opencode", id: "other-model" },
-        deep: { providerID: "opencode", id: "default-model", variant: "amends-high" },
-        elsewhere: { providerID: "elsewhere", id: "model" },
+    const driver = yield* Driver.make(
+      "opencode2",
+      {
+        model: { providerID: "opencode", id: "default-model" },
+        models: {
+          other: { providerID: "opencode", id: "other-model" },
+          deep: { providerID: "opencode", id: "default-model", variant: "amends-high" },
+          elsewhere: { providerID: "elsewhere", id: "model" },
+        },
+        command: "opencode",
+        config: {},
+        env: {},
       },
-      command: "opencode",
-      config: {},
-      env: {},
-    }).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, processes.spawner));
+      createOpencodeSession,
+    ).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, processes.spawner));
     return { fake, processes, driver };
   });
 
@@ -128,7 +129,7 @@ const callBash = (turn: FakeTurn) =>
 
 const TestLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer);
 
-layer(TestLayer)("OpencodeDriver", (it) => {
+layer(TestLayer)("opencode 2 sessions", (it) => {
   it.effect("runs a turn in the session's directory, streaming what opencode records", () =>
     Effect.gen(function* () {
       const { fake, session } = yield* createSession(answer("hello"));
@@ -253,7 +254,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
 
       expect(refusals.map((error) => error.reason._tag)).toEqual(Array(6).fill("UnsupportedError"));
       expect(refusals.at(-1)?.reason).toMatchObject({
-        description: "The opencode agent has no model named constructor",
+        description: "The opencode 2 agent has no model named constructor",
       });
       expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
     }),
@@ -409,7 +410,7 @@ layer(TestLayer)("OpencodeDriver", (it) => {
 
 // The driver checks once a second whether opencode still runs a turn that recorded no end, so this
 // test runs on the live clock, which the shared layer's tests do not offer.
-it.live("OpencodeDriver fails a turn opencode stopped without recording its end", () =>
+it.live("opencode 2 sessions fail a turn opencode stopped without recording its end", () =>
   Effect.gen(function* () {
     const { session } = yield* createSession(() => Effect.void);
 

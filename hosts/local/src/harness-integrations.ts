@@ -8,7 +8,7 @@
 import { Connection, Integration } from "@amends/connection";
 import { type Agent, Harness } from "@amends/harness";
 import { AmendsAgent, Models } from "@amends/harness-amends";
-import { OpencodeAgent } from "@amends/harness-opencode";
+import { Opencode2Agent } from "@amends/harness-opencode";
 import { type Crypto, Effect } from "effect";
 import type { Socket } from "effect/socket";
 
@@ -47,7 +47,7 @@ export const amends = Effect.fn("HarnessIntegrations.amends")(function* (
  * `opencode-agent`, as `opencode` is the id of OpenCode Zen, a provider of models in the catalog.
  */
 export const opencode = Effect.fn("HarnessIntegrations.opencode")(function* (
-  options: Omit<OpencodeAgent.Options, keyof Agent.Options>,
+  options: Omit<Opencode2Agent.Options, keyof Agent.Options>,
 ) {
   const context = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
   return Integration.make({
@@ -58,7 +58,7 @@ export const opencode = Effect.fn("HarnessIntegrations.opencode")(function* (
     harnesses: {
       requiresSandbox: true,
       harness: (_access, agentOptions) =>
-        OpencodeAgent.make({ ...options, ...agentOptions }).pipe(
+        Opencode2Agent.make({ ...options, ...agentOptions }).pipe(
           Effect.map(Harness.make),
           Effect.mapError(
             (error) => new Connection.UnsupportedError({ description: error.reason.message }),

@@ -1,16 +1,20 @@
 /**
- * opencode as an agent that hosts run. opencode works in the sandbox behind its bridge: the agent's
- * template installs both there, and a session launches the bridge when none answers. One bridge and
- * one opencode server serve every session that hosts start in a sandbox with the same options,
- * whichever host started it; other options, such as another model, get a bridge and a server of
- * their own. What runs in the sandbox is in `internal/bridge/`.
+ * opencode 2 as an agent that hosts run: opencode driven over opencode 2's session API, in which
+ * opencode keeps a session's events numbered, so that a turn is read again from any point, and a
+ * session started on another agent is written into opencode's own record. opencode works in the
+ * sandbox behind its bridge: the agent's template installs both there, and a session launches the
+ * bridge when none answers. One bridge and one opencode server serve every session that hosts
+ * start in a sandbox with the same options, whichever host started it; other options, such as
+ * another model, get a bridge and a server of their own. What runs in the sandbox is in
+ * `internal/bridge/v2/`.
  *
  * opencode runs on the model endpoints the agent is made with, which it is configured for.
  * Their keys reach opencode in its configuration, in the sandbox, where the commands opencode runs
  * can read them.
  *
- * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
- * tools, or a request to compact, which fail with `UnsupportedError`.
+ * opencode 2's session API does not yet take a turn's instructions, an answer in JSON, the host's
+ * tools, or a request to compact, which fail with `UnsupportedError`; `OpencodeAgent`, over
+ * opencode 1's session API, takes them all.
  *
  * @since 0.1.0
  */
@@ -56,10 +60,10 @@ export interface Options extends Agent.Options {
  * headers, as Bun's and Node's do. Endpoints that opencode cannot serve together fail with
  * `UnsupportedError`.
  *
- * **Example** (A turn of opencode in a new sandbox)
+ * **Example** (A turn of opencode 2 in a new sandbox)
  *
  * ```ts
- * import { OpencodeAgent } from "@amends/harness-opencode";
+ * import { Opencode2Agent } from "@amends/harness-opencode";
  * import { Agent, Harness } from "@amends/harness";
  * import { SandboxProvider } from "@amends/sandbox";
  * import { BunServices, BunSocket } from "@effect/platform-bun";
@@ -71,7 +75,7 @@ export interface Options extends Agent.Options {
  * const program = Effect.gen(function* () {
  *   // Every host derives a sandbox's bridge token from its id with a secret the hosts share.
  *   const secret = yield* Config.Redacted("BRIDGE_SECRET");
- *   const agent = yield* OpencodeAgent.make({
+ *   const agent = yield* Opencode2Agent.make({
  *     model: {
  *       provider: "anthropic",
  *       model: "claude-sonnet-5-5",
@@ -101,14 +105,14 @@ export interface Options extends Agent.Options {
  * @category constructors
  * @since 0.1.0
  */
-export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
+export const make = Effect.fn("Opencode2Agent.make")(function* (options: Options) {
   const models = yield* Effect.fromResult(modelsOf(options)).pipe(
-    Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode", reason })),
+    Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode2", reason })),
   );
-  const installation = yield* makeInstallation();
+  const installation = yield* makeInstallation(2);
   const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
   const bridge: BridgeClient.Options = {
-    id: "opencode",
+    id: "opencode2",
     ...installation,
     token: options.token,
     agentOptions: {
@@ -119,7 +123,7 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options)
     } satisfies DriverOptions,
   };
   const agent: Agent.Agent = {
-    id: "opencode",
+    id: "opencode2",
     requiresSandbox: true,
     template: installation.template,
     createSession: (sessionOptions) =>

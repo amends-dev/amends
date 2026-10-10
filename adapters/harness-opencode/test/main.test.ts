@@ -7,8 +7,9 @@ import { Effect, Layer, Redacted, Schedule } from "effect";
 import { installStandIn, isRunning, makeBridgedAgent, makeSandbox, startsIn } from "./fixtures.ts";
 
 /**
- * The bridge client launches opencode's bridge program, `main.ts`, in a sandbox on this machine, as
- * a host does, with the stand-in for `opencode serve` as the command that runs opencode.
+ * The bridge client launches the opencode 2 agent's bridge program, `v2/main.ts`, in a sandbox on
+ * this machine, as a host does, with the stand-in for `opencode serve` as the command that runs
+ * opencode.
  */
 const TestLayer = Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor);
 
@@ -18,14 +19,14 @@ const config = { autoupdate: false };
 const makeHarness = (command: string, env: Readonly<Record<string, string>> = {}) =>
   Effect.map(
     makeBridgedAgent({
-      id: "opencode",
+      id: "opencode2",
       template: {
-        name: Template.TemplateName.make("opencode"),
+        name: Template.TemplateName.make("opencode2"),
         identity: "none",
         prepare: Effect.void,
       },
       command: process.execPath,
-      args: [`${import.meta.dirname}/../src/internal/bridge/main.ts`],
+      args: [`${import.meta.dirname}/../src/internal/bridge/v2/main.ts`],
       token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
       agentOptions: {
         model: { providerID: "opencode", id: "default-model" },
@@ -38,7 +39,7 @@ const makeHarness = (command: string, env: Readonly<Record<string, string>> = {}
     Harness.make,
   );
 
-describe("opencode's bridge program", () => {
+describe("the opencode 2 agent's bridge program", () => {
   it.live("starts opencode's server with the agent options when a session starts", () =>
     Effect.gen(function* () {
       const { command, directory } = yield* installStandIn;

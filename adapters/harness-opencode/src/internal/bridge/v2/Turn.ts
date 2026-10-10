@@ -13,7 +13,7 @@
 import { HarnessError, type StreamPart } from "@amends/harness";
 import { Result, Schema } from "effect";
 import { Response } from "effect/ai";
-import type { SessionEvent, StepEnded } from "./SessionEvent.ts";
+import type { SessionEvent, StepEnded } from "./Event.ts";
 
 type Tokens = (typeof StepEnded.Type)["data"]["tokens"];
 

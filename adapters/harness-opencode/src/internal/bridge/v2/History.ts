@@ -12,7 +12,8 @@
 import { HarnessError } from "@amends/harness";
 import { Predicate, Result, Schema } from "effect";
 import type { Prompt } from "effect/ai";
-import { type ModelRef, type SessionEvent, ToolContent } from "./SessionEvent.ts";
+import type { ModelRef } from "../Driver.ts";
+import { type SessionEvent, ToolContent } from "./Event.ts";
 
 export interface Session {
   /** The opencode session the events are appended to, which has recorded only its creation. */

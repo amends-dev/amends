@@ -1,9 +1,11 @@
 /**
- * opencode's server, which the bridge starts in its sandbox, and the requests the driver makes of
- * it. One server serves every session in the sandbox, each in its own directory. `start` runs the
- * server until the scope closes, listening only on 127.0.0.1, at a port the server picks, behind
- * a password that `start` makes and gives the server in its environment. The bridge is the
- * server's only client and lives exactly as long as it, so the password is kept nowhere else.
+ * opencode's server, which the bridge starts in its sandbox. One server serves every session in the
+ * sandbox, each in its own directory. `start` runs the server until the scope closes, listening
+ * only on 127.0.0.1, at a port the server picks, behind a password that `start` makes and gives
+ * the server in its environment. The bridge is the server's only client and lives exactly as long
+ * as it, so the password is kept nowhere else. The requests the bridge makes of the server are
+ * those of the API its version of opencode speaks, in `v1/Api.ts` and `v2/Api.ts`, over the
+ * client `start` returns.
  *
  * opencode reads the configuration `start` is given from a directory that `start` makes for it and
  * removes when the scope closes, in place of the global configuration of the sandbox's user, which
@@ -12,7 +14,7 @@
  *
  * opencode's tools run with the server's environment, so the agent can read the password; it keeps
  * out everything else on the machine. A failed request fails with the `HarnessError` the driver
- * reports.
+ * reports, naming the agent, as `requestError` maps it.
  */
 import { HarnessError } from "@amends/harness";
 import {
@@ -21,25 +23,20 @@ import {
   Effect,
   FileSystem,
   flow,
-  Option,
   Path,
-  type PlatformError,
   Record,
   Redacted,
-  Schema,
+  type Schema,
   Stream,
 } from "effect";
-import { Hex, Sse } from "effect/encoding";
-import {
-  HttpClient,
-  type HttpClientError,
-  HttpClientRequest,
-  HttpClientResponse,
-} from "effect/http";
+import { Hex, type Sse } from "effect/encoding";
+import { HttpClient, type HttpClientError, HttpClientRequest } from "effect/http";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { type ModelRef, SessionEvent } from "./SessionEvent.ts";
 
-export interface ServerOptions {
+export interface Options {
+  /** The agent the server runs for, which its errors name, such as `opencode`. */
+  readonly agent: string;
+
   /** The command that runs opencode, such as `opencode`. */
   readonly command: string;
 
@@ -51,87 +48,29 @@ export interface ServerOptions {
 }
 
 export interface Server {
+  /** The agent the server runs for, which the errors of its requests name. */
+  readonly agent: string;
+
   /** Completes when the server exits, which it does before the scope closes only when it fails. */
   readonly exited: Effect.Effect<void>;
 
-  /** Creates a session working in `directory`, returning its id. */
-  readonly createSession: (options: {
-    readonly directory: string;
-    readonly model?: ModelRef;
-  }) => Effect.Effect<string, HarnessError.HarnessError>;
+  /** A client of the server, at its URL, presenting its password. It answers every status. */
+  readonly client: HttpClient.HttpClient;
 
-  /**
-   * Whether opencode has loaded the model provider `providerID`, which a server loads a moment
-   * after it starts answering, and only when it can use the provider.
-   */
-  readonly hasProvider: (providerID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
-
-  /** Whether the server has the session, as it does unless the sandbox lost opencode's data. */
-  readonly hasSession: (sessionID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
-
-  /**
-   * Gives the session a prompt, which starts a turn, or steers the turn running, returning the
-   * number of the event that admitted it. The turn's events follow it.
-   */
-  readonly prompt: (
-    sessionID: string,
-    text: string,
-  ) => Effect.Effect<number, HarnessError.HarnessError>;
-
-  /** Runs the session's next turns on `model`. */
-  readonly switchModel: (
-    sessionID: string,
-    model: ModelRef,
-  ) => Effect.Effect<void, HarnessError.HarnessError>;
-
-  /** Ends the session's running turn. Interrupting a session that runs none does nothing. */
-  readonly interrupt: (sessionID: string) => Effect.Effect<void, HarnessError.HarnessError>;
-
-  /** Whether opencode is running the session: working on a turn, from taking its prompt. */
-  readonly isRunning: (sessionID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
-
-  /** Deletes the session and everything it recorded. Deleting a deleted session succeeds. */
-  readonly deleteSession: (sessionID: string) => Effect.Effect<void, HarnessError.HarnessError>;
-
-  /**
-   * The session's events numbered after `after`, or all of them, and then each new one as it
-   * happens. The stream does not end by itself. Events of types the adapter does not read are left
-   * out.
-   */
-  readonly events: (
-    sessionID: string,
-    after: number | undefined,
-  ) => Stream.Stream<SessionEvent, HarnessError.HarnessError>;
-
-  /**
-   * The session's events numbered after `after` that it has recorded so far, ending with the last.
-   * Events of types the adapter does not read are left out.
-   */
-  readonly history: (
-    sessionID: string,
-    after: number,
-  ) => Stream.Stream<SessionEvent, HarnessError.HarnessError>;
-
-  /**
-   * Appends `events` to the session in `directory` they name, as if it had recorded them. They are
-   * numbered on from the session's last event, without gaps.
-   */
-  readonly replay: (
-    directory: string,
-    events: ReadonlyArray<SessionEvent>,
-  ) => Effect.Effect<void, HarnessError.HarnessError>;
+  /** `client`, failing with the responses whose status is not a success. */
+  readonly clientOk: HttpClient.HttpClient;
 }
 
 /** Starts the server, which runs until the scope closes, and waits until it listens. */
 export const start = Effect.fn("Server.start")(
-  function* (options: ServerOptions) {
+  function* (options: Options) {
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const httpClient = yield* HttpClient.HttpClient;
     const crypto = yield* Crypto.Crypto;
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const password = Redacted.make(Hex.encode(yield* crypto.randomBytes(32)));
-    // opencode's session API reads its configuration from files alone, as here from the directory
+    // opencode reads its configuration from files alone, as here from the directory
     // `OPENCODE_CONFIG_DIR` names. The configuration holds the models' keys, so only the sandbox's
     // user can read it, as only they can read the directory.
     const configDirectory = yield* fs.makeTempDirectoryScoped({ prefix: "opencode-config-" });
@@ -156,181 +95,40 @@ export const start = Effect.fn("Server.start")(
         forceKillAfter: "3 seconds",
       }),
     );
-    const url = yield* awaitListening(process);
+    const url = yield* awaitListening(options.agent, process);
     const client = httpClient.pipe(
       HttpClient.mapRequest(
         flow(HttpClientRequest.prependUrl(url), HttpClientRequest.basicAuth("opencode", password)),
       ),
     );
-    const clientOk = HttpClient.filterStatusOk(client);
-
-    const send = (request: HttpClientRequest.HttpClientRequest) =>
-      clientOk.execute(request).pipe(Effect.asVoid, Effect.mapError(fromRequestError));
-
     const server: Server = {
+      agent: options.agent,
       exited: Effect.ignore(process.exitCode),
-
-      createSession: ({ directory, model }) =>
-        HttpClientRequest.post("/api/session").pipe(
-          HttpClientRequest.bodyJsonUnsafe({ location: { directory }, model }),
-          clientOk.execute,
-          Effect.flatMap(HttpClientResponse.schemaBodyJson(CreatedSession)),
-          Effect.map((created) => created.data.id),
-          Effect.mapError(fromRequestError),
-        ),
-
-      hasProvider: (providerID) =>
-        client.get(`/api/provider/${encodeURIComponent(providerID)}`).pipe(
-          Effect.flatMap(
-            HttpClientResponse.filterStatus((status) => status === 200 || status === 404),
-          ),
-          Effect.map((response) => response.status === 200),
-          Effect.mapError(fromRequestError),
-        ),
-
-      hasSession: (sessionID) =>
-        client.get(`/api/session/${encodeURIComponent(sessionID)}`).pipe(
-          Effect.flatMap(
-            HttpClientResponse.filterStatus((status) => status === 200 || status === 404),
-          ),
-          Effect.map((response) => response.status === 200),
-          Effect.mapError(fromRequestError),
-        ),
-
-      prompt: (sessionID, text) =>
-        HttpClientRequest.post(`/api/session/${encodeURIComponent(sessionID)}/prompt`).pipe(
-          HttpClientRequest.bodyJsonUnsafe({ prompt: { text } }),
-          clientOk.execute,
-          Effect.flatMap(HttpClientResponse.schemaBodyJson(AdmittedPrompt)),
-          Effect.map((admitted) => admitted.data.admittedSeq),
-          Effect.mapError(fromRequestError),
-        ),
-
-      switchModel: (sessionID, model) =>
-        send(
-          HttpClientRequest.post(`/api/session/${encodeURIComponent(sessionID)}/model`).pipe(
-            HttpClientRequest.bodyJsonUnsafe({ model }),
-          ),
-        ),
-
-      interrupt: (sessionID) =>
-        send(HttpClientRequest.post(`/api/session/${encodeURIComponent(sessionID)}/interrupt`)),
-
-      isRunning: (sessionID) =>
-        clientOk.get("/api/session/active").pipe(
-          Effect.flatMap(HttpClientResponse.schemaBodyJson(ActiveSessions)),
-          Effect.map((active) => Object.hasOwn(active.data, sessionID)),
-          Effect.mapError(fromRequestError),
-        ),
-
-      // The session API has no route that deletes a session yet, so this is the server's older one.
-      // It answers 404 for a session it does not have.
-      deleteSession: (sessionID) =>
-        client
-          .del(`/session/${encodeURIComponent(sessionID)}`)
-          .pipe(
-            Effect.flatMap(
-              HttpClientResponse.filterStatus((status) => status === 200 || status === 404),
-            ),
-            Effect.asVoid,
-            Effect.mapError(fromRequestError),
-          ),
-
-      events: (sessionID, after) =>
-        clientOk
-          .get(`/api/session/${encodeURIComponent(sessionID)}/event`, {
-            urlParams: after === undefined ? {} : { after: String(after) },
-          })
-          .pipe(
-            Effect.map((response) => response.stream),
-            Stream.unwrap,
-            Stream.decodeText(),
-            Stream.pipeThroughChannel(Sse.decodeDataSchema(StreamedEvent)),
-            Stream.map((event) => event.data),
-            Stream.filter(Schema.is(SessionEvent)),
-            Stream.mapError(fromRequestError),
-          ),
-
-      history: (sessionID, after) =>
-        Stream.paginate(after, (afterSeq) =>
-          clientOk
-            .get(`/api/session/${encodeURIComponent(sessionID)}/history`, {
-              urlParams: { after: String(afterSeq) },
-            })
-            .pipe(
-              Effect.flatMap(HttpClientResponse.schemaBodyJson(HistoryPage)),
-              Effect.map(({ data, hasMore }) => {
-                const last = data.at(-1);
-                return [
-                  data.filter(Schema.is(SessionEvent)),
-                  hasMore && last !== undefined ? Option.some(last.durable.seq) : Option.none(),
-                ] as const;
-              }),
-            ),
-        ).pipe(Stream.mapError(fromRequestError)),
-
-      replay: (directory, events) =>
-        Effect.forEach(events, (event) => Schema.encodeEffect(SessionEvent)(event)).pipe(
-          Effect.map((encoded) =>
-            encoded.map(({ id, type, durable, data }) => ({
-              id,
-              aggregateID: durable.aggregateID,
-              seq: durable.seq,
-              type: `${type}.${durable.version}`,
-              data,
-            })),
-          ),
-          Effect.flatMap((rows) =>
-            send(
-              HttpClientRequest.post("/sync/replay").pipe(
-                HttpClientRequest.bodyJsonUnsafe({ directory, events: rows }),
-              ),
-            ),
-          ),
-          Effect.catchTag("SchemaError", (cause) =>
-            Effect.fail(
-              harnessError(
-                new HarnessError.AgentContractError({ description: cause.message }),
-                cause,
-              ),
-            ),
-          ),
-        ),
+      client,
+      clientOk: HttpClient.filterStatusOk(client),
     };
     return server;
   },
-  Effect.catchTag("PlatformError", (error) => Effect.fail(fromPlatformError(error))),
+  (effect, options) =>
+    effect.pipe(
+      Effect.catchTag("PlatformError", (error) =>
+        Effect.fail(
+          harnessError(
+            options.agent,
+            new HarnessError.UnknownError({ description: error.message }),
+            error,
+          ),
+        ),
+      ),
+    ),
 );
-
-const CreatedSession = Schema.Struct({ data: Schema.Struct({ id: Schema.String }) });
-
-const AdmittedPrompt = Schema.Struct({ data: Schema.Struct({ admittedSeq: Schema.Int }) });
-
-/** The sessions the server is running, by id. */
-const ActiveSessions = Schema.Struct({ data: Schema.Record(Schema.String, Schema.Unknown) });
-
-/** An event of a type the adapter does not read, which `events` and `history` leave out. */
-const OtherEvent = Schema.Struct({
-  type: Schema.String.check(
-    Schema.makeFilter((type: string) => !Object.hasOwn(SessionEvent.cases, type)),
-  ),
-  durable: Schema.Struct({ seq: Schema.Int }),
-});
-
-/**
- * An event as the server streams it. A known type that does not decode fails, rather than being
- * left out as an event of another type.
- */
-const StreamedEvent = Schema.Union([SessionEvent, OtherEvent]);
-
-/** A page of the session's history, with whether more follow it. */
-const HistoryPage = Schema.Struct({ data: Schema.Array(StreamedEvent), hasMore: Schema.Boolean });
 
 /**
  * The URL the server announces on its output once it listens. Fails when the server exits first,
  * or does not listen within 30 seconds. The output is read to its end, so that it never fills.
  */
 const awaitListening = Effect.fnUntraced(function* (
+  agent: string,
   process: ChildProcessSpawner.ChildProcessHandle,
 ) {
   const listening = yield* Deferred.make<string>();
@@ -345,7 +143,7 @@ const awaitListening = Effect.fnUntraced(function* (
     Effect.forkScoped,
   );
   const unavailable = (description: string) =>
-    harnessError(new HarnessError.UnavailableError({ description }));
+    harnessError(agent, new HarnessError.UnavailableError({ description }));
   const exited = Effect.flatMap(process.exitCode, (code) =>
     Effect.fail(unavailable(`opencode's server exited with code ${code} before it listened`)),
   );
@@ -358,42 +156,53 @@ const awaitListening = Effect.fnUntraced(function* (
   );
 });
 
-/** The error a request that failed with `error` reports. */
-const fromRequestError = (
-  error: HttpClientError.HttpClientError | Schema.SchemaError | Sse.SseError | Sse.Retry,
-) => {
-  switch (error._tag) {
-    case "HttpClientError": {
-      const { reason } = error;
-      const description = error.message;
-      if (reason._tag === "TransportError") {
-        return harnessError(new HarnessError.UnavailableError({ description }), error);
+/** The error that `agent` reports for `reason`. */
+export const harnessError = (
+  agent: string,
+  reason: HarnessError.HarnessErrorReason,
+  cause?: unknown,
+) => new HarnessError.HarnessError({ agent, reason, cause });
+
+/**
+ * The error `agent` reports for a request that failed with `error`: `UnavailableError` for a server
+ * it cannot reach, one that asks to be retried, or one that failed; `NotFoundError` for what the
+ * server has no record of; `AgentContractError` for an answer the agent cannot read; and
+ * `UnknownError` for the rest.
+ */
+export const requestError =
+  (agent: string) =>
+  (error: HttpClientError.HttpClientError | Schema.SchemaError | Sse.SseError | Sse.Retry) => {
+    switch (error._tag) {
+      case "HttpClientError": {
+        const { reason } = error;
+        const description = error.message;
+        if (reason._tag === "TransportError") {
+          return harnessError(agent, new HarnessError.UnavailableError({ description }), error);
+        }
+        const status = reason._tag === "StatusCodeError" ? reason.response.status : undefined;
+        return harnessError(
+          agent,
+          status === 404
+            ? new HarnessError.NotFoundError({ description })
+            : status === 429 || (status !== undefined && status >= 500)
+              ? new HarnessError.UnavailableError({ description })
+              : new HarnessError.UnknownError({ description }),
+          error,
+        );
       }
-      const status = reason._tag === "StatusCodeError" ? reason.response.status : undefined;
-      return harnessError(
-        status === 404
-          ? new HarnessError.NotFoundError({ description })
-          : status === 429 || (status !== undefined && status >= 500)
-            ? new HarnessError.UnavailableError({ description })
-            : new HarnessError.UnknownError({ description }),
-        error,
-      );
+      case "SchemaError":
+      case "SseError":
+        return harnessError(
+          agent,
+          new HarnessError.AgentContractError({ description: error.message }),
+          error,
+        );
+      case "Retry":
+        return harnessError(
+          agent,
+          new HarnessError.UnavailableError({
+            description: "opencode's server asked to be retried",
+          }),
+        );
     }
-    case "SchemaError":
-    case "SseError":
-      return harnessError(
-        new HarnessError.AgentContractError({ description: error.message }),
-        error,
-      );
-    case "Retry":
-      return harnessError(
-        new HarnessError.UnavailableError({ description: "opencode's server asked to be retried" }),
-      );
-  }
-};
-
-const fromPlatformError = (error: PlatformError.PlatformError) =>
-  harnessError(new HarnessError.UnknownError({ description: error.message }), error);
-
-const harnessError = (reason: HarnessError.HarnessErrorReason, cause?: unknown) =>
-  new HarnessError.HarnessError({ agent: "opencode", reason, cause });
+  };

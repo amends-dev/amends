@@ -13,6 +13,7 @@ const TestLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
 
 /** The options that start the stand-in installed as `command`, with `env` beside a greeting. */
 const optionsFor = (command: string, env: Readonly<Record<string, string>> = {}) => ({
+  agent: "opencode",
   command,
   config: { model: "opencode/default-model" },
   env: { GREETING: "hello", ...env },
@@ -25,9 +26,9 @@ describe("Server", () => {
 
       const server = yield* Server.start(optionsFor(command));
       // The stand-in answers only with the password it started with.
-      const hasProvider = yield* server.hasProvider("anthropic");
+      const health = yield* server.clientOk.get("/api/health");
 
-      expect(hasProvider).toBe(false);
+      expect(health.status).toBe(200);
       expect(yield* startsIn(directory)).toMatchObject([
         {
           args: ["serve", "--hostname=127.0.0.1", "--port=0"],

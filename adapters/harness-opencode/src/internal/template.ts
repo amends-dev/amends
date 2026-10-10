@@ -1,11 +1,12 @@
 /**
- * Installs opencode's bridge in a sandbox, and launches it there. The template gives the sandbox a
- * pinned Bun and a pinned opencode in `~/.amends/opencode/<programs>`, a directory named for their
- * versions, and beside them the bridge program bundled into one file, named for its contents: like
- * AI SDK's harness, it keeps what it installs in the sandbox's home, out of the directory sessions
- * work in. Bun and opencode come from their npm packages for the sandbox's platform, which the
- * sandbox downloads and checks against the integrity npm published for them, as a lockfile pins
- * them.
+ * Installs an opencode agent's bridge in a sandbox, and launches it there. The template gives the
+ * sandbox a pinned Bun and a pinned opencode in `~/.amends/opencode/<programs>`, a directory named
+ * for their versions, and beside them the agent's bridge program bundled into one file, named for
+ * its contents: like AI SDK's harness, it keeps what it installs in the sandbox's home, out of the
+ * directory sessions work in. Bun and opencode come from their npm packages for the sandbox's
+ * platform, which the sandbox downloads and checks against the integrity npm published for them,
+ * as a lockfile pins them. The two agents share the programs: opencode 1.18 serves both the
+ * session API of opencode 1 and that of opencode 2.
  *
  * What a sandbox has already is kept: one created from a snapshot of a prepared one, or a local
  * sandbox sharing this machine's home with one prepared before, is ready at once, and a new bridge
@@ -90,6 +91,12 @@ const programs = {
 /** Bump to install the programs anew, as when the files they install move. */
 const layoutVersion = 1;
 
+/**
+ * The version of opencode an agent runs: 1, whose session API opencode 1 speaks, or 2, whose
+ * session API opencode 2 speaks. Each has a bridge program of its own, `bridge/v<version>/main`.
+ */
+export type Version = 1 | 2;
+
 export interface Installation {
   /** Installs the bridge in a new sandbox. */
   readonly template: Template.Template;
@@ -101,23 +108,26 @@ export interface Installation {
 }
 
 /**
- * Bundles the bridge program, giving the template that installs it with the command that launches
- * it. The template's identity changes with anything it installs.
+ * Bundles the bridge program of the agent that runs opencode `version`, giving the template that
+ * installs it with the command that launches it. The template's identity changes with anything it
+ * installs.
  */
-export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* () {
+export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* (
+  version: Version,
+) {
   const crypto = yield* Crypto.Crypto;
   const hashOf = (text: string) =>
     Effect.map(crypto.digest("SHA-256", new TextEncoder().encode(text)), (digest) =>
       Hex.encode(digest).slice(0, 16),
     );
-  const bundle = yield* bundleBridge;
+  const bundle = yield* bundleBridge(version);
   const programsHash = yield* hashOf(JSON.stringify([layoutVersion, programs]));
   const bundleHash = yield* hashOf(bundle);
   const directory = `.amends/opencode/${programsHash}`;
   const bridge = `bridge-${bundleHash}.js`;
   const installation: Installation = {
     template: {
-      name: Template.TemplateName.make("opencode"),
+      name: Template.TemplateName.make(version === 1 ? "opencode" : "opencode2"),
       identity: `${programsHash}-${bundleHash}`,
       prepare: install(directory, bridge, bundle),
     },
@@ -145,21 +155,22 @@ export const platformOf = (uname: string): Platform | undefined => {
 };
 
 /**
- * The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for
- * Bun. The program is beside this module, in this module's own form: a source among the sources,
- * a compiled file among the compiled ones of the distribution.
+ * The bridge program of opencode `version`, `bridge/v<version>/main.ts`, bundled with everything
+ * it imports into one file for Bun. The program is beside this module, in this module's own form:
+ * a source among the sources, a compiled file among the compiled ones of the distribution.
  */
-const bundleBridge = Effect.promise(async () => {
-  const extension = import.meta.url.slice(import.meta.url.lastIndexOf("."));
-  const { outputs } = await Bun.build({
-    entrypoints: [`${import.meta.dirname}/bridge/main${extension}`],
-    target: "bun",
-    minify: true,
+const bundleBridge = (version: Version) =>
+  Effect.promise(async () => {
+    const extension = import.meta.url.slice(import.meta.url.lastIndexOf("."));
+    const { outputs } = await Bun.build({
+      entrypoints: [`${import.meta.dirname}/bridge/v${version}/main${extension}`],
+      target: "bun",
+      minify: true,
+    });
+    const [bundle] = outputs;
+    if (bundle === undefined) throw new Error("Bun built the bridge program into no file");
+    return bundle.text();
   });
-  const [bundle] = outputs;
-  if (bundle === undefined) throw new Error("Bun built the bridge program into no file");
-  return bundle.text();
-});
 
 /**
  * Installs Bun and opencode in `directory` of the sandbox's home, and `bundle` beside them as

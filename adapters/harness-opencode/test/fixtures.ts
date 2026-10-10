@@ -1,9 +1,8 @@
 import { type Agent, BridgeClient } from "@amends/harness";
 import { LocalSandboxProvider } from "@amends/sandbox-local";
 import { Network, type Template } from "@amends/sandbox";
-import { type Crypto, Effect, FileSystem, Path, Schema } from "effect";
+import { type Crypto, Effect, FileSystem, Path } from "effect";
 import type { Socket } from "effect/socket";
-import { SessionEvent } from "../src/internal/bridge/SessionEvent.ts";
 
 /**
  * A new sandbox on this machine, prepared with `template` if given, and destroyed with the
@@ -76,24 +75,6 @@ export const isRunning = (pid: number) =>
       return false;
     }
   });
-
-/**
- * Numbers events as opencode records them in the session `sessionID`, from `firstSeq`: the
- * returned function makes the session's next event of `type`, with `data` beside the fields every
- * event in a session has. Each event is decoded, so it has the shape opencode records.
- */
-export const makeEvents = (sessionID: string, firstSeq = 1) => {
-  let seq = firstSeq - 1;
-  return (type: SessionEvent["type"], data: Record<string, unknown>): SessionEvent => {
-    seq += 1;
-    return Schema.decodeUnknownSync(SessionEvent)({
-      id: `evt_${seq}`,
-      durable: { aggregateID: sessionID, seq, version: type === "session.next.step.ended" ? 2 : 1 },
-      type,
-      data: { timestamp: 1_791_073_617_000 + seq, sessionID, ...data },
-    });
-  };
-};
 
 /** The tokens of a step that used `input` and `output` tokens, none of them cached or reasoning. */
 export const tokens = (input: number, output: number) => ({

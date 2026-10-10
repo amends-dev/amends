@@ -9,7 +9,7 @@
  */
 import { HarnessError, type ModelEndpoint } from "@amends/harness";
 import { Array, Record, Redacted, Result, type Schema } from "effect";
-import type { ModelRef } from "./bridge/SessionEvent.ts";
+import type { ModelRef } from "./bridge/Driver.ts";
 
 export interface Models {
   /** The `providers` of opencode's configuration, which serve the endpoints' models. */
