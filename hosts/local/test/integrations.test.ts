@@ -15,7 +15,7 @@ it.effect(
           .filter((integration) => integration.provides.includes(capability))
           .map((integration) => integration.id);
 
-      expect(providing("harnesses")).toEqual(["amends", "opencode-agent"]);
+      expect(providing("harnesses")).toEqual(["amends", "opencode-agent", "opencode2-agent"]);
       expect(providing("sandboxes")).toEqual(["local", "daytona"]);
       expect(providing("tools")).toEqual(["mcp", "openapi"]);
       expect(providing("models")).toContain("anthropic");

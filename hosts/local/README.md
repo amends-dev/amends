@@ -46,7 +46,8 @@ declares, a connection to Daytona being an organization reached with its API key
 listing one of its sandboxes; and amends's
 [agent](../../adapters/harness-amends) and
 [opencode](../../adapters/harness-opencode/README.md) as harnesses, whose integrations
-`HarnessIntegrations` declares. Connections' keys are sealed with
+`HarnessIntegrations` declares: `opencode`, which runs opencode 1, and `opencode 2`, which runs
+opencode 2 and does not answer in JSON yet. Connections' keys are sealed with
 `AMENDS_CREDENTIAL_KEY`, and opencode's bridge tokens are derived from it, so a host reaches a
 bridge any host over the database launched; without a key, they come from a secret of this
 process's own, which only a single process can use.

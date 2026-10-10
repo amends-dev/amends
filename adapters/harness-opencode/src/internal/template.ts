@@ -1,11 +1,12 @@
 /**
- * Installs opencode's bridge in a sandbox, and launches it there. The template gives the sandbox a
- * pinned Bun and a pinned opencode in `~/.amends/opencode/<programs>`, a directory named for their
- * versions, and beside them the bridge program bundled into one file, named for its contents: like
- * AI SDK's harness, it keeps what it installs in the sandbox's home, out of the directory sessions
- * work in. Bun and opencode come from their npm packages for the sandbox's platform, which the
- * sandbox downloads and checks against the integrity npm published for them, as a lockfile pins
- * them.
+ * Installs an opencode agent's bridge in a sandbox, and launches it there. The template gives the
+ * sandbox a pinned Bun and a pinned opencode in `~/.amends/opencode/<programs>`, a directory named
+ * for their versions, and beside them the agent's bridge program bundled into one file, named for
+ * its contents: like AI SDK's harness, it keeps what it installs in the sandbox's home, out of the
+ * directory sessions work in. Bun and opencode come from their npm packages for the sandbox's
+ * platform, which the sandbox downloads and checks against the integrity npm published for them,
+ * as a lockfile pins them. Each version of opencode has its programs and its directory: opencode 1
+ * from `opencode-ai`, and opencode 2 from `@opencode/cli`.
  *
  * What a sandbox has already is kept: one created from a snapshot of a prepared one, or a local
  * sandbox sharing this machine's home with one prepared before, is ready at once, and a new bridge
@@ -28,67 +29,110 @@ interface Package {
   readonly integrity: string;
 }
 
-/** The programs the bridge needs, each at a pinned version, from its package for each platform. */
-const programs = {
-  bun: {
-    version: "1.3.14",
-    packages: {
-      "darwin-arm64": {
-        name: "@oven/bun-darwin-aarch64",
-        integrity:
-          "sha512-Omj20SuiHBOUjUBIyqtkNjSUIjOtEOJwmbix/ZyFH4BaQ6OZTaaRWIR4TjHVz0yadHgli6lLTiAh1uarnvD49A==",
-      },
-      "darwin-x64": {
-        name: "@oven/bun-darwin-x64",
-        integrity:
-          "sha512-FFj3QdU/OhlDyZOJ8CWfN5eWLpRlT4qjZg7lMQi7jA6GuoY5ajlO1zWLP/MuHYRSbXQUvV52RejNi8DVnAp13w==",
-      },
-      "linux-arm64": {
-        name: "@oven/bun-linux-aarch64",
-        integrity:
-          "sha512-X5SsPZHs+iYO8R/efIcRtc7gT2Q2DgPfliCxEkx4cXBumwkw0c/EsHMNwH3EgGpCDaZ7IYVPhpCG/xBOQHEwZw==",
-      },
-      "linux-x64": {
-        name: "@oven/bun-linux-x64",
-        integrity:
-          "sha512-7OVTAKvwfPmSbIV1HpdOoVVx5VRc427GuPPne93N6vk4eQBPId9nXmZDh9/zGaKPdbVjVtQSZafWQoUjx38Utw==",
+/** A program at a pinned version, from its package for each platform. */
+interface Program {
+  readonly version: string;
+  readonly packages: { readonly [platform in Platform]: Package };
+}
+
+/** Bun, which runs the bridge program. */
+const bun: Program = {
+  version: "1.3.14",
+  packages: {
+    "darwin-arm64": {
+      name: "@oven/bun-darwin-aarch64",
+      integrity:
+        "sha512-Omj20SuiHBOUjUBIyqtkNjSUIjOtEOJwmbix/ZyFH4BaQ6OZTaaRWIR4TjHVz0yadHgli6lLTiAh1uarnvD49A==",
+    },
+    "darwin-x64": {
+      name: "@oven/bun-darwin-x64",
+      integrity:
+        "sha512-FFj3QdU/OhlDyZOJ8CWfN5eWLpRlT4qjZg7lMQi7jA6GuoY5ajlO1zWLP/MuHYRSbXQUvV52RejNi8DVnAp13w==",
+    },
+    "linux-arm64": {
+      name: "@oven/bun-linux-aarch64",
+      integrity:
+        "sha512-X5SsPZHs+iYO8R/efIcRtc7gT2Q2DgPfliCxEkx4cXBumwkw0c/EsHMNwH3EgGpCDaZ7IYVPhpCG/xBOQHEwZw==",
+    },
+    "linux-x64": {
+      name: "@oven/bun-linux-x64",
+      integrity:
+        "sha512-7OVTAKvwfPmSbIV1HpdOoVVx5VRc427GuPPne93N6vk4eQBPId9nXmZDh9/zGaKPdbVjVtQSZafWQoUjx38Utw==",
+    },
+  },
+};
+
+/**
+ * The programs each version's bridge needs: Bun, which runs the bridge, and opencode, each named
+ * as the bridge runs it.
+ */
+const programsOf: { readonly [version in Version]: { readonly [program: string]: Program } } = {
+  1: {
+    bun,
+    opencode: {
+      version: "1.18.23",
+      packages: {
+        "darwin-arm64": {
+          name: "opencode-darwin-arm64",
+          integrity:
+            "sha512-QP9PjwpHtZoLVXw2WvUmPZecz7mWbQkT4t3K36B//fCaDG+zWa+SsztIeaW5azujNwwtUemLA5icE/zINng48Q==",
+        },
+        "darwin-x64": {
+          name: "opencode-darwin-x64",
+          integrity:
+            "sha512-R9nWP3edz/0FnEfwmuxtiWBB7bS4NtZCyCffJyiMlrbwdDC+bIXYrWxWXVrzaP1mJujs6g2MAwTCUSx/qpBhDw==",
+        },
+        "linux-arm64": {
+          name: "opencode-linux-arm64",
+          integrity:
+            "sha512-g1zDFhuE9FOYwjSGderlu69wfd4GQzS0xsDiIY11QUciuBmM6DrHqLvmhlLFsUVHYVnCPY1YeN1pq5ewE3x72Q==",
+        },
+        "linux-x64": {
+          name: "opencode-linux-x64",
+          integrity:
+            "sha512-5x9d1Cm/YtqzR6lAlNbgVprTQ3R3hx7qGTWCzm5l5u6lBNkhYTrhy2s8k25dxKKuxqZ9Kngqz9JYWvSVHy2Lmw==",
+        },
       },
     },
   },
-  opencode: {
-    version: "1.18.23",
-    packages: {
-      "darwin-arm64": {
-        name: "opencode-darwin-arm64",
-        integrity:
-          "sha512-QP9PjwpHtZoLVXw2WvUmPZecz7mWbQkT4t3K36B//fCaDG+zWa+SsztIeaW5azujNwwtUemLA5icE/zINng48Q==",
-      },
-      "darwin-x64": {
-        name: "opencode-darwin-x64",
-        integrity:
-          "sha512-R9nWP3edz/0FnEfwmuxtiWBB7bS4NtZCyCffJyiMlrbwdDC+bIXYrWxWXVrzaP1mJujs6g2MAwTCUSx/qpBhDw==",
-      },
-      "linux-arm64": {
-        name: "opencode-linux-arm64",
-        integrity:
-          "sha512-g1zDFhuE9FOYwjSGderlu69wfd4GQzS0xsDiIY11QUciuBmM6DrHqLvmhlLFsUVHYVnCPY1YeN1pq5ewE3x72Q==",
-      },
-      "linux-x64": {
-        name: "opencode-linux-x64",
-        integrity:
-          "sha512-5x9d1Cm/YtqzR6lAlNbgVprTQ3R3hx7qGTWCzm5l5u6lBNkhYTrhy2s8k25dxKKuxqZ9Kngqz9JYWvSVHy2Lmw==",
+  2: {
+    bun,
+    opencode: {
+      version: "2.0.26",
+      packages: {
+        "darwin-arm64": {
+          name: "@opencode/cli-darwin-arm64",
+          integrity:
+            "sha512-XklldeO6eWgG8vkPNLcdlBPEm1Y+/tyhEXGZvXbk8uytpPP7SEVV2R9oZ98NMSSPH9kBAO/+Xo4sKfvD6CHAsw==",
+        },
+        "darwin-x64": {
+          name: "@opencode/cli-darwin-x64",
+          integrity:
+            "sha512-051fIryTH4FK4Ml63TH+IP3s7Mi+jYfVyEXSBh9aGDJUS2VZfD+AwNJ9Ew9nBPTBKYvhMGhqHcudHagRL8SBbQ==",
+        },
+        "linux-arm64": {
+          name: "@opencode/cli-linux-arm64",
+          integrity:
+            "sha512-IG316I8wVqndohzFAoWNeH83eMA8sKQFRtMeuk2Wfg4DU1haCSgzAJz3/gbytjwh6bXdWR7V3FCSrfjoraKDgw==",
+        },
+        "linux-x64": {
+          name: "@opencode/cli-linux-x64",
+          integrity:
+            "sha512-UIA2/1Ik8HaN54C4xp7H+OHgRfq995XUixrX+kLmFs8EPn1fAcmn3OoiN+3c3Vc3jEV/LHmj0Cy1SL6nW4wdGw==",
+        },
       },
     },
   },
-} satisfies {
-  readonly [program: string]: {
-    readonly version: string;
-    readonly packages: { readonly [platform in Platform]: Package };
-  };
 };
 
 /** Bump to install the programs anew, as when the files they install move. */
 const layoutVersion = 1;
+
+/**
+ * The version of opencode an agent runs: 1, whose session API opencode 1 speaks, or 2, whose
+ * session API opencode 2 speaks. Each has a bridge program of its own, `bridge/v<version>/main`.
+ */
+export type Version = 1 | 2;
 
 export interface Installation {
   /** Installs the bridge in a new sandbox. */
@@ -101,25 +145,29 @@ export interface Installation {
 }
 
 /**
- * Bundles the bridge program, giving the template that installs it with the command that launches
- * it. The template's identity changes with anything it installs.
+ * Bundles the bridge program of the agent that runs opencode `version`, giving the template that
+ * installs it with the command that launches it. The template's identity changes with anything it
+ * installs.
  */
-export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* () {
+export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* (
+  version: Version,
+) {
   const crypto = yield* Crypto.Crypto;
   const hashOf = (text: string) =>
     Effect.map(crypto.digest("SHA-256", new TextEncoder().encode(text)), (digest) =>
       Hex.encode(digest).slice(0, 16),
     );
-  const bundle = yield* bundleBridge;
+  const bundle = yield* bundleBridge(version);
+  const programs = programsOf[version];
   const programsHash = yield* hashOf(JSON.stringify([layoutVersion, programs]));
   const bundleHash = yield* hashOf(bundle);
   const directory = `.amends/opencode/${programsHash}`;
   const bridge = `bridge-${bundleHash}.js`;
   const installation: Installation = {
     template: {
-      name: Template.TemplateName.make("opencode"),
+      name: Template.TemplateName.make(version === 1 ? "opencode" : "opencode2"),
       identity: `${programsHash}-${bundleHash}`,
-      prepare: install(directory, bridge, bundle),
+      prepare: install(programs, directory, bridge, bundle),
     },
     command: "sh",
     args: ["-c", `exec "$HOME/${directory}/bun" "$HOME/${directory}/${bridge}"`],
@@ -145,33 +193,39 @@ export const platformOf = (uname: string): Platform | undefined => {
 };
 
 /**
- * The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for
- * Bun. The program is beside this module, in this module's own form: a source among the sources,
- * a compiled file among the compiled ones of the distribution.
+ * The bridge program of opencode `version`, `bridge/v<version>/main.ts`, bundled with everything
+ * it imports into one file for Bun. The program is beside this module, in this module's own form:
+ * a source among the sources, a compiled file among the compiled ones of the distribution.
  */
-const bundleBridge = Effect.promise(async () => {
-  const extension = import.meta.url.slice(import.meta.url.lastIndexOf("."));
-  const { outputs } = await Bun.build({
-    entrypoints: [`${import.meta.dirname}/bridge/main${extension}`],
-    target: "bun",
-    minify: true,
+const bundleBridge = (version: Version) =>
+  Effect.promise(async () => {
+    const extension = import.meta.url.slice(import.meta.url.lastIndexOf("."));
+    const { outputs } = await Bun.build({
+      entrypoints: [`${import.meta.dirname}/bridge/v${version}/main${extension}`],
+      target: "bun",
+      minify: true,
+    });
+    const [bundle] = outputs;
+    if (bundle === undefined) throw new Error("Bun built the bridge program into no file");
+    return bundle.text();
   });
-  const [bundle] = outputs;
-  if (bundle === undefined) throw new Error("Bun built the bridge program into no file");
-  return bundle.text();
-});
 
 /**
- * Installs Bun and opencode in `directory` of the sandbox's home, and `bundle` beside them as
- * `bridge`, each unless the sandbox has it already. Each goes in under another name first, renamed
- * into place once whole, so that no bridge launches from half an installation.
+ * Installs `programs` in `directory` of the sandbox's home, and `bundle` beside them as `bridge`,
+ * each unless the sandbox has it already. Each goes in under another name first, renamed into
+ * place once whole, so that no bridge launches from half an installation.
  */
-const install = (directory: string, bridge: string, bundle: string) =>
+const install = (
+  programs: { readonly [program: string]: Program },
+  directory: string,
+  bridge: string,
+  bundle: string,
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
     const installed = path.join(yield* homeDirectory, directory);
-    if (!(yield* fs.exists(installed))) yield* installPrograms(installed);
+    if (!(yield* fs.exists(installed))) yield* installPrograms(programs, installed);
     const bridgeFile = path.join(installed, bridge);
     if (yield* fs.exists(bridgeFile)) return;
     const staging = yield* fs.makeTempDirectory({ directory: installed, prefix: ".bridge-" });
@@ -183,8 +237,8 @@ const install = (directory: string, bridge: string, bundle: string) =>
       );
   });
 
-/** Installs Bun and opencode in `installed`, checking that each runs as its pinned version. */
-const installPrograms = (installed: string) =>
+/** Installs `programs` in `installed`, checking that each runs as its pinned version. */
+const installPrograms = (programs: { readonly [program: string]: Program }, installed: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -263,13 +317,19 @@ const installProgram = (directory: string, program: string, version: string, pkg
     ]);
     yield* fs.remove(tarball);
     const printed = (yield* run(path.join(directory, program), ["--version"])).trim();
-    if (printed !== version) {
+    if (versionIn(printed) !== version) {
       return yield* failure(
         "InvalidData",
         `${program} ${version} printed ${printed} as its version`,
       );
     }
   });
+
+/**
+ * The version a program printed for `--version`: alone, as Bun and opencode 1 print it, or after
+ * the program's name, as opencode 2 prints `opencode v2.0.26`.
+ */
+export const versionIn = (printed: string) => printed.trim().split(/\s+/).at(-1)?.replace(/^v/, "");
 
 /** Runs `command` in the sandbox for its output, failing with its error output when it fails. */
 const run = (command: string, args: ReadonlyArray<string>) =>

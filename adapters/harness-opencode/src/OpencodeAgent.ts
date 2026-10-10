@@ -1,16 +1,21 @@
 /**
- * opencode as an agent that hosts run. opencode works in the sandbox behind its bridge: the agent's
- * template installs both there, and a session launches the bridge when none answers. One bridge and
- * one opencode server serve every session that hosts start in a sandbox with the same options,
- * whichever host started it; other options, such as another model, get a bridge and a server of
- * their own. What runs in the sandbox is in `internal/bridge/`.
+ * opencode as an agent that hosts run: opencode 1, driven over its session API, which takes all of
+ * a turn: its instructions, as the system prompt of its prompt, an answer in JSON, the files of its
+ * prompt, the host's tools, and requests to compact. opencode works in the sandbox behind its
+ * bridge: the agent's template installs both there, and a session launches the bridge when none
+ * answers. One bridge and one opencode server serve every session that hosts start in a sandbox
+ * with the same options, whichever host started it; other options, such as another model, get a
+ * bridge and a server of their own. What runs in the sandbox is in `internal/bridge/v1/`.
  *
  * opencode runs on the model endpoints the agent is made with, which it is configured for.
  * Their keys reach opencode in its configuration, in the sandbox, where the commands opencode runs
- * can read them.
+ * can read them. The host's tools reach opencode as an MCP server the bridge serves on the
+ * sandbox's loopback, whose tools opencode names `host_<tool>`; the host runs them, and nothing
+ * they need reaches the sandbox.
  *
- * opencode's session API does not yet take a turn's instructions, an answer in JSON, the host's
- * tools, or a request to compact, which fail with `UnsupportedError`.
+ * A session started on another agent is written into opencode as one message the model reads,
+ * since opencode 1 records no steps but its own. `Opencode2Agent`, over opencode 2's session API,
+ * records them as opencode's own, but does not answer in JSON yet.
  *
  * @since 0.1.0
  */
@@ -20,6 +25,7 @@ import { type Crypto, Effect, type Redacted, Schema } from "effect";
 import type { Socket } from "effect/socket";
 import type { Options as DriverOptions } from "./internal/bridge/Driver.ts";
 import { modelsOf } from "./internal/models.ts";
+import { hostToolName } from "./internal/bridge/v1/Session.ts";
 import { makeInstallation } from "./internal/template.ts";
 
 /**
@@ -38,8 +44,8 @@ export interface Options extends Agent.Options {
   readonly token: (id: Sandbox.SandboxId) => Redacted.Redacted<string>;
 
   /**
-   * opencode's configuration, as opencode 1.18 writes its `opencode.json`, which names providers
-   * `providers`; the providers that serve the models replace any it has. It takes effect when the
+   * opencode's configuration, as opencode 1 writes its `opencode.json`, which names providers
+   * `provider`; the providers that serve the models replace any it has. It takes effect when the
    * bridge starts opencode's server; a server already running in the sandbox keeps the one it
    * started with.
    */
@@ -51,10 +57,11 @@ export interface Options extends Agent.Options {
 
 /**
  * The agent, which bundles the bridge program for its template when it is made, with `Bun.build`,
- * so the host runs on Bun. Each session reaches opencode through the bridge in its sandbox, with
- * the `Crypto` and the `WebSocketConstructor` the agent is made with; the constructor must send
- * headers, as Bun's and Node's do. Endpoints that opencode cannot serve together fail with
- * `UnsupportedError`.
+ * so the host runs on Bun. The names of the host's tools fit in 59 characters, as
+ * `maxToolNameLength` says, since opencode puts `host_` before them. Each session reaches opencode
+ * through the bridge in its sandbox, with the `Crypto` and the `WebSocketConstructor` the agent is
+ * made with; the constructor must send headers, as Bun's and Node's do. Endpoints that opencode
+ * cannot serve together fail with `UnsupportedError`.
  *
  * **Example** (A turn of opencode in a new sandbox)
  *
@@ -102,10 +109,10 @@ export interface Options extends Agent.Options {
  * @since 0.1.0
  */
 export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options) {
-  const models = yield* Effect.fromResult(modelsOf(options)).pipe(
+  const models = yield* Effect.fromResult(modelsOf(1, options)).pipe(
     Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode", reason })),
   );
-  const installation = yield* makeInstallation();
+  const installation = yield* makeInstallation(1);
   const services = yield* Effect.context<Socket.WebSocketConstructor | Crypto.Crypto>();
   const bridge: BridgeClient.Options = {
     id: "opencode",
@@ -114,14 +121,16 @@ export const make = Effect.fn("OpencodeAgent.make")(function* (options: Options)
     agentOptions: {
       model: models.model,
       models: models.models,
-      config: { ...options.config, providers: models.providers },
-      env: options.env ?? {},
+      config: { ...options.config, ...models.config },
+      env: { ...options.env, ...models.env },
     } satisfies DriverOptions,
   };
   const agent: Agent.Agent = {
     id: "opencode",
     requiresSandbox: true,
     template: installation.template,
+    // opencode names a host's tool after the MCP server that offers it, `host_<tool>`.
+    maxToolNameLength: 64 - hostToolName("").length,
     createSession: (sessionOptions) =>
       Effect.provide(BridgeClient.createSession(bridge, sessionOptions), services),
   };

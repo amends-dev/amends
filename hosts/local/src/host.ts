@@ -82,13 +82,17 @@ const bridgeSecretOf = (credentialKey: Redacted.Redacted<string> | undefined) =>
  * The integrations this host installs, which workspaces connect to: each model provider in the
  * catalog and any OpenAI-compatible API, for models; MCP servers and HTTP APIs, for tools;
  * sandboxes as directories under `directory`, for development, and on Daytona; and amends's agent
- * and opencode, as harnesses. opencode's bridges take tokens derived from `credentialKey`.
+ * and opencode's two, as harnesses. opencode's bridges take tokens derived from `credentialKey`.
  *
  * @category constructors
  */
 export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
   function* (directory: string, credentialKey?: Redacted.Redacted<string>) {
     const bridgeSecret = bridgeSecretOf(credentialKey);
+    const opencodeOptions: HarnessIntegrations.OpencodeOptions = {
+      token: (sandboxId) =>
+        Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),
+    };
     return [
       ...(yield* ModelIntegrations.catalogProviders),
       yield* ModelIntegrations.openAiCompatible,
@@ -97,10 +101,8 @@ export const makeIntegrations = Effect.fn("LocalHost.makeIntegrations")(
       yield* SandboxIntegrations.local({ directory }),
       yield* SandboxIntegrations.daytona,
       yield* HarnessIntegrations.amends(),
-      yield* HarnessIntegrations.opencode({
-        token: (sandboxId) =>
-          Redacted.make(createHmac("sha256", bridgeSecret).update(sandboxId).digest("base64url")),
-      }),
+      yield* HarnessIntegrations.opencode(opencodeOptions),
+      yield* HarnessIntegrations.opencode2(opencodeOptions),
     ];
   },
   Effect.provide(
