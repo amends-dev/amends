@@ -14,6 +14,9 @@ Read [README.md](README.md) before changing this package.
   shows.
 - Components read colors, shadows, type, and spacing from the foundations, never raw values.
   Corners are square.
+- `src/site` holds the site's sections, composed from the same components and foundations; only
+  its display type and page widths are its own, in `site/tokens.ts`. Compare **Site / Sections**
+  with the "Site / amends.dev" frames.
 - Give every piece Storybook coverage with representative data, in both modes. Portable story
   tests run through `@effect/vitest` in the existing Bun/Vitest suite.
 - Run `bun run check`, the package tests, and the Storybook build. Inspect stories in a browser;

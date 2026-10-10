@@ -73,6 +73,7 @@ jobs:
               --project @amends-dev/icons --project @amends-dev/ui
               --project @amends-dev/client
               --project @amends-dev/web --project @amends-dev/desktop
+              --project @amends-dev/site
     env:
       # Each PostgreSQL shard starts its own cluster from the runner's installation.
       AMENDS_POSTGRES_REQUIRED: "true"
@@ -100,6 +101,10 @@ jobs:
       - name: UI workshop
         working-directory: apps/ui
         run: bun run --bun storybook build --output-dir dist --disable-telemetry
+      # Generating the site's API reference also typechecks the examples in doc comments.
+      - name: Site
+        working-directory: apps/site
+        run: bun run build
 
   # One required check that succeeds only when every job above succeeds.
   check:

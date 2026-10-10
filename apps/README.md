@@ -1,7 +1,8 @@
 # Apps
 
 The apps are what people use: a web app and a desktop app, built from two shared libraries, the
-design system and the headless client. None of them is published to npm.
+design system and the headless client, and the site at amends.dev, built from the design system
+alone. None of them is published to npm.
 
 | Package                        | What it is                                                                       |
 | ------------------------------ | -------------------------------------------------------------------------------- |
@@ -9,6 +10,7 @@ design system and the headless client. None of them is published to npm.
 | [`client`](client/README.md)   | The headless client: sessions, API access, query state, and the hooks pages use. |
 | [`web`](web/README.md)         | The web app, with browser routing, served on port 4321 in development.           |
 | [`desktop`](desktop/README.md) | The desktop app on Tauri 2, with hash routing.                                   |
+| [`site`](site/README.md)       | amends.dev: the product, the packages, and their docs, on Astro and Starlight.   |
 | [`icons`](icons/README.md)     | The icons, drawn as data and generated as Solid components and SVGs.             |
 
 ## How they fit
@@ -22,7 +24,8 @@ dependency only, to type its hooks by the screens' own types.
 Web and desktop each own their route tree and pages. A page connects a client hook to a UI screen,
 and decides which screen shows. Each app owns its platform too: web proxies the API in
 development, and desktop reaches the host at port 8787 and keeps platform APIs, such as
-appearance persistence, to itself. The apps compose UI; they define no styles of their own.
+appearance persistence, to itself. The site composes UI's site sections into static pages, with
+no client. The apps compose UI; they define no styles of their own.
 [Feature development](../docs/feature-development.md) walks through adding a screen, and the
 [workspace shell](../docs/workspace-shell.md) describes the navigation every page shares.
 
@@ -37,8 +40,9 @@ From the repository root, after `bun install`, run each in its own terminal:
 bun run --filter @amends-dev/web dev       # http://127.0.0.1:4321/
 bun run --filter @amends-dev/desktop dev   # the Tauri app, its webview on port 1420
 bun run --filter @amends-dev/ui dev        # the design system's workshop, http://127.0.0.1:6010/
+bun run --filter @amends-dev/site dev      # the site, http://127.0.0.1:4400/
 ```
 
-The apps need the [local host](../hosts/local/README.md#run) running. The desktop app needs
-[Rust and Tauri's prerequisites](desktop/README.md#run-and-verify); the others need only Bun.
-`bun run test apps` runs every app's tests, and each package's README covers its own checks.
+The web and desktop apps need the [local host](../hosts/local/README.md#run) running. The desktop
+app needs [Rust and Tauri's prerequisites](desktop/README.md#run-and-verify); the others need only
+Bun. `bun run test apps` runs every app's tests, and each package's README covers its own checks.

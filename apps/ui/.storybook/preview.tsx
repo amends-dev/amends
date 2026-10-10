@@ -65,7 +65,7 @@ const preview = {
     controls: { expanded: true },
     a11y: { test: "error" },
     options: {
-      storySort: { order: ["Foundations", "Components", "Patterns", "Screens"] },
+      storySort: { order: ["Foundations", "Components", "Patterns", "Screens", "Site"] },
     },
   },
 } satisfies DefinePreviewInput;

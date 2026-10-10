@@ -6,7 +6,8 @@
   "sideEffects": [
     "**/*.css.ts",
     "**/*.css",
-    "./src/foundations/typography/fonts.ts"
+    "./src/foundations/typography/fonts.ts",
+    "./src/site/fonts.ts"
   ],
   "exports": {
     "./components/avatar": "./src/components/avatar/index.ts",
@@ -67,6 +68,10 @@
     "./screens/turns": "./src/screens/turns/index.ts",
     "./screens/workspace-navigation": "./src/screens/workspace-navigation/index.ts",
     "./screens/workspaces": "./src/screens/workspaces/index.ts",
+    "./site": "./src/site/index.ts",
+    "./site/document": "./src/site/document.css.ts",
+    "./site/fonts": "./src/site/fonts.ts",
+    "./site/starlight": "./src/site/starlight.css.ts",
     "./styles": "./src/styles.css.ts"
   },
   "scripts": {
@@ -79,6 +84,7 @@
     "@amends-dev/icons": "workspace:*",
     "@fontsource/figtree": "^5.3.0",
     "@fontsource/geist-mono": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
     "@kobalte/core": "^0.13.14",
     "@tiptap/core": "3.31.3",
     "@tiptap/extension-hard-break": "3.31.3",

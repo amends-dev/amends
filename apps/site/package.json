@@ -1,0 +1,25 @@
+{
+  "name": "@amends-dev/site",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run generate && astro dev --host 127.0.0.1 --port 4400",
+    "generate": "bun run scripts/generate-docs.ts",
+    "build": "bun run generate && astro build",
+    "preview": "wrangler dev --port 4400",
+    "deploy": "bun run build && wrangler deploy",
+    "typecheck": "astro sync && tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@amends-dev/ui": "workspace:*",
+    "@astrojs/solid-js": "7.0.2",
+    "@astrojs/starlight": "0.42.6",
+    "astro": "7.3.8",
+    "solid-js": "^1.9.13"
+  },
+  "devDependencies": {
+    "@vanilla-extract/vite-plugin": "^5.2.6",
+    "wrangler": "4.149.0"
+  }
+}

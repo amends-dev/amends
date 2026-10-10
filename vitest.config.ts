@@ -36,6 +36,13 @@ export default defineConfig({
           include: ["adapters/storage-postgresql/test/**/*.test.ts", "hosts/*/test/**/*.test.ts"],
         },
       },
+      {
+        test: {
+          name: "@amends-dev/site",
+          environment: "node",
+          include: ["apps/site/test/**/*.test.ts"],
+        },
+      },
       "apps/icons/vite.config.ts",
       "apps/ui/vite.config.ts",
       "apps/client/vite.config.ts",

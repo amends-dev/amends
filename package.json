@@ -39,6 +39,8 @@
     "prepare": "effect-tsgo patch && lefthook install"
   },
   "devDependencies": {
+    "@effect/docgen": "4.0.0",
+    "@effect/platform-bun": "catalog:",
     "@effect/tsgo": "0.45.0",
     "@effect/vitest": "catalog:",
     "@testing-library/jest-dom": "7.0.1",

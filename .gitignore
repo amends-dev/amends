@@ -46,3 +46,9 @@ apps/desktop/src-tauri/gen/
 
 output/
 .playwright-mcp/
+
+# The site's generated documentation and build state (apps/site)
+apps/site/src/content/docs/docs/api/
+apps/site/src/content/docs/docs/packages/
+apps/site/.astro/
+apps/site/.wrangler/

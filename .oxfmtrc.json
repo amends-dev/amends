@@ -9,6 +9,10 @@
     "**/coverage/**",
     "bun.lock",
     "**/target/**",
-    "apps/desktop/src-tauri/gen/**"
+    "apps/desktop/src-tauri/gen/**",
+    "apps/site/.astro/**",
+    "apps/site/.wrangler/**",
+    "apps/site/src/content/docs/docs/api/**",
+    "apps/site/src/content/docs/docs/packages/**"
   ]
 }

@@ -61,11 +61,20 @@ export type ButtonLinkProps = JSX.AnchorHTMLAttributes<HTMLAnchorElement> & {
   icon?: IconComponent;
   /** Fill the container's width. */
   wide?: boolean;
+  /** "large" is 44px with larger text, as on a site's headline. Default "regular". */
+  size?: "regular" | "large";
 };
 
 /** A link that looks like a Button, for an action that leads somewhere, such as Agent settings. */
 export function ButtonLink(props: ButtonLinkProps) {
-  const [local, native] = splitProps(props, ["variant", "icon", "wide", "class", "children"]);
+  const [local, native] = splitProps(props, [
+    "variant",
+    "icon",
+    "wide",
+    "size",
+    "class",
+    "children",
+  ]);
   return (
     <a
       {...native}
@@ -73,6 +82,7 @@ export function ButtonLink(props: ButtonLinkProps) {
         s.button,
         s.variant[local.variant ?? "secondary"],
         s.link,
+        local.size === "large" && s.large,
         local.wide && s.wide,
         local.class,
       )}
