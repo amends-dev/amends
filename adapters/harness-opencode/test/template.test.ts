@@ -6,7 +6,12 @@ import { describe, expect, it } from "@effect/vitest";
 import { dirname } from "node:path";
 import { Effect, FileSystem, Layer, Path, Redacted } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { type Installation, makeInstallation, platformOf } from "../src/internal/template.ts";
+import {
+  type Installation,
+  makeInstallation,
+  platformOf,
+  versionIn,
+} from "../src/internal/template.ts";
 import { makeScriptedCommands } from "./fakes.ts";
 import { makeBridgedAgent, makeSandbox } from "./fixtures.ts";
 
@@ -75,6 +80,11 @@ describe("Template", () => {
     expect(platformOf("FreeBSD amd64")).toBeUndefined();
   });
 
+  it("reads the version a program prints, alone or after its name", () => {
+    expect(versionIn("1.3.14\n")).toBe("1.3.14");
+    expect(versionIn("opencode v2.0.26\n")).toBe("2.0.26");
+  });
+
   it.effect(
     "launches the bridge from where the template installs it, under the same identity",
     () =>
@@ -92,12 +102,12 @@ describe("Template", () => {
       }).pipe(Effect.provide(BunServices.layer)),
   );
 
-  it.effect("installs each agent's own bridge program beside the programs both agents share", () =>
+  it.effect("installs each agent's own programs and bridge program", () =>
     Effect.gen(function* () {
       const [one, two] = yield* Effect.all([makeInstallation(1), makeInstallation(2)]);
 
       expect([one.template.name, two.template.name]).toEqual(["opencode", "opencode2"]);
-      expect(dirname(launchedFrom(one).bun)).toBe(dirname(launchedFrom(two).bun));
+      expect(dirname(launchedFrom(one).bun)).not.toBe(dirname(launchedFrom(two).bun));
       expect(launchedFrom(one).bridge).not.toBe(launchedFrom(two).bridge);
       expect(one.template.identity).not.toBe(two.template.identity);
     }).pipe(Effect.provide(BunServices.layer)),
@@ -194,49 +204,57 @@ describe("Template", () => {
   );
 });
 
-describe.skipIf(!enabled)("Template on this machine", () => {
-  it.live(
-    "installs Bun and opencode in the sandbox's home, from where the bridge launches and starts opencode",
-    () =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const path = yield* Path.Path;
-        const home = yield* fs.makeTempDirectoryScoped();
-        const local = yield* makeSandbox();
-        const sandbox: Sandbox.Sandbox["Service"] = {
-          ...local,
-          childProcessSpawner: withHome(local.childProcessSpawner, home),
-        };
-        const installation = yield* makeInstallation(2);
+describe.skipIf(!enabled).each([1, 2] as const)(
+  "Template of opencode %i on this machine",
+  (version) => {
+    it.live(
+      "installs Bun and opencode in the sandbox's home, from where the bridge launches and starts opencode",
+      () =>
+        Effect.gen(function* () {
+          const fs = yield* FileSystem.FileSystem;
+          const path = yield* Path.Path;
+          const home = yield* fs.makeTempDirectoryScoped();
+          const local = yield* makeSandbox();
+          const sandbox: Sandbox.Sandbox["Service"] = {
+            ...local,
+            childProcessSpawner: withHome(local.childProcessSpawner, home),
+          };
+          const installation = yield* makeInstallation(version);
 
-        yield* installation.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox)));
+          yield* installation.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 
-        const { bun, bridge } = launchedFrom(installation);
-        const installed = path.join(home, path.dirname(bun));
-        expect((yield* fs.readDirectory(installed)).toSorted()).toEqual([
-          path.basename(bridge),
-          "bun",
-          "opencode",
-        ]);
-        const harness = Harness.make(
-          yield* makeBridgedAgent({
-            id: "opencode2",
-            template: installation.template,
-            command: installation.command,
-            args: installation.args,
-            token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
-            agentOptions: {
-              model: { providerID: "opencode", id: "fledge-alpha-free" },
-              models: {},
-              command: path.join(installed, "opencode"),
-              config: {},
-              env: {},
-            },
-          }),
-        );
-        const session = yield* harness.createSession({ sandbox, id: SessionId.make("session-1") });
-        yield* session.destroy;
-      }).pipe(Effect.provide(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))),
-    180_000,
-  );
-});
+          const { bun, bridge } = launchedFrom(installation);
+          const installed = path.join(home, path.dirname(bun));
+          expect((yield* fs.readDirectory(installed)).toSorted()).toEqual([
+            path.basename(bridge),
+            "bun",
+            "opencode",
+          ]);
+          const harness = Harness.make(
+            yield* makeBridgedAgent({
+              id: version === 1 ? "opencode" : "opencode2",
+              template: installation.template,
+              command: installation.command,
+              args: installation.args,
+              token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
+              agentOptions: {
+                model: { providerID: "opencode", id: "fledge-alpha-free" },
+                models: {},
+                command: path.join(installed, "opencode"),
+                config: {},
+                env: {},
+              },
+            }),
+          );
+          const session = yield* harness.createSession({
+            sandbox,
+            id: SessionId.make("session-1"),
+          });
+          yield* session.destroy;
+        }).pipe(
+          Effect.provide(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor)),
+        ),
+      180_000,
+    );
+  },
+);

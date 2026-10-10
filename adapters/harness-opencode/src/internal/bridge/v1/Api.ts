@@ -9,6 +9,7 @@ import type { HarnessError } from "@amends/harness";
 import { Effect, Schema, type Scope, Stream } from "effect";
 import { Sse } from "effect/encoding";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import type { RemoteMcpServer } from "../HostTools.ts";
 import * as Server from "../Server.ts";
 import { type MessageModel, Message, Part, SessionEvent } from "./Event.ts";
 
@@ -48,12 +49,6 @@ export type PermissionReply = "once" | "always" | "reject";
 export const MessageWithParts = Schema.Struct({ info: Message, parts: Schema.Array(Part) });
 
 export type MessageWithParts = typeof MessageWithParts.Type;
-
-/** An MCP server the agent connects to over HTTP, presenting `headers`. */
-export interface RemoteMcpServer {
-  readonly url: string;
-  readonly headers: Readonly<Record<string, string>>;
-}
 
 export interface Api {
   /** Creates a session working in the directory, returning its id. */

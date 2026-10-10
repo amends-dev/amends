@@ -74,7 +74,8 @@ export interface Driver extends Bridge.Driver {
 /**
  * Creates a session on opencode's server, as the API of one version of opencode does: the
  * session's turns run on `options`' models, and `sessionOptions` say where it works and what
- * conversation it starts from. It reads the sandbox's files with the bridge's file system.
+ * conversation it starts from. It reads the sandbox's files with the bridge's file system, and
+ * makes ids with its `Crypto`.
  */
 export type CreateSession = (
   server: Server.Server,
@@ -83,7 +84,7 @@ export type CreateSession = (
 ) => Effect.Effect<
   Bridge.DriverSession,
   HarnessError.HarnessError,
-  Scope.Scope | FileSystem.FileSystem
+  Scope.Scope | FileSystem.FileSystem | Crypto.Crypto
 >;
 
 /**

@@ -15,7 +15,7 @@
  *
  * A session started on another agent is written into opencode as one message the model reads,
  * since opencode 1 records no steps but its own. `Opencode2Agent`, over opencode 2's session API,
- * records them as opencode's own, but takes less of a turn.
+ * records them as opencode's own, but does not answer in JSON yet.
  *
  * @since 0.1.0
  */

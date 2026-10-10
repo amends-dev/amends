@@ -397,13 +397,26 @@ const daytonaSandboxes: Sandboxes = {
     }),
 };
 
-/** What the host does with opencode set up from connections, in a new sandbox of `sandboxes`. */
-/** opencode's integrations, one for each of its session APIs, and the connection to each. */
+/**
+ * opencode's integrations, one for each of its session APIs, with the connection to each and the
+ * name of the agent's tool that runs a command.
+ */
 const opencodeIntegrations = [
-  { name: "opencode", make: HarnessIntegrations.opencode, connection: opencode },
-  { name: "opencode 2", make: HarnessIntegrations.opencode2, connection: opencode2 },
+  {
+    name: "opencode",
+    make: HarnessIntegrations.opencode,
+    connection: opencode,
+    shellTool: "bash",
+  },
+  {
+    name: "opencode 2",
+    make: HarnessIntegrations.opencode2,
+    connection: opencode2,
+    shellTool: "shell",
+  },
 ];
 
+/** What the host does with opencode set up from connections, in a new sandbox of `sandboxes`. */
 const describeOpencode = (title: string, enabled: boolean, sandboxes: Sandboxes, timeout: number) =>
   describe.skipIf(!enabled).each(opencodeIntegrations)(`$name ${title}`, (integration) => {
     it.live(
@@ -427,11 +440,11 @@ const describeOpencode = (title: string, enabled: boolean, sandboxes: Sandboxes,
           const session = yield* harness.createSession({ sandbox, id });
           const result = yield* session.generate({
             prompt:
-              "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
+              "Run `echo live-opencode` in a shell with your tool, then reply with what it printed.",
           });
 
           expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
-            expect.objectContaining({ name: "bash", providerExecuted: true }),
+            expect.objectContaining({ name: integration.shellTool, providerExecuted: true }),
           );
           expect(result.text).toContain("live-opencode");
         }).pipe(Effect.provide(LiveLayer)),

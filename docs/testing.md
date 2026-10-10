@@ -195,18 +195,20 @@ programs a host launches, run everywhere too, against a stand-in for `opencode s
 `test/fake-opencode-server.js`, which the tests install as an executable that runs on the Bun
 running them. The template's tests run everywhere with its commands answered as a sandbox would
 answer them. Its live tests run real opencode under both agents, whose turns OpenCode Zen's free
-model answers over the network; they take about two minutes, so they run only with
+model answers over the network; they take a few minutes, so they run only with
 `AMENDS_TEST_OPENCODE=1`. `AMENDS_TEST_OPENCODE_MODEL` names another of OpenCode Zen's models, and
 `AMENDS_TEST_OPENCODE_API_KEY` the key for it. One of them has opencode send turns on endpoints of
-each protocol to a fake of their APIs on a local port, to check what opencode sends. The opencode 1
-agent's also give turns instructions, an answer in JSON, a file, the host's tools across two turns,
-a request to compact, and a tool that asks permission. The agents as the bridge runs them run the
-opencode 1.18 on the `PATH`. The agents as hosts run them run the Bun and opencode their template
-installs in this machine's home, under `~/.amends/opencode`, once for each version; the template's
-own live test installs them afresh in a temporary home directory. Each keeps opencode's
-configuration and data in temporary directories, apart from this machine's opencode. With
-`AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on Daytona, in
-sandboxes started from the snapshot of the template's version once Daytona has made it.
+each protocol to a fake of their APIs on a local port, to check what opencode sends. Others give
+turns instructions, a file, the host's tools across two turns, a request to compact, and a tool that
+asks permission, and opencode 1 an answer in JSON. The agents as the bridge runs them run the
+opencode on the `PATH`: `opencode`, opencode 1.18, for the opencode 1 agent, and `opencode2`,
+opencode 2.0, for the opencode 2 agent, or the command `AMENDS_TEST_OPENCODE2_COMMAND` names. The
+agents as hosts run them run the Bun and opencode their template installs in this machine's home,
+under `~/.amends/opencode`, once for each version; the template's own live tests install them afresh
+in a temporary home directory. Each keeps opencode's configuration and data in temporary
+directories, apart from this machine's opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`
+too, the hosts' tests also run on Daytona, in sandboxes started from the snapshot of the template's
+version once Daytona has made it.
 
 The sandbox providers in `adapters/sandbox-local` and
 `adapters/sandbox-daytona` run the suites `@amends/sandbox/conformance` exports, and

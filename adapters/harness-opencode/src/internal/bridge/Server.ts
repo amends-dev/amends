@@ -149,7 +149,7 @@ const awaitListening = Effect.fnUntraced(function* (
     Stream.decodeText(),
     Stream.splitLines,
     Stream.runForEach((line) => {
-      const url = /^opencode server listening on (\S+)/.exec(line)?.[1];
+      const url = /^(?:opencode )?server listening on (\S+)/.exec(line)?.[1];
       return url === undefined ? Effect.void : Deferred.succeed(listening, url);
     }),
     Effect.ignore,

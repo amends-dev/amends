@@ -6,30 +6,29 @@
  * with a conversation from another agent has it written into the session first, as `Prompt`
  * writes it.
  *
- * The host's tools reach opencode through the bridge's `HostToolRelay`, as an MCP server named
- * `host` in the session's directory, whose tools opencode names `host_<tool>`: the relay streams
- * their calls, which the host answers with `submitToolResult`. A tool of opencode's own that asks
+ * The host's tools reach opencode through the bridge's `HostToolRelay`, as `HostTools` lists them,
+ * and opencode names them `host_<tool>`: the relay streams their calls, which the host answers with
+ * `submitToolResult`. A tool of opencode's own that asks
  * permission waits for `approve`. `compact` asks opencode to summarize the conversation, which it
  * does without instructions.
  */
 import { type Bridge, HarnessError, type HostToolRelay } from "@amends/harness";
-import { Effect, FileSystem, Redacted, Ref, Schedule, Schema, Stream } from "effect";
+import { Effect, FileSystem, Ref, Schedule, Schema, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import * as Driver from "../Driver.ts";
+import * as HostTools from "../HostTools.ts";
 import * as Server from "../Server.ts";
 import * as Api from "./Api.ts";
 import { type AssistantMessage, isTextPart, type MessageModel } from "./Event.ts";
 import { conversationPartsOf, promptPartsOf } from "./Prompt.ts";
 import * as Turn from "./Turn.ts";
 
-/** The MCP server that offers opencode the host's tools, as each session's directory names it. */
-const hostServer = "host";
-
 /**
- * The name opencode gives the host's tool `name`: the server's name and the tool's, each with
+ * The name opencode gives the host's tool `name`: the MCP server's name and the tool's, each with
  * the characters MCP's names leave out replaced.
  */
-export const hostToolName = (name: string) => `${hostServer}_${name.replace(/[^\w-]/g, "_")}`;
+export const hostToolName = (name: string) =>
+  `${HostTools.serverName}_${name.replace(/[^\w-]/g, "_")}`;
 
 /** What `state` returns, for `createSession` to take back. */
 const State = Schema.Struct({ sessionID: Schema.String });
@@ -57,36 +56,16 @@ export const makeCreateSession =
         kept?.sessionID ??
         (yield* createOpencodeSession(api, messageModelOf(options.model), sessionOptions.history));
       const relaySession = yield* relay.open(sessionOptions.id);
+      const listHostTools = yield* HostTools.makeLister(relay.url, relaySession, {
+        add: (mcpServer) => api.addMcpServer(HostTools.serverName, mcpServer),
+        reconnect: api.reconnectMcpServer(HostTools.serverName),
+        disconnect: api.disconnectMcpServer(HostTools.serverName),
+      });
       // opencode reports the files a tool changed by their real paths.
       const fs = yield* FileSystem.FileSystem;
       const realDirectory = yield* fs
         .realPath(sessionOptions.directory)
         .pipe(Effect.orElseSucceed(() => sessionOptions.directory));
-
-      /**
-       * The host's tools that opencode lists, as JSON, or nothing while it lists none. opencode
-       * lists an MCP server's tools when it connects, so it connects again when they change.
-       */
-      const listed = yield* Ref.make<string | undefined>(undefined);
-      const added = yield* Ref.make(false);
-      const listHostTools = Effect.fnUntraced(function* (
-        tools: ReadonlyArray<Bridge.ToolDefinition>,
-      ) {
-        const wanted = tools.length === 0 ? undefined : JSON.stringify(tools);
-        if (wanted === (yield* Ref.get(listed))) return;
-        if (wanted === undefined) {
-          yield* api.disconnectMcpServer(hostServer);
-        } else if (yield* Ref.get(added)) {
-          yield* api.reconnectMcpServer(hostServer);
-        } else {
-          yield* api.addMcpServer(hostServer, {
-            url: relay.url,
-            headers: { authorization: `Bearer ${Redacted.value(relaySession.token)}` },
-          });
-          yield* Ref.set(added, true);
-        }
-        yield* Ref.set(listed, wanted);
-      });
 
       /** What opencode is prompted with for a turn with `turnOptions`. */
       const promptOptionsOf = Effect.fnUntraced(function* (turnOptions: Bridge.TurnOptions) {

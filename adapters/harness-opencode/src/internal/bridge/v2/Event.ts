@@ -1,74 +1,21 @@
 /**
- * The events opencode records for a session in opencode 2's session API: the prompts the session took,
- * the steps of each turn, and the reasoning, text, and tool calls of each step. opencode numbers a
- * session's events from 0 and keeps them, so a client reads them again from any number, and another
- * opencode server rebuilds the session by replaying them.
+ * The events opencode 2 publishes for a session as it works, which the driver reads to stream a
+ * turn: the session's executions, the steps of each, the text, reasoning, and tool calls of each
+ * step, compactions, and the permissions its tools ask and the forms its model asks the user to
+ * fill. opencode publishes every event of the server on one stream, live only: the deltas of text,
+ * reasoning, and tool input as they come, and the whole of each when it ends.
  *
- * The schemas are opencode 1.18's, for the events this adapter reads and writes, with every field
- * opencode gives them, so that an event decodes and encodes again as it came. `durable.version`
- * names the version of an event's shape; these are version 1 of each, except `step.ended`, which is
- * version 2. Text, reasoning, and tool input are recorded whole when they end: the deltas opencode
- * streams while a step runs are not kept.
+ * The schemas are opencode 2.0's, with only the fields this adapter reads, so that fields opencode
+ * adds do not stop an event from decoding.
  */
 import { Schema } from "effect";
 import { ModelRef } from "../Driver.ts";
 import { Tokens } from "../Steps.ts";
 
-/** Where an event falls in its session's numbered events. */
-const Durable = Schema.Struct({
-  /** The session's id. */
-  aggregateID: Schema.String,
+/** An error opencode reports, as its sessions record it. */
+export const SessionError = Schema.Struct({ type: Schema.String, message: Schema.String });
 
-  seq: Schema.Int,
-
-  /** The version of the event's shape. */
-  version: Schema.Int,
-});
-
-const envelope = {
-  id: Schema.String,
-  durable: Durable,
-};
-
-/** Fields the data of every event in a session has. */
-const inSession = {
-  timestamp: Schema.Finite,
-  sessionID: Schema.String,
-};
-
-/** What the model's provider reported beside a part, by provider, such as a reasoning signature. */
-const ProviderMetadata = Schema.Record(Schema.String, Schema.Json);
-
-/** Where an attachment was mentioned in the prompt's text. */
-const PromptSource = Schema.Struct({
-  start: Schema.Int,
-  end: Schema.Int,
-  text: Schema.String,
-});
-
-/** A user's prompt as opencode records it: its text, and the files and agents it mentions. */
-const UserPrompt = Schema.Struct({
-  text: Schema.String,
-  files: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        uri: Schema.String,
-        mime: Schema.String,
-        name: Schema.optionalKey(Schema.String),
-        description: Schema.optionalKey(Schema.String),
-        source: Schema.optionalKey(PromptSource),
-      }),
-    ),
-  ),
-  agents: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        source: Schema.optionalKey(PromptSource),
-      }),
-    ),
-  ),
-});
+export type SessionError = typeof SessionError.Type;
 
 /** What a tool returned to the model: text, or a file. */
 export const ToolContent = Schema.Union([
@@ -83,223 +30,177 @@ export const ToolContent = Schema.Union([
 
 export type ToolContent = typeof ToolContent.Type;
 
-const Provider = Schema.Struct({
-  /** Whether the model's provider ran the tool, instead of opencode. */
-  executed: Schema.Boolean,
-  metadata: Schema.optionalKey(ProviderMetadata),
+/** An event of the session `sessionID`, of the type `type`, with `data` besides its session's id. */
+const sessionEvent = <Type extends string, Fields extends Schema.Struct.Fields>(
+  type: Type,
+  fields: Fields,
+) =>
+  Schema.Struct({
+    type: Schema.tag(type),
+    data: Schema.Struct({ sessionID: Schema.String, ...fields }),
+  });
+
+/** Of the step that the assistant message `assistantMessageID` records. */
+const inStep = { assistantMessageID: Schema.String };
+
+/** Of the text or reasoning numbered `ordinal` in its step. */
+const ordinal = { ...inStep, ordinal: Schema.Int };
+
+/** Of the tool call `id`. */
+const inCall = { ...inStep, id: Schema.String };
+
+/** opencode started running the session: a prompt it took, and what follows until it is idle. */
+export const ExecutionStarted = sessionEvent("session.execution.started", {});
+
+/** opencode ran the session until it had nothing more to do. */
+export const ExecutionSucceeded = sessionEvent("session.execution.succeeded", {});
+
+export const ExecutionFailed = sessionEvent("session.execution.failed", { error: SessionError });
+
+/** opencode stopped running the session, `reason` saying why. */
+export const ExecutionInterrupted = sessionEvent("session.execution.interrupted", {
+  reason: Schema.String,
 });
 
-const SessionError = Schema.Struct({
-  type: Schema.Literal("unknown"),
-  message: Schema.String,
+/** The session started work on the input `inboxID`, such as a prompt. */
+export const InboxDelivered = sessionEvent("session.inbox.delivered", {
+  inboxID: Schema.String,
 });
 
-/** The session took a prompt: the user's message that starts a turn. */
-export const Prompted = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.prompted"),
-  data: Schema.Struct({
-    ...inSession,
-    messageID: Schema.String,
-    prompt: UserPrompt,
-    delivery: Schema.Literals(["steer", "queue"]),
-  }),
-});
-
-/**
- * A step started: one response of the model, given as the assistant message
- * `assistantMessageID`.
- */
-export const StepStarted = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.step.started"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    agent: Schema.String,
-    model: ModelRef,
-    snapshot: Schema.optionalKey(Schema.String),
-  }),
+/** A step started: one response of `model`, which the assistant message records. */
+export const StepStarted = sessionEvent("session.step.started", {
+  ...inStep,
+  model: ModelRef,
+  /** When opencode sent the request, in milliseconds since the epoch. */
+  started: Schema.Finite,
 });
 
 /** A step ended, `finish` saying why, as AI SDK's finish reasons do. */
-export const StepEnded = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.step.ended"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    finish: Schema.String,
-    cost: Schema.Finite,
-    tokens: Tokens,
-    snapshot: Schema.optionalKey(Schema.String),
-    files: Schema.optionalKey(Schema.Array(Schema.String)),
-  }),
+export const StepEnded = sessionEvent("session.step.ended", {
+  ...inStep,
+  finish: Schema.String,
+  tokens: Tokens,
 });
 
-/** A step failed, ending the turn. */
-export const StepFailed = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.step.failed"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    error: SessionError,
-  }),
-});
+/** A step failed, ending the session's execution. */
+export const StepFailed = sessionEvent("session.step.failed", { ...inStep, error: SessionError });
 
-export const TextStarted = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.text.started"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    textID: Schema.String,
-  }),
-});
+export const TextStarted = sessionEvent("session.text.started", ordinal);
+
+export const TextDelta = sessionEvent("session.text.delta", { ...ordinal, delta: Schema.String });
 
 /** A text of the step ended, with the whole text. */
-export const TextEnded = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.text.ended"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    textID: Schema.String,
-    text: Schema.String,
-  }),
-});
+export const TextEnded = sessionEvent("session.text.ended", { ...ordinal, text: Schema.String });
 
-export const ReasoningStarted = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.reasoning.started"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    reasoningID: Schema.String,
-  }),
+export const ReasoningStarted = sessionEvent("session.reasoning.started", ordinal);
+
+export const ReasoningDelta = sessionEvent("session.reasoning.delta", {
+  ...ordinal,
+  delta: Schema.String,
 });
 
 /** A reasoning of the step ended, with the whole reasoning. */
-export const ReasoningEnded = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.reasoning.ended"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    reasoningID: Schema.String,
-    text: Schema.String,
-    providerMetadata: Schema.optionalKey(ProviderMetadata),
-  }),
+export const ReasoningEnded = sessionEvent("session.reasoning.ended", {
+  ...ordinal,
+  text: Schema.String,
 });
 
 /** The model started writing the input of a call to the tool `name`. */
-export const ToolInputStarted = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.tool.input.started"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    callID: Schema.String,
-    name: Schema.String,
-  }),
+export const ToolInputStarted = sessionEvent("session.tool.input.started", {
+  ...inCall,
+  name: Schema.String,
+});
+
+export const ToolInputDelta = sessionEvent("session.tool.input.delta", {
+  ...inCall,
+  delta: Schema.String,
 });
 
 /** The model finished writing a call's input, with the whole input as JSON text. */
-export const ToolInputEnded = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.tool.input.ended"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    callID: Schema.String,
-    text: Schema.String,
-  }),
+export const ToolInputEnded = sessionEvent("session.tool.input.ended", {
+  ...inCall,
+  text: Schema.String,
 });
 
-/** The model called the tool `tool` with `input`. */
-export const ToolCalled = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.tool.called"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    callID: Schema.String,
-    tool: Schema.String,
-    input: Schema.Record(Schema.String, Schema.Unknown),
-    provider: Provider,
-  }),
+/** The model called a tool with `input`, which opencode runs. */
+export const ToolCalled = sessionEvent("session.tool.called", {
+  ...inCall,
+  input: Schema.Record(Schema.String, Schema.Unknown),
 });
 
-/** A call succeeded: `content` is what the model reads, and `structured` what the tool reported. */
-export const ToolSucceeded = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.tool.success"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    callID: Schema.String,
-    structured: Schema.Record(Schema.String, Schema.Unknown),
-    content: Schema.Array(ToolContent),
-    outputPaths: Schema.optionalKey(Schema.Array(Schema.String)),
-    result: Schema.optionalKey(Schema.Unknown),
-    provider: Provider,
-  }),
+/**
+ * A call succeeded: `content` is what the model reads, and `metadata` what the tool reported
+ * besides, such as the files an edit changed.
+ */
+export const ToolSucceeded = sessionEvent("session.tool.success", {
+  ...inCall,
+  content: Schema.Array(ToolContent),
+  metadata: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
 });
 
-export const ToolFailed = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.tool.failed"),
-  data: Schema.Struct({
-    ...inSession,
-    assistantMessageID: Schema.String,
-    callID: Schema.String,
-    error: SessionError,
-    result: Schema.optionalKey(Schema.Unknown),
-    provider: Provider,
-  }),
-});
-
-/** The session started replacing its conversation so far with a summary. */
-export const CompactionStarted = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.compaction.started"),
-  data: Schema.Struct({
-    ...inSession,
-    messageID: Schema.String,
-    reason: Schema.Literals(["auto", "manual"]),
-  }),
-});
+export const ToolFailed = sessionEvent("session.tool.failed", { ...inCall, error: SessionError });
 
 /** The session replaced its conversation so far with the summary `text`. */
-export const CompactionEnded = Schema.Struct({
-  ...envelope,
-  type: Schema.tag("session.next.compaction.ended"),
+export const CompactionEnded = sessionEvent("session.compaction.ended", {
+  reason: Schema.Literals(["auto", "manual"]),
+  text: Schema.String,
+});
+
+export const CompactionFailed = sessionEvent("session.compaction.failed", {
+  reason: Schema.Literals(["auto", "manual"]),
+  error: SessionError,
+});
+
+/**
+ * A tool asks permission to act on `resources`, waiting for a reply to the request `id`. `source`
+ * names the call that asks.
+ */
+export const PermissionAsked = Schema.Struct({
+  type: Schema.tag("permission.asked"),
   data: Schema.Struct({
-    ...inSession,
-    messageID: Schema.String,
-    reason: Schema.Literals(["auto", "manual"]),
-    text: Schema.String,
-    recent: Schema.String,
+    id: Schema.String,
+    sessionID: Schema.String,
+    source: Schema.optionalKey(Schema.Struct({ id: Schema.String })),
+  }),
+});
+
+/** The model asks the user to fill the form `id`, waiting for an answer. */
+export const FormCreated = Schema.Struct({
+  type: Schema.tag("form.created"),
+  data: Schema.Struct({
+    form: Schema.Struct({ id: Schema.String, sessionID: Schema.String }),
   }),
 });
 
 export const SessionEvent = Schema.Union([
-  Prompted,
+  ExecutionStarted,
+  ExecutionSucceeded,
+  ExecutionFailed,
+  ExecutionInterrupted,
+  InboxDelivered,
   StepStarted,
   StepEnded,
   StepFailed,
   TextStarted,
+  TextDelta,
   TextEnded,
   ReasoningStarted,
+  ReasoningDelta,
   ReasoningEnded,
   ToolInputStarted,
+  ToolInputDelta,
   ToolInputEnded,
   ToolCalled,
   ToolSucceeded,
   ToolFailed,
-  CompactionStarted,
   CompactionEnded,
+  CompactionFailed,
+  PermissionAsked,
+  FormCreated,
 ]).pipe(Schema.toTaggedUnion("type"));
 
 export type SessionEvent = typeof SessionEvent.Type;
+
+/** The session an event is of. */
+export const sessionIdOf = (event: SessionEvent) =>
+  event.type === "form.created" ? event.data.form.sessionID : event.data.sessionID;

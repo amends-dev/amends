@@ -28,7 +28,7 @@ import { Prompt, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import * as Driver from "../src/internal/bridge/Driver.ts";
 import { makeCreateSession } from "../src/internal/bridge/v1/Session.ts";
-import { createSession as createSession2 } from "../src/internal/bridge/v2/Session.ts";
+import { makeCreateSession as makeCreateSession2 } from "../src/internal/bridge/v2/Session.ts";
 import { modelsOf } from "../src/internal/models.ts";
 import * as Opencode2Agent from "../src/Opencode2Agent.ts";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
@@ -37,10 +37,11 @@ import { makeSandbox } from "./fixtures.ts";
 /**
  * These tests run real opencode, whose turns a model answers over the network, so they take
  * minutes and run only with `AMENDS_TEST_OPENCODE=1`. Each agent's driver, as its bridge runs it,
- * runs the opencode 1.18 on the `PATH`; the agents as hosts run them run the opencode their template
- * installs in this machine's home, under `~/.amends/opencode`, once for each version. Their model is
- * one of OpenCode Zen's free ones, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names another
- * of OpenCode Zen's models, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
+ * runs the opencode on the `PATH`: `opencode`, of opencode 1, and `opencode2`, of opencode 2, or the
+ * command `AMENDS_TEST_OPENCODE2_COMMAND` names. The agents as hosts run them run the opencode their
+ * template installs in this machine's home, under `~/.amends/opencode`, once for each version.
+ * Their model is one of OpenCode Zen's free ones, which needs no key; `AMENDS_TEST_OPENCODE_MODEL`
+ * names another of OpenCode Zen's models, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
  */
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
 const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "space-bunny-free";
@@ -49,7 +50,7 @@ const apiKey = process.env.AMENDS_TEST_OPENCODE_API_KEY;
 const id = SessionId.make("live");
 const timeout = 180_000;
 
-/** The relay through which opencode 1 calls the host's tools, as its bridge program serves it. */
+/** The relay through which opencode calls the host's tools, as its bridge program serves it. */
 const RelayLayer = HostToolRelay.layer().pipe(
   Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: 0, idleTimeout: 0 })),
   Layer.provide(BunServices.layer),
@@ -57,20 +58,38 @@ const RelayLayer = HostToolRelay.layer().pipe(
 const LiveLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer, RelayLayer);
 const HostLayer = Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor);
 
-/** The version of opencode each agent runs, and how its driver creates sessions. */
+/**
+ * The version of opencode each agent runs, the command that runs it, the name of its tool that runs
+ * commands, and how its driver creates sessions.
+ */
 interface Version {
   readonly version: 1 | 2;
   readonly agent: string;
+  readonly command: string;
+  readonly shellTool: string;
   readonly makeCreateSession: (
     relay: HostToolRelay.HostToolRelay["Service"],
   ) => Driver.CreateSession;
+
+  /** opencode's configuration that has it ask permission before it runs a command. */
+  readonly askBeforeCommands: Record<string, Schema.Json>;
 }
 
-const opencode1: Version = { version: 1, agent: "opencode", makeCreateSession };
+const opencode1: Version = {
+  version: 1,
+  agent: "opencode",
+  command: "opencode",
+  shellTool: "bash",
+  makeCreateSession,
+  askBeforeCommands: { permission: { bash: "ask" } },
+};
 const opencode2: Version = {
   version: 2,
   agent: "opencode2",
-  makeCreateSession: () => createSession2,
+  command: process.env.AMENDS_TEST_OPENCODE2_COMMAND ?? "opencode2",
+  shellTool: "shell",
+  makeCreateSession: makeCreateSession2,
+  askBeforeCommands: { permissions: [{ action: "shell", resource: "*", effect: "ask" }] },
 };
 const versions = [opencode1, opencode2];
 
@@ -122,7 +141,7 @@ const makeLiveDriver = (
       {
         model: models.model,
         models: models.models,
-        command: "opencode",
+        command: version.command,
         config: { ...config, ...extraConfig, ...models.config },
         env: { ...(yield* makeOpencodeEnv), ...models.env },
       },
@@ -333,11 +352,11 @@ describe.skipIf(!enabled).each(versions)("opencode $version as the bridge runs i
 
         const result = yield* runTurn(
           session,
-          "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
+          "Run `echo live-opencode` in a shell with your tool, then reply with what it printed.",
         );
 
         expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
-          expect.objectContaining({ name: "bash", providerExecuted: true }),
+          expect.objectContaining({ name: version.shellTool, providerExecuted: true }),
         );
         expect(
           result.parts.some(
@@ -450,7 +469,7 @@ describe.skipIf(!enabled).each(versions)("opencode $version as the bridge runs i
         const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         yield* session
-          .promptTurn(turnOptions("Run `sleep 300` with your bash tool, then say done."))
+          .promptTurn(turnOptions("Run `sleep 300` in a shell with your tool, then say done."))
           .pipe(
             Stream.takeUntil((part) => part.type === "tool-call"),
             Stream.runDrain,
@@ -477,6 +496,10 @@ const lookupTime: Bridge.ToolDefinition = {
   parameters: lookupWeather.parameters,
 };
 
+/** Whether `part` calls one of the host's tools, rather than one opencode runs itself. */
+const isHostCall = (part: StreamPart.StreamPart) =>
+  part.type === "tool-call" && part.providerExecuted !== true;
+
 /**
  * Runs a turn asking `text` with the host's `tools`, answering each call of them with `result`, as
  * the host would.
@@ -497,23 +520,144 @@ const runTurnWithTools = (
     Effect.map((parts) => new GenerateResult.GenerateResult(parts)),
   );
 
-describe.skipIf(!enabled)("opencode 1 as the bridge runs it, with all of a turn", () => {
-  it.live(
-    "gives the model the turn's instructions",
-    () =>
-      Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver(opencode1);
-        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+describe.skipIf(!enabled).each(versions)(
+  "opencode $version as the bridge runs it, with more of a turn",
+  (version) => {
+    it.live(
+      "gives the model the turn's instructions",
+      () =>
+        Effect.gen(function* () {
+          const { driver, directory } = yield* makeLiveDriver(version);
+          const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
-        const result = yield* runTurn(session, "Say hello.", {
-          instructions: "End every answer with the word LIVE-INSTRUCTIONS-OK.",
-        });
+          const result = yield* runTurn(session, "Say hello.", {
+            instructions: "End every answer with the word LIVE-INSTRUCTIONS-OK.",
+          });
 
-        expect(result.text).toContain("LIVE-INSTRUCTIONS-OK");
-      }).pipe(Effect.provide(LiveLayer)),
-    timeout,
-  );
+          expect(result.text).toContain("LIVE-INSTRUCTIONS-OK");
+        }).pipe(Effect.provide(LiveLayer)),
+      timeout,
+    );
 
+    it.live(
+      "reads a file the prompt attaches",
+      () =>
+        Effect.gen(function* () {
+          const { driver, directory } = yield* makeLiveDriver(version);
+          const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+          const parts = yield* Stream.runCollect(
+            session.promptTurn({
+              tools: [],
+              responseFormat: { type: "text" },
+              prompt: Prompt.makeMessage("user", {
+                content: [
+                  Prompt.makePart("text", {
+                    text: "Which container does the attached manifest list? Reply with just its id.",
+                  }),
+                  Prompt.makePart("file", {
+                    mediaType: "text/plain",
+                    fileName: "manifest.txt",
+                    data: btoa(
+                      "Shipping manifest\nContainer: MARMALADE-77\nPorts: Lisbon, Porto\n",
+                    ),
+                  }),
+                ],
+              }),
+            }),
+          );
+
+          expect(new GenerateResult.GenerateResult(parts).text).toContain("MARMALADE-77");
+        }).pipe(Effect.provide(LiveLayer)),
+      timeout,
+    );
+
+    it.live(
+      "calls the host's tools, and those of a later turn when they change",
+      () =>
+        Effect.gen(function* () {
+          const { driver, directory } = yield* makeLiveDriver(version);
+          const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+          const weather = yield* runTurnWithTools(
+            session,
+            "Use the lookup_weather tool for Lisbon, then tell me how many degrees it returned.",
+            [lookupWeather],
+            { forecast: "foggy", celsius: 14 },
+          );
+          const time = yield* runTurnWithTools(
+            session,
+            "Use the lookup_time tool for Lisbon, then tell me the time it returned.",
+            [lookupTime],
+            { time: "13:37" },
+          );
+
+          expect(weather.parts.find(isHostCall)).toMatchObject({
+            name: "lookup_weather",
+            params: { city: "Lisbon" },
+          });
+          expect(weather.text).toContain("14");
+          expect(time.parts.find(isHostCall)).toMatchObject({
+            name: "lookup_time",
+          });
+          expect(time.text).toContain("13:37");
+        }).pipe(Effect.provide(LiveLayer)),
+      timeout,
+    );
+
+    it.live(
+      "compacts on request, the conversation going on from the summary",
+      () =>
+        Effect.gen(function* () {
+          const { driver, directory } = yield* makeLiveDriver(version);
+          const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+          yield* runTurn(session, "Remember the codename BLUE-MARLIN-9. Reply OK.");
+
+          const compaction = yield* session.compact();
+          const after = yield* runTurn(session, "What is the codename? Reply with just it.");
+
+          expect(compaction).toMatchObject({ type: "compaction", trigger: "manual" });
+          expect(compaction.summary).toContain("BLUE-MARLIN-9");
+          expect(after.text).toContain("BLUE-MARLIN-9");
+        }).pipe(Effect.provide(LiveLayer)),
+      timeout,
+    );
+
+    it.live(
+      "asks for approval when a tool asks permission, and runs it once approved",
+      () =>
+        Effect.gen(function* () {
+          const { driver, directory } = yield* makeLiveDriver(
+            version,
+            undefined,
+            version.askBeforeCommands,
+          );
+          const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+          const parts = yield* session
+            .promptTurn(
+              turnOptions(
+                "Run `echo live-approved` in a shell with your tool, then reply with what it printed.",
+              ),
+            )
+            .pipe(
+              Stream.tap((part) =>
+                part.type === "tool-approval-request"
+                  ? session.approve({ approvalId: part.approvalId, approved: true })
+                  : Effect.void,
+              ),
+              Stream.runCollect,
+            );
+
+          expect(parts.some((part) => part.type === "tool-approval-request")).toBe(true);
+          expect(new GenerateResult.GenerateResult(parts).text).toContain("live-approved");
+        }).pipe(Effect.provide(LiveLayer)),
+      timeout,
+    );
+  },
+);
+
+describe.skipIf(!enabled)("opencode 1 as the bridge runs it, answering in JSON", () => {
   it.live(
     "answers in JSON that matches the turn's schema",
     () =>
@@ -539,118 +683,6 @@ describe.skipIf(!enabled)("opencode 1 as the bridge runs it, with all of a turn"
       }).pipe(Effect.provide(LiveLayer)),
     timeout,
   );
-
-  it.live(
-    "reads a file the prompt attaches",
-    () =>
-      Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver(opencode1);
-        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
-
-        const parts = yield* Stream.runCollect(
-          session.promptTurn({
-            tools: [],
-            responseFormat: { type: "text" },
-            prompt: Prompt.makeMessage("user", {
-              content: [
-                Prompt.makePart("text", {
-                  text: "What is the secret word in the attached file? Reply with just the word.",
-                }),
-                Prompt.makePart("file", {
-                  mediaType: "text/plain",
-                  fileName: "secret.txt",
-                  data: btoa("The secret word is MARMALADE-77."),
-                }),
-              ],
-            }),
-          }),
-        );
-
-        expect(new GenerateResult.GenerateResult(parts).text).toContain("MARMALADE-77");
-      }).pipe(Effect.provide(LiveLayer)),
-    timeout,
-  );
-
-  it.live(
-    "calls the host's tools, and those of a later turn when they change",
-    () =>
-      Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver(opencode1);
-        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
-
-        const weather = yield* runTurnWithTools(
-          session,
-          "Use the lookup_weather tool for Lisbon, then tell me how many degrees it returned.",
-          [lookupWeather],
-          { forecast: "foggy", celsius: 14 },
-        );
-        const time = yield* runTurnWithTools(
-          session,
-          "Use the lookup_time tool for Lisbon, then tell me the time it returned.",
-          [lookupTime],
-          { time: "13:37" },
-        );
-
-        expect(weather.parts.find((part) => part.type === "tool-call")).toMatchObject({
-          name: "lookup_weather",
-          params: { city: "Lisbon" },
-        });
-        expect(weather.text).toContain("14");
-        expect(time.parts.find((part) => part.type === "tool-call")).toMatchObject({
-          name: "lookup_time",
-        });
-        expect(time.text).toContain("13:37");
-      }).pipe(Effect.provide(LiveLayer)),
-    timeout,
-  );
-
-  it.live(
-    "compacts on request, the conversation going on from the summary",
-    () =>
-      Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver(opencode1);
-        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
-        yield* runTurn(session, "Remember the codename BLUE-MARLIN-9. Reply OK.");
-
-        const compaction = yield* session.compact();
-        const after = yield* runTurn(session, "What is the codename? Reply with just it.");
-
-        expect(compaction).toMatchObject({ type: "compaction", trigger: "manual" });
-        expect(compaction.summary).toContain("BLUE-MARLIN-9");
-        expect(after.text).toContain("BLUE-MARLIN-9");
-      }).pipe(Effect.provide(LiveLayer)),
-    timeout,
-  );
-
-  it.live(
-    "asks for approval when a tool asks permission, and runs it once approved",
-    () =>
-      Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver(opencode1, undefined, {
-          permission: { bash: "ask" },
-        });
-        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
-
-        const parts = yield* session
-          .promptTurn(
-            turnOptions(
-              "Run `echo live-approved` with your bash tool, then reply with what it printed.",
-            ),
-          )
-          .pipe(
-            Stream.tap((part) =>
-              part.type === "tool-approval-request"
-                ? session.approve({ approvalId: part.approvalId, approved: true })
-                : Effect.void,
-            ),
-            Stream.runCollect,
-          );
-
-        expect(parts.some((part) => part.type === "tool-approval-request")).toBe(true);
-        expect(new GenerateResult.GenerateResult(parts).text).toContain("live-approved");
-      }).pipe(Effect.provide(LiveLayer)),
-    timeout,
-  );
 });
 
 /** What hosts do with opencode through its bridge, on sandboxes of `sandboxes`. */
@@ -665,11 +697,11 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
 
           const result = yield* session.generate({
             prompt:
-              "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
+              "Run `echo live-opencode` in a shell with your tool, then reply with what it printed.",
           });
 
           expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
-            expect.objectContaining({ name: "bash", providerExecuted: true }),
+            expect.objectContaining({ name: version.shellTool, providerExecuted: true }),
           );
           expect(result.text).toContain("live-opencode");
         }).pipe(Effect.provide(HostLayer)),
@@ -688,7 +720,7 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
           const reading = yield* session
             .stream({
               prompt:
-                "Run `sleep 2; echo slept` with your bash tool, then reply with what it printed.",
+                "Run `sleep 2; echo slept` in a shell with your tool, then reply with what it printed.",
             })
             .pipe(
               Stream.runForEach((part) =>
@@ -725,7 +757,7 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
     );
   });
 
-/** The host's tool the hosts' tests give opencode 1, with the weather it always gives. */
+/** The host's tool the hosts' tests give opencode, with the weather it always gives. */
 const Weather = Tool.make("lookup_weather", {
   description: "Looks up the weather in a city",
   parameters: Schema.Struct({ city: Schema.String }),
@@ -736,28 +768,29 @@ const WeatherHandlers = WeatherToolkit.toLayer({
   lookup_weather: () => Effect.succeed({ forecast: "foggy", celsius: 14 }),
 });
 
-describe.skipIf(!enabled)("opencode 1 as hosts run it, with the host's tools", () => {
-  it.live(
-    "calls the host's tool through the relay its bridge serves in the sandbox",
-    () =>
-      Effect.gen(function* () {
-        const { sandbox, harness } = yield* makeLiveHosts(localSandboxes, opencode1);
-        const session = yield* harness.createSession({ sandbox, id });
+describe.skipIf(!enabled).each(versions)(
+  "opencode $version as hosts run it, with the host's tools",
+  (version) => {
+    it.live(
+      "calls the host's tool through the relay its bridge serves in the sandbox",
+      () =>
+        Effect.gen(function* () {
+          const { sandbox, harness } = yield* makeLiveHosts(localSandboxes, version);
+          const session = yield* harness.createSession({ sandbox, id });
 
-        const result = yield* session.generate({
-          prompt:
-            "Use the lookup_weather tool for Lisbon, then tell me how many degrees it returned.",
-          toolkit: yield* WeatherToolkit,
-        });
+          const result = yield* session.generate({
+            prompt:
+              "Use the lookup_weather tool for Lisbon, then tell me how many degrees it returned.",
+            toolkit: yield* WeatherToolkit,
+          });
 
-        expect(result.parts.find((part) => part.type === "tool-call")).toMatchObject({
-          name: "lookup_weather",
-        });
-        expect(result.text).toContain("14");
-      }).pipe(Effect.provide(Layer.merge(HostLayer, WeatherHandlers))),
-    timeout,
-  );
-});
+          expect(result.parts.find(isHostCall)).toMatchObject({ name: "lookup_weather" });
+          expect(result.text).toContain("14");
+        }).pipe(Effect.provide(Layer.merge(HostLayer, WeatherHandlers))),
+      timeout,
+    );
+  },
+);
 
 describeHosts(
   "opencode $version as hosts run it, through its bridge",

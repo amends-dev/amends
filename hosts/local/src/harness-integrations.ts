@@ -60,8 +60,8 @@ export const opencode = (options: OpencodeOptions) =>
 
 /**
  * The integration of opencode 2, as `opencode` gives that of opencode 1, with the id
- * `opencode2-agent`. Its agent keeps a session's events numbered, but refuses a turn's
- * instructions, an answer in JSON, the host's tools, and requests to compact.
+ * `opencode2-agent`. Its agent records a session started on another agent as opencode's own, but
+ * refuses an answer in JSON.
  */
 export const opencode2 = (options: OpencodeOptions) =>
   makeOpencodeIntegration(options, {

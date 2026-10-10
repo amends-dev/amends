@@ -1,9 +1,9 @@
 /**
  * opencode as an agent for the `@amends/harness` contract, working in a sandbox behind its bridge,
- * which the agent's template installs there with opencode itself. opencode has two session APIs,
- * and the package an agent for each: `OpencodeAgent` drives opencode 1's, which takes everything a
- * turn gives, and `Opencode2Agent` drives opencode 2's, which keeps a session's events numbered
- * but does not take all of a turn yet.
+ * which the agent's template installs there with opencode itself. opencode has two versions, each
+ * with a session API of its own, and the package an agent for each: `OpencodeAgent` runs opencode 1,
+ * which takes everything a turn gives, and `Opencode2Agent` runs opencode 2, which records a
+ * session started on another agent as its own but does not answer in JSON yet.
  *
  * @since 0.1.0
  */

@@ -1,36 +1,43 @@
-import { type Bridge, GenerateResult, type StreamPart } from "@amends/harness";
+import { type Bridge, GenerateResult, HostToolRelay, type StreamPart } from "@amends/harness";
 import { SessionId } from "@amends/harness/Agent";
 import { BunServices } from "@effect/platform-bun";
-import { expect, it, layer } from "@effect/vitest";
-import { Effect, Fiber, Deferred, Layer, Stream } from "effect";
+import { expect, layer } from "@effect/vitest";
+import { Deferred, Effect, Layer, Option, Schema, Stream } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
 import * as Driver from "../../src/internal/bridge/Driver.ts";
-import { createSession as createOpencodeSession } from "../../src/internal/bridge/v2/Session.ts";
+import { makeCreateSession } from "../../src/internal/bridge/v2/Session.ts";
 import { makeFakeServerProcesses } from "../fakes.ts";
-import { tokens } from "../fixtures.ts";
-import { type FakeOpencodeOptions, type FakeTurn, makeFakeOpencode } from "./fakes.ts";
+import {
+  answerEvents,
+  eventsOf,
+  type FakeOpencodeOptions,
+  type FakeTurn,
+  makeFakeOpencode,
+} from "./fakes.ts";
 
 const id = SessionId.make("session-one");
 const directory = "/work/session-one";
 
 /**
- * opencode's driver as a bridge runs it, whose server is a fake opencode that runs each turn with
- * `runTurn`. The driver starts the server as it would opencode's, through a process spawner whose
- * servers announce the fake's address; the first `failingStarts` of them fail to start. Its models
- * are of opencode's own provider, the fake's only one, except `elsewhere`.
+ * opencode's driver over opencode 2's session API, as a bridge runs it, whose server is a fake of
+ * opencode 2 that runs each turn with `runTurn`, and whose host tools go through a relay without a
+ * transport, as the test answers its messages.
  */
-const makeDriver = (
+const createSession = (
   runTurn: (turn: FakeTurn) => Effect.Effect<void>,
-  options: FakeOpencodeOptions & { readonly failingStarts?: number } = {},
+  options: FakeOpencodeOptions & {
+    readonly history?: Prompt.Prompt;
+    readonly relay?: HostToolRelay.Relay;
+  } = {},
 ) =>
   Effect.gen(function* () {
     const fake = yield* makeFakeOpencode(runTurn, options);
-    const processes = yield* makeFakeServerProcesses(`http://127.0.0.1:${fake.port}`, {
-      failing: options.failingStarts,
-    });
+    const processes = yield* makeFakeServerProcesses(`http://127.0.0.1:${fake.port}`);
+    const relay = options.relay ?? (yield* HostToolRelay.make());
+    const relayService = { url: "http://127.0.0.1:1/mcp", open: relay.open };
     const driver = yield* Driver.make(
       "opencode2",
       {
@@ -38,28 +45,21 @@ const makeDriver = (
         models: {
           other: { providerID: "opencode", id: "other-model" },
           deep: { providerID: "opencode", id: "default-model", variant: "amends-high" },
-          elsewhere: { providerID: "elsewhere", id: "model" },
         },
         command: "opencode",
         config: {},
         env: {},
       },
-      createOpencodeSession,
+      makeCreateSession(relayService),
     ).pipe(Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, processes.spawner));
-    return { fake, processes, driver };
+    const session = yield* driver.createSession({
+      id,
+      directory,
+      history: options.history ?? Prompt.empty,
+    });
+    return { fake, driver, relay, session };
   });
 
-const createSession = (
-  runTurn: (turn: FakeTurn) => Effect.Effect<void>,
-  options?: FakeOpencodeOptions,
-) =>
-  Effect.gen(function* () {
-    const made = yield* makeDriver(runTurn, options);
-    const session = yield* made.driver.createSession({ id, directory, history: Prompt.empty });
-    return { ...made, session };
-  });
-
-/** A turn asking `text`, with nothing else that opencode does not take. */
 const turnOptions = (
   text: string,
   options: Partial<Bridge.TurnOptions> = {},
@@ -70,7 +70,6 @@ const turnOptions = (
   ...options,
 });
 
-/** Runs a turn asking `text` to its end. */
 const runTurn = (
   session: Bridge.DriverSession,
   text: string,
@@ -82,253 +81,143 @@ const textOf = (parts: ReadonlyArray<StreamPart.StreamPart>) =>
 
 /** A turn that answers `text` in one step. */
 const answer = (text: string) => (turn: FakeTurn) =>
-  Effect.gen(function* () {
-    const assistantMessageID = "msg_answer";
-    yield* turn.record("session.next.step.started", {
-      assistantMessageID,
-      agent: "build",
-      model: turn.model,
-    });
-    yield* turn.record("session.next.text.started", { assistantMessageID, textID: "text-0" });
-    yield* turn.record("session.next.text.ended", { assistantMessageID, textID: "text-0", text });
-    yield* turn.record("session.next.step.ended", {
-      assistantMessageID,
-      finish: "stop",
-      cost: 0,
-      tokens: tokens(10, 5),
-    });
-  });
+  turn.publish(...answerEvents(turn.sessionID, turn.inboxID, text));
 
-/** A turn's first step, up to its call of `bash`, which then runs until the turn goes on. */
-const callBash = (turn: FakeTurn) =>
-  Effect.gen(function* () {
-    const assistantMessageID = "msg_tool";
-    yield* turn.record("session.next.step.started", {
-      assistantMessageID,
-      agent: "build",
-      model: turn.model,
-    });
-    yield* turn.record("session.next.tool.input.started", {
-      assistantMessageID,
-      callID: "call_1",
-      name: "bash",
-    });
-    yield* turn.record("session.next.tool.input.ended", {
-      assistantMessageID,
-      callID: "call_1",
-      text: '{"command":"make"}',
-    });
-    yield* turn.record("session.next.tool.called", {
-      assistantMessageID,
-      callID: "call_1",
-      tool: "bash",
-      input: { command: "make" },
-      provider: { executed: false },
-    });
-  });
+/** The bodies the fake took for requests to paths that end with `suffix`. */
+const bodiesTo = (
+  fake: { readonly bodies: ReadonlyArray<readonly [string, unknown]> },
+  suffix: string,
+) => fake.bodies.filter(([path]) => path.endsWith(suffix)).map(([, body]) => body);
+
+const weather: Bridge.ToolDefinition = {
+  name: "lookup_weather",
+  description: "Looks up the weather in a city",
+  parameters: { type: "object", properties: { city: { type: "string" } } },
+};
 
 const TestLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer);
 
 layer(TestLayer)("opencode 2 sessions", (it) => {
-  it.effect("runs a turn in the session's directory, streaming what opencode records", () =>
+  it.effect("runs a turn in the session's directory, streaming the events opencode publishes", () =>
     Effect.gen(function* () {
       const { fake, session } = yield* createSession(answer("hello"));
 
       const parts = yield* runTurn(session, "Say hello.");
 
       expect(textOf(parts)).toBe("hello");
-      expect(parts.map((part) => part.type)).toEqual([
-        "response-metadata",
-        "text-start",
-        "text-delta",
-        "text-end",
-        "finish-step",
-        "finish",
+      expect(parts.at(-1)).toMatchObject({ type: "finish", reason: "stop" });
+      expect(bodiesTo(fake, "/api/session")).toEqual([
+        {
+          location: { directory },
+          model: { providerID: "opencode", id: "default-model" },
+        },
       ]);
-      const [opencodeSession] = (yield* fake.sessions).values();
-      expect(opencodeSession?.directory).toBe(directory);
-      expect(opencodeSession?.model).toEqual({ providerID: "opencode", id: "default-model" });
-    }),
-  );
-
-  it.effect("streams a turn from opencode taking its prompt, not the call it failed before", () =>
-    Effect.gen(function* () {
-      const { session } = yield* createSession(answer("hello"), {
-        takingPrompt: (record) =>
-          record("session.next.tool.failed", {
-            assistantMessageID: "msg_before",
-            callID: "call_before",
-            error: { type: "unknown", message: "Tool execution interrupted" },
-            provider: { executed: false },
-          }),
-      });
-
-      const parts = yield* runTurn(session, "Continue.");
-
-      expect(textOf(parts)).toBe("hello");
-      expect(parts.filter((part) => part.type === "tool-result")).toEqual([]);
-    }),
-  );
-
-  it.effect("starts opencode's server once, when the first session starts", () =>
-    Effect.gen(function* () {
-      const { processes, driver } = yield* makeDriver(answer("hello"));
-      const before = processes.spawned.length;
-
-      yield* driver.createSession({ id, directory, history: Prompt.empty });
-      yield* driver.createSession({
-        id: SessionId.make("session-two"),
-        directory,
-        history: Prompt.empty,
-      });
-
-      expect(before).toBe(0);
-      expect(processes.spawned).toHaveLength(1);
-    }),
-  );
-
-  it.effect("starts opencode's server again for the next session when it failed to start", () =>
-    Effect.gen(function* () {
-      const { processes, driver } = yield* makeDriver(answer("hello"), { failingStarts: 1 });
-
-      const failed = yield* Effect.flip(
-        driver.createSession({ id, directory, history: Prompt.empty }),
-      );
-      const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
-
-      expect(failed.reason._tag).toBe("UnavailableError");
-      expect(textOf(yield* runTurn(session, "Say hello."))).toBe("hello");
-      expect(processes.spawned).toHaveLength(2);
-    }),
-  );
-
-  it.effect("reports when opencode's server exits by itself", () =>
-    Effect.gen(function* () {
-      const { processes, driver } = yield* makeDriver(answer("hello"));
-      yield* driver.createSession({ id, directory, history: Prompt.empty });
-      const exited = yield* Effect.forkChild(driver.serverExited);
-
-      yield* processes.exit;
-
-      yield* Fiber.join(exited);
-    }),
-  );
-
-  it.effect("switches the session's model when a turn names another, and back", () =>
-    Effect.gen(function* () {
-      const { fake, session } = yield* createSession((turn) =>
-        answer(`${turn.model?.providerID}/${turn.model?.id}:${turn.model?.variant ?? "-"}`)(turn),
-      );
-
-      const named = yield* runTurn(session, "Which?", { model: "other" });
-      const again = yield* runTurn(session, "Which?", { model: "other" });
-      const variant = yield* runTurn(session, "Which?", { model: "deep" });
-      const unnamed = yield* runTurn(session, "Which?");
-
-      expect([named, again, variant, unnamed].map(textOf)).toEqual([
-        "opencode/other-model:-",
-        "opencode/other-model:-",
-        "opencode/default-model:amends-high",
-        "opencode/default-model:-",
-      ]);
-      expect(fake.requests.filter((request) => request.endsWith("/model"))).toHaveLength(3);
-    }),
-  );
-
-  it.effect("refuses what opencode's session API does not take, before prompting", () =>
-    Effect.gen(function* () {
-      const { fake, session } = yield* createSession(answer("unused"));
-      const file = Prompt.makePart("file", { mediaType: "text/plain", data: "aGk=" });
-
-      const refused: ReadonlyArray<Partial<Bridge.TurnOptions>> = [
-        { instructions: "Be brief." },
-        { responseFormat: { type: "json", objectName: "output", schema: {} } },
-        { tools: [{ name: "Echo", parameters: { type: "object" } }] },
-        { prompt: Prompt.makeMessage("user", { content: [file] }) },
-        { model: "opencode/default-model" },
-        { model: "constructor" },
-      ];
-      const refusals = yield* Effect.forEach(refused, (options) =>
-        Effect.flip(runTurn(session, "Hi.", options)),
-      );
-
-      expect(refusals.map((error) => error.reason._tag)).toEqual(Array(6).fill("UnsupportedError"));
-      expect(refusals.at(-1)?.reason).toMatchObject({
-        description: "The opencode 2 agent has no model named constructor",
-      });
-      expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
     }),
   );
 
   it.effect(
-    "fails a turn whose events it cannot read, and interrupts the turn in opencode, rather than finishing it",
+    "prompts with the turn's files, after giving the session its model and instructions",
     () =>
       Effect.gen(function* () {
-        const { fake, session } = yield* createSession((turn) =>
-          Effect.andThen(
-            Effect.andThen(callBash(turn), turn.record("fake.unreadable", {})),
-            Effect.never,
-          ),
+        const { fake, session } = yield* createSession(answer("ok"));
+
+        yield* Stream.runCollect(
+          session.promptTurn({
+            tools: [],
+            prompt: Prompt.makeMessage("user", {
+              content: [
+                Prompt.makePart("text", { text: "Read this." }),
+                Prompt.makePart("file", {
+                  mediaType: "text/plain",
+                  fileName: "a.txt",
+                  data: "aGk=",
+                }),
+              ],
+            }),
+            model: "deep",
+            instructions: "Be brief.",
+            responseFormat: { type: "text" },
+          }),
         );
+        // The same instructions are given once, and a turn without any removes them.
+        yield* runTurn(session, "Again.", { model: "deep", instructions: "Be brief." });
+        yield* runTurn(session, "Without.", { model: "deep" });
 
-        const error = yield* Effect.flip(runTurn(session, "Build it."));
-
-        expect(error.reason._tag).toBe("AgentContractError");
-        expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toHaveLength(1);
+        expect(bodiesTo(fake, "/model")).toEqual([
+          { model: { providerID: "opencode", id: "default-model", variant: "amends-high" } },
+        ]);
+        expect(bodiesTo(fake, "/instructions/amends")).toEqual([{ value: "Be brief." }]);
+        expect(
+          fake.requests.filter((request) => request.includes("/instructions/entries/")),
+        ).toEqual([
+          "PUT /api/experimental/session/ses_fake1/instructions/entries/amends",
+          "DELETE /api/experimental/session/ses_fake1/instructions/entries/amends",
+        ]);
+        expect(bodiesTo(fake, "/prompt")[0]).toEqual({
+          text: "Read this.",
+          files: [{ uri: "data:text/plain;base64,aGk=", name: "a.txt" }],
+          delivery: "queue",
+        });
       }),
   );
 
-  it.effect("admits no prompt when the turn is aborted while it waits for opencode's models", () =>
+  it.effect("refuses an answer in JSON, a model it has no name for, and a file at a URL", () =>
     Effect.gen(function* () {
-      const asked = yield* Deferred.make<void>();
-      const loaded = yield* Deferred.make<void>();
-      const { fake, session } = yield* createSession(answer("hello"), {
-        loadingProvider: Effect.andThen(Deferred.succeed(asked, undefined), Deferred.await(loaded)),
-      });
+      const { fake, session } = yield* createSession(answer("unused"));
 
-      const aborted = yield* Effect.forkChild(runTurn(session, "Say hi."));
-      yield* Deferred.await(asked);
-      yield* Fiber.interrupt(aborted);
-      yield* Deferred.succeed(loaded, undefined);
-      const parts = yield* runTurn(session, "Say hello.");
-
-      expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toHaveLength(1);
-      expect(textOf(parts)).toBe("hello");
-    }),
-  );
-
-  it.effect("refuses a model whose provider opencode has not loaded within 10 seconds", () =>
-    Effect.gen(function* () {
-      const { fake, session } = yield* createSession(answer("hello"));
-
-      // The driver asks opencode over HTTP between its waits, so the clock moves on a little at a
-      // time until it gives up.
-      const refused = yield* Effect.raceFirst(
-        Effect.flip(runTurn(session, "Say hello.", { model: "elsewhere" })),
-        Effect.forever(
-          Effect.andThen(
-            TestClock.adjust("200 millis"),
-            TestClock.withLive(Effect.sleep("5 millis")),
+      const json = yield* Effect.flip(
+        runTurn(session, "Hi.", {
+          responseFormat: { type: "json", objectName: "answer", schema: { type: "object" } },
+        }),
+      );
+      const model = yield* Effect.flip(runTurn(session, "Hi.", { model: "constructor" }));
+      const file = yield* Effect.flip(
+        Stream.runCollect(
+          session.promptTurn(
+            turnOptions("", {
+              prompt: Prompt.makeMessage("user", {
+                content: [
+                  Prompt.makePart("file", {
+                    mediaType: "application/pdf",
+                    data: new URL("https://example.com/a.pdf"),
+                  }),
+                ],
+              }),
+            }),
           ),
         ),
       );
 
-      expect(refused.reason).toMatchObject({
-        _tag: "UnsupportedError",
-        description: "opencode has no model provider elsewhere",
-      });
-      expect(
-        fake.requests.filter((request) => request === "GET /api/provider/elsewhere").length,
-      ).toBeGreaterThan(1);
+      expect([json.reason, model.reason, file.reason]).toEqual([
+        expect.objectContaining({
+          _tag: "UnsupportedError",
+          description: "opencode 2's session API does not answer in JSON",
+        }),
+        expect.objectContaining({
+          _tag: "UnsupportedError",
+          description: "The opencode 2 agent has no model named constructor",
+        }),
+        expect.objectContaining({ _tag: "UnsupportedError" }),
+      ]);
       expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
     }),
   );
 
-  it.effect("interrupts the turn in opencode when its stream ends before the turn does", () =>
+  it.effect("stops the session in opencode when the turn's stream ends before the turn does", () =>
     Effect.gen(function* () {
-      const { fake, session } = yield* createSession((turn) =>
-        Effect.andThen(callBash(turn), Effect.never),
-      );
+      const { fake, session } = yield* createSession((turn) => {
+        const event = eventsOf(turn.sessionID);
+        return Effect.andThen(
+          turn.publish(
+            event.delivered(turn.inboxID),
+            event.stepStarted("msg_1"),
+            event.inputStarted("msg_1", "call_1", "shell"),
+            event.inputEnded("msg_1", "call_1", "{}"),
+            event.called("msg_1", "call_1", { command: "make" }),
+          ),
+          Effect.never,
+        );
+      });
 
       const read = yield* session.promptTurn(turnOptions("Build it.")).pipe(
         Stream.takeUntil((part) => part.type === "tool-call"),
@@ -340,88 +229,268 @@ layer(TestLayer)("opencode 2 sessions", (it) => {
     }),
   );
 
-  it.effect("writes another agent's conversation into a new opencode session", () =>
+  it.effect("fails a turn whose events it cannot read, and stops it in opencode", () =>
     Effect.gen(function* () {
-      const { fake, driver } = yield* makeDriver(answer("unused"));
+      const { fake, session } = yield* createSession((turn) =>
+        Effect.andThen(
+          turn.publish(eventsOf(turn.sessionID).delivered(turn.inboxID), {
+            type: "fake.unreadable",
+            data: {},
+          }),
+          Effect.never,
+        ),
+      );
+
+      const failed = yield* Effect.flip(runTurn(session, "Build it."));
+
+      expect(failed.reason._tag).toBe("AgentContractError");
+      expect(fake.requests.filter((request) => request.endsWith("/interrupt"))).toHaveLength(1);
+    }),
+  );
+
+  it.effect("imports another agent's conversation as the new session's own", () =>
+    Effect.gen(function* () {
       const history = Prompt.make([
         { role: "user", content: "Remember the codename BLUE-MARLIN-9." },
         { role: "assistant", content: [{ type: "text", text: "Noted." }] },
       ]);
+      const { fake, session } = yield* createSession(answer("BLUE-MARLIN-9"), { history });
 
-      yield* driver.createSession({ id, directory, history });
+      const parts = yield* runTurn(session, "What is the codename?");
 
-      const [opencodeSession] = (yield* fake.sessions).values();
-      expect(opencodeSession?.events.map((event) => event.type)).toEqual([
-        "session.created",
-        "session.next.prompted",
-        "session.next.step.started",
-        "session.next.text.started",
-        "session.next.text.ended",
-        "session.next.step.ended",
-      ]);
+      const [imported] = bodiesTo(fake, "/import") as Array<{
+        info: { id: string; model: unknown; location: unknown };
+        messages: Array<{ type: string }>;
+        location: unknown;
+      }>;
+      expect(imported?.info).toMatchObject({
+        id: expect.stringMatching(/^ses_[0-9a-f]{32}$/),
+        model: { providerID: "opencode", id: "default-model" },
+        location: { directory },
+      });
+      expect(imported?.messages.map((message) => message.type)).toEqual(["user", "assistant"]);
+      expect(imported?.location).toEqual({ directory });
+      expect(textOf(parts)).toBe("BLUE-MARLIN-9");
+      expect(fake.requests.filter((request) => request === "POST /api/session")).toEqual([]);
+      expect(session.keptConversation).toBe(false);
     }),
   );
 
   it.effect(
-    "picks its own opencode session up again from its state, or writes the conversation into a new one when opencode lost it",
+    "picks its own opencode session up again from its state, or starts another when opencode lost it",
     () =>
       Effect.gen(function* () {
         const { fake, driver, session } = yield* createSession(answer("hello"));
-        yield* runTurn(session, "Say hello.");
-        const history = Prompt.make([
-          { role: "user", content: "Say hello." },
-          { role: "assistant", content: [{ type: "text", text: "hello" }] },
-        ]);
+        yield* runTurn(session, "Hi.", { model: "other" });
+        const agentState = yield* session.state;
 
         const again = yield* driver.createSession({
           id,
           directory,
-          history,
-          agentState: yield* session.state,
+          history: Prompt.empty,
+          agentState,
         });
-        const state = yield* again.state;
-        const kept = [...(yield* fake.sessions).keys()];
-        for (const sessionID of kept) fake.forget(sessionID);
-        yield* driver.createSession({ id, directory, history, agentState: state });
+        fake.sessions.clear();
+        const lost = yield* driver.createSession({
+          id,
+          directory,
+          history: Prompt.empty,
+          agentState,
+        });
 
-        const sessions = yield* fake.sessions;
-        expect(kept).toHaveLength(1);
-        expect([...sessions.keys()]).not.toContain(kept[0]);
-        const [rebuilt] = sessions.values();
+        const State = Schema.Struct({ sessionID: Schema.String, model: Schema.Unknown });
+        expect(again.keptConversation).toBe(true);
+        expect(yield* again.state).toEqual(agentState);
+        expect((yield* Schema.decodeUnknownEffect(State)(agentState)).model).toEqual({
+          providerID: "opencode",
+          id: "other-model",
+        });
+        expect(lost.keptConversation).toBe(false);
+        expect((yield* Schema.decodeUnknownEffect(State)(yield* lost.state)).sessionID).not.toBe(
+          (yield* Schema.decodeUnknownEffect(State)(agentState)).sessionID,
+        );
+      }),
+  );
+
+  // The session waits on the live clock for opencode to register the host's tools.
+  it.effect(
+    "offers the host's tools as an MCP server, connecting again when they change, streaming their calls",
+    () =>
+      Effect.gen(function* () {
+        const called = yield* Deferred.make<void>();
+        const answered = yield* Deferred.make<unknown>();
+        const relay = yield* HostToolRelay.make();
+        const { fake, session } = yield* createSession(
+          (turn) =>
+            Effect.gen(function* () {
+              const event = eventsOf(turn.sessionID);
+              if (turn.body.text !== "Check the weather.") {
+                return yield* turn.publish(...answerEvents(turn.sessionID, turn.inboxID, "ok"));
+              }
+              // opencode 2's model calls the host's tools from code it runs, through the MCP
+              // server, as its client does.
+              yield* turn.publish(
+                event.delivered(turn.inboxID),
+                event.stepStarted("msg_1"),
+                event.inputStarted("msg_1", "call_1", "code"),
+                event.inputEnded("msg_1", "call_1", "{}"),
+                event.called("msg_1", "call_1", { code: "return tools.host.lookup_weather()" }),
+              );
+              const [, mcp] =
+                turn.bodies.find(([path]) => path === "/api/experimental/mcp/host") ?? [];
+              const authorization = (mcp as { config: { headers: { authorization: string } } })
+                .config.headers.authorization;
+              const reply = yield* relay.answer(authorization, {
+                jsonrpc: "2.0",
+                id: 1,
+                method: "tools/call",
+                params: { name: "lookup_weather", arguments: { city: "Lisbon" } },
+              });
+              yield* Deferred.succeed(called, undefined);
+              if (reply._tag === "Events") {
+                const last = yield* Stream.runLast(reply.messages);
+                yield* Deferred.succeed(answered, Option.getOrUndefined(last));
+              }
+              yield* turn.publish(
+                event.succeededCall("msg_1", "call_1", "foggy"),
+                event.stepEnded("msg_1", "tool-calls"),
+                ...answerEvents(turn.sessionID, turn.inboxID, "It is foggy.", "msg_2").slice(2),
+              );
+            }),
+          { relay },
+        );
+
+        const parts = yield* session
+          .promptTurn(turnOptions("Check the weather.", { tools: [weather] }))
+          .pipe(
+            Stream.tap((part) =>
+              part.type === "tool-call" && part.providerExecuted !== true
+                ? session.submitToolResult({
+                    id: part.id,
+                    name: part.name,
+                    result: "foggy",
+                    isFailure: false,
+                  })
+                : Effect.void,
+            ),
+            Stream.runCollect,
+          );
+        yield* runTurn(session, "Again.", { tools: [weather] });
+        yield* runTurn(session, "Other tools.", {
+          tools: [{ name: "lookup_time", parameters: weather.parameters }],
+        });
+        yield* runTurn(session, "No tools.");
+
+        yield* Deferred.await(called);
         expect(
-          rebuilt?.events.flatMap((event) =>
-            event.type === "session.next.prompted" ? [event.data.prompt] : [],
-          ),
-        ).toEqual([{ text: "Say hello." }]);
+          parts.filter((part) => part.type === "tool-call" && part.providerExecuted !== true),
+        ).toEqual([
+          expect.objectContaining({ name: "lookup_weather", params: { city: "Lisbon" } }),
+        ]);
+        expect(textOf(parts)).toBe("It is foggy.");
+        expect(yield* Deferred.await(answered)).toMatchObject({
+          result: { content: [{ type: "text", text: "foggy" }] },
+        });
+        expect(bodiesTo(fake, "/mcp/host")).toEqual([
+          {
+            config: {
+              type: "remote",
+              url: "http://127.0.0.1:1/mcp",
+              headers: { authorization: expect.stringMatching(/^Bearer \w+$/) },
+            },
+          },
+        ]);
+        expect(fake.requests.filter((request) => request.includes("/mcp/"))).toEqual([
+          `PUT /api/experimental/mcp/host?location[directory]=${directory}`,
+          `POST /api/experimental/mcp/host/connect?location[directory]=${directory}`,
+          `POST /api/experimental/mcp/host/disconnect?location[directory]=${directory}`,
+        ]);
+      }).pipe(TestClock.withLive),
+  );
+
+  it.effect("fails a turn with the host's tools when opencode cannot connect to them", () =>
+    Effect.gen(function* () {
+      const { fake, session } = yield* createSession(answer("unused"), { mcpStatus: "failed" });
+
+      const failed = yield* Effect.flip(runTurn(session, "Hi.", { tools: [weather] }));
+
+      expect(failed.reason).toMatchObject({
+        _tag: "UnavailableError",
+        description: "opencode did not connect to the host's tools: it reports them failed",
+      });
+      expect(fake.requests.filter((request) => request.endsWith("/prompt"))).toEqual([]);
+    }),
+  );
+
+  it.effect("answers a tool's request for permission as the host approves or refuses it", () =>
+    Effect.gen(function* () {
+      const { fake, session } = yield* createSession(answer("unused"));
+
+      yield* session.approve({ approvalId: "per_1", approved: true });
+      yield* session.approve({ approvalId: "per_2", approved: false, reason: "Not now" });
+
+      expect(fake.bodies.filter(([path]) => path.includes("/permission/"))).toEqual([
+        ["/api/session/ses_fake1/permission/per_1", { decision: "once" }],
+        ["/api/session/ses_fake1/permission/per_2", { decision: "reject", message: "Not now" }],
+      ]);
+    }),
+  );
+
+  it.effect("cancels the forms the model asks the user to fill, which no host answers", () =>
+    Effect.gen(function* () {
+      const { fake, session } = yield* createSession((turn) =>
+        turn.publish(
+          eventsOf(turn.sessionID).form("frm_1"),
+          ...answerEvents(turn.sessionID, turn.inboxID, "ok"),
+        ),
+      );
+
+      yield* runTurn(session, "Ask me.");
+
+      expect(
+        fake.requests.filter((request) =>
+          request.startsWith("DELETE /api/session/ses_fake1/form/"),
+        ),
+      ).toEqual(["DELETE /api/session/ses_fake1/form/frm_1?message=No+one+answers+forms+here"]);
+    }),
+  );
+
+  it.effect("compacts, returning the summary opencode wrote", () =>
+    Effect.gen(function* () {
+      const { fake, session } = yield* createSession(answer("unused"), { summary: "We spoke." });
+
+      const compaction = yield* session.compact();
+
+      expect(compaction).toEqual({ type: "compaction", trigger: "manual", summary: "We spoke." });
+      expect(fake.requests).toContain("POST /api/session/ses_fake1/compact");
+    }),
+  );
+
+  it.effect(
+    "refuses to compact with instructions, and fails when opencode fails to summarize",
+    () =>
+      Effect.gen(function* () {
+        const { session } = yield* createSession(answer("unused"), { summary: "failed" });
+
+        const withInstructions = yield* Effect.flip(session.compact("Keep the codename."));
+        const failed = yield* Effect.flip(session.compact());
+
+        expect(withInstructions.reason._tag).toBe("UnsupportedError");
+        expect(failed.reason).toMatchObject({
+          _tag: "UnknownError",
+          description: "opencode failed to summarize the conversation: No model",
+        });
       }),
   );
 
   it.effect("deletes the session in opencode when destroyed", () =>
     Effect.gen(function* () {
       const { fake, session } = yield* createSession(answer("hello"));
-      yield* runTurn(session, "Say hello.");
 
       yield* session.destroy;
+      yield* session.destroy;
 
-      expect((yield* fake.sessions).size).toBe(0);
+      expect(fake.sessions.size).toBe(0);
     }),
   );
 });
-
-// The driver checks once a second whether opencode still runs a turn that recorded no end, so this
-// test runs on the live clock, which the shared layer's tests do not offer.
-it.live("opencode 2 sessions fail a turn opencode stopped without recording its end", () =>
-  Effect.gen(function* () {
-    const { session } = yield* createSession(() => Effect.void);
-
-    const parts = yield* runTurn(session, "Say hi.");
-
-    expect(parts.slice(-2)).toEqual([
-      {
-        type: "error",
-        error: { type: "unknown", message: "opencode stopped the turn unfinished" },
-      },
-      expect.objectContaining({ type: "finish", reason: "error" }),
-    ]);
-  }).pipe(Effect.provide(TestLayer)),
-);

@@ -1,20 +1,18 @@
 /**
- * opencode 2 as an agent that hosts run: opencode driven over opencode 2's session API, in which
- * opencode keeps a session's events numbered, so that a turn is read again from any point, and a
- * session started on another agent is written into opencode's own record. opencode works in the
- * sandbox behind its bridge: the agent's template installs both there, and a session launches the
- * bridge when none answers. One bridge and one opencode server serve every session that hosts
- * start in a sandbox with the same options, whichever host started it; other options, such as
- * another model, get a bridge and a server of their own. What runs in the sandbox is in
- * `internal/bridge/v2/`.
+ * opencode as an agent that hosts run: opencode 2, driven over its session API, which takes a
+ * turn's prompt with its files, its instructions, given beside opencode's own, the host's tools,
+ * and requests to compact, and records a session started on another agent as opencode's own. It
+ * does not answer in JSON yet, which fails with `UnsupportedError`. opencode works in the sandbox
+ * behind its bridge: the agent's template installs both there, and a session launches the bridge
+ * when none answers. One bridge and one opencode server serve every session that hosts start in a
+ * sandbox with the same options, whichever host started it; other options, such as another model,
+ * get a bridge and a server of their own. What runs in the sandbox is in `internal/bridge/v2/`.
  *
  * opencode runs on the model endpoints the agent is made with, which it is configured for.
  * Their keys reach opencode in its configuration, in the sandbox, where the commands opencode runs
- * can read them.
- *
- * opencode 2's session API does not yet take a turn's instructions, an answer in JSON, the host's
- * tools, or a request to compact, which fail with `UnsupportedError`; `OpencodeAgent`, over
- * opencode 1's session API, takes them all.
+ * can read them. The host's tools reach opencode as an MCP server the bridge serves on the
+ * sandbox's loopback, which opencode 2's model calls from code it runs; the host runs them, and
+ * nothing they need reaches the sandbox.
  *
  * @since 0.1.0
  */
@@ -42,7 +40,7 @@ export interface Options extends Agent.Options {
   readonly token: (id: Sandbox.SandboxId) => Redacted.Redacted<string>;
 
   /**
-   * opencode's configuration, as opencode 1.18 writes its `opencode.json`, which names providers
+   * opencode's configuration, as opencode 2 writes its `opencode.json`, which names providers
    * `providers`; the providers that serve the models replace any it has. It takes effect when the
    * bridge starts opencode's server; a server already running in the sandbox keeps the one it
    * started with.

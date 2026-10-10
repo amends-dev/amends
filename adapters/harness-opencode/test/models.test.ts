@@ -100,49 +100,54 @@ describe("modelsOf", () => {
     expect(models.config).toEqual({
       providers: {
         anthropic: {
-          request: { body: { apiKey: "secret-key" } },
+          settings: { apiKey: "secret-key" },
           models: {
             "claude-sonnet-5-5": {
-              api: {
-                id: "claude-sonnet-5-5",
-                type: "aisdk",
-                package: "@ai-sdk/anthropic",
-                url: "https://api.anthropic.com/v1",
-              },
+              package: "@ai-sdk/anthropic",
+              settings: { baseURL: "https://api.anthropic.com/v1" },
             },
           },
         },
         openai: {
-          request: { body: { apiKey: "other-key" } },
+          settings: { apiKey: "other-key" },
           models: {
             "gpt-5.6": {
-              api: {
-                id: "gpt-5.6",
-                type: "aisdk",
-                package: "@ai-sdk/openai",
-                url: "https://api.openai.com/v1",
-              },
-              variants: [{ id: "amends-xhigh", body: { reasoning: { effort: "xhigh" } } }],
+              package: "@ai-sdk/openai",
+              settings: { baseURL: "https://api.openai.com/v1" },
+              variants: [{ id: "amends-xhigh", settings: { reasoningEffort: "xhigh" } }],
             },
           },
         },
         openrouter: {
           models: {
             "openai/gpt-oss-120b": {
-              api: {
-                id: "openai/gpt-oss-120b",
-                type: "aisdk",
-                package: "@ai-sdk/openai-compatible",
-                url: "https://openrouter.ai/api/v1",
-              },
-              limit: { output: 8000 },
-              variants: [{ id: "amends-low", body: { reasoning_effort: "low" } }],
+              package: "@ai-sdk/openai-compatible",
+              settings: { baseURL: "https://openrouter.ai/api/v1" },
+              limit: { output: 8000, context: 131_072 },
+              variants: [{ id: "amends-low", settings: { reasoningEffort: "low" } }],
             },
           },
         },
       },
     });
     expect(models.env).toEqual({});
+  });
+
+  it("gives opencode 2 a model's limits apart, each over what models.dev says", () => {
+    const { contextWindow: _, ...withoutWindow } = gptOss;
+    const models = Result.getOrThrow(
+      modelsOf(2, {
+        model: withoutWindow,
+        models: { large: { ...sonnet, contextWindow: 200_000 } },
+      }),
+    );
+
+    expect(models.config).toMatchObject({
+      providers: {
+        openrouter: { models: { "openai/gpt-oss-120b": { limit: { output: 8000 } } } },
+        anthropic: { models: { "claude-sonnet-5-5": { limit: { context: 200_000 } } } },
+      },
+    });
   });
 
   it("asks a model on the Messages API for an effort as each opencode takes it", () => {
@@ -161,9 +166,7 @@ describe("modelsOf", () => {
       providers: {
         anthropic: {
           models: {
-            "claude-sonnet-5-5": {
-              variants: [{ id: "amends-max", body: { output_config: { effort: "max" } } }],
-            },
+            "claude-sonnet-5-5": { variants: [{ id: "amends-max", settings: { effort: "max" } }] },
           },
         },
       },
@@ -282,15 +285,13 @@ describe("modelsOf", () => {
     expect(opencode2.config).toMatchObject({
       providers: {
         anthropic: {
-          request: {
-            body: { apiKey: "secret-key" },
-            headers: { "cf-aig-authorization": "Bearer gateway-token" },
-          },
+          settings: { apiKey: "secret-key" },
+          headers: { "cf-aig-authorization": "Bearer gateway-token" },
         },
-        openrouter: { request: { headers: { "cf-aig-authorization": "Bearer gateway-token" } } },
+        openrouter: { headers: { "cf-aig-authorization": "Bearer gateway-token" } },
       },
     });
-    expect(opencode2.config).not.toHaveProperty(["providers", "openrouter", "request", "body"]);
+    expect(opencode2.config).not.toHaveProperty(["providers", "openrouter", "settings"]);
   });
 
   it("refuses endpoints of one provider with different keys or headers", () => {

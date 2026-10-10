@@ -5,11 +5,11 @@
  * with the key and headers of its provider. An endpoint's effort is a variant of the model, which
  * the endpoint's model names.
  *
- * opencode 1 and opencode 2 configure providers apart. opencode 1 names them `provider` and gives
- * a model's AI SDK package, its URL, and its variants' AI SDK options, and opencode 2 names them
- * `providers` and gives the fields of the requests a model's variant sends. Both find the
- * providers and models that models.dev lists by their ids, as endpoints name them, and know the
- * rest of a model from there, such as whether it calls tools.
+ * opencode 1 and opencode 2 configure providers apart: opencode 1 names them `provider`, and
+ * opencode 2 `providers`, each in a shape of its own. Both give a model its AI SDK package and URL,
+ * and a variant the AI SDK options that ask for its effort, and both find the providers and models
+ * that models.dev lists by their ids, as endpoints name them, knowing the rest of a model from
+ * there, such as whether it calls tools.
  */
 import { HarnessError, type ModelEndpoint } from "@amends/harness";
 import { Array, Record, Redacted, Result, type Schema } from "effect";
@@ -117,12 +117,9 @@ const providerOf: Record<Version, (endpoints: Endpoints) => Schema.Json> = {
   },
   2: (endpoints) => {
     const { apiKey, headers } = secretsOf(endpoints[0]);
-    const request: JsonObject = {
-      ...(apiKey === undefined ? {} : { body: { apiKey } }),
-      ...(headers === undefined ? {} : { headers }),
-    };
     return {
-      ...(Record.isEmptyRecord(request) ? {} : { request }),
+      ...(apiKey === undefined ? {} : { settings: { apiKey } }),
+      ...(headers === undefined ? {} : { headers }),
       models: modelsByIdOf(endpoints, opencode2ModelOf),
     };
   },
@@ -156,23 +153,24 @@ const opencode1ModelOf = (endpoints: Endpoints): Schema.Json => {
   };
 };
 
-/** A model in opencode 2's configuration, whose variants give the fields of their requests. */
+/**
+ * A model in opencode 2's configuration, whose URL is an AI SDK setting, and whose limits opencode
+ * takes apart, each over what models.dev says.
+ */
 const opencode2ModelOf = (endpoints: Endpoints): Schema.Json => {
   const [endpoint] = endpoints;
+  const limit: JsonObject = {
+    ...(endpoint.maxOutputTokens === undefined ? {} : { output: endpoint.maxOutputTokens }),
+    ...(endpoint.contextWindow === undefined ? {} : { context: endpoint.contextWindow }),
+  };
   const variants = efforts(endpoints).map((effort) => ({
     id: variantOf(effort),
-    body: effortFields[endpoint.protocol](effort),
+    settings: effortOptions[endpoint.protocol](effort),
   }));
   return {
-    api: {
-      id: endpoint.model,
-      type: "aisdk",
-      package: packages[endpoint.protocol],
-      url: urlOf(endpoint),
-    },
-    ...(endpoint.maxOutputTokens === undefined
-      ? {}
-      : { limit: { output: endpoint.maxOutputTokens } }),
+    package: packages[endpoint.protocol],
+    settings: { baseURL: urlOf(endpoint) },
+    ...(Record.isEmptyRecord(limit) ? {} : { limit }),
     ...(variants.length === 0 ? {} : { variants }),
   };
 };
@@ -199,8 +197,8 @@ const packages: Record<ModelEndpoint.Protocol, string> = {
 };
 
 /**
- * The AI SDK options that ask for an effort, as each protocol's package takes them, which
- * opencode 1 gives the requests of a model that runs in a variant of them.
+ * The AI SDK options that ask for an effort, as each protocol's package takes them, which opencode
+ * gives the requests of a model that runs in a variant of them.
  */
 const effortOptions: Record<ModelEndpoint.Protocol, (effort: ModelEndpoint.Effort) => JsonObject> =
   {
@@ -208,16 +206,6 @@ const effortOptions: Record<ModelEndpoint.Protocol, (effort: ModelEndpoint.Effor
     "openai-responses": (effort) => ({ reasoningEffort: effort }),
     "openai-chat": (effort) => ({ reasoningEffort: effort }),
   };
-
-/**
- * The fields of a request's body that ask for an effort, as each protocol takes them, which
- * opencode 2 adds to the requests of a model that runs in a variant of them.
- */
-const effortFields: Record<ModelEndpoint.Protocol, (effort: ModelEndpoint.Effort) => JsonObject> = {
-  "anthropic-messages": (effort) => ({ output_config: { effort } }),
-  "openai-responses": (effort) => ({ reasoning: { effort } }),
-  "openai-chat": (effort) => ({ reasoning_effort: effort }),
-};
 
 /**
  * The variant of a model that asks for `effort`, named apart from the variants that opencode gives
