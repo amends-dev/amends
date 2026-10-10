@@ -11,9 +11,6 @@ import { HarnessError, type ModelEndpoint } from "@amends/harness";
 import { Array, Record, Redacted, Result, type Schema } from "effect";
 import type { ModelRef } from "./bridge/SessionEvent.ts";
 
-// TODO: Tell opencode what a model it does not find in models.dev takes and how much, such as
-// whether it calls tools and its context window, once endpoints say: opencode runs such a model
-// without tools.
 export interface Models {
   /** The `providers` of opencode's configuration, which serve the endpoints' models. */
   readonly providers: { readonly [providerId: string]: Schema.Json };
@@ -30,13 +27,13 @@ export interface Models {
  * key, with one set of headers, for each provider, and serves a model through one protocol, at one
  * URL, with one output limit, so endpoints that differ in them fail with `UnsupportedError`.
  */
-export const fromEndpoints = (endpoints: {
+export const modelsOf = (endpoints: {
   readonly model: ModelEndpoint.ModelEndpoint;
-  readonly models: Readonly<Record<string, ModelEndpoint.ModelEndpoint>>;
+  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>> | undefined;
 }): Result.Result<Models, HarnessError.UnsupportedError> => {
   const byProvider = Object.entries(
     Array.groupBy(
-      [endpoints.model, ...Object.values(endpoints.models)],
+      [endpoints.model, ...Object.values(endpoints.models ?? {})],
       (endpoint) => endpoint.provider,
     ),
   );
@@ -52,7 +49,10 @@ export const fromEndpoints = (endpoints: {
     ),
     model: modelRefOf(endpoints.model),
     models: Object.fromEntries(
-      Object.entries(endpoints.models).map(([name, endpoint]) => [name, modelRefOf(endpoint)]),
+      Object.entries(endpoints.models ?? {}).map(([name, endpoint]) => [
+        name,
+        modelRefOf(endpoint),
+      ]),
     ),
   });
 };
@@ -63,7 +63,10 @@ const conflictIn = (
   endpoints: ReadonlyArray<ModelEndpoint.ModelEndpoint>,
 ): string | undefined => {
   if (new Set(endpoints.map((endpoint) => JSON.stringify(requestOf(endpoint)))).size > 1) {
-    return `opencode presents one key, with one set of headers, for each provider, and the endpoints for ${providerId} differ in them`;
+    return (
+      "opencode presents one key, with one set of headers, for each provider, and the " +
+      `endpoints for ${providerId} differ in them`
+    );
   }
   for (const [modelId, ofModel] of Object.entries(
     Array.groupBy(endpoints, (endpoint) => endpoint.model),
@@ -74,7 +77,10 @@ const conflictIn = (
       ),
     );
     if (served.size > 1) {
-      return `opencode serves a model through one protocol, at one URL, with one output limit, and the endpoints for ${providerId}/${modelId} differ in them`;
+      return (
+        "opencode serves a model through one protocol, at one URL, with one output limit, and " +
+        `the endpoints for ${providerId}/${modelId} differ in them`
+      );
     }
   }
   return undefined;

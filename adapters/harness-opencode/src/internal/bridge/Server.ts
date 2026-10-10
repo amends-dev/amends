@@ -1,9 +1,9 @@
 /**
- * opencode's server, which the bridge starts in its sandbox, and the requests the driver makes of it.
- * One server serves every session in the sandbox, each in its own directory. `start` runs the server
- * until the scope closes, listening only on 127.0.0.1, at a port the server picks, behind a password
- * that `start` makes and gives the server in its environment. The bridge is the server's only client
- * and lives exactly as long as it, so the password is kept nowhere else.
+ * opencode's server, which the bridge starts in its sandbox, and the requests the driver makes of
+ * it. One server serves every session in the sandbox, each in its own directory. `start` runs the
+ * server until the scope closes, listening only on 127.0.0.1, at a port the server picks, behind
+ * a password that `start` makes and gives the server in its environment. The bridge is the
+ * server's only client and lives exactly as long as it, so the password is kept nowhere else.
  *
  * opencode reads the configuration `start` is given from a directory that `start` makes for it and
  * removes when the scope closes, in place of the global configuration of the sandbox's user, which
@@ -50,7 +50,6 @@ export interface ServerOptions {
   readonly env: Record.ReadonlyRecord<string, string>;
 }
 
-// TODO: Give `prompt` the files a user message carries, once a turn's prompt has files.
 export interface Server {
   /** Completes when the server exits, which it does before the scope closes only when it fails. */
   readonly exited: Effect.Effect<void>;
@@ -62,8 +61,8 @@ export interface Server {
   }) => Effect.Effect<string, HarnessError.HarnessError>;
 
   /**
-   * Whether opencode has loaded the model provider `providerID`, which a server loads a moment after
-   * it starts answering, and only when it can use the provider.
+   * Whether opencode has loaded the model provider `providerID`, which a server loads a moment
+   * after it starts answering, and only when it can use the provider.
    */
   readonly hasProvider: (providerID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
 
@@ -123,10 +122,6 @@ export interface Server {
   ) => Effect.Effect<void, HarnessError.HarnessError>;
 }
 
-// TODO: Stop a server left running by a bridge that died, as one killed does. In a process group of
-// its own, the server outlives the bridge and goes on with the turn the bridge ran, while the next
-// bridge's server continues the same session. AI SDK's harness leaves its server running so too.
-// Its configuration, with the models' keys, stays in its directory with it.
 /** Starts the server, which runs until the scope closes, and waits until it listens. */
 export const start = Effect.fn("Server.start")(
   function* (options: ServerOptions) {

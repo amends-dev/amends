@@ -194,21 +194,17 @@ opencode's server, which the tests script turn by turn. Starting the server, and
 a host launches, run everywhere too, against a stand-in for `opencode serve` in
 `test/fake-opencode-server.js`, which the tests install as an executable that runs on the Bun
 running them. The template's tests run everywhere with its commands answered as a sandbox would
-answer them. Its live tests run real opencode, whose turns a free model of opencode's own provider
-answers over the network, on an endpoint made from the model catalog; they take about a minute, so
-they run only with `AMENDS_TEST_OPENCODE=1`. `AMENDS_TEST_OPENCODE_MODEL` names another of the
-catalog's models, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it. One of
-them has opencode send turns on endpoints of each protocol to a fake of their APIs on a local port,
-to check what opencode sends. The agent as the bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
+answer them. Its live tests run real opencode, whose turns OpenCode Zen's free model answers over
+the network; they take about a minute, so they run only with `AMENDS_TEST_OPENCODE=1`.
+`AMENDS_TEST_OPENCODE_MODEL` names another of OpenCode Zen's models, and
+`AMENDS_TEST_OPENCODE_API_KEY` the key for it. One of them has opencode send turns on endpoints of
+each protocol to a fake of their APIs on a local port, to check what opencode sends. The agent as
+the bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
 opencode its template installs in this machine's home, under `~/.amends/opencode`, once for each
 version; the template's own live test installs them afresh in a temporary home directory. Each
 keeps opencode's configuration and data in temporary directories, apart from this machine's
 opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on
 Daytona, in sandboxes started from the snapshot of the template's version once Daytona has made it.
-With `OPENROUTER_API_KEY` too, from the `.env` as `bun --env-file=hosts/local/.env` gives it, hosts
-also set opencode up as they would from a workspace's connections, to OpenRouter, whose free model
-it runs on, to the agent, and to this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1`,
-Daytona's.
 
 The sandbox providers in `adapters/sandbox-local` and
 `adapters/sandbox-daytona` run the suites `@amends/sandbox/conformance` exports, and
@@ -223,11 +219,10 @@ does not take fail a create before Daytona is asked.
 that answers as each model API does, an MCP server in the test's process, and an HTTP API with an
 OpenAPI document. Their live tests reach real model providers and run only with
 `AMENDS_TEST_MODELS=1`: amends's agent runs turns on a free OpenRouter model, with
-`OPENROUTER_API_KEY` from the `.env` as `bun --env-file=hosts/local/.env` gives it, and checks of
-connections find the keys Anthropic, OpenAI, OpenRouter, and DeepSeek refuse, and OpenRouter's own.
-The agent is also set up as a host would set it up from a workspace's connections, to OpenRouter, to
-the agent, to an MCP server on this machine whose tool a turn calls, and to this machine's
-sandboxes, in one of which a turn runs a command. None of them costs anything.
+`OPENROUTER_API_KEY` from the `.env` as `bun --env-file=hosts/local/.env` gives it, one of them in
+a sandbox on this machine, where it runs a command; and checks of connections find the keys
+Anthropic, OpenAI, OpenRouter, and DeepSeek refuse, and OpenRouter's own. None of them costs
+anything.
 
 ## Storage conformance
 
@@ -300,7 +295,12 @@ The local host's HTTP tests exercise desktop CORS preflights, including the gene
 client's `b3` tracing header, and 401 response headers. Its sandbox integrations are tested
 everywhere, Daytona's against a fake of Daytona's API in the test's process; with
 `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, they also check a real organization's key and
-create a sandbox through a connection.
+create a sandbox through a connection. Its harness integrations are tested everywhere, amends's
+agent over scripted models and opencode as far as its bundled bridge. With `OPENROUTER_API_KEY`
+from the `.env` too, they set the agents up as the host does from a workspace's connections, on
+OpenRouter's free model: with `AMENDS_TEST_MODELS=1`, amends's agent runs a turn calling the tool
+of an MCP connection to a server on this machine; with `AMENDS_TEST_OPENCODE=1`, opencode runs a
+turn in this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, Daytona's.
 After changing host runtime setup, also perform the temporary-port startup check.
 Verify both app builds and native hash navigation after changing app composition.
 

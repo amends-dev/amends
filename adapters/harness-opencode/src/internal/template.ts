@@ -16,12 +16,13 @@ import { Crypto, Effect, FileSystem, Path, PlatformError, Result, Stream } from 
 import { Base64, Hex } from "effect/encoding";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-// TODO: Add Linux on musl, as Alpine has, and the baseline builds for x64 processors without AVX2,
-// once a sandbox needs them.
 /** The platforms the bridge installs on, as `platformOf` names them. */
 export type Platform = `${"darwin" | "linux"}-${"arm64" | "x64"}`;
 
-/** An npm package holding one program as `bin/<program>`, and the integrity npm published for it. */
+/**
+ * An npm package holding one program as `bin/<program>`, and the integrity npm published for
+ * it.
+ */
 interface Package {
   readonly name: string;
   readonly integrity: string;
@@ -99,13 +100,11 @@ export interface Installation {
   readonly args: ReadonlyArray<string>;
 }
 
-// TODO: Remove the programs and bridge programs that no host launches any more, which build up in
-// a home that sandboxes share, as on this machine.
 /**
  * Bundles the bridge program, giving the template that installs it with the command that launches
  * it. The template's identity changes with anything it installs.
  */
-export const make = Effect.fn("OpencodeTemplate.make")(function* () {
+export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* () {
   const crypto = yield* Crypto.Crypto;
   const hashOf = (text: string) =>
     Effect.map(crypto.digest("SHA-256", new TextEncoder().encode(text)), (digest) =>
@@ -145,12 +144,15 @@ export const platformOf = (uname: string): Platform | undefined => {
       : undefined;
 };
 
-// TODO: Ship the bundle built with the package, as AI SDK ships its bridge, once the package is
-// published without its sources.
-/** The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for Bun. */
+/**
+ * The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for
+ * Bun. The program is beside this module, in this module's own form: a source among the sources,
+ * a compiled file among the compiled ones of the distribution.
+ */
 const bundleBridge = Effect.promise(async () => {
+  const extension = import.meta.url.slice(import.meta.url.lastIndexOf("."));
   const { outputs } = await Bun.build({
-    entrypoints: [`${import.meta.dirname}/bridge/main.ts`],
+    entrypoints: [`${import.meta.dirname}/bridge/main${extension}`],
     target: "bun",
     minify: true,
   });
@@ -191,7 +193,8 @@ const installPrograms = (installed: string) =>
     if (platform === undefined) {
       return yield* failure(
         "Unknown",
-        `opencode's bridge installs on macOS and on Linux with glibc, on arm64 and x64, not on ${uname.trim()}`,
+        "opencode's bridge installs on macOS and on Linux with glibc, on arm64 and x64, not on " +
+          uname.trim(),
       );
     }
 
@@ -305,7 +308,7 @@ const hexOf = (integrity: string) =>
 const failure = (tag: PlatformError.SystemErrorTag, description: string) =>
   PlatformError.systemError({
     _tag: tag,
-    module: "OpencodeTemplate",
+    module: "OpencodeAgent",
     method: "prepare",
     description,
   });

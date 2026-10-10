@@ -1,18 +1,39 @@
 {
   "name": "@amends/harness-amends",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "An agent in your own process for the @amends/harness contract: a loop over an Effect AI language model, with tools for the files and the shell of a sandbox.",
+  "keywords": [
+    "agent",
+    "ai",
+    "effect",
+    "harness",
+    "sandbox"
+  ],
+  "homepage": "https://github.com/saribmah/amends-v2/tree/main/adapters/harness-amends#readme",
+  "bugs": {
+    "url": "https://github.com/saribmah/amends-v2/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saribmah/amends-v2.git",
+    "directory": "adapters/harness-amends"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
-    "./*": "./src/*.ts"
+    "./*": "./src/*.ts",
+    "./internal/*": null
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
     "@amends/harness": "workspace:*",
     "@amends/sandbox": "workspace:*",
     "@effect/ai-anthropic": "catalog:",
@@ -21,7 +42,6 @@
   },
   "devDependencies": {
     "@amends/sandbox-local": "workspace:*",
-    "@amends/toolkit": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"

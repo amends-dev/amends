@@ -1,4 +1,3 @@
-import { Connection, Integrations, ModelCatalog, ModelIntegrations } from "@amends/connection";
 import {
   type Bridge,
   GenerateResult,
@@ -26,50 +25,36 @@ import {
 } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
-import * as OpencodeDriver from "../src/bridge/Driver.ts";
-import * as Models from "../src/Models.ts";
+import * as Driver from "../src/internal/bridge/Driver.ts";
+import { modelsOf } from "../src/internal/models.ts";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import { makeSandbox } from "./fixtures.ts";
 
 /**
  * These tests run real opencode, whose turns a model answers over the network, so they take a
  * minute and run only with `AMENDS_TEST_OPENCODE=1`. opencode's driver, as the bridge runs it, runs
- * opencode 1.18.23 on the `PATH`; the agent as hosts run it runs the opencode its template installs in this
- * machine's home, under `~/.amends/opencode`, once for each version. Their model is the catalog's
- * free one of opencode's own provider, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names
- * another of the catalog's, as `provider/model`, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
- * Hosts also set opencode up from a workspace's connections, to OpenRouter, whose free model it runs
- * on with the key in `OPENROUTER_API_KEY`, as `bun --env-file=hosts/local/.env` gives it, and to
- * the agent, in a sandbox of this machine's or Daytona's.
+ * opencode 1.18.23 on the `PATH`; the agent as hosts run it runs the opencode its template installs
+ * in this machine's home, under `~/.amends/opencode`, once for each version. Their model is OpenCode
+ * Zen's free one, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names another of OpenCode Zen's
+ * models, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
  */
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
-const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "opencode/fledge-alpha-free";
+const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "fledge-alpha-free";
 const apiKey = process.env.AMENDS_TEST_OPENCODE_API_KEY;
 
 const id = SessionId.make("live");
 const timeout = 120_000;
-const LiveLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer, ModelCatalog.layer);
-const HostLayer = Layer.mergeAll(
-  BunServices.layer,
-  BunSocket.layerWebSocketConstructor,
-  ModelCatalog.layer,
-);
+const LiveLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
+const HostLayer = Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor);
 
-/** The endpoint of the catalog's model that `AMENDS_TEST_OPENCODE_MODEL` names, as a host makes it. */
-const makeEndpoint = Effect.gen(function* () {
-  const catalog = yield* ModelCatalog.ModelCatalog;
-  const slash = modelName.indexOf("/");
-  const [providerId, modelId] = [modelName.slice(0, slash), modelName.slice(slash + 1)];
-  const model = yield* catalog.findModel(providerId, modelId);
-  if (model === undefined) return yield* Effect.die(`The catalog has no ${modelName}`);
-  return {
-    provider: providerId,
-    model: model.id,
-    protocol: model.protocol,
-    url: model.url,
-    ...(apiKey === undefined ? {} : { apiKey: Redacted.make(apiKey) }),
-  } satisfies ModelEndpoint.ModelEndpoint;
-});
+/** The endpoint of OpenCode Zen's model that `AMENDS_TEST_OPENCODE_MODEL` names. */
+const endpoint = {
+  provider: "opencode",
+  model: modelName,
+  protocol: "openai-chat",
+  url: "https://opencode.ai/zen/v1",
+  ...(apiKey === undefined ? {} : { apiKey: Redacted.make(apiKey) }),
+} satisfies ModelEndpoint.ModelEndpoint;
 
 /** opencode's configuration, which keeps opencode from updating itself. */
 const config = { autoupdate: false };
@@ -93,14 +78,12 @@ const makeOpencodeEnv = Effect.gen(function* () {
  * opencode's driver as a bridge runs it, on this machine, on `endpoints` or the model the tests
  * run on, and a directory for its session. opencode's server stops when the scope closes.
  */
-const makeLiveDriver = (endpoints?: Parameters<typeof Models.fromEndpoints>[0]) =>
+const makeLiveDriver = (endpoints?: Parameters<typeof modelsOf>[0]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* fs.makeTempDirectoryScoped();
-    const models = Result.getOrThrow(
-      Models.fromEndpoints(endpoints ?? { model: yield* makeEndpoint, models: {} }),
-    );
-    const driver = yield* OpencodeDriver.make({
+    const models = Result.getOrThrow(modelsOf(endpoints ?? { model: endpoint, models: {} }));
+    const driver = yield* Driver.make({
       model: models.model,
       models: models.models,
       command: "opencode",
@@ -150,7 +133,7 @@ const daytonaSandboxes: Sandboxes = {
 const makeLiveHosts = (sandboxes: Sandboxes) =>
   Effect.gen(function* () {
     const env = yield* sandboxes.env;
-    const model = yield* makeEndpoint;
+    const model = endpoint;
     const makeHarness = Effect.map(
       OpencodeAgent.make({
         model,
@@ -382,7 +365,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "ends a turn on a model its provider does not serve with an error",
     () =>
       Effect.gen(function* () {
-        const model = yield* makeEndpoint;
+        const model = endpoint;
         const { driver, directory } = yield* makeLiveDriver({
           model,
           models: { missing: { ...model, model: "no-such-model" } },
@@ -520,95 +503,6 @@ describeHosts("opencode as hosts run it, through its bridge", enabled, localSand
 describeHosts(
   "opencode as hosts run it on Daytona, through its bridge",
   enabled && process.env.AMENDS_TEST_DAYTONA === "1" && process.env.DAYTONA_API_KEY !== undefined,
-  daytonaSandboxes,
-  300_000,
-);
-
-const openRouterKey = process.env.OPENROUTER_API_KEY;
-const openRouterModel = "nvidia/nemotron-3-super-120b-a12b:free";
-
-/** A connection as a workspace stores it. */
-const connectionTo = (
-  integration: string,
-  name: string,
-  auth: Connection.AuthMethod,
-): Connection.Connection => ({
-  id: Connection.ConnectionId.make(`${integration}-1`),
-  integration,
-  name,
-  settings: {},
-  auth,
-});
-
-const openRouter = connectionTo("openrouter", "OpenRouter", "apiKey");
-const agent = connectionTo("opencode-agent", "opencode", "none");
-
-/**
- * What hosts do with opencode set up from connections, in a new sandbox of `sandboxes`, which is
- * destroyed when the scope closes.
- */
-const describeConnections = (
-  title: string,
-  enabled: boolean,
-  sandboxes: Sandboxes,
-  timeout: number,
-) =>
-  describe.skipIf(!enabled)(title, () => {
-    it.live(
-      "runs a turn on a model connection, in a sandbox",
-      () =>
-        Effect.gen(function* () {
-          const env = yield* sandboxes.env;
-          const integrations = yield* Integrations.make([
-            ...(yield* ModelIntegrations.catalogProviders),
-            yield* OpencodeAgent.integration({
-              token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
-              config,
-              ...(env === undefined ? {} : { env }),
-            }),
-          ]);
-
-          const model = yield* (yield* integrations.find(openRouter.integration)).modelEndpoint(
-            openRouter,
-            { apiKey: Redacted.make(openRouterKey ?? "") },
-            { model: openRouterModel },
-          );
-          const harness = yield* (yield* integrations.find(agent.integration)).harness(
-            agent,
-            undefined,
-            { model },
-          );
-          const sandbox = yield* sandboxes.create(harness.agent.template);
-          const session = yield* harness.createSession({ sandbox, id });
-
-          const result = yield* session.generate({
-            prompt:
-              "Run `echo live-opencode` with your bash tool, then reply with what it printed.",
-          });
-
-          expect(result.parts.find((part) => part.type === "tool-call")).toEqual(
-            expect.objectContaining({ name: "bash", providerExecuted: true }),
-          );
-          expect(result.text).toContain("live-opencode");
-        }).pipe(Effect.provide(Layer.merge(HostLayer, FetchHttpClient.layer))),
-      timeout,
-    );
-  });
-
-describeConnections(
-  "opencode set up from connections, in this machine's sandboxes",
-  enabled && openRouterKey !== undefined,
-  localSandboxes,
-  timeout,
-);
-
-// Daytona's sandboxes cost money, so opencode is set up there only with `AMENDS_TEST_DAYTONA=1` too.
-describeConnections(
-  "opencode set up from connections, in Daytona's sandboxes",
-  enabled &&
-    openRouterKey !== undefined &&
-    process.env.AMENDS_TEST_DAYTONA === "1" &&
-    process.env.DAYTONA_API_KEY !== undefined,
   daytonaSandboxes,
   300_000,
 );

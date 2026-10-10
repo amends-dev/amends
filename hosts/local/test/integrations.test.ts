@@ -20,6 +20,8 @@ it.effect(
       expect(providing("tools")).toEqual(["mcp", "openapi"]);
       expect(providing("models")).toContain("anthropic");
       expect(providing("models")).toContain("openai-compatible");
+      // opencode's agent is `opencode-agent`, beside OpenCode Zen, the catalog's `opencode`.
+      expect(providing("models")).toContain("opencode");
       expect(providing("models").length).toBeGreaterThan(100);
     }),
 );

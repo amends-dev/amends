@@ -14,8 +14,9 @@ depend on the contract and their platform's SDK alone; the
 
 `harness-amends/` is amends's own agent for the [harness contract](../packages/harness/README.md), a
 loop over an Effect AI `LanguageModel` with the model providers' clients, and `harness-opencode/`
-runs opencode behind its bridge in a sandbox. Each of these two gives the integration a host
-installs.
+runs opencode behind its bridge in a sandbox. Both depend on the harness and sandbox contracts and
+their platform's clients alone; the [local host](../hosts/local/README.md) declares their
+[integrations](../packages/connection/README.md).
 
 `storage-postgresql/` implements the gateway's workspace storage and workspace
 directory contracts over PostgreSQL, with Drizzle over the Effect PostgreSQL client

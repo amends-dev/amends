@@ -3,7 +3,7 @@ import { BunHttpServer } from "@effect/platform-bun";
 import { Deferred, Effect, Fiber, Schema, Sink, Stream, SubscriptionRef } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 import { type ChildProcess, ChildProcessSpawner } from "effect/process";
-import { ModelRef } from "../src/bridge/SessionEvent.ts";
+import { ModelRef } from "../src/internal/bridge/SessionEvent.ts";
 
 /** An event as opencode's server sends it, of any type. */
 interface RecordedEvent {

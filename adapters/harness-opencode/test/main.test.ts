@@ -25,7 +25,7 @@ const makeHarness = (command: string, env: Readonly<Record<string, string>> = {}
         prepare: Effect.void,
       },
       command: process.execPath,
-      args: [`${import.meta.dirname}/../src/bridge/main.ts`],
+      args: [`${import.meta.dirname}/../src/internal/bridge/main.ts`],
       token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
       agentOptions: {
         model: { providerID: "opencode", id: "default-model" },

@@ -1,7 +1,7 @@
 /**
- * Serves a bridge from Bun, as a bridge program does once it has made its driver: on every interface
- * of the sandbox, at a port the sandbox picks, until the bridge exits idle or another takes its
- * place.
+ * Serves a bridge from Bun, as a bridge program does once it has made its driver: on every
+ * interface of the sandbox, at a port the sandbox picks, until the bridge exits idle or another
+ * takes its place.
  *
  * Bun's server never finishes stopping once a WebSocket has been open, so it runs in a scope of its
  * own, which the bridge gives a second to close after the bridge's own finalizers have run, rather
@@ -28,9 +28,6 @@ export const serve = Effect.fnUntraced(function* (
       Effect.ignore,
     ),
   );
-  // TODO: Listen on the port the bridge's last listening file names, when it is free, so that a
-  // bridge launched again keeps its port, rather than add one to the ports its sandbox exposes, which
-  // are never taken back, each time it is launched.
   const server = yield* Layer.buildWithScope(
     BunHttpServer.layer({ hostname: "0.0.0.0", port: 0, disablePreemptiveShutdown: true }),
     serverScope,

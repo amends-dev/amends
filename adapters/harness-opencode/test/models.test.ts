@@ -1,7 +1,7 @@
 import type { ModelEndpoint } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Redacted, Result } from "effect";
-import * as Models from "../src/Models.ts";
+import { modelsOf } from "../src/internal/models.ts";
 
 const key = Redacted.make("secret-key");
 
@@ -32,15 +32,15 @@ const gptOss = {
 } satisfies ModelEndpoint.ModelEndpoint;
 
 /** Why opencode cannot serve `endpoints`, or nothing when it can. */
-const refusalOf = (endpoints: Parameters<typeof Models.fromEndpoints>[0]) => {
-  const models = Models.fromEndpoints(endpoints);
+const refusalOf = (endpoints: Parameters<typeof modelsOf>[0]) => {
+  const models = modelsOf(endpoints);
   return Result.isFailure(models) ? models.failure : undefined;
 };
 
-describe("Models.fromEndpoints", () => {
+describe("modelsOf", () => {
   it("serves each endpoint's model through its protocol, at its URL, with its key", () => {
     const models = Result.getOrThrow(
-      Models.fromEndpoints({ model: sonnet, models: { deep: gpt, open: gptOss } }),
+      modelsOf({ model: sonnet, models: { deep: gpt, open: gptOss } }),
     );
 
     expect(models.providers).toEqual({
@@ -94,9 +94,7 @@ describe("Models.fromEndpoints", () => {
   });
 
   it("asks a model on the Messages API for an effort in `output_config`", () => {
-    const models = Result.getOrThrow(
-      Models.fromEndpoints({ model: { ...sonnet, effort: "max" }, models: {} }),
-    );
+    const models = Result.getOrThrow(modelsOf({ model: { ...sonnet, effort: "max" }, models: {} }));
 
     expect(models.providers["anthropic"]).toMatchObject({
       models: {
@@ -110,7 +108,7 @@ describe("Models.fromEndpoints", () => {
 
   it("names one model at several efforts as variants of it", () => {
     const models = Result.getOrThrow(
-      Models.fromEndpoints({
+      modelsOf({
         model: sonnet,
         models: {
           quick: { ...sonnet, effort: "low" },
@@ -137,7 +135,7 @@ describe("Models.fromEndpoints", () => {
 
   it("serves the models of one provider at URLs of their own, under its key", () => {
     const models = Result.getOrThrow(
-      Models.fromEndpoints({
+      modelsOf({
         model: sonnet,
         models: {
           gateway: { ...sonnet, model: "claude-opus-5-5", url: "https://gateway.example/v1" },
@@ -157,7 +155,7 @@ describe("Models.fromEndpoints", () => {
   it("sends a provider's requests with the headers its endpoints ask for", () => {
     const headers = { "cf-aig-authorization": Redacted.make("Bearer gateway-token") };
     const models = Result.getOrThrow(
-      Models.fromEndpoints({
+      modelsOf({
         model: { ...sonnet, headers },
         models: { other: { ...gptOss, headers } },
       }),
@@ -219,7 +217,7 @@ describe("Models.fromEndpoints", () => {
 
   it("takes a URL that ends in a slash as the one without it", () => {
     const models = Result.getOrThrow(
-      Models.fromEndpoints({
+      modelsOf({
         model: sonnet,
         models: { slashed: { ...sonnet, url: "https://api.anthropic.com/v1/" } },
       }),

@@ -22,7 +22,7 @@ const Add = Tool.make("Add", {
   description: "Adds two numbers.",
   parameters: Schema.Struct({ a: Schema.Finite, b: Schema.Finite }),
   success: Schema.Finite,
-});
+}).annotate(Tool.Strict, false);
 const MathToolkit = Toolkit.make(Add);
 const MathHandlers = MathToolkit.toLayer({ Add: ({ a, b }) => Effect.succeed(a + b) });
 
@@ -173,6 +173,7 @@ layer(BunServices.layer)("AmendsAgent", (it) => {
         expect(offered.map((tool) => tool.name)).toEqual(["Add"]);
         expect(offered.map(Tool.getDescription)).toEqual(["Adds two numbers."]);
         expect(offered.map((tool) => Tool.getJsonSchema(tool))).toEqual([Tool.getJsonSchema(Add)]);
+        expect(offered.map(Tool.getStrictMode)).toEqual([false]);
         // The session streams the result of the host's tool; the agent does not repeat it.
         expect(result.toolResults).toEqual([
           {
