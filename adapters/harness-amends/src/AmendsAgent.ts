@@ -48,8 +48,6 @@ import {
 import * as Models from "./Models.ts";
 import * as Tools from "./Tools.ts";
 
-// TODO: Add instructions of the agent's own, telling the model where it works and how it works
-// there, once the tools' descriptions are not enough.
 /**
  * What the agent is made with: the endpoints its turns run on, as `Agent.Options` give them, and
  * what only this agent takes.
@@ -113,12 +111,10 @@ type JsonFormat = Extract<Agent.TurnOptions["responseFormat"], { readonly type: 
 /** Delivers parts of the running turn to its stream. */
 type Emit = (parts: ReadonlyArray<StreamPart.StreamPart>) => Effect.Effect<unknown>;
 
-// TODO: Give the stand-in the host's Effect schema instead of its JSON schema, once a provider that
-// adapts schemas to the model, such as OpenAI's in strict mode, rejects a host's tool.
 /**
- * Stands in for a host's tool: the model sees the tool as the host declares it, and the stand-in
- * answers each call with the result the host submits, as it came. The session, which runs the host's
- * tool, checks the call's params.
+ * Stands in for a host's tool: the model sees the tool as the host declares it, its JSON schema
+ * sent as strictly as the host says, and the stand-in answers each call with the result the host
+ * submits, as it came. The session, which runs the host's tool, checks the call's params.
  */
 const standInFor = (tool: Tool.Any) =>
   Tool.dynamic(tool.name, {
@@ -127,7 +123,7 @@ const standInFor = (tool: Tool.Any) =>
     success: Schema.Unknown,
     failure: Schema.Unknown,
     failureMode: "return",
-  });
+  }).annotate(Tool.Strict, Tool.getStrictMode(tool));
 
 /**
  * The agent, which makes the language model of each of its endpoints with `Models.LanguageModels`,

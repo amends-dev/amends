@@ -92,8 +92,6 @@ const languageModel = (
   }
 };
 
-// TODO: Turn on adaptive thinking for the models that think only when a request asks, such as
-// Claude Opus 4.8, once the catalog tells them apart from those that cannot be asked.
 const anthropicModel = Effect.fnUntraced(function* (
   endpoint: ModelEndpoint.ModelEndpoint,
   url: string,
@@ -172,12 +170,11 @@ const withHeaders = (endpoint: ModelEndpoint.ModelEndpoint) =>
     HttpClientRequest.setHeaders(Record.map(endpoint.headers ?? {}, Redacted.value)),
   );
 
-// TODO: Drop this once Effect's Chat Completions client takes a `service_tier` of null, as OpenRouter
-// answers. The client refuses a whole answer that has one, and skips a streamed chunk that has one,
-// which loses the usage that OpenRouter streams in its last chunk.
 /**
- * A Chat Completions API's answers without a `service_tier` of null: in each line of a streamed
- * answer, where every chunk is a line, and in a whole answer.
+ * A Chat Completions API's answers without a `service_tier` of null, as OpenRouter answers: in each
+ * line of a streamed answer, where every chunk is a line, and in a whole answer. Effect's client
+ * refuses a whole answer that has one, and skips a streamed chunk that has one, which loses the
+ * usage OpenRouter streams in its last chunk.
  */
 const withoutNullServiceTiers = HttpClient.transformResponse(
   Effect.flatMap((response: HttpClientResponse.HttpClientResponse) => {

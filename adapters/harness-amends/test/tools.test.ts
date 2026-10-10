@@ -124,6 +124,50 @@ layer(BunServices.layer)("Tools", (it) => {
     }),
   );
 
+  it.effect("reads the lines asked for, saying how many lines follow them", () =>
+    Effect.gen(function* () {
+      const { call } = yield* makeTools();
+      const lines = Array.from({ length: 5 }, (_, index) => `line ${index + 1}`);
+      yield* call("write", { file_path: "lines.txt", content: `${lines.join("\n")}\n` });
+
+      const first = yield* call("read", { file_path: "lines.txt", limit: 2 });
+      const middle = yield* call("read", { file_path: "lines.txt", offset: 2, limit: 2 });
+      const last = yield* call("read", { file_path: "lines.txt", offset: 4 });
+      const beyond = yield* call("read", { file_path: "lines.txt", offset: 9 });
+
+      expect(first).toEqual({
+        isFailure: false,
+        result: "line 1\nline 2\n[3 more lines after line 2]\n",
+      });
+      expect(middle).toEqual({
+        isFailure: false,
+        result: "line 2\nline 3\n[2 more lines after line 3]\n",
+      });
+      expect(last).toEqual({ isFailure: false, result: "line 4\nline 5\n" });
+      expect(beyond).toEqual({ isFailure: false, result: "" });
+    }),
+  );
+
+  it.effect("replaces every occurrence with replace_all", () =>
+    Effect.gen(function* () {
+      const { call } = yield* makeTools();
+      yield* call("write", { file_path: "notes.txt", content: "one two one" });
+
+      const edited = yield* call("edit", {
+        file_path: "notes.txt",
+        old_string: "one",
+        new_string: "1",
+        replace_all: true,
+      });
+
+      expect(edited).toEqual({ isFailure: false, result: "Edited notes.txt in 2 places" });
+      expect(yield* call("read", { file_path: "notes.txt" })).toEqual({
+        isFailure: false,
+        result: "1 two 1",
+      });
+    }),
+  );
+
   it.effect(
     "refuses an edit whose text is empty, missing, or appears more than once, leaving the file",
     () =>
@@ -154,7 +198,9 @@ layer(BunServices.layer)("Tools", (it) => {
         expect(missing).toEqual({ isFailure: true, result: "old_string is not in notes.txt" });
         expect(repeated).toEqual({
           isFailure: true,
-          result: "old_string appears 2 times in notes.txt: include more of the text around it",
+          result:
+            "old_string appears 2 times in notes.txt: include more of the text around it, or " +
+            "replace them all with replace_all",
         });
         expect(yield* call("read", { file_path: "notes.txt" })).toEqual({
           isFailure: false,

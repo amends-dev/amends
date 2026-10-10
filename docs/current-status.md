@@ -39,7 +39,10 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
   the local host runs turns on both. Amends's agent compacts by itself only for a model whose
-  context window the catalog knows, not one of an OpenAI-compatible connection. opencode's session
+  context window the catalog knows, not one of an OpenAI-compatible connection; it tells the
+  model nothing of its own beyond a turn's instructions and its tools' descriptions, such as where
+  it works; and it asks Anthropic's models for an effort but never for adaptive thinking, which an
+  endpoint does not say its model takes. opencode's session
   API takes no instructions for a turn, so opencode refuses a turn that gives some: only an agent
   without instructions runs on it, and it compacts only by itself. An agent's own tools run without
   asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode saying

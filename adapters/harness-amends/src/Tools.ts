@@ -1,7 +1,8 @@
 /**
- * The tools the amends agent works with in a session's sandbox: reading, writing, and editing files,
- * and running shell commands. Their names and inputs are those AI SDK's harnesses share, so a model
- * meets the same tools whichever agent runs it.
+ * The tools the agent works with in a session's sandbox: reading, writing, and editing files, and
+ * running shell commands. Their names and inputs are those of Claude Code's and opencode's tools,
+ * which AI SDK's harnesses share, so a model meets the tools it knows whichever agent runs it;
+ * searching goes through `bash`, with `grep` and `find`.
  *
  * File paths resolve against the session's directory, and the tools refuse a path that names a place
  * outside it. That keeps the model's work in its directory but confines nothing: a symbolic link in
@@ -18,16 +19,23 @@ import { Duration, Effect, FileSystem, Option, Path, Ref, Schema, Stream } from 
 import { Tool, Toolkit } from "effect/ai";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-// TODO: Add `offset` and `limit`, which read part of a long file, once files outgrow a turn.
 /**
- * Reads a text file in the session's directory, answering with its contents.
+ * Reads a text file in the session's directory, answering with its contents: all of it, or
+ * `limit` lines from line `offset`, `defaultReadLimit` lines from the first by default, saying how
+ * many lines follow.
  *
  * @category tools
  * @since 0.1.0
  */
 export const Read = Tool.make("read", {
-  description: "Reads a text file and returns its contents.",
-  parameters: Schema.Struct({ file_path: Schema.String }),
+  description:
+    "Reads a text file and returns its contents: `limit` lines from line `offset`, the first 2000 " +
+    "lines by default, saying how many lines follow them.",
+  parameters: Schema.Struct({
+    file_path: Schema.String,
+    offset: Schema.optionalKey(Schema.Int),
+    limit: Schema.optionalKey(Schema.Int),
+  }),
   success: Schema.String,
   failure: Schema.String,
   failureMode: "return",
@@ -48,10 +56,9 @@ export const Write = Tool.make("write", {
   failureMode: "return",
 });
 
-// TODO: Add `replace_all`, which replaces every occurrence, once a model needs to rename things.
 /**
- * Replaces one occurrence of a text in a file in the session's directory, answering with why when
- * the text is not there once.
+ * Replaces a text in a file in the session's directory: the one place it appears, or every place
+ * with `replace_all`, answering with why when the text is not there once.
  *
  * @category tools
  * @since 0.1.0
@@ -59,11 +66,13 @@ export const Write = Tool.make("write", {
 export const Edit = Tool.make("edit", {
   description:
     "Replaces `old_string` in a text file with `new_string`. `old_string` must appear exactly once: " +
-    "include enough of the text around it to pick out one place.",
+    "include enough of the text around it to pick out one place. With `replace_all`, every " +
+    "occurrence is replaced instead.",
   parameters: Schema.Struct({
     file_path: Schema.String,
     old_string: Schema.String,
     new_string: Schema.String,
+    replace_all: Schema.optionalKey(Schema.Boolean),
   }),
   success: Schema.String,
   failure: Schema.String,
@@ -89,8 +98,6 @@ export const Bash = Tool.make("bash", {
   failureMode: "return",
 });
 
-// TODO: Add `grep` and `glob`, which AI SDK's harnesses also share, once `bash` is not enough to
-// search with.
 /**
  * The agent's tools, as the toolkit a turn offers the model with the handlers `layer` gives them.
  *
@@ -98,6 +105,14 @@ export const Bash = Tool.make("bash", {
  * @since 0.1.0
  */
 export const toolkit = Toolkit.make(Read, Write, Edit, Bash);
+
+/**
+ * The most lines `read` returns unless asked for a `limit`.
+ *
+ * @category constants
+ * @since 0.1.0
+ */
+export const defaultReadLimit = 2000;
 
 /**
  * How long a `bash` command runs before it is killed, unless the layer is given another.
@@ -169,9 +184,12 @@ export const layer = (
       };
 
       return toolkit.of({
-        read: Effect.fn("Tools.read")(function* ({ file_path }) {
+        read: Effect.fn("Tools.read")(function* ({ file_path, offset, limit }) {
           const resolved = yield* resolve(file_path);
-          return yield* fs.readFileString(resolved).pipe(Effect.mapError((error) => error.message));
+          const text = yield* fs
+            .readFileString(resolved)
+            .pipe(Effect.mapError((error) => error.message));
+          return linesOf(text, offset ?? 1, limit ?? defaultReadLimit);
         }),
 
         write: Effect.fn("Tools.write")(function* ({ file_path, content }) {
@@ -183,7 +201,12 @@ export const layer = (
           return `Wrote ${file_path}`;
         }),
 
-        edit: Effect.fn("Tools.edit")(function* ({ file_path, old_string, new_string }) {
+        edit: Effect.fn("Tools.edit")(function* ({
+          file_path,
+          old_string,
+          new_string,
+          replace_all = false,
+        }) {
           if (old_string === "") {
             return yield* Effect.fail("old_string is empty: give the text to replace");
           }
@@ -191,21 +214,24 @@ export const layer = (
           const text = yield* fs
             .readFileString(resolved)
             .pipe(Effect.mapError((error) => error.message));
-          const occurrences = text.split(old_string).length - 1;
-          if (occurrences !== 1) {
+          const pieces = text.split(old_string);
+          const occurrences = pieces.length - 1;
+          if (occurrences === 0) return yield* Effect.fail(`old_string is not in ${file_path}`);
+          if (occurrences > 1 && !replace_all) {
             return yield* Effect.fail(
-              occurrences === 0
-                ? `old_string is not in ${file_path}`
-                : `old_string appears ${occurrences} times in ${file_path}: include more of the text around it`,
+              `old_string appears ${occurrences} times in ${file_path}: include more of the text ` +
+                "around it, or replace them all with replace_all",
             );
           }
           yield* fs
             .writeFileString(
               resolved,
-              text.replace(old_string, () => new_string),
+              replace_all ? pieces.join(new_string) : text.replace(old_string, () => new_string),
             )
             .pipe(Effect.mapError((error) => error.message));
-          return `Edited ${file_path}`;
+          return occurrences === 1
+            ? `Edited ${file_path}`
+            : `Edited ${file_path} in ${occurrences} places`;
         }),
 
         bash: Effect.fn("Tools.bash")(function* ({ command }) {
@@ -246,6 +272,25 @@ export const layer = (
       });
     }).pipe(Effect.provide(Sandbox.layerServices(workspace.sandbox))),
   );
+
+/**
+ * `count` lines of `text` from line `from`, as they are, with how many lines follow them. The
+ * whole text, as it is, when the lines asked for hold it.
+ */
+const linesOf = (text: string, from: number, count: number) => {
+  const lines = text.split("\n");
+  // A text that ends with a newline ends there, not with an empty line after it.
+  if (lines.at(-1) === "") lines.pop();
+  const start = Math.max(from, 1) - 1;
+  if (start === 0 && lines.length <= count) return text;
+  const end = Math.min(start + Math.max(count, 0), lines.length);
+  const page = lines
+    .slice(start, end)
+    .map((line) => `${line}\n`)
+    .join("");
+  const following = lines.length - end;
+  return following === 0 ? page : `${page}[${following} more lines after line ${end}]\n`;
+};
 
 /**
  * The output of a command that `bash` keeps: its start, its end so far, and how many characters
