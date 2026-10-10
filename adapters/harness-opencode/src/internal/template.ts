@@ -108,7 +108,7 @@ export interface Installation {
  * Bundles the bridge program, giving the template that installs it with the command that launches
  * it. The template's identity changes with anything it installs.
  */
-export const make = Effect.fn("Template.make")(function* () {
+export const makeInstallation = Effect.fn("OpencodeAgent.makeInstallation")(function* () {
   const crypto = yield* Crypto.Crypto;
   const hashOf = (text: string) =>
     Effect.map(crypto.digest("SHA-256", new TextEncoder().encode(text)), (digest) =>
@@ -312,7 +312,7 @@ const hexOf = (integrity: string) =>
 const failure = (tag: PlatformError.SystemErrorTag, description: string) =>
   PlatformError.systemError({
     _tag: tag,
-    module: "Template",
+    module: "OpencodeAgent",
     method: "prepare",
     description,
   });

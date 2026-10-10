@@ -2,7 +2,7 @@ import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Path } from "effect";
 import { FetchHttpClient } from "effect/http";
-import * as Server from "../src/bridge/Server.ts";
+import * as Server from "../src/internal/bridge/Server.ts";
 import { installStandIn, isRunning, startsIn } from "./fixtures.ts";
 
 /**

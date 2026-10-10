@@ -5,7 +5,7 @@ import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Path, Redacted } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import * as Template from "../src/Template.ts";
+import { type Installation, makeInstallation, platformOf } from "../src/internal/template.ts";
 import { makeScriptedCommands } from "./fakes.ts";
 import { makeBridgedAgent, makeSandbox } from "./fixtures.ts";
 
@@ -20,7 +20,7 @@ const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
 const homeLookup = ["sh", "-c", 'printf %s "$HOME"'];
 
 /** Where `installation` launches Bun and the bridge program from, relative to the home directory. */
-const launchedFrom = (installation: Template.Installation) => {
+const launchedFrom = (installation: Installation) => {
   const [bun = "", bridge = ""] = [
     ...(installation.args[1] ?? "").matchAll(/"\$HOME\/([^"]+)"/g),
   ].map(([, file]) => file);
@@ -66,20 +66,20 @@ const withHome = (spawner: ChildProcessSpawner.ChildProcessSpawner["Service"], h
 
 describe("Template", () => {
   it("names the platform `uname -sm` prints, and none the bridge does not install on", () => {
-    expect(Template.platformOf("Darwin arm64\n")).toBe("darwin-arm64");
-    expect(Template.platformOf("Darwin x86_64")).toBe("darwin-x64");
-    expect(Template.platformOf("Linux aarch64")).toBe("linux-arm64");
-    expect(Template.platformOf("Linux x86_64")).toBe("linux-x64");
-    expect(Template.platformOf("Linux armv7l")).toBeUndefined();
-    expect(Template.platformOf("FreeBSD amd64")).toBeUndefined();
+    expect(platformOf("Darwin arm64\n")).toBe("darwin-arm64");
+    expect(platformOf("Darwin x86_64")).toBe("darwin-x64");
+    expect(platformOf("Linux aarch64")).toBe("linux-arm64");
+    expect(platformOf("Linux x86_64")).toBe("linux-x64");
+    expect(platformOf("Linux armv7l")).toBeUndefined();
+    expect(platformOf("FreeBSD amd64")).toBeUndefined();
   });
 
   it.effect(
     "launches the bridge from where the template installs it, under the same identity",
     () =>
       Effect.gen(function* () {
-        const installation = yield* Template.make();
-        const again = yield* Template.make();
+        const installation = yield* makeInstallation();
+        const again = yield* makeInstallation();
         const [programs, bundle] = installation.template.identity.split("-");
 
         expect(again.template.identity).toBe(installation.template.identity);
@@ -96,7 +96,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* Template.make();
+      const installation = yield* makeInstallation();
       const { bridge } = launchedFrom(installation);
       yield* fs.makeDirectory(path.join(home, path.dirname(bridge)), { recursive: true });
       yield* fs.writeFileString(path.join(home, bridge), "the bridge program");
@@ -115,7 +115,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* Template.make();
+      const installation = yield* makeInstallation();
       const { bridge } = launchedFrom(installation);
       yield* fs.makeDirectory(path.join(home, path.dirname(bridge)), { recursive: true });
 
@@ -136,7 +136,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* Template.make();
+      const installation = yield* makeInstallation();
 
       const commands = makeSandboxCommands(home, (command) =>
         command === "uname" ? { output: "FreeBSD amd64\n" } : {},
@@ -157,7 +157,7 @@ describe("Template", () => {
       const fs = yield* FileSystem.FileSystem;
       const path = yield* Path.Path;
       const home = yield* fs.makeTempDirectoryScoped();
-      const installation = yield* Template.make();
+      const installation = yield* makeInstallation();
 
       const commands = makeSandboxCommands(home, (command) =>
         command === "uname"
@@ -195,7 +195,7 @@ describe.skipIf(!enabled)("Template on this machine", () => {
           ...local,
           childProcessSpawner: withHome(local.childProcessSpawner, home),
         };
-        const installation = yield* Template.make();
+        const installation = yield* makeInstallation();
 
         yield* installation.template.prepare.pipe(Effect.provide(Sandbox.layerServices(sandbox)));
 

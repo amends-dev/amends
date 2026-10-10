@@ -2,9 +2,9 @@ import type { StreamPart } from "@amends/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Result } from "effect";
 import { Prompt } from "effect/ai";
-import * as History from "../src/bridge/History.ts";
-import type { SessionEvent } from "../src/bridge/SessionEvent.ts";
-import * as Turn from "../src/bridge/Turn.ts";
+import * as History from "../src/internal/bridge/History.ts";
+import type { SessionEvent } from "../src/internal/bridge/SessionEvent.ts";
+import * as Turn from "../src/internal/bridge/Turn.ts";
 
 /** A session opencode created: its id ends with a random part, which the written ids reuse. */
 const session = { sessionID: "ses_efb8baedfffeBYbN21QzYS7lIf", now: 1_791_073_617_000 };

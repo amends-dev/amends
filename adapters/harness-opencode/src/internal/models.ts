@@ -30,13 +30,13 @@ export interface Models {
  * key, with one set of headers, for each provider, and serves a model through one protocol, at one
  * URL, with one output limit, so endpoints that differ in them fail with `UnsupportedError`.
  */
-export const fromEndpoints = (endpoints: {
+export const modelsOf = (endpoints: {
   readonly model: ModelEndpoint.ModelEndpoint;
-  readonly models: Readonly<Record<string, ModelEndpoint.ModelEndpoint>>;
+  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>> | undefined;
 }): Result.Result<Models, HarnessError.UnsupportedError> => {
   const byProvider = Object.entries(
     Array.groupBy(
-      [endpoints.model, ...Object.values(endpoints.models)],
+      [endpoints.model, ...Object.values(endpoints.models ?? {})],
       (endpoint) => endpoint.provider,
     ),
   );
@@ -52,7 +52,10 @@ export const fromEndpoints = (endpoints: {
     ),
     model: modelRefOf(endpoints.model),
     models: Object.fromEntries(
-      Object.entries(endpoints.models).map(([name, endpoint]) => [name, modelRefOf(endpoint)]),
+      Object.entries(endpoints.models ?? {}).map(([name, endpoint]) => [
+        name,
+        modelRefOf(endpoint),
+      ]),
     ),
   });
 };

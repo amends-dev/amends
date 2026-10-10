@@ -1,16 +1,38 @@
 {
   "name": "@amends/harness-opencode",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
+  "description": "opencode as an agent for the @amends/harness contract: opencode works in a sandbox behind its bridge, which the agent's template installs there.",
+  "keywords": [
+    "agent",
+    "ai",
+    "effect",
+    "harness",
+    "opencode",
+    "sandbox"
+  ],
+  "homepage": "https://github.com/saribmah/amends-v2/tree/main/adapters/harness-opencode#readme",
+  "bugs": {
+    "url": "https://github.com/saribmah/amends-v2/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saribmah/amends-v2.git",
+    "directory": "adapters/harness-opencode"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
     ".": "./src/index.ts",
     "./*": "./src/*.ts",
-    "./bridge/*": null
+    "./internal/*": null
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@amends/harness": "workspace:*",

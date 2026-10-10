@@ -7,7 +7,7 @@ import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
-import * as Driver from "../src/bridge/Driver.ts";
+import * as Driver from "../src/internal/bridge/Driver.ts";
 import {
   type FakeOpencodeOptions,
   type FakeTurn,

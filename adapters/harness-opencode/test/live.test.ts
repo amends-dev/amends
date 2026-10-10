@@ -25,8 +25,8 @@ import {
 } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
-import * as Driver from "../src/bridge/Driver.ts";
-import * as Models from "../src/Models.ts";
+import * as Driver from "../src/internal/bridge/Driver.ts";
+import { modelsOf } from "../src/internal/models.ts";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import { makeSandbox } from "./fixtures.ts";
 
@@ -78,13 +78,11 @@ const makeOpencodeEnv = Effect.gen(function* () {
  * opencode's driver as a bridge runs it, on this machine, on `endpoints` or the model the tests
  * run on, and a directory for its session. opencode's server stops when the scope closes.
  */
-const makeLiveDriver = (endpoints?: Parameters<typeof Models.fromEndpoints>[0]) =>
+const makeLiveDriver = (endpoints?: Parameters<typeof modelsOf>[0]) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* fs.makeTempDirectoryScoped();
-    const models = Result.getOrThrow(
-      Models.fromEndpoints(endpoints ?? { model: endpoint, models: {} }),
-    );
+    const models = Result.getOrThrow(modelsOf(endpoints ?? { model: endpoint, models: {} }));
     const driver = yield* Driver.make({
       model: models.model,
       models: models.models,

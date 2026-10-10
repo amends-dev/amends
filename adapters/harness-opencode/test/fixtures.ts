@@ -3,7 +3,7 @@ import { LocalSandboxProvider } from "@amends/sandbox-local";
 import { Network, type Template } from "@amends/sandbox";
 import { type Crypto, Effect, FileSystem, Path, Schema } from "effect";
 import type { Socket } from "effect/socket";
-import { SessionEvent } from "../src/bridge/SessionEvent.ts";
+import { SessionEvent } from "../src/internal/bridge/SessionEvent.ts";
 
 /**
  * A new sandbox on this machine, prepared with `template` if given, and destroyed with the
