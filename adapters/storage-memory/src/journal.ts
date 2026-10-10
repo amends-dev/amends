@@ -1,4 +1,4 @@
-import { Commit, Entry, Store } from "@amends/core/journal";
+import { Commit, Entry, Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { MemoryDatabase } from "./database.ts";

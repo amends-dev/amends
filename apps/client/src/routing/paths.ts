@@ -1,4 +1,4 @@
-import type { SettingsTab } from "@amends/ui/screens/settings";
+import type { SettingsTab } from "@amends-dev/ui/screens/settings";
 export type WorkspacePage =
   | "home"
   | "inbox"

@@ -1,5 +1,5 @@
 import { Show, createContext, createUniqueId, splitProps, useContext, type JSX } from "solid-js";
-import { IconCheck } from "@amends/icons";
+import { IconCheck } from "@amends-dev/icons";
 import * as fieldStyles from "../field/field.css.ts";
 import { classes } from "../../internal/props.ts";
 import * as s from "./choice.css.ts";

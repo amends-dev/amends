@@ -1,10 +1,10 @@
-import { AssignmentService, BuiltinRoles, Role } from "@amends/core/authorization";
+import { AssignmentService, BuiltinRoles, Role } from "@amends-dev/core/authorization";
 
-import { Actor, Identity } from "@amends/core/identity";
+import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Log, Store } from "@amends/core/journal";
+import { Log, Store } from "@amends-dev/core/journal";
 
-import type { Gateway } from "@amends/gateway";
+import type { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 
 import { Effect, Option, Result } from "effect";

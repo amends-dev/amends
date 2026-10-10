@@ -1,6 +1,6 @@
-import { BuiltinRoles } from "@amends/core/authorization";
-import { Invitation } from "@amends/core/workspace";
-import { Suites } from "@amends/storage-conformance";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { Invitation } from "@amends-dev/core/workspace";
+import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import { harness } from "./harness.ts";

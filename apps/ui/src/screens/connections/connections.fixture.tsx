@@ -1,7 +1,7 @@
 // Workshop harness: Connections over local state, with integrations shaped like those the local
 // host installs. Not exported.
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { IconMarkConnections } from "@amends/icons";
+import { IconMarkConnections } from "@amends-dev/icons";
 import type { FormField, FormIssue } from "../../components/form-fields/index.ts";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";

@@ -1,4 +1,4 @@
-import { ApiErrors, Invitation, Member, Workspace } from "@amends/api-http";
+import { ApiErrors, Invitation, Member, Workspace } from "@amends-dev/api-http";
 import { Cause, Effect, Schema } from "effect";
 import { Reactivity } from "effect/reactivity";
 import type { Api } from "../api/client.ts";

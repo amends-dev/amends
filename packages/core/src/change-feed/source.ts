@@ -55,7 +55,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/change-feed/source/Service",
+  "@amends-dev/core/change-feed/source/Service",
 ) {}
 
 export const Options = Schema.Struct({

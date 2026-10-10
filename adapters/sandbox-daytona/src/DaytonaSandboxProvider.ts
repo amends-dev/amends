@@ -16,7 +16,13 @@
  *
  * @since 0.1.0
  */
-import { Network, Sandbox, SandboxError, SandboxProvider, type Template } from "@amends/sandbox";
+import {
+  Network,
+  Sandbox,
+  SandboxError,
+  SandboxProvider,
+  type Template,
+} from "@amends-dev/sandbox";
 import {
   type CreateSandboxFromSnapshotParams,
   Daytona,
@@ -64,7 +70,7 @@ export interface Options {
  * **Example** (A sandbox from another snapshot, which Daytona stops after an hour idle)
  *
  * ```ts
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { Effect } from "effect";
  *
  * const program = Effect.gen(function* () {
@@ -115,7 +121,7 @@ const stoppedStates = new Set(["stopped", "archived"]);
  * **Example** (A provider for one piece of work)
  *
  * ```ts
- * import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+ * import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
  * import { BunCrypto } from "@effect/platform-bun";
  * import { Effect, Redacted } from "effect";
  *
@@ -386,8 +392,8 @@ export const make = Effect.fn("DaytonaSandboxProvider.make")(function* (options:
  * **Example** (Sandboxes of the organization whose key the environment holds)
  *
  * ```ts
- * import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { BunCrypto } from "@effect/platform-bun";
  * import { Config, Effect, Layer } from "effect";
  *

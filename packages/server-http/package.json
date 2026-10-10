@@ -1,5 +1,5 @@
 {
-  "name": "@amends/server-http",
+  "name": "@amends-dev/server-http",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/api-http": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/gateway": "workspace:*",
+    "@amends-dev/api-http": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
     "effect": "catalog:"
   }
 }

@@ -1,9 +1,10 @@
 /**
  * A channel is a configured external communication point: a connection whose integration gives
- * channels, as `@amends/connection`'s `ChannelTransport` describes them, and one destination group,
- * where each conversation the channel receives becomes a thread. Changing the destination affects
- * new conversations only: a bound thread stays where it is. `ChannelService` is the operations;
- * `ChannelIntake` takes in what a channel receives, and deliveries carry replies back out.
+ * channels, as `@amends-dev/connection`'s `ChannelTransport` describes them, and one destination
+ * group, where each conversation the channel receives becomes a thread. Changing the destination
+ * affects new conversations only: a bound thread stays where it is. `ChannelService` is the
+ * operations; `ChannelIntake` takes in what a channel receives, and deliveries carry replies back
+ * out.
  *
  * @since 0.1.0
  */

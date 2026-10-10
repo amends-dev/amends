@@ -18,7 +18,7 @@
  *
  * @since 0.1.0
  */
-import { Sandbox, type Template } from "@amends/sandbox";
+import { Sandbox, type Template } from "@amends-dev/sandbox";
 import { type Effect, Schema, type Stream } from "effect";
 import type { LanguageModel, Prompt, Tool } from "effect/ai";
 import type { HarnessError } from "./HarnessError.ts";
@@ -211,7 +211,7 @@ export interface AgentSession {
  * **Example** (An agent that answers from its model alone)
  *
  * ```ts
- * import { Agent, Harness, HarnessError } from "@amends/harness";
+ * import { Agent, Harness, HarnessError } from "@amends-dev/harness";
  * import { Effect, Stream } from "effect";
  *
  * const echo: Agent.Agent = {

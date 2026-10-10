@@ -1,9 +1,9 @@
-import { type Agent, Harness, type ModelEndpoint } from "@amends/harness";
-import { SandboxProvider } from "@amends/sandbox";
-import type { ToolSource } from "@amends/toolkit";
+import { type Agent, Harness, type ModelEndpoint } from "@amends-dev/harness";
+import { SandboxProvider } from "@amends-dev/sandbox";
+import type { ToolSource } from "@amends-dev/toolkit";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Redacted, Result, Schema } from "effect";
-import type { ChannelTransport } from "@amends/channel";
+import type { ChannelTransport } from "@amends-dev/channel";
 import * as Connection from "../src/Connection.ts";
 import * as Integration from "../src/Integration.ts";
 import * as Integrations from "../src/Integrations.ts";

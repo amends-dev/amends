@@ -104,7 +104,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/service/Service",
+  "@amends-dev/core/turn/service/Service",
 ) {}
 
 /** Entries of a session log read at a time. */

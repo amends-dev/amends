@@ -1,5 +1,5 @@
-import { Group, GroupFollow, GroupMembership } from "@amends/core/group";
-import { Workspace } from "@amends/core/workspace";
+import { Group, GroupFollow, GroupMembership } from "@amends-dev/core/group";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

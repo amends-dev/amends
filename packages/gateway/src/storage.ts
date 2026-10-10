@@ -1,8 +1,8 @@
-import type { Integrations } from "@amends/connection";
-import type * as Core from "@amends/core";
-import type { DeliveryJobs } from "@amends/core/channel";
-import type { TurnJobs } from "@amends/core/turn";
-import type { Workspace } from "@amends/core/workspace";
+import type { Integrations } from "@amends-dev/connection";
+import type * as Core from "@amends-dev/core";
+import type { DeliveryJobs } from "@amends-dev/core/channel";
+import type { TurnJobs } from "@amends-dev/core/turn";
+import type { Workspace } from "@amends-dev/core/workspace";
 import { Context } from "effect";
 import type { Crypto, Effect } from "effect";
 
@@ -26,7 +26,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/gateway/storage/Service",
+  "@amends-dev/gateway/storage/Service",
 ) {}
 
 export * as WorkspaceStorage from "./storage.ts";

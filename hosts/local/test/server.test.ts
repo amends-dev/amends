@@ -1,7 +1,7 @@
-import { Assignment, BuiltinRoles } from "@amends/core/authorization";
+import { Assignment, BuiltinRoles } from "@amends-dev/core/authorization";
 import { describe, expect, it } from "@effect/vitest";
-import { Identity } from "@amends/core/identity";
-import { Invitation, Member, Ownership, Workspace } from "@amends/core/workspace";
+import { Identity } from "@amends-dev/core/identity";
+import { Invitation, Member, Ownership, Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Schema } from "effect";
 import { setup } from "./database.ts";
 import { withServer } from "./server.ts";

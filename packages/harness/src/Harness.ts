@@ -11,7 +11,7 @@
  *
  * @since 0.1.0
  */
-import { Sandbox } from "@amends/sandbox";
+import { Sandbox } from "@amends-dev/sandbox";
 import { Context, Effect, FileSystem, Layer, Path } from "effect";
 import { Prompt } from "effect/ai";
 import type { Agent, SessionId, Workspace } from "./Agent.ts";
@@ -78,7 +78,7 @@ export class Harness extends Context.Service<
       options: CreateSessionOptions,
     ) => Effect.Effect<Session.Session, HarnessError>;
   }
->()("@amends/harness/Harness") {}
+>()("@amends-dev/harness/Harness") {}
 
 /**
  * The harness over `agent`, as its adapter implements it.
@@ -86,11 +86,11 @@ export class Harness extends Context.Service<
  * **Example** (Running a turn, saving the session, and resuming it)
  *
  * ```ts
- * import { Agent, Harness, Session } from "@amends/harness";
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { Agent, Harness, Session } from "@amends-dev/harness";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { Console, Effect, Schema, Stream } from "effect";
  *
- * declare const agent: Agent.Agent; // from an adapter, such as @amends/harness-opencode
+ * declare const agent: Agent.Agent; // from an adapter, such as @amends-dev/harness-opencode
  *
  * const SessionStateJson = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState));
  *
@@ -190,7 +190,7 @@ export const make = (agent: Agent): Harness["Service"] => {
  * **Example** (Providing the harness to a program)
  *
  * ```ts
- * import { Agent, Harness } from "@amends/harness";
+ * import { Agent, Harness } from "@amends-dev/harness";
  * import { Effect } from "effect";
  *
  * declare const agent: Agent.Agent;

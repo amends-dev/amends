@@ -1,6 +1,6 @@
-import { Harness, type StreamPart } from "@amends/harness";
-import { SessionId } from "@amends/harness/Agent";
-import { type Sandbox, Template } from "@amends/sandbox";
+import { Harness, type StreamPart } from "@amends-dev/harness";
+import { SessionId } from "@amends-dev/harness/Agent";
+import { type Sandbox, Template } from "@amends-dev/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Layer, Path, Redacted, Schedule, Schema, Stream } from "effect";

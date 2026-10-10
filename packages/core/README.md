@@ -1,6 +1,6 @@
 # Core
 
-`@amends/core` implements one workspace's journal, authorization, and application
+`@amends-dev/core` implements one workspace's journal, authorization, and application
 operations. Hosts supply storage and cryptography; the gateway supplies the actor
 for each protected operation. The root `layer`
 composes the workspace services.
@@ -37,7 +37,7 @@ Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features belong beside these domains; workspace scoping alone does not make
 a feature part of workspace management.
 
-`@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
+`@amends-dev/core/notification` holds the `Notification.Record` model, the `NotificationStore`
 contract, `NotificationService`, and the projection that generates notifications. A record
 references a source log entry and a Human, Agent, Contact, or Triage recipient (one Triage
 recipient per workspace, `{ _tag: "Triage" }`), and is `Pending`, `Discarded` when its agent
@@ -127,7 +127,7 @@ every workspace's jobs.
 
 ## Groups
 
-`@amends/core/group` holds team and direct groups, their admissions, and follows.
+`@amends-dev/core/group` holds team and direct groups, their admissions, and follows.
 `GroupService` creates teams, private or public, and reads groups (`listMine`, `listPublic`,
 `get`);
 `GroupMembershipService` adds, removes, and lets members join public groups and leave team
@@ -150,7 +150,7 @@ without thread activity. Workspace-member removal uses it for every admission. S
 
 ## Connections
 
-`@amends/core/connection` holds a workspace's connections, each its link to one integration its
+`@amends-dev/core/connection` holds a workspace's connections, each its link to one integration its
 host installs, as [connection](../connection/README.md) declares integrations. `ConnectionService` lists the
 host's `integrations`, each as `Connection.IntegrationView` (its auth methods, what it gives,
 whether the agent of its harnesses `requiresSandbox`, and the form of its settings), which every
@@ -180,7 +180,7 @@ gateway supplies the host's integrations as `Integrations`.
 
 ## Agents
 
-`@amends/core/agent` holds a workspace's agents. An agent is a workspace member that works: `Agent.Record` keeps its
+`@amends-dev/core/agent` holds a workspace's agents. An agent is a workspace member that works: `Agent.Record` keeps its
 instructions; its `harness`, the harnesses of one of the workspace's connections or `Auto`, for
 amends to choose among them; its `model`, one a connection offers, by id, with an `effort`; and its
 `sandbox`, the sandboxes of a connection, or none. Its name, role, and departure are its
@@ -220,7 +220,7 @@ and stopping or retrying its [turns](#turns), requires.
 
 ## Turns
 
-`@amends/core/turn` holds agents' turns in threads. A `Turn.Record` is one harness turn of one
+`@amends-dev/core/turn` holds agents' turns in threads. A `Turn.Record` is one harness turn of one
 agent in one thread: `queued` until its job starts it, `running`, `cancelling` once asked to stop,
 then `completed`, `failed`, or `cancelled`, never reopening. An agent has at most one active turn
 per thread, which the stores enforce, and work that arrives while it is active waits for the next.
@@ -334,7 +334,7 @@ agent's reply as its message.
 
 ## Read state
 
-`@amends/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
+`@amends-dev/core/read-state` holds private read state: `ReadStateService.markThreadRead` and
 `markGroupRead`, over the required `ReadStateStore` binding, which is kept outside the journal.
 Its internal `ReadStateCommand.markThreadRead` marks the reader's notifications from the thread
 seen and advances their position; marking a thread read, starting one, and replying all use it, so
@@ -356,21 +356,22 @@ not grant authority, and a contact identity does not select an external reply de
 
 `Target.Reference` supports Workspace, Member, Group, Thread, and Connection. Group targets carry
 `workspaceId` and `Group.Id`; thread targets carry `workspaceId` and `ThreadId.Id`, exported from
-`@amends/core/thread`. Exact target scopes compare the workspace, kind, and ID; a workspace scope
-covers targets in that workspace. Group and thread actions also require current group membership,
-following the [thread access rule](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions);
-every thread belongs to one group.
+`@amends-dev/core/thread`. Exact target scopes compare the workspace, kind, and ID; a workspace
+scope covers targets in that workspace. Group and thread actions also require current group
+membership, following the [thread access
+rule](../../docs/core-model.md#agreed-thread-access-combines-audience-and-action-permissions); every
+thread belongs to one group.
 
 ## Threads
 
-`@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
+`@amends-dev/core/thread` holds threads, participations, messages, and their timeline activity, with
 four store contracts. Its operations are `ThreadService` (`startInGroup`, which also starts a
 thread as a task, `startDirect`, `rename`, `get`, `listInGroup`, `listOpenings`, `readTimeline`,
 `listParticipants`), `ThreadMessageService` (`publish`, `edit`, `delete`, `typing`), and
 `ThreadParticipationService` (`follow`, `unfollow`). A participant is a member, a contact, or
 triage: member participation references the exact group admission, while contacts and triage take
-part without group access. A message author is a member or a contact. `@amends/core/task` builds on
-it: `Task.Record` is a row keyed by the thread, `TaskService` (`create`, `update`, `get`,
+part without group access. A message author is a member or a contact. `@amends-dev/core/task` builds
+on it: `Task.Record` is a row keyed by the thread, `TaskService` (`create`, `update`, `get`,
 `listInGroup`) the operations, and `TaskCommand` the writes that create and change a task at the
 thread's next position, telling and admitting by the change, and asking an agent's turn to stop when
 a change takes the agent off the task; the thread's list items carry each thread's task.
@@ -446,7 +447,7 @@ See [thread workflows](../../docs/thread-workflows.md).
 
 ## Request keys
 
-`@amends/core/request` holds `Request.Key`, the `Request.Options` creating operations accept,
+`@amends-dev/core/request` holds `Request.Key`, the `Request.Options` creating operations accept,
 `Request.derivedId`, which derives an ID from parts naming an operation, its requester, and a key,
 and `Request.idFor`, a new ID without a key or a derived one with it. Each creating operation names
 what it creates that way, so a retry runs the operation's checks, finds the record by its ID, and
@@ -462,7 +463,7 @@ or `owner`. Permission groups supply a name prefix and default target kind, but
 never a default tier:
 
 ```ts
-import { Permission } from "@amends/core/authorization";
+import { Permission } from "@amends-dev/core/authorization";
 
 const member = Permission.makeGroup("member", { targetKind: "Member" });
 const Read = member.make("read", { builtinTier: "member" });
@@ -556,7 +557,7 @@ The existing journal log reader and projection replay retain complete-batch read
 
 ## Change feed
 
-`@amends/core/change-feed` exports the `ChangeFeed` schemas and
+`@amends-dev/core/change-feed` exports the `ChangeFeed` schemas and
 `ChangeFeedService.watch(options?)`. The feed reads the workspace journal, so it
 carries every commit to the journal from any host or process over the same storage,
 including commits whose acknowledgment was lost. Nothing is published from the
@@ -622,8 +623,8 @@ message schemas. Frontend query dependencies belong in the client.
 
 ## Signals
 
-`@amends/core/signal` holds what is happening now and is never stored: `Signal.Value` is `Typing`,
-`ThreadRead`, `GroupRead`, `NotificationsSeen`, or `TurnDraft`.
+`@amends-dev/core/signal` holds what is happening now and is never stored: `Signal.Value` is
+`Typing`, `ThreadRead`, `GroupRead`, `NotificationsSeen`, or `TurnDraft`.
 `Signal.changeFeedReachOf` gives each its audience on the change feed, as a fact declares one:
 typing reaches the thread's group with `thread.read` for the thread, and the three read-state
 signals reach only the member whose private state changed, so their other sessions stay current
@@ -648,8 +649,8 @@ signals after their writes; the reader's sessions, the one that wrote included, 
 
 ## Channels
 
-`@amends/core/channel` is a channel, a connection's external conversations as threads in one group,
-as [threads](../../docs/threads.md#channels) fixes it and
+`@amends-dev/core/channel` is a channel, a connection's external conversations as threads in one
+group, as [threads](../../docs/threads.md#channels) fixes it and
 [channels](../../docs/thread-workflows.md#channels) describes. `Channel.Record` names the connection,
 the group new conversations open in, and whether they open tasks; `ChannelBinding.Record` is a bound
 thread's conversation, keyed by the thread, as the connection's transport
@@ -716,7 +717,7 @@ follow when touched: one module per namespace, named after it and flat in the fe
 directory (`thread/ThreadMessageService.ts` exports `ThreadMessageService`), with
 helpers no consumer imports under `internal/`; a header paragraph and `@since` on every
 module; `@category` and `@since` on every export, documented one by one; and a service
-key that names its module, `@amends/core/thread/ThreadStore`. The categories and the
+key that names its module, `@amends-dev/core/thread/ThreadStore`. The categories and the
 rest of the convention are in [threads](../../docs/threads.md#code-conventions).
 
 ```ts
@@ -724,12 +725,12 @@ rest of the convention are in [threads](../../docs/threads.md#code-conventions).
 import { MemberStore } from "./store.ts";
 
 // From another package:
-import { Member, MemberService } from "@amends/core/workspace";
+import { Member, MemberService } from "@amends-dev/core/workspace";
 ```
 
 The domain `index.ts` files define the public package surface. A feature folder
 does not automatically need its own barrel or package subpath. File moves retain
-the existing `@amends/core/workspace` and `@amends/core/authorization` imports.
+the existing `@amends-dev/core/workspace` and `@amends-dev/core/authorization` imports.
 
 Workspace and member IDs live in small leaf modules and remain available as
 `Workspace.Id` and `Member.Id`. Use these ID leaves to avoid model dependency
@@ -847,7 +848,7 @@ acquisition. A constructor does not cache its result by itself.
 For example, callers can construct logs with an explicit transaction coordinator:
 
 ```ts
-import { Log, Transaction } from "@amends/core/journal";
+import { Log, Transaction } from "@amends-dev/core/journal";
 import { Effect } from "effect";
 
 const makeLogs = Effect.gen(function* () {

@@ -1,4 +1,4 @@
-import { Identity } from "@amends/core/identity";
+import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { Effect, Redacted } from "effect";
 
@@ -23,7 +23,7 @@ export interface Interface {
  * one. Hosts own both, along with the format and lifetime of their tokens.
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/gateway/session-tokens/Service",
+  "@amends-dev/gateway/session-tokens/Service",
 ) {}
 
 export * as SessionTokens from "./session-tokens.ts";

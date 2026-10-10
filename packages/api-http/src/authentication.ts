@@ -1,4 +1,4 @@
-import { Identity } from "@amends/core/identity";
+import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
 
@@ -8,7 +8,7 @@ import { HttpApiMiddleware, HttpApiSecurity } from "effect/http-api";
  * @category services
  */
 export class Principal extends Context.Service<Principal, Identity.MemberReference>()(
-  "@amends/api-http/authentication/Principal",
+  "@amends-dev/api-http/authentication/Principal",
 ) {}
 
 export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
@@ -27,7 +27,7 @@ export class Unauthorized extends Schema.TaggedError<Unauthorized>()(
 export class Authentication extends HttpApiMiddleware.Service<
   Authentication,
   { provides: Principal }
->()("@amends/api-http/authentication/Authentication", {
+>()("@amends-dev/api-http/authentication/Authentication", {
   requiredForClient: true,
   security: { bearer: HttpApiSecurity.bearer },
   error: Unauthorized,

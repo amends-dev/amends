@@ -1,7 +1,7 @@
-# @amends/harness-opencode
+# @amends-dev/harness-opencode
 
-opencode as an agent for the [`@amends/harness`](../../packages/harness) contract. opencode works
-in the sandbox behind its bridge, a program the agent's template installs there with opencode
+opencode as an agent for the [`@amends-dev/harness`](../../packages/harness) contract. opencode
+works in the sandbox behind its bridge, a program the agent's template installs there with opencode
 itself: the bridge drives opencode's server, and hosts reach the bridge over a WebSocket on a port
 of the sandbox's. Nothing else of opencode is exposed outside the sandbox, and hosts that start
 sessions in a sandbox with the same options share its bridge and its server, whichever host
@@ -24,11 +24,11 @@ request; they share everything but the opencode they run and the session API the
 ## Install
 
 ```sh
-bun add @amends/harness-opencode @amends/harness @amends/sandbox effect
+bun add @amends-dev/harness-opencode @amends-dev/harness @amends-dev/sandbox effect
 ```
 
-Add a sandbox provider, such as [`@amends/sandbox-local`](../sandbox-local) for this machine or
-[`@amends/sandbox-daytona`](../sandbox-daytona). The host runs on Bun: `OpencodeAgent.make`
+Add a sandbox provider, such as [`@amends-dev/sandbox-local`](../sandbox-local) for this machine or
+[`@amends-dev/sandbox-daytona`](../sandbox-daytona). The host runs on Bun: `OpencodeAgent.make`
 bundles the bridge program with `Bun.build`. It needs Effect's `Crypto` and a
 `Socket.WebSocketConstructor` that sends headers, as `@effect/platform-bun` provides them.
 
@@ -40,9 +40,9 @@ connects to a bridge any of them launched. The caller creates each sandbox with 
 `template`, which installs opencode and the bridge, and `Harness.make` runs the agent in it.
 
 ```ts
-import { OpencodeAgent } from "@amends/harness-opencode";
-import { Agent, Harness } from "@amends/harness";
-import { SandboxProvider } from "@amends/sandbox";
+import { OpencodeAgent } from "@amends-dev/harness-opencode";
+import { Agent, Harness } from "@amends-dev/harness";
+import { SandboxProvider } from "@amends-dev/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { Config, Effect, Layer, Redacted } from "effect";
 import { createHmac } from "node:crypto";
@@ -83,7 +83,7 @@ models' replace: `provider` for `OpencodeAgent`, as opencode 1 names them, and `
 with. Both take effect when the bridge starts the server. All of the options, the keys included, name
 the bridge, so an agent made with other options gets a bridge and a server of its own in a
 sandbox, and never runs on another's.
-[`@amends/harness`](../../packages/harness/README.md) says how sessions, turns, and releasing a
+[`@amends-dev/harness`](../../packages/harness/README.md) says how sessions, turns, and releasing a
 session work, which these agents do as any agent does. `Opencode2Agent.make` takes the same
 options.
 

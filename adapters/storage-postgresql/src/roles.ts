@@ -1,5 +1,5 @@
-import { BuiltinRoles, Role, RoleStore } from "@amends/core/authorization";
-import { Store } from "@amends/core/journal";
+import { BuiltinRoles, Role, RoleStore } from "@amends-dev/core/authorization";
+import { Store } from "@amends-dev/core/journal";
 import { and, eq, lt } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

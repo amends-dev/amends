@@ -1,21 +1,22 @@
-# @amends/harness
+# @amends-dev/harness
 
 Runs an agent, such as opencode, Codex, Claude Code, or one in your own process over an Effect AI
 `LanguageModel`, and streams every agent's turns in one format, so your code does not depend on
 which agent works for it. It is to agents what Effect AI is to model providers, and is modelled on
-AI SDK's harnesses. The package depends only on Effect and on [`@amends/sandbox`](../sandbox), the
-sandboxes agents work in.
+AI SDK's harnesses. The package depends only on Effect and on [`@amends-dev/sandbox`](../sandbox),
+the sandboxes agents work in.
 
 ## Install
 
 ```sh
-bun add @amends/harness @amends/sandbox effect
+bun add @amends-dev/harness @amends-dev/sandbox effect
 ```
 
 Add an adapter for each agent you run, such as
-[`@amends/harness-opencode`](../../adapters/harness-opencode) for opencode in a sandbox or
-[`@amends/harness-amends`](../../adapters/harness-amends) for an agent in your own process, and a
-sandbox provider, such as `@amends/sandbox-local` for this machine or `@amends/sandbox-daytona`.
+[`@amends-dev/harness-opencode`](../../adapters/harness-opencode) for opencode in a sandbox or
+[`@amends-dev/harness-amends`](../../adapters/harness-amends) for an agent in your own process, and
+a sandbox provider, such as `@amends-dev/sandbox-local` for this machine or
+`@amends-dev/sandbox-daytona`.
 
 ## Quick start
 
@@ -24,11 +25,11 @@ and owns it, creates a session in it, and runs turns. Releasing the session retu
 JSON-encodable data, to resume it later on any host, and on any agent.
 
 ```ts
-import { Agent, Harness, Session } from "@amends/harness";
-import { SandboxProvider } from "@amends/sandbox";
+import { Agent, Harness, Session } from "@amends-dev/harness";
+import { SandboxProvider } from "@amends-dev/sandbox";
 import { Console, Effect, Schema, Stream } from "effect";
 
-declare const agent: Agent.Agent; // from an adapter, such as @amends/harness-opencode
+declare const agent: Agent.Agent; // from an adapter, such as @amends-dev/harness-opencode
 
 const SessionStateJson = Schema.fromJsonString(Schema.toCodecJson(Session.SessionState));
 
@@ -83,7 +84,7 @@ A `Session` runs one turn at a time. `stream` runs a turn as a stream of `Stream
 asks the agent to answer in JSON and decodes the answer with a schema:
 
 ```ts
-import { Session } from "@amends/harness";
+import { Session } from "@amends-dev/harness";
 import { Effect, Schema } from "effect";
 
 declare const session: Session.Session;
@@ -118,7 +119,7 @@ refuses it, which answers the agent `execution-denied`. The requests for calls m
 together, to answer in any order.
 
 ```ts
-import { Agent, Harness } from "@amends/harness";
+import { Agent, Harness } from "@amends-dev/harness";
 import { Effect, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 
@@ -220,7 +221,7 @@ host's process makes an Effect AI language model of each endpoint; an agent in a
 configured with them.
 
 ```ts
-import { ModelEndpoint } from "@amends/harness";
+import { ModelEndpoint } from "@amends-dev/harness";
 import { Redacted } from "effect";
 
 const sonnet: ModelEndpoint.ModelEndpoint = {
@@ -257,7 +258,7 @@ short, given how many steps the harness already has, which `StreamPart.afterStep
 turn the agent streams again. The harness runs one turn at a time and
 releases the session once, so an agent never sees a turn start while another runs.
 
-`@amends/harness-amends` is such an agent: a loop over an Effect AI `LanguageModel`, with the
+`@amends-dev/harness-amends` is such an agent: a loop over an Effect AI `LanguageModel`, with the
 tools in the sandbox given as an Effect AI toolkit.
 
 ### An agent in a sandbox, behind a bridge
@@ -276,10 +277,10 @@ sandbox exposes of the agent, on a port of its own, to hosts that present its to
    `BridgeClient.createSession`, with `BridgeClient.Options` saying how to install and launch the
    bridge, and how to derive its token from a sandbox's id.
 
-Each module's documentation shows one. [`@amends/harness-opencode`](../../adapters/harness-opencode)
-is a complete adapter: its template installs opencode and the bridge program, its driver runs
-opencode's server on the sandbox's loopback, and its bridge program serves the host's tools
-through the relay.
+Each module's documentation shows one.
+[`@amends-dev/harness-opencode`](../../adapters/harness-opencode) is a complete adapter: its
+template installs opencode and the bridge program, its driver runs opencode's server on the
+sandbox's loopback, and its bridge program serves the host's tools through the relay.
 
 How bridges run:
 
@@ -336,10 +337,10 @@ keeps a call that waits on the host alive with progress notifications every ten 
 agent with a time limit for a request, until it gives up after an hour. The relay's server must not
 close idle connections: Bun's does after ten seconds, unless it is made with `idleTimeout: 0`.
 
-Both agents of [`@amends/harness-opencode`](../../adapters/harness-opencode) use the relay: opencode
-connects to it as an MCP server for each session's directory, and lists its tools again when a
-turn's tools change. opencode 1's model calls them as tools of their own, and opencode 2's from code
-it runs.
+Both agents of [`@amends-dev/harness-opencode`](../../adapters/harness-opencode) use the relay:
+opencode connects to it as an MCP server for each session's directory, and lists its tools again
+when a turn's tools change. opencode 1's model calls them as tools of their own, and opencode 2's
+from code it runs.
 
 ## Development
 

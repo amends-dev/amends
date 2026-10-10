@@ -1,4 +1,4 @@
-import { Commit, Entry, Store } from "@amends/core/journal";
+import { Commit, Entry, Store } from "@amends-dev/core/journal";
 import { and, asc, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { Array, DateTime, Deferred, Effect, Layer, Option, Schema } from "effect";
 import { JournalEntry } from "./journal-entry.ts";

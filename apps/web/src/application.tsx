@@ -4,9 +4,9 @@ import {
   ClientProvider,
   type AppearanceSource,
   type ClientProviderProps,
-} from "@amends/client";
-import { Theme } from "@amends/ui/foundations/theme";
-import { CrashedScreen } from "@amends/ui/screens/standalone";
+} from "@amends-dev/client";
+import { Theme } from "@amends-dev/ui/foundations/theme";
+import { CrashedScreen } from "@amends-dev/ui/screens/standalone";
 import { ErrorBoundary, type ParentProps } from "solid-js";
 
 export type ApplicationProps = ParentProps<

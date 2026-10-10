@@ -1,5 +1,5 @@
 import { Show, createContext, createUniqueId, splitProps, useContext, type JSX } from "solid-js";
-import { IconAlertTriangle } from "@amends/icons";
+import { IconAlertTriangle } from "@amends-dev/icons";
 import { classes } from "../../internal/props.ts";
 import * as s from "./field.css.ts";
 

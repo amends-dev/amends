@@ -1,8 +1,8 @@
 import { afterEach, expect, it } from "@effect/vitest";
 import { cleanup, render, screen } from "@solidjs/testing-library";
 import { createSignal } from "solid-js";
-import { IconCheck, IconSearch, type IconSize, type IconWeight } from "@amends/icons";
-import { IconX } from "@amends/icons/x";
+import { IconCheck, IconSearch, type IconSize, type IconWeight } from "@amends-dev/icons";
+import { IconX } from "@amends-dev/icons/x";
 
 afterEach(cleanup);
 

@@ -3,9 +3,9 @@
  * every commit runs inside, and the guard every store applies to its
  * statements. Store modules require this service and nothing else of each other.
  */
-import { Commit, Store } from "@amends/core/journal";
-import type { Entry } from "@amends/core/journal";
-import type { Workspace } from "@amends/core/workspace";
+import { Commit, Store } from "@amends-dev/core/journal";
+import type { Entry } from "@amends-dev/core/journal";
+import type { Workspace } from "@amends-dev/core/workspace";
 import {
   Cause,
   Clock,
@@ -133,7 +133,7 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
 
 /** The session a program runs under; statements check it against their own binding. */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
-  "@amends/storage-postgresql/binding/Current",
+  "@amends-dev/storage-postgresql/binding/Current",
 ) {}
 
 export interface Interface {
@@ -167,7 +167,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/storage-postgresql/binding/Service",
+  "@amends-dev/storage-postgresql/binding/Service",
 ) {}
 
 /** Contention is a conflict the caller may retry; anything else failed the transaction. */

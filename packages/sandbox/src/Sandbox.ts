@@ -67,7 +67,7 @@ export type SandboxServices =
  * **Example** (Running a command and reading a file inside a sandbox)
  *
  * ```ts
- * import { Sandbox } from "@amends/sandbox";
+ * import { Sandbox } from "@amends-dev/sandbox";
  * import { Effect, FileSystem, Path } from "effect";
  * import { ChildProcess, ChildProcessSpawner } from "effect/process";
  *
@@ -155,7 +155,7 @@ export class Sandbox extends Context.Service<
       transformations: ReadonlyArray<RequestTransformation>,
     ) => Effect.Effect<void, SandboxError>;
   }
->()("@amends/sandbox/Sandbox") {}
+>()("@amends-dev/sandbox/Sandbox") {}
 
 /**
  * Provides the sandbox's files, processes, and paths to Effect code, without the `Sandbox` service

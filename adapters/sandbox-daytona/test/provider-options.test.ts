@@ -1,4 +1,4 @@
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
 import { BunServices } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Effect, Redacted } from "effect";

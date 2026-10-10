@@ -75,7 +75,7 @@ export interface Interface {
 
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/command/Service",
+  "@amends-dev/core/group/command/Service",
 ) {}
 
 /** Capture domain dependencies without capturing actor or transaction authority. @category constructors */

@@ -84,21 +84,21 @@ tool first runs.
 
 ## Channels
 
-[`@amends/channel`](../channel)'s `ChannelTransport` is what an integration gives a channel: how its
-external system's conversations are received and replied to. `receive` takes a request the system sent the host, its headers and
-body as they came, verifies it as the system signs it, and gives the `events` in it, each a
-`MessageReceived`, `MessageEdited`, or `MessageDeleted` with the external `conversation`, its id and
-what the transport needs to post there, the message's id, its `sender`, and when, and the `answer`
-the system expects when it does, as Slack's URL verification does; a request it cannot read is a
-`TransportError` of reason `rejected`. `post` sends `Outgoing`, a text and its author's name, as a
-reply in a conversation, and gives the id the system assigned the message; `edit` and `delete`,
-when the system allows them, change a posted message. `self` is the transport's own identity in the
-system, so that what it posted and receives back is known as an echo. A `TransportError` is
-`refused` when the system refused the request for good, and `unavailable`, which `isRetryable`, when
-it could not be reached. An integration gives transports with `channels: (access) =>
-Effect<ChannelTransport>`, and `Integration.channelTransport(connection, credential?)` makes one
-for a connection. No installed integration gives channels yet; the conformance suites run channels
-on a test transport.
+[`@amends-dev/channel`](../channel)'s `ChannelTransport` is what an integration gives a channel: how
+its external system's conversations are received and replied to. `receive` takes a request the
+system sent the host, its headers and body as they came, verifies it as the system signs it, and
+gives the `events` in it, each a `MessageReceived`, `MessageEdited`, or `MessageDeleted` with the
+external `conversation`, its id and what the transport needs to post there, the message's id, its
+`sender`, and when, and the `answer` the system expects when it does, as Slack's URL verification
+does; a request it cannot read is a `TransportError` of reason `rejected`. `post` sends `Outgoing`,
+a text and its author's name, as a reply in a conversation, and gives the id the system assigned the
+message; `edit` and `delete`, when the system allows them, change a posted message. `self` is the
+transport's own identity in the system, so that what it posted and receives back is known as an
+echo. A `TransportError` is `refused` when the system refused the request for good, and
+`unavailable`, which `isRetryable`, when it could not be reached. An integration gives transports
+with `channels: (access) => Effect<ChannelTransport>`, and `Integration.channelTransport(connection,
+credential?)` makes one for a connection. No installed integration gives channels yet; the
+conformance suites run channels on a test transport.
 
 ## Testing
 

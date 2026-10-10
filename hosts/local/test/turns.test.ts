@@ -1,9 +1,9 @@
-import { Api, Authentication } from "@amends/api-http";
-import { BuiltinRoles } from "@amends/core/authorization";
-import { Group } from "@amends/core/group";
-import { Identity } from "@amends/core/identity";
-import type { Thread } from "@amends/core/thread";
-import type { Member, Workspace } from "@amends/core/workspace";
+import { Api, Authentication } from "@amends-dev/api-http";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { Group } from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
+import type { Thread } from "@amends-dev/core/thread";
+import type { Member, Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Effect, Layer, Redacted, Schedule } from "effect";

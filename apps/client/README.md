@@ -1,6 +1,6 @@
 # Amends client
 
-`@amends/client` is the headless half of web and desktop. It talks to the host, keeps what it
+`@amends-dev/client` is the headless half of web and desktop. It talks to the host, keeps what it
 read current, and gives each screen a hook that returns what to show and the actions it offers.
 It renders nothing: web and desktop connect these hooks to [UI](../ui/README.md) screens and own
 routes, navigation, and page composition. Its hooks return the screens' own types, which it
@@ -115,8 +115,8 @@ can use their `$is` guards without comparing `_tag` directly.
 ## Verification
 
 ```sh
-bun run --filter @amends/client typecheck
-bun run --filter @amends/client test
+bun run --filter @amends-dev/client typecheck
+bun run --filter @amends-dev/client test
 bun run check
 ```
 

@@ -1,4 +1,4 @@
-import { Network } from "@amends/sandbox";
+import { Network } from "@amends-dev/sandbox";
 import { BunHttpServer } from "@effect/platform-bun";
 import { Effect, Fiber, Schema, Stream, SubscriptionRef } from "effect";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";

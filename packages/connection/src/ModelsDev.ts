@@ -7,7 +7,7 @@
  * package, base URL, and API. The catalog keeps the models whose package speaks a protocol amends
  * speaks, and the providers that have any.
  */
-import type { ModelEndpoint } from "@amends/harness";
+import type { ModelEndpoint } from "@amends-dev/harness";
 import { Effect, Schema } from "effect";
 import type * as ModelCatalog from "./ModelCatalog.ts";
 

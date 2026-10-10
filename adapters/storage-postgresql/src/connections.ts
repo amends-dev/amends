@@ -1,5 +1,5 @@
-import { Connection, ConnectionStore } from "@amends/core/connection";
-import { Store } from "@amends/core/journal";
+import { Connection, ConnectionStore } from "@amends-dev/core/connection";
+import { Store } from "@amends-dev/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

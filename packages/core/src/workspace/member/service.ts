@@ -73,7 +73,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/workspace/member-application/Service",
+  "@amends-dev/core/workspace/member-application/Service",
 ) {}
 
 const decodeId = Schema.decodeEffect(Member.Id);

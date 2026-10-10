@@ -65,7 +65,7 @@ export interface Endpoint extends Schema.Schema.Type<typeof Endpoint> {}
  * **Example** (Allowing one registry and a private network, except its metadata address)
  *
  * ```ts
- * import { Network } from "@amends/sandbox";
+ * import { Network } from "@amends-dev/sandbox";
  *
  * const policy = Network.NetworkPolicy.cases.AllowList.make({
  *   allowedHosts: ["registry.npmjs.org"],
@@ -101,7 +101,7 @@ export type NetworkPolicy = typeof NetworkPolicy.Type;
  * **Example** (Giving a sandbox an API key it never sees)
  *
  * ```ts
- * import { Network } from "@amends/sandbox";
+ * import { Network } from "@amends-dev/sandbox";
  * import type { Redacted } from "effect";
  *
  * declare const apiKey: Redacted.Redacted<string>;

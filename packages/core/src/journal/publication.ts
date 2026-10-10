@@ -11,7 +11,7 @@ import { Event } from "./event.ts";
  * @effect-leakable-service
  */
 export class Service extends Context.Service<Service, Event.Provenance>()(
-  "@amends/core/journal/publication/Service",
+  "@amends-dev/core/journal/publication/Service",
 ) {}
 
 /**

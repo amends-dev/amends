@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { Identity } from "@amends/core/identity";
+import { Identity } from "@amends-dev/core/identity";
 import { Schema } from "effect";
 import { WorkspaceDirectory } from "../src/directory.ts";
 import { SignIn } from "../src/sign-in.ts";

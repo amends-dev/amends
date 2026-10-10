@@ -1,5 +1,5 @@
 {
-  "name": "@amends/connection",
+  "name": "@amends-dev/connection",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,10 +13,10 @@
     "update-models": "bun run scripts/update-models.ts"
   },
   "dependencies": {
-    "@amends/channel": "workspace:*",
-    "@amends/harness": "workspace:*",
-    "@amends/sandbox": "workspace:*",
-    "@amends/toolkit": "workspace:*"
+    "@amends-dev/channel": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
+    "@amends-dev/toolkit": "workspace:*"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",

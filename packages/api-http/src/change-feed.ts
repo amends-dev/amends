@@ -1,5 +1,5 @@
-import { ChangeFeed } from "@amends/core/change-feed";
-import { Workspace } from "@amends/core/workspace";
+import { ChangeFeed } from "@amends-dev/core/change-feed";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

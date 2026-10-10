@@ -1,5 +1,5 @@
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { type Network, type Sandbox, type SandboxProvider, Template } from "@amends/sandbox";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+import { type Network, type Sandbox, type SandboxProvider, Template } from "@amends-dev/sandbox";
 import { Daytona, DaytonaNotFoundError } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { afterAll, describe, expect, layer } from "@effect/vitest";

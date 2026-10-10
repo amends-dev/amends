@@ -6,7 +6,7 @@ import {
   Grant,
   Role,
   RoleFacts,
-} from "@amends/core/authorization";
+} from "@amends-dev/core/authorization";
 import {
   Group,
   GroupService,
@@ -19,10 +19,10 @@ import {
   GroupPermissions,
   GroupProjection,
   GroupStore,
-} from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberFacts } from "@amends/core/workspace";
+} from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { Context, DateTime, Effect, Option, Ref } from "effect";
 import {
   type Bound,

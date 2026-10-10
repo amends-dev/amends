@@ -51,7 +51,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/store/Service",
+  "@amends-dev/core/turn/store/Service",
 ) {}
 
 export * as TurnStore from "./store.ts";

@@ -1,6 +1,6 @@
-import { Thread, ThreadStore, ThreadMessage } from "@amends/core/thread";
-import { Group } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
+import { Thread, ThreadStore, ThreadMessage } from "@amends-dev/core/thread";
+import { Group } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, desc, eq, isNotNull, lt, or, isNull, sql } from "drizzle-orm";
 import { threads } from "./schema.ts";

@@ -1,6 +1,6 @@
 import { For, Show, createEffect, createMemo, createSignal, createUniqueId, on } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { IconMarkClose, IconMarkSearch } from "@amends/icons";
+import { IconMarkClose, IconMarkSearch } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";

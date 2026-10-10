@@ -1,6 +1,6 @@
-import { Connection as ConnectionContract } from "@amends/connection";
-import { Connection } from "@amends/core/connection";
-import { Workspace } from "@amends/core/workspace";
+import { Connection as ConnectionContract } from "@amends-dev/connection";
+import { Connection } from "@amends-dev/core/connection";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

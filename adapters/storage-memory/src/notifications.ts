@@ -1,8 +1,8 @@
-import { Store } from "@amends/core/journal";
-import { Group } from "@amends/core/group";
-import { Notification, NotificationStore } from "@amends/core/notification";
-import { Thread, ThreadParticipation } from "@amends/core/thread";
-import { Member } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import { Group } from "@amends-dev/core/group";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
+import { Thread, ThreadParticipation } from "@amends-dev/core/thread";
+import { Member } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema, Predicate } from "effect";
 import { Binding } from "./binding.ts";
 import type { MemoryDatabase } from "./database.ts";

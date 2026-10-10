@@ -9,8 +9,13 @@
  * drafts to show. The run's loop performs it, part by part, and keeps the latest progress for the
  * turn's end to read.
  */
-import { SessionLog, type SessionStateStore, type Turn, type TurnJobs } from "@amends/core/turn";
-import { Agent, type Session, StreamPart } from "@amends/harness";
+import {
+  SessionLog,
+  type SessionStateStore,
+  type Turn,
+  type TurnJobs,
+} from "@amends-dev/core/turn";
+import { Agent, type Session, StreamPart } from "@amends-dev/harness";
 import {
   Array,
   Cause,

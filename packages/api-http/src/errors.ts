@@ -3,28 +3,28 @@ import {
   Authorization,
   Delegation,
   PermissionCatalog,
-} from "@amends/core/authorization";
+} from "@amends-dev/core/authorization";
 import {
   InvitationService,
   MemberService,
   OwnershipService,
   WorkspaceSettingsService,
-} from "@amends/core/workspace";
-import { GatewayErrors } from "@amends/gateway/errors";
-import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
-import { AgentService } from "@amends/core/agent";
-import { ChannelIntake, ChannelService } from "@amends/core/channel";
-import { TurnService } from "@amends/core/turn";
-import { ConnectionService } from "@amends/core/connection";
-import { NotificationService } from "@amends/core/notification";
-import { ReadStateService } from "@amends/core/read-state";
-import { TaskService } from "@amends/core/task";
+} from "@amends-dev/core/workspace";
+import { GatewayErrors } from "@amends-dev/gateway/errors";
+import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
+import { AgentService } from "@amends-dev/core/agent";
+import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
+import { TurnService } from "@amends-dev/core/turn";
+import { ConnectionService } from "@amends-dev/core/connection";
+import { NotificationService } from "@amends-dev/core/notification";
+import { ReadStateService } from "@amends-dev/core/read-state";
+import { TaskService } from "@amends-dev/core/task";
 import {
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
-} from "@amends/core/thread";
-import { Request } from "@amends/core/request";
+} from "@amends-dev/core/thread";
+import { Request } from "@amends-dev/core/request";
 import { Schema } from "effect";
 import { HttpApiSchema } from "effect/http-api";
 

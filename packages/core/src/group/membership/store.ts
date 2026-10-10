@@ -90,7 +90,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/membership/store/Service",
+  "@amends-dev/core/group/membership/store/Service",
 ) {}
 
 export * as GroupMembershipStore from "./store.ts";

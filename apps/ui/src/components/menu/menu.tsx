@@ -1,6 +1,6 @@
 import * as Primitive from "@kobalte/core/dropdown-menu";
 import { createContext, createSignal, splitProps, useContext, type JSX } from "solid-js";
-import { IconCheck } from "@amends/icons";
+import { IconCheck } from "@amends-dev/icons";
 import { Button, type ButtonProps } from "../button/index.ts";
 import { overlayMount } from "../../internal/overlay.ts";
 import * as s from "./menu.css.ts";

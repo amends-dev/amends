@@ -1,5 +1,5 @@
-import { Entry, Store } from "@amends/core/journal";
-import { Suites } from "@amends/storage-conformance";
+import { Entry, Store } from "@amends-dev/core/journal";
+import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option } from "effect";
 import { SqlClient } from "effect/sql";

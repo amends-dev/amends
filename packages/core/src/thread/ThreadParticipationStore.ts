@@ -109,7 +109,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/ThreadParticipationStore",
+  "@amends-dev/core/thread/ThreadParticipationStore",
 ) {}
 
 export * as ThreadParticipationStore from "./ThreadParticipationStore.ts";

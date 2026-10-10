@@ -1,4 +1,4 @@
-import { paths, useAgents, useWorkspace } from "@amends/client";
+import { paths, useAgents, useWorkspace } from "@amends-dev/client";
 import {
   AddAgent,
   AgentList,
@@ -8,7 +8,7 @@ import {
   agentsToast,
   type AgentsAction,
   type AgentsTab,
-} from "@amends/ui/screens/agents";
+} from "@amends-dev/ui/screens/agents";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

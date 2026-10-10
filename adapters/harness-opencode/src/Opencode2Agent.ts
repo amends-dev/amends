@@ -16,8 +16,8 @@
  *
  * @since 0.1.0
  */
-import { type Agent, BridgeClient, HarnessError } from "@amends/harness";
-import type { Sandbox } from "@amends/sandbox";
+import { type Agent, BridgeClient, HarnessError } from "@amends-dev/harness";
+import type { Sandbox } from "@amends-dev/sandbox";
 import { type Crypto, Effect, type Redacted, Schema } from "effect";
 import type { Socket } from "effect/socket";
 import type { Options as DriverOptions } from "./internal/bridge/Driver.ts";
@@ -61,9 +61,9 @@ export interface Options extends Agent.Options {
  * **Example** (A turn of opencode 2 in a new sandbox)
  *
  * ```ts
- * import { Opencode2Agent } from "@amends/harness-opencode";
- * import { Agent, Harness } from "@amends/harness";
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { Opencode2Agent } from "@amends-dev/harness-opencode";
+ * import { Agent, Harness } from "@amends-dev/harness";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { BunServices, BunSocket } from "@effect/platform-bun";
  * import { Config, Effect, Layer, Redacted } from "effect";
  * import { createHmac } from "node:crypto";

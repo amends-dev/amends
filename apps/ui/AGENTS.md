@@ -7,7 +7,7 @@ Read [README.md](README.md) before changing this package.
   and compare the story with the frame in both modes. Document intentional differences.
 - Build up in order: foundations, components, the six patterns, then screens. Reuse a component
   or pattern before adding one; screens compose patterns rather than restyling them.
-- This package is presentation only. Do not depend on `@amends/client`, routing, Effect, or
+- This package is presentation only. Do not depend on `@amends-dev/client`, routing, Effect, or
   platform APIs. Screens take data as props and report
   actions through callbacks; web and desktop connect them to client hooks. Screens' data types
   are the vocabulary client's hooks return, imported type-only, so name them for what the screen

@@ -20,7 +20,7 @@ import { Schema } from "effect";
  * @since 0.1.0
  */
 export class AuthenticationError extends Schema.TaggedError<AuthenticationError>(
-  "@amends/sandbox/SandboxError/AuthenticationError",
+  "@amends-dev/sandbox/SandboxError/AuthenticationError",
 )("AuthenticationError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -38,7 +38,7 @@ export class AuthenticationError extends Schema.TaggedError<AuthenticationError>
  * @since 0.1.0
  */
 export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends/sandbox/SandboxError/NotFoundError",
+  "@amends-dev/sandbox/SandboxError/NotFoundError",
 )("NotFoundError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -56,7 +56,7 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * @since 0.1.0
  */
 export class AlreadyExistsError extends Schema.TaggedError<AlreadyExistsError>(
-  "@amends/sandbox/SandboxError/AlreadyExistsError",
+  "@amends-dev/sandbox/SandboxError/AlreadyExistsError",
 )("AlreadyExistsError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -75,7 +75,7 @@ export class AlreadyExistsError extends Schema.TaggedError<AlreadyExistsError>(
  * @since 0.1.0
  */
 export class InvalidOptionsError extends Schema.TaggedError<InvalidOptionsError>(
-  "@amends/sandbox/SandboxError/InvalidOptionsError",
+  "@amends-dev/sandbox/SandboxError/InvalidOptionsError",
 )("InvalidOptionsError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -94,7 +94,7 @@ export class InvalidOptionsError extends Schema.TaggedError<InvalidOptionsError>
  * @since 0.1.0
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends/sandbox/SandboxError/UnsupportedError",
+  "@amends-dev/sandbox/SandboxError/UnsupportedError",
 )("UnsupportedError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -112,7 +112,7 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
  * @since 0.1.0
  */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends/sandbox/SandboxError/UnavailableError",
+  "@amends-dev/sandbox/SandboxError/UnavailableError",
 )("UnavailableError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return true;
@@ -130,7 +130,7 @@ export class UnavailableError extends Schema.TaggedError<UnavailableError>(
  * @since 0.1.0
  */
 export class UnknownError extends Schema.TaggedError<UnknownError>(
-  "@amends/sandbox/SandboxError/UnknownError",
+  "@amends-dev/sandbox/SandboxError/UnknownError",
 )("UnknownError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -169,7 +169,7 @@ export type SandboxErrorReason = typeof SandboxErrorReason.Type;
  * **Example** (Recovering from one reason)
  *
  * ```ts
- * import { Sandbox, SandboxProvider } from "@amends/sandbox";
+ * import { Sandbox, SandboxProvider } from "@amends-dev/sandbox";
  * import { Effect } from "effect";
  *
  * declare const id: Sandbox.SandboxId;
@@ -188,15 +188,14 @@ export type SandboxErrorReason = typeof SandboxErrorReason.Type;
  * @category errors
  * @since 0.1.0
  */
-export class SandboxError extends Schema.TaggedError<SandboxError>("@amends/sandbox/SandboxError")(
-  "SandboxError",
-  {
-    /** The provider that failed, such as `local`. */
-    provider: Schema.String,
-    reason: SandboxErrorReason,
-    cause: Schema.optional(Schema.Defect()),
-  },
-) {
+export class SandboxError extends Schema.TaggedError<SandboxError>(
+  "@amends-dev/sandbox/SandboxError",
+)("SandboxError", {
+  /** The provider that failed, such as `local`. */
+  provider: Schema.String,
+  reason: SandboxErrorReason,
+  cause: Schema.optional(Schema.Defect()),
+}) {
   get isRetryable(): boolean {
     return this.reason.isRetryable;
   }

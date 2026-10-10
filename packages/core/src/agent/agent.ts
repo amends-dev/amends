@@ -1,10 +1,10 @@
 /**
  * An agent is a workspace member that works, as its instructions say, on a harness and a model, and
  * in a sandbox when it needs one, each given by one of the workspace's connections, as
- * `@amends/core/connection` keeps them. Its name, its role, and whether it is still in the
+ * `@amends-dev/core/connection` keeps them. Its name, its role, and whether it is still in the
  * workspace are its membership's, which it joins with as any member does.
  */
-import { ModelEndpoint } from "@amends/harness";
+import { ModelEndpoint } from "@amends-dev/harness";
 import { Schema } from "effect";
 import { Role } from "../authorization/role/role.ts";
 import { Connection } from "../connection/connection.ts";

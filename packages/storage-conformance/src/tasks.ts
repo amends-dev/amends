@@ -1,26 +1,26 @@
 import { describe, expect, it } from "@effect/vitest";
-import { AgentPermissions } from "@amends/core/agent";
+import { AgentPermissions } from "@amends-dev/core/agent";
 import {
   Assignment,
   AssignmentFacts,
   Grant,
   type Permission,
   type Target,
-} from "@amends/core/authorization";
-import { GroupService } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Log, Publication } from "@amends/core/journal";
-import { Notification } from "@amends/core/notification";
-import { Request } from "@amends/core/request";
-import { Task, TaskPermissions, TaskService } from "@amends/core/task";
+} from "@amends-dev/core/authorization";
+import { GroupService } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Notification } from "@amends-dev/core/notification";
+import { Request } from "@amends-dev/core/request";
+import { Task, TaskPermissions, TaskService } from "@amends-dev/core/task";
 import {
   Thread,
   ThreadMessageService,
   ThreadParticipation,
   ThreadPermissions,
   ThreadService,
-} from "@amends/core/thread";
-import { Member, MemberFacts } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import { TestClock } from "effect/testing";
 import type { Harness } from "./harness.ts";

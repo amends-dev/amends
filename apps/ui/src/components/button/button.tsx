@@ -1,6 +1,6 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { IconChevronDown } from "@amends/icons";
+import { IconChevronDown } from "@amends-dev/icons";
 import { classes, type IconComponent } from "../../internal/props.ts";
 import * as s from "./button.css.ts";
 

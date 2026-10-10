@@ -1,5 +1,5 @@
 {
-  "name": "@amends/host-local",
+  "name": "@amends-dev/host-local",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,25 +9,25 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/cluster": "workspace:*",
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/gateway": "workspace:*",
-    "@amends/harness": "workspace:*",
-    "@amends/harness-amends": "workspace:*",
-    "@amends/harness-opencode": "workspace:*",
-    "@amends/sandbox": "workspace:*",
-    "@amends/sandbox-daytona": "workspace:*",
-    "@amends/sandbox-local": "workspace:*",
-    "@amends/server-http": "workspace:*",
-    "@amends/storage-postgresql": "workspace:*",
+    "@amends-dev/cluster": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/harness-amends": "workspace:*",
+    "@amends-dev/harness-opencode": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
+    "@amends-dev/sandbox-daytona": "workspace:*",
+    "@amends-dev/sandbox-local": "workspace:*",
+    "@amends-dev/server-http": "workspace:*",
+    "@amends-dev/storage-postgresql": "workspace:*",
     "@daytona/sdk": "catalog:",
     "@effect/platform-bun": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/api-http": "workspace:*",
-    "@amends/toolkit": "workspace:*",
+    "@amends-dev/api-http": "workspace:*",
+    "@amends-dev/toolkit": "workspace:*",
     "@effect/sql-pg": "catalog:"
   }
 }

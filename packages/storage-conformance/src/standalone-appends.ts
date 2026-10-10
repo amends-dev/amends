@@ -1,4 +1,4 @@
-import { Log, Store } from "@amends/core/journal";
+import { Log, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option } from "effect";
 import type { Harness } from "./harness.ts";

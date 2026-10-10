@@ -8,7 +8,7 @@ import {
   onCleanup,
   type JSX,
 } from "solid-js";
-import { IconCheck, IconChevronDown } from "@amends/icons";
+import { IconCheck, IconChevronDown } from "@amends-dev/icons";
 import { useField } from "../field/index.ts";
 import * as s from "./combobox.css.ts";
 

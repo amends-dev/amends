@@ -1,5 +1,5 @@
-import type { ConversationStatus } from "@amends/ui/screens/group";
-import type { InboxItem } from "@amends/ui/screens/inbox";
+import type { ConversationStatus } from "@amends-dev/ui/screens/group";
+import type { InboxItem } from "@amends-dev/ui/screens/inbox";
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import {

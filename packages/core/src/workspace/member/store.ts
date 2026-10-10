@@ -73,7 +73,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/workspace/member-store/Service",
+  "@amends-dev/core/workspace/member-store/Service",
 ) {}
 
 export * as MemberStore from "./store.ts";

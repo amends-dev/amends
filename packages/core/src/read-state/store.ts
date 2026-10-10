@@ -40,6 +40,6 @@ export interface Interface {
   readonly advanceGroup: (read: ReadState.GroupRead) => Effect.Effect<void, Failure | Conflict>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/read-state/store/Service",
+  "@amends-dev/core/read-state/store/Service",
 ) {}
 export * as ReadStateStore from "./store.ts";

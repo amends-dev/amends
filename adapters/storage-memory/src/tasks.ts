@@ -1,7 +1,7 @@
-import { Group } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
-import { Task, TaskStore } from "@amends/core/task";
-import { Thread } from "@amends/core/thread";
+import { Group } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
+import { Task, TaskStore } from "@amends-dev/core/task";
+import { Thread } from "@amends-dev/core/thread";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

@@ -1,4 +1,4 @@
-import { GenerateResult, type StreamPart } from "@amends/harness";
+import { GenerateResult, type StreamPart } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import * as Turn from "../../src/internal/bridge/v1/Turn.ts";
 import { answerEvents, decode, eventsOf, type RawEvent } from "./fakes.ts";

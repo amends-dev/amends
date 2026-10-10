@@ -1,4 +1,4 @@
-import { Ownership, Workspace, WorkspaceSettings } from "@amends/core/workspace";
+import { Ownership, Workspace, WorkspaceSettings } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

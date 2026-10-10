@@ -4,13 +4,13 @@ import {
   ModelCatalog,
   ModelIntegrations,
   ToolIntegrations,
-} from "@amends/connection";
-import { Agent, type ModelEndpoint } from "@amends/harness";
-import { Models } from "@amends/harness-amends";
-import type { Sandbox, Template } from "@amends/sandbox";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { LocalSandboxProvider } from "@amends/sandbox-local";
-import { Assembly } from "@amends/toolkit";
+} from "@amends-dev/connection";
+import { Agent, type ModelEndpoint } from "@amends-dev/harness";
+import { Models } from "@amends-dev/harness-amends";
+import type { Sandbox, Template } from "@amends-dev/sandbox";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
+import { Assembly } from "@amends-dev/toolkit";
 import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it, layer } from "@effect/vitest";
 import {

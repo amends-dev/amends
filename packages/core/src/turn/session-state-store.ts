@@ -51,7 +51,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/session-state-store/Service",
+  "@amends-dev/core/turn/session-state-store/Service",
 ) {}
 
 export * as SessionStateStore from "./session-state-store.ts";

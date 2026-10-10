@@ -1,4 +1,4 @@
-import { SessionLog, SessionLogStore } from "@amends/core/turn";
+import { SessionLog, SessionLogStore } from "@amends-dev/core/turn";
 import { Array, DateTime, Deferred, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { MemoryDatabase } from "./database.ts";

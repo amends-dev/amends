@@ -13,7 +13,7 @@ import {
   type JSX,
 } from "solid-js";
 import { Portal } from "solid-js/web";
-import { IconMarkClose, IconMenu } from "@amends/icons";
+import { IconMarkClose, IconMenu } from "@amends-dev/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { media } from "../../foundations/layout/tokens.ts";
 import { createMediaQuery } from "../../internal/media.ts";

@@ -6,8 +6,8 @@
  * the two leaves readers to their poll. One listener per pool, on one connection, routes both.
  */
 import { PgClient } from "@effect/sql-pg";
-import { Signal, SignalHub } from "@amends/core/signal";
-import type { Workspace } from "@amends/core/workspace";
+import { Signal, SignalHub } from "@amends-dev/core/signal";
+import type { Workspace } from "@amends-dev/core/workspace";
 import { Deferred, Duration, Effect, Option, Queue, RcRef, Schema, Stream } from "effect";
 import type { Scope } from "effect";
 

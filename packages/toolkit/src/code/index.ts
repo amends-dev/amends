@@ -23,16 +23,15 @@ import { Failure } from "../ToolSource.ts";
 import { declare } from "./Declarations.ts";
 
 /** Why code did not finish: it threw, or the runtime could not run it. */
-export class CodeError extends Schema.TaggedError<CodeError>("@amends/toolkit/CodeMode/CodeError")(
-  "CodeError",
-  {
-    /** What went wrong, which the model reads, such as the message of what the code threw. */
-    description: Schema.String,
+export class CodeError extends Schema.TaggedError<CodeError>(
+  "@amends-dev/toolkit/CodeMode/CodeError",
+)("CodeError", {
+  /** What went wrong, which the model reads, such as the message of what the code threw. */
+  description: Schema.String,
 
-    /** What the code logged before it failed. */
-    logs: Schema.Array(Schema.String),
-  },
-) {
+  /** What the code logged before it failed. */
+  logs: Schema.Array(Schema.String),
+}) {
   override get message(): string {
     return this.description;
   }

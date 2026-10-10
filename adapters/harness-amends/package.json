@@ -1,7 +1,7 @@
 {
-  "name": "@amends/harness-amends",
+  "name": "@amends-dev/harness-amends",
   "version": "0.1.0",
-  "description": "An agent in your own process for the @amends/harness contract: a loop over an Effect AI language model, with tools for the files and the shell of a sandbox.",
+  "description": "An agent in your own process for the @amends-dev/harness contract: a loop over an Effect AI language model, with tools for the files and the shell of a sandbox.",
   "keywords": [
     "agent",
     "ai",
@@ -9,14 +9,14 @@
     "harness",
     "sandbox"
   ],
-  "homepage": "https://github.com/saribmah/amends-v2/tree/main/adapters/harness-amends#readme",
+  "homepage": "https://github.com/amends-dev/amends/tree/main/adapters/harness-amends#readme",
   "bugs": {
-    "url": "https://github.com/saribmah/amends-v2/issues"
+    "url": "https://github.com/amends-dev/amends/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/saribmah/amends-v2.git",
+    "url": "https://github.com/amends-dev/amends.git",
     "directory": "adapters/harness-amends"
   },
   "type": "module",
@@ -34,14 +34,14 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends/harness": "workspace:*",
-    "@amends/sandbox": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
     "@effect/ai-anthropic": "catalog:",
     "@effect/ai-openai": "catalog:",
     "@effect/ai-openai-compat": "catalog:"
   },
   "devDependencies": {
-    "@amends/sandbox-local": "workspace:*",
+    "@amends-dev/sandbox-local": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"

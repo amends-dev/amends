@@ -6,10 +6,10 @@
  * time and redelivers a request whose handling was cut short. A request that fails is tried again
  * where it is, as `JobRequests` says; then the delivery the job could not post is given up.
  */
-import { DeliveryJobs } from "@amends/core/channel";
-import { Store } from "@amends/core/journal";
-import { ThreadId } from "@amends/core/thread";
-import { Workspace } from "@amends/core/workspace";
+import { DeliveryJobs } from "@amends-dev/core/channel";
+import { Store } from "@amends-dev/core/journal";
+import { ThreadId } from "@amends-dev/core/thread";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Schema } from "effect";
 import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";

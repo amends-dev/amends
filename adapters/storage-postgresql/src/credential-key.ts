@@ -20,7 +20,7 @@ export interface Interface {
 
 /** The host's credential key, when it configured one. */
 export class Service extends Context.Service<Service, Option.Option<Interface>>()(
-  "@amends/storage-postgresql/credential-key/Service",
+  "@amends-dev/storage-postgresql/credential-key/Service",
 ) {}
 
 const version = "v1";

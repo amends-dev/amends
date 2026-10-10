@@ -4,10 +4,10 @@ The pattern-based design system for web and desktop, built from the Lunacy mocks
 [`design-system/Amends Group Exploration.free`](../../design-system/). The mocks are the
 reference: open the file in Lunacy and compare a screen with its story.
 
-This package was built as `@amends/ui-v2` and took the `@amends/ui` name once it had replaced
-the earlier UI and the retired `@amends/features` in web and desktop. Screens here are
+This package was built as `ui-v2` and took the `ui` name once it had replaced the earlier UI
+and the retired `features` package in web and desktop. Screens here are
 presentation only: data arrives as props and actions leave as callbacks. Connected logic lives
-in [client](../client/README.md) as hooks, and web and desktop join the two. `@amends/ui/styles`
+in [client](../client/README.md) as hooks, and web and desktop join the two. `@amends-dev/ui/styles`
 holds the global styles app entry points load.
 
 ## Structure
@@ -44,16 +44,17 @@ patterns, and screens as they are introduced.
   in eight roles from `meta` (11/16) to `display` (28/36). The mocks' half-pixel sizes round to
   the nearest role. Geist Mono (`monoFamily`) sets code and values people copy exactly: code in
   messages and the composer, commands, environment variables, and model IDs, where `Combobox`
-  takes `monospace`. Import `@amends/ui/foundations/typography/fonts` once at an app entry point.
+  takes `monospace`. Import `@amends-dev/ui/foundations/typography/fonts` once at an app entry
+  point.
 - **Space** ([tokens](src/foundations/space/tokens.ts)): a 4px grid with 2, 6, and 10px half
   steps. Corners are square throughout; there is no radius scale.
 - **Elevation** ([tokens](src/foundations/elevation/tokens.ts)): shadows for modals, popovers,
   and toasts only. Panels are flat and separated by dividers.
 - **Theme** ([Theme](src/foundations/theme/theme.tsx)): `<Theme mode="light" palette="linen">` applies a mode and palette's
   variables, the typeface, and body text. A nested Theme starts its own scope. Styles read values from
-  `vars` in `@amends/ui/foundations/theme`. Omitting `palette` selects Neutral, including in nested
-  scopes. CSS variable names start with `amends-`.
-- **Icons** (**Foundations / Icons**): every drawing from [`@amends/icons`](../icons/README.md),
+  `vars` in `@amends-dev/ui/foundations/theme`. Omitting `palette` selects Neutral, including in
+  nested scopes. CSS variable names start with `amends-`.
+- **Icons** (**Foundations / Icons**): every drawing from [`@amends-dev/icons`](../icons/README.md),
   searchable, with sizes, weights, and accessible names. Review new drawings here.
 
 ## Components
@@ -408,9 +409,9 @@ pressed formats share the selected row's fill.
 From the repository root:
 
 ```sh
-bun run --filter @amends/ui dev
-bun run test --project @amends/ui
-bun run --filter @amends/ui build
+bun run --filter @amends-dev/ui dev
+bun run test --project @amends-dev/ui
+bun run --filter @amends-dev/ui build
 bun run check
 ```
 

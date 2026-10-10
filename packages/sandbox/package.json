@@ -1,5 +1,5 @@
 {
-  "name": "@amends/sandbox",
+  "name": "@amends-dev/sandbox",
   "version": "0.1.0",
   "description": "Sandboxes that agents work in: the contract every sandbox provider implements, with Effect's own file system and processes inside, and the conformance suites each provider runs.",
   "keywords": [
@@ -8,14 +8,14 @@
     "effect",
     "sandbox"
   ],
-  "homepage": "https://github.com/saribmah/amends-v2/tree/main/packages/sandbox#readme",
+  "homepage": "https://github.com/amends-dev/amends/tree/main/packages/sandbox#readme",
   "bugs": {
-    "url": "https://github.com/saribmah/amends-v2/issues"
+    "url": "https://github.com/amends-dev/amends/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/saribmah/amends-v2.git",
+    "url": "https://github.com/amends-dev/amends.git",
     "directory": "packages/sandbox"
   },
   "type": "module",

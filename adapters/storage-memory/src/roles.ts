@@ -1,5 +1,5 @@
-import { BuiltinRoles, Role, RoleStore } from "@amends/core/authorization";
-import { Store } from "@amends/core/journal";
+import { BuiltinRoles, Role, RoleStore } from "@amends-dev/core/authorization";
+import { Store } from "@amends-dev/core/journal";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

@@ -1,9 +1,9 @@
 import { expect, it } from "@effect/vitest";
 import { Schema } from "effect";
-import { Scope, Target } from "@amends/core/authorization";
-import { ThreadId } from "@amends/core/thread";
-import { Group } from "@amends/core/group";
-import { Member, Workspace } from "@amends/core/workspace";
+import { Scope, Target } from "@amends-dev/core/authorization";
+import { ThreadId } from "@amends-dev/core/thread";
+import { Group } from "@amends-dev/core/group";
+import { Member, Workspace } from "@amends-dev/core/workspace";
 import { ScopeColumns } from "../src/scope.ts";
 
 const workspaceId = Workspace.Id.make("workspace");

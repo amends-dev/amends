@@ -1,12 +1,12 @@
-import type * as Core from "@amends/core";
-import { AgentService } from "@amends/core/agent";
-import { BuiltinRoles } from "@amends/core/authorization";
-import { ChannelIntake, ChannelService } from "@amends/core/channel";
-import { ConnectionService } from "@amends/core/connection";
-import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Notification } from "@amends/core/notification";
-import { TaskService } from "@amends/core/task";
+import type * as Core from "@amends-dev/core";
+import { AgentService } from "@amends-dev/core/agent";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
+import { ConnectionService } from "@amends-dev/core/connection";
+import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Notification } from "@amends-dev/core/notification";
+import { TaskService } from "@amends-dev/core/task";
 import {
   Thread,
   ThreadService,
@@ -15,17 +15,17 @@ import {
   ThreadParticipationService,
   type ThreadTimeline,
   ThreadParticipation,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import {
   type SessionLog,
   type SessionStateStore,
   Turn,
   TurnExecution,
   TurnService,
-} from "@amends/core/turn";
-import type { Member, Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
-import type { StreamPart } from "@amends/harness";
+} from "@amends-dev/core/turn";
+import type { Member, Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
+import type { StreamPart } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Queue, Redacted, Stream } from "effect";
 import type { Prompt } from "effect/ai";

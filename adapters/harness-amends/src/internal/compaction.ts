@@ -4,7 +4,7 @@
  * the model's context window, keeping messages up to `keepUpTo` of it, and compacts the whole
  * conversation on request. Tokens are estimated from the JSON of the messages.
  */
-import { Session, type StreamPart } from "@amends/harness";
+import { Session, type StreamPart } from "@amends-dev/harness";
 import { Effect, Schema } from "effect";
 import { LanguageModel, Prompt } from "effect/ai";
 

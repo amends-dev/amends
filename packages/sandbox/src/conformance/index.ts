@@ -25,8 +25,8 @@ export type { Fixture } from "./Fixture.ts";
  * **Example** (A provider's conformance test)
  *
  * ```ts
- * import { Network, SandboxProvider } from "@amends/sandbox";
- * import * as Conformance from "@amends/sandbox/conformance";
+ * import { Network, SandboxProvider } from "@amends-dev/sandbox";
+ * import * as Conformance from "@amends-dev/sandbox/conformance";
  * import { Effect, Scope } from "effect";
  * import { FetchHttpClient } from "effect/http";
  * import { ChildProcess } from "effect/process";

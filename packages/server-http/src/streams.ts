@@ -3,9 +3,9 @@
  * contained to the stream's own reconnect error, an end as the server drains, and a place within
  * the process's limits on open streams for as long as the response lasts.
  */
-import { ApiErrors } from "@amends/api-http";
-import type { Identity } from "@amends/core/identity";
-import type { Workspace } from "@amends/core/workspace";
+import { ApiErrors } from "@amends-dev/api-http";
+import type { Identity } from "@amends-dev/core/identity";
+import type { Workspace } from "@amends-dev/core/workspace";
 import {
   Cause,
   Context,
@@ -54,7 +54,7 @@ export const withHeartbeats = HttpEffect.withPreResponseHandler(prepareResponse)
 export const Limits = Context.Reference<{
   readonly perWorkspace: number;
   readonly perMember: number;
-}>("@amends/server-http/streams/Limits", {
+}>("@amends-dev/server-http/streams/Limits", {
   defaultValue: () => ({ perWorkspace: 1000, perMember: 20 }),
 });
 
@@ -78,7 +78,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/server-http/streams/Service",
+  "@amends-dev/server-http/streams/Service",
 ) {}
 
 /** @category constructors */

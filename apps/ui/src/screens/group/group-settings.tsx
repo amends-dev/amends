@@ -1,5 +1,5 @@
 import { Match, Show, Switch, createEffect, createSignal, createUniqueId } from "solid-js";
-import { IconMarkNew } from "@amends/icons";
+import { IconMarkNew } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Choice } from "../../components/choice/index.ts";

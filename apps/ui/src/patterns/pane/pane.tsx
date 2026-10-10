@@ -1,6 +1,6 @@
 import { Show, createContext, splitProps, useContext, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { IconMarkBack, IconMarkClose } from "@amends/icons";
+import { IconMarkBack, IconMarkClose } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Badge } from "../../components/badge/index.ts";
 import { IconButton, type IconButtonProps } from "../../components/icon-button/index.ts";

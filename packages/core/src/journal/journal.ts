@@ -45,7 +45,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/journal/Service",
+  "@amends-dev/core/journal/Service",
 ) {}
 
 export interface Options<

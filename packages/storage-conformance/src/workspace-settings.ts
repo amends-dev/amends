@@ -1,9 +1,9 @@
-import { Actor, type Identity } from "@amends/core/identity";
-import { Journal, Store } from "@amends/core/journal";
-import { BuiltinRoles, type Role } from "@amends/core/authorization";
-import { Identity as Identities } from "@amends/core/identity";
-import { Workspace, WorkspaceSettingsService } from "@amends/core/workspace";
-import { Gateway, WorkspaceDirectory } from "@amends/gateway";
+import { Actor, type Identity } from "@amends-dev/core/identity";
+import { Journal, Store } from "@amends-dev/core/journal";
+import { BuiltinRoles, type Role } from "@amends-dev/core/authorization";
+import { Identity as Identities } from "@amends-dev/core/identity";
+import { Workspace, WorkspaceSettingsService } from "@amends-dev/core/workspace";
+import { Gateway, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Tracer } from "effect";
 import type { Harness } from "./harness.ts";

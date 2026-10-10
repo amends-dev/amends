@@ -1,5 +1,5 @@
-import { Store } from "@amends/core/journal";
-import { Thread, ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
+import { Store } from "@amends-dev/core/journal";
+import { Thread, ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

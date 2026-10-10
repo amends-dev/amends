@@ -1,5 +1,5 @@
-import { Connection } from "@amends/connection";
-import { Sandbox } from "@amends/sandbox";
+import { Connection } from "@amends-dev/connection";
+import { Sandbox } from "@amends-dev/sandbox";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, layer } from "@effect/vitest";
 import { Effect, Fiber, FileSystem, Path, Redacted } from "effect";

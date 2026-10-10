@@ -1,7 +1,7 @@
 import { For, createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
-import { IconMarkAttach, IconMarkMention, IconMarkResources } from "@amends/icons";
+import { IconMarkAttach, IconMarkMention, IconMarkResources } from "@amends-dev/icons";
 import { Composer } from "./composer/index.ts";
 import { Divider } from "./divider/index.ts";
 import { IconButton } from "./icon-button/index.ts";

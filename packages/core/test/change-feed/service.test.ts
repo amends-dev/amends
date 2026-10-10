@@ -10,8 +10,8 @@ import {
   ThreadActivityKind,
   ThreadMessageActivity,
   ThreadPermissions,
-} from "@amends/core/thread";
-import { Subject } from "@amends/core/journal";
+} from "@amends-dev/core/thread";
+import { Subject } from "@amends-dev/core/journal";
 import {
   Group,
   GroupFacts,
@@ -21,7 +21,7 @@ import {
   GroupMembershipFacts,
   GroupMembershipStore,
   GroupPermissions,
-} from "@amends/core/group";
+} from "@amends-dev/core/group";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Exit, Fiber, Layer, Option, Queue, Schema, Scope, Stream } from "effect";
 import { Assignment } from "../../src/authorization/assignment/assignment.ts";

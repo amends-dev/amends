@@ -105,7 +105,7 @@ export interface Interface {
   readonly commit: Transaction.Interface["run"];
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/journal/log/Service",
+  "@amends-dev/core/journal/log/Service",
 ) {}
 
 const batchSchema = Schema.toType(Store.Batch).check(

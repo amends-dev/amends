@@ -1,8 +1,8 @@
-import { paths } from "@amends/client";
-import { Button } from "@amends/ui/components/button";
-import { EmptyState } from "@amends/ui/components/empty-state";
-import { Pane } from "@amends/ui/patterns/pane";
-import { Shell } from "@amends/ui/patterns/shell";
+import { paths } from "@amends-dev/client";
+import { Button } from "@amends-dev/ui/components/button";
+import { EmptyState } from "@amends-dev/ui/components/empty-state";
+import { Pane } from "@amends-dev/ui/patterns/pane";
+import { Shell } from "@amends-dev/ui/patterns/shell";
 import { Navigate, useNavigate, useParams } from "@solidjs/router";
 import type { JSX } from "solid-js";
 

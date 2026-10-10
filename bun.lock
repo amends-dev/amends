@@ -18,17 +18,17 @@
       },
     },
     "adapters/harness-amends": {
-      "name": "@amends/harness-amends",
+      "name": "@amends-dev/harness-amends",
       "version": "0.1.0",
       "dependencies": {
-        "@amends/harness": "workspace:*",
-        "@amends/sandbox": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
         "@effect/ai-anthropic": "catalog:",
         "@effect/ai-openai": "catalog:",
         "@effect/ai-openai-compat": "catalog:",
       },
       "devDependencies": {
-        "@amends/sandbox-local": "workspace:*",
+        "@amends-dev/sandbox-local": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
@@ -38,16 +38,16 @@
       },
     },
     "adapters/harness-opencode": {
-      "name": "@amends/harness-opencode",
+      "name": "@amends-dev/harness-opencode",
       "version": "0.1.0",
       "dependencies": {
-        "@amends/harness": "workspace:*",
-        "@amends/sandbox": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
         "@effect/platform-bun": "catalog:",
       },
       "devDependencies": {
-        "@amends/sandbox-daytona": "workspace:*",
-        "@amends/sandbox-local": "workspace:*",
+        "@amends-dev/sandbox-daytona": "workspace:*",
+        "@amends-dev/sandbox-local": "workspace:*",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
@@ -56,10 +56,10 @@
       },
     },
     "adapters/sandbox-daytona": {
-      "name": "@amends/sandbox-daytona",
+      "name": "@amends-dev/sandbox-daytona",
       "version": "0.1.0",
       "dependencies": {
-        "@amends/sandbox": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
         "@daytona/sdk": "catalog:",
       },
       "devDependencies": {
@@ -72,10 +72,10 @@
       },
     },
     "adapters/sandbox-local": {
-      "name": "@amends/sandbox-local",
+      "name": "@amends-dev/sandbox-local",
       "version": "0.1.0",
       "dependencies": {
-        "@amends/sandbox": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
       },
       "devDependencies": {
         "@effect/platform-bun": "catalog:",
@@ -87,48 +87,48 @@
       },
     },
     "adapters/storage-memory": {
-      "name": "@amends/storage-memory",
+      "name": "@amends-dev/storage-memory",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends/storage-conformance": "workspace:*",
+        "@amends-dev/storage-conformance": "workspace:*",
         "@effect/platform-bun": "catalog:",
       },
     },
     "adapters/storage-postgresql": {
-      "name": "@amends/storage-postgresql",
+      "name": "@amends-dev/storage-postgresql",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
-        "@amends/harness": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
         "@effect/sql-pg": "catalog:",
         "drizzle-orm": "1.0.0-rc.5-5935859",
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends/storage-conformance": "workspace:*",
+        "@amends-dev/storage-conformance": "workspace:*",
         "@effect/platform-bun": "catalog:",
         "drizzle-kit": "1.0.0-rc.5-5935859",
       },
     },
     "apps/client": {
-      "name": "@amends/client",
+      "name": "@amends-dev/client",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/api-http": "workspace:*",
-        "@amends/gateway": "workspace:*",
+        "@amends-dev/api-http": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
         "@effect/atom-solid": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends/ui": "workspace:*",
+        "@amends-dev/ui": "workspace:*",
         "@solidjs/testing-library": "^0.8.9",
         "happy-dom": "^20.10.6",
         "solid-js": "^1.9.12",
@@ -140,12 +140,12 @@
       },
     },
     "apps/desktop": {
-      "name": "@amends/desktop",
+      "name": "@amends-dev/desktop",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/client": "workspace:*",
-        "@amends/icons": "workspace:*",
-        "@amends/ui": "workspace:*",
+        "@amends-dev/client": "workspace:*",
+        "@amends-dev/icons": "workspace:*",
+        "@amends-dev/ui": "workspace:*",
         "@solidjs/router": "catalog:",
         "solid-js": "^1.9.12",
       },
@@ -161,7 +161,7 @@
       },
     },
     "apps/icons": {
-      "name": "@amends/icons",
+      "name": "@amends-dev/icons",
       "version": "0.0.0",
       "devDependencies": {
         "@solidjs/testing-library": "^0.8.9",
@@ -175,10 +175,10 @@
       },
     },
     "apps/ui": {
-      "name": "@amends/ui",
+      "name": "@amends-dev/ui",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/icons": "workspace:*",
+        "@amends-dev/icons": "workspace:*",
         "@fontsource/figtree": "^5.3.0",
         "@fontsource/geist-mono": "^5.3.0",
         "@kobalte/core": "^0.13.14",
@@ -211,12 +211,12 @@
       },
     },
     "apps/web": {
-      "name": "@amends/web",
+      "name": "@amends-dev/web",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/client": "workspace:*",
-        "@amends/icons": "workspace:*",
-        "@amends/ui": "workspace:*",
+        "@amends-dev/client": "workspace:*",
+        "@amends-dev/icons": "workspace:*",
+        "@amends-dev/ui": "workspace:*",
         "@solidjs/router": "catalog:",
         "solid-js": "^1.9.12",
       },
@@ -231,43 +231,43 @@
       },
     },
     "hosts/local": {
-      "name": "@amends/host-local",
+      "name": "@amends-dev/host-local",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/cluster": "workspace:*",
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
-        "@amends/harness": "workspace:*",
-        "@amends/harness-amends": "workspace:*",
-        "@amends/harness-opencode": "workspace:*",
-        "@amends/sandbox": "workspace:*",
-        "@amends/sandbox-daytona": "workspace:*",
-        "@amends/sandbox-local": "workspace:*",
-        "@amends/server-http": "workspace:*",
-        "@amends/storage-postgresql": "workspace:*",
+        "@amends-dev/cluster": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
+        "@amends-dev/harness-amends": "workspace:*",
+        "@amends-dev/harness-opencode": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/sandbox-daytona": "workspace:*",
+        "@amends-dev/sandbox-local": "workspace:*",
+        "@amends-dev/server-http": "workspace:*",
+        "@amends-dev/storage-postgresql": "workspace:*",
         "@daytona/sdk": "catalog:",
         "@effect/platform-bun": "catalog:",
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends/api-http": "workspace:*",
-        "@amends/toolkit": "workspace:*",
+        "@amends-dev/api-http": "workspace:*",
+        "@amends-dev/toolkit": "workspace:*",
         "@effect/sql-pg": "catalog:",
       },
     },
     "packages/api-http": {
-      "name": "@amends/api-http",
+      "name": "@amends-dev/api-http",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
         "effect": "catalog:",
       },
     },
     "packages/channel": {
-      "name": "@amends/channel",
+      "name": "@amends-dev/channel",
       "version": "0.1.0",
       "devDependencies": {
         "effect": "catalog:",
@@ -277,28 +277,28 @@
       },
     },
     "packages/cluster": {
-      "name": "@amends/cluster",
+      "name": "@amends-dev/cluster",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
-        "@amends/harness": "workspace:*",
-        "@amends/sandbox": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
         "effect": "catalog:",
       },
       "devDependencies": {
-        "@amends/channel": "workspace:*",
+        "@amends-dev/channel": "workspace:*",
       },
     },
     "packages/connection": {
-      "name": "@amends/connection",
+      "name": "@amends-dev/connection",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/channel": "workspace:*",
-        "@amends/harness": "workspace:*",
-        "@amends/sandbox": "workspace:*",
-        "@amends/toolkit": "workspace:*",
+        "@amends-dev/channel": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
+        "@amends-dev/toolkit": "workspace:*",
       },
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -309,29 +309,29 @@
       },
     },
     "packages/core": {
-      "name": "@amends/core",
+      "name": "@amends-dev/core",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/channel": "workspace:*",
-        "@amends/connection": "workspace:*",
-        "@amends/harness": "workspace:*",
+        "@amends-dev/channel": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
         "effect": "catalog:",
       },
     },
     "packages/gateway": {
-      "name": "@amends/gateway",
+      "name": "@amends-dev/gateway",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
         "effect": "catalog:",
       },
     },
     "packages/harness": {
-      "name": "@amends/harness",
+      "name": "@amends-dev/harness",
       "version": "0.1.0",
       "dependencies": {
-        "@amends/sandbox": "workspace:*",
+        "@amends-dev/sandbox": "workspace:*",
       },
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -342,7 +342,7 @@
       },
     },
     "packages/sandbox": {
-      "name": "@amends/sandbox",
+      "name": "@amends-dev/sandbox",
       "version": "0.1.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -357,30 +357,30 @@
       ],
     },
     "packages/server-http": {
-      "name": "@amends/server-http",
+      "name": "@amends-dev/server-http",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/api-http": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
+        "@amends-dev/api-http": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
         "effect": "catalog:",
       },
     },
     "packages/storage-conformance": {
-      "name": "@amends/storage-conformance",
+      "name": "@amends-dev/storage-conformance",
       "version": "0.0.0",
       "dependencies": {
-        "@amends/channel": "workspace:*",
-        "@amends/connection": "workspace:*",
-        "@amends/core": "workspace:*",
-        "@amends/gateway": "workspace:*",
-        "@amends/harness": "workspace:*",
+        "@amends-dev/channel": "workspace:*",
+        "@amends-dev/connection": "workspace:*",
+        "@amends-dev/core": "workspace:*",
+        "@amends-dev/gateway": "workspace:*",
+        "@amends-dev/harness": "workspace:*",
         "@effect/vitest": "catalog:",
         "effect": "catalog:",
       },
     },
     "packages/toolkit": {
-      "name": "@amends/toolkit",
+      "name": "@amends-dev/toolkit",
       "version": "0.0.0",
       "devDependencies": {
         "@effect/vitest": "catalog:",
@@ -413,51 +413,51 @@
   "packages": {
     "@adobe/css-tools": ["@adobe/css-tools@4.5.0", "", {}, "sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q=="],
 
-    "@amends/api-http": ["@amends/api-http@workspace:packages/api-http"],
+    "@amends-dev/api-http": ["@amends-dev/api-http@workspace:packages/api-http"],
 
-    "@amends/channel": ["@amends/channel@workspace:packages/channel"],
+    "@amends-dev/channel": ["@amends-dev/channel@workspace:packages/channel"],
 
-    "@amends/client": ["@amends/client@workspace:apps/client"],
+    "@amends-dev/client": ["@amends-dev/client@workspace:apps/client"],
 
-    "@amends/cluster": ["@amends/cluster@workspace:packages/cluster"],
+    "@amends-dev/cluster": ["@amends-dev/cluster@workspace:packages/cluster"],
 
-    "@amends/connection": ["@amends/connection@workspace:packages/connection"],
+    "@amends-dev/connection": ["@amends-dev/connection@workspace:packages/connection"],
 
-    "@amends/core": ["@amends/core@workspace:packages/core"],
+    "@amends-dev/core": ["@amends-dev/core@workspace:packages/core"],
 
-    "@amends/desktop": ["@amends/desktop@workspace:apps/desktop"],
+    "@amends-dev/desktop": ["@amends-dev/desktop@workspace:apps/desktop"],
 
-    "@amends/gateway": ["@amends/gateway@workspace:packages/gateway"],
+    "@amends-dev/gateway": ["@amends-dev/gateway@workspace:packages/gateway"],
 
-    "@amends/harness": ["@amends/harness@workspace:packages/harness"],
+    "@amends-dev/harness": ["@amends-dev/harness@workspace:packages/harness"],
 
-    "@amends/harness-amends": ["@amends/harness-amends@workspace:adapters/harness-amends"],
+    "@amends-dev/harness-amends": ["@amends-dev/harness-amends@workspace:adapters/harness-amends"],
 
-    "@amends/harness-opencode": ["@amends/harness-opencode@workspace:adapters/harness-opencode"],
+    "@amends-dev/harness-opencode": ["@amends-dev/harness-opencode@workspace:adapters/harness-opencode"],
 
-    "@amends/host-local": ["@amends/host-local@workspace:hosts/local"],
+    "@amends-dev/host-local": ["@amends-dev/host-local@workspace:hosts/local"],
 
-    "@amends/icons": ["@amends/icons@workspace:apps/icons"],
+    "@amends-dev/icons": ["@amends-dev/icons@workspace:apps/icons"],
 
-    "@amends/sandbox": ["@amends/sandbox@workspace:packages/sandbox"],
+    "@amends-dev/sandbox": ["@amends-dev/sandbox@workspace:packages/sandbox"],
 
-    "@amends/sandbox-daytona": ["@amends/sandbox-daytona@workspace:adapters/sandbox-daytona"],
+    "@amends-dev/sandbox-daytona": ["@amends-dev/sandbox-daytona@workspace:adapters/sandbox-daytona"],
 
-    "@amends/sandbox-local": ["@amends/sandbox-local@workspace:adapters/sandbox-local"],
+    "@amends-dev/sandbox-local": ["@amends-dev/sandbox-local@workspace:adapters/sandbox-local"],
 
-    "@amends/server-http": ["@amends/server-http@workspace:packages/server-http"],
+    "@amends-dev/server-http": ["@amends-dev/server-http@workspace:packages/server-http"],
 
-    "@amends/storage-conformance": ["@amends/storage-conformance@workspace:packages/storage-conformance"],
+    "@amends-dev/storage-conformance": ["@amends-dev/storage-conformance@workspace:packages/storage-conformance"],
 
-    "@amends/storage-memory": ["@amends/storage-memory@workspace:adapters/storage-memory"],
+    "@amends-dev/storage-memory": ["@amends-dev/storage-memory@workspace:adapters/storage-memory"],
 
-    "@amends/storage-postgresql": ["@amends/storage-postgresql@workspace:adapters/storage-postgresql"],
+    "@amends-dev/storage-postgresql": ["@amends-dev/storage-postgresql@workspace:adapters/storage-postgresql"],
 
-    "@amends/toolkit": ["@amends/toolkit@workspace:packages/toolkit"],
+    "@amends-dev/toolkit": ["@amends-dev/toolkit@workspace:packages/toolkit"],
 
-    "@amends/ui": ["@amends/ui@workspace:apps/ui"],
+    "@amends-dev/ui": ["@amends-dev/ui@workspace:apps/ui"],
 
-    "@amends/web": ["@amends/web@workspace:apps/web"],
+    "@amends-dev/web": ["@amends-dev/web@workspace:apps/web"],
 
     "@aws-sdk/checksums": ["@aws-sdk/checksums@3.1001.1", "", { "dependencies": { "@aws-sdk/core": "^3.978.1", "@aws-sdk/types": "^3.974.6", "@smithy/core": "^3.35.0", "@smithy/types": "^4.19.0", "tslib": "^2.6.2" } }, "sha512-x12Q17KYlJAd3nKf8LV5LV0vt8sh8/6YfQLGPtrGnQf/tW4jqxPGq5GPpuVitpQYM3eUR4XB7CbxZf751NMbLw=="],
 

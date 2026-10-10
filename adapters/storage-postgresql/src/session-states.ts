@@ -1,5 +1,5 @@
-import { Store } from "@amends/core/journal";
-import { SessionStateStore } from "@amends/core/turn";
+import { Store } from "@amends-dev/core/journal";
+import { SessionStateStore } from "@amends-dev/core/turn";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";

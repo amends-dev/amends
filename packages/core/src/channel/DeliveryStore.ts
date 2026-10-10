@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends/channel";
+import type { ChannelTransport } from "@amends-dev/channel";
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
@@ -75,7 +75,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/channel/DeliveryStore",
+  "@amends-dev/core/channel/DeliveryStore",
 ) {}
 
 export * as DeliveryStore from "./DeliveryStore.ts";

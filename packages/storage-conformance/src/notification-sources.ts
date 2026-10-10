@@ -1,4 +1,4 @@
-import type * as Core from "@amends/core";
+import type * as Core from "@amends-dev/core";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import {
   Assignment,
@@ -6,17 +6,17 @@ import {
   Grant,
   type Permission,
   type Target,
-} from "@amends/core/authorization";
-import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Entry, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
+} from "@amends-dev/core/authorization";
+import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Entry, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 import {
   Notification,
   NotificationService,
   NotificationInbox,
   NotificationStore,
-} from "@amends/core/notification";
+} from "@amends-dev/core/notification";
 import {
   Thread,
   ThreadService,
@@ -29,8 +29,8 @@ import {
   ThreadPermissions,
   ThreadCommand,
   ThreadQuery,
-} from "@amends/core/thread";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/thread";
+import { Gateway } from "@amends-dev/gateway";
 import { Context, DateTime, Effect, Layer, Option } from "effect";
 import { TestClock } from "effect/testing";
 import {

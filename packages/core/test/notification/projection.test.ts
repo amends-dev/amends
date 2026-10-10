@@ -1,4 +1,4 @@
-import { Notification, NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   Thread,
   ThreadActivity,
@@ -9,9 +9,9 @@ import {
   ThreadParticipation,
   ThreadParticipationActivity,
   ThreadParticipationFacts,
-} from "@amends/core/thread";
-import { Identity } from "@amends/core/identity";
-import { Subject } from "@amends/core/journal";
+} from "@amends-dev/core/thread";
+import { Identity } from "@amends-dev/core/identity";
+import { Subject } from "@amends-dev/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, it } from "@effect/vitest";

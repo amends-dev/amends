@@ -1,7 +1,7 @@
 // Application code reuses the backend wire schemas; visual layers stay independent.
-import { SignIn } from "@amends/gateway/sign-in";
+import { SignIn } from "@amends-dev/gateway/sign-in";
 export { SignIn };
-export { WorkspaceDirectory } from "@amends/gateway/directory";
+export { WorkspaceDirectory } from "@amends-dev/gateway/directory";
 
 export const Session = SignIn.Session;
 export type Session = SignIn.Session;

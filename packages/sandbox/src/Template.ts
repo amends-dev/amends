@@ -36,7 +36,7 @@ export type TemplateName = typeof TemplateName.Type;
  * **Example** (A template that installs a tool)
  *
  * ```ts
- * import { Template } from "@amends/sandbox";
+ * import { Template } from "@amends-dev/sandbox";
  * import { Effect } from "effect";
  * import { ChildProcess, ChildProcessSpawner } from "effect/process";
  *

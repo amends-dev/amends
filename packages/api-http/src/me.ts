@@ -1,4 +1,4 @@
-import { WorkspaceDirectory } from "@amends/gateway/directory";
+import { WorkspaceDirectory } from "@amends-dev/gateway/directory";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";
 

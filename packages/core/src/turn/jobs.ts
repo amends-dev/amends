@@ -44,7 +44,7 @@ export interface Interface {
 }
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/jobs/Service",
+  "@amends-dev/core/turn/jobs/Service",
 ) {}
 
 /**

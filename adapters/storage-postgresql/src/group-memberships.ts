@@ -1,6 +1,6 @@
-import { Group, GroupMembership, GroupMembershipStore } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
-import { Member } from "@amends/core/workspace";
+import { Group, GroupMembership, GroupMembershipStore } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
+import { Member } from "@amends-dev/core/workspace";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

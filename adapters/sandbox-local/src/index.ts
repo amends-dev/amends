@@ -1,5 +1,5 @@
 /**
- * Sandboxes as directories on this machine, for the `@amends/sandbox` contract. Nothing is
+ * Sandboxes as directories on this machine, for the `@amends-dev/sandbox` contract. Nothing is
  * isolated, so they suit development, tests, and agents you would trust on this machine anyway.
  *
  * @since 0.1.0

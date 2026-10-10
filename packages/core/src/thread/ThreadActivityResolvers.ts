@@ -76,7 +76,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/ThreadActivityResolvers",
+  "@amends-dev/core/thread/ThreadActivityResolvers",
 ) {}
 
 /**

@@ -17,7 +17,7 @@
  *
  * @since 0.1.0
  */
-import { type Agent, HarnessError, type ModelEndpoint, type StreamPart } from "@amends/harness";
+import { type Agent, HarnessError, type ModelEndpoint, type StreamPart } from "@amends-dev/harness";
 import {
   Deferred,
   type Duration,
@@ -132,8 +132,8 @@ const standInFor = (tool: Tool.Any) =>
  * **Example** (A turn on Anthropic's API, in the host's process)
  *
  * ```ts
- * import { AmendsAgent, Models } from "@amends/harness-amends";
- * import { Agent, Harness } from "@amends/harness";
+ * import { AmendsAgent, Models } from "@amends-dev/harness-amends";
+ * import { Agent, Harness } from "@amends-dev/harness";
  * import { Config, Effect, Layer } from "effect";
  * import { FetchHttpClient } from "effect/http";
  *

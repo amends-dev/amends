@@ -1,6 +1,6 @@
-import { Identity } from "@amends/core/identity";
-import { Member, Workspace, Invitation } from "@amends/core/workspace";
-import { WorkspaceDirectory } from "@amends/gateway";
+import { Identity } from "@amends-dev/core/identity";
+import { Member, Workspace, Invitation } from "@amends-dev/core/workspace";
+import { WorkspaceDirectory } from "@amends-dev/gateway";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { MemoryConnection } from "./connection.ts";
 import { Invitations } from "./invitations.ts";

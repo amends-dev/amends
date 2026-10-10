@@ -1,23 +1,23 @@
-import { Notification } from "@amends/core/notification";
+import { Notification } from "@amends-dev/core/notification";
 import { describe, expect, it } from "@effect/vitest";
-import { ReadState, ReadStateService } from "@amends/core/read-state";
-import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
+import { ReadState, ReadStateService } from "@amends-dev/core/read-state";
+import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends-dev/core/authorization";
 import {
   Group,
   GroupService,
   GroupFollowService,
   GroupMembershipService,
-} from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Log, Publication } from "@amends/core/journal";
+} from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Journal, Log, Publication } from "@amends-dev/core/journal";
 import {
   Thread,
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
   ThreadPermissions,
-} from "@amends/core/thread";
-import { Member, MemberFacts } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Deferred, Effect, Fiber, Tracer } from "effect";
 import { TestClock } from "effect/testing";
 import {

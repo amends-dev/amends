@@ -6,7 +6,7 @@ import {
   IconMarkSearch,
   IconMarkSettings,
   IconMessage,
-} from "@amends/icons";
+} from "@amends-dev/icons";
 import { AvatarStack, type AvatarStackPerson } from "../../components/avatar/index.ts";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { Tabs } from "../../components/tabs/index.ts";

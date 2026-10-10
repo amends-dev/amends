@@ -16,7 +16,7 @@ import { type FileChangePart, type Step, type StreamPart, stepsOf } from "./Stre
  * **Example** (Reading a turn's answer and what it did)
  *
  * ```ts
- * import { Session } from "@amends/harness";
+ * import { Session } from "@amends-dev/harness";
  * import { Effect } from "effect";
  *
  * declare const session: Session.Session;

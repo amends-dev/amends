@@ -1,5 +1,5 @@
 {
-  "name": "@amends/storage-postgresql",
+  "name": "@amends-dev/storage-postgresql",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -13,16 +13,16 @@
     "test": "bun run --bun vitest run --root ../.. --config vitest.config.ts adapters/storage-postgresql/test"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/gateway": "workspace:*",
-    "@amends/harness": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
     "@effect/sql-pg": "catalog:",
     "drizzle-orm": "1.0.0-rc.5-5935859",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/storage-conformance": "workspace:*",
+    "@amends-dev/storage-conformance": "workspace:*",
     "@effect/platform-bun": "catalog:",
     "drizzle-kit": "1.0.0-rc.5-5935859"
   }

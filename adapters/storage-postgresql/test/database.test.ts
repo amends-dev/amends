@@ -1,11 +1,11 @@
 import { describe, it, expect } from "@effect/vitest";
 import { PgClient } from "@effect/sql-pg";
-import { GroupService } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Fact, Journal, Publication, Subject } from "@amends/core/journal";
-import { ThreadService } from "@amends/core/thread";
-import { Notification } from "@amends/core/notification";
-import { Member, MemberFacts } from "@amends/core/workspace";
+import { GroupService } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Fact, Journal, Publication, Subject } from "@amends-dev/core/journal";
+import { ThreadService } from "@amends-dev/core/thread";
+import { Notification } from "@amends-dev/core/notification";
+import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { Array, DateTime, Effect, Option, Redacted, Schema, Exit } from "effect";
 import { SqlClient } from "effect/sql";
 import { PostgresDatabase } from "../src/index.ts";

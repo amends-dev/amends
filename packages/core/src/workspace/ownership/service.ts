@@ -45,7 +45,7 @@ export interface Interface {
   ) => Effect.Effect<Workspace.Record, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/workspace/ownership-application/Service",
+  "@amends-dev/core/workspace/ownership-application/Service",
 ) {}
 
 /** Construct ownership operations over one workspace's journal and access policy. @category constructors */

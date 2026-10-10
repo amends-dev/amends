@@ -45,21 +45,14 @@ for (const { path, manifest } of packages) {
   }
 }
 
-// Reject the old UI package names and the retired design-system package.
+// UI stays presentational and client stays headless, whatever either declares.
 for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })) {
   const manifest: PackageManifest = await Bun.file(`${root}/${path}`).json();
   for (const section of sections) {
     for (const name of Object.keys(manifest[section] ?? {})) {
       if (
-        name === "@amends/frontend" ||
-        name === "@amends/ui-v2" ||
-        name === "@amends/design-system"
-      ) {
-        errors.push(`${path}: ${section}.${name} is renamed or retired; use @amends/ui.`);
-      }
-      if (
         path === "apps/ui/package.json" &&
-        ((name.startsWith("@amends/") && name !== "@amends/icons") ||
+        ((name.startsWith("@amends-dev/") && name !== "@amends-dev/icons") ||
           name === "effect" ||
           name.startsWith("@effect/atom-") ||
           name === "@solidjs/router" ||
@@ -69,11 +62,11 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
           `${path}: UI must remain presentation-only; ${section}.${name} belongs in client or a platform app.`,
         );
       // Client names what it returns by the screens' types, so it takes UI to type-check only.
-      const screenTypes = name === "@amends/ui" && section === "devDependencies";
+      const screenTypes = name === "@amends-dev/ui" && section === "devDependencies";
       if (
         path === "apps/client/package.json" &&
-        ((name.startsWith("@amends/") &&
-          !["@amends/api-http", "@amends/gateway"].includes(name) &&
+        ((name.startsWith("@amends-dev/") &&
+          !["@amends-dev/api-http", "@amends-dev/gateway"].includes(name) &&
           !screenTypes) ||
           name.startsWith("@tauri-apps/") ||
           name === "@solidjs/router" ||
@@ -139,7 +132,8 @@ for await (const path of new Bun.Glob(
     const target = dependency.startsWith(".")
       ? resolve(root, dirname(path), dependency)
       : dependency;
-    const iconImport = dependency === "@amends/icons" || dependency.startsWith("@amends/icons/");
+    const iconImport =
+      dependency === "@amends-dev/icons" || dependency.startsWith("@amends-dev/icons/");
     if (
       path.startsWith("apps/icons/src/") &&
       !(
@@ -151,30 +145,23 @@ for await (const path of new Bun.Glob(
       errors.push(
         `${path}: icon runtime must depend only on Solid and its own source (${dependency}).`,
       );
-    if (
-      dependency === "@amends/frontend" ||
-      dependency.startsWith("@amends/frontend/") ||
-      dependency === "@amends/ui-v2" ||
-      dependency.startsWith("@amends/ui-v2/") ||
-      dependency === "@amends/design-system" ||
-      dependency.startsWith("@amends/design-system/")
-    )
-      errors.push(`${path}: ${dependency} is renamed or retired; use @amends/ui.`);
-    const uiImport = dependency === "@amends/ui" || dependency.startsWith("@amends/ui/");
+    const uiImport = dependency === "@amends-dev/ui" || dependency.startsWith("@amends-dev/ui/");
     const clientImport =
-      dependency === "@amends/client" || dependency.startsWith("@amends/client/");
+      dependency === "@amends-dev/client" || dependency.startsWith("@amends-dev/client/");
     // Shared API plumbing and each feature's api.ts reach the HTTP contract.
     // Client may name the screens' types, never import UI code.
     const screenTypeImport = uiImport && !runtime.has(dependency);
     const contractImport =
       (path.startsWith("apps/client/src/api/") ||
         /^apps\/client\/src\/[^/]+\/api\.ts$/.test(path)) &&
-      ["@amends/api-http", "@amends/gateway/sign-in", "@amends/gateway/directory"].includes(
-        dependency,
-      );
+      [
+        "@amends-dev/api-http",
+        "@amends-dev/gateway/sign-in",
+        "@amends-dev/gateway/directory",
+      ].includes(dependency);
     if (
       path.startsWith("apps/ui/") &&
-      ((dependency.startsWith("@amends/") && !uiImport && !iconImport) ||
+      ((dependency.startsWith("@amends-dev/") && !uiImport && !iconImport) ||
         dependency === "effect" ||
         dependency.startsWith("effect/") ||
         dependency.startsWith("@effect/atom-") ||
@@ -192,7 +179,7 @@ for await (const path of new Bun.Glob(
       );
     if (
       path.startsWith("apps/client/") &&
-      ((dependency.startsWith("@amends/") &&
+      ((dependency.startsWith("@amends-dev/") &&
         !clientImport &&
         !contractImport &&
         !screenTypeImport) ||

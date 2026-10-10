@@ -69,7 +69,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/role-store/Service",
+  "@amends-dev/core/authorization/role-store/Service",
 ) {}
 
 export * as RoleStore from "./store.ts";

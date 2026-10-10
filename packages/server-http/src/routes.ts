@@ -1,4 +1,4 @@
-import { Api } from "@amends/api-http";
+import { Api } from "@amends-dev/api-http";
 import { Layer } from "effect";
 import { HttpApiBuilder, HttpApiScalar } from "effect/http-api";
 import { BearerAuthentication } from "./authentication.ts";

@@ -1,24 +1,28 @@
 import { describe, expect, it } from "@effect/vitest";
 
-import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
+import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends-dev/core/authorization";
 
-import { GroupService, GroupMembershipService } from "@amends/core/group";
+import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
 
-import { Actor, Identity } from "@amends/core/identity";
+import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Notification, NotificationService, NotificationStore } from "@amends/core/notification";
+import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import {
+  Notification,
+  NotificationService,
+  NotificationStore,
+} from "@amends-dev/core/notification";
 
 import {
   ThreadService,
   ThreadMessageService,
   ThreadParticipation,
   ThreadParticipationService,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 
-import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
+import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
-import { Gateway } from "@amends/gateway";
+import { Gateway } from "@amends-dev/gateway";
 
 import { Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
 

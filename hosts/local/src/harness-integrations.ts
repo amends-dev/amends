@@ -5,10 +5,10 @@
  * credential, and reaches nothing, so it is always healthy. Its harness runs the agent on the
  * endpoints it is given, which connections to model providers give.
  */
-import { Connection, Integration } from "@amends/connection";
-import { type Agent, Harness } from "@amends/harness";
-import { AmendsAgent, Models } from "@amends/harness-amends";
-import { Opencode2Agent, OpencodeAgent } from "@amends/harness-opencode";
+import { Connection, Integration } from "@amends-dev/connection";
+import { type Agent, Harness } from "@amends-dev/harness";
+import { AmendsAgent, Models } from "@amends-dev/harness-amends";
+import { Opencode2Agent, OpencodeAgent } from "@amends-dev/harness-opencode";
 import { type Crypto, Effect } from "effect";
 import type { Socket } from "effect/socket";
 

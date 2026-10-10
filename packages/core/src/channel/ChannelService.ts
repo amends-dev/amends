@@ -140,7 +140,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/channel/ChannelService",
+  "@amends-dev/core/channel/ChannelService",
 ) {}
 
 /** Channels by name, and by id among channels of one name. */

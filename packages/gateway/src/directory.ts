@@ -1,5 +1,5 @@
-import type { Identity } from "@amends/core/identity";
-import { Invitation, Member, Workspace } from "@amends/core/workspace";
+import type { Identity } from "@amends-dev/core/identity";
+import { Invitation, Member, Workspace } from "@amends-dev/core/workspace";
 import { Context, Schema } from "effect";
 import type { Effect } from "effect";
 
@@ -35,7 +35,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/gateway/directory/Service",
+  "@amends-dev/gateway/directory/Service",
 ) {}
 
 export * as WorkspaceDirectory from "./directory.ts";

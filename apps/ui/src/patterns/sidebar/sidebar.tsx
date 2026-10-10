@@ -1,6 +1,6 @@
 import { Show, splitProps, type JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
-import { IconChevronDown, IconMarkSearch } from "@amends/icons";
+import { IconChevronDown, IconMarkSearch } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Count } from "../../components/count/index.ts";
 import { StatusMark, markTone, type Status } from "../../components/status-mark/index.ts";

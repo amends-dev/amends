@@ -1,11 +1,11 @@
-import type { TurnState } from "@amends/ui/components/turn-status";
-import type { AgentActivity } from "@amends/ui/screens/agents";
+import type { TurnState } from "@amends-dev/ui/components/turn-status";
+import type { AgentActivity } from "@amends-dev/ui/screens/agents";
 import type {
   ThreadTurnControls,
   TurnLogActivity,
   TurnLogTurn,
   TurnProblem,
-} from "@amends/ui/screens/turns";
+} from "@amends-dev/ui/screens/turns";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Effect, Exit, Option } from "effect";
 import { AsyncResult, type Atom } from "effect/reactivity";

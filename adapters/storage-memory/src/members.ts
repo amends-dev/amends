@@ -1,6 +1,6 @@
-import { Identity } from "@amends/core/identity";
-import { Store } from "@amends/core/journal";
-import { Member, MemberStore } from "@amends/core/workspace";
+import { Identity } from "@amends-dev/core/identity";
+import { Store } from "@amends-dev/core/journal";
+import { Member, MemberStore } from "@amends-dev/core/workspace";
 import { Array, Effect, Layer, Schema, Option } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

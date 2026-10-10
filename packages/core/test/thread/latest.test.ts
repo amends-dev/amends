@@ -1,4 +1,4 @@
-import { Group, GroupFacts, GroupProjection, GroupStore } from "@amends/core/group";
+import { Group, GroupFacts, GroupProjection, GroupStore } from "@amends-dev/core/group";
 import {
   Thread,
   ThreadActivity,
@@ -11,8 +11,8 @@ import {
   ThreadParticipationActivity,
   ThreadProjection,
   ThreadStore,
-} from "@amends/core/thread";
-import { Member } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { Member } from "@amends-dev/core/workspace";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";

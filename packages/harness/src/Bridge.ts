@@ -25,7 +25,7 @@
  *
  * @since 0.1.0
  */
-import { Network, Sandbox } from "@amends/sandbox";
+import { Network, Sandbox } from "@amends-dev/sandbox";
 import { type Effect, Schema, type Scope, type Stream } from "effect";
 import { Prompt } from "effect/ai";
 import { Rpc, RpcGroup } from "effect/rpc";
@@ -156,7 +156,7 @@ export interface DriverSession {
  * **Example** (A driver over an agent's own session API)
  *
  * ```ts
- * import { Bridge, StreamPart } from "@amends/harness";
+ * import { Bridge, StreamPart } from "@amends-dev/harness";
  * import { Effect, Stream } from "effect";
  *
  * // What the adapter has of its agent in the sandbox: a client of the agent's own API.

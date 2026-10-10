@@ -7,7 +7,7 @@ import {
   Grant,
   Role,
   RoleFacts,
-} from "@amends/core/authorization";
+} from "@amends-dev/core/authorization";
 
 import {
   Group,
@@ -18,11 +18,11 @@ import {
   GroupMembershipPermissions,
   GroupMembershipStore,
   GroupPermissions,
-} from "@amends/core/group";
+} from "@amends-dev/core/group";
 
-import { Actor, Identity } from "@amends/core/identity";
+import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Journal, Log, Publication, Store } from "@amends/core/journal";
+import { Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
 import {
   Invitation,
   InvitationFacts,
@@ -30,9 +30,9 @@ import {
   MemberService,
   MemberFacts,
   MemberPermissions,
-} from "@amends/core/workspace";
+} from "@amends-dev/core/workspace";
 
-import { Gateway } from "@amends/gateway";
+import { Gateway } from "@amends-dev/gateway";
 
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Option } from "effect";
 

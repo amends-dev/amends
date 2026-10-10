@@ -1,5 +1,5 @@
 {
-  "name": "amends-v2",
+  "name": "amends",
   "private": true,
   "workspaces": {
     "packages": [
@@ -23,13 +23,13 @@
   },
   "type": "module",
   "scripts": {
-    "start": "bun run --filter @amends/host-local start",
-    "dev": "bun run --filter @amends/host-local dev",
+    "start": "bun run --filter @amends-dev/host-local start",
+    "dev": "bun run --filter @amends-dev/host-local dev",
     "typecheck": "tsc --noEmit && bun run --workspaces typecheck",
     "test": "bun run --bun vitest run",
     "check:packages": "bun run scripts/check-packages.ts",
     "dist": "bun run scripts/dist.ts",
-    "check:icons": "bun run --filter @amends/icons check:generated",
+    "check:icons": "bun run --filter @amends-dev/icons check:generated",
     "lint": "oxlint --disable-nested-config --deny-warnings .",
     "lint:fix": "oxlint --disable-nested-config --fix --deny-warnings .",
     "format": "oxfmt --config .oxfmtrc.json --write .",

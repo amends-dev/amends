@@ -13,7 +13,7 @@
  * that no sandbox has started from for a day. A version that other hosts still start sandboxes
  * from stays, as while hosts are upgraded one by one.
  */
-import { SandboxError, type Template } from "@amends/sandbox";
+import { SandboxError, type Template } from "@amends-dev/sandbox";
 import { type Daytona, type Snapshot, SnapshotState } from "@daytona/sdk";
 import { Clock, Crypto, Duration, Effect, Option, type Scope } from "effect";
 import { Hex } from "effect/encoding";

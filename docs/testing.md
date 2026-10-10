@@ -14,11 +14,11 @@ bun run test
 bun run test packages/core/test
 bun run test --project backend
 bun run test --project postgresql
-bun run test --project @amends/icons
-bun run test --project @amends/ui
-bun run test --project @amends/client
-bun run test --project @amends/web
-bun run test --project @amends/desktop
+bun run test --project @amends-dev/icons
+bun run test --project @amends-dev/ui
+bun run test --project @amends-dev/client
+bun run test --project @amends-dev/web
+bun run test --project @amends-dev/desktop
 bun run test --watch packages/core/test
 bun run check
 ```
@@ -54,7 +54,7 @@ and desktop widths, before relying on them.
 Solid projects explicitly load [`scripts/testing/jest-dom.ts`](../scripts/testing/jest-dom.ts),
 which registers DOM matchers on the Effect Vitest assertions. This prevents the Solid Vite plugin
 from automatically adding an unresolved setup path when another package installs Storybook.
-Build the workshop with `bun run --filter @amends/ui build`. The root `vite-node` override keeps vanilla-extract's
+Build the workshop with `bun run --filter @amends-dev/ui build`. The root `vite-node` override keeps vanilla-extract's
 evaluator on its supported Vite 7 line; verify the workshop build before changing it.
 
 ## Local runtime and CPU use
@@ -65,8 +65,8 @@ iterating; watch mode also reuses Vite's in-memory transforms between edits.
 
 ```sh
 bun run test packages/core/test --watch
-bun run test --project @amends/ui
-bun run test --project '!@amends/ui'
+bun run test --project @amends-dev/ui
+bun run test --project '!@amends-dev/ui'
 bun run test --project '!postgresql'
 bun run test --maxWorkers=2
 ```
@@ -211,7 +211,7 @@ too, the hosts' tests also run on Daytona, in sandboxes started from the snapsho
 version once Daytona has made it.
 
 The sandbox providers in `adapters/sandbox-local` and
-`adapters/sandbox-daytona` run the suites `@amends/sandbox/conformance` exports, and
+`adapters/sandbox-daytona` run the suites `@amends-dev/sandbox/conformance` exports, and
 `packages/sandbox/test` checks the contract's own rules, such as what names a template. The local
 provider's run everywhere. Daytona's, and its own tests of what it asks of Daytona and the network
 policies Daytona enforces, create real sandboxes and cost money, so they run only with

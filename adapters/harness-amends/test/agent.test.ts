@@ -1,5 +1,5 @@
-import { Agent, GenerateResult, Harness, Session } from "@amends/harness";
-import type { Sandbox } from "@amends/sandbox";
+import { Agent, GenerateResult, Harness, Session } from "@amends-dev/harness";
+import type { Sandbox } from "@amends-dev/sandbox";
 import { BunServices } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Path, Schema, Stream } from "effect";

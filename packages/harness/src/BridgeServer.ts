@@ -22,7 +22,7 @@
  *
  * @since 0.1.0
  */
-import { Network } from "@amends/sandbox";
+import { Network } from "@amends-dev/sandbox";
 import {
   Cause,
   Clock,
@@ -119,7 +119,7 @@ export interface HandlerOptions extends Pick<Options, "stateDirectory" | "bridge
  * **Example** (A bridge program on Bun)
  *
  * ```ts
- * import { Bridge, BridgeServer } from "@amends/harness";
+ * import { Bridge, BridgeServer } from "@amends-dev/harness";
  * import { BunHttpServer, BunRuntime, BunServices } from "@effect/platform-bun";
  * import { Effect, Layer, Redacted, Schema } from "effect";
  *

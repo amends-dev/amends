@@ -58,7 +58,7 @@ export interface Interface {
 }
 /** What a keyed issuance created, so that a retry returns it. */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/workspace/invitation-application/Service",
+  "@amends-dev/core/workspace/invitation-application/Service",
 ) {}
 
 /**

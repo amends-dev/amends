@@ -24,7 +24,7 @@ export interface Interface {
   ) => Effect.Effect<void, Error>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/read-state/command/Service",
+  "@amends-dev/core/read-state/command/Service",
 ) {}
 
 /** @category constructors */

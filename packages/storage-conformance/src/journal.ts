@@ -1,8 +1,8 @@
-import { Notification } from "@amends/core/notification";
-import * as Core from "@amends/core";
-import { BuiltinRoles, Role, RoleFacts } from "@amends/core/authorization";
-import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
+import { Notification } from "@amends-dev/core/notification";
+import * as Core from "@amends-dev/core";
+import { BuiltinRoles, Role, RoleFacts } from "@amends-dev/core/authorization";
+import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
 import {
   type Checkpoint,
   Fact,
@@ -12,14 +12,14 @@ import {
   Publication,
   Store,
   Subject,
-} from "@amends/core/journal";
+} from "@amends-dev/core/journal";
 import {
   ThreadService,
   ThreadMessageService,
   ThreadParticipation,
   ThreadParticipationActivity,
-} from "@amends/core/thread";
-import { InvitationService, Member, MemberPermissions } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { InvitationService, Member, MemberPermissions } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, Deferred, Effect, Fiber, Layer, Option, Schema, Stream } from "effect";
 import type { Harness } from "./harness.ts";

@@ -13,8 +13,8 @@
  *
  * @since 0.1.0
  */
-import type { Agent } from "@amends/harness";
-import { Sandbox } from "@amends/sandbox";
+import type { Agent } from "@amends-dev/harness";
+import { Sandbox } from "@amends-dev/sandbox";
 import { Duration, Effect, FileSystem, Option, Path, Ref, Schema, Stream } from "effect";
 import { Tool, Toolkit } from "effect/ai";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -141,8 +141,8 @@ const killGracePeriod = Duration.seconds(2);
  * **Example** (Running a command in a session's directory, as the model would)
  *
  * ```ts
- * import { Tools } from "@amends/harness-amends";
- * import type { Agent } from "@amends/harness";
+ * import { Tools } from "@amends-dev/harness-amends";
+ * import type { Agent } from "@amends-dev/harness";
  * import { Effect, Stream } from "effect";
  *
  * declare const workspace: Agent.Workspace; // the session's sandbox and directory

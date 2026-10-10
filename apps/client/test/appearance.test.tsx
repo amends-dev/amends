@@ -7,8 +7,8 @@ import {
   type AppearanceSource,
   type SystemAppearance,
 } from "../src/index.ts";
-import type { ColorPalette } from "@amends/ui/foundations/theme";
-import type { Appearance } from "@amends/ui/screens/workspace-navigation";
+import type { ColorPalette } from "@amends-dev/ui/foundations/theme";
+import type { Appearance } from "@amends-dev/ui/screens/workspace-navigation";
 afterEach(cleanup);
 it("follows system appearance only in system mode, responds to external changes, and disposes subscriptions", () => {
   let preference: Appearance = "system";

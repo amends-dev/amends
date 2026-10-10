@@ -246,7 +246,7 @@ agent, natively or through MCP or code mode, is not decided here.
 
 ## Conformance
 
-`@amends/toolkit/conformance` holds the suites every kind of tool source runs against itself, so that
+`@amends-dev/toolkit/conformance` holds the suites every kind of tool source runs against itself, so that
 code written against `ToolSource` works the same on each. A source's tests call `run` with a
 `Fixture`, which makes the source for one test over a system that serves three tools: `echo`, which
 answers with the text it is given, `failing`, which reports that it failed, and `blocking`, which does

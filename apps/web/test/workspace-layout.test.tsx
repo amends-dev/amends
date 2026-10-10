@@ -7,7 +7,7 @@ import {
   useDirectory,
   ChangeFeedProvider,
   type DirectoryScope,
-} from "@amends/client";
+} from "@amends-dev/client";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Application } from "../src/application.tsx";

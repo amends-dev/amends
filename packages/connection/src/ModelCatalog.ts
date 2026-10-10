@@ -10,7 +10,7 @@
  * A catalog holds no credentials. A connection to a provider holds those, and gives the settings
  * that the provider's URLs name.
  */
-import { ModelEndpoint } from "@amends/harness";
+import { ModelEndpoint } from "@amends-dev/harness";
 import { Context, Effect, Layer, Schema } from "effect";
 import { snapshot } from "./snapshot.ts";
 
@@ -144,7 +144,7 @@ export class ModelCatalog extends Context.Service<
     /** The model `modelId` of the provider `providerId`, or nothing when the catalog has neither. */
     readonly findModel: (providerId: string, modelId: string) => Effect.Effect<Model | undefined>;
   }
->()("@amends/connection/ModelCatalog") {}
+>()("@amends-dev/connection/ModelCatalog") {}
 
 /** A model catalog of the providers in `catalog`. */
 export const make = (catalog: Catalog): ModelCatalog["Service"] => {

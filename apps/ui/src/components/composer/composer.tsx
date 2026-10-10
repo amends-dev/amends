@@ -28,7 +28,7 @@ import {
   IconQuote,
   IconStrikethrough,
   IconType,
-} from "@amends/icons";
+} from "@amends-dev/icons";
 import { Avatar } from "../avatar/index.ts";
 import { Button } from "../button/index.ts";
 import { IconButton } from "../icon-button/index.ts";

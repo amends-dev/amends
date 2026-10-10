@@ -3,17 +3,17 @@
  * the workspace through the gateway for itself, since a run holds the workspace only while a call
  * runs. The runner and the session log writer call these and know nothing of the gateway.
  */
-import type * as Core from "@amends/core";
-import type { ThreadParticipation } from "@amends/core/thread";
+import type * as Core from "@amends-dev/core";
+import type { ThreadParticipation } from "@amends-dev/core/thread";
 import {
   type SessionLog,
   SessionLogStore,
   type Turn,
   TurnExecution,
   type TurnJobs,
-} from "@amends/core/turn";
-import type { Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/turn";
+import type { Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { type Array, Effect, type Scope } from "effect";
 
 /** @category constructors */

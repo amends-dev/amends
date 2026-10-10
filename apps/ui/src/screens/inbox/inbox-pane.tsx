@@ -1,5 +1,5 @@
 import { Match, Show, Switch, createMemo } from "solid-js";
-import { IconMarkMail, IconMessage } from "@amends/icons";
+import { IconMarkMail, IconMessage } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";

@@ -1,11 +1,11 @@
-import { Api, Principal } from "@amends/api-http";
-import { ReadStateService } from "@amends/core/read-state";
+import { Api, Principal } from "@amends-dev/api-http";
+import { ReadStateService } from "@amends-dev/core/read-state";
 import {
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
-} from "@amends/core/thread";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/thread";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

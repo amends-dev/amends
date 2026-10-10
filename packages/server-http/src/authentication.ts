@@ -1,5 +1,5 @@
-import { Authentication, Principal, Unauthorized } from "@amends/api-http";
-import { SessionTokens } from "@amends/gateway";
+import { Authentication, Principal, Unauthorized } from "@amends-dev/api-http";
+import { SessionTokens } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 
 const messages: Record<SessionTokens.Rejected["reason"], string> = {

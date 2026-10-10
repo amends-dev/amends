@@ -28,7 +28,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/query/Service",
+  "@amends-dev/core/group/query/Service",
 ) {}
 
 /** Capture bound services; check the acting member and current admission on every call. @category constructors */

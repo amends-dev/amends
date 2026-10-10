@@ -176,7 +176,7 @@ export class Transaction extends Context.Service<
      */
     readonly afterCommit: (effect: Effect.Effect<void>) => Effect.Effect<void, Failure>;
   }
->()("@amends/core/journal/store/Transaction") {}
+>()("@amends-dev/core/journal/store/Transaction") {}
 
 export interface Interface {
   /** Every log and read addresses this workspace alone. */
@@ -261,7 +261,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/journal/store/Service",
+  "@amends-dev/core/journal/store/Service",
 ) {}
 
 /**

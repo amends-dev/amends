@@ -1,17 +1,17 @@
-# @amends/sandbox-daytona
+# @amends-dev/sandbox-daytona
 
-Sandboxes on [Daytona](https://www.daytona.io) for the [`@amends/sandbox`](../../packages/sandbox)
-contract. Each sandbox is a Linux machine of its own in Daytona's cloud, which Daytona names by the
-sandbox's id. The provider reaches Daytona through its SDK with the API key of the organization
-the sandboxes belong to, makes a snapshot of each template version so that later sandboxes start
-ready, and reaches a sandbox's ports through Daytona's preview URLs. It runs on Bun or Node, as
-Daytona's SDK does; [`@amends/sandbox-local`](../sandbox-local) runs the same code in directories
-on this machine.
+Sandboxes on [Daytona](https://www.daytona.io) for the
+[`@amends-dev/sandbox`](../../packages/sandbox) contract. Each sandbox is a Linux machine of its own
+in Daytona's cloud, which Daytona names by the sandbox's id. The provider reaches Daytona through
+its SDK with the API key of the organization the sandboxes belong to, makes a snapshot of each
+template version so that later sandboxes start ready, and reaches a sandbox's ports through
+Daytona's preview URLs. It runs on Bun or Node, as Daytona's SDK does;
+[`@amends-dev/sandbox-local`](../sandbox-local) runs the same code in directories on this machine.
 
 ## Install
 
 ```sh
-bun add @amends/sandbox-daytona @amends/sandbox effect
+bun add @amends-dev/sandbox-daytona @amends-dev/sandbox effect
 ```
 
 The provider needs Effect's `Crypto` service, as `BunCrypto.layer` from `@effect/platform-bun` or
@@ -26,8 +26,8 @@ organization's API key. A program then creates sandboxes, works inside them with
 would on any provider.
 
 ```ts
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { Network, Sandbox, SandboxProvider } from "@amends/sandbox";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox";
 import { BunCrypto } from "@effect/platform-bun";
 import { Config, Effect, FileSystem, Layer } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -179,7 +179,7 @@ Run the package's tests with `bun run test adapters/sandbox-daytona`. What to do
 in each state, which other versions to delete, how versions are named, and that options Daytona
 does not take fail a create before Daytona is asked run everywhere. The rest create real sandboxes
 and cost money, so they run only with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`: the
-conformance suites of `@amends/sandbox`, which delete the snapshots of their templates when they
+conformance suites of `@amends-dev/sandbox`, which delete the snapshots of their templates when they
 end, and what the provider asks of Daytona, such as that sandboxes do not stop on their own, that
 one snapshot is made of a version several hosts create sandboxes from at once, that a failing
 template leaves neither its sandbox nor a snapshot, the network policies Daytona enforces and those

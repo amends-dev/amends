@@ -1,6 +1,6 @@
 import { For, Match, Show, Switch, createMemo } from "solid-js";
 import { Keyed } from "../../internal/keyed.tsx";
-import { IconList, IconMarkNew, IconMarkReply, IconMarkResources } from "@amends/icons";
+import { IconList, IconMarkNew, IconMarkReply, IconMarkResources } from "@amends-dev/icons";
 import type { AvatarStackPerson } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import {

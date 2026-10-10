@@ -59,7 +59,7 @@ export interface Interface {
   ) => Effect.Effect<Assignment.Record, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/assignment/service/Service",
+  "@amends-dev/core/authorization/assignment/service/Service",
 ) {}
 
 /** @category constructors */

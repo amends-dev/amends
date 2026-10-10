@@ -15,7 +15,7 @@ export class Integrations extends Context.Service<
     /** The integration of the id `id`, failing with `NotFoundError` for one the host has not. */
     readonly find: (id: string) => Effect.Effect<Integration, ConnectionError>;
   }
->()("@amends/connection/Integrations") {}
+>()("@amends-dev/connection/Integrations") {}
 
 /** The installed integrations `integrations`, whose ids must be distinct. */
 export const make = (integrations: ReadonlyArray<Integration>) => {

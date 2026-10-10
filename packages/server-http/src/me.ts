@@ -1,5 +1,5 @@
-import { Api, Principal } from "@amends/api-http";
-import { WorkspaceDirectory } from "@amends/gateway";
+import { Api, Principal } from "@amends-dev/api-http";
+import { WorkspaceDirectory } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

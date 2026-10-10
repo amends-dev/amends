@@ -1,9 +1,9 @@
-import { Assignment, Grant, Role, Scope, Target } from "@amends/core/authorization";
-import { Group } from "@amends/core/group";
-import { Identity } from "@amends/core/identity";
-import { Checkpoint, Entry, Store } from "@amends/core/journal";
-import { ThreadId } from "@amends/core/thread";
-import { Invitation, Member, MemberPermissions, Workspace } from "@amends/core/workspace";
+import { Assignment, Grant, Role, Scope, Target } from "@amends-dev/core/authorization";
+import { Group } from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
+import { Checkpoint, Entry, Store } from "@amends-dev/core/journal";
+import { ThreadId } from "@amends-dev/core/thread";
+import { Invitation, Member, MemberPermissions, Workspace } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";

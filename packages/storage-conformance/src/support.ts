@@ -1,6 +1,6 @@
 /** Fixtures the suites share: identities, bound stores, and cores and gateways over a host. */
-import * as Core from "@amends/core";
-import { ReadStateStore } from "@amends/core/read-state";
+import * as Core from "@amends-dev/core";
+import { ReadStateStore } from "@amends-dev/core/read-state";
 import {
   Assignment,
   AssignmentFacts,
@@ -8,11 +8,16 @@ import {
   BuiltinRoles,
   type Role,
   RoleStore,
-} from "@amends/core/authorization";
-import { GroupQuery, GroupFollowStore, GroupMembershipStore, GroupStore } from "@amends/core/group";
-import { type Actor, Identity, Performer } from "@amends/core/identity";
-import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Notification, NotificationStore } from "@amends/core/notification";
+} from "@amends-dev/core/authorization";
+import {
+  GroupQuery,
+  GroupFollowStore,
+  GroupMembershipStore,
+  GroupStore,
+} from "@amends-dev/core/group";
+import { type Actor, Identity, Performer } from "@amends-dev/core/identity";
+import { Checkpoint, Event, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   type ThreadActivity,
   ThreadActivityKind,
@@ -28,7 +33,7 @@ import {
   ThreadQuery,
   ThreadStore,
   type Thread,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import {
   type Invitation,
   InvitationStore,
@@ -38,19 +43,19 @@ import {
   Workspace,
   WorkspaceInitialization,
   WorkspaceStore,
-} from "@amends/core/workspace";
-import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
-import { AgentStore } from "@amends/core/agent";
+} from "@amends-dev/core/workspace";
+import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection";
+import { AgentStore } from "@amends-dev/core/agent";
 import {
   ChannelBindingStore,
   ChannelStore,
   ContactStore,
   DeliveryJobs,
   DeliveryStore,
-} from "@amends/core/channel";
-import { TaskStore, TaskTimeline } from "@amends/core/task";
-import { ChannelTransport } from "@amends/channel";
-import { Integration, Integrations, type ModelCatalog } from "@amends/connection";
+} from "@amends-dev/core/channel";
+import { TaskStore, TaskTimeline } from "@amends-dev/core/task";
+import { ChannelTransport } from "@amends-dev/channel";
+import { Integration, Integrations, type ModelCatalog } from "@amends-dev/connection";
 import {
   SessionLogStore,
   SessionStateStore,
@@ -58,9 +63,9 @@ import {
   TurnJobs,
   TurnStore,
   TurnTimeline,
-} from "@amends/core/turn";
-import { Harness as AgentHarness } from "@amends/harness";
-import { Gateway, WorkspaceStorage } from "@amends/gateway";
+} from "@amends-dev/core/turn";
+import { Harness as AgentHarness } from "@amends-dev/harness";
+import { Gateway, WorkspaceStorage } from "@amends-dev/gateway";
 import { Clock, Context, DateTime, Effect, Layer, Option, Redacted, Result, Schema } from "effect";
 import type { Harness, Host, Storage } from "./harness.ts";
 

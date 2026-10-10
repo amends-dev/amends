@@ -18,7 +18,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/signal/hub/Service",
+  "@amends-dev/core/signal/hub/Service",
 ) {}
 
 /** Signals a subscriber may fall behind by before it misses the oldest. */

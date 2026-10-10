@@ -15,7 +15,7 @@
  * key, so a wrong key there shows only when a turn runs. Checking a connection to an
  * OpenAI-compatible API asks it which models it has.
  */
-import type { ModelEndpoint } from "@amends/harness";
+import type { ModelEndpoint } from "@amends-dev/harness";
 import { Effect, Redacted, Result, Schema } from "effect";
 import { HttpClient, HttpClientRequest, type HttpClientResponse } from "effect/http";
 import { type Health, healthOf, UnsupportedError } from "./Connection.ts";

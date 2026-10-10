@@ -1,4 +1,4 @@
-import { Identity } from "@amends/core/identity";
+import { Identity } from "@amends-dev/core/identity";
 import { Array, Context, DateTime, Deferred, Effect, Option, Ref, Schema, Semaphore } from "effect";
 import { Assignment } from "../src/authorization/assignment/assignment.ts";
 import { AssignmentStore } from "../src/authorization/assignment/store.ts";

@@ -1,5 +1,5 @@
-import { Group, GroupStore } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
+import { Group, GroupStore } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

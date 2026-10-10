@@ -1,6 +1,6 @@
 import { render } from "solid-js/web";
-import "@amends/ui/foundations/typography/fonts";
-import "@amends/ui/styles";
+import "@amends-dev/ui/foundations/typography/fonts";
+import "@amends-dev/ui/styles";
 import { App } from "./app.tsx";
 
 const root = document.getElementById("root");

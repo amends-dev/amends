@@ -10,8 +10,8 @@ import {
   useWorkspace,
   ChangeFeedProvider,
   DirectoryState,
-} from "@amends/client";
-import { CheckingSessionScreen, HostUnavailableScreen } from "@amends/ui/screens/standalone";
+} from "@amends-dev/client";
+import { CheckingSessionScreen, HostUnavailableScreen } from "@amends-dev/ui/screens/standalone";
 import { Match, Show, Switch, type ParentProps } from "solid-js";
 import { useStandaloneAccount } from "./account.ts";
 import { NotFoundPage } from "./pages/not-found.tsx";

@@ -1,17 +1,17 @@
-# @amends/harness-amends
+# @amends-dev/harness-amends
 
-An agent in your own process for the [`@amends/harness`](../../packages/harness) contract: a loop
-over an Effect AI `LanguageModel`, with the model providers' clients, that runs where your program
-runs. Each step streams the model's response while Effect AI runs the tools the model calls, and a
-turn takes steps until the model answers without calling one. In a sandbox the agent works with
-its own tools for files and the shell; without one it answers from its model alone, calling only
-your tools. It is the agent to run when nothing is to be installed in the sandbox, and the
+An agent in your own process for the [`@amends-dev/harness`](../../packages/harness) contract: a
+loop over an Effect AI `LanguageModel`, with the model providers' clients, that runs where your
+program runs. Each step streams the model's response while Effect AI runs the tools the model calls,
+and a turn takes steps until the model answers without calling one. In a sandbox the agent works
+with its own tools for files and the shell; without one it answers from its model alone, calling
+only your tools. It is the agent to run when nothing is to be installed in the sandbox, and the
 reference for what the contract asks of an agent in the host's process.
 
 ## Install
 
 ```sh
-bun add @amends/harness-amends @amends/harness effect
+bun add @amends-dev/harness-amends @amends-dev/harness effect
 ```
 
 The package brings Effect AI's clients for Anthropic's Messages API, OpenAI's Responses API, and
@@ -25,8 +25,8 @@ a language model of each endpoint with `Models.LanguageModels`, which `Models.la
 the `HttpClient` the requests go out through.
 
 ```ts
-import { AmendsAgent, Models } from "@amends/harness-amends";
-import { Agent, Harness } from "@amends/harness";
+import { AmendsAgent, Models } from "@amends-dev/harness-amends";
+import { Agent, Harness } from "@amends-dev/harness";
 import { Config, Effect, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";
 
@@ -50,7 +50,7 @@ const program = Effect.gen(function* () {
 
 The agent needs no sandbox and installs nothing in one. Given a sandbox, as `createSession`'s
 `sandbox`, it works in the session's directory there with the tools in [Tools](#tools).
-[`@amends/harness`](../../packages/harness/README.md) says how sessions, turns, host tools, and
+[`@amends-dev/harness`](../../packages/harness/README.md) says how sessions, turns, host tools, and
 releasing a session work, which this agent does as any agent does.
 
 ## Models

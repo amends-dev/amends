@@ -1,6 +1,6 @@
 # Gateway
 
-`@amends/gateway` is how a host enters core. Core operates within one workspace
+`@amends-dev/gateway` is how a host enters core. Core operates within one workspace
 with a trusted actor, and its services are the operations. The
 gateway does the two things core cannot do for itself: bootstrap a workspace,
 and bind a workspace's storage and resolve an authenticated identity into the
@@ -143,8 +143,8 @@ does. The `./sign-in` and `./directory` exports carry their schemas for
 contracts.
 
 Hosts implement core's `TurnJobs` and `DeliveryJobs` on a job runner that enters workspaces
-through `inWorkspace`, as [`@amends/cluster`](../cluster/README.md)'s `TurnJob` and `DeliveryJob`
-do; a host that runs none uses each one's `layerNoRunner`.
+through `inWorkspace`, as [`@amends-dev/cluster`](../cluster/README.md)'s `TurnJob` and
+`DeliveryJob` do; a host that runs none uses each one's `layerNoRunner`.
 
 Storage binds each workspace's `SignalHub.Service`, which delivers
 [ephemeral signals](../core/README.md#signals), such as typing, between every process over the
@@ -178,7 +178,7 @@ The commit ID is an internal reconciliation reference; the HTTP contract does no
 expose a commit-status lookup endpoint.
 
 `GatewayErrors` is the canonical error namespace. Import it from
-`@amends/gateway/errors` in contracts to avoid loading the gateway implementation;
+`@amends-dev/gateway/errors` in contracts to avoid loading the gateway implementation;
 the package root relays the same namespace. `Gateway` exposes operations and
 construction APIs. Error tags such as `Gateway.NotMember` remain stable.
 

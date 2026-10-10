@@ -1,5 +1,5 @@
-import { Identity } from "@amends/core/identity";
-import { Assignment, AssignmentService } from "@amends/core/authorization";
+import { Identity } from "@amends-dev/core/identity";
+import { Assignment, AssignmentService } from "@amends-dev/core/authorization";
 import {
   Invitation,
   InvitationService,
@@ -8,8 +8,8 @@ import {
   Ownership,
   OwnershipService,
   Workspace,
-} from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 
 /**

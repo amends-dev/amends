@@ -1,6 +1,6 @@
-import { Assignment, AssignmentStore } from "@amends/core/authorization";
-import { Store } from "@amends/core/journal";
-import type { Workspace } from "@amends/core/workspace";
+import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
+import { Store } from "@amends-dev/core/journal";
+import type { Workspace } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

@@ -1,4 +1,4 @@
-import { Integrations } from "@amends/connection";
+import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
@@ -74,7 +74,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/agent/service/Service",
+  "@amends-dev/core/agent/service/Service",
 ) {}
 
 /** An agent's membership's name; an agent joins with one, and only it can rename it. */

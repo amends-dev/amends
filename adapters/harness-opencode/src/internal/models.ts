@@ -11,7 +11,7 @@
  * that models.dev lists by their ids, as endpoints name them, knowing the rest of a model from
  * there, such as whether it calls tools.
  */
-import { HarnessError, type ModelEndpoint } from "@amends/harness";
+import { HarnessError, type ModelEndpoint } from "@amends-dev/harness";
 import { Array, Record, Redacted, Result, type Schema } from "effect";
 import type { ModelRef } from "./bridge/Driver.ts";
 import type { Version } from "./template.ts";

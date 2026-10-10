@@ -1,5 +1,5 @@
 {
-  "name": "@amends/cluster",
+  "name": "@amends-dev/cluster",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,14 +11,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/gateway": "workspace:*",
-    "@amends/harness": "workspace:*",
-    "@amends/sandbox": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/channel": "workspace:*"
+    "@amends-dev/channel": "workspace:*"
   }
 }

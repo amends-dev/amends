@@ -1,5 +1,5 @@
-import { Assignment, AssignmentStore } from "@amends/core/authorization";
-import { Store } from "@amends/core/journal";
+import { Assignment, AssignmentStore } from "@amends-dev/core/authorization";
+import { Store } from "@amends-dev/core/journal";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

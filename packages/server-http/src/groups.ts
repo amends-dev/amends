@@ -1,7 +1,7 @@
-import { Api, Principal } from "@amends/api-http";
-import { ReadStateService } from "@amends/core/read-state";
-import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
-import { Gateway } from "@amends/gateway";
+import { Api, Principal } from "@amends-dev/api-http";
+import { ReadStateService } from "@amends-dev/core/read-state";
+import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
-import { SessionTokens } from "@amends/gateway";
-import { Identity } from "@amends/core/identity";
+import { SessionTokens } from "@amends-dev/gateway";
+import { Identity } from "@amends-dev/core/identity";
 import { Effect, Redacted } from "effect";
 import { DevelopmentSessionTokens } from "../../src/authentication/session-tokens.ts";
 

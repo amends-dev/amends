@@ -1,6 +1,6 @@
-import type { AppearanceSource } from "@amends/client";
-import type { ColorPalette } from "@amends/ui/foundations/theme";
-import type { Appearance } from "@amends/ui/screens/workspace-navigation";
+import type { AppearanceSource } from "@amends-dev/client";
+import type { ColorPalette } from "@amends-dev/ui/foundations/theme";
+import type { Appearance } from "@amends-dev/ui/screens/workspace-navigation";
 const key = "amends.appearance";
 const paletteKey = "amends.palette";
 const parsePalette = (value: string | null): ColorPalette =>

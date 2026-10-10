@@ -23,7 +23,7 @@ export interface Value extends Schema.Schema.Type<typeof Value> {}
  * @effect-leakable-service
  */
 export class Service extends Context.Service<Service, Value>()(
-  "@amends/core/identity/actor/Service",
+  "@amends-dev/core/identity/actor/Service",
 ) {}
 
 export * as Actor from "./actor.ts";

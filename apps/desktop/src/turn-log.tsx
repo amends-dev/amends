@@ -1,5 +1,5 @@
-import { paths, useTurnLog } from "@amends/client";
-import { TurnLogPane } from "@amends/ui/screens/turns";
+import { paths, useTurnLog } from "@amends-dev/client";
+import { TurnLogPane } from "@amends-dev/ui/screens/turns";
 
 const href = (path: string) => `#${path}`;
 

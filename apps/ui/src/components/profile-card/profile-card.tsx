@@ -9,7 +9,7 @@ import {
   useContext,
   type JSX,
 } from "solid-js";
-import { IconMarkClose } from "@amends/icons";
+import { IconMarkClose } from "@amends-dev/icons";
 import { Avatar } from "../avatar/index.ts";
 import { Button } from "../button/index.ts";
 import { IconButton } from "../icon-button/index.ts";

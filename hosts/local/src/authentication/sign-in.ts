@@ -1,5 +1,5 @@
-import { Identity } from "@amends/core/identity";
-import { SignIn } from "@amends/gateway";
+import { Identity } from "@amends-dev/core/identity";
+import { SignIn } from "@amends-dev/gateway";
 import { Crypto, DateTime, Duration, Effect, Exit, Layer, Schema } from "effect";
 
 interface PendingCode {

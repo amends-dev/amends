@@ -1,5 +1,5 @@
 import { For, Match, Show, Switch, type JSX } from "solid-js";
-import { IconMarkAgents } from "@amends/icons";
+import { IconMarkAgents } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";

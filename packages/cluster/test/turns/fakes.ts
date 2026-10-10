@@ -1,9 +1,9 @@
-import { Integration, Integrations } from "@amends/connection";
-import type { AgentQuery } from "@amends/core/agent";
-import { Connection } from "@amends/core/connection";
-import { Identity } from "@amends/core/identity";
-import { Group } from "@amends/core/group";
-import { ThreadId, ThreadParticipation } from "@amends/core/thread";
+import { Integration, Integrations } from "@amends-dev/connection";
+import type { AgentQuery } from "@amends-dev/core/agent";
+import { Connection } from "@amends-dev/core/connection";
+import { Identity } from "@amends-dev/core/identity";
+import { Group } from "@amends-dev/core/group";
+import { ThreadId, ThreadParticipation } from "@amends-dev/core/thread";
 import {
   type SessionLog,
   SessionLogStore,
@@ -11,10 +11,10 @@ import {
   Turn,
   TurnExecution,
   type TurnJobs,
-} from "@amends/core/turn";
-import { Member, Workspace } from "@amends/core/workspace";
-import { Gateway, GatewayErrors } from "@amends/gateway";
-import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends/harness";
+} from "@amends-dev/core/turn";
+import { Member, Workspace } from "@amends-dev/core/workspace";
+import { Gateway, GatewayErrors } from "@amends-dev/gateway";
+import { type Agent, Harness, type HarnessError, type StreamPart } from "@amends-dev/harness";
 import { Array, Context, DateTime, Effect, Layer, Option, Result, Stream } from "effect";
 import { Prompt } from "effect/ai";
 

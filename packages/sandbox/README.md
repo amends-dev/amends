@@ -1,4 +1,4 @@
-# @amends/sandbox
+# @amends-dev/sandbox
 
 Sandboxes that agents work in. A sandbox is an isolated machine that code runs in: its files and
 processes are Effect's own `FileSystem` and `ChildProcessSpawner`, so any Effect code that uses
@@ -11,11 +11,11 @@ The package depends only on Effect.
 ## Install
 
 ```sh
-bun add @amends/sandbox effect
+bun add @amends-dev/sandbox effect
 ```
 
-Add a provider for each platform you run sandboxes on, such as `@amends/sandbox-local` for this
-machine or `@amends/sandbox-daytona`. [`@amends/harness`](../harness) runs agents in them.
+Add a provider for each platform you run sandboxes on, such as `@amends-dev/sandbox-local` for this
+machine or `@amends-dev/sandbox-daytona`. [`@amends-dev/harness`](../harness) runs agents in them.
 
 ## Quick start
 
@@ -24,11 +24,12 @@ it once `Sandbox.layerServices` provides the sandbox's services. The sandbox out
 stopping it keeps its files, and the provider resumes it later by its id.
 
 ```ts
-import { Network, Sandbox, SandboxProvider } from "@amends/sandbox";
+import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox";
 import { Effect, FileSystem, Layer, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-// From a provider, such as @amends/sandbox-local for this machine or @amends/sandbox-daytona.
+// From a provider, such as @amends-dev/sandbox-local for this machine or
+// @amends-dev/sandbox-daytona.
 declare const sandboxes: Layer.Layer<SandboxProvider.SandboxProvider>;
 
 const program = Effect.gen(function* () {
@@ -134,14 +135,15 @@ layer takes the platform's settings, such as credentials or a root directory, an
 its own entry of `providerOptions` with a schema of what it takes per sandbox, ignoring the entries
 of others.
 
-Then run the conformance suites in `@amends/sandbox/conformance` against it, so that code written
-against the contract works the same on each provider. A test file calls `run` with a `Fixture`:
-how to make the provider for one test, a free port, a command that serves HTTP on a port, and a
-layer with what those need and the HTTP client the suites reach ports with. The suites need
+Then run the conformance suites in `@amends-dev/sandbox/conformance` against it, so that code
+written against the contract works the same on each provider. A test file calls `run` with a
+`Fixture`: how to make the provider for one test, a free port, a command that serves HTTP on a port,
+and a layer with what those need and the HTTP client the suites reach ports with. The suites need
 `@effect/vitest`, an optional peer dependency that only a provider's tests install. The
 documentation of `run` shows such a test file.
-[`@amends/sandbox-local`](../../adapters/sandbox-local) and
-[`@amends/sandbox-daytona`](../../adapters/sandbox-daytona) are the providers in this repository.
+[`@amends-dev/sandbox-local`](../../adapters/sandbox-local) and
+[`@amends-dev/sandbox-daytona`](../../adapters/sandbox-daytona) are the providers in this
+repository.
 
 ## Development
 

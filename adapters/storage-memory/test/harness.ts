@@ -1,4 +1,4 @@
-import type { Harness } from "@amends/storage-conformance";
+import type { Harness } from "@amends-dev/storage-conformance";
 import { BunCrypto } from "@effect/platform-bun";
 import { Effect, Layer } from "effect";
 import { layer, MemoryDatabase } from "../src/index.ts";

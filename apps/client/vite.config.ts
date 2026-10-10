@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [solid()],
   resolve: { dedupe: ["solid-js"] },
   test: {
-    name: "@amends/client",
+    name: "@amends-dev/client",
     environment: "happy-dom",
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
     include: ["test/**/*.test.{ts,tsx}"],

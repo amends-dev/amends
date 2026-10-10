@@ -1,5 +1,5 @@
 import { HashRouter } from "@solidjs/router";
-import { createBrowserSessionStore, resolveApiBaseUrl } from "@amends/client";
+import { createBrowserSessionStore, resolveApiBaseUrl } from "@amends-dev/client";
 import { createAppearanceSource } from "./appearance.ts";
 import { Application } from "./application.tsx";
 import { ApplicationRoutes } from "./routes.tsx";

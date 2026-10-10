@@ -1,4 +1,4 @@
-# amends-v2
+# amends
 
 A Bun and TypeScript monorepo with a shared Solid application for web and Tauri desktop, an HTTP API, and workspace
 services backed by PostgreSQL. The root workspace catalog pins Effect
@@ -18,8 +18,8 @@ PostgreSQL database the host may create its tables in; startup applies the schem
 but does not create the database. The server creates workspaces only when requested
 through the API.
 
-Run `bun run --filter @amends/web dev` and open `http://127.0.0.1:4321/`, or run
-`bun run --filter @amends/desktop dev` to open the Tauri app after installing its
+Run `bun run --filter @amends-dev/web dev` and open `http://127.0.0.1:4321/`, or run
+`bun run --filter @amends-dev/desktop dev` to open the Tauri app after installing its
 [native prerequisites](apps/desktop/README.md#run-and-verify). Both independently compose headless client state and UI components in their own route trees. Guests see the email/code sign-in page. Successful and restored sessions are validated
 before protected routes render. Workspace pages remain placeholders.
 The API independently exposes OpenAPI at `/openapi.json` and documentation at `/docs`;
@@ -38,32 +38,32 @@ guides from proposals and historical references.
 
 ```text
 packages/
-  core/               @amends/core: portable journal and workspace domain services
-  gateway/            @amends/gateway: workspace entry and host contracts
-  api-http/           @amends/api-http: shared HTTP contract
-  server-http/        @amends/server-http: HTTP handlers and authentication
-  storage-conformance/ @amends/storage-conformance: test suites every storage adapter runs
-  cluster/            @amends/cluster: jobs on Effect Cluster, with their retries and pruning
-  connection/      @amends/connection: integrations, connections, and the model catalog
-  harness/         @amends/harness: the harness contract, its stream format, and the bridge
-  sandbox/         @amends/sandbox: the sandbox provider contract and its suites
-  channel/         @amends/channel: the channel transport contract
-  toolkit/            @amends/toolkit: tool sources, such as MCP servers and HTTP APIs
+  core/               @amends-dev/core: portable journal and workspace domain services
+  gateway/            @amends-dev/gateway: workspace entry and host contracts
+  api-http/           @amends-dev/api-http: shared HTTP contract
+  server-http/        @amends-dev/server-http: HTTP handlers and authentication
+  storage-conformance/ @amends-dev/storage-conformance: test suites every storage adapter runs
+  cluster/            @amends-dev/cluster: jobs on Effect Cluster, with their retries and pruning
+  connection/      @amends-dev/connection: integrations, connections, and the model catalog
+  harness/         @amends-dev/harness: the harness contract, its stream format, and the bridge
+  sandbox/         @amends-dev/sandbox: the sandbox provider contract and its suites
+  channel/         @amends-dev/channel: the channel transport contract
+  toolkit/            @amends-dev/toolkit: tool sources, such as MCP servers and HTTP APIs
 adapters/
-  storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory
-  storage-memory/     @amends/storage-memory: in-memory reference storage and directory
-  harness-amends/  @amends/harness-amends: amends's own agent over Effect AI
-  harness-opencode/   @amends/harness-opencode: opencode behind its bridge in a sandbox
-  sandbox-local/   @amends/sandbox-local: sandboxes as local directories, for development
-  sandbox-daytona/ @amends/sandbox-daytona: sandboxes on Daytona
+  storage-postgresql/ @amends-dev/storage-postgresql: PostgreSQL storage and directory
+  storage-memory/     @amends-dev/storage-memory: in-memory reference storage and directory
+  harness-amends/  @amends-dev/harness-amends: amends's own agent over Effect AI
+  harness-opencode/   @amends-dev/harness-opencode: opencode behind its bridge in a sandbox
+  sandbox-local/   @amends-dev/sandbox-local: sandboxes as local directories, for development
+  sandbox-daytona/ @amends-dev/sandbox-daytona: sandboxes on Daytona
 hosts/
-  local/              @amends/host-local: Bun runtime entry point
+  local/              @amends-dev/host-local: Bun runtime entry point
 apps/
-  icons/              @amends/icons: generated Solid icons, SVGs, and searchable metadata
-  ui/                 @amends/ui: the Lunacy design system, screens, and Storybook
-  client/             @amends/client: headless sessions, API/query state, and route helpers
-  web/                @amends/web: browser routes and client/UI composition
-  desktop/            @amends/desktop: Tauri 2 routes and client/UI composition
+  icons/              @amends-dev/icons: generated Solid icons, SVGs, and searchable metadata
+  ui/                 @amends-dev/ui: the Lunacy design system, screens, and Storybook
+  client/             @amends-dev/client: headless sessions, API/query state, and route helpers
+  web/                @amends-dev/web: browser routes and client/UI composition
+  desktop/            @amends-dev/desktop: Tauri 2 routes and client/UI composition
 docs/                 implementation guides, design intent, and known limitations
 design-system/        design references and historical token handoff
 scripts/              repository tooling

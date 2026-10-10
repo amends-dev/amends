@@ -8,21 +8,21 @@ import {
   RoleFacts,
   type Permission,
   type Target,
-} from "@amends/core/authorization";
+} from "@amends-dev/core/authorization";
 
 import {
   Group,
   GroupService,
   GroupMembershipService,
   GroupMembershipFacts,
-} from "@amends/core/group";
+} from "@amends-dev/core/group";
 
-import { Actor, Identity } from "@amends/core/identity";
+import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Event, Fact, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
+import { Event, Fact, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
 
-import { Notification, NotificationStore } from "@amends/core/notification";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
 
 import {
   Thread,
@@ -45,9 +45,9 @@ import {
   ThreadParticipationStore,
   ThreadPermissions,
   ThreadCommand,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 
-import { Gateway } from "@amends/gateway";
+import { Gateway } from "@amends-dev/gateway";
 
 import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
 

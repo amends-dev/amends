@@ -1,4 +1,4 @@
-import { Event } from "@amends/core/journal";
+import { Event } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import type { Harness } from "./harness.ts";

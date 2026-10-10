@@ -1,6 +1,6 @@
-import { LocalSandboxProvider } from "@amends/sandbox-local";
-import { Network } from "@amends/sandbox";
-import * as Conformance from "@amends/sandbox/conformance";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
+import { Network } from "@amends-dev/sandbox";
+import * as Conformance from "@amends-dev/sandbox/conformance";
 import { BunHttpServer, BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, Layer } from "effect";
 import { FetchHttpClient } from "effect/http";

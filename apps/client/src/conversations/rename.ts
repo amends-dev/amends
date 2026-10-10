@@ -1,4 +1,4 @@
-import type { GroupChangeError } from "@amends/ui/screens/group";
+import type { GroupChangeError } from "@amends-dev/ui/screens/group";
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { isGroupName, renameGroup } from "./api.ts";

@@ -1,7 +1,7 @@
-import { Group } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
-import { Task, TaskStore } from "@amends/core/task";
-import { Thread, ThreadMessage } from "@amends/core/thread";
+import { Group } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
+import { Task, TaskStore } from "@amends-dev/core/task";
+import { Thread, ThreadMessage } from "@amends-dev/core/thread";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";

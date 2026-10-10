@@ -334,7 +334,7 @@ export interface Interface {
  * @effect-expect-leaking Transaction
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/ThreadCommand",
+  "@amends-dev/core/thread/ThreadCommand",
 ) {}
 
 /** The participant an author publishes as. */

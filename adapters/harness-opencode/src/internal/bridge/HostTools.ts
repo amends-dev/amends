@@ -4,7 +4,7 @@
  * session's token. opencode lists an MCP server's tools when it connects, so the session connects
  * it again whenever a turn's tools change, and disconnects it for a turn without any.
  */
-import type { Bridge, HarnessError, HostToolRelay } from "@amends/harness";
+import type { Bridge, HarnessError, HostToolRelay } from "@amends-dev/harness";
 import { Effect, Redacted, Ref } from "effect";
 
 /** The name the relay's MCP server has in opencode. */

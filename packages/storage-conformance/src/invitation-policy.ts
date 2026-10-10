@@ -1,6 +1,6 @@
-import { AssignmentFacts, BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
-import { Journal, Log, Publication } from "@amends/core/journal";
-import { Member, MemberFacts } from "@amends/core/workspace";
+import { AssignmentFacts, BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization";
+import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";

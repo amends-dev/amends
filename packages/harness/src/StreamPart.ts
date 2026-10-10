@@ -234,7 +234,7 @@ export interface Step extends Schema.Schema.Type<typeof Step> {}
  * **Example** (Adding a turn's parts up into steps)
  *
  * ```ts
- * import { StreamPart } from "@amends/harness";
+ * import { StreamPart } from "@amends-dev/harness";
  *
  * const steps = StreamPart.stepsOf([
  *   { type: "text-start", id: "answer" },

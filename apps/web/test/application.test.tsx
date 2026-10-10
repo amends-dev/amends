@@ -6,7 +6,7 @@ import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Application } from "../src/application.tsx";
 import { ApplicationRoutes } from "../src/routes.tsx";
-import { Session, type SessionStore } from "@amends/client";
+import { Session, type SessionStore } from "@amends-dev/client";
 import { committed, notificationsSeen, withChangeFeed, type Sidebar } from "./change-feed.ts";
 
 const session = (token: string) => Schema.decodeSync(Session)({ token, identity: token });

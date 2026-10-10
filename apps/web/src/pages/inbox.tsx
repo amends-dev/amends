@@ -1,5 +1,5 @@
-import { paths, useInboxView, useWorkspace } from "@amends/client";
-import { InboxPane, type InboxTab } from "@amends/ui/screens/inbox";
+import { paths, useInboxView, useWorkspace } from "@amends-dev/client";
+import { InboxPane, type InboxTab } from "@amends-dev/ui/screens/inbox";
 import { useParams, useSearchParams } from "@solidjs/router";
 import { createEffect, createSignal } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

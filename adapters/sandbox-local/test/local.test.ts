@@ -1,5 +1,5 @@
-import { LocalSandboxProvider } from "@amends/sandbox-local";
-import { Network, Sandbox } from "@amends/sandbox";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
+import { Network, Sandbox } from "@amends-dev/sandbox";
 import { BunServices } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Effect, FileSystem, Path, Redacted } from "effect";

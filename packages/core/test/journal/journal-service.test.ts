@@ -1,4 +1,4 @@
-import { Subject } from "@amends/core/journal";
+import { Subject } from "@amends-dev/core/journal";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";

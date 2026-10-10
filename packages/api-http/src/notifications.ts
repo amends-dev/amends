@@ -1,5 +1,5 @@
-import { Notification, NotificationInbox, NotificationStore } from "@amends/core/notification";
-import { Workspace } from "@amends/core/workspace";
+import { Notification, NotificationInbox, NotificationStore } from "@amends-dev/core/notification";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

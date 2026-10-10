@@ -1,4 +1,4 @@
-import { type Connection as ConnectionContract, Integrations } from "@amends/connection";
+import { type Connection as ConnectionContract, Integrations } from "@amends-dev/connection";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
@@ -104,7 +104,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/connection/service/Service",
+  "@amends-dev/core/connection/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority inside each operation. @category constructors */

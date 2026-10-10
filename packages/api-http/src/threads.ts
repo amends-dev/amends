@@ -1,13 +1,13 @@
-import { Group } from "@amends/core/group";
+import { Group } from "@amends-dev/core/group";
 import {
   Thread,
   ThreadActivityStore,
   ThreadMessage,
   ThreadParticipation,
   ThreadTimeline,
-} from "@amends/core/thread";
-import { ReadState } from "@amends/core/read-state";
-import { Workspace } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { ReadState } from "@amends-dev/core/read-state";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

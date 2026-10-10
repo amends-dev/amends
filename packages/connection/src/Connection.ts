@@ -78,7 +78,7 @@ const described = { description: Schema.String };
 
 /** The host has no integration of the id a connection names. */
 export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends/connection/ConnectionError/NotFoundError",
+  "@amends-dev/connection/ConnectionError/NotFoundError",
 )("NotFoundError", described) {
   override get message(): string {
     return this.description;
@@ -90,7 +90,7 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * a way the integration does not offer, or it has no credential to authenticate with.
  */
 export class InvalidConnectionError extends Schema.TaggedError<InvalidConnectionError>(
-  "@amends/connection/ConnectionError/InvalidConnectionError",
+  "@amends-dev/connection/ConnectionError/InvalidConnectionError",
 )("InvalidConnectionError", described) {
   override get message(): string {
     return this.description;
@@ -102,7 +102,7 @@ export class InvalidConnectionError extends Schema.TaggedError<InvalidConnection
  * integration of tools, or a model or an effort it does not offer.
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends/connection/ConnectionError/UnsupportedError",
+  "@amends-dev/connection/ConnectionError/UnsupportedError",
 )("UnsupportedError", described) {
   override get message(): string {
     return this.description;
@@ -111,7 +111,7 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
 
 /** The integration's system could not be reached for what was asked, which may pass. */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends/connection/ConnectionError/UnavailableError",
+  "@amends-dev/connection/ConnectionError/UnavailableError",
 )("UnavailableError", described) {
   override get message(): string {
     return this.description;
@@ -128,7 +128,7 @@ export const ConnectionErrorReason = Schema.Union([
 export type ConnectionErrorReason = typeof ConnectionErrorReason.Type;
 
 export class ConnectionError extends Schema.TaggedError<ConnectionError>(
-  "@amends/connection/ConnectionError",
+  "@amends-dev/connection/ConnectionError",
 )("ConnectionError", {
   /** The integration of the connection, as its id names it. */
   integration: Schema.String,

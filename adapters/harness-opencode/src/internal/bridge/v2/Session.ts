@@ -10,7 +10,7 @@
  * waits for `approve`, and `compact` asks opencode to summarize the conversation, which it does
  * without instructions. opencode 2 does not answer in JSON, which fails with `UnsupportedError`.
  */
-import { type Bridge, HarnessError, type HostToolRelay } from "@amends/harness";
+import { type Bridge, HarnessError, type HostToolRelay } from "@amends-dev/harness";
 import { Clock, Crypto, Effect, FileSystem, Ref, Schema, Stream } from "effect";
 import type { Prompt as AiPrompt } from "effect/ai";
 import * as Driver from "../Driver.ts";

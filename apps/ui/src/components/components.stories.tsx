@@ -7,7 +7,7 @@ import {
   IconMarkNew,
   IconMarkSearch,
   IconMarkSettings,
-} from "@amends/icons";
+} from "@amends-dev/icons";
 import { avatarTones } from "../foundations/color/tokens.ts";
 import { Avatar, AvatarStack } from "./avatar/index.ts";
 import { Count } from "./count/index.ts";

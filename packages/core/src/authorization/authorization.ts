@@ -49,7 +49,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/authorization/Service",
+  "@amends-dev/core/authorization/authorization/Service",
 ) {}
 
 const sameIdentity = Schema.toEquivalence(Identity.Reference);

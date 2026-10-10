@@ -157,7 +157,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/ThreadMessageService",
+  "@amends-dev/core/thread/ThreadMessageService",
 ) {}
 
 /**

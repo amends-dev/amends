@@ -1,12 +1,12 @@
-import { ChannelTransport } from "@amends/channel";
-import { Integration, Integrations } from "@amends/connection";
-import { Delivery, DeliveryExecution, DeliveryJobs } from "@amends/core/channel";
-import { Connection } from "@amends/core/connection";
-import { Group } from "@amends/core/group";
-import { Commit, Store } from "@amends/core/journal";
-import { ThreadId, ThreadMessage } from "@amends/core/thread";
-import { Workspace } from "@amends/core/workspace";
-import { Gateway, GatewayErrors } from "@amends/gateway";
+import { ChannelTransport } from "@amends-dev/channel";
+import { Integration, Integrations } from "@amends-dev/connection";
+import { Delivery, DeliveryExecution, DeliveryJobs } from "@amends-dev/core/channel";
+import { Connection } from "@amends-dev/core/connection";
+import { Group } from "@amends-dev/core/group";
+import { Commit, Store } from "@amends-dev/core/journal";
+import { ThreadId, ThreadMessage } from "@amends-dev/core/thread";
+import { Workspace } from "@amends-dev/core/workspace";
+import { Gateway, GatewayErrors } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Duration, Effect, Layer } from "effect";
 import {

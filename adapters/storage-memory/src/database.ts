@@ -4,9 +4,9 @@
  * the reference implementation of the storage contracts: it enforces what the SQL adapters
  * enforce with plain maps.
  */
-import type { Commit, Entry, Store } from "@amends/core/journal";
-import { SignalHub } from "@amends/core/signal";
-import type { Workspace } from "@amends/core/workspace";
+import type { Commit, Entry, Store } from "@amends-dev/core/journal";
+import { SignalHub } from "@amends-dev/core/signal";
+import type { Workspace } from "@amends-dev/core/workspace";
 import { Context, Deferred, Effect, Layer, Semaphore } from "effect";
 
 /** One commit's entries in one log, at one position. Stored batches are never changed. */
@@ -109,7 +109,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/storage-memory/database/Service",
+  "@amends-dev/storage-memory/database/Service",
 ) {}
 
 /** A workspace with nothing stored. */

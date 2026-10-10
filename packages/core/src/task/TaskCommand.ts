@@ -127,7 +127,7 @@ export interface Interface {
  * @effect-expect-leaking Transaction
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/task/TaskCommand",
+  "@amends-dev/core/task/TaskCommand",
 ) {}
 
 const member = (memberId: Member.Id): ThreadParticipation.Reference => ({

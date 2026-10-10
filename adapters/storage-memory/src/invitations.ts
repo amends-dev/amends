@@ -1,5 +1,5 @@
-import { Store } from "@amends/core/journal";
-import { Invitation, InvitationStore } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import { Invitation, InvitationStore } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";
