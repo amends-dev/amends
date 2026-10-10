@@ -19,7 +19,7 @@ import type { SandboxProvider } from "@amends/sandbox";
 import type { ToolSource } from "@amends/toolkit";
 import { type Array, Effect, type Redacted, type Result, Schema, type Scope } from "effect";
 import { McpSchema } from "effect/ai";
-import type { ChannelTransport } from "./ChannelTransport.ts";
+import type { ChannelTransport } from "@amends/channel";
 import {
   type AuthMethod,
   type Connection,
@@ -156,7 +156,7 @@ export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
   /** The channel transport of a connection, which receives the system's events and posts there. */
   readonly channels?: (
     access: Access<Settings, Auth>,
-  ) => Effect.Effect<ChannelTransport, ConnectionErrorReason>;
+  ) => Effect.Effect<ChannelTransport.ChannelTransport, ConnectionErrorReason>;
 
   /** Checks a connection, as by asking the system for something only a working connection gets. */
   readonly check: (access: Access<Settings, Auth>) => Effect.Effect<Health>;
@@ -236,7 +236,7 @@ export interface Integration {
   readonly channelTransport: (
     connection: Connection,
     credential: Credential | undefined,
-  ) => Effect.Effect<ChannelTransport, ConnectionError>;
+  ) => Effect.Effect<ChannelTransport.ChannelTransport, ConnectionError>;
 
   /** Checks `connection`. */
   readonly check: (

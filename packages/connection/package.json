@@ -13,6 +13,7 @@
     "update-models": "bun run scripts/update-models.ts"
   },
   "dependencies": {
+    "@amends/channel": "workspace:*",
     "@amends/harness": "workspace:*",
     "@amends/sandbox": "workspace:*",
     "@amends/toolkit": "workspace:*"

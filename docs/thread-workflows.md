@@ -147,7 +147,7 @@ evaluates a policy or records a decision.
 
 A channel is a connection's external conversations, which become threads in one group: a support
 inbox or a chat room, whatever the connection's integration gives as a `ChannelTransport`
-([connections](../packages/connection/README.md#channels)). `ChannelService.create({ connectionId,
+([channel](../packages/channel/README.md)). `ChannelService.create({ connectionId,
 groupId, name, opensTasks })` makes one under `channel.create`, over a connection the actor may read
 and use whose integration gives channels (`ConnectionUnavailable` otherwise), into a group the actor
 belongs to and may start threads in (`GroupNotFound` otherwise), since every member of that group

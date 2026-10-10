@@ -1249,8 +1249,8 @@ are granted; an OAuth client registered with a provider belongs to the host's co
 workspace, and refreshing an expired token will be part of resolving the credential for use.
 
 Connections that authenticate with an API key, or not at all, are implemented, as is the channel
-contract an integration gives (`ChannelTransport`), though no installed integration gives channels
-yet. OAuth and refreshing tokens arrive with the integrations that need them.
+contract an integration gives ([`@amends/channel`](../packages/channel/README.md)), though no
+installed integration gives channels yet. OAuth and refreshing tokens arrive with the integrations that need them.
 
 ## Agreed: agents select a harness, a model, and a sandbox
 

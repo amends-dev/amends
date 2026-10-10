@@ -1,4 +1,5 @@
-import { ChannelTransport, Integration, Integrations } from "@amends/connection";
+import { ChannelTransport } from "@amends/channel";
+import { Integration, Integrations } from "@amends/connection";
 import { Delivery, DeliveryExecution, DeliveryJobs } from "@amends/core/channel";
 import { Connection } from "@amends/core/connection";
 import { Group } from "@amends/core/group";

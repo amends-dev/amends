@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends/channel": "workspace:*",
     "@amends/connection": "workspace:*",
     "@amends/core": "workspace:*",
     "@amends/gateway": "workspace:*",

@@ -25,6 +25,7 @@ remaining gaps with links to their owning code.
 | [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                                    |
 | [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.                        |
 | [Sandbox](../packages/sandbox/README.md)                             | The sandbox contract: Effect's file system and processes inside, ports, network, lifecycle, and the suites every provider runs. |
+| [Channel](../packages/channel/README.md)                             | The channel transport contract: receiving what an external system sends and replying in its conversations.                      |
 | [Connections](../packages/connection/README.md)                      | Integrations a host installs, the connections workspaces make to them, and the model catalog.                                   |
 | [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                                 |
 | [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for the harness contract, behind its bridge in a sandbox, on opencode 1 or opencode 2.                     |

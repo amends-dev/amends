@@ -7,7 +7,7 @@
  *
  * @since 0.1.0
  */
-import { ChannelTransport } from "@amends/connection";
+import { ChannelTransport } from "@amends/channel";
 import { Schema } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { Text } from "../text/text.ts";

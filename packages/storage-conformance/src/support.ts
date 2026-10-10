@@ -49,7 +49,8 @@ import {
   DeliveryStore,
 } from "@amends/core/channel";
 import { TaskStore, TaskTimeline } from "@amends/core/task";
-import { ChannelTransport, Integration, Integrations, type ModelCatalog } from "@amends/connection";
+import { ChannelTransport } from "@amends/channel";
+import { Integration, Integrations, type ModelCatalog } from "@amends/connection";
 import {
   SessionLogStore,
   SessionStateStore,

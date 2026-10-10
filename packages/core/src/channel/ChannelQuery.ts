@@ -6,8 +6,8 @@
  *
  * @since 0.1.0
  */
+import type { ChannelTransport } from "@amends/channel";
 import {
-  type ChannelTransport,
   type Connection as ConnectionContract,
   type Integration,
   Integrations,

@@ -2,8 +2,8 @@
 
 What amends connects to, and what it knows of the models it can run. It depends on Effect, and on the contracts of the
 [harness](../harness), [sandboxes](../sandbox), and the [toolkit](../toolkit), whose
-`Harness`, `ModelEndpoint`, `SandboxProvider`, and `ToolSource` are what a connection gives, with
-the `ChannelTransport` this package declares.
+`Harness`, `ModelEndpoint`, `SandboxProvider`, and `ToolSource` are what a connection gives, and
+the [channel](../channel) contract, whose `ChannelTransport` is the fifth.
 
 ## Integrations, connections, and credentials
 
@@ -84,8 +84,8 @@ tool first runs.
 
 ## Channels
 
-`ChannelTransport` is what an integration gives a channel: how its external system's conversations
-are received and replied to. `receive` takes a request the system sent the host, its headers and
+[`@amends/channel`](../channel)'s `ChannelTransport` is what an integration gives a channel: how its
+external system's conversations are received and replied to. `receive` takes a request the system sent the host, its headers and
 body as they came, verifies it as the system signs it, and gives the `events` in it, each a
 `MessageReceived`, `MessageEdited`, or `MessageDeleted` with the external `conversation`, its id and
 what the transport needs to post there, the message's id, its `sender`, and when, and the `answer`

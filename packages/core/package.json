@@ -27,6 +27,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends/channel": "workspace:*",
     "@amends/connection": "workspace:*",
     "@amends/harness": "workspace:*",
     "effect": "catalog:"

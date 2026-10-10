@@ -3,7 +3,7 @@ import { SandboxProvider } from "@amends/sandbox";
 import type { ToolSource } from "@amends/toolkit";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Redacted, Result, Schema } from "effect";
-import type * as ChannelTransport from "../src/ChannelTransport.ts";
+import type { ChannelTransport } from "@amends/channel";
 import * as Connection from "../src/Connection.ts";
 import * as Integration from "../src/Integration.ts";
 import * as Integrations from "../src/Integrations.ts";

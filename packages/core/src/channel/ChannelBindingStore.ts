@@ -5,7 +5,7 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends/connection";
+import type { ChannelTransport } from "@amends/channel";
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";

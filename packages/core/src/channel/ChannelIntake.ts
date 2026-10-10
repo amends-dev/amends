@@ -10,7 +10,7 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends/connection";
+import type { ChannelTransport } from "@amends/channel";
 import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
 import { Identity } from "../identity/identity.ts";
 import { Performer } from "../identity/performer.ts";

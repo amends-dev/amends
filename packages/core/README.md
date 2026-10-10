@@ -647,7 +647,8 @@ signals after their writes; the reader's sessions, the one that wrote included, 
 as [threads](../../docs/threads.md#channels) fixes it and
 [channels](../../docs/thread-workflows.md#channels) describes. `Channel.Record` names the connection,
 the group new conversations open in, and whether they open tasks; `ChannelBinding.Record` is a bound
-thread's conversation, keyed by the thread, as the connection's `ChannelTransport` identifies it;
+thread's conversation, keyed by the thread, as the connection's transport
+([channel](../channel/README.md)) identifies it;
 `Contact.Record` a person heard from through a channel, named as the system names them; and
 `Delivery.Record` one message's delivery to a conversation, `requested`, `sent`, or `failed`.
 `ChannelService` (`create`, `list`, `get`, `redirect`, `remove`, `getBinding`) is the operations,

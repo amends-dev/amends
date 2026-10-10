@@ -8,7 +8,7 @@
  *
  * @since 0.1.0
  */
-import { ChannelTransport } from "@amends/connection";
+import { ChannelTransport } from "@amends/channel";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Connection } from "../connection/connection.ts";
