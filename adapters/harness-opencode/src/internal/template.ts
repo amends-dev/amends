@@ -144,15 +144,15 @@ export const platformOf = (uname: string): Platform | undefined => {
       : undefined;
 };
 
-// TODO: Ship the bundle built with the package, as AI SDK ships its bridge, once the package is
-// published without its sources.
 /**
  * The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for
- * Bun.
+ * Bun. The program is beside this module, in this module's own form: a source among the sources,
+ * a compiled file among the compiled ones of the distribution.
  */
 const bundleBridge = Effect.promise(async () => {
+  const extension = import.meta.url.slice(import.meta.url.lastIndexOf("."));
   const { outputs } = await Bun.build({
-    entrypoints: [`${import.meta.dirname}/bridge/main.ts`],
+    entrypoints: [`${import.meta.dirname}/bridge/main${extension}`],
     target: "bun",
     minify: true,
   });

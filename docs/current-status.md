@@ -50,7 +50,9 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   files a step changed but not how; a model that models.dev does not list runs on opencode without
   tools, as an endpoint does not say whether its model calls them; the endpoints' keys reach
   opencode's configuration in the sandbox, where the commands it runs can read them; and each
-  launch of a bridge exposes another port of its sandbox, which is never taken back. An agent's own tools run without
+  launch of a bridge exposes another port of its sandbox, which is never taken back. opencode's
+  bridge program is bundled from the package's files when the agent is made, with `Bun.build`, so
+  a host that runs opencode runs on Bun, where AI SDK ships its bridge prebuilt. An agent's own tools run without
   asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode saying
   which of them an agent may use and which it asks about, amends's agent runs its `read`, `write`,
   `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default permissions,
