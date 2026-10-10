@@ -293,6 +293,8 @@ export const threadStarts = (harness: Harness) => {
                         threadCommand.create({
                           threadId: Thread.Id.make("late-order"),
                           groupId: team.id,
+                          title: null,
+                          origin: null,
                           participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],
                           first: {
                             _tag: "Message",

@@ -1,8 +1,8 @@
 /**
  * The operations on threads an actor calls: starting one in a group or with the members of a
- * direct conversation, and reading threads, their timelines, and their participants. Replies are
- * `ThreadMessageService`, and following is `ThreadParticipationService`. Each operation authorizes
- * the actor itself, writes inside one journal commit, and reads outside any.
+ * direct conversation, renaming one, and reading threads, their timelines, and their participants.
+ * Replies are `ThreadMessageService`, and following is `ThreadParticipationService`. Each operation
+ * authorizes the actor itself, writes inside one journal commit, and reads outside any.
  *
  * @since 0.1.0
  */
@@ -40,11 +40,14 @@ import { ThreadActivity } from "./ThreadActivity.ts";
 import { ThreadActivityKind } from "./ThreadActivityKind.ts";
 import { ThreadMessageActivity } from "./ThreadMessageActivity.ts";
 import { ThreadMessage } from "./ThreadMessage.ts";
+import { ThreadFacts } from "./ThreadFacts.ts";
+import { ThreadTitleActivity } from "./ThreadTitleActivity.ts";
 import { ReadStateCommand } from "../read-state/command.ts";
 import type { ReadState } from "../read-state/read-state.ts";
 import { ReadStateStore } from "../read-state/store.ts";
 import { Request } from "../request/request.ts";
 import {
+  Changed,
   DirectMembersRequired,
   GroupNotFound,
   HumanAuthorRequired,
@@ -53,6 +56,7 @@ import {
 } from "./ThreadErrors.ts";
 import { Notification } from "../notification/notification.ts";
 export {
+  Changed,
   DirectMembersRequired,
   GroupNotFound,
   HumanAuthorRequired,
@@ -87,6 +91,20 @@ export type Error =
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
   | ThreadActivityStore.Failure;
+
+/**
+ * What renaming a thread can fail with: the outcomes in `ThreadErrors`, and the failures of what
+ * a rename depends on.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type RenameError =
+  | Authorization.Error
+  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | GroupMembershipStore.Failure
+  | NotFound
+  | Changed;
 
 /**
  * What reading threads can fail with.
@@ -134,6 +152,15 @@ export interface Interface {
     input: Thread.StartDirectInput,
     options?: Request.Options,
   ) => Effect.Effect<Thread.Started, Error, Actor.Service>;
+  /**
+   * Give a thread a title, under current group audience and `thread.rename` on the thread. The
+   * same title again records nothing; otherwise a title other than `expectedTitle` is `Changed`,
+   * and nothing is recorded. A rename publishes its fact and records a quiet `thread.renamed`
+   * activity in one commit, and returns the renamed thread.
+   */
+  readonly rename: (
+    input: Thread.RenameInput,
+  ) => Effect.Effect<Thread.Record, RenameError, Actor.Service>;
   /**
    * The thread, under current group audience and `thread.read`. Reading creates no participation
    * and marks nothing seen.
@@ -257,25 +284,34 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     }
   });
 
-  /** Create the thread with its author's opening message, which the author has then read. */
+  /**
+   * Create the thread with its author's opening message, which the author has then read. A start
+   * derives from no other thread; deriving one is a later workflow's.
+   */
   const createThread = Effect.fnUntraced(function* (
     author: ReadState.Reader,
     groupId: Group.Id,
     participants: ReadonlyArray<Member.Id>,
-    message: { readonly text: ThreadMessage.Text; readonly mentions: ReadonlyArray<Member.Id> },
+    opening: {
+      readonly title?: Thread.Title;
+      readonly text: ThreadMessage.Text;
+      readonly mentions: ReadonlyArray<Member.Id>;
+    },
     ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id },
   ) {
     const started = yield* threadCommand
       .create({
         threadId: ids.threadId,
         groupId,
+        title: opening.title ?? null,
+        origin: null,
         participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
         first: {
           _tag: "Message",
           messageId: ids.messageId,
           author: { _tag: "Member", memberId: author.memberId },
-          text: message.text,
-          mentions: message.mentions,
+          text: opening.text,
+          mentions: opening.mentions,
         },
         occurredAt: yield* DateTime.now,
       })
@@ -397,6 +433,65 @@ export const make = Effect.fn("ThreadService.make")(function* () {
           : yield* teamStarters(group.id, actor.memberId, request.mentions);
       yield* authorizeParticipants(starters, request.mentions, eligible);
       return yield* createThread(author, request.groupId, starters, request, ids);
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  const rename = Effect.fn("ThreadService.rename")(
+    function* (input: Thread.RenameInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Thread.RenameInput))(input);
+      // Only its group's members may rename a thread; to anyone else it is missing.
+      const thread = yield* threadQuery
+        .requireAccess(request.threadId)
+        .pipe(
+          Effect.catchTag(
+            "ThreadQuery.NotFound",
+            (error) => new NotFound({ threadId: error.threadId }),
+          ),
+        );
+      yield* authorization.require([
+        Requirement.make(ThreadPermissions.Rename, {
+          _tag: "Thread",
+          workspaceId,
+          threadId: thread.id,
+        }),
+      ]);
+      if (thread.title === request.title) return thread;
+      if (thread.title !== request.expectedTitle)
+        return yield* new Changed({ threadId: thread.id });
+      const occurredAt = yield* DateTime.now;
+      const renamed = yield* threadCommand
+        .publishActivity({
+          thread,
+          occurredAt,
+          step: () =>
+            Effect.gen(function* () {
+              const fact = yield* journal
+                .publish(ThreadFacts.Renamed, {
+                  workspaceId,
+                  threadId: thread.id,
+                  groupId: thread.groupId,
+                  title: request.title,
+                })
+                .pipe(Publication.withOccurredAt(occurredAt));
+              return {
+                value: Object.assign({}, thread, { title: request.title }) satisfies Thread.Record,
+                kind: ThreadTitleActivity.Renamed,
+                details: { title: request.title, previous: thread.title },
+                // A rename tells no one until the thread is a task, whose participants it reaches.
+                recipients: [],
+                cause: fact,
+              };
+            }),
+        })
+        .pipe(
+          Effect.catchTag("ThreadCommand.Unavailable", () =>
+            Effect.die("A rename admits no participant"),
+          ),
+        );
+      return renamed.value;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -565,6 +660,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   return Service.of({
     startInGroup,
     startDirect,
+    rename,
     get,
     listInGroup,
     listOpenings,

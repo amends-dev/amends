@@ -239,6 +239,14 @@ revisions[8] = Object.fromEntries(
   ]),
 );
 
+// Members rename the threads of their groups, as they rename the groups.
+revisions[9] = Object.fromEntries(
+  Object.entries(revisions[8]!).map(([roleId, names]) => [
+    roleId,
+    names.flatMap((name) => (name === "thread.read" ? [name, "thread.rename"] : [name])),
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

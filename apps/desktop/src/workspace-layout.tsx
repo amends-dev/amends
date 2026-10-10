@@ -9,6 +9,7 @@ import {
   useMentionCandidates,
   useReply,
   useSession,
+  useThread,
   useThreadConversation,
   useThreadFollow,
   useAgentList,
@@ -651,6 +652,7 @@ function ThreadPanel(props: {
 }) {
   const groups = useWorkspaceGroups(props.workspaceId);
   const group = () => groups.group(props.groupId);
+  const record = useThread(props.workspaceId, props.threadId);
   const thread = useThreadConversation(props.workspaceId, props.threadId, () => props.focus);
   const reply = useReply(props.workspaceId, props.threadId);
   const candidates = useMentionCandidates(props.workspaceId, props.groupId);
@@ -682,7 +684,7 @@ function ThreadPanel(props: {
       keyed
       fallback={
         <ThreadPane
-          title="Thread"
+          title={record.value()?.title ?? "Thread"}
           groupName={group()?.name ?? ""}
           groupKind={group()?.kind}
           reason={props.fromInbox ? thread.focusReason() : undefined}

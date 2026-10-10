@@ -107,6 +107,8 @@ const thread = (id: Thread.Id, group: Group.Id) => ({
   id,
   workspaceId,
   groupId: group,
+  title: null,
+  origin: null,
   createdBy: { _tag: "Member" as const, memberId: bobMember },
   createdAt: at,
 });

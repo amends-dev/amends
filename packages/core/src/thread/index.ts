@@ -10,7 +10,7 @@
  */
 
 /**
- * A thread's record, the views lists show of it, and the inputs that start one.
+ * A thread's record, the views lists show of it, and the inputs that start and rename one.
  *
  * @since 0.1.0
  */
@@ -228,7 +228,7 @@ export { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
 export { ThreadParticipationTimeline } from "./ThreadParticipationTimeline.ts";
 
 /**
- * The actions on a thread that need a grant: starting one, and reading one.
+ * The actions on a thread that need a grant: starting, reading, and renaming one.
  *
  * @since 0.1.0
  */
@@ -249,7 +249,7 @@ export { ThreadProjection } from "./ThreadProjection.ts";
 export { ThreadQuery } from "./ThreadQuery.ts";
 
 /**
- * The operations on threads an actor calls: starting and reading them.
+ * The operations on threads an actor calls: starting, renaming, and reading them.
  *
  * @since 0.1.0
  */
@@ -268,3 +268,17 @@ export { ThreadStore } from "./ThreadStore.ts";
  * @since 0.1.0
  */
 export { ThreadTimeline } from "./ThreadTimeline.ts";
+
+/**
+ * The kind of activity a thread's title records in its timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadTitleActivity } from "./ThreadTitleActivity.ts";
+
+/**
+ * How a thread's title appears in a timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadTitleTimeline } from "./ThreadTitleTimeline.ts";

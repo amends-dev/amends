@@ -129,6 +129,7 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ThreadParticipationService.FixedParticipation": "invalid",
   "GroupFollowService.NotFollowable": "invalid",
   "ThreadService.DirectMembersRequired": "invalid",
+  "ThreadService.Changed": "changed",
   "Gateway.InvalidInput": "invalid",
   "InvitationService.InvalidExpiry": "invalid",
   "Delegation.UnsupportedRole": "invalid",

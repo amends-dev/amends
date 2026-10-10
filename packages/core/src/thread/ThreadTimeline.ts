@@ -8,6 +8,7 @@
 import { Schema } from "effect";
 import { ThreadMessageTimeline } from "./ThreadMessageTimeline.ts";
 import { ThreadParticipationTimeline } from "./ThreadParticipationTimeline.ts";
+import { ThreadTitleTimeline } from "./ThreadTitleTimeline.ts";
 import { TurnTimeline } from "../turn/timeline.ts";
 
 /**
@@ -21,6 +22,7 @@ export const Item = Schema.Union([
   ThreadMessageTimeline.Item,
   ThreadParticipationTimeline.FollowedItem,
   ThreadParticipationTimeline.EndedItem,
+  ThreadTitleTimeline.RenamedItem,
   TurnTimeline.CreatedItem,
   TurnTimeline.StartedItem,
   TurnTimeline.StoppingItem,

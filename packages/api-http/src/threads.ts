@@ -20,15 +20,17 @@ const reply = Schema.Struct({
   text: ThreadMessage.PublishInput.fields.text,
   mentions: ThreadMessage.PublishInput.fields.mentions,
 });
+const opening = Schema.Struct({ ...reply.fields, title: Thread.StartInGroupInput.fields.title });
 const started = Thread.Started.pipe(HttpApiSchema.status(201)).annotate({
   identifier: "StartedThread",
 });
+const record = Thread.Record.annotate({ identifier: "Thread" });
 const participant = ThreadParticipation.Summary.annotate({ identifier: "ThreadParticipant" });
 const reading = ThreadActivityStore.ReadOptions.fields;
 
 /**
- * Conversations: a group's threads, starting them, their timelines and participants, replying,
- * saying one is typing, following, and read positions. Reading a thread requires current
+ * Conversations: a group's threads, starting and renaming them, their timelines and participants,
+ * replying, saying one is typing, following, and read positions. Reading a thread requires current
  * membership of its group and creates no participation; missing and unreadable threads answer
  * alike.
  */
@@ -61,7 +63,7 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
     HttpApiEndpoint.post("start", "/groups/:groupId/threads", {
       params: inGroup,
       headers: ApiErrors.requestKey,
-      payload: reply,
+      payload: opening,
       success: started,
       error: [...ApiErrors.member, ...ApiErrors.thread],
     }),
@@ -74,8 +76,17 @@ export class ThreadsGroup extends HttpApiGroup.make("threads")
     }),
     HttpApiEndpoint.get("get", "/threads/:threadId", {
       params: thread,
-      success: Thread.Record.annotate({ identifier: "Thread" }),
+      success: record,
       error: [...ApiErrors.member, ...ApiErrors.thread],
+    }),
+    HttpApiEndpoint.post("rename", "/threads/:threadId/rename", {
+      params: thread,
+      payload: Schema.Struct({
+        title: Thread.RenameInput.fields.title,
+        expectedTitle: Thread.RenameInput.fields.expectedTitle,
+      }),
+      success: record,
+      error: [...ApiErrors.member, ...ApiErrors.thread, ApiErrors.ThreadChanged],
     }),
     HttpApiEndpoint.get("timeline", "/threads/:threadId/timeline", {
       params: thread,

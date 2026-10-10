@@ -94,6 +94,7 @@ export const PublicError = Schema.Union([
   ThreadService.ParticipantUnavailable,
   ThreadService.HumanAuthorRequired,
   ThreadService.DirectMembersRequired,
+  ThreadService.Changed,
   ThreadMessageService.NotFound,
   ThreadMessageService.ParticipantUnavailable,
   ThreadMessageService.HumanAuthorRequired,

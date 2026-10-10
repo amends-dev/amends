@@ -543,6 +543,9 @@ export const threads = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     groupId: text("group_id").notNull(),
+    // The thread's own title, when it has one, and the thread it was derived from, if any.
+    title: text("title"),
+    origin: text("origin"),
     // A member starts a conversation in the app; a contact starts one a channel receives.
     createdByKind: text("created_by_kind", { enum: ["Member", "Contact"] }).notNull(),
     createdByMemberId: text("created_by_member_id"),

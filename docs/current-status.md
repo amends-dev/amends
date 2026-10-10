@@ -29,8 +29,8 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   a stream of its items and the step being written; the text being written is best effort, and a
   reader who starts following midway, or misses a draft while reconnecting, sees a step's text
   from its next text part, or once the step finishes. The [turn screens](turns.md) follow, stop,
-  and retry turns in threads and show each turn's log; threads have no titles, so the log names a
-  thread by its group.
+  and retry turns in threads and show each turn's log; they do not show a thread's title yet, so the
+  log names a thread by its group.
   A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
   activity for participants is not built. The active turns read covers at most a hundred active
   turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox

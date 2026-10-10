@@ -22,6 +22,7 @@ import { ThreadParticipationPermissions } from "./thread/ThreadParticipationPerm
 import { ThreadActivityResolvers } from "./thread/ThreadActivityResolvers.ts";
 import { ThreadMessageTimeline } from "./thread/ThreadMessageTimeline.ts";
 import { ThreadParticipationTimeline } from "./thread/ThreadParticipationTimeline.ts";
+import { ThreadTitleTimeline } from "./thread/ThreadTitleTimeline.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
 import { ThreadPermissions } from "./thread/ThreadPermissions.ts";
 import { ThreadProjection } from "./thread/ThreadProjection.ts";
@@ -117,6 +118,7 @@ export const permissions = [
   GroupMembershipPermissions.Join,
   ThreadPermissions.Start,
   ThreadPermissions.Read,
+  ThreadPermissions.Rename,
   ThreadMessagePermissions.Publish,
   ThreadParticipationPermissions.Follow,
   AgentPermissions.Use,
@@ -136,6 +138,7 @@ export const permissions = [
 const activityResolvers = [
   ThreadMessageTimeline.resolver,
   ThreadParticipationTimeline.resolver,
+  ThreadTitleTimeline.resolver,
   TurnTimeline.resolver,
 ] as const;
 

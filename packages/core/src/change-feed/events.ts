@@ -277,6 +277,9 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(ThreadFacts.Created, {
     requirement: ({ id }, workspaceId) => readThreadRequirement(id, workspaceId),
   }),
+  registerFact(ThreadFacts.Renamed, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
   registerFact(ThreadMessageFacts.Published, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),

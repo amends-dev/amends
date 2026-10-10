@@ -144,6 +144,8 @@ export const thread = [
   ThreadService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
   ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
 ] as const;
+/** A thread renamed since the caller last saw its title refuses another title with 409. */
+export const ThreadChanged = ThreadService.Changed.pipe(HttpApiSchema.status(409));
 export const message = [
   ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404)),
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),

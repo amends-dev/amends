@@ -159,6 +159,11 @@ const targets: Readonly<Record<string, (payload: unknown) => ReadonlyArray<Targe
     { collection: "timelines", id: text(payload, "activity", "threadId") },
     { collection: "streams", id: text(payload, "groupId") },
   ],
+  // A thread's title: the thread itself, and its group's stream, which shows it.
+  "thread.renamed": (payload) => [
+    { collection: "threads", id: text(payload, "threadId") },
+    { collection: "streams", id: text(payload, "groupId") },
+  ],
   // Who belongs to a group, and which of its threads the reader may see. A fact names its group
   // but not its threads, so every open timeline and participant list checks its access again.
   "group.membership.added": (payload) => [

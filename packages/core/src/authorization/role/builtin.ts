@@ -23,7 +23,7 @@ export const Revision = Schema.Int.check(Schema.isGreaterThan(0));
  * workspace recorded at an older revision is upgraded when a host loads it, and one at a newer
  * revision is left alone, so an older host never reverts it. A test pins each revision's bundles.
  */
-export const revision = 8;
+export const revision = 9;
 
 /** Display label for a built-in identity, including invitations before membership exists. */
 export const nameOf = (roleId: Role.Id): string =>

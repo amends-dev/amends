@@ -105,6 +105,8 @@ const openings = [
       id: "t1",
       workspaceId: "one",
       groupId: "g1",
+      title: null,
+      origin: null,
       createdBy: author("ada"),
       createdAt: at(1),
     },

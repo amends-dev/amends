@@ -159,6 +159,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
         listByLatest: unexpected,
         listByStart: unexpected,
         insert: unexpected,
+        rename: unexpected,
         getLatest: unexpected,
         recordLatest: unexpected,
       }),

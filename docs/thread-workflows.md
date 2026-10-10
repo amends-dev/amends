@@ -1,7 +1,7 @@
 # Thread workflows
 
-Conversations in groups: starting them, replying, following, reading, and the notifications and
-read state around them. The operations are `ThreadService`, `ThreadMessageService`,
+Conversations in groups: starting them, renaming them, replying, following, reading, and the
+notifications and read state around them. The operations are `ThreadService`, `ThreadMessageService`,
 `ThreadParticipationService`, `NotificationService`, and `ReadStateService` in a workspace
 context, such as `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
@@ -27,7 +27,9 @@ const start = (groupId: Group.Id) =>
 ```
 
 The result contains `thread` and `message`; the timeline holds the activity that places the
-message. The operation accepts non-whitespace
+message. The thread's `title` is null unless the start gives one, a trimmed line of 1 to 200
+characters without hidden ones, and its `origin` is null: a start derives from no other thread.
+The operation accepts non-whitespace
 text and preserves it verbatim, including indentation and newlines. NUL characters and unpaired
 surrogate halves, which storage cannot keep as given, are rejected as invalid input. `mentions` is an explicit
 array of distinct workspace-member IDs; text such as `@Reviewer` does not itself address anyone.
@@ -70,6 +72,22 @@ which must name members, only narrow notification. Fewer than two distinct membe
 `ThreadService.DirectMembersRequired`; a missing or inactive member, or a mention outside the
 group, returns `ThreadService.ParticipantUnavailable`. Later threads in the same direct group
 can also start with `startInGroup`.
+
+## Renaming a thread
+
+`ThreadService.rename({ threadId, title, expectedTitle })` requires `thread.rename` on the thread,
+which every built-in role holds, and membership of its group. To anyone outside the group, the
+thread is `ThreadService.NotFound`, as a missing or foreign one is. The title follows the start's
+rule, while `expectedTitle` is the title the renamer last saw, or null for a thread that had none.
+Renaming records `thread.renamed` with the new title and, in the same commit, a quiet
+`thread.renamed` activity whose details carry the new and previous titles; it returns the renamed
+thread. The same title again records nothing. Otherwise `expectedTitle` must still be the thread's
+title: one renamed meanwhile is `ThreadService.Changed`, so a rename is never silently replaced,
+and nothing is recorded. The activity notifies no one and makes nothing unread, and the title
+never derives from a message: editing the opening message leaves the title as it is, and renaming
+leaves every message as it is. Readers see the new title through the thread and its group's
+stream, and the change feed delivers the fact to the group's readers. The [thread model](threads.md)
+sets these rules.
 
 ## Participation and recipients
 

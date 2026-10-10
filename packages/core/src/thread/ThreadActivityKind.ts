@@ -1,15 +1,17 @@
 /**
  * How a domain defines a kind of thread activity, and how activity of that kind is recorded and
  * read back. A kind names itself, gives its details a schema, says what an activity of it is
- * about and whether it is repeatable, and whether it counts as new activity for readers. A domain
- * defines its kinds beside its facts, records them through `ThreadCommand.publishActivity`, and
- * shows them in timelines with a resolver it registers in `ThreadActivityResolvers`.
+ * about, its thread unless the kind says otherwise, and whether it is repeatable, and whether it
+ * counts as new activity for readers. A domain defines its kinds beside its facts, records them
+ * through `ThreadCommand.publishActivity`, and shows them in timelines with a resolver it registers
+ * in `ThreadActivityResolvers`.
  *
  * @since 0.1.0
  */
 import { Effect, Schema } from "effect";
 import { Subject } from "../journal/subject.ts";
 import { ThreadActivity } from "./ThreadActivity.ts";
+import type { ThreadId } from "./ThreadId.ts";
 
 /**
  * Resolved timeline items by activity kind. Each domain that records activity adds its kinds'
@@ -62,10 +64,10 @@ export interface Definition<Name extends string = string, D extends Details = De
   readonly newActivity: boolean;
   /** The activity with its details decoded, as timelines and handlers read it. */
   readonly Activity: ReturnType<typeof activitySchema<Name, D>>;
-  /** Pure: what the activity is about. */
-  subject(details: D["Type"]): Subject.Value;
+  /** Pure: what the activity is about, given its details and the thread it is in. */
+  subject(details: D["Type"], threadId: ThreadId.Id): Subject.Value;
   /** Pure: the activity's identity within the workspace, or null to leave it repeatable. */
-  occurrence(details: D["Type"]): ReadonlyArray<string> | null;
+  occurrence(details: D["Type"], threadId: ThreadId.Id): ReadonlyArray<string> | null;
 }
 
 /**
@@ -77,8 +79,9 @@ export interface Definition<Name extends string = string, D extends Details = De
 export type Activity<K extends Definition> = K["Activity"]["Type"];
 
 /**
- * Define an activity kind. Without an occurrence rule, each subject holds at most one activity of
- * the kind, as a message has one publication.
+ * Define an activity kind. Without a subject rule, the activity is about its thread, as a rename
+ * is. Without an occurrence rule, each subject holds at most one activity of the kind, as a message
+ * has one publication.
  *
  * @category constructors
  * @since 0.1.0
@@ -87,19 +90,25 @@ export const make = <const Name extends string, D extends Details>(
   name: Name,
   options: {
     readonly details: D;
-    readonly subject: (details: NoInfer<D["Type"]>) => Subject.Value;
+    readonly subject?: (details: NoInfer<D["Type"]>) => Subject.Value;
     readonly occurrence?: (details: NoInfer<D["Type"]>) => ReadonlyArray<string> | null;
     readonly newActivity: boolean;
   },
 ): Readonly<Definition<Name, D>> => {
   ThreadActivity.Kind.make(name);
+  const subject =
+    options.subject === undefined
+      ? (_: D["Type"], threadId: ThreadId.Id) => Subject.make("thread", threadId)
+      : options.subject;
   return Object.freeze({
     name,
     details: options.details,
     newActivity: options.newActivity,
     Activity: activitySchema(name, options.details),
-    subject: options.subject,
-    occurrence: options.occurrence ?? ((details) => [options.subject(details)]),
+    subject,
+    occurrence:
+      options.occurrence ??
+      ((details: D["Type"], threadId: ThreadId.Id) => [subject(details, threadId)]),
   });
 };
 
@@ -118,8 +127,8 @@ const occurrenceKey = (name: string, parts: ReadonlyArray<string> | null) =>
   parts === null ? null : JSON.stringify([name, ...parts]);
 
 /**
- * Derive what an activity of a kind records from its details: the kind's name, the subject and
- * occurrence key the kind gives the details, and the details encoded.
+ * Derive what an activity of a kind records in a thread from its details: the kind's name, the
+ * subject and occurrence key the kind gives the details there, and the details encoded.
  *
  * @category constructors
  * @since 0.1.0
@@ -127,11 +136,12 @@ const occurrenceKey = (name: string, parts: ReadonlyArray<string> | null) =>
 export const prepare = Effect.fn("ThreadActivityKind.prepare")(function* <K extends Definition>(
   kind: K,
   details: K["details"]["Type"],
+  threadId: ThreadId.Id,
 ) {
   return {
     kind: ThreadActivity.Kind.make(kind.name),
-    subject: kind.subject(details),
-    occurrence: occurrenceKey(kind.name, kind.occurrence(details)),
+    subject: kind.subject(details, threadId),
+    occurrence: occurrenceKey(kind.name, kind.occurrence(details, threadId)),
     newActivity: kind.newActivity,
     details: yield* Schema.encodeEffect(kind.details)(details),
   } satisfies Prepared;
@@ -187,6 +197,11 @@ export const makeRecordUnsafe = <K extends Definition>(
   common: (typeof ThreadActivity.Common)["Type"],
   details: K["details"]["Type"],
 ): ThreadActivity.Record =>
-  Effect.runSync(Effect.map(prepare(kind, details), (prepared) => ({ ...common, ...prepared })));
+  Effect.runSync(
+    Effect.map(prepare(kind, details, common.threadId), (prepared) => ({
+      ...common,
+      ...prepared,
+    })),
+  );
 
 export * as ThreadActivityKind from "./ThreadActivityKind.ts";

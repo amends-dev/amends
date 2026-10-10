@@ -97,8 +97,8 @@ export const First = Schema.TaggedUnion({
 export type First = typeof First.Type;
 
 /**
- * What creates a thread: its ID and group, who takes part from the start, and its opening
- * activity.
+ * What creates a thread: its ID and group, its title and origin if it has them, who takes part
+ * from the start, and its opening activity.
  *
  * @category options
  * @since 0.1.0
@@ -107,6 +107,8 @@ export const CreateInput = Schema.Struct({
   /** The caller names the thread, so a keyed request can name the same one on its retry. */
   threadId: Thread.Id,
   groupId: Group.Id,
+  title: Thread.Record.fields.title,
+  origin: Thread.Record.fields.origin,
   /** Everyone who takes part from the first activity; group membership enrolls no one else. */
   participants: Schema.Array(ThreadParticipation.Reference),
   first: First,
@@ -430,7 +432,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     readonly recipients: ReadonlyArray<ThreadActivity.Recipient>;
   }) {
     yield* Store.Transaction;
-    const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details);
+    const prepared = yield* ThreadActivityKind.prepare(input.kind, input.details, input.thread.id);
     const activity: ThreadActivity.Record = {
       ...prepared,
       id: ThreadActivity.Id.make(yield* crypto.randomUUIDv4),
@@ -530,6 +532,8 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       id: input.threadId,
       workspaceId,
       groupId: input.groupId,
+      title: input.title,
+      origin: input.origin,
       createdBy: first.author,
       createdAt: occurredAt,
     };

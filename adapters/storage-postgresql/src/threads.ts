@@ -178,6 +178,30 @@ export const make = Effect.fn("Threads.make")(function* () {
           message: "Thread is missing",
         });
     }),
+    rename: Effect.fn("Threads.rename")(function* (input) {
+      yield* Store.Transaction;
+      const renamed = yield* Schema.decodeEffect(Schema.toType(Thread.Renamed))(input).pipe(
+        Effect.mapError(storeConflict(ThreadStore, "rename")),
+      );
+      if (renamed.workspaceId !== workspaceId)
+        return yield* new ThreadStore.Conflict({
+          operation: "rename",
+          message: "Expected a thread in this workspace",
+        });
+      const updated = yield* guard(
+        db
+          .update(threads)
+          .set({ title: renamed.title })
+          .where(and(inWorkspace, eq(threads.id, renamed.threadId)))
+          .returning({ id: threads.id }),
+        true,
+      ).pipe(Effect.mapError(storeError(ThreadStore, "rename")));
+      if (updated.length === 0)
+        return yield* new ThreadStore.Conflict({
+          operation: "rename",
+          message: "Thread is missing",
+        });
+    }),
     insert: Effect.fn("Threads.insert")(function* (input) {
       yield* Store.Transaction;
       const record = yield* validate(input).pipe(

@@ -396,6 +396,8 @@ export function useThreadConversation(
         turns.set(turn.id, turn);
         latest.set(turn.memberId, turn.id);
         shown.push(turn);
+      } else if (item.activity.kind === "thread.renamed") {
+        // The thread's title shows in its pane's header; a rename has no entry of its own yet.
       } else {
         // A turn that began before the pages loaded shows once they reach its start.
         const turn = turns.get(item.activity.details.turnId);

@@ -132,6 +132,9 @@ const conversations = Layer.mergeAll(
         Effect.fail(new ThreadService.DirectMembersRequired()),
       ),
       get: record("thread.get", (id) => Effect.fail(new ThreadService.NotFound({ threadId: id }))),
+      rename: record("thread.rename", (input) =>
+        Effect.fail(new ThreadService.Changed({ threadId: input.threadId })),
+      ),
       listInGroup: record("thread.list", () => Effect.succeed([])),
       listOpenings: record("thread.openings", () => Effect.succeed([])),
       readTimeline: record("thread.timeline", () => Effect.succeed([])),
@@ -642,6 +645,11 @@ it.effect(
             responseMode: "response-only",
           }),
           client.threads.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.threads.rename({
+            params: { workspaceId, threadId },
+            payload: { title: "Launch plan", expectedTitle: null },
+            responseMode: "response-only",
+          }),
           client.threads.timeline({
             params: { workspaceId, threadId },
             query: { limit: 50, beforeSequence: 9, from: "newest" },
@@ -679,8 +687,8 @@ it.effect(
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
       );
       expect(statuses).toEqual([
-        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 200,
-        200, 403, 404, 409, 409, 409,
+        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 409,
+        200, 200, 403, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
@@ -712,6 +720,10 @@ it.effect(
           arguments: [{ memberIds: [memberId], text: "Hi", mentions: [] }, {}],
         },
         { operation: "thread.get", arguments: [threadId] },
+        {
+          operation: "thread.rename",
+          arguments: [{ threadId, title: "Launch plan", expectedTitle: null }],
+        },
         {
           operation: "thread.timeline",
           arguments: [threadId, { limit: 50, beforeSequence: 9, from: "newest" }],

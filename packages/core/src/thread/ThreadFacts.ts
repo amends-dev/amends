@@ -17,10 +17,24 @@ import { Thread } from "./Thread.ts";
  */
 export const Created = Fact.make("thread.created", {
   audience: (payload) => [Group.audienceOf(payload.groupId)],
-  version: 1,
+  version: 2,
   subject: (payload) => Subject.make("thread", payload.id),
   occurrence: (payload) => [payload.id],
   payload: Thread.Record,
+});
+
+/**
+ * A thread's title changed; each rename is its own fact. The same commit records a quiet
+ * `thread.renamed` activity in the thread's timeline.
+ *
+ * @category facts
+ * @since 0.1.0
+ */
+export const Renamed = Fact.make("thread.renamed", {
+  audience: (payload) => [Group.audienceOf(payload.groupId)],
+  version: 1,
+  subject: (payload) => Subject.make("thread", payload.threadId),
+  payload: Thread.Renamed,
 });
 
 export * as ThreadFacts from "./ThreadFacts.ts";

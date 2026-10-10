@@ -1,13 +1,14 @@
 /**
  * A thread is one conversation in exactly one group, with participants and an ordered timeline of
  * typed activity. This module holds its record, the views a group's lists show of it, and the
- * inputs of the operations that start one; `ThreadService` is those operations. The messages,
- * participations, and activity hang off the thread by its ID, in modules of their own.
+ * inputs of the operations that start and rename one; `ThreadService` is those operations. The
+ * messages, participations, and activity hang off the thread by its ID, in modules of their own.
  *
  * @since 0.1.0
  */
 import { DateTime, Schema } from "effect";
 import { GroupId } from "../group/id.ts";
+import { Text } from "../text/text.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { ThreadId } from "./ThreadId.ts";
@@ -29,7 +30,27 @@ export const Id = ThreadId.Id;
 export type Id = ThreadId.Id;
 
 /**
- * A thread as created. Its group, which never changes, is whose members may read it.
+ * A thread's title: a trimmed line of 1 to 200 characters without hidden ones. It is the thread's
+ * own text, independent of every message in it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Title = Schema.Trimmed.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(200),
+  Text.isName,
+);
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Title = typeof Title.Type;
+
+/**
+ * A thread as created and since renamed. Its group, which never changes, is whose members may
+ * read it.
  *
  * @category schemas
  * @since 0.1.0
@@ -38,6 +59,13 @@ export const Record = Schema.Struct({
   id: Id,
   workspaceId: WorkspaceId.Id,
   groupId: GroupId.Id,
+  /** Its title, or null, when readers show its opening message instead. */
+  title: Schema.NullOr(Title),
+  /**
+   * The thread this one was derived from, or null. Set at creation, never changed, and no grant
+   * of access to either thread: the originating thread may be in another group.
+   */
+  origin: Schema.NullOr(Id),
   /** Who started the conversation: a member, or the contact whose message a channel received. */
   createdBy: ThreadMessage.Author,
   createdAt: Schema.DateTimeUtcFromString,
@@ -232,7 +260,46 @@ export const opening = (
 });
 
 /**
- * What starts a thread in a group: the opening message and whom it mentions.
+ * A thread's new title, and the title the renamer last saw, so a rename made meanwhile is not
+ * silently replaced.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const RenameInput = Schema.Struct({
+  threadId: Id,
+  title: Title,
+  expectedTitle: Schema.NullOr(Title),
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface RenameInput extends Schema.Schema.Type<typeof RenameInput> {}
+
+/**
+ * What renaming a thread records: its new title. The group is the fact's audience.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Renamed = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  threadId: Id,
+  groupId: GroupId.Id,
+  title: Title,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
+
+/**
+ * What starts a thread in a group: the opening message, whom it mentions, and a title if the
+ * author gives one.
  *
  * @category options
  * @since 0.1.0
@@ -241,6 +308,7 @@ export const StartInGroupInput = Schema.Struct({
   groupId: GroupId.Id,
   text: ThreadMessage.Text,
   mentions: Schema.UniqueArray(MemberId.Id),
+  title: Schema.optionalKey(Title),
 });
 
 /**
@@ -251,7 +319,7 @@ export interface StartInGroupInput extends Schema.Schema.Type<typeof StartInGrou
 
 /**
  * What starts a thread in a direct group: the other members of the group, which the author always
- * belongs to, and the opening message.
+ * belongs to, the opening message, and a title if the author gives one.
  *
  * @category options
  * @since 0.1.0
@@ -260,6 +328,7 @@ export const StartDirectInput = Schema.Struct({
   memberIds: Schema.UniqueArray(MemberId.Id).check(Schema.isMinLength(1)),
   text: ThreadMessage.Text,
   mentions: Schema.UniqueArray(MemberId.Id),
+  title: Schema.optionalKey(Title),
 });
 
 /**

@@ -10,6 +10,16 @@ import { Member } from "../workspace/member/member.ts";
 import { Thread } from "./Thread.ts";
 
 /**
+ * The thread's title is no longer the one the renamer expected: someone renamed it meanwhile.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export class Changed extends Schema.TaggedError<Changed>()("ThreadService.Changed", {
+  threadId: Thread.Id,
+}) {}
+
+/**
  * A direct group needs the author and at least one other member.
  *
  * @category errors

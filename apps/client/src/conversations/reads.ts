@@ -12,6 +12,7 @@ import {
   publicGroupsRead,
   rosterRead,
   streamRead,
+  threadRead,
   timelineRead,
   type Group,
   type GroupMembership,
@@ -174,6 +175,12 @@ function page<A, E>(read: PagedRead<A, E>): PagedView<A> {
 export function useGroupStream(workspaceId: string, groupId: string): PagedView<Thread.Opening> {
   const read = streamRead(useApiClient(), workspaceId, groupId);
   return read ? page(read) : unpaged;
+}
+
+/** One thread's record, live while mounted: its title as renamed, its group, and who started it. */
+export function useThread(workspaceId: string, threadId: string): Read<Thread.Record> {
+  const read = threadRead(useApiClient(), workspaceId, threadId);
+  return read ? connect(read) : unread;
 }
 
 /** A thread's timeline from its newest activity, oldest shown first, live while mounted. */

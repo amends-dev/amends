@@ -73,6 +73,20 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
+      rename: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.rename({
+                threadId: params.threadId,
+                title: payload.title,
+                expectedTitle: payload.expectedTitle,
+              }),
+            ),
+          ),
+        ),
       timeline: ({ params, query }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

@@ -376,11 +376,20 @@ const item = (sequence: number, id: string, text: string) => ({
   },
   message: message(id, text),
 });
+const thread = {
+  id: "t1",
+  workspaceId: "one",
+  groupId: "g1",
+  title: null,
+  origin: null,
+  createdBy: author,
+  createdAt: at,
+};
 const conversation = (path: string) =>
   path.endsWith("/groups/g1/openings")
     ? [
         {
-          thread: { id: "t1", workspaceId: "one", groupId: "g1", createdBy: author, createdAt: at },
+          thread,
           message: message("m1", "Can you look at the terms?"),
           replies: 1,
           latest: { threadId: "t1", sequence: 2, occurredAt: at },
@@ -388,9 +397,11 @@ const conversation = (path: string) =>
           unread: false,
         },
       ]
-    : path.endsWith("/threads/t1/timeline")
-      ? [item(1, "m1", "Can you look at the terms?"), item(2, "m2", "On it.")]
-      : undefined;
+    : path.endsWith("/threads/t1")
+      ? thread
+      : path.endsWith("/threads/t1/timeline")
+        ? [item(1, "m1", "Can you look at the terms?"), item(2, "m2", "On it.")]
+        : undefined;
 
 it("shows a group's stream at its route and an open thread beside it", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
@@ -637,7 +648,15 @@ it("drafts a first direct message at its hash route and opens the conversation",
     if (request.method === "POST" && path === "/workspaces/one/threads")
       return response(
         {
-          thread: { id: "t9", workspaceId: "one", groupId: "g9", createdBy: author, createdAt: at },
+          thread: {
+            id: "t9",
+            workspaceId: "one",
+            groupId: "g9",
+            title: null,
+            origin: null,
+            createdBy: author,
+            createdAt: at,
+          },
           message: message("m9", "Are you free?"),
           activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" },
         },

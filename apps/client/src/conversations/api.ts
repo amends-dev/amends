@@ -133,6 +133,23 @@ export const rosterRead = (client: ApiClient, workspaceId: string, groupId: stri
     ? rosterOf(client, joined(workspaceId, groupId))
     : undefined;
 
+/** One thread's record: its title, group, and who started it. */
+const threadOf = perClient((client: ApiClient, key: string) => {
+  const { workspaceId, id } = split(key);
+  return client.runtime
+    .atom(
+      Effect.gen(function* () {
+        const api = yield* client;
+        return yield* api.threads.get({ params: { workspaceId, threadId: Thread.Id.make(id) } });
+      }),
+    )
+    .pipe(Atom.withReactivity(itemKeys(workspaceId, "threads", id)));
+});
+export const threadRead = (client: ApiClient, workspaceId: string, threadId: string) =>
+  valid(workspaceId) && Option.isSome(Schema.decodeOption(Thread.Id)(threadId))
+    ? threadOf(client, joined(workspaceId, threadId))
+    : undefined;
+
 /** A thread's current participants, read page by page: whether the reader follows it. */
 const participantsOf = perClient((client: ApiClient, key: string) => {
   const { workspaceId, id } = split(key);

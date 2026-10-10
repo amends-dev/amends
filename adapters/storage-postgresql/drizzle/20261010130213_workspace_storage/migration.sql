@@ -338,6 +338,8 @@ CREATE TABLE "threads" (
 	"workspace_id" text,
 	"id" text,
 	"group_id" text NOT NULL,
+	"title" text,
+	"origin" text,
 	"created_by_kind" text NOT NULL,
 	"created_by_member_id" text,
 	"created_by_contact_id" text,

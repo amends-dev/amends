@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "a934db81-2b0c-467b-9a9f-ba1c8f47ebec",
+  "id": "19aced87-c9e3-460d-ba6a-36043ae59413",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -2919,6 +2919,32 @@
       "generated": null,
       "identity": null,
       "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "threads"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "origin",
       "entityType": "columns",
       "schema": "public",
       "table": "threads"

@@ -72,6 +72,13 @@ export interface Interface {
     record: Thread.Record,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /**
+   * Projection write that sets a thread's title. A missing, foreign, or malformed thread conflicts;
+   * the same title again changes nothing.
+   */
+  readonly rename: (
+    renamed: Thread.Renamed,
+  ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
+  /**
    * Latest content activity of several threads in one read. Threads without any, and absent IDs,
    * are omitted; order is unspecified.
    */

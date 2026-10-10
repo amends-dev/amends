@@ -31,6 +31,8 @@ const thread = (id: string): Thread.Record => ({
   id: Thread.Id.make(id),
   workspaceId,
   groupId,
+  title: null,
+  origin: null,
   createdBy: { _tag: "Member", memberId: actor.memberId },
   createdAt: DateTime.makeUnsafe("2026-09-23T12:00:00.000Z"),
 });

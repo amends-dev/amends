@@ -65,6 +65,7 @@ export {
   usePublicGroups,
   useMembers,
   useGroupStream,
+  useThread,
   useThreadTimeline,
   useInbox,
   useInboxPending,
