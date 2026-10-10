@@ -38,6 +38,8 @@ export const recipientKinds = [...identityKinds, "Triage"] as const;
 export const memberStatuses = ["active", "removed"] as const;
 export const groupKinds = ["Team", "Direct"] as const;
 export const participantKinds = ["Member", "Contact", "Triage"] as const;
+export const taskStatuses = ["triage", "todo", "doing", "held", "done", "dismissed"] as const;
+export const taskPriorities = ["none", "low", "medium", "high", "urgent"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
@@ -707,6 +709,37 @@ export const threadMessages = pgTable(
       .where(sql`${t.contentKind} = 'Text'`),
   ],
 );
+/** A thread's task: its current status, priority, and assignee. A thread has at most one, keyed by it. */
+export const tasks = pgTable(
+  "tasks",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    groupId: text("group_id").notNull(),
+    status: text("status", { enum: taskStatuses }).notNull(),
+    priority: text("priority", { enum: taskPriorities }).notNull(),
+    assignee: text("assignee"),
+    // A member creates a task in the app; a contact's conversation opens one through a channel.
+    createdByKind: text("created_by_kind", { enum: ["Member", "Contact"] }).notNull(),
+    createdByMemberId: text("created_by_member_id"),
+    createdByContactId: text("created_by_contact_id"),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.threadId] }),
+    check(
+      "task_creator",
+      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
+    ),
+    // A group's tasks by when they were created, newest first.
+    index("tasks_by_group").on(
+      t.workspaceId,
+      t.groupId,
+      t.createdAt,
+      sql`${t.threadId} COLLATE "C"`,
+    ),
+  ],
+);
 /**
  * Core validates each activity kind. The table keeps typed references with their keys and
  * uniqueness, so a new kind adds nullable reference columns rather than rewriting a constraint.
@@ -837,7 +870,9 @@ export const turns = pgTable(
     sandboxConnectionId: text("sandbox_connection_id"),
     messageIds: text("message_ids").array().notNull(),
     failure: text("failure"),
-    cancelReason: text("cancel_reason", { enum: ["requested", "participation-ended"] }),
+    cancelReason: text("cancel_reason", {
+      enum: ["requested", "participation-ended", "task-changed"],
+    }),
     createdAt: instant("created_at").notNull(),
     startedAt: instant("started_at"),
     finishedAt: instant("finished_at"),

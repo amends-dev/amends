@@ -29,6 +29,11 @@ import { ThreadProjection } from "./thread/ThreadProjection.ts";
 import { ThreadParticipationProjection } from "./thread/ThreadParticipationProjection.ts";
 import { ThreadMessageProjection } from "./thread/ThreadMessageProjection.ts";
 import { ThreadActivityProjection } from "./thread/ThreadActivityProjection.ts";
+import { TaskCommand } from "./task/TaskCommand.ts";
+import { TaskPermissions } from "./task/TaskPermissions.ts";
+import { TaskProjection } from "./task/TaskProjection.ts";
+import { TaskService } from "./task/TaskService.ts";
+import { TaskTimeline } from "./task/TaskTimeline.ts";
 /**
  * Compose one workspace's core from its domains. Hosts bind storage to a
  * workspace and supply cryptography; a gateway resolves the acting member and
@@ -91,6 +96,7 @@ export const projections = [
   ThreadParticipationProjection.definition,
   ThreadMessageProjection.definition,
   ThreadActivityProjection.definition,
+  TaskProjection.definition,
   NotificationProjection.definition,
   ConnectionProjection.definition,
   AgentProjection.definition,
@@ -122,6 +128,8 @@ export const permissions = [
   ThreadMessagePermissions.Publish,
   ThreadMessagePermissions.Moderate,
   ThreadParticipationPermissions.Follow,
+  TaskPermissions.Create,
+  TaskPermissions.Update,
   AgentPermissions.Use,
   ConnectionPermissions.Create,
   ConnectionPermissions.Read,
@@ -141,6 +149,7 @@ const activityResolvers = [
   ThreadParticipationTimeline.resolver,
   ThreadTitleTimeline.resolver,
   TurnTimeline.resolver,
+  TaskTimeline.resolver,
 ] as const;
 
 /**
@@ -171,6 +180,9 @@ const threadQuery = ThreadQuery.layer.pipe(
 const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
 const turnCommand = TurnCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand)),
+);
+const taskCommand = TaskCommand.layer.pipe(
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
 );
 const readStateCommand = ReadStateCommand.layer;
 const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
@@ -204,6 +216,7 @@ const operations = Layer.mergeAll(
   ReadStateService.layer,
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
+  TaskService.layer,
   ConnectionService.layer,
   AgentService.layer,
   TurnService.layer,
@@ -219,6 +232,7 @@ const operations = Layer.mergeAll(
       threadCommand,
       readStateCommand,
       turnCommand,
+      taskCommand,
       changeFeedSource,
     ),
   ),

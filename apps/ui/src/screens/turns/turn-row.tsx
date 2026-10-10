@@ -12,7 +12,7 @@ export interface ThreadTurn {
   /** Why it failed, as the host worded it. */
   readonly failure?: string;
   /** Why it stopped: someone asked, or the agent stopped taking part in the thread. */
-  readonly stoppedBy?: "request" | "departure";
+  readonly stoppedBy?: "request" | "departure" | "task";
   /** The reader may ask it to stop now. */
   readonly stoppable: boolean;
   /** The reader may run it again now. */
@@ -77,6 +77,8 @@ function detailOf(turn: ThreadTurn): string | undefined {
   if (turn.state === "failed") return turn.failure;
   if (turn.state === "stopped" && turn.stoppedBy === "departure")
     return `${turn.agent.name} stopped taking part in this thread.`;
+  if (turn.state === "stopped" && turn.stoppedBy === "task")
+    return `The task no longer asks ${turn.agent.name} to work on it.`;
   if (turn.state === "done") return "No reply posted.";
   return undefined;
 }

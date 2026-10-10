@@ -44,6 +44,13 @@ export class Conflict extends Schema.TaggedError<Conflict>()("ThreadStore.Confli
 export interface Interface {
   readonly get: (id: Thread.Id) => Effect.Effect<Option.Option<Thread.Record>, Failure>;
   /**
+   * Several threads in one read. Absent IDs are omitted and each found thread appears once; order
+   * is unspecified, so callers index results by ID. An empty request reads nothing.
+   */
+  readonly getMany: (
+    ids: ReadonlyArray<Thread.Id>,
+  ) => Effect.Effect<ReadonlyArray<Thread.Record>, Failure>;
+  /**
    * Every thread of a group in stable ID order. A history read for inspection; operations read
    * pages.
    */

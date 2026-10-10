@@ -20,6 +20,7 @@ import { SessionLogs } from "./session-logs.ts";
 import { SessionStates } from "./session-states.ts";
 import { MemorySignalHub } from "./signal-hub.ts";
 import { Roles } from "./roles.ts";
+import { Tasks } from "./tasks.ts";
 import { ThreadActivities } from "./thread-activities.ts";
 import { ThreadMessages } from "./thread-messages.ts";
 import { ThreadParticipations } from "./thread-participations.ts";
@@ -49,6 +50,7 @@ const layerStores = Layer.mergeAll(
   ThreadParticipations.layer,
   ThreadMessages.layer,
   ThreadActivities.layer,
+  Tasks.layer,
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,

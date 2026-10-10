@@ -14,6 +14,7 @@ import { MemberId } from "../workspace/member/id.ts";
 import { ThreadId } from "./ThreadId.ts";
 import { ThreadMessage } from "./ThreadMessage.ts";
 import type { ThreadActivityKind } from "./ThreadActivityKind.ts";
+import { Task } from "../task/Task.ts";
 
 /**
  * Names a thread; `ThreadId.Id`, where models that only refer to threads import it from.
@@ -133,14 +134,17 @@ export const ListOptions = Schema.Struct({
 export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
 
 /**
- * A readable thread with its latest activity and the reader's position. `unread` holds when the
- * latest message is past the position or, for a thread never read, came after the reader joined.
+ * A readable thread with the task it tracks, if any, its latest activity, and the reader's
+ * position. `unread` holds when the latest message is past the position or, for a thread never
+ * read, came after the reader joined.
  *
  * @category schemas
  * @since 0.1.0
  */
 export const ListItem = Schema.Struct({
   thread: Record,
+  /** The task the thread tracks, or null. */
+  task: Schema.NullOr(Task.Record),
   latest: Latest,
   readThrough: Schema.NullOr(Latest.fields.sequence),
   unread: Schema.Boolean,
@@ -177,10 +181,17 @@ export const isUnread = (
  */
 export const listItem = (
   thread: Record,
+  task: Task.Record | null,
   latest: Latest,
   readThrough: number | null,
   admittedAt: DateTime.Utc,
-): ListItem => ({ thread, latest, readThrough, unread: isUnread(latest, readThrough, admittedAt) });
+): ListItem => ({
+  thread,
+  task,
+  latest,
+  readThrough,
+  unread: isUnread(latest, readThrough, admittedAt),
+});
 
 /**
  * Exclusive boundary for paging a group's threads by when they started, newest first: the last
@@ -219,14 +230,16 @@ export const OpeningOptions = Schema.Struct({
 export interface OpeningOptions extends Schema.Schema.Type<typeof OpeningOptions> {}
 
 /**
- * A readable thread as its group's stream shows it: the message that opened it, how many replies
- * followed, its latest message, and the reader's position, with `unread` as in `ListItem`.
+ * A readable thread as its group's stream shows it: the task it tracks, if any, the message that
+ * opened it, how many replies followed, its latest message, and the reader's position, with
+ * `unread` as in `ListItem`.
  *
  * @category schemas
  * @since 0.1.0
  */
 export const Opening = Schema.Struct({
   thread: Record,
+  task: ListItem.fields.task,
   message: ThreadMessage.Record,
   replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   latest: Latest,
@@ -252,6 +265,7 @@ export const opening = (
   replies: number,
 ): Opening => ({
   thread: item.thread,
+  task: item.task,
   message,
   replies,
   latest: item.latest,
@@ -298,8 +312,8 @@ export const Renamed = Schema.Struct({
 export interface Renamed extends Schema.Schema.Type<typeof Renamed> {}
 
 /**
- * What starts a thread in a group: the opening message, whom it mentions, and a title if the
- * author gives one.
+ * What starts a thread in a group: the opening message, whom it mentions, a title if the author
+ * gives one, the thread it is derived from if any, and the task it is created as, if one.
  *
  * @category options
  * @since 0.1.0
@@ -309,6 +323,10 @@ export const StartInGroupInput = Schema.Struct({
   text: ThreadMessage.Text,
   mentions: Schema.UniqueArray(MemberId.Id),
   title: Schema.optionalKey(Title),
+  /** The thread this one splits work out of, which the author can read. */
+  origin: Schema.optionalKey(Id),
+  /** Create the thread as a task, with these options, at its second position. */
+  task: Schema.optionalKey(Task.Options),
 });
 
 /**
@@ -338,7 +356,7 @@ export const StartDirectInput = Schema.Struct({
 export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectInput> {}
 
 /**
- * What a start returns: the thread and its opening message.
+ * What a start returns: the thread, its opening message, and the task it was created as, or null.
  *
  * @category schemas
  * @since 0.1.0
@@ -346,6 +364,7 @@ export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectI
 export const Started = Schema.Struct({
   thread: Record,
   message: ThreadMessage.Record,
+  task: Schema.NullOr(Task.Record),
 });
 
 /**

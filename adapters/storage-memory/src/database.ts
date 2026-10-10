@@ -44,6 +44,7 @@ export const projections = [
   "threadParticipations",
   "threadMessages",
   "threadActivities",
+  "tasks",
   "connections",
   "agents",
   "turns",

@@ -844,6 +844,7 @@ const conversation = (path: string) =>
     ? [
         {
           thread,
+          task: null,
           message: message("m1", "Can you look at the terms?"),
           replies: 1,
           latest: { threadId: "t1", sequence: 2, occurredAt: at },
@@ -1170,6 +1171,7 @@ it("drafts a first message to someone new and opens the conversation it starts",
             createdAt: at,
           },
           message: message("m9", "Are you free?"),
+          task: null,
           activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" },
         },
         201,

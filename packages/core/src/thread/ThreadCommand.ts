@@ -20,6 +20,8 @@ import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
+import { Task } from "../task/Task.ts";
+import { TaskStore } from "../task/TaskStore.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Thread } from "./Thread.ts";
 import { ThreadFacts } from "./ThreadFacts.ts";
@@ -66,6 +68,7 @@ export type Error =
   | ThreadQuery.ParticipantsError
   | ThreadStore.Failure
   | ThreadActivityStore.Failure
+  | TaskStore.Failure
   | Unavailable
   | PositionChanged
   | Schema.SchemaError
@@ -190,12 +193,15 @@ export const CreateInput = Schema.Struct({
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
 
 /**
- * A created thread and the activity that places its opening message, for the starting workflow.
+ * A created thread, its opening message, and the activity that places it, for the starting
+ * workflow, which may create the thread as more.
  *
  * @category models
  * @since 0.1.0
  */
-export interface Created extends Thread.Started {
+export interface Created {
+  readonly thread: Thread.Record;
+  readonly message: ThreadMessage.Record;
   readonly activity: ThreadMessageActivity.Published;
 }
 
@@ -294,8 +300,10 @@ export interface Interface {
   ) => Effect.Effect<MessagePublished, Error, Store.Transaction | Publication.Service>;
   /**
    * Replace a message's text and mentions at its next revision, admitting the members it newly
-   * mentions and telling them, and them alone. The caller authorizes the editor, checks the
-   * revision the editor last saw, and gives a message that still has text.
+   * mentions and telling them, and them alone; on a task's thread, editing the opening message
+   * changes the task's description, so every participant is told and the assignee asked to work on
+   * it anew. The caller authorizes the editor, checks the revision the editor last saw, and gives a
+   * message that still has text.
    */
   readonly editMessage: (
     input: EditInput,
@@ -379,6 +387,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
   const threadQuery = yield* ThreadQuery.Service;
   const threadStore = yield* ThreadStore.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
+  const taskStore = yield* TaskStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -577,6 +586,21 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     return { message: published.value, activity } satisfies MessagePublished;
   });
 
+  /** The task whose description a message is: the thread's task, when the message opened the thread. */
+  const describedTask = Effect.fnUntraced(function* (
+    thread: Thread.Record,
+    message: ThreadMessage.Record,
+  ) {
+    const task = yield* taskStore.get(thread.id);
+    if (Option.isNone(task)) return undefined;
+    const [first] = yield* threadActivityStore.getFirst([thread.id]);
+    if (first === undefined) return yield* Effect.die("A thread has no first activity");
+    const opening = yield* Effect.orDie(
+      ThreadActivityKind.decode(ThreadMessageActivity.Published, first),
+    );
+    return opening.details.messageId === message.id ? task.value : undefined;
+  });
+
   const editMessage = Effect.fn("ThreadCommand.editMessage")(function* (input: EditInput) {
     yield* Store.Transaction;
     const { message } = input;
@@ -584,6 +608,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       return yield* Effect.die("An edited message must still have text");
     const current = message.content;
     const thread = yield* threadOf(message);
+    const task = yield* describedTask(thread, message);
     const revision = current.revision + 1;
     // Those the edit newly mentions are admitted and told; the author takes part already, and is
     // selected so the recipients know whether an agent wrote.
@@ -620,7 +645,14 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
             value: Object.assign({}, message, { content }) satisfies ThreadMessage.Record,
             kind: ThreadMessageActivity.Edited,
             details: { messageId: message.id, revision },
-            recipients: recipientsOf(message.author, joining, admitted.participants),
+            recipients:
+              task === undefined
+                ? recipientsOf(message.author, joining, admitted.participants)
+                : Task.recipients(
+                    yield* threadQuery.currentParticipants(thread),
+                    authorAsParticipant(message.author),
+                    Task.asked(task),
+                  ),
             cause: fact,
           };
         }),

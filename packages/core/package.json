@@ -19,7 +19,8 @@
     "./request": "./src/request/index.ts",
     "./signal": "./src/signal/index.ts",
     "./connection": "./src/connection/index.ts",
-    "./turn": "./src/turn/index.ts"
+    "./turn": "./src/turn/index.ts",
+    "./task": "./src/task/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

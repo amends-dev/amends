@@ -257,6 +257,16 @@ revisions[10] = Object.fromEntries(
   ]),
 );
 
+// Members create tasks in their groups and change them, as they start and rename threads.
+revisions[11] = Object.fromEntries(
+  Object.entries(revisions[10]!).map(([roleId, names]) => [
+    roleId,
+    names.flatMap((name) =>
+      name === "thread.follow" ? [name, "task.create", "task.update"] : [name],
+    ),
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

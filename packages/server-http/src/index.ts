@@ -11,6 +11,7 @@ export { AgentsHandlers } from "./agents.ts";
 export { Draining } from "./draining.ts";
 export { SessionHandlers } from "./session.ts";
 export { Streams } from "./streams.ts";
+export { TasksHandlers } from "./tasks.ts";
 export { ThreadsHandlers } from "./threads.ts";
 export { TurnsHandlers } from "./turns.ts";
 export { WorkspacesHandlers } from "./workspaces.ts";

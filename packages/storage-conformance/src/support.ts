@@ -41,6 +41,7 @@ import {
 } from "@amends/core/workspace";
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
+import { TaskStore, TaskTimeline } from "@amends/core/task";
 import { Integration, Integrations, type ModelCatalog } from "@amends/connection";
 import {
   SessionLogStore,
@@ -217,6 +218,7 @@ export const bind = (
   participations: Context.get(context, ThreadParticipationStore.Service),
   messages: Context.get(context, ThreadMessageStore.Service),
   activities: Context.get(context, ThreadActivityStore.Service),
+  tasks: Context.get(context, TaskStore.Service),
   store: Context.get(context, Store.Service),
   checkpoints: Context.get(context, Checkpoint.Service),
   workspace: Context.get(context, WorkspaceStore.Service),
@@ -399,6 +401,7 @@ export const threadInternals = ThreadCommand.layer.pipe(
         ThreadMessageTimeline.resolver,
         ThreadParticipationTimeline.resolver,
         TurnTimeline.resolver,
+        TaskTimeline.resolver,
       ]),
     ),
   ),

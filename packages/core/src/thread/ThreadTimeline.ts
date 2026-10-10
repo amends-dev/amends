@@ -10,6 +10,7 @@ import { ThreadMessageTimeline } from "./ThreadMessageTimeline.ts";
 import { ThreadParticipationTimeline } from "./ThreadParticipationTimeline.ts";
 import { ThreadTitleTimeline } from "./ThreadTitleTimeline.ts";
 import { TurnTimeline } from "../turn/timeline.ts";
+import { TaskTimeline } from "../task/TaskTimeline.ts";
 
 /**
  * Every kind of timeline item: the schema of `Thread.TimelineItem`. Each item holds its activity,
@@ -29,6 +30,8 @@ export const Item = Schema.Union([
   TurnTimeline.StartedItem,
   TurnTimeline.StoppingItem,
   TurnTimeline.EndedItem,
+  TaskTimeline.CreatedItem,
+  TaskTimeline.UpdatedItem,
 ]);
 
 /**

@@ -201,10 +201,10 @@ describe the rules behind each operation.
 | `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                       |
 | `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                               |
 | `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                   |
-| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                       |
-| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                    |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title? }`; 201 with the thread and its opening message.                                                                    |
-| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201.                                                              |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, each with its task or null, the caller's position, and unread.                                               |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, each with its task or null, opening message, and reply count.                                            |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title?, origin?, task? }`; 201 with the thread, its opening message, and its task or null. See [tasks](#tasks).            |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201 with `task` null.                                             |
 | `GET …/threads/:threadId`                            | One thread.                                                                                                                                                       |
 | `POST …/threads/:threadId/rename`                    | Give a thread `{ title, expectedTitle }` under `thread.rename`; returns it. A title no longer `expectedTitle` (`ThreadService.Changed`) is 409.                   |
 | `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                              |
@@ -227,8 +227,8 @@ is in ascending sequence order: `afterSequence` and `beforeSequence` bound it ex
 and pages back with `beforeSequence` set to its first item's sequence. Timeline items are
 `{ activity, message }` for messages, `{ activity, participant }` for participants joining or
 leaving, and `{ activity }` for an agent's turn changing (`turn.created`, `turn.started`,
-`turn.stopping`, `turn.ended`, whose details carry the turn and how it went), with the activity's
-`kind` naming which. Edits and deletions are items of their own (`message.edited`,
+`turn.stopping`, `turn.ended`, whose details carry the turn and how it went) or a task changing
+(`task.created`, `task.updated`), with the activity's `kind` naming which. Edits and deletions are items of their own (`message.edited`,
 `message.deleted`) carrying the same message, whose `content` is its text, mentions, revision,
 and edit time as it is now, or its deletion. A message's `via` names the agent's turn that posted
 it, for an agent's reply, and is null otherwise.
@@ -241,6 +241,24 @@ sequence. A direct group's members are fixed and it has nothing to follow, so ad
 following there are 409s; unfollowing an ended participation or removing an ended admission is
 also a 409. Positions, read times, and what they saw reach the caller's sessions as
 signals on the change feed, and the conversation's facts reach the group's readers as commits.
+
+### Tasks
+
+Task paths sit under `/workspaces/:workspaceId` and require active membership of the thread's
+group. A task is the work a thread tracks, keyed by the thread; [tasks](../../docs/thread-workflows.md#tasks)
+describes the rules. A thread without a task, or one the caller cannot read, answers 404 as a
+missing one does.
+
+| Endpoint                                          | Operation                                                                                                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/groups/:groupId/tasks?limit&status&before` | The group's readable tasks, newest created first, of one `status` when given, each as a thread list item with its task; `before` is JSON of the last item's task `{ createdAt, threadId }`. |
+| `GET …/threads/:threadId/task`                    | The thread's task.                                                                                                                                                                          |
+| `POST …/threads/:threadId/task`                   | Make the conversation a task from `{ status?, priority?, assignee? }` under `task.create` on the group; 201. A thread that is a task is 409 `AlreadyTask`.                                  |
+| `PATCH …/threads/:threadId/task`                  | Change the task by `{ change }`, a `Status`, `Assignee`, or `Priority` change with `from` and `to`, under `task.update`; returns it. A stale `from` is 409 `Changed`.                       |
+
+An assignee who cannot take part in the thread is a 409 `ParticipantUnavailable`, and assigning an
+agent needs `agent.use` on it (403 otherwise). Timeline items `{ activity }` of kind `task.created`
+carry the task's initial values in their details, and `task.updated` the change.
 
 ### Connections
 

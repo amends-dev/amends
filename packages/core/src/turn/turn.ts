@@ -34,8 +34,11 @@ export const active = (status: Status) =>
 
 const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
-/** Why a turn stopped short: execution failed, or its cancellation was requested. */
-export const CancelReason = Schema.Literals(["requested", "participation-ended"]);
+/**
+ * Why a turn was asked to stop: someone asked, its agent stopped taking part in the thread, or the
+ * thread's task was taken from the agent or stopped asking for work.
+ */
+export const CancelReason = Schema.Literals(["requested", "participation-ended", "task-changed"]);
 export type CancelReason = typeof CancelReason.Type;
 
 /** How a turn ended. */

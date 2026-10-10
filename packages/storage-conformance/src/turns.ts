@@ -5,6 +5,7 @@ import { ConnectionService } from "@amends/core/connection";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
+import { TaskService } from "@amends/core/task";
 import {
   ThreadService,
   type ThreadMessage,
@@ -901,6 +902,93 @@ export const turns = (harness: ConformanceHarness) => {
           }),
         ),
       ),
+    );
+
+    it.effect(
+      "an agent taken off a task has its turn there stopped, and is asked anew as work resumes",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent } = yield* workspaceWithAgent;
+              // Assigned at the start, the agent is asked to work the task.
+              const started = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.startInGroup({
+                    groupId: Group.GeneralId,
+                    text: "Plan the launch.",
+                    mentions: [],
+                    task: { assignee: agent.memberId },
+                  }),
+                ),
+              );
+              const threadId = started.thread.id;
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "run", memberId: agent.memberId, threadId },
+              ]);
+              yield* reply(workspace.id, threadId, "Planner, start with the budget.");
+              yield* takeTurnJobs(workspace.id);
+              const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
+              const change = (change: Parameters<TaskService.Interface["update"]>[0]["change"]) =>
+                as(
+                  workspace.id,
+                  alice,
+                  Effect.flatMap(TaskService.Service, (taskService) =>
+                    taskService.update({ threadId, change }),
+                  ),
+                );
+              // Holding the task asks the agent's job to stop its turn, which it confirms.
+              yield* change({ _tag: "Status", from: "todo", to: "held" });
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "stop", memberId: agent.memberId, threadId, turnId: turn.id },
+              ]);
+              yield* execute(workspace.id, (turnExecution) =>
+                turnExecution.confirmStopped(turn.id, { resume }),
+              );
+              expect(yield* turnOf(workspace.id, turn.id)).toMatchObject({
+                status: "cancelled",
+                cancelReason: "task-changed",
+              });
+              // The turn's end runs the job again, for work that waited; nothing does.
+              yield* takeTurnJobs(workspace.id);
+              // Resuming the work asks the agent again; taking it off the task stops that turn too.
+              yield* reply(workspace.id, threadId, "Planner, pick it up again.");
+              yield* change({ _tag: "Status", from: "held", to: "todo" });
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "run", memberId: agent.memberId, threadId },
+                { kind: "run", memberId: agent.memberId, threadId },
+              ]);
+              const { turn: resumed } = yield* startReady(workspace.id, agent.memberId, threadId);
+              yield* change({ _tag: "Assignee", from: agent.memberId, to: null });
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "stop", memberId: agent.memberId, threadId, turnId: resumed.id },
+              ]);
+              yield* execute(workspace.id, (turnExecution) =>
+                turnExecution.confirmStopped(resumed.id, { resume }),
+              );
+              expect((yield* timelineOf(workspace.id, threadId)).map(told)).toEqual([
+                "message: Plan the launch.",
+                "task.created",
+                "message: Planner, start with the budget.",
+                `created ${turn.id}`,
+                `started ${turn.id}`,
+                "task.updated",
+                `stopping ${turn.id} task-changed`,
+                `ended ${turn.id} cancelled task-changed`,
+                "message: Planner, pick it up again.",
+                "task.updated",
+                `created ${resumed.id}`,
+                `started ${resumed.id}`,
+                "task.updated",
+                `stopping ${resumed.id} task-changed`,
+                `ended ${resumed.id} cancelled task-changed`,
+              ]);
+            }),
+          ),
+        ),
     );
 
     it.effect(

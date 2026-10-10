@@ -109,6 +109,7 @@ const openings = [
       createdBy: author("ada"),
       createdAt: at(1),
     },
+    task: null,
     message: message("m1", "t1", "ada", "Can [@Scout](member:scout) check the terms?", ["scout"]),
     replies: 2,
     latest: { threadId: "t1", sequence: 3, occurredAt: at(3) },

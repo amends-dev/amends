@@ -1,9 +1,10 @@
 # Thread workflows
 
-Conversations in groups: starting them, renaming them, replying, editing and deleting messages,
-following, reading, and the notifications and read state around them. The operations are `ThreadService`, `ThreadMessageService`,
-`ThreadParticipationService`, `NotificationService`, and `ReadStateService` in a workspace
-context, such as `Gateway.asMember`. The gateway preserves the
+Conversations in groups: starting them, as tasks or not, renaming them, replying, editing and
+deleting messages, following, reading, tracking tasks, and the notifications and read state around
+them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`,
+`TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
+`Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
 failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
@@ -89,6 +90,58 @@ leaves every message as it is. Readers see the new title through the thread and 
 stream, and the change feed delivers the fact to the group's readers. The [thread model](threads.md)
 sets these rules.
 
+## Tasks
+
+A task is work a thread tracks: a row keyed by the thread with a `status` (`triage`, `todo`,
+`doing`, `held`, `done`, or `dismissed`), a `priority` (`none` to `urgent`), and an `assignee`, a
+member or null. Its title is the thread's and its description the thread's opening message, so it
+holds no text; `Thread.ListItem` and `Thread.Opening` carry each thread's `task`, or null, and
+`TaskService.get(threadId)` reads one under `thread.read`. A task comes about in three ways:
+
+- **With its thread.** `ThreadService.startInGroup` with `task: { status?, priority?, assignee? }`
+  creates the task at the thread's second position, in the same commit as the opening message,
+  under `thread.start` and `task.create` on the group. A start may also name an `origin`, a thread
+  the author can read that this one splits work out of; the origin grants no access either way.
+- **From a conversation.** `TaskService.create({ threadId, status?, priority?, assignee? })` makes
+  a thread the actor's group can reach a task, under `task.create`; the opening message becomes the
+  description, and the title stays as it is. A thread that is a task already is
+  `TaskService.AlreadyTask`.
+- **Through a channel**, once channels exist, in `triage`.
+
+Without a status, a task starts in `triage`, or `todo` when assigned. An assignee must be able to
+take part in the thread, or the operation is `TaskService.ParticipantUnavailable`, and assigning an
+agent needs `agent.use` on it, as mentioning one does. The task's creation records `task.created`
+and a quiet `task.created` activity whose details hold the initial values; it admits triage while
+the task is in triage, and the assignee, and tells them: an agent assignee is asked for work when
+the task is being worked (`todo` or `doing`).
+
+`TaskService.update({ threadId, change })` changes one thing under `task.update` on the thread:
+`{ _tag: "Status", from, to }`, `{ _tag: "Assignee", from, to }`, or
+`{ _tag: "Priority", from, to }`, where `from` is the value the changer last saw. The same value
+again records nothing; a task that changed meanwhile is `TaskService.Changed`. Each change
+records `task.updated` and a quiet `task.updated` activity whose details are the change, so a later
+change cannot alter what an earlier item meant. The change admits and tells by its kind, and
+whoever made it is told nothing:
+
+| Change                                   | Admits           | Tells                                                          |
+| ---------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| Assignee                                 | The new assignee | The new assignee, asked for work when the task is being worked |
+| Status to `triage`                       | Triage           | Triage                                                         |
+| Status to `todo` or `doing`              | The assignee     | Every participant; the assignee agent is asked for work        |
+| Status to `held`, `done`, or `dismissed` | Nobody           | Every participant                                              |
+| Priority                                 | Nobody           | Every participant                                              |
+
+An agent taken off a task, by reassignment or by a status that asks no work, has its active turn
+in the thread asked to stop in the same commit, as a person's stop request does; the turn ends
+with the reason `task-changed`. A task's title and description are its requirements: renaming the
+thread or editing its opening message tells every participant and asks the assignee agent anew
+while the task is being worked. `done` does not close the thread; messages continue, and a later
+status reopens the work. `TaskService.listInGroup(groupId, { status?, before?, limit })` pages a
+group's tasks newest created first, each as a `Thread.ListItem` under the rules of
+`ThreadService.listInGroup`. To anyone outside a thread's group, and for a thread without a task,
+the task is `TaskService.NotFound`. Triage is a participant and recipient only: nothing yet
+evaluates a policy or records a decision.
+
 ## Participation and recipients
 
 These rules follow the agreed [attention
@@ -108,9 +161,9 @@ Participation and notification are separate recorded decisions. Other group memb
 thread when they hold `thread.read`; reading does not enroll them. A later group addition does not
 enroll that member in existing threads or create retroactive notifications.
 
-Participants are members, contacts, or triage. Only the member workflows above exist today;
-task and channel workflows will start threads with contacts and triage through the same internal
-start. Notifications to agents are pending input for them to handle; no agent work runs yet.
+Participants are members, contacts, or triage. Tasks admit triage and their assignees through the
+same internal start and activity; channel workflows will admit contacts the same way. Notifications
+to agents are pending input for them to handle, which their turns take up.
 
 ## Replying to a conversation
 

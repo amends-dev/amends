@@ -31,6 +31,7 @@ export { requests } from "./requests.ts";
 export { sessionLogs } from "./session-logs.ts";
 export { signals } from "./signals.ts";
 export { standaloneAppends } from "./standalone-appends.ts";
+export { tasks } from "./tasks.ts";
 export { threadParticipation } from "./thread-participation.ts";
 export { threadReads } from "./thread-reads.ts";
 export { threadReplies } from "./thread-replies.ts";

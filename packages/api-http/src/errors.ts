@@ -17,6 +17,7 @@ import { TurnService } from "@amends/core/turn";
 import { ConnectionService } from "@amends/core/connection";
 import { NotificationService } from "@amends/core/notification";
 import { ReadStateService } from "@amends/core/read-state";
+import { TaskService } from "@amends/core/task";
 import {
   ThreadService,
   ThreadMessageService,
@@ -174,6 +175,26 @@ export const participation = [
   ThreadParticipationService.NotFound.pipe(HttpApiSchema.status(404)),
   ThreadParticipationService.AlreadyEnded.pipe(HttpApiSchema.status(409)),
   ThreadParticipationService.FixedParticipation.pipe(HttpApiSchema.status(409)),
+] as const;
+
+/**
+ * Task outcomes. A thread the caller cannot read, or without a task, is 404, as is a group the
+ * caller does not belong to; a thread that is a task already, a change to a value that changed
+ * meanwhile, and an assignee who cannot take part are 409.
+ */
+export const taskRead = [
+  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  TaskService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+] as const;
+export const taskCreate = [
+  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  TaskService.AlreadyTask.pipe(HttpApiSchema.status(409)),
+  TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const;
+export const taskUpdate = [
+  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  TaskService.Changed.pipe(HttpApiSchema.status(409)),
+  TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** Read-state outcomes: only people keep it, and a position cannot pass the latest activity. */

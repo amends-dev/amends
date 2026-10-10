@@ -276,6 +276,21 @@ CREATE TABLE "session_states" (
 	CONSTRAINT "session_states_pkey" PRIMARY KEY("workspace_id","participation_id")
 );
 --> statement-breakpoint
+CREATE TABLE "tasks" (
+	"workspace_id" text,
+	"thread_id" text,
+	"group_id" text NOT NULL,
+	"status" text NOT NULL,
+	"priority" text NOT NULL,
+	"assignee" text,
+	"created_by_kind" text NOT NULL,
+	"created_by_member_id" text,
+	"created_by_contact_id" text,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "tasks_pkey" PRIMARY KEY("workspace_id","thread_id"),
+	CONSTRAINT "task_creator" CHECK (("created_by_kind" = 'Member' AND "created_by_member_id" IS NOT NULL AND "created_by_contact_id" IS NULL) OR ("created_by_kind" = 'Contact' AND "created_by_member_id" IS NULL AND "created_by_contact_id" IS NOT NULL))
+);
+--> statement-breakpoint
 CREATE TABLE "thread_activities" (
 	"workspace_id" text,
 	"id" text,
@@ -422,6 +437,7 @@ CREATE INDEX "pending_notifications_by_recipient" ON "notifications" ("workspace
 CREATE INDEX "pending_notifications_by_group" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_group_id") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id","recipient_kind",coalesce("recipient_member_id", "recipient_id", ''),"thread_id","thread_sequence") WHERE "state" = 'Pending';--> statement-breakpoint
 CREATE INDEX "pending_agent_notifications_by_participation" ON "notifications" ("workspace_id","participation_id") WHERE "state" = 'Pending' AND "recipient_kind" = 'Agent';--> statement-breakpoint
+CREATE INDEX "tasks_by_group" ON "tasks" ("workspace_id","group_id","created_at","thread_id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_occurrence" ON "thread_activities" ("workspace_id","occurrence");--> statement-breakpoint
 CREATE INDEX "thread_messages_by_thread" ON "thread_messages" ("workspace_id","thread_id") WHERE "content_kind" = 'Text';--> statement-breakpoint

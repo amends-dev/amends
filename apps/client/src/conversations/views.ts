@@ -306,11 +306,17 @@ interface TurnSoFar {
   readonly sequence: number;
   state: TurnState;
   failure?: string;
-  stoppedBy?: "request" | "departure";
+  stoppedBy?: "request" | "departure" | "task";
   replied: boolean;
 }
-const stoppedBy = (reason: "requested" | "participation-ended" | null) =>
-  reason === null ? undefined : reason === "participation-ended" ? "departure" : "request";
+const stoppedBy = (reason: "requested" | "participation-ended" | "task-changed" | null) =>
+  reason === null
+    ? undefined
+    : reason === "participation-ended"
+      ? "departure"
+      : reason === "task-changed"
+        ? "task"
+        : "request";
 
 /** Carry a turn's later item into what it tells so far; its creation began it. */
 function advance(turn: TurnSoFar, item: TurnItem) {
@@ -421,6 +427,8 @@ export function useThreadConversation(
         shown.push(turn);
       } else if (item.activity.kind === "thread.renamed") {
         // The thread's title shows in its pane's header; a rename has no entry of its own yet.
+      } else if (item.activity.kind === "task.created" || item.activity.kind === "task.updated") {
+        // A task's state shows with its thread; its changes have no entry of their own yet.
       } else {
         // A turn that began before the pages loaded shows once they reach its start.
         const turn = turns.get(item.activity.details.turnId);

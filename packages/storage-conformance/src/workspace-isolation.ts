@@ -150,6 +150,20 @@ export const workspaceIsolation = (harness: Harness) => {
                 kept: (on) => on.turns.get(Turn.Id.make("foreign-turn")),
               },
               {
+                store: "TaskStore",
+                write: bound.tasks.insert({
+                  threadId,
+                  workspaceId: otherWorkspaceId,
+                  groupId: Group.GeneralId,
+                  status: "triage",
+                  priority: "none",
+                  assignee: null,
+                  createdBy: { _tag: "Member", memberId },
+                  createdAt: now,
+                }),
+                kept: (on) => on.tasks.get(threadId),
+              },
+              {
                 store: "ThreadMessageStore",
                 write: bound.messages.insert({
                   id: messageId,

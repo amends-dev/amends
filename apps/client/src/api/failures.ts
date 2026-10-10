@@ -36,6 +36,7 @@ type Reported =
   | Failure<Client["invitations"][keyof Client["invitations"]]>
   | Failure<Client["groups"][keyof Client["groups"]]>
   | Failure<Client["threads"][keyof Client["threads"]]>
+  | Failure<Client["tasks"][keyof Client["tasks"]]>
   | Failure<Client["notifications"][keyof Client["notifications"]]>
   | Failure<Client["connections"][keyof Client["connections"]]>
   | Failure<Client["agents"][keyof Client["agents"]]>
@@ -124,6 +125,11 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "ThreadMessageService.NotAuthor": "denied",
   "ThreadMessageService.Deleted": "gone",
   "ThreadMessageService.Changed": "changed",
+  "TaskService.NotFound": "gone",
+  "TaskService.GroupNotFound": "gone",
+  "TaskService.ParticipantUnavailable": "gone",
+  "TaskService.AlreadyTask": "changed",
+  "TaskService.Changed": "changed",
   "ThreadParticipationService.ThreadNotFound": "gone",
   "ThreadParticipationService.NotFound": "gone",
   "NotificationService.NotFound": "gone",

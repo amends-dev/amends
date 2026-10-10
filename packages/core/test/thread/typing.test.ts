@@ -66,6 +66,7 @@ const run = <A, E>(
       currentParticipants: unexpected,
       pageParticipants: unexpected,
       findParticipants: unexpected,
+      listReadable: unexpected,
       readTimeline: unexpected,
       readTimelineItem: unexpected,
     });

@@ -123,6 +123,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
         currentParticipants: unexpected,
         pageParticipants: unexpected,
         findParticipants: unexpected,
+        listReadable: unexpected,
         readTimeline: unexpected,
         readTimelineItem: unexpected,
       }),

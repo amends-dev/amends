@@ -41,7 +41,7 @@ export interface TurnEntry {
   /** Why it failed, as the host worded it. */
   readonly failure: string | undefined;
   /** Why it stopped: someone asked, or its agent stopped taking part in the thread. */
-  readonly stoppedBy: "request" | "departure" | undefined;
+  readonly stoppedBy: "request" | "departure" | "task" | undefined;
   /** The last reply it posted when it closed, if any. */
   readonly replyId: string | undefined;
   /** Every reply it posted when it closed, in order. */
@@ -89,7 +89,9 @@ function useEntries(workspaceId: string) {
         ? undefined
         : turn.cancelReason === "participation-ended"
           ? "departure"
-          : "request",
+          : turn.cancelReason === "task-changed"
+            ? "task"
+            : "request",
     replyId: turn.messageIds.at(-1),
     replyIds: turn.messageIds,
     throughSequence: turn.acceptedThroughSequence,

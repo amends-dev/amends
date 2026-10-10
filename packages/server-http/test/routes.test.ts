@@ -23,6 +23,7 @@ import {
   ThreadMessage,
 } from "@amends/core/thread";
 import { ReadStateService } from "@amends/core/read-state";
+import { TaskService } from "@amends/core/task";
 import {
   Invitation,
   InvitationService,
@@ -141,6 +142,19 @@ const conversations = Layer.mergeAll(
       listOpenings: record("thread.openings", () => Effect.succeed([])),
       readTimeline: record("thread.timeline", () => Effect.succeed([])),
       listParticipants: record("thread.participants", () => Effect.succeed([])),
+    }),
+  ),
+  Layer.succeed(
+    TaskService.Service,
+    TaskService.Service.of({
+      create: record("task.create", (input) =>
+        Effect.fail(new TaskService.AlreadyTask({ threadId: input.threadId })),
+      ),
+      update: record("task.update", (input) =>
+        Effect.fail(new TaskService.Changed({ threadId: input.threadId })),
+      ),
+      get: record("task.get", (id) => Effect.fail(new TaskService.NotFound({ threadId: id }))),
+      listInGroup: record("task.list", () => Effect.succeed([])),
     }),
   ),
   Layer.succeed(
@@ -332,6 +346,7 @@ const makeClient = HttpApiTest.groups(Api, [
   "session",
   "me",
   "workspaces",
+  "tasks",
   "members",
   "invitations",
   "notifications",
@@ -697,6 +712,22 @@ it.effect(
             payload: { throughSequence: 4 },
             responseMode: "response-only",
           }),
+          client.tasks.list({
+            params: { workspaceId, groupId },
+            query: { limit: 10, status: "todo" },
+            responseMode: "response-only",
+          }),
+          client.tasks.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.tasks.create({
+            params: { workspaceId, threadId },
+            payload: { assignee: memberId },
+            responseMode: "response-only",
+          }),
+          client.tasks.update({
+            params: { workspaceId, threadId },
+            payload: { change: { _tag: "Status", from: "triage", to: "todo" } },
+            responseMode: "response-only",
+          }),
           client.notifications.markSeen({
             params: { workspaceId, notificationId: notification.id },
             responseMode: "response-only",
@@ -705,7 +736,7 @@ it.effect(
       );
       expect(statuses).toEqual([
         201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 409,
-        200, 200, 403, 409, 404, 404, 409, 409, 409,
+        200, 200, 403, 409, 404, 404, 409, 409, 200, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
@@ -761,6 +792,13 @@ it.effect(
         { operation: "thread.follow", arguments: [threadId] },
         { operation: "thread.unfollow", arguments: [{ threadId, participationId }] },
         { operation: "thread.markRead", arguments: [{ threadId, throughSequence: 4 }] },
+        { operation: "task.list", arguments: [groupId, { limit: 10, status: "todo" }] },
+        { operation: "task.get", arguments: [threadId] },
+        { operation: "task.create", arguments: [{ threadId, assignee: memberId }] },
+        {
+          operation: "task.update",
+          arguments: [{ threadId, change: { _tag: "Status", from: "triage", to: "todo" } }],
+        },
         { operation: "notification.markSeen", arguments: [notification.id] },
       ]);
     }),

@@ -1,9 +1,9 @@
 /**
  * The reads of threads that operations share: whether the actor may reach a thread, who may take
- * part in a group's threads, who takes part in a thread now, and a thread's timeline resolved into
- * items. The thread, turn, read-state, signal, and notification operations all read through it. It
- * writes nothing and checks no action permission but `thread.read`; each operation checks its own,
- * inside its commit when it writes.
+ * part in a group's threads, who takes part in a thread now, a page of a group's threads the actor
+ * can read, and a thread's timeline resolved into items. The thread, task, turn, read-state, signal,
+ * and notification operations all read through it. It writes nothing and checks no action
+ * permission but `thread.read`; each operation checks its own, inside its commit when it writes.
  *
  * @since 0.1.0
  */
@@ -14,8 +14,10 @@ import { Group } from "../group/group.ts";
 import { GroupQuery } from "../group/query.ts";
 import { GroupMembership } from "../group/membership/membership.ts";
 import { GroupMembershipStore } from "../group/membership/store.ts";
-import type { Actor } from "../identity/actor.ts";
+import { Actor } from "../identity/actor.ts";
 import { Store } from "../journal/store.ts";
+import { ReadStateStore } from "../read-state/store.ts";
+import { TaskStore } from "../task/TaskStore.ts";
 import { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { Thread } from "./Thread.ts";
@@ -85,6 +87,39 @@ export type TimelineError =
   | ThreadActivityResolvers.Failure;
 
 /**
+ * What listing a group's readable threads can fail with, beyond the listing's own failures.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type ListError =
+  | GroupQuery.NotMember
+  | Authorization.Error
+  | GroupMembershipStore.Failure
+  | ThreadStore.Failure
+  | TaskStore.Failure
+  | ReadStateStore.Failure
+  | Schema.SchemaError;
+
+/**
+ * How a page of a group's threads is listed: what lists the rows in the page's order, the thread
+ * each row is about, and the cursor the next page starts after.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export interface ListOptions<R, Cursor, E> {
+  readonly limit: number;
+  /** The exclusive cursor the page starts after, or none for the first page. */
+  readonly first: Cursor | undefined;
+  /** At most `limit` rows after the cursor, in the page's order. */
+  readonly list: (before: Cursor | undefined) => Effect.Effect<ReadonlyArray<R>, E>;
+  readonly threadOf: (row: R) => Thread.Record;
+  /** The cursor after a listed row, given the row's thread's latest activity. */
+  readonly cursorOf: (row: R, latest: Thread.Latest) => Cursor;
+}
+
+/**
  * The shared reads.
  *
  * @category services
@@ -134,6 +169,17 @@ export interface Interface {
     thread: Thread.Record,
     participants: ReadonlyArray<ThreadParticipation.Reference>,
   ) => Effect.Effect<ReadonlyArray<ThreadParticipation.Record>, ParticipantsError>;
+  /**
+   * Fill a page with a group's threads the actor can read, from the rows `options.list` gives in
+   * the page's order, reading further when grants skip some: each thread with its task, if any,
+   * its latest activity, and the actor's read position and unread state. Requires current group
+   * membership; `thread.read` is checked for the whole page at once, and threads it does not cover
+   * are skipped. A page reads a fixed number of times, however many threads it holds.
+   */
+  readonly listReadable: <R, Cursor, E>(
+    groupId: Group.Id,
+    options: ListOptions<R, Cursor, E>,
+  ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ListError | E, Actor.Service>;
   /** A page of the thread's timeline with resolved subjects, under access and `thread.read`. */
   readonly readTimeline: (
     threadId: Thread.Id,
@@ -173,6 +219,8 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
   const threadActivityResolvers = yield* ThreadActivityResolvers.Service;
+  const readStateStore = yield* ReadStateStore.Service;
+  const taskStore = yield* TaskStore.Service;
   const { workspaceId } = yield* Store.Service;
 
   const requireAccess = Effect.fn("ThreadQuery.requireAccess")(function* (threadId: Thread.Id) {
@@ -301,6 +349,60 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     return yield* keepCurrent(yield* threadParticipationStore.findActive(thread.id, references));
   });
 
+  const listReadable = Effect.fn("ThreadQuery.listReadable")(function* <R, Cursor, E>(
+    groupId: Group.Id,
+    options: ListOptions<R, Cursor, E>,
+  ) {
+    const id = yield* Schema.decodeEffect(Group.Id)(groupId);
+    const admission = yield* groupQuery.requireAudience(id);
+    const actor = yield* Actor.Service;
+    const items: Array<Thread.ListItem> = [];
+    let before = options.first;
+    while (items.length < options.limit) {
+      const page = yield* options.list(before);
+      if (page.length === 0) break;
+      const ids = page.map((row) => options.threadOf(row).id);
+      const latest = new Map(
+        (yield* threadStore.getLatest(ids)).map((value) => [value.threadId, value] as const),
+      );
+      const tasks = new Map(
+        (yield* taskStore.getMany(ids)).map((task) => [task.threadId, task] as const),
+      );
+      const allowed = yield* authorization.permitted(
+        ids.map((threadId) =>
+          Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId }),
+        ),
+      );
+      const readableIds = ids.filter((_, index) => allowed[index] === true);
+      const positions = new Map(
+        (yield* readStateStore.getThreadPositions(actor.memberId, readableIds)).map(
+          (position) => [position.threadId, position.readThrough] as const,
+        ),
+      );
+      for (const [index, row] of page.entries()) {
+        const thread = options.threadOf(row);
+        const current = latest.get(thread.id);
+        if (current === undefined)
+          return yield* Effect.die("A listed thread has no recorded activity");
+        // The next page starts after the last row seen, readable or not.
+        before = options.cursorOf(row, current);
+        if (allowed[index] !== true || items.length === options.limit) continue;
+        const readThrough = positions.get(thread.id) ?? null;
+        items.push(
+          Thread.listItem(
+            thread,
+            tasks.get(thread.id) ?? null,
+            current,
+            readThrough,
+            admission.admittedAt,
+          ),
+        );
+      }
+      if (page.length < options.limit) break;
+    }
+    return items;
+  });
+
   const readTimeline = Effect.fn("ThreadQuery.readTimeline")(function* (
     threadId: Thread.Id,
     options: ThreadActivityStore.ReadOptions,
@@ -334,13 +436,15 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     currentParticipants,
     pageParticipants,
     findParticipants,
+    listReadable,
     readTimeline,
     readTimelineItem,
   });
 });
 
 /**
- * Provide the shared reads over the stores, group reads, authorization, and resolvers.
+ * Provide the shared reads over the stores, group reads, authorization, read positions, and
+ * resolvers.
  *
  * @category layers
  * @since 0.1.0

@@ -10,6 +10,7 @@ export { MeGroup } from "./me.ts";
 export { MembersGroup } from "./members.ts";
 export { NotificationsGroup } from "./notifications.ts";
 export { SessionGroup } from "./session.ts";
+export { TasksGroup } from "./tasks.ts";
 export { ThreadsGroup } from "./threads.ts";
 export { TurnsGroup } from "./turns.ts";
 export { WorkspacesGroup } from "./workspaces.ts";
@@ -28,6 +29,7 @@ export {
 export { Assignment, Scope } from "@amends/core/authorization";
 export { Group, GroupMembership } from "@amends/core/group";
 export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends/core/thread";
+export { Task } from "@amends/core/task";
 export { Notification, NotificationInbox } from "@amends/core/notification";
 export { Connection } from "@amends/core/connection";
 export { Agent } from "@amends/core/agent";

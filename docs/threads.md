@@ -155,8 +155,9 @@ triage and stays.
 | Status to `held`, `done`, or `dismissed` | Every participant, informed. The assignee agent's active turn is stopped.                                         |
 | Priority                                 | Every participant, informed.                                                                                      |
 
-Stopping a turn is a reaction to the task fact, as ending a participation stops a turn today.
-`done` does not close the thread; messages continue, and a later status change reopens the work.
+The change asks the turn to stop in its own commit, as a person's stop request does, and the
+turn's job confirms it; the turn ends with the reason `task-changed`. `done` does not close the
+thread; messages continue, and a later status change reopens the work.
 A turn on a task thread is told the title and the task's state with its context, and task
 changes as input, by the turn's prompt rules.
 

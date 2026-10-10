@@ -21,7 +21,12 @@ const reply = Schema.Struct({
   text: ThreadMessage.PublishInput.fields.text,
   mentions: ThreadMessage.PublishInput.fields.mentions,
 });
-const opening = Schema.Struct({ ...reply.fields, title: Thread.StartInGroupInput.fields.title });
+const opening = Schema.Struct({
+  ...reply.fields,
+  title: Thread.StartInGroupInput.fields.title,
+  origin: Thread.StartInGroupInput.fields.origin,
+  task: Thread.StartInGroupInput.fields.task,
+});
 const started = Thread.Started.pipe(HttpApiSchema.status(201)).annotate({
   identifier: "StartedThread",
 });
@@ -31,8 +36,9 @@ const participant = ThreadParticipation.Summary.annotate({ identifier: "ThreadPa
 const reading = ThreadActivityStore.ReadOptions.fields;
 
 /**
- * Conversations: a group's threads, starting and renaming them, their timelines and participants,
- * replying, editing and deleting messages, saying one is typing, following, and read positions.
+ * Conversations: a group's threads, starting them, as tasks or not, and renaming them, their
+ * timelines and participants, replying, editing and deleting messages, saying one is typing,
+ * following, and read positions.
  * Reading a thread requires current membership of its group and creates no participation; missing
  * and unreadable threads answer alike.
  */

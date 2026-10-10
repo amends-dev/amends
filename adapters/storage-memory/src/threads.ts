@@ -31,6 +31,13 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "get")),
     ),
+    getMany: Effect.fn("Threads.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+        return yield* rows.getMany((yield* read).records.threads, ids);
+      },
+      Effect.mapError(storeFailure(ThreadStore, "getMany")),
+    ),
     listByGroup: Effect.fn("Threads.listByGroup")(
       function* (input) {
         const groupId = yield* Schema.decodeEffect(Group.Id)(input);

@@ -53,6 +53,7 @@ it.effect(
       const groupLatest: Array<Group.Latest> = [];
       const threads: ThreadStore.Interface = {
         get: () => Effect.die("Unexpected thread read"),
+        getMany: () => Effect.die("Unexpected thread read"),
         listByGroup: () => Effect.die("Unexpected thread read"),
         listByLatest: () => Effect.die("Unexpected thread read"),
         listByStart: () => Effect.die("Unexpected thread read"),

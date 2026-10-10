@@ -1,5 +1,6 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
+import { TaskStore } from "@amends/core/task";
 import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
 import {
   ThreadStore,
@@ -153,8 +154,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           insertMany: unexpected,
         }),
       ),
+      Context.add(TaskStore.Service, {
+        get: unexpected,
+        getMany: unexpected,
+        listByGroup: unexpected,
+        insert: unexpected,
+        apply: unexpected,
+      }),
       Context.add(ThreadStore.Service, {
         get: unexpected,
+        getMany: unexpected,
         listByGroup: unexpected,
         listByLatest: unexpected,
         listByStart: unexpected,

@@ -109,7 +109,7 @@ export const threads = (harness: Harness) => {
     ) {
       const started = yield* startOnly(groupId, mentions, text);
       // A start returns its thread and opening message; the activity is read back from the store.
-      expect(Object.keys(started).sort()).toEqual(["message", "thread"]);
+      expect(Object.keys(started).sort()).toEqual(["message", "task", "thread"]);
       const result = yield* placed(started);
       const threadParticipationStore = yield* ThreadParticipationStore.Service;
       return Object.assign({}, result, {
@@ -790,7 +790,7 @@ export const threads = (harness: Harness) => {
                 owner,
                 startOnly(group.id, [workspace.ownerMemberId, humanId, agentId]),
               );
-              expect(Object.keys(result).sort()).toEqual(["message", "thread"]);
+              expect(Object.keys(result).sort()).toEqual(["message", "task", "thread"]);
               expect(yield* bound.participations.listByThread(result.thread.id)).toHaveLength(3);
               expect(
                 yield* Effect.flip(

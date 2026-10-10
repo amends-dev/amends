@@ -71,6 +71,7 @@ const opening = (index: number) => {
       createdBy: author,
       createdAt: minute(index),
     },
+    task: null,
     message: message(`${id}-opening`, id, minute(index)),
     replies: 0,
     latest: { threadId: id, sequence: 1, occurredAt: minute(index) },
@@ -876,6 +877,7 @@ it("a new thread in a group posts its first message there with a key, then clear
           createdAt: minute(1),
         },
         message: message("m9", "t9", minute(1)),
+        task: null,
       }),
       { status: 201, headers: { "content-type": "application/json" } },
     );
@@ -927,6 +929,7 @@ it("a first direct message starts the conversation and hands over its group", as
           createdAt: minute(1),
         },
         message: message("m9", "t9", minute(1)),
+        task: null,
       }),
       { status: 201, headers: { "content-type": "application/json" } },
     );

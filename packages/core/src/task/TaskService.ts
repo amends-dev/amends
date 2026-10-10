@@ -1,0 +1,323 @@
+/**
+ * The operations on tasks an actor calls: making a conversation a task, changing a task, and
+ * reading a thread's task or a group's tasks. A task created with its thread is `ThreadService`'s
+ * start. Each operation authorizes the actor itself, writes inside one journal commit, and reads
+ * outside any.
+ *
+ * @since 0.1.0
+ */
+import { Context, Crypto, DateTime, Effect, Layer, Option, Schema } from "effect";
+import { AgentPermissions } from "../agent/permissions.ts";
+import { Authorization } from "../authorization/authorization.ts";
+import { Requirement } from "../authorization/requirement.ts";
+import type { Group } from "../group/group.ts";
+import type { GroupQuery } from "../group/query.ts";
+import { Actor } from "../identity/actor.ts";
+import { Identity } from "../identity/identity.ts";
+import { Journal } from "../journal/journal.ts";
+import { Publication } from "../journal/publication.ts";
+import { Store } from "../journal/store.ts";
+import { Thread } from "../thread/Thread.ts";
+import type { ThreadCommand } from "../thread/ThreadCommand.ts";
+import { ThreadQuery } from "../thread/ThreadQuery.ts";
+import { ThreadStore } from "../thread/ThreadStore.ts";
+import type { Member } from "../workspace/member/member.ts";
+import { Task } from "./Task.ts";
+import { TaskCommand } from "./TaskCommand.ts";
+import {
+  AlreadyTask,
+  Changed,
+  GroupNotFound,
+  NotFound,
+  ParticipantUnavailable,
+} from "./TaskErrors.ts";
+import { TaskPermissions } from "./TaskPermissions.ts";
+import { TaskStore } from "./TaskStore.ts";
+export {
+  AlreadyTask,
+  Changed,
+  GroupNotFound,
+  NotFound,
+  ParticipantUnavailable,
+} from "./TaskErrors.ts";
+
+/**
+ * What creating a task in a conversation can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type CreateError =
+  | Authorization.Error
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
+  | TaskStore.Failure
+  | NotFound
+  | AlreadyTask
+  | ParticipantUnavailable;
+
+/**
+ * What changing a task can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type UpdateError =
+  | Authorization.Error
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
+  | TaskStore.Failure
+  | NotFound
+  | Changed
+  | ParticipantUnavailable;
+
+/**
+ * What reading tasks can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type ReadError =
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | Exclude<ThreadQuery.ListError, GroupQuery.NotMember>
+  | TaskStore.Failure
+  | NotFound
+  | GroupNotFound;
+
+/**
+ * The task operations.
+ *
+ * @category services
+ * @since 0.1.0
+ */
+export interface Interface {
+  /**
+   * Make a conversation a task, under current group audience and `task.create` on the group. The
+   * conversation's opening message becomes the task's description, and its title stays as it is. A
+   * thread that is a task already is `AlreadyTask`. An assignee must be able to take part in the
+   * thread, and assigning an agent needs `agent.use` on it. Returns the task.
+   */
+  readonly create: (
+    input: Task.CreateInput,
+  ) => Effect.Effect<Task.Record, CreateError, Actor.Service>;
+  /**
+   * Change a task in one way, under current group audience and `task.update` on the thread. The
+   * change names the value it replaces: the same value again records nothing, and a task that
+   * changed meanwhile is `Changed`. A new assignee must be able to take part, and assigning an
+   * agent needs `agent.use` on it. Returns the task as changed.
+   */
+  readonly update: (
+    input: Task.UpdateInput,
+  ) => Effect.Effect<Task.Record, UpdateError, Actor.Service>;
+  /** The thread's task, under current group audience and `thread.read`; a thread without one is `NotFound`. */
+  readonly get: (threadId: Thread.Id) => Effect.Effect<Task.Record, ReadError, Actor.Service>;
+  /**
+   * One page of a group's tasks the actor can read, newest created first, of one status when the
+   * options name one: each thread with its task, latest activity, and the actor's position and
+   * unread state, under the rules of `ThreadService.listInGroup`.
+   */
+  readonly listInGroup: (
+    groupId: Group.Id,
+    options: Task.ListOptions,
+  ) => Effect.Effect<ReadonlyArray<Thread.ListItem>, ReadError, Actor.Service>;
+}
+
+/**
+ * The task operations, one of `Core.Operations`.
+ *
+ * @category services
+ * @since 0.1.0
+ */
+export class Service extends Context.Service<Service, Interface>()(
+  "@amends/core/task/TaskService",
+) {}
+
+/**
+ * Capture bound services; authorize each operation inside its commit.
+ *
+ * @category constructors
+ * @since 0.1.0
+ */
+export const make = Effect.fn("TaskService.make")(function* () {
+  const authorization = yield* Authorization.Service;
+  const threadQuery = yield* ThreadQuery.Service;
+  const threadStore = yield* ThreadStore.Service;
+  const taskCommand = yield* TaskCommand.Service;
+  const taskStore = yield* TaskStore.Service;
+  const journal = yield* Journal.Service;
+  const crypto = yield* Crypto.Crypto;
+  const { workspaceId } = yield* Store.Service;
+
+  /** The thread, which only its group's members may act on; to anyone else it is missing. */
+  const requireThread = (threadId: Thread.Id) =>
+    threadQuery
+      .requireAccess(threadId)
+      .pipe(
+        Effect.catchTag(
+          "ThreadQuery.NotFound",
+          (error) => new NotFound({ threadId: error.threadId }),
+        ),
+      );
+
+  /** The thread's task, which it must have. */
+  const requireTask = Effect.fnUntraced(function* (thread: Thread.Record) {
+    const found = yield* taskStore.get(thread.id);
+    if (Option.isNone(found)) return yield* new NotFound({ threadId: thread.id });
+    return found.value;
+  });
+
+  /**
+   * Require the assignee to be able to take part in the thread, and the actor's agent use when
+   * the assignee is an agent, since assigning one directs it.
+   */
+  const requireAssignable = Effect.fnUntraced(function* (
+    thread: Thread.Record,
+    memberId: Member.Id,
+  ) {
+    const eligible = yield* threadQuery.eligibleMembers(thread.groupId, [memberId]);
+    const entry = eligible.get(memberId);
+    if (entry === undefined) return yield* new ParticipantUnavailable({ memberId });
+    if (Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity))
+      yield* authorization.require([
+        Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
+      ]);
+  });
+
+  /** The actor as a member, who created the task or made the change, and is told nothing of it. */
+  const actorAsMember = Effect.map(
+    Actor.Service,
+    (actor) => ({ _tag: "Member", memberId: actor.memberId }) as const,
+  );
+
+  const create = Effect.fn("TaskService.create")(
+    function* (input: Task.CreateInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Task.CreateInput))(input);
+      const thread = yield* requireThread(request.threadId);
+      yield* authorization.require([
+        Requirement.make(TaskPermissions.Create, {
+          _tag: "Group",
+          workspaceId,
+          groupId: thread.groupId,
+        }),
+      ]);
+      if (Option.isSome(yield* taskStore.get(thread.id)))
+        return yield* new AlreadyTask({ threadId: thread.id });
+      const initial = Task.initial(request);
+      if (initial.assignee !== null) yield* requireAssignable(thread, initial.assignee);
+      const by = yield* actorAsMember;
+      const created = yield* taskCommand
+        .create({ thread, ...initial, createdBy: by, by, occurredAt: yield* DateTime.now })
+        .pipe(
+          Effect.catchTag(
+            "ThreadCommand.Unavailable",
+            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
+          ),
+        );
+      return created.task;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  const update = Effect.fn("TaskService.update")(
+    function* (input: Task.UpdateInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(Task.UpdateInput))(input);
+      const thread = yield* requireThread(request.threadId);
+      const task = yield* requireTask(thread);
+      yield* authorization.require([
+        Requirement.make(TaskPermissions.Update, {
+          _tag: "Thread",
+          workspaceId,
+          threadId: thread.id,
+        }),
+      ]);
+      const { change } = request;
+      if (Task.valueOf(task, change) === change.to) return task;
+      if (Task.valueOf(task, change) !== change.from)
+        return yield* new Changed({ threadId: thread.id });
+      if (Task.Change.isAnyOf(["Assignee"])(change) && change.to !== null)
+        yield* requireAssignable(thread, change.to);
+      const updated = yield* taskCommand
+        .update({ task, change, by: yield* actorAsMember, occurredAt: yield* DateTime.now })
+        .pipe(
+          Effect.catchTag(
+            "ThreadCommand.Unavailable",
+            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
+          ),
+        );
+      return updated.task;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  // Reads are outside journal.commit; an enclosing caller transaction remains authoritative.
+  const get = Effect.fn("TaskService.get")(function* (threadId: Thread.Id) {
+    const thread = yield* threadQuery
+      .requireReadable(threadId)
+      .pipe(
+        Effect.catchTag(
+          "ThreadQuery.NotFound",
+          (error) => new NotFound({ threadId: error.threadId }),
+        ),
+      );
+    return yield* requireTask(thread);
+  });
+
+  const listInGroup = Effect.fn("TaskService.listInGroup")(function* (
+    groupId: Group.Id,
+    input: Task.ListOptions,
+  ) {
+    const options = yield* Schema.decodeEffect(Schema.toType(Task.ListOptions))(input);
+    /** A page of the group's tasks, each with its thread, which a task cannot outlive. */
+    const page = Effect.fnUntraced(function* (
+      before: Task.ListCursor | undefined,
+    ): Effect.fn.Return<
+      ReadonlyArray<{ readonly task: Task.Record; readonly thread: Thread.Record }>,
+      TaskStore.Failure | ThreadStore.Failure
+    > {
+      const tasks = yield* taskStore.listByGroup(groupId, {
+        ...(options.status === undefined ? {} : { status: options.status }),
+        ...(before === undefined ? {} : { before }),
+        limit: options.limit,
+      });
+      const threads = new Map(
+        (yield* threadStore.getMany(tasks.map((task) => task.threadId))).map(
+          (thread) => [thread.id, thread] as const,
+        ),
+      );
+      return yield* Effect.forEach(tasks, (task) => {
+        const thread = threads.get(task.threadId);
+        return thread === undefined
+          ? Effect.die("A task's thread is missing")
+          : Effect.succeed({ task, thread });
+      });
+    });
+    return yield* threadQuery
+      .listReadable(groupId, {
+        limit: options.limit,
+        first: options.before,
+        list: page,
+        threadOf: ({ thread }) => thread,
+        cursorOf: ({ task }): Task.ListCursor => ({
+          createdAt: task.createdAt,
+          threadId: task.threadId,
+        }),
+      })
+      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
+  });
+
+  return Service.of({ create, update, get, listInGroup });
+});
+
+/**
+ * Provide the task operations over the shared writes and reads, the stores, and authorization.
+ *
+ * @category layers
+ * @since 0.1.0
+ */
+export const layer = Layer.effect(Service, make());
+
+export * as TaskService from "./TaskService.ts";

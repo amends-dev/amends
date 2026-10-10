@@ -12,9 +12,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - A group's visibility is chosen at creation and cannot change afterwards. Public groups show
   their threads only to members, with no read-only preview before joining. Direct groups exist,
   with fixed membership.
-- Only member workflows exist. Task and channel workflows, which will start threads with contacts
-  and triage and admit human followers, are not implemented, and neither are managing other
-  participants or muting.
+- Member and task workflows exist. Channel workflows, which will start threads with contacts and
+  admit human followers, are not implemented, and neither are managing other participants or
+  muting. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision for
+  it; a task's cross-group views, such as everything assigned to one member, are not read; and a
+  turn prompted by a task assignment alone is told nothing of the task yet, so it completes until
+  a message follows.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), which the
   local host runs as [cluster](../packages/cluster/README.md)'s turn jobs on
   [harness](../packages/harness/README.md). Core starts each turn as one
@@ -34,7 +37,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
   activity for participants is not built. The active turns read covers at most a hundred active
   turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
-  outside the store. Task activity kinds remain design intent.
+  outside the store.
 - The [harness](../packages/harness/README.md) runs amends's own agent
   ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
@@ -222,14 +225,15 @@ closes, and shows "You're all caught up" only once nothing unread and nothing op
 "Mark all seen" marks everything through the newest one listed so that later arrivals stay
 unread. There is no way to mark one seen without opening it. The inbox reads each listed
 notification's source under current access, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
-placeholder until tasks exist.
+placeholder: tasks admit and tell it, but nothing evaluates a policy for it yet.
 
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. Search is Jump to, over what the app already
 reads: pages, groups, conversations, people, agents, and connections, by name.
-Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
-tabs, reactions, and task references have no backend and are not shown.
+Searching messages has no backend. A group shows its Threads tab alone: tasks have a backend, but
+the mocks' Tasks tab is not connected to it, and a thread's task shows nowhere yet; Files, reactions,
+and task references have no backend and are not shown.
 
 ## Storage cost
 

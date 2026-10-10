@@ -217,6 +217,8 @@ listed, assigned, and offered in invitations.
 | `thread.publish`               | Member        | Thread    | [Replying](thread-workflows.md#replying-to-a-conversation), typing, and editing or deleting one's own messages |
 | `thread.moderate`              | Administrator | Group     | [Deleting others' messages](thread-workflows.md#editing-and-deleting-a-message) in a group you belong to       |
 | `thread.follow`                | Member        | Thread    | Following a thread for oneself                                                                                 |
+| `task.create`                  | Member        | Group     | [Creating a task](thread-workflows.md#tasks), with its thread or in a conversation of a group you belong to    |
+| `task.update`                  | Member        | Thread    | [Changing a task](thread-workflows.md#tasks): its status, assignee, or priority                                |
 | `agent.use`                    | Member        | Member    | Mentioning an agent, creating a direct group with it, or making it follow a group                              |
 
 Group and thread permissions also need current membership in the group; see each guide.

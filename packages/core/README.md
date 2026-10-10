@@ -14,27 +14,27 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                                                                               |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.                                           |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                                                     |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                                                           |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                                                         |
-| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                                               |
-| `thread`        | Private-group starts, renames, human replies and their edits and deletions, authorized reads, participation, timeline activity, and projection storage. |
-| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.                                 |
-| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                                              |
-| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.                                  |
-| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                                                |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                                                   |
-| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                                                          |
-| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                                                   |
-| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                                                   |
+| Domain          | Ownership                                                                                                                                                 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.                                             |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                                                       |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                                                             |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                                                           |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                                                 |
+| `thread`        | Private-group starts, renames, human replies and their edits and deletions, authorized reads, participation, timeline activity, and projection storage.   |
+| `task`          | The work a thread tracks: its status, priority, and assignee, created with the thread or in a conversation, changed one way at a time, and read by group. |
+| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.                                   |
+| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                                                |
+| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.                                    |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                                                  |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                                                     |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                                                            |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                                                     |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                                                     |
 
 Permission, grant, requirement, scope, and target remain focused modules within
-authorization. Future features such as thread and task belong beside these
-domains; workspace scoping alone does not make a feature part of workspace
-management.
+authorization. Future features such as channels belong beside these domains; workspace scoping
+alone does not make a feature part of workspace management.
 
 `@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
 contract, `NotificationService`, and the projection that generates notifications. A record
@@ -358,27 +358,33 @@ every thread belongs to one group.
 ## Threads
 
 `@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
-four store contracts. Its operations are `ThreadService` (`startInGroup`, `startDirect`, `get`,
-`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageService.publish`, and
+four store contracts. Its operations are `ThreadService` (`startInGroup`, which also starts a
+thread as a task, `startDirect`, `rename`, `get`, `listInGroup`, `listOpenings`, `readTimeline`,
+`listParticipants`), `ThreadMessageService` (`publish`, `edit`, `delete`, `typing`), and
 `ThreadParticipationService` (`follow`, `unfollow`). A participant is a member, a contact, or
 triage: member participation references the exact group admission, while contacts and triage take
-part without group access. A message author is a member or a contact.
+part without group access. A message author is a member or a contact. `@amends/core/task` builds on
+it: `Task.Record` is a row keyed by the thread, `TaskService` (`create`, `update`, `get`,
+`listInGroup`) the operations, and `TaskCommand` the writes that create and change a task at the
+thread's next position, telling and admitting by the change, and asking an agent's turn to stop when
+a change takes the agent off the task; the thread's list items carry each thread's task.
 
 Two internal services carry the work operations share, with no action checks of their own; they
 are excluded from `Core.Operations`. `ThreadQuery` holds the reads and `ThreadCommand` the writes,
 which run inside the caller's commit and publication context. A command may read through
 `ThreadQuery`; a query never writes.
 
-| Method                                                                    | Role                                                                                                  |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                   |
-| `ThreadQuery.requireReadable`                                             | The thread under that access and `thread.read`, as every read of its conversation needs               |
-| `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                |
-| `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                          |
-| `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                   |
-| `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message |
-| `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients                                     |
-| `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
+| Method                                                                    | Role                                                                                                         |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                          |
+| `ThreadQuery.requireReadable`                                             | The thread under that access and `thread.read`, as every read of its conversation needs                      |
+| `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                       |
+| `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                                 |
+| `ThreadQuery.listReadable`                                                | A page of a group's threads the actor can read, from any listing, with tasks, latest activity, and positions |
+| `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                          |
+| `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message        |
+| `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients                                            |
+| `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording                   |
 
 `ThreadActivityResolvers` routes each activity kind to the resolver its domain registers.
 
@@ -394,8 +400,9 @@ such as `message.published` and the `version` of its details, its `subject`, an 
 that shape, so a new kind or version changes none of them and needs no migration. The domain that
 owns a kind defines it next to its facts with
 `ThreadActivityKind.make(name, { version, details, subject?, occurrence?, newActivity })`:
-`ThreadMessageActivity.Published`, `ThreadParticipationActivity.Followed` and `Ended`,
-`ThreadTitleActivity.Renamed`, and `TurnActivity.Created`, `Started`, `Stopping`, and `Ended`.
+`ThreadMessageActivity.Published`, `Edited`, and `Deleted`, `ThreadParticipationActivity.Followed`
+and `Ended`, `ThreadTitleActivity.Renamed`, `TaskActivity.Created` and `Updated`, and
+`TurnActivity.Created`, `Started`, `Stopping`, and `Ended`.
 
 - `details` is the kind's schema, encoded to JSON when recorded and decoded when read.
 - `version` is the details schema's version, recorded on the activity. A kind whose details change
@@ -417,8 +424,8 @@ operation asks for, then runs the domain's step, which publishes the domain fact
 kind, details, and recipients. The activity is recorded at that position, caused by that fact.
 
 A kind appears in timelines through a resolver its domain registers:
-`ThreadMessageTimeline.resolver`, `ThreadParticipationTimeline.resolver`, and
-`TurnTimeline.resolver`. Each loads what its
+`ThreadMessageTimeline.resolver`, `ThreadParticipationTimeline.resolver`,
+`ThreadTitleTimeline.resolver`, `TaskTimeline.resolver`, and `TurnTimeline.resolver`. Each loads what its
 kinds reference in one batch per page and returns typed items; each timeline module adds its item
 type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers, and
 `ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new

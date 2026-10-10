@@ -1,5 +1,6 @@
 import { AgentPermissions } from "@amends/core/agent";
 import { ConnectionPermissions } from "@amends/core/connection";
+import { TaskPermissions } from "@amends/core/task";
 import { TurnExecution } from "@amends/core/turn";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
@@ -121,6 +122,8 @@ export const gateway = (harness: Harness) => {
                     ThreadPermissions.Rename.name,
                     ThreadMessagePermissions.Publish.name,
                     ThreadParticipationPermissions.Follow.name,
+                    TaskPermissions.Create.name,
+                    TaskPermissions.Update.name,
                     AgentPermissions.Use.name,
                     ConnectionPermissions.Read.name,
                     ConnectionPermissions.Use.name,
@@ -158,6 +161,8 @@ export const gateway = (harness: Harness) => {
                       ThreadMessagePermissions.Publish.name,
                       ThreadMessagePermissions.Moderate.name,
                       ThreadParticipationPermissions.Follow.name,
+                      TaskPermissions.Create.name,
+                      TaskPermissions.Update.name,
                       AgentPermissions.Use.name,
                       ConnectionPermissions.Create.name,
                       ConnectionPermissions.Read.name,

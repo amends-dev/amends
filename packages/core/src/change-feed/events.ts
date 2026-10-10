@@ -25,6 +25,7 @@ import { ThreadMessageFacts } from "../thread/ThreadMessageFacts.ts";
 import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
 import { ThreadParticipationFacts } from "../thread/ThreadParticipationFacts.ts";
 import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
+import { TaskFacts } from "../task/TaskFacts.ts";
 import { WorkspaceFacts } from "../workspace/facts.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { InvitationFacts } from "../workspace/invitation/facts.ts";
@@ -287,6 +288,12 @@ const registry: ReadonlyArray<Registered> = [
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
   registerFact(ThreadMessageFacts.Deleted, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(TaskFacts.Created, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(TaskFacts.Updated, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
   // Readers see the timeline item without whom it notified; each human or agent recipient

@@ -23,6 +23,7 @@ import {
 import { ReadStateService } from "@amends/core/read-state";
 import { ConnectionService } from "@amends/core/connection";
 import { AgentService } from "@amends/core/agent";
+import { TaskService } from "@amends/core/task";
 import { Turn, TurnService } from "@amends/core/turn";
 import { Schema } from "effect";
 
@@ -106,6 +107,11 @@ export const PublicError = Schema.Union([
   ThreadParticipationService.NotFound,
   ThreadParticipationService.AlreadyEnded,
   ThreadParticipationService.FixedParticipation,
+  TaskService.NotFound,
+  TaskService.AlreadyTask,
+  TaskService.Changed,
+  TaskService.ParticipantUnavailable,
+  TaskService.GroupNotFound,
   GroupService.MemberNotFound,
   GroupService.NotFound,
   GroupService.InactiveMember,

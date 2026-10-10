@@ -531,6 +531,7 @@ export const readState = (harness: Harness) => {
               expect(next).toEqual([
                 {
                   thread: first.thread,
+                  task: null,
                   message: first.message,
                   replies: 1,
                   latest: {
@@ -597,7 +598,9 @@ export const readState = (harness: Harness) => {
                   Tracer.make({
                     span(options) {
                       if (
-                        /^(Threads|ThreadActivities|ThreadMessages|ReadStates)\./.test(options.name)
+                        /^(Threads|Tasks|ThreadActivities|ThreadMessages|ReadStates)\./.test(
+                          options.name,
+                        )
                       )
                         counts.set(options.name, (counts.get(options.name) ?? 0) + 1);
                       return Tracer.nativeTracer.span(options);
@@ -619,6 +622,7 @@ export const readState = (harness: Harness) => {
             expect(large.counts).toEqual(small.counts);
             expect(small.counts).toMatchObject({
               "Threads.listByStart": 1,
+              "Tasks.getMany": 1,
               "ThreadActivities.getFirst": 1,
               "ThreadMessages.countByThread": 1,
               "ThreadMessages.getMany": 1,

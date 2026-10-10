@@ -1,8 +1,9 @@
 /**
- * The operations on threads an actor calls: starting one in a group or with the members of a
- * direct conversation, renaming one, and reading threads, their timelines, and their participants.
- * Replies are `ThreadMessageService`, and following is `ThreadParticipationService`. Each operation
- * authorizes the actor itself, writes inside one journal commit, and reads outside any.
+ * The operations on threads an actor calls: starting one in a group, as a task or not, or with the
+ * members of a direct conversation, renaming one, and reading threads, their timelines, and their
+ * participants. Replies are `ThreadMessageService`, following is `ThreadParticipationService`, and
+ * a task once it exists is `TaskService`. Each operation authorizes the actor itself, writes inside
+ * one journal commit, and reads outside any.
  *
  * @since 0.1.0
  */
@@ -43,8 +44,11 @@ import { ThreadFacts } from "./ThreadFacts.ts";
 import { ThreadTitleActivity } from "./ThreadTitleActivity.ts";
 import { ReadStateCommand } from "../read-state/command.ts";
 import type { ReadState } from "../read-state/read-state.ts";
-import { ReadStateStore } from "../read-state/store.ts";
 import { Request } from "../request/request.ts";
+import { Task } from "../task/Task.ts";
+import { TaskCommand } from "../task/TaskCommand.ts";
+import { TaskPermissions } from "../task/TaskPermissions.ts";
+import { TaskStore } from "../task/TaskStore.ts";
 import {
   Changed,
   DirectMembersRequired,
@@ -73,6 +77,7 @@ export {
 export type Error =
   | Authorization.Error
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | Exclude<TaskCommand.Error, ThreadCommand.Unavailable>
   | Exclude<GroupCommand.EstablishError, GroupCommand.Unavailable>
   | GroupStore.Failure
   | GroupMembershipStore.Failure
@@ -87,9 +92,11 @@ export type Error =
   | ParticipantUnavailable
   | HumanAuthorRequired
   | DirectMembersRequired
+  | NotFound
   | ThreadStore.Failure
   | ThreadMessageStore.Failure
-  | ThreadActivityStore.Failure;
+  | ThreadActivityStore.Failure
+  | TaskStore.Failure;
 
 /**
  * What renaming a thread can fail with: the outcomes in `ThreadErrors`, and the failures of what
@@ -102,6 +109,7 @@ export type RenameError =
   | Authorization.Error
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | GroupMembershipStore.Failure
+  | TaskStore.Failure
   | NotFound
   | Changed;
 
@@ -112,16 +120,12 @@ export type RenameError =
  * @since 0.1.0
  */
 export type ReadError =
-  | ReadStateStore.Failure
-  | Authorization.Error
-  | GroupMembershipStore.Failure
+  | Exclude<ThreadQuery.ListError, GroupQuery.NotMember>
   | MemberStore.Failure
-  | ThreadStore.Failure
   | ThreadMessageStore.Failure
   | ThreadActivityStore.Failure
   | ThreadActivityResolvers.Failure
   | ThreadParticipationStore.Failure
-  | Schema.SchemaError
   | GroupNotFound
   | NotFound;
 
@@ -136,7 +140,10 @@ export interface Interface {
    * Start a thread in a group the author belongs to. A team thread starts with its author,
    * mentioned members, and the group's followers; the rest of the group can read it without
    * participating. A direct-group thread enrolls all of its members, and mentions only narrow who
-   * is notified. Only mentioned agents need the author's agent-use authority.
+   * is notified. Only mentioned agents need the author's agent-use authority. A thread derived
+   * from an `origin` the author can read names it. Started as a task, under `task.create` on the
+   * group, the thread's second activity creates the task, admitting its assignee, who must be able
+   * to take part, and triage while it is in triage; assigning an agent needs `agent.use` on it.
    */
   readonly startInGroup: (
     input: Thread.StartInGroupInput,
@@ -225,10 +232,11 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   const groupFollowStore = yield* GroupFollowStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadStore = yield* ThreadStore.Service;
-  const readStateStore = yield* ReadStateStore.Service;
   const readStateCommand = yield* ReadStateCommand.Service;
   const threadMessageStore = yield* ThreadMessageStore.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
+  const taskCommand = yield* TaskCommand.Service;
+  const taskStore = yield* TaskStore.Service;
   const journal = yield* Journal.Service;
   const crypto = yield* Crypto.Crypto;
   const { workspaceId } = yield* Store.Service;
@@ -259,7 +267,12 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     const message = yield* threadMessageStore.get(ids.messageId);
     if (Option.isNone(message))
       return yield* Effect.die("A started thread's opening message is missing");
-    return Option.some<Thread.Started>({ thread: thread.value, message: message.value });
+    const task = yield* taskStore.get(ids.threadId);
+    return Option.some<Thread.Started>({
+      thread: thread.value,
+      message: message.value,
+      task: Option.getOrNull(task),
+    });
   });
 
   /**
@@ -284,8 +297,21 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   });
 
   /**
-   * Create the thread with its author's opening message, which the author has then read. A start
-   * derives from no other thread; deriving one is a later workflow's.
+   * Require `task.create` on the group, and the assignee, if one, to be able to take part there,
+   * with the author's agent use when the assignee is an agent, since assigning one directs it.
+   */
+  const authorizeTask = Effect.fnUntraced(function* (groupId: Group.Id, task: Task.Options) {
+    yield* authorization.require([
+      Requirement.make(TaskPermissions.Create, { _tag: "Group", workspaceId, groupId }),
+    ]);
+    if (task.assignee === undefined) return;
+    const eligible = yield* threadQuery.eligibleMembers(groupId, [task.assignee]);
+    yield* authorizeParticipants([task.assignee], [task.assignee], eligible);
+  });
+
+  /**
+   * Create the thread with its author's opening message, which the author has then read, and as a
+   * task at its second position when the start asks for one, so a task never lacks a description.
    */
   const createThread = Effect.fnUntraced(function* (
     author: ReadState.Reader,
@@ -293,17 +319,22 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     participants: ReadonlyArray<Member.Id>,
     opening: {
       readonly title?: Thread.Title;
+      readonly origin?: Thread.Id;
       readonly text: ThreadMessage.Text;
       readonly mentions: ReadonlyArray<Member.Id>;
+      readonly task?: Task.Options;
     },
     ids: { readonly threadId: Thread.Id; readonly messageId: ThreadMessage.Id },
   ) {
+    const unavailable = (error: ThreadCommand.Unavailable) =>
+      new ParticipantUnavailable({ memberId: error.memberId });
+    const occurredAt = yield* DateTime.now;
     const started = yield* threadCommand
       .create({
         threadId: ids.threadId,
         groupId,
         title: opening.title ?? null,
-        origin: null,
+        origin: opening.origin ?? null,
         participants: participants.map((memberId) => ({ _tag: "Member" as const, memberId })),
         message: {
           messageId: ids.messageId,
@@ -311,17 +342,24 @@ export const make = Effect.fn("ThreadService.make")(function* () {
           text: opening.text,
           mentions: opening.mentions,
         },
-        occurredAt: yield* DateTime.now,
+        occurredAt,
       })
-      .pipe(
-        Effect.catchTag(
-          "ThreadCommand.Unavailable",
-          (error) => new ParticipantUnavailable({ memberId: error.memberId }),
-        ),
-      );
+      .pipe(Effect.catchTag("ThreadCommand.Unavailable", unavailable));
     // Posting reads the thread through the author's own message.
     yield* readStateCommand.markThreadRead(author, started.thread, started.activity.sequence);
-    return { thread: started.thread, message: started.message } satisfies Thread.Started;
+    const task =
+      opening.task === undefined
+        ? null
+        : (yield* taskCommand
+            .create({
+              thread: started.thread,
+              ...Task.initial(opening.task),
+              createdBy: started.thread.createdBy,
+              by: { _tag: "Member", memberId: author.memberId },
+              occurredAt,
+            })
+            .pipe(Effect.catchTag("ThreadCommand.Unavailable", unavailable))).task;
+    return { thread: started.thread, message: started.message, task } satisfies Thread.Started;
   });
 
   /**
@@ -430,6 +468,17 @@ export const make = Effect.fn("ThreadService.make")(function* () {
           ? yield* directStarters(group)
           : yield* teamStarters(group.id, actor.memberId, request.mentions);
       yield* authorizeParticipants(starters, request.mentions, eligible);
+      // Work is split out of a thread its author can read; to anyone else the origin is missing.
+      if (request.origin !== undefined)
+        yield* threadQuery
+          .requireReadable(request.origin)
+          .pipe(
+            Effect.catchTag(
+              "ThreadQuery.NotFound",
+              (error) => new NotFound({ threadId: error.threadId }),
+            ),
+          );
+      if (request.task !== undefined) yield* authorizeTask(group.id, request.task);
       return yield* createThread(author, request.groupId, starters, request, ids);
     },
     Publication.withActor,
@@ -460,6 +509,17 @@ export const make = Effect.fn("ThreadService.make")(function* () {
       if (thread.title !== request.expectedTitle)
         return yield* new Changed({ threadId: thread.id });
       const occurredAt = yield* DateTime.now;
+      // A task's title is a requirement: every participant is told of it, and the assignee asked
+      // to work on it anew; a conversation's title tells no one.
+      const task = yield* taskStore.get(thread.id);
+      const actor = yield* Actor.Service;
+      const recipients = Option.isNone(task)
+        ? []
+        : Task.recipients(
+            yield* threadQuery.currentParticipants(thread),
+            { _tag: "Member", memberId: actor.memberId },
+            Task.asked(task.value),
+          );
       const renamed = yield* threadCommand
         .publishActivity({
           thread,
@@ -478,8 +538,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
                 value: Object.assign({}, thread, { title: request.title }) satisfies Thread.Record,
                 kind: ThreadTitleActivity.Renamed,
                 details: { title: request.title, previous: thread.title },
-                // A rename tells no one until the thread is a task, whose participants it reaches.
-                recipients: [],
+                recipients,
                 cause: fact,
               };
             }),
@@ -511,79 +570,34 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   // authoritative when present.
   const get = Effect.fn("ThreadService.get")(requireReadable);
 
-  /**
-   * Fill a page with a group's threads the actor can read, from one store listing, reading further
-   * when grants skip some. Each comes with its latest activity and the actor's position.
-   */
-  const listReadableThreads = Effect.fnUntraced(function* <Cursor>(
+  /** A page of the group's readable threads, which the actor must belong to. */
+  const listReadable = <R, Cursor, E>(
     groupId: Group.Id,
-    limit: number,
-    first: Cursor | undefined,
-    list: (
-      id: Group.Id,
-      before: Cursor | undefined,
-    ) => Effect.Effect<ReadonlyArray<Thread.Record>, ThreadStore.Failure>,
-    cursorOf: (thread: Thread.Record, latest: Thread.Latest) => Cursor,
-  ) {
-    const id = yield* Schema.decodeEffect(Group.Id)(groupId);
-    const admission = yield* groupQuery
-      .requireAudience(id)
-      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId: id })));
-    const actor = yield* Actor.Service;
-    const items: Array<Thread.ListItem> = [];
-    let before = first;
-    while (items.length < limit) {
-      const page = yield* list(id, before);
-      if (page.length === 0) break;
-      const ids = page.map((thread) => thread.id);
-      const latest = new Map(
-        (yield* threadStore.getLatest(ids)).map((value) => [value.threadId, value] as const),
-      );
-      const allowed = yield* authorization.permitted(
-        ids.map((threadId) =>
-          Requirement.make(ThreadPermissions.Read, { _tag: "Thread", workspaceId, threadId }),
-        ),
-      );
-      const readableIds = ids.filter((_, index) => allowed[index] === true);
-      const positions = new Map(
-        (yield* readStateStore.getThreadPositions(actor.memberId, readableIds)).map(
-          (position) => [position.threadId, position.readThrough] as const,
-        ),
-      );
-      for (const [index, thread] of page.entries()) {
-        const current = latest.get(thread.id);
-        if (current === undefined)
-          return yield* Effect.die("A listed thread has no recorded activity");
-        // The next page starts after the last thread seen, readable or not.
-        before = cursorOf(thread, current);
-        if (allowed[index] !== true || items.length === limit) continue;
-        const readThrough = positions.get(thread.id) ?? null;
-        items.push(Thread.listItem(thread, current, readThrough, admission.admittedAt));
-      }
-      if (page.length < limit) break;
-    }
-    return items;
-  });
+    options: ThreadQuery.ListOptions<R, Cursor, E>,
+  ) =>
+    threadQuery
+      .listReadable(groupId, options)
+      .pipe(Effect.catchTag("GroupQuery.NotMember", () => new GroupNotFound({ groupId })));
 
   const listInGroup = Effect.fn("ThreadService.listInGroup")(function* (
     groupId: Group.Id,
     input: Thread.ListOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.ListOptions))(input);
-    return yield* listReadableThreads(
-      groupId,
-      options.limit,
-      options.before,
-      (id, before) =>
+    return yield* listReadable(groupId, {
+      limit: options.limit,
+      first: options.before,
+      list: (before) =>
         threadStore.listByLatest(
-          id,
+          groupId,
           before === undefined ? { limit: options.limit } : { before, limit: options.limit },
         ),
-      (thread, latest): Thread.ListCursor => ({
+      threadOf: (thread) => thread,
+      cursorOf: (thread, latest): Thread.ListCursor => ({
         latestActivityAt: latest.occurredAt,
         threadId: thread.id,
       }),
-    );
+    });
   });
 
   const listOpenings = Effect.fn("ThreadService.listOpenings")(function* (
@@ -591,17 +605,20 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     input: Thread.OpeningOptions,
   ) {
     const options = yield* Schema.decodeEffect(Schema.toType(Thread.OpeningOptions))(input);
-    const items = yield* listReadableThreads(
-      groupId,
-      options.limit,
-      options.before,
-      (id, before) =>
+    const items = yield* listReadable(groupId, {
+      limit: options.limit,
+      first: options.before,
+      list: (before) =>
         threadStore.listByStart(
-          id,
+          groupId,
           before === undefined ? { limit: options.limit } : { before, limit: options.limit },
         ),
-      (thread): Thread.OpeningCursor => ({ createdAt: thread.createdAt, threadId: thread.id }),
-    );
+      threadOf: (thread) => thread,
+      cursorOf: (thread): Thread.OpeningCursor => ({
+        createdAt: thread.createdAt,
+        threadId: thread.id,
+      }),
+    });
     if (items.length === 0) return [];
     // A start publishes its opening message as the thread's first activity.
     const ids = items.map((item) => item.thread.id);

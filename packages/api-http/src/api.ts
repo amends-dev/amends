@@ -10,6 +10,7 @@ import { ChangeFeedGroup } from "./change-feed.ts";
 import { AgentsGroup } from "./agents.ts";
 import { ConnectionsGroup } from "./connections.ts";
 import { GroupsGroup } from "./groups.ts";
+import { TasksGroup } from "./tasks.ts";
 import { ThreadsGroup } from "./threads.ts";
 import { TurnsGroup } from "./turns.ts";
 
@@ -23,6 +24,7 @@ export class Api extends HttpApi.make("amends")
   .add(AssignmentsGroup)
   .add(GroupsGroup)
   .add(ThreadsGroup)
+  .add(TasksGroup)
   .add(NotificationsGroup)
   .add(ConnectionsGroup)
   .add(AgentsGroup)
