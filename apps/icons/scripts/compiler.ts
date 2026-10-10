@@ -1,4 +1,4 @@
-// Geometry and rounded-corner construction adapted from Regen Icons (see LICENSE).
+// Geometry and rounded-corner construction for the package's drawings.
 // This deliberately supports only the primitives needed by the current drawings.
 export const spec = {
   canvas: 24,
