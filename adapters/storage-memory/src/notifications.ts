@@ -13,6 +13,7 @@ const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
 const validateRecipient = Schema.decodeEffect(Notification.Recipient);
 const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
 const validateLatest = Schema.decodeEffect(Schema.toType(NotificationStore.LatestOptions));
+const validateRange = Schema.decodeEffect(Schema.toType(NotificationStore.ThreadRange));
 const rows = Rows.make(Schema.fromJsonString(Notification.Record));
 
 /** Whose inbox a notification is in: a membership, a contact, or triage. */
@@ -175,6 +176,29 @@ export const make = Effect.fn("Notifications.make")(function* () {
     listLatestPendingByRecipient: Effect.fn("Notifications.listLatestPendingByRecipient")(
       (recipient, options) => latest(recipient, options, true),
       Effect.mapError(storeFailure(NotificationStore, "listLatestPendingByRecipient")),
+    ),
+    listByThread: Effect.fn("Notifications.listByThread")(
+      function* (recipient, threadInput, rangeInput) {
+        const target = inboxKey(yield* validateRecipient(recipient));
+        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const range = yield* validateRange(rangeInput);
+        const records = yield* all;
+        return records
+          .filter(
+            (record) =>
+              inboxKey(record.recipient) === target &&
+              record.thread !== undefined &&
+              record.thread.threadId === threadId &&
+              record.thread.sequence > range.afterSequence &&
+              record.thread.sequence <= range.throughSequence,
+          )
+          .toSorted(
+            (left, right) =>
+              (left.thread?.sequence ?? 0) - (right.thread?.sequence ?? 0) ||
+              compareBinary(left.id, right.id),
+          );
+      },
+      Effect.mapError(storeFailure(NotificationStore, "listByThread")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (recipient, threadInput, throughSequence) {

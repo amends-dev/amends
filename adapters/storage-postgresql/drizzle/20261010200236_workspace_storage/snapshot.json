@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "89761730-1eed-43f6-9c31-f1ece7fe293c",
+  "id": "4e2f7a3b-b022-42e6-a509-65a99669295e",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -5194,14 +5194,21 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": null
+        },
+        {
+          "value": "\"id\" COLLATE \"C\"",
+          "isExpression": true,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
         }
       ],
       "isUnique": false,
-      "where": "\"state\" = 'Pending'",
+      "where": null,
       "with": "",
       "method": "btree",
       "concurrently": false,
-      "name": "pending_notifications_by_thread",
+      "name": "notifications_by_thread",
       "entityType": "indexes",
       "schema": "public",
       "table": "notifications"

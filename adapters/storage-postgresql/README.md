@@ -44,7 +44,8 @@ binary ID order. Adding it replaced the development baseline.
 Threads keep `latest_sequence` and `latest_activity_at` for their latest message, constrained by
 `thread_latest`, and groups `latest_activity_at`; updates only move them forward. Notifications
 carry `thread_id`, `thread_group_id`, and `thread_sequence` for thread activity.
-`pending_notifications_by_thread` serves a reader's pending notifications from one thread, and
+`notifications_by_thread` serves a reader's notifications from one thread by position, what they
+were told there and the pending ones settled when they read it, and
 `pending_notifications_by_group` counts them per group for the sidebar. `thread_read_positions` and
 `group_read_times` hold private read state; their upserts keep the later value with `greatest` and
 run on their own, without the workspace lock, when the caller has no transaction.

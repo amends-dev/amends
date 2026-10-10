@@ -244,9 +244,14 @@ job could call them from another process. Each change is its own commit, attribu
   agent cannot run on it. `start` answers `Idle`, or `Ready` with the turn, the agent's `Runnable`,
   its prompt and how many messages it tells, and what the participation's session resumes from
   (`SessionStateStore.Resume`), or none when it starts anew. The prompt (`TurnPrompt.promptOf`) is
-  the others' messages since the agent was last prompted there, through what the turn accepted,
-  each named by its author, and, for a retry, who asked. A running turn, as a run cut short leaves
-  it, is ready again as it was.
+  the agent's view of the timeline since it was last prompted there, through what the turn
+  accepted: first the thread as it stands, its title and its task's state, then each activity that
+  told the agent, in its kind's words, as a person reads it in the timeline, and, for a retry, who
+  asked. What told the agent is its notifications from the thread in that range, whatever their
+  state, so the recipient rules decide what an agent is told and the prompt only how each kind
+  reads: a message by its author, an edit by its new text, a deletion as such, a task's creation
+  and changes by their values, with the agent itself as "you"; a turn's own activity tells no one.
+  A running turn, as a run cut short leaves it, is ready again as it was.
 - `joinedConversation` is the conversation the agent joined: the thread's messages before it took
   part (`TurnPrompt.conversationOf`: others' as the user's, each named, the agent's own as its
   answers), which a new session log starts with.

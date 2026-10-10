@@ -214,7 +214,10 @@ enroll that member in existing threads or create retroactive notifications.
 
 Participants are members, contacts, or triage. Tasks admit triage and their assignees through the
 same internal start and activity, and [channels](#channels) admit contacts the same way. Notifications
-to agents are pending input for them to handle, which their turns take up.
+to agents are pending input for them to handle, which their turns take up: a turn's prompt tells the
+agent the thread as it stands, its title and its task, then every activity that notified it since
+it was last prompted, each in its kind's words, so what an agent is told follows from these
+recipient rules alone ([turns](../packages/core/README.md#turns)).
 
 ## Replying to a conversation
 

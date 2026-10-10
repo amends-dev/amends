@@ -16,16 +16,15 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   participants and muting are not implemented. No installed integration gives channels yet, so the
   local host can create no channel until one does; the conformance suites run channels on a test
   transport. Contacts are told of messages alone, which the delivery job carries to their
-  conversation; a sent message's edits and deletions are not carried, a channel's readiness is not
-  shown, and an agent's prompt does not yet name a contact. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision for
-  it; a task's cross-group views, such as everything assigned to one member, are not read; and a
-  turn prompted by a task assignment alone is told nothing of the task yet, so it completes until
-  a message follows.
+  conversation; a sent message's edits and deletions are not carried, and a channel's readiness is
+  not shown. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision
+  for it, and a task's cross-group views, such as everything assigned to one member, are not read.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), which the
   local host runs as [cluster](../packages/cluster/README.md)'s turn jobs on
   [harness](../packages/harness/README.md). Core starts each turn as one
   harness turn on what [agents](../packages/core/README.md#agents) select, prompted with the
-  thread's messages since the agent's last turn there, and posts the reply its job gives, the text
+  thread as it stands and what told the agent since its last turn there, each in its kind's
+  words, and posts the reply its job gives, the text
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
   conversation in each participation's session log, from which the agent's next turn there
   resumes; resuming reads the whole log each turn and goes on from its latest compaction. A turn

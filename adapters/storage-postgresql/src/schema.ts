@@ -377,16 +377,16 @@ export const notifications = pgTable(
         table.threadGroupId,
       )
       .where(sql`${table.state} = 'Pending'`),
-    // A reader's pending notifications from one thread, settled when they read it.
-    index("pending_notifications_by_thread")
-      .on(
-        table.workspaceId,
-        table.recipientKind,
-        sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
-        table.threadId,
-        table.threadSequence,
-      )
-      .where(sql`${table.state} = 'Pending'`),
+    // A reader's notifications from one thread by position: what they were told there, and the
+    // pending ones settled when they read it.
+    index("notifications_by_thread").on(
+      table.workspaceId,
+      table.recipientKind,
+      sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
+      table.threadId,
+      table.threadSequence,
+      sql`${table.id} COLLATE "C"`,
+    ),
     // An ended participation's pending agent input, settled in the commit that ends it.
     index("pending_agent_notifications_by_participation")
       .on(table.workspaceId, table.participationId)

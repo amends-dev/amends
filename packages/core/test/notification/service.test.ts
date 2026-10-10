@@ -88,6 +88,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     listPendingByRecipient: list,
     listLatestByRecipient: list,
     listLatestPendingByRecipient: list,
+    listByThread: unexpected,
     listPendingByThread: unexpected,
     countPendingByRecipient: (recipient) =>
       Effect.succeed(records.filter((value) => sameRecipient(value.recipient, recipient)).length),

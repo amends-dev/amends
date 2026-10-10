@@ -56,6 +56,17 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * outside the journal and kept when projections are rebuilt: a notification projected again as
  * Pending reads as Seen, with its first time, once its recipient has seen it.
  */
+/**
+ * A range of one thread's timeline positions: after one, through another.
+ *
+ * @category schemas
+ */
+export const ThreadRange = Schema.Struct({
+  afterSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  throughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+});
+export interface ThreadRange extends Schema.Schema.Type<typeof ThreadRange> {}
+
 export interface Interface {
   /** Find a notification in this workspace; None if absent. */
   readonly get: (id: Notification.Id) => Effect.Effect<Option.Option<Notification.Record>, Failure>;
@@ -86,6 +97,16 @@ export interface Interface {
     options: LatestOptions,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
 
+  /**
+   * Every notification of the recipient from one thread's activity in a range of timeline
+   * positions, whatever its state, ordered by position, then ID in binary lexical order: what the
+   * recipient was told there.
+   */
+  readonly listByThread: (
+    recipient: Notification.Recipient,
+    threadId: ThreadId.Id,
+    range: ThreadRange,
+  ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
   /**
    * The recipient's pending notifications from one thread's activity at or before a timeline
    * position, ordered by that position, then ID in binary lexical order.

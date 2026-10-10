@@ -3,7 +3,7 @@ import { Member } from "@amends/core/workspace";
 import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
@@ -16,6 +16,7 @@ const validateRecord = Schema.decodeEffect(Schema.toType(Notification.Record));
 const validateRecipient = Schema.decodeEffect(Notification.Recipient);
 const validateOptions = Schema.decodeEffect(Schema.toType(NotificationStore.ReadOptions));
 const validateLatest = Schema.decodeEffect(Schema.toType(NotificationStore.LatestOptions));
+const validateRange = Schema.decodeEffect(Schema.toType(NotificationStore.ThreadRange));
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
@@ -280,6 +281,28 @@ export const make = Effect.fn("Notifications.make")(function* () {
         );
       },
       Effect.mapError(storeFailure(NotificationStore, "countPendingByGroup")),
+    ),
+    listByThread: Effect.fn("Notifications.listByThread")(
+      function* (recipient, threadInput, rangeInput) {
+        const target = yield* validateRecipient(recipient);
+        const threadId = yield* Schema.decodeEffect(Thread.Id)(threadInput);
+        const range = yield* validateRange(rangeInput);
+        return yield* guard(
+          recorded()
+            .where(
+              and(
+                inWorkspace,
+                eq(notifications.recipientKind, target._tag),
+                eq(inbox, inboxOf(target)),
+                eq(notifications.threadId, threadId),
+                gt(notifications.threadSequence, range.afterSequence),
+                lte(notifications.threadSequence, range.throughSequence),
+              ),
+            )
+            .orderBy(asc(notifications.threadSequence), asc(orderedId)),
+        ).pipe(Effect.flatMap((rows) => decode(rows.map(toEncodedRecord))));
+      },
+      Effect.mapError(storeFailure(NotificationStore, "listByThread")),
     ),
     listPendingByThread: Effect.fn("Notifications.listPendingByThread")(
       function* (recipient, threadInput, throughSequence) {
