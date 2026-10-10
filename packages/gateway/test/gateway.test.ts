@@ -176,14 +176,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       Context.add(ThreadMessageStore.Service, {
         get: unexpected,
         getMany: unexpected,
+        countByThread: unexpected,
         insert: unexpected,
+        edit: unexpected,
+        delete: unexpected,
       }),
       Context.add(ThreadActivityStore.Service, {
         latest: unexpected,
         get: unexpected,
         listByThread: unexpected,
         getFirst: unexpected,
-        countByKind: unexpected,
         readPage: unexpected,
         insert: unexpected,
       }),

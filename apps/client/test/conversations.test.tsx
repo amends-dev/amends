@@ -54,10 +54,9 @@ const message = (id: string, threadId: string, at: string) => ({
   workspaceId: "one",
   threadId,
   author,
-  text: `Message ${id}`,
-  mentions: [],
+  via: null,
   publishedAt: at,
-  turnId: null,
+  content: { _tag: "Text", text: `Message ${id}`, mentions: [], revision: 1, editedAt: null },
 });
 /** A thread started at the given minute, with its opening message and no replies. */
 const opening = (index: number) => {

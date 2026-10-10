@@ -22,10 +22,14 @@ export interface TimelineMessage {
   readonly time?: string;
   /** When it was sent: the time shown unless `time` is given, and its day seam. */
   readonly at?: Date;
-  /** Markdown, whose mentions link to members by id. */
+  /** Markdown, whose mentions link to members by id; empty once deleted. */
   readonly text: string;
   /** The members its mentions name, as the reader knows them now. */
   readonly mentions?: readonly RichTextMention[];
+  /** Its text was edited since it was sent, so it reads with an edited mark. */
+  readonly edited?: boolean;
+  /** It was deleted: a deleted mark shows in place of its text. */
+  readonly deleted?: boolean;
   /** A step an agent took, such as "Checked codebase". */
   readonly activity?: string;
   readonly reactions?: ReadonlyArray<{
@@ -260,7 +264,15 @@ export function Timeline(props: TimelineProps) {
                     )}
                   </Show>
                   <Message.Text>
-                    <RichText text={message().text} mentions={message().mentions} />
+                    <Show
+                      when={!message().deleted}
+                      fallback={<span class={s.deleted}>Message deleted</span>}
+                    >
+                      <RichText text={message().text} mentions={message().mentions} />
+                      <Show when={message().edited}>
+                        <span class={s.edited}> (edited)</span>
+                      </Show>
+                    </Show>
                   </Message.Text>
                   <Show when={message().reactions?.length}>
                     <Message.Reactions>

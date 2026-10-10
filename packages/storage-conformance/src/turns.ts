@@ -124,7 +124,8 @@ const brief = (message: Turn.LogMessage | "done" | "unavailable") => {
 
 /** A timeline item in brief: a message's text, or a turn's change. */
 const told = (item: ThreadTimeline.Item) => {
-  if ("message" in item) return `message: ${item.message.text}`;
+  if ("message" in item)
+    return `message: ${item.message.content._tag === "Text" ? item.message.content.text : "(deleted)"}`;
   const activity = item.activity;
   switch (activity.kind) {
     case "turn.created":
@@ -435,8 +436,8 @@ export const turns = (harness: ConformanceHarness) => {
                 message: {
                   id: closed.messageIds[0],
                   author: { _tag: "Member", memberId: agent.memberId },
-                  text: "The plan is on track.",
-                  turnId: turn.id,
+                  via: { _tag: "Turn", turnId: turn.id },
+                  content: { text: "The plan is on track." },
                 },
               });
               // What the session resumes from is kept for the agent's next turn there, as prompted

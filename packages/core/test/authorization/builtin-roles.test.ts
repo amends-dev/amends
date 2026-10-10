@@ -247,6 +247,16 @@ revisions[9] = Object.fromEntries(
   ]),
 );
 
+// Administrators and the owner delete others' messages in their groups' threads.
+revisions[10] = Object.fromEntries(
+  Object.entries(revisions[9]!).map(([roleId, names]) => [
+    roleId,
+    roleId === BuiltinRoles.MemberId
+      ? names
+      : names.flatMap((name) => (name === "thread.publish" ? [name, "thread.moderate"] : [name])),
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

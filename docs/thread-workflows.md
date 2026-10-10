@@ -1,7 +1,7 @@
 # Thread workflows
 
-Conversations in groups: starting them, renaming them, replying, following, reading, and the
-notifications and read state around them. The operations are `ThreadService`, `ThreadMessageService`,
+Conversations in groups: starting them, renaming them, replying, editing and deleting messages,
+following, reading, and the notifications and read state around them. The operations are `ThreadService`, `ThreadMessageService`,
 `ThreadParticipationService`, `NotificationService`, and `ReadStateService` in a workspace
 context, such as `Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
@@ -125,8 +125,10 @@ const reply = (threadId: Thread.Id) =>
   });
 ```
 
-The result is the published message. Text and mentions are validated as for starts.
-Without a request key, every call publishes a new message; see [retrying safely](#retrying-safely).
+The result is the published message: its `content` holds the text and mentions at revision 1, and
+its `via` is null for a message written in amends, or names the agent's turn that posted it. Text
+and mentions are validated as for starts. Without a request key, every call publishes a new
+message; see [retrying safely](#retrying-safely).
 
 The caller must be a human with active workspace membership, current membership in the thread's
 group, and `thread.publish` on the thread. Replying needs no `thread.read`, `thread.start`,
@@ -158,6 +160,33 @@ Missing, foreign, and outside-audience threads share `ThreadMessageService.NotFo
 Ineligible mentions return `ThreadMessageService.ParticipantUnavailable`, and agent callers get
 `ThreadMessageService.HumanAuthorRequired`. Admission, the message, its timeline activity, and
 its notifications commit together; the timeline never has gaps or duplicate positions.
+
+## Editing and deleting a message
+
+`ThreadMessageService.edit({ messageId, text, mentions, expectedRevision })` replaces what a
+message says. Only its author edits it, with `thread.publish` on the thread and membership of the
+group; anyone else gets `ThreadMessageService.NotAuthor`, and to someone outside the group the
+message is `MessageNotFound`, as a missing one is. Agents edit their own replies through their
+turns, so an agent caller gets `HumanAuthorRequired`. The text and mentions follow a reply's
+rules. The same text and mentions again record nothing; otherwise `expectedRevision`, the revision
+the editor last saw, must still be the message's: one edited meanwhile is `Changed`, and nothing is
+recorded. A deleted message is `Deleted`.
+
+An edit records `thread.message.edited` with the next revision, the new text and mentions, and the
+time, and a quiet `message.edited` activity whose occurrence is the message and revision, in one
+commit. The projection replaces the message's `content`, so the timeline shows the publication with
+the content as it is now, and clients collapse the edit into an edited mark. Members the edit newly
+mentions join the thread and are told, under a reply's rules, and nobody else hears of it; an
+ineligible mention is `ParticipantUnavailable`.
+
+`ThreadMessageService.delete(messageId)` deletes a message: its own author's under
+`thread.publish` on the thread, anyone's under `thread.moderate` on the thread's group, which the
+built-in administrator and owner roles hold. It records `thread.message.deleted` and a quiet
+`message.deleted` activity; the content becomes `{ _tag: "Deleted", deletedAt }`, the text is gone
+from the row, and the message's place in the thread stays, since read positions, notifications,
+and turns refer to sequences. No one is told, and one already deleted records nothing. A deleted
+reply no longer counts among a thread's replies, and a deleted opening message leaves the thread
+with its title alone.
 
 ## Retrying safely
 

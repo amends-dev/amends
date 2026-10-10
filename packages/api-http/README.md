@@ -210,6 +210,8 @@ describe the rules behind each operation.
 | `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                              |
 | `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                   |
 | `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                            |
+| `PUT …/messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `NotAuthor`; a deleted one or a stale revision is 409.           |
+| `DELETE …/messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                       |
 | `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                       |
 | `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                      |
 | `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                      |
@@ -226,8 +228,10 @@ and pages back with `beforeSequence` set to its first item's sequence. Timeline 
 `{ activity, message }` for messages, `{ activity, participant }` for participants joining or
 leaving, and `{ activity }` for an agent's turn changing (`turn.created`, `turn.started`,
 `turn.stopping`, `turn.ended`, whose details carry the turn and how it went), with the activity's
-`kind` naming which. A message's `turnId` names the agent's turn that posted it, for an agent's
-reply, and is null otherwise.
+`kind` naming which. Edits and deletions are items of their own (`message.edited`,
+`message.deleted`) carrying the same message, whose `content` is its text, mentions, revision,
+and edit time as it is now, or its deletion. A message's `via` names the agent's turn that posted
+it, for an agent's reply, and is null otherwise.
 
 Message text keeps its whitespace and must contain a non-space character. Mentions name members
 of the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only

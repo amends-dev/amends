@@ -20,6 +20,7 @@ import {
   ThreadMessageService,
   ThreadParticipation,
   ThreadParticipationService,
+  ThreadMessage,
 } from "@amends/core/thread";
 import { ReadStateService } from "@amends/core/read-state";
 import {
@@ -83,6 +84,7 @@ const team: Group.TeamRecord = {
   createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
 };
 const threadId = Thread.Id.make("thread-one");
+const messageId = ThreadMessage.Id.make("message-one");
 /** Conversation services record their inputs; failures show that each tag keeps its status. */
 const conversations = Layer.mergeAll(
   Layer.succeed(
@@ -146,6 +148,12 @@ const conversations = Layer.mergeAll(
     ThreadMessageService.Service.of({
       publish: record("thread.publish", () =>
         Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
+      ),
+      edit: record("thread.edit", (input) =>
+        Effect.fail(new ThreadMessageService.Changed({ messageId: input.messageId })),
+      ),
+      delete: record("thread.delete", (id) =>
+        Effect.fail(new ThreadMessageService.MessageNotFound({ messageId: id })),
       ),
       typing: record("thread.typing", () => Effect.void),
     }),
@@ -666,6 +674,15 @@ it.effect(
             payload: { text: "Reply", mentions: [] },
             responseMode: "response-only",
           }),
+          client.threads.edit({
+            params: { workspaceId, messageId },
+            payload: { text: "Edited", mentions: [], expectedRevision: 1 },
+            responseMode: "response-only",
+          }),
+          client.threads.delete({
+            params: { workspaceId, messageId },
+            responseMode: "response-only",
+          }),
           client.threads.follow({
             params: { workspaceId, threadId },
             responseMode: "response-only",
@@ -688,7 +705,7 @@ it.effect(
       );
       expect(statuses).toEqual([
         201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 409,
-        200, 200, 403, 404, 409, 409, 409,
+        200, 200, 403, 409, 404, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
@@ -736,6 +753,11 @@ it.effect(
           operation: "thread.publish",
           arguments: [{ threadId, text: "Reply", mentions: [] }, { requestKey: "reply-1" }],
         },
+        {
+          operation: "thread.edit",
+          arguments: [{ messageId, text: "Edited", mentions: [], expectedRevision: 1 }],
+        },
+        { operation: "thread.delete", arguments: [messageId] },
         { operation: "thread.follow", arguments: [threadId] },
         { operation: "thread.unfollow", arguments: [{ threadId, participationId }] },
         { operation: "thread.markRead", arguments: [{ threadId, throughSequence: 4 }] },

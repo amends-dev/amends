@@ -172,13 +172,14 @@ describe.skipIf(!available)("turns on the local host", () => {
 
           // The mention runs the agent's turn job, which posts its answer as the agent.
           const [answer] = yield* agentMessages(asAlice, params, agent.memberId, 1);
-          expect(answer?.text).toBe("The plan is on track.");
+          expect(answer?.content).toMatchObject({ text: "The plan is on track." });
           expect(models.requests[0]).toEqual([
             { role: "system", text: "Plan each change." },
             { role: "user", text: "Alice: Planner, summarize the plan." },
           ]);
+          if (answer?.via?._tag !== "Turn") return yield* Effect.die("Expected an agent's reply");
           const turn = yield* asAlice.turns.get({
-            params: { workspaceId, turnId: answer!.turnId! },
+            params: { workspaceId, turnId: answer.via.turnId },
           });
           expect(turn).toMatchObject({ status: "completed", messageIds: [answer!.id] });
 
@@ -189,7 +190,7 @@ describe.skipIf(!available)("turns on the local host", () => {
             payload: { text: "Planner, and the risks?", mentions: [agent.memberId] },
           });
           const answers = yield* agentMessages(asAlice, params, agent.memberId, 2);
-          expect(answers.map(({ text }) => text)).toEqual([
+          expect(answers.map(({ content }) => ("text" in content ? content.text : null))).toEqual([
             "The plan is on track.",
             "The risks are small.",
           ]);

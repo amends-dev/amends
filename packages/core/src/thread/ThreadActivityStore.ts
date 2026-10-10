@@ -45,23 +45,6 @@ export const ReadOptions = Schema.Struct({
 export interface ReadOptions extends Schema.Schema.Type<typeof ReadOptions> {}
 
 /**
- * How many activities of one kind a thread holds.
- *
- * @category schemas
- * @since 0.1.0
- */
-export const Count = Schema.Struct({
-  threadId: ThreadId.Id,
-  count: Schema.Int.check(Schema.isGreaterThan(0)),
-});
-
-/**
- * @category schemas
- * @since 0.1.0
- */
-export interface Count extends Schema.Schema.Type<typeof Count> {}
-
-/**
  * Storage failed while reading or writing activity.
  *
  * @category errors
@@ -112,14 +95,6 @@ export interface Interface {
   readonly getFirst: (
     ids: ReadonlyArray<ThreadId.Id>,
   ) => Effect.Effect<ReadonlyArray<ThreadActivity.Record>, Failure>;
-  /**
-   * How many activities of one kind each of several threads holds, in one read. Threads with none,
-   * and absent IDs, are omitted; order is unspecified.
-   */
-  readonly countByKind: (
-    ids: ReadonlyArray<ThreadId.Id>,
-    kind: ThreadActivity.Kind,
-  ) => Effect.Effect<ReadonlyArray<Count>, Failure>;
   /**
    * At most limit activities of the requested range, from its requested end, in ascending
    * sequence order. No shared snapshot across pages.

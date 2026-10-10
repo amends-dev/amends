@@ -36,7 +36,6 @@ import { ThreadParticipation } from "./ThreadParticipation.ts";
 import { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
 import { ThreadActivityResolvers } from "./ThreadActivityResolvers.ts";
 import { ThreadActivityStore } from "./ThreadActivityStore.ts";
-import { ThreadActivity } from "./ThreadActivity.ts";
 import { ThreadActivityKind } from "./ThreadActivityKind.ts";
 import { ThreadMessageActivity } from "./ThreadMessageActivity.ts";
 import { ThreadMessage } from "./ThreadMessage.ts";
@@ -587,7 +586,6 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     );
   });
 
-  const messagePublishedKind = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
   const listOpenings = Effect.fn("ThreadService.listOpenings")(function* (
     groupId: Group.Id,
     input: Thread.OpeningOptions,
@@ -619,8 +617,9 @@ export const make = Effect.fn("ThreadService.make")(function* () {
         (message) => [message.id, message] as const,
       ),
     );
+    // Replies are the thread's messages after its opening one that still have text.
     const counts = new Map(
-      (yield* threadActivityStore.countByKind(ids, messagePublishedKind)).map(
+      (yield* threadMessageStore.countByThread(ids)).map(
         (value) => [value.threadId, value.count] as const,
       ),
     );
@@ -628,10 +627,10 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     for (const item of items) {
       const messageId = openings.get(item.thread.id);
       const message = messageId === undefined ? undefined : found.get(messageId);
-      const count = counts.get(item.thread.id);
-      if (message === undefined || count === undefined)
-        return yield* Effect.die("A listed thread's opening is missing");
-      result.push(Thread.opening(item, message, count - 1));
+      if (message === undefined) return yield* Effect.die("A listed thread's opening is missing");
+      const remaining = counts.get(item.thread.id) ?? 0;
+      const opening = ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? 1 : 0;
+      result.push(Thread.opening(item, message, remaining - opening));
     }
     return result;
   });

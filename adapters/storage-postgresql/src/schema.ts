@@ -675,10 +675,17 @@ export const threadMessages = pgTable(
     authorKind: text("author_kind", { enum: ["Member", "Contact"] }).notNull(),
     authorMemberId: text("author_member_id"),
     authorContactId: text("author_contact_id"),
-    text: text("text").notNull(),
-    mentions: text("mentions").array().notNull(),
-    publishedAt: instant("published_at").notNull(),
+    // How it came about: an agent's turn, or null for one written in amends.
+    viaKind: text("via_kind", { enum: ["Turn"] }),
     turnId: text("turn_id"),
+    publishedAt: instant("published_at").notNull(),
+    // Its content: text and mentions at a revision, as last edited, or its deletion.
+    contentKind: text("content_kind", { enum: ["Text", "Deleted"] }).notNull(),
+    text: text("text"),
+    mentions: text("mentions").array(),
+    revision: integer("revision"),
+    editedAt: instant("edited_at"),
+    deletedAt: instant("deleted_at"),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
@@ -686,6 +693,18 @@ export const threadMessages = pgTable(
       "thread_message_author",
       sql`(${t.authorKind} = 'Member' AND ${t.authorMemberId} IS NOT NULL AND ${t.authorContactId} IS NULL) OR (${t.authorKind} = 'Contact' AND ${t.authorMemberId} IS NULL AND ${t.authorContactId} IS NOT NULL)`,
     ),
+    check(
+      "thread_message_via",
+      sql`(${t.viaKind} IS NULL AND ${t.turnId} IS NULL) OR (${t.viaKind} = 'Turn' AND ${t.turnId} IS NOT NULL)`,
+    ),
+    check(
+      "thread_message_content",
+      sql`(${t.contentKind} = 'Text' AND ${t.text} IS NOT NULL AND ${t.mentions} IS NOT NULL AND ${t.revision} > 0 AND ${t.deletedAt} IS NULL) OR (${t.contentKind} = 'Deleted' AND ${t.text} IS NULL AND ${t.mentions} IS NULL AND ${t.revision} IS NULL AND ${t.editedAt} IS NULL AND ${t.deletedAt} IS NOT NULL)`,
+    ),
+    // A thread's messages that still have text, counted per thread for reply counts.
+    index("thread_messages_by_thread")
+      .on(t.workspaceId, t.threadId)
+      .where(sql`${t.contentKind} = 'Text'`),
   ],
 );
 /**

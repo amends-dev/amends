@@ -19,7 +19,9 @@ import { TurnTimeline } from "../turn/timeline.ts";
  * @since 0.1.0
  */
 export const Item = Schema.Union([
-  ThreadMessageTimeline.Item,
+  ThreadMessageTimeline.PublishedItem,
+  ThreadMessageTimeline.EditedItem,
+  ThreadMessageTimeline.DeletedItem,
   ThreadParticipationTimeline.FollowedItem,
   ThreadParticipationTimeline.EndedItem,
   ThreadTitleTimeline.RenamedItem,

@@ -1,12 +1,14 @@
 /**
- * A message in a thread: markdown written by a member or a contact, and whom it addresses. Its
- * place in the thread is activity, `ThreadMessageActivity.Published`, recorded with it; the
- * message row holds the text once. `ThreadMessageService` publishes replies, and `ThreadService`
- * the message that opens a thread.
+ * A message in a thread: markdown written by a member or a contact, and whom it addresses, as last
+ * edited, or deleted. Its place in the thread is activity, `ThreadMessageActivity.Published`,
+ * recorded with it; the message row holds the text once, and edits and deletions replace it there.
+ * `ThreadMessageService` publishes, edits, and deletes replies, and `ThreadService` publishes the
+ * message that opens a thread.
  *
  * @since 0.1.0
  */
 import { Schema } from "effect";
+import { GroupId } from "../group/id.ts";
 import { ThreadId } from "./ThreadId.ts";
 import { ThreadMessageId } from "./ThreadMessageId.ts";
 import { WorkspaceId } from "../workspace/id.ts";
@@ -104,7 +106,63 @@ export const Author = Schema.TaggedUnion({
 export type Author = typeof Author.Type;
 
 /**
- * A message as published. Its position in the thread is on its activity, not here.
+ * How a message came about, when not written in amends: an agent's reply names the turn that
+ * posted it, whose log tells how. A message a channel received will name the channel.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Via = Schema.TaggedUnion({
+  Turn: { turnId: TurnId.Id },
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Via = typeof Via.Type;
+
+/**
+ * Which edit of a message its content is: 1 as published, and one more per edit.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Revision = Schema.Int.check(Schema.isGreaterThan(0));
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Revision = typeof Revision.Type;
+
+/**
+ * What a message says now: its text and whom it addresses, at the revision its last edit made,
+ * or nothing since it was deleted. The text is the only copy of it in the read models.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Content = Schema.TaggedUnion({
+  Text: {
+    text: Text,
+    mentions: Schema.UniqueArray(MemberId.Id),
+    revision: Revision,
+    /** When it was last edited, or null as published. */
+    editedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  },
+  Deleted: { deletedAt: Schema.DateTimeUtcFromString },
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Content = typeof Content.Type;
+
+/**
+ * A message as published, edited, and deleted. Its position in the thread is on its activity, not
+ * here, and stays through edits and deletion.
  *
  * @category schemas
  * @since 0.1.0
@@ -114,11 +172,10 @@ export const Record = Schema.Struct({
   workspaceId: WorkspaceId.Id,
   threadId: ThreadId.Id,
   author: Author,
-  text: Text,
-  mentions: Schema.UniqueArray(MemberId.Id),
+  /** How it came about, or null for one written in amends. */
+  via: Schema.NullOr(Via),
   publishedAt: Schema.DateTimeUtcFromString,
-  /** For an agent's reply, the turn that posted it, whose log tells how it came about. */
-  turnId: Schema.NullOr(TurnId.Id),
+  content: Content,
 });
 
 /**
@@ -126,6 +183,20 @@ export const Record = Schema.Struct({
  * @since 0.1.0
  */
 export interface Record extends Schema.Schema.Type<typeof Record> {}
+
+/**
+ * The content a message is published with: its text and mentions at revision 1.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const published = (text: Text, mentions: ReadonlyArray<MemberId.Id>): Content => ({
+  _tag: "Text",
+  text,
+  mentions,
+  revision: 1,
+  editedAt: null,
+});
 
 /**
  * What a reply says and whom it addresses. Without mentions it addresses every current
@@ -145,5 +216,69 @@ export const PublishInput = Schema.Struct({
  * @since 0.1.0
  */
 export interface PublishInput extends Schema.Schema.Type<typeof PublishInput> {}
+
+/**
+ * What an edit says and whom it addresses, and the revision the editor last saw, so an edit made
+ * meanwhile is not silently replaced.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const EditInput = Schema.Struct({
+  messageId: Id,
+  text: Text,
+  mentions: Schema.UniqueArray(MemberId.Id),
+  expectedRevision: Revision,
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface EditInput extends Schema.Schema.Type<typeof EditInput> {}
+
+/**
+ * What editing a message records: its next revision, the new text and mentions, and when. The
+ * group is the fact's audience.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Edited = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  threadId: ThreadId.Id,
+  groupId: GroupId.Id,
+  messageId: Id,
+  revision: Revision,
+  text: Text,
+  mentions: Schema.UniqueArray(MemberId.Id),
+  editedAt: Schema.DateTimeUtcFromString,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Edited extends Schema.Schema.Type<typeof Edited> {}
+
+/**
+ * What deleting a message records: which, and when. The group is the fact's audience.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Deleted = Schema.Struct({
+  workspaceId: WorkspaceId.Id,
+  threadId: ThreadId.Id,
+  groupId: GroupId.Id,
+  messageId: Id,
+  deletedAt: Schema.DateTimeUtcFromString,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Deleted extends Schema.Schema.Type<typeof Deleted> {}
 
 export * as ThreadMessage from "./ThreadMessage.ts";

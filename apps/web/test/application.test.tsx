@@ -805,15 +805,14 @@ it("points an invited identity to its invitation instead of reporting no access"
 /** A group with one thread and its reply, as the host answers them. */
 const at = "2026-09-25T12:00:00.000Z";
 const author = { _tag: "Member", memberId: "owner-one" };
-const message = (id: string, text: string) => ({
+const message = (id: string, text: string, mentions: ReadonlyArray<string> = []) => ({
   id,
   workspaceId: "one",
   threadId: "t1",
   author,
-  text,
-  mentions: [],
+  via: null,
   publishedAt: at,
-  turnId: null,
+  content: { _tag: "Text", text, mentions, revision: 1, editedAt: null },
 });
 const item = (sequence: number, id: string, text: string) => ({
   activity: {
@@ -902,7 +901,7 @@ const mentioned = () => ({
   },
   source: {
     ...item(2, "m2", "On it."),
-    message: { ...message("m2", "On it."), mentions: ["owner-one"] },
+    message: message("m2", "On it.", ["owner-one"]),
   },
 });
 it("lists the inbox at its route, and opening one marks it seen and shows its thread beside it", async () => {
@@ -931,7 +930,7 @@ it("lists the inbox at its route, and opening one marks it seen and shows its th
           item(1, "m1", "Can you look at the terms?"),
           {
             ...item(2, "m2", "On it."),
-            message: { ...message("m2", "On it."), mentions: ["owner-one"] },
+            message: message("m2", "On it.", ["owner-one"]),
           },
         ]
       : conversation(path);

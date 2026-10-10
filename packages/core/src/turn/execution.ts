@@ -342,11 +342,14 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
         ThreadMessage.Author.isAnyOf(["Member"])(author) ? [author.memberId] : [],
       ),
     );
-    return messages.map(({ author, text }): TurnPrompt.Input =>
-      ThreadMessage.Author.isAnyOf(["Member"])(author)
-        ? { author: nameOf(author.memberId), own: author.memberId === memberId, text }
-        : { author: "A contact", own: false, text },
-    );
+    // A deleted message has no text to tell; what the agent was told of it stays in its log.
+    return messages.flatMap(({ author, content }): ReadonlyArray<TurnPrompt.Input> => {
+      if (!ThreadMessage.Content.isAnyOf(["Text"])(content)) return [];
+      const { text } = content;
+      return ThreadMessage.Author.isAnyOf(["Member"])(author)
+        ? [{ author: nameOf(author.memberId), own: author.memberId === memberId, text }]
+        : [{ author: "A contact", own: false, text }];
+    });
   });
 
   /**
@@ -651,7 +654,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           mentions: [],
           participants: participants.success,
           occurredAt: yield* DateTime.now,
-          turnId: turn.id,
+          via: { _tag: "Turn", turnId: turn.id },
         });
         const messageIds = [published.message.id];
         yield* turnCommand.endTurn(turn, { outcome: "completed", messageIds });

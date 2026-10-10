@@ -17,7 +17,6 @@ const decodeRows = (rows: ReadonlyArray<typeof threadActivities.$inferSelect>) =
   decode(rows).pipe(
     Effect.flatMap((values) => Effect.forEach(values, (record) => validate(record))),
   );
-const decodeCounts = Schema.decodeUnknownEffect(Schema.Array(ThreadActivityStore.Count));
 /** Workspace-bound thread-activities projection storage. @category constructors */
 export const make = Effect.fn("ThreadActivities.make")(function* () {
   const { workspaceId, database, guard } = yield* Binding.Service;
@@ -82,27 +81,6 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
         ).pipe(Effect.flatMap(decodeRows));
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "getFirst")),
-    ),
-    countByKind: Effect.fn("ThreadActivities.countByKind")(
-      function* (input, kindInput) {
-        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
-        const kind = yield* Schema.decodeEffect(ThreadActivity.Kind)(kindInput);
-        if (ids.length === 0) return [];
-        return yield* guard(
-          db
-            .select({ threadId: threadActivities.threadId, count: sql<number>`count(*)::int` })
-            .from(threadActivities)
-            .where(
-              and(
-                inWorkspace,
-                inIds(threadActivities.threadId, ids),
-                eq(threadActivities.kind, kind),
-              ),
-            )
-            .groupBy(threadActivities.threadId),
-        ).pipe(Effect.flatMap(decodeCounts));
-      },
-      Effect.mapError(storeFailure(ThreadActivityStore, "countByKind")),
     ),
     readPage: Effect.fn("ThreadActivities.readPage")(
       function* (input, options) {

@@ -223,7 +223,10 @@ export const changeFeed = (harness: Harness) => {
             expect(created.events.map((e) => e.name)).toContain(GroupFacts.Created.name);
             const started = committed(yield* readerFeed);
             const text = started.events.find((e) => e.name === ThreadMessageFacts.Published.name);
-            expect(text?.payload).toMatchObject({ text: "Secret plan", groupId: group.id });
+            expect(text?.payload).toMatchObject({
+              content: { text: "Secret plan" },
+              groupId: group.id,
+            });
             expect(committed(yield* readerFeed).events[0]?.name).toBe(RoleFacts.Created.name);
             // Outside the group, or without read permission, only workspace facts arrive.
             for (const next of [outsiderFeed, unpermittedFeed])

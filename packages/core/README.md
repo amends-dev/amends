@@ -14,22 +14,22 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                                                 |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.             |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                       |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                             |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                           |
-| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                 |
-| `thread`        | Private-group starts, renames, human replies, authorized reads, participation, timeline activity, and projection storage. |
-| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.   |
-| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                |
-| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.    |
-| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                  |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                     |
-| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                            |
-| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                     |
-| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                     |
+| Domain          | Ownership                                                                                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.                                           |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                                                     |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                                                           |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                                                         |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                                               |
+| `thread`        | Private-group starts, renames, human replies and their edits and deletions, authorized reads, participation, timeline activity, and projection storage. |
+| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.                                 |
+| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                                              |
+| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.                                  |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                                                |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                                                   |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                                                          |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                                                   |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                                                   |
 
 Permission, grant, requirement, scope, and target remain focused modules within
 authorization. Future features such as thread and task belong beside these
@@ -252,7 +252,7 @@ job could call them from another process. Each change is its own commit, attribu
 - `showDraft` shows readers more of the step being written, as a `TurnDraft` signal.
 - `close` posts the reply its job gives, the text of the turn's last step
   (`SessionLog.answerOf`), as the agent's own message to the thread's current participants, naming
-  the turn (`turnId` on the message), saves what the session resumes from, and completes the turn,
+  the turn (the message's `via`), saves what the session resumes from, and completes the turn,
   in one commit. A reply of only space posts nothing, and one the agent may no longer post, as it
   can no longer open or post in the thread, fails the turn. A turn asked to stop meanwhile stops
   instead.

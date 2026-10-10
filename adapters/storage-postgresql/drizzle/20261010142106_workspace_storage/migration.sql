@@ -300,12 +300,19 @@ CREATE TABLE "thread_messages" (
 	"author_kind" text NOT NULL,
 	"author_member_id" text,
 	"author_contact_id" text,
-	"text" text NOT NULL,
-	"mentions" text[] NOT NULL,
-	"published_at" timestamp with time zone NOT NULL,
+	"via_kind" text,
 	"turn_id" text,
+	"published_at" timestamp with time zone NOT NULL,
+	"content_kind" text NOT NULL,
+	"text" text,
+	"mentions" text[],
+	"revision" integer,
+	"edited_at" timestamp with time zone,
+	"deleted_at" timestamp with time zone,
 	CONSTRAINT "thread_messages_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "thread_message_author" CHECK (("author_kind" = 'Member' AND "author_member_id" IS NOT NULL AND "author_contact_id" IS NULL) OR ("author_kind" = 'Contact' AND "author_member_id" IS NULL AND "author_contact_id" IS NOT NULL))
+	CONSTRAINT "thread_message_author" CHECK (("author_kind" = 'Member' AND "author_member_id" IS NOT NULL AND "author_contact_id" IS NULL) OR ("author_kind" = 'Contact' AND "author_member_id" IS NULL AND "author_contact_id" IS NOT NULL)),
+	CONSTRAINT "thread_message_via" CHECK (("via_kind" IS NULL AND "turn_id" IS NULL) OR ("via_kind" = 'Turn' AND "turn_id" IS NOT NULL)),
+	CONSTRAINT "thread_message_content" CHECK (("content_kind" = 'Text' AND "text" IS NOT NULL AND "mentions" IS NOT NULL AND "revision" > 0 AND "deleted_at" IS NULL) OR ("content_kind" = 'Deleted' AND "text" IS NULL AND "mentions" IS NULL AND "revision" IS NULL AND "edited_at" IS NULL AND "deleted_at" IS NOT NULL))
 );
 --> statement-breakpoint
 CREATE TABLE "thread_participations" (
@@ -417,6 +424,7 @@ CREATE INDEX "pending_notifications_by_thread" ON "notifications" ("workspace_id
 CREATE INDEX "pending_agent_notifications_by_participation" ON "notifications" ("workspace_id","participation_id") WHERE "state" = 'Pending' AND "recipient_kind" = 'Agent';--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_sequence" ON "thread_activities" ("workspace_id","thread_id","sequence");--> statement-breakpoint
 CREATE UNIQUE INDEX "thread_activity_occurrence" ON "thread_activities" ("workspace_id","occurrence");--> statement-breakpoint
+CREATE INDEX "thread_messages_by_thread" ON "thread_messages" ("workspace_id","thread_id") WHERE "content_kind" = 'Text';--> statement-breakpoint
 CREATE UNIQUE INDEX "active_thread_participation" ON "thread_participations" ("workspace_id","thread_id","participant_kind",coalesce("member_id", "identity_id", '')) WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C");--> statement-breakpoint
 CREATE INDEX "active_participations_by_thread" ON "thread_participations" ("workspace_id","thread_id","id" COLLATE "C") WHERE "status" = 'active';--> statement-breakpoint

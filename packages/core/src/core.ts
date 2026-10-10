@@ -120,6 +120,7 @@ export const permissions = [
   ThreadPermissions.Read,
   ThreadPermissions.Rename,
   ThreadMessagePermissions.Publish,
+  ThreadMessagePermissions.Moderate,
   ThreadParticipationPermissions.Follow,
   AgentPermissions.Use,
   ConnectionPermissions.Create,

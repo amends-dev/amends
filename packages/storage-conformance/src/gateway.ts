@@ -156,6 +156,7 @@ export const gateway = (harness: Harness) => {
                       ThreadPermissions.Read.name,
                       ThreadPermissions.Rename.name,
                       ThreadMessagePermissions.Publish.name,
+                      ThreadMessagePermissions.Moderate.name,
                       ThreadParticipationPermissions.Follow.name,
                       AgentPermissions.Use.name,
                       ConnectionPermissions.Create.name,

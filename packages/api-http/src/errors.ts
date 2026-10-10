@@ -151,6 +151,23 @@ export const message = [
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
+/**
+ * Editing a message: a missing one, or one in a thread outside the caller's groups, is 404; one
+ * someone else wrote is 403; a deleted one, a stale revision, and an unavailable mention are 409.
+ */
+export const messageEdit = [
+  ThreadMessageService.MessageNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  ThreadMessageService.NotAuthor.pipe(HttpApiSchema.status(403)),
+  ThreadMessageService.Deleted.pipe(HttpApiSchema.status(409)),
+  ThreadMessageService.Changed.pipe(HttpApiSchema.status(409)),
+  ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const;
+/** Deleting a message: a missing or unreadable one is 404; an agent principal is 403. */
+export const messageDelete = [
+  ThreadMessageService.MessageNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+] as const;
 export const typing = [ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404))] as const;
 export const participation = [
   ThreadParticipationService.ThreadNotFound.pipe(HttpApiSchema.status(404)),

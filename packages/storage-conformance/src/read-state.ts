@@ -620,7 +620,7 @@ export const readState = (harness: Harness) => {
             expect(small.counts).toMatchObject({
               "Threads.listByStart": 1,
               "ThreadActivities.getFirst": 1,
-              "ThreadActivities.countByKind": 1,
+              "ThreadMessages.countByThread": 1,
               "ThreadMessages.getMany": 1,
             });
           }),

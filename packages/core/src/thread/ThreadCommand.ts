@@ -1,6 +1,7 @@
 /**
  * The writes to threads that operations share, run inside the caller's commit: creating a thread,
- * publishing a message, and recording one activity of any kind at the thread's next position.
+ * publishing, editing, and deleting a message, and recording one activity of any kind at the
+ * thread's next position.
  * Every domain that records activity goes through `publishActivity`, which takes the position,
  * admits the participants the activity asks for, runs the domain's step, and records the activity
  * the step returns, caused by the fact the step published. The caller owns authorization and the
@@ -19,7 +20,6 @@ import type { Log } from "../journal/log.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
-import { TurnId } from "../turn/id.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Thread } from "./Thread.ts";
 import { ThreadFacts } from "./ThreadFacts.ts";
@@ -90,8 +90,8 @@ export const MessageInput = Schema.Struct({
   /** The author, mentions, and everyone else this message addresses when it has no mentions. */
   participants: Schema.Array(ThreadParticipation.Reference),
   occurredAt: Schema.DateTimeUtcFromString,
-  /** The agent's turn posting it as a reply, if one is. */
-  turnId: Schema.optionalKey(TurnId.Id),
+  /** How the message came about: an agent's turn, or null for one written in amends. */
+  via: Schema.NullOr(ThreadMessage.Via),
 });
 
 /**
@@ -109,6 +109,52 @@ export interface MessageInput extends Schema.Schema.Type<typeof MessageInput> {}
 export interface MessagePublished {
   readonly message: ThreadMessage.Record;
   readonly activity: ThreadMessageActivity.Published;
+}
+
+/**
+ * What edits a message: the message as it is, with its text, the new text and mentions, and when.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export interface EditInput {
+  readonly message: ThreadMessage.Record;
+  readonly text: ThreadMessage.Text;
+  readonly mentions: ReadonlyArray<Member.Id>;
+  readonly occurredAt: DateTime.Utc;
+}
+
+/**
+ * An edited message, with its new content, and the timeline activity that records the edit.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export interface MessageEdited {
+  readonly message: ThreadMessage.Record;
+  readonly activity: ThreadMessageActivity.Edited;
+}
+
+/**
+ * What deletes a message: the message as it is, and when.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export interface DeleteInput {
+  readonly message: ThreadMessage.Record;
+  readonly occurredAt: DateTime.Utc;
+}
+
+/**
+ * A deleted message, its content gone, and the timeline activity that records the deletion.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export interface MessageDeleted {
+  readonly message: ThreadMessage.Record;
+  readonly activity: ThreadMessageActivity.Deleted;
 }
 
 /**
@@ -247,6 +293,21 @@ export interface Interface {
     input: MessageInput,
   ) => Effect.Effect<MessagePublished, Error, Store.Transaction | Publication.Service>;
   /**
+   * Replace a message's text and mentions at its next revision, admitting the members it newly
+   * mentions and telling them, and them alone. The caller authorizes the editor, checks the
+   * revision the editor last saw, and gives a message that still has text.
+   */
+  readonly editMessage: (
+    input: EditInput,
+  ) => Effect.Effect<MessageEdited, Error, Store.Transaction | Publication.Service>;
+  /**
+   * Delete a message: its text is gone, its place in the thread stays, and no one is told. The
+   * caller authorizes the deletion and gives a message not yet deleted.
+   */
+  readonly deleteMessage: (
+    input: DeleteInput,
+  ) => Effect.Effect<MessageDeleted, Error, Store.Transaction | Publication.Service>;
+  /**
    * Publish one activity in the caller's commit: take the thread's next position, admit the
    * participants asked for, run the owning domain's step, and record the activity it returns
    * there, caused by the fact the step published. The caller authorizes the operation.
@@ -274,28 +335,27 @@ const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.
     : { _tag: "Contact", contactId: author.contactId };
 
 /**
- * Whom a message notifies, of the participants selected for it. Mentions address members; without
- * them the message reaches every selected participant. A message never notifies its own author,
- * and an agent's message asks no work of other agents, so agents cannot keep setting each other to
- * work.
+ * Whom a message by `author` notifies, of the participants selected for it. Mentions address
+ * members; without them the message reaches every selected participant. A message never notifies
+ * its own author, and an agent's message asks no work of other agents, so agents cannot keep
+ * setting each other to work.
  */
 const recipientsOf = (
-  input: MessageInput,
+  author: ThreadMessage.Author,
+  mentions: ReadonlyArray<Member.Id>,
   participants: ReadonlyArray<ThreadParticipation.Record>,
 ): ReadonlyArray<ThreadActivity.Recipient> => {
-  const author = ThreadParticipation.keyOf(authorAsParticipant(input.author));
+  const authorKey = ThreadParticipation.keyOf(authorAsParticipant(author));
   const writer = participants.find(
-    ({ participant }) => ThreadParticipation.keyOf(participant) === author,
+    ({ participant }) => ThreadParticipation.keyOf(participant) === authorKey,
   )?.participant;
   const byAgent =
     Predicate.isTagged(writer, "Member") &&
     Identity.MemberReference.isAnyOf(["Agent"])(writer.identity);
   const addressed = (participant: ThreadParticipation.Participant) => {
-    if (ThreadParticipation.keyOf(participant) === author) return false;
+    if (ThreadParticipation.keyOf(participant) === authorKey) return false;
     const memberId = ThreadParticipation.memberOf(participant);
-    return (
-      input.mentions.length === 0 || (memberId !== undefined && input.mentions.includes(memberId))
-    );
+    return mentions.length === 0 || (memberId !== undefined && mentions.includes(memberId));
   };
   return participants
     .filter(({ participant }) => addressed(participant))
@@ -460,6 +520,15 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     return { value: step.value, event } satisfies ActivityPublished<A>;
   });
 
+  /** The thread a message belongs to, which a message cannot outlive. */
+  const threadOf = Effect.fnUntraced(function* (message: {
+    readonly threadId: Thread.Id;
+  }): Effect.fn.Return<Thread.Record, ThreadStore.Failure> {
+    const found = yield* threadStore.get(message.threadId);
+    if (Option.isNone(found)) return yield* Effect.die("A message's thread is missing");
+    return found.value;
+  });
+
   const publishMessage = Effect.fn("ThreadCommand.publishMessage")(function* (input: MessageInput) {
     yield* Store.Transaction;
     // Recipients come from the selected participants, so an unselected mention would go unheard.
@@ -471,9 +540,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       )
     )
       return yield* Effect.die("A message's author and mentions must be selected participants");
-    const found = yield* threadStore.get(input.threadId);
-    if (Option.isNone(found)) return yield* Effect.die("A published message's thread is missing");
-    const thread = found.value;
+    const thread = yield* threadOf(input);
     const published = yield* publishActivity({
       thread,
       occurredAt: input.occurredAt,
@@ -485,10 +552,9 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
             workspaceId,
             threadId: thread.id,
             author: input.author,
-            text: input.text,
-            mentions: input.mentions,
+            via: input.via,
             publishedAt: input.occurredAt,
-            turnId: input.turnId ?? null,
+            content: ThreadMessage.published(input.text, input.mentions),
           };
           const fact = yield* journal
             .publish(
@@ -500,7 +566,7 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
             value: message,
             kind: ThreadMessageActivity.Published,
             details: { messageId: message.id },
-            recipients: recipientsOf(input, admitted.participants),
+            recipients: recipientsOf(input.author, input.mentions, admitted.participants),
             cause: fact,
           };
         }),
@@ -509,6 +575,96 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
       ThreadActivityKind.decode(ThreadMessageActivity.Published, published.event.payload.activity),
     );
     return { message: published.value, activity } satisfies MessagePublished;
+  });
+
+  const editMessage = Effect.fn("ThreadCommand.editMessage")(function* (input: EditInput) {
+    yield* Store.Transaction;
+    const { message } = input;
+    if (!ThreadMessage.Content.isAnyOf(["Text"])(message.content))
+      return yield* Effect.die("An edited message must still have text");
+    const current = message.content;
+    const thread = yield* threadOf(message);
+    const revision = current.revision + 1;
+    // Those the edit newly mentions are admitted and told; the author takes part already, and is
+    // selected so the recipients know whether an agent wrote.
+    const joining = input.mentions.filter((memberId) => !current.mentions.includes(memberId));
+    const edited = yield* publishActivity({
+      thread,
+      occurredAt: input.occurredAt,
+      admit: [
+        authorAsParticipant(message.author),
+        ...joining.map((memberId) => ({ _tag: "Member" as const, memberId })),
+      ],
+      step: ({ admitted }) =>
+        Effect.gen(function* () {
+          const content: ThreadMessage.Content = {
+            _tag: "Text",
+            text: input.text,
+            mentions: input.mentions,
+            revision,
+            editedAt: input.occurredAt,
+          };
+          const fact = yield* journal
+            .publish(ThreadMessageFacts.Edited, {
+              workspaceId,
+              threadId: thread.id,
+              groupId: thread.groupId,
+              messageId: message.id,
+              revision,
+              text: input.text,
+              mentions: input.mentions,
+              editedAt: input.occurredAt,
+            })
+            .pipe(Publication.withOccurredAt(input.occurredAt));
+          return {
+            value: Object.assign({}, message, { content }) satisfies ThreadMessage.Record,
+            kind: ThreadMessageActivity.Edited,
+            details: { messageId: message.id, revision },
+            recipients: recipientsOf(message.author, joining, admitted.participants),
+            cause: fact,
+          };
+        }),
+    });
+    const activity = yield* Effect.orDie(
+      ThreadActivityKind.decode(ThreadMessageActivity.Edited, edited.event.payload.activity),
+    );
+    return { message: edited.value, activity } satisfies MessageEdited;
+  });
+
+  const deleteMessage = Effect.fn("ThreadCommand.deleteMessage")(function* (input: DeleteInput) {
+    yield* Store.Transaction;
+    const { message } = input;
+    if (ThreadMessage.Content.isAnyOf(["Deleted"])(message.content))
+      return yield* Effect.die("A message is deleted once");
+    const thread = yield* threadOf(message);
+    const deleted = yield* publishActivity({
+      thread,
+      occurredAt: input.occurredAt,
+      step: () =>
+        Effect.gen(function* () {
+          const content: ThreadMessage.Content = { _tag: "Deleted", deletedAt: input.occurredAt };
+          const fact = yield* journal
+            .publish(ThreadMessageFacts.Deleted, {
+              workspaceId,
+              threadId: thread.id,
+              groupId: thread.groupId,
+              messageId: message.id,
+              deletedAt: input.occurredAt,
+            })
+            .pipe(Publication.withOccurredAt(input.occurredAt));
+          return {
+            value: Object.assign({}, message, { content }) satisfies ThreadMessage.Record,
+            kind: ThreadMessageActivity.Deleted,
+            details: { messageId: message.id },
+            recipients: [],
+            cause: fact,
+          };
+        }),
+    });
+    const activity = yield* Effect.orDie(
+      ThreadActivityKind.decode(ThreadMessageActivity.Deleted, deleted.event.payload.activity),
+    );
+    return { message: deleted.value, activity } satisfies MessageDeleted;
   });
 
   const create = Effect.fn("ThreadCommand.create")(function* (input: CreateInput) {
@@ -528,13 +684,14 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     const published = yield* publishMessage({
       ...message,
       threadId: thread.id,
+      via: null,
       participants: input.participants,
       occurredAt,
     }).pipe(Publication.withCause(created, occurredAt));
     return { thread, message: published.message, activity: published.activity } satisfies Created;
   });
 
-  return Service.of({ create, publishMessage, publishActivity });
+  return Service.of({ create, publishMessage, editMessage, deleteMessage, publishActivity });
 });
 
 /**

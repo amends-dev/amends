@@ -283,6 +283,12 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(ThreadMessageFacts.Published, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
+  registerFact(ThreadMessageFacts.Edited, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(ThreadMessageFacts.Deleted, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
   // Readers see the timeline item without whom it notified; each human or agent recipient
   // receives the notification it created for them, which needs no thread read permission.
   registerFact(ThreadActivityFacts.Recorded, {

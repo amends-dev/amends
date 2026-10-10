@@ -1,8 +1,9 @@
 /**
- * The operations on messages an actor calls: publishing a reply, and telling a thread's readers
- * that one is being written. Only people reply through it; an agent's replies come from its turns.
- * A reply authorizes its author and the members it mentions, admits them, and records its
- * recipients, all in one commit.
+ * The operations on messages an actor calls: publishing a reply, editing and deleting one, and
+ * telling a thread's readers that a reply is being written. Only people write through it; an
+ * agent's replies come from its turns. A reply authorizes its author and the members it mentions,
+ * admits them, and records its recipients, all in one commit, and an edit does the same for the
+ * members it newly mentions.
  *
  * @since 0.1.0
  */
@@ -24,12 +25,28 @@ import { ThreadMessagePermissions } from "./ThreadMessagePermissions.ts";
 import { ReadStateCommand } from "../read-state/command.ts";
 import { Request } from "../request/request.ts";
 import { ThreadMessageStore } from "./ThreadMessageStore.ts";
-import { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./ThreadMessageErrors.ts";
+import {
+  Changed,
+  Deleted,
+  HumanAuthorRequired,
+  MessageNotFound,
+  NotAuthor,
+  NotFound,
+  ParticipantUnavailable,
+} from "./ThreadMessageErrors.ts";
 import { Notification } from "../notification/notification.ts";
 import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
 import type { Thread } from "./Thread.ts";
-export { HumanAuthorRequired, NotFound, ParticipantUnavailable } from "./ThreadMessageErrors.ts";
+export {
+  Changed,
+  Deleted,
+  HumanAuthorRequired,
+  MessageNotFound,
+  NotAuthor,
+  NotFound,
+  ParticipantUnavailable,
+} from "./ThreadMessageErrors.ts";
 
 /**
  * What publishing can fail with: the outcomes in `ThreadMessageErrors`, and the failures of what
@@ -45,6 +62,38 @@ export type Error =
   | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
   | NotFound
   | ParticipantUnavailable
+  | HumanAuthorRequired
+  | ThreadMessageStore.Failure;
+
+/**
+ * What editing a message can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type EditError =
+  | Authorization.Error
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | MessageNotFound
+  | HumanAuthorRequired
+  | NotAuthor
+  | Deleted
+  | Changed
+  | ParticipantUnavailable
+  | ThreadMessageStore.Failure;
+
+/**
+ * What deleting a message can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type DeleteError =
+  | Authorization.Error
+  | Exclude<ThreadQuery.AccessError, ThreadQuery.NotFound>
+  | Exclude<ThreadCommand.Error, ThreadCommand.Unavailable>
+  | MessageNotFound
   | HumanAuthorRequired
   | ThreadMessageStore.Failure;
 
@@ -74,6 +123,24 @@ export interface Interface {
     input: ThreadMessage.PublishInput,
     options?: Request.Options,
   ) => Effect.Effect<ThreadMessage.Record, Error, Actor.Service>;
+  /**
+   * Replace the text and mentions of a message the actor wrote, at its next revision, under
+   * `thread.publish` on its thread. The same text and mentions again record nothing; otherwise a
+   * revision other than `expectedRevision` is `Changed`, and nothing is recorded. Members the edit
+   * newly mentions join and are told, under the rules of a reply; a deleted message is `Deleted`.
+   * Returns the message as edited.
+   */
+  readonly edit: (
+    input: ThreadMessage.EditInput,
+  ) => Effect.Effect<ThreadMessage.Record, EditError, Actor.Service>;
+  /**
+   * Delete a message: its own author's under `thread.publish` on the thread, anyone's under
+   * `thread.moderate` on the thread's group. Its text is gone, its place in the thread stays, and
+   * no one is told; one already deleted records nothing. Returns the message as deleted.
+   */
+  readonly delete: (
+    messageId: ThreadMessage.Id,
+  ) => Effect.Effect<ThreadMessage.Record, DeleteError, Actor.Service>;
   /**
    * Tell the thread's readers that the acting member is composing a message there, for the next
    * few seconds. Requires current group access and `thread.publish`, as publishing does. Repeats
@@ -170,6 +237,28 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
   /** The message an earlier attempt of this keyed reply published, so a retry returns it. */
   const findRetriedReply = (key: Request.Key | undefined, messageId: ThreadMessage.Id) =>
     key === undefined ? Effect.succeedNone : threadMessageStore.get(messageId);
+
+  /**
+   * A message and its thread, once the actor may act in that thread; to anyone outside its group,
+   * the message is missing, as a missing one is.
+   */
+  const requireMessage = Effect.fnUntraced(function* (messageId: ThreadMessage.Id) {
+    const found = yield* threadMessageStore.get(messageId);
+    if (Option.isNone(found)) return yield* new MessageNotFound({ messageId });
+    const thread = yield* threadQuery
+      .requireAccess(found.value.threadId)
+      .pipe(Effect.catchTag("ThreadQuery.NotFound", () => new MessageNotFound({ messageId })));
+    return { message: found.value, thread };
+  });
+
+  /** Whether the actor wrote the message; only a member writes through the service. */
+  const wroteBy = (message: ThreadMessage.Record, actor: Actor.Value) =>
+    ThreadMessage.Author.isAnyOf(["Member"])(message.author) &&
+    message.author.memberId === actor.memberId;
+
+  /** Whether two sets of mentions name the same members. */
+  const sameMentions = (left: ReadonlyArray<Member.Id>, right: ReadonlyArray<Member.Id>) =>
+    left.length === right.length && left.every((memberId) => right.includes(memberId));
   const publish = Effect.fn("ThreadMessageService.publish")(
     function* (input: ThreadMessage.PublishInput, options: Request.Options = {}) {
       const request = yield* Schema.decodeEffect(ThreadMessage.PublishInput)(input);
@@ -223,6 +312,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
           ...request,
           messageId,
           author: { _tag: "Member", memberId: actor.memberId },
+          via: null,
           participants: selected,
           occurredAt: yield* DateTime.now,
         })
@@ -239,6 +329,105 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
         published.activity.sequence,
       );
       return published.message;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  const edit = Effect.fn("ThreadMessageService.edit")(
+    function* (input: ThreadMessage.EditInput) {
+      const request = yield* Schema.decodeEffect(Schema.toType(ThreadMessage.EditInput))(input);
+      const { message, thread } = yield* requireMessage(request.messageId);
+      const actor = yield* Actor.Service;
+      if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
+        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+      if (!wroteBy(message, actor)) return yield* new NotAuthor({ messageId: message.id });
+      yield* authorization.require([
+        Requirement.make(ThreadMessagePermissions.Publish, {
+          _tag: "Thread",
+          workspaceId,
+          threadId: thread.id,
+        }),
+      ]);
+      if (!ThreadMessage.Content.isAnyOf(["Text"])(message.content))
+        return yield* new Deleted({ messageId: message.id });
+      const content = message.content;
+      if (content.text === request.text && sameMentions(content.mentions, request.mentions))
+        return message;
+      if (content.revision !== request.expectedRevision)
+        return yield* new Changed({ messageId: message.id });
+      // Those the edit newly mentions must be able to take part, as a reply's mentions must, and
+      // newly mentioning an agent not yet taking part directs it, so needs the author's agent use.
+      const joining = request.mentions.filter((memberId) => !content.mentions.includes(memberId));
+      const participating = new Set(
+        (yield* threadQuery.findParticipants(
+          thread,
+          joining.map((memberId) => ({ _tag: "Member" as const, memberId })),
+        )).flatMap(({ participant }) => ThreadParticipation.memberOf(participant) ?? []),
+      );
+      const eligible = yield* threadQuery.eligibleMembers(thread.groupId, joining);
+      for (const memberId of joining) {
+        const entry = eligible.get(memberId);
+        if (entry === undefined) return yield* new ParticipantUnavailable({ memberId });
+        if (
+          Identity.MemberReference.isAnyOf(["Agent"])(entry.member.identity) &&
+          !participating.has(memberId)
+        )
+          yield* authorization.require([
+            Requirement.make(AgentPermissions.Use, { _tag: "Member", workspaceId, memberId }),
+          ]);
+      }
+      const edited = yield* threadCommand
+        .editMessage({
+          message,
+          text: request.text,
+          mentions: request.mentions,
+          occurredAt: yield* DateTime.now,
+        })
+        .pipe(
+          Effect.catchTag(
+            "ThreadCommand.Unavailable",
+            (error) => new ParticipantUnavailable({ memberId: error.memberId }),
+          ),
+        );
+      return edited.message;
+    },
+    Publication.withActor,
+    Effect.provideService(Crypto.Crypto, crypto),
+    journal.commit,
+  );
+
+  const deleteMessage = Effect.fn("ThreadMessageService.delete")(
+    function* (messageId: ThreadMessage.Id) {
+      const id = yield* Schema.decodeEffect(ThreadMessage.Id)(messageId);
+      const { message, thread } = yield* requireMessage(id);
+      const actor = yield* Actor.Service;
+      if (!Identity.MemberReference.isAnyOf(["Human"])(actor.identity))
+        return yield* new HumanAuthorRequired({ memberId: actor.memberId });
+      // The author deletes their own message as they published it; anyone else moderates the group.
+      yield* authorization.require([
+        wroteBy(message, actor)
+          ? Requirement.make(ThreadMessagePermissions.Publish, {
+              _tag: "Thread",
+              workspaceId,
+              threadId: thread.id,
+            })
+          : Requirement.make(ThreadMessagePermissions.Moderate, {
+              _tag: "Group",
+              workspaceId,
+              groupId: thread.groupId,
+            }),
+      ]);
+      if (ThreadMessage.Content.isAnyOf(["Deleted"])(message.content)) return message;
+      const deleted = yield* threadCommand
+        .deleteMessage({ message, occurredAt: yield* DateTime.now })
+        .pipe(
+          Effect.catchTag("ThreadCommand.Unavailable", () =>
+            Effect.die("A deletion admits no participant"),
+          ),
+        );
+      return deleted.message;
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),
@@ -270,7 +459,7 @@ export const make = Effect.fn("ThreadMessageService.make")(function* () {
       }),
     );
   });
-  return Service.of({ publish, typing });
+  return Service.of({ publish, edit, delete: deleteMessage, typing });
 });
 
 /**

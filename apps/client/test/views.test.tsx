@@ -94,10 +94,9 @@ const message = (
   workspaceId: "one",
   threadId,
   author: author(by),
-  text,
-  mentions,
+  via: null,
   publishedAt: at(1),
-  turnId: null,
+  content: { _tag: "Text", text, mentions, revision: 1, editedAt: null },
 });
 const openings = [
   {
@@ -158,7 +157,10 @@ const timeline = [
   },
   {
     activity: activity(4, "message.published", "message:m2", { messageId: "m2" }),
-    message: { ...message("m2", "t1", "scout", "All clear."), turnId: "turn-9" },
+    message: {
+      ...message("m2", "t1", "scout", "All clear."),
+      via: { _tag: "Turn", turnId: "turn-9" },
+    },
   },
 ];
 const roster = ["owner", "ada"].map((memberId, index) => ({

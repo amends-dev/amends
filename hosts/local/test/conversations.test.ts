@@ -52,7 +52,9 @@ const workspaceWithBob = Effect.gen(function* () {
   return { asAlice, asBob, workspace, aliceId: workspace.ownerMemberId, bobId: joined.id };
 });
 const texts = (items: ReadonlyArray<ThreadTimeline.Item>) =>
-  items.flatMap((item) => ("message" in item ? [item.message.text] : []));
+  items.flatMap((item) =>
+    "message" in item && item.message.content._tag === "Text" ? [item.message.content.text] : [],
+  );
 const { available, withDatabase } = setup();
 describe.skipIf(!available)("PostgreSQL", () => {
   it.live("a conversation runs over HTTP: a group, a thread, replies, mentions, and reading", () =>
@@ -168,8 +170,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
           createdBy: { _tag: "Member", memberId: bobId },
         });
         expect(started.message).toMatchObject({
-          text: "Can you review the draft?",
-          mentions: [aliceId],
+          content: { _tag: "Text", text: "Can you review the draft?", mentions: [aliceId] },
         });
         const threadId = started.thread.id;
         expect(yield* asAlice.threads.get({ params: { workspaceId, threadId } })).toEqual(
@@ -243,7 +244,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
         ).toMatchObject([
           {
             thread: started.thread,
-            message: { id: started.message.id, text: "Can you review the draft?" },
+            message: { id: started.message.id, content: { text: "Can you review the draft?" } },
             replies: 1,
             latest: { sequence: latest },
           },
@@ -485,7 +486,10 @@ describe.skipIf(!available)("PostgreSQL", () => {
           params: { workspaceId, groupId },
           query: { limit: 1 },
         });
-        expect(newest).toMatchObject({ thread: second.thread, message: { text: "Another one" } });
+        expect(newest).toMatchObject({
+          thread: second.thread,
+          message: { content: { text: "Another one" } },
+        });
         expect(
           yield* asBob.threads.openings({
             params: { workspaceId, groupId },
@@ -495,7 +499,7 @@ describe.skipIf(!available)("PostgreSQL", () => {
             },
           }),
         ).toMatchObject([
-          { thread: direct.thread, message: { text: "Quick question" }, replies: 0 },
+          { thread: direct.thread, message: { content: { text: "Quick question" } }, replies: 0 },
         ]);
         // Direct groups have fixed members and nothing to follow.
         const roster = yield* asAlice.groups.members({

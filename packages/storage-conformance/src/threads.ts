@@ -194,8 +194,10 @@ export const threads = (harness: Harness) => {
                 workspaceId,
                 createdBy: { _tag: "Member", memberId: owner.memberId },
               });
-              expect(result.message.text).toBe("  Here's the proposal\n");
-              expect(result.message.mentions).toEqual([]);
+              expect(result.message.content).toEqual(
+                ThreadMessage.published("  Here's the proposal\n", []),
+              );
+              expect(result.message.via).toBeNull();
               expect(result.activity).toMatchObject({
                 threadId: result.thread.id,
                 details: { messageId: result.message.id },
@@ -847,7 +849,7 @@ export const threads = (harness: Harness) => {
                     bound.messages.insert(
                       Object.assign({}, first.message, {
                         id: ThreadMessage.Id.make("blank"),
-                        text: "  ",
+                        content: ThreadMessage.published("  ", []),
                       }),
                     ),
                   ),

@@ -120,6 +120,26 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
+      edit: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.edit({ messageId: params.messageId, ...payload }),
+            ),
+          ),
+        ),
+      delete: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.delete(params.messageId),
+            ),
+          ),
+        ),
       follow: ({ params }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(

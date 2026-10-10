@@ -118,10 +118,9 @@ const message = (id: string, thread: Thread.Id, group: Group.Id) => ({
   groupId: group,
   threadId: thread,
   author: { _tag: "Member" as const, memberId: bobMember },
-  text: `Message ${id}`,
-  mentions: [],
+  via: null,
   publishedAt: at,
-  turnId: null,
+  content: ThreadMessage.published(`Message ${id}`, []),
 });
 const workspaceGrant = (permission: Permission.Definition) =>
   Assignment.Source.cases.Direct.make({

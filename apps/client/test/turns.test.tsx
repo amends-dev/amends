@@ -73,10 +73,9 @@ const message = (id: string, by: string, text: string, turnId: string | null = n
   workspaceId: "one",
   threadId: "thread",
   author: { _tag: "Member", memberId: by },
-  text,
-  mentions: [],
+  via: turnId === null ? null : { _tag: "Turn", turnId },
   publishedAt: at(1),
-  turnId,
+  content: { _tag: "Text", text, mentions: [], revision: 1, editedAt: null },
 });
 type Item = { readonly activity: { readonly sequence: number } };
 /** The thread's activity so far, oldest first; each write adds what the host would. */

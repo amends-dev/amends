@@ -67,10 +67,9 @@ const message = (id: string, text: string, mentions: string[]) => ({
   workspaceId: "one",
   threadId: "t1",
   author: { _tag: "Member", memberId: "ada" },
-  text,
-  mentions,
+  via: null,
   publishedAt: at(1),
-  turnId: null,
+  content: { _tag: "Text", text, mentions, revision: 1, editedAt: null },
 });
 const notification = (
   id: string,
