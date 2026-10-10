@@ -1,10 +1,10 @@
-import * as Core from "@amends/core";
-import { BuiltinRoleUpgrade } from "@amends/core/authorization";
-import { DeliveryJobs } from "@amends/core/channel";
-import { TurnJobs } from "@amends/core/turn";
-import { type Integration, Integrations } from "@amends/connection";
-import { Journal } from "@amends/core/journal";
-import { Workspace } from "@amends/core/workspace";
+import * as Core from "@amends-dev/core";
+import { BuiltinRoleUpgrade } from "@amends-dev/core/authorization";
+import { DeliveryJobs } from "@amends-dev/core/channel";
+import { TurnJobs } from "@amends-dev/core/turn";
+import { type Integration, Integrations } from "@amends-dev/connection";
+import { Journal } from "@amends-dev/core/journal";
+import { Workspace } from "@amends-dev/core/workspace";
 import {
   Context,
   Crypto,

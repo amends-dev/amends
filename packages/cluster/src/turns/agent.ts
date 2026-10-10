@@ -3,11 +3,11 @@
  * `AgentQuery.Runnable` with the integrations the host installs: its harness, on its model, and
  * the sandbox the session works in, if the agent has one.
  */
-import { Integrations } from "@amends/connection";
-import type { AgentQuery } from "@amends/core/agent";
-import type { Connection } from "@amends/core/connection";
-import type { Agent, Session } from "@amends/harness";
-import { Sandbox } from "@amends/sandbox";
+import { Integrations } from "@amends-dev/connection";
+import type { AgentQuery } from "@amends-dev/core/agent";
+import type { Connection } from "@amends-dev/core/connection";
+import type { Agent, Session } from "@amends-dev/harness";
+import { Sandbox } from "@amends-dev/sandbox";
 import { Effect } from "effect";
 import type { SessionLogWriter } from "./session-log-writer.ts";
 

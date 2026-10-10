@@ -1,8 +1,8 @@
-import { BuiltinRoles } from "@amends/core/authorization";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { describe, expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends/api-http";
-import { Identity } from "@amends/core/identity";
-import { Member } from "@amends/core/workspace";
+import { Api, Authentication } from "@amends-dev/api-http";
+import { Identity } from "@amends-dev/core/identity";
+import { Member } from "@amends-dev/core/workspace";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import { HttpBody, HttpClient, HttpClientRequest, HttpRouter } from "effect/http";

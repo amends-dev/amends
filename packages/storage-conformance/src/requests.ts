@@ -1,10 +1,10 @@
-import { GroupService, GroupMembershipService } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Log, Store } from "@amends/core/journal";
-import { Request } from "@amends/core/request";
-import { ThreadService, ThreadMessageService } from "@amends/core/thread";
-import { InvitationService, Member } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { GroupService, GroupMembershipService } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Log, Store } from "@amends-dev/core/journal";
+import { Request } from "@amends-dev/core/request";
+import { ThreadService, ThreadMessageService } from "@amends-dev/core/thread";
+import { InvitationService, Member } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";

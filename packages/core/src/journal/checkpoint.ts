@@ -77,7 +77,7 @@ export interface Interface {
 
 /** Persistence is supplied by the host and shares the journal's native transaction. */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/journal/checkpoint/Service",
+  "@amends-dev/core/journal/checkpoint/Service",
 ) {}
 
 export * as Checkpoint from "./checkpoint.ts";

@@ -6,12 +6,12 @@
  *
  * @since 0.1.0
  */
-import type { ChannelTransport } from "@amends/channel";
+import type { ChannelTransport } from "@amends-dev/channel";
 import {
   type Connection as ConnectionContract,
   type Integration,
   Integrations,
-} from "@amends/connection";
+} from "@amends-dev/connection";
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Connection } from "../connection/connection.ts";
 import { ConnectionCredentialStore } from "../connection/credential-store.ts";
@@ -75,7 +75,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/channel/ChannelQuery",
+  "@amends-dev/core/channel/ChannelQuery",
 ) {}
 
 /**

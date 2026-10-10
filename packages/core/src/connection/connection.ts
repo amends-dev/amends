@@ -1,11 +1,11 @@
 /**
  * A connection is a workspace's link to one integration its host installed, such as its Anthropic
- * account, its Daytona organization, or an MCP server, as `@amends/connection` describes them.
+ * account, its Daytona organization, or an MCP server, as `@amends-dev/connection` describes them.
  * Core keeps each connection's record: what the workspace calls it, the settings its integration
  * takes, and how it authenticates. Its key is kept apart from it, so that no secret enters the
  * journal, a fact, or a view.
  */
-import { Connection, Integration, ModelCatalog } from "@amends/connection";
+import { Connection, Integration, ModelCatalog } from "@amends-dev/connection";
 import { Schema } from "effect";
 import { Text } from "../text/text.ts";
 import { WorkspaceId } from "../workspace/id.ts";

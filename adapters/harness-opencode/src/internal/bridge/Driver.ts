@@ -9,7 +9,7 @@
  * the next session, and one that exits by itself completes `serverExited`, for the bridge to exit
  * with it.
  */
-import type { Bridge, HarnessError } from "@amends/harness";
+import type { Bridge, HarnessError } from "@amends-dev/harness";
 import {
   type Crypto,
   Deferred,

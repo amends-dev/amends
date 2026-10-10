@@ -21,7 +21,7 @@ The host requires a PostgreSQL database; see the [local host guide](../../hosts/
 In another terminal:
 
 ```sh
-bun run --filter @amends/web dev
+bun run --filter @amends-dev/web dev
 ```
 
 Open `http://127.0.0.1:4321/`. Guests reach the sign-in form without contacting
@@ -29,8 +29,8 @@ the host. Requesting a code calls the host, which logs it in its terminal. Resto
 `/api` to `http://127.0.0.1:8787`; the local host remains a separate process.
 
 ```sh
-bun run --filter @amends/web build
-bun run --filter @amends/web preview
+bun run --filter @amends-dev/web build
+bun run --filter @amends-dev/web preview
 bun run check
 bun run test
 ```

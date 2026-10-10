@@ -3,8 +3,8 @@
  * runs inside, and the state each statement sees. Store modules require this service and
  * nothing else of each other.
  */
-import { Commit, Store } from "@amends/core/journal";
-import type { Workspace } from "@amends/core/workspace";
+import { Commit, Store } from "@amends-dev/core/journal";
+import type { Workspace } from "@amends-dev/core/workspace";
 import { Context, DateTime, Effect, Exit, Layer, Option } from "effect";
 import { MemoryConnection } from "./connection.ts";
 import { MemoryDatabase } from "./database.ts";
@@ -41,7 +41,7 @@ export const afterCommit = (session: TransactionState, effect: Effect.Effect<voi
 
 /** The session a program runs under; statements check it against their own binding. */
 export class CurrentTransaction extends Context.Service<CurrentTransaction, TransactionState>()(
-  "@amends/storage-memory/binding/Current",
+  "@amends-dev/storage-memory/binding/Current",
 ) {}
 
 export interface Interface {
@@ -80,7 +80,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/storage-memory/binding/Service",
+  "@amends-dev/storage-memory/binding/Service",
 ) {}
 
 /**

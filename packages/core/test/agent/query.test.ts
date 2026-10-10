@@ -3,8 +3,8 @@ import {
   Integration,
   Integrations,
   type ModelCatalog,
-} from "@amends/connection";
-import { Harness } from "@amends/harness";
+} from "@amends-dev/connection";
+import { Harness } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Layer, Option, Redacted, Result } from "effect";
 import { Agent } from "../../src/agent/agent.ts";

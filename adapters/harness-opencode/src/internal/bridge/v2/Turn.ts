@@ -14,7 +14,7 @@
  * tokens, and the reason its last step ended, or `error` for a turn that failed, was stopped, or
  * took no step.
  */
-import { HarnessError, type StreamPart } from "@amends/harness";
+import { HarnessError, type StreamPart } from "@amends-dev/harness";
 import { Result, Schema } from "effect";
 import type { Response } from "effect/ai";
 import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts";

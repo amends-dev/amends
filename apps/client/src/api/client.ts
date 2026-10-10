@@ -1,4 +1,4 @@
-import { Api as Contract, Authentication, Unauthorized } from "@amends/api-http";
+import { Api as Contract, Authentication, Unauthorized } from "@amends-dev/api-http";
 import { Cause, Effect, Layer, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 import { HttpApiMiddleware } from "effect/http-api";
@@ -25,7 +25,7 @@ export function createApiClient(options: ApiClientOptions) {
       HttpClient.tap((response) => (response.status === 401 ? Effect.sync(rejected) : Effect.void)),
     ),
   ).pipe(Layer.provide(transport));
-  class Client extends AtomHttpApi.Service<Client>()("@amends/client/api/ApiClient", {
+  class Client extends AtomHttpApi.Service<Client>()("@amends-dev/client/api/ApiClient", {
     api: Contract,
     baseUrl: options.baseUrl,
     httpClient: Layer.mergeAll(

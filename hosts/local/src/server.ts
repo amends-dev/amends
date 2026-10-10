@@ -1,4 +1,4 @@
-import { Draining, Routes } from "@amends/server-http";
+import { Draining, Routes } from "@amends-dev/server-http";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { Layer } from "effect";
 import { HttpRouter } from "effect/http";

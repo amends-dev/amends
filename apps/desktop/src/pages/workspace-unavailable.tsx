@@ -1,5 +1,5 @@
-import { paths, useSession, useWorkspaceAccess } from "@amends/client";
-import { WorkspaceUnavailableScreen } from "@amends/ui/screens/standalone";
+import { paths, useSession, useWorkspaceAccess } from "@amends-dev/client";
+import { WorkspaceUnavailableScreen } from "@amends-dev/ui/screens/standalone";
 import { useNavigate } from "@solidjs/router";
 import { useStandaloneAccount } from "../account.ts";
 

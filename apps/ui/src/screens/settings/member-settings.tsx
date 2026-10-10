@@ -1,5 +1,5 @@
 import { For, Show, createUniqueId } from "solid-js";
-import { IconMarkForward, IconMarkMail } from "@amends/icons";
+import { IconMarkForward, IconMarkMail } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";

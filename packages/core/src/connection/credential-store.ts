@@ -1,4 +1,4 @@
-import type { Connection as ConnectionContract } from "@amends/connection";
+import type { Connection as ConnectionContract } from "@amends-dev/connection";
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
@@ -37,7 +37,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/connection/credential-store/Service",
+  "@amends-dev/core/connection/credential-store/Service",
 ) {}
 
 export * as ConnectionCredentialStore from "./credential-store.ts";

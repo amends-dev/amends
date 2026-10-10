@@ -12,7 +12,7 @@ import {
   IconMarkTasks,
   IconMarkTriage,
   IconMessage,
-} from "@amends/icons";
+} from "@amends-dev/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
 import type { Status } from "../../components/status-mark/index.ts";
 import { Menu } from "../../components/menu/index.ts";

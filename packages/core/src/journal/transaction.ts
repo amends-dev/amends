@@ -48,7 +48,7 @@ export interface Interface {
   readonly step: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/journal/transaction/Service",
+  "@amends-dev/core/journal/transaction/Service",
 ) {}
 
 interface State {
@@ -59,13 +59,13 @@ interface State {
   failure: Option.Option<Cause.Cause<unknown>>;
 }
 class Current extends Context.Service<Current, State>()(
-  "@amends/core/journal/transaction/Current",
+  "@amends-dev/core/journal/transaction/Current",
 ) {}
 class OperationOwner extends Context.Service<OperationOwner, number>()(
-  "@amends/core/journal/transaction/OperationOwner",
+  "@amends-dev/core/journal/transaction/OperationOwner",
 ) {}
 class Forbidden extends Context.Service<Forbidden, string>()(
-  "@amends/core/journal/transaction/Forbidden",
+  "@amends-dev/core/journal/transaction/Forbidden",
 ) {}
 
 /** Projections may update their stores, but may not append new log entries. */

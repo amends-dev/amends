@@ -31,7 +31,7 @@
  *
  * @since 0.1.0
  */
-import { type Network, Sandbox, type Template } from "@amends/sandbox";
+import { type Network, Sandbox, type Template } from "@amends-dev/sandbox";
 import {
   Crypto,
   Deferred,
@@ -123,8 +123,8 @@ type Client = RpcClient.FromGroup<typeof Bridge.Rpcs, RpcClientError.RpcClientEr
  * **Example** (An adapter's agent whose sessions run behind its bridge)
  *
  * ```ts
- * import { Agent, BridgeClient } from "@amends/harness";
- * import type { Sandbox, Template } from "@amends/sandbox";
+ * import { Agent, BridgeClient } from "@amends-dev/harness";
+ * import type { Sandbox, Template } from "@amends-dev/sandbox";
  * import { Crypto, Effect, Redacted, Schema } from "effect";
  * import type { Socket } from "effect/socket";
  *

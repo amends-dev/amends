@@ -80,6 +80,8 @@ export interface Interface {
  * @category services
  * @since 0.1.0
  */
-export class Service extends Context.Service<Service, Interface>()("@amends/core/task/TaskStore") {}
+export class Service extends Context.Service<Service, Interface>()(
+  "@amends-dev/core/task/TaskStore",
+) {}
 
 export * as TaskStore from "./TaskStore.ts";

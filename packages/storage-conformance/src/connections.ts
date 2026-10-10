@@ -1,10 +1,10 @@
-import { Integration } from "@amends/connection";
-import { Connection, ConnectionService } from "@amends/core/connection";
-import { Actor, type Identity } from "@amends/core/identity";
-import { Journal, Store } from "@amends/core/journal";
-import { Request } from "@amends/core/request";
-import type { Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Integration } from "@amends-dev/connection";
+import { Connection, ConnectionService } from "@amends-dev/core/connection";
+import { Actor, type Identity } from "@amends-dev/core/identity";
+import { Journal, Store } from "@amends-dev/core/journal";
+import { Request } from "@amends-dev/core/request";
+import type { Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Redacted, Schema } from "effect";
 import type { Harness } from "./harness.ts";

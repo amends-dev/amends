@@ -1,4 +1,4 @@
-import type { StreamPart } from "@amends/harness";
+import type { StreamPart } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
 import { Prompt } from "effect/ai";

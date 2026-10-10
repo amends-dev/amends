@@ -1,5 +1,5 @@
 import { Match, Switch, splitProps, type JSX } from "solid-js";
-import { IconAlertTriangle, IconCheck, IconMinus } from "@amends/icons";
+import { IconAlertTriangle, IconCheck, IconMinus } from "@amends-dev/icons";
 import { classes } from "../../internal/props.ts";
 import { Logo } from "../logo/index.ts";
 import * as s from "./turn-status.css.ts";

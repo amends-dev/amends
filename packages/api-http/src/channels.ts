@@ -1,7 +1,7 @@
-import { Channel, ChannelBinding } from "@amends/core/channel";
-import { Group } from "@amends/core/group";
-import { Thread } from "@amends/core/thread";
-import { Workspace } from "@amends/core/workspace";
+import { Channel, ChannelBinding } from "@amends-dev/core/channel";
+import { Group } from "@amends-dev/core/group";
+import { Thread } from "@amends-dev/core/thread";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

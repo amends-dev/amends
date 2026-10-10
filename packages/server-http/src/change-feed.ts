@@ -1,6 +1,6 @@
-import { Api, Principal } from "@amends/api-http";
-import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
-import { Gateway } from "@amends/gateway";
+import { Api, Principal } from "@amends-dev/api-http";
+import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 import { Streams } from "./streams.ts";

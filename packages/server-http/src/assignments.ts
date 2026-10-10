@@ -1,6 +1,6 @@
-import { Api, Principal } from "@amends/api-http";
-import { AssignmentService } from "@amends/core/authorization";
-import { Gateway } from "@amends/gateway";
+import { Api, Principal } from "@amends-dev/api-http";
+import { AssignmentService } from "@amends-dev/core/authorization";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

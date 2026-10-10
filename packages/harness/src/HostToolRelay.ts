@@ -138,7 +138,7 @@ export interface Relay {
  * **Example** (A driver giving its agent the host's tools through the relay)
  *
  * ```ts
- * import { Bridge, HostToolRelay, StreamPart } from "@amends/harness";
+ * import { Bridge, HostToolRelay, StreamPart } from "@amends-dev/harness";
  * import { Effect, Redacted, Stream } from "effect";
  *
  * // What the adapter has of its agent: it is an MCP client over HTTP, configured per session.
@@ -200,7 +200,7 @@ export class HostToolRelay extends Context.Service<
 
     readonly open: Relay["open"];
   }
->()("@amends/harness/HostToolRelay") {}
+>()("@amends-dev/harness/HostToolRelay") {}
 
 /** The protocols of MCP the relay speaks, newest first. */
 const protocolVersions = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
@@ -467,7 +467,7 @@ export const make = Effect.fn("HostToolRelay.make")(function* (options?: Options
  * **Example** (Serving the relay from a bridge program on Bun)
  *
  * ```ts
- * import { HostToolRelay } from "@amends/harness";
+ * import { HostToolRelay } from "@amends-dev/harness";
  * import { BunHttpServer } from "@effect/platform-bun";
  * import { Layer } from "effect";
  *

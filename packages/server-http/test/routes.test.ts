@@ -1,21 +1,21 @@
-import { Channel, ChannelIntake, ChannelService } from "@amends/core/channel";
-import { Connection } from "@amends/core/connection";
-import { Request } from "@amends/core/request";
-import { BuiltinRoles } from "@amends/core/authorization";
+import { Channel, ChannelIntake, ChannelService } from "@amends-dev/core/channel";
+import { Connection } from "@amends-dev/core/connection";
+import { Request } from "@amends-dev/core/request";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
 import { expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends/api-http";
-import type * as Core from "@amends/core";
-import { Authorization, Requirement, Target } from "@amends/core/authorization";
-import { Actor, Identity } from "@amends/core/identity";
-import { Entry } from "@amends/core/journal";
-import { Notification, NotificationService } from "@amends/core/notification";
+import { Api, Authentication } from "@amends-dev/api-http";
+import type * as Core from "@amends-dev/core";
+import { Authorization, Requirement, Target } from "@amends-dev/core/authorization";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Entry } from "@amends-dev/core/journal";
+import { Notification, NotificationService } from "@amends-dev/core/notification";
 import {
   Group,
   GroupService,
   GroupFollowService,
   GroupMembership,
   GroupMembershipService,
-} from "@amends/core/group";
+} from "@amends-dev/core/group";
 import {
   Thread,
   ThreadService,
@@ -23,9 +23,9 @@ import {
   ThreadParticipation,
   ThreadParticipationService,
   ThreadMessage,
-} from "@amends/core/thread";
-import { ReadStateService } from "@amends/core/read-state";
-import { TaskService } from "@amends/core/task";
+} from "@amends-dev/core/thread";
+import { ReadStateService } from "@amends-dev/core/read-state";
+import { TaskService } from "@amends-dev/core/task";
 import {
   Invitation,
   InvitationService,
@@ -33,8 +33,14 @@ import {
   MemberService,
   MemberPermissions,
   Workspace,
-} from "@amends/core/workspace";
-import { SessionTokens, Gateway, GatewayErrors, SignIn, WorkspaceDirectory } from "@amends/gateway";
+} from "@amends-dev/core/workspace";
+import {
+  SessionTokens,
+  Gateway,
+  GatewayErrors,
+  SignIn,
+  WorkspaceDirectory,
+} from "@amends-dev/gateway";
 import { DateTime, Effect, Layer, Redacted } from "effect";
 import type { Scope } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";

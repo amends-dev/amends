@@ -1,7 +1,7 @@
 import { expect, it } from "@effect/vitest";
-import { Api, Authentication } from "@amends/api-http";
-import { Identity } from "@amends/core/identity";
-import { SessionTokens, WorkspaceDirectory } from "@amends/gateway";
+import { Api, Authentication } from "@amends-dev/api-http";
+import { Identity } from "@amends-dev/core/identity";
+import { SessionTokens, WorkspaceDirectory } from "@amends-dev/gateway";
 import { Effect, Layer, Redacted, Ref } from "effect";
 import { HttpClientRequest, HttpServer } from "effect/http";
 import { HttpApiMiddleware, HttpApiTest } from "effect/http-api";

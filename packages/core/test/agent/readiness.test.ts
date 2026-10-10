@@ -3,7 +3,7 @@ import {
   Integration,
   Integrations,
   type ModelCatalog,
-} from "@amends/connection";
+} from "@amends-dev/connection";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Result, Schema } from "effect";
 import { AgentReadiness } from "../../src/agent/readiness.ts";

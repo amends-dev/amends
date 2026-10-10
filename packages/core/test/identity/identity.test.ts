@@ -1,8 +1,8 @@
 import { expect, it } from "@effect/vitest";
 import { Option, Schema } from "effect";
-import { Actor, Identity, Performer } from "@amends/core/identity";
-import { Notification } from "@amends/core/notification";
-import { Member } from "@amends/core/workspace";
+import { Actor, Identity, Performer } from "@amends-dev/core/identity";
+import { Notification } from "@amends-dev/core/notification";
+import { Member } from "@amends-dev/core/workspace";
 
 it("contact authorship does not make a contact a member, authenticated actor, or member performer", () => {
   const contact = Identity.Reference.cases.Contact.make({

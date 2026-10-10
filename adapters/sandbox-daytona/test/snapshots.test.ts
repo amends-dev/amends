@@ -1,4 +1,4 @@
-import { Sandbox, Template } from "@amends/sandbox";
+import { Sandbox, Template } from "@amends-dev/sandbox";
 import { SnapshotState } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it, layer } from "@effect/vitest";

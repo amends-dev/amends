@@ -17,22 +17,27 @@ export { TurnsGroup } from "./turns.ts";
 export { WorkspacesGroup } from "./workspaces.ts";
 
 // Shared wire schemas for typed clients; implementations stay in core.
-export { Identity } from "@amends/core/identity";
-export { ChangeFeed } from "@amends/core/change-feed";
-export { Signal } from "@amends/core/signal";
+export { Identity } from "@amends-dev/core/identity";
+export { ChangeFeed } from "@amends-dev/core/change-feed";
+export { Signal } from "@amends-dev/core/signal";
 export {
   Workspace,
   WorkspaceSettings,
   Ownership,
   Member,
   Invitation,
-} from "@amends/core/workspace";
-export { Assignment, Scope } from "@amends/core/authorization";
-export { Group, GroupMembership } from "@amends/core/group";
-export { Thread, ThreadMessage, ThreadParticipation, ThreadTimeline } from "@amends/core/thread";
-export { Task } from "@amends/core/task";
-export { Notification, NotificationInbox } from "@amends/core/notification";
-export { Connection } from "@amends/core/connection";
-export { Agent } from "@amends/core/agent";
-export { Turn } from "@amends/core/turn";
-export { Channel, ChannelBinding } from "@amends/core/channel";
+} from "@amends-dev/core/workspace";
+export { Assignment, Scope } from "@amends-dev/core/authorization";
+export { Group, GroupMembership } from "@amends-dev/core/group";
+export {
+  Thread,
+  ThreadMessage,
+  ThreadParticipation,
+  ThreadTimeline,
+} from "@amends-dev/core/thread";
+export { Task } from "@amends-dev/core/task";
+export { Notification, NotificationInbox } from "@amends-dev/core/notification";
+export { Connection } from "@amends-dev/core/connection";
+export { Agent } from "@amends-dev/core/agent";
+export { Turn } from "@amends-dev/core/turn";
+export { Channel, ChannelBinding } from "@amends-dev/core/channel";

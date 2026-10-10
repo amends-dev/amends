@@ -4,8 +4,8 @@
  * the log past what it wrote, as one another run replaced after Cluster moved its job, writes
  * nothing more and stops: it is `Superseded`.
  */
-import { SessionLog, Turn, type TurnExecution } from "@amends/core/turn";
-import { Agent, type Session } from "@amends/harness";
+import { SessionLog, Turn, type TurnExecution } from "@amends-dev/core/turn";
+import { Agent, type Session } from "@amends-dev/harness";
 import { Array, Effect, Ref, Schema } from "effect";
 import type { Prompt } from "effect/ai";
 import type { TurnWorkspace } from "./workspace.ts";

@@ -1,6 +1,6 @@
-import { ThreadParticipation, Thread, ThreadParticipationStore } from "@amends/core/thread";
-import { GroupMembership } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
+import { ThreadParticipation, Thread, ThreadParticipationStore } from "@amends-dev/core/thread";
+import { GroupMembership } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, eq, sql } from "drizzle-orm";
 import { threadParticipations } from "./schema.ts";

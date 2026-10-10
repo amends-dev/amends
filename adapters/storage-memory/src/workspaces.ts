@@ -1,5 +1,10 @@
-import { Store } from "@amends/core/journal";
-import { Ownership, Workspace, WorkspaceSettings, WorkspaceStore } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import {
+  Ownership,
+  Workspace,
+  WorkspaceSettings,
+  WorkspaceStore,
+} from "@amends-dev/core/workspace";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

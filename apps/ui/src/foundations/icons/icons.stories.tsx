@@ -2,8 +2,8 @@ import { For, createMemo, createSignal } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
-import * as icons from "@amends/icons";
-import { iconCatalog } from "@amends/icons/catalog";
+import * as icons from "@amends-dev/icons";
+import { iconCatalog } from "@amends-dev/icons/catalog";
 import { Button } from "../../components/button/index.ts";
 import { SearchField } from "../../components/input/index.ts";
 import * as s from "../foundations.stories.css.ts";
@@ -30,8 +30,8 @@ function GallerySpecimen() {
       <section class={s.section}>
         <h2 class={s.heading}>Icons</h2>
         <p class={s.note}>
-          Every drawing on the shared 24-unit grid, from <code>@amends/icons</code>. Marks follow
-          the Lunacy mocks; search by shape, meaning, or category.
+          Every drawing on the shared 24-unit grid, from <code>@amends-dev/icons</code>. Marks
+          follow the Lunacy mocks; search by shape, meaning, or category.
         </p>
         <SearchField
           placeholder="Find an icon"

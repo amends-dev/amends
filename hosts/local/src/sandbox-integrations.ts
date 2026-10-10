@@ -3,10 +3,10 @@
  * machine's sandboxes, under a directory the host gives, since a workspace cannot say where on the
  * host's disk its sandboxes go; and those of Daytona organizations.
  */
-import { Connection, Integration } from "@amends/connection";
-import { Sandbox } from "@amends/sandbox";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { LocalSandboxProvider } from "@amends/sandbox-local";
+import { Connection, Integration } from "@amends-dev/connection";
+import { Sandbox } from "@amends-dev/sandbox";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
 import { Daytona, type DaytonaConfig, DaytonaError } from "@daytona/sdk";
 import { Crypto, Effect, FileSystem, Path, Redacted, Schema } from "effect";
 import { ChildProcessSpawner } from "effect/process";

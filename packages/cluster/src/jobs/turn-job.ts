@@ -7,10 +7,10 @@
  * then a run that accepted a turn gives the turn up. The job's runs take turns, while a stop
  * reaches the run in progress.
  */
-import { Store } from "@amends/core/journal";
-import { ThreadId } from "@amends/core/thread";
-import { Turn, TurnJobs } from "@amends/core/turn";
-import { Member, Workspace } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import { ThreadId } from "@amends-dev/core/thread";
+import { Turn, TurnJobs } from "@amends-dev/core/turn";
+import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Effect, Layer, PrimaryKey, Ref, Schema } from "effect";
 import { ClusterSchema, Entity, Sharding } from "effect/cluster";
 import { Rpc } from "effect/rpc";

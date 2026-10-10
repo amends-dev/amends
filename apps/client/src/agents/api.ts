@@ -1,5 +1,5 @@
-import { Agent, ApiErrors, Connection, Member, Workspace } from "@amends/api-http";
-import type { AgentIssue, AgentsFailure, Effort } from "@amends/ui/screens/agents";
+import { Agent, ApiErrors, Connection, Member, Workspace } from "@amends-dev/api-http";
+import type { AgentIssue, AgentsFailure, Effort } from "@amends-dev/ui/screens/agents";
 import { Cause, Effect, Option, Schema } from "effect";
 import type { Api, ApiClient } from "../api/client.ts";
 import { command, workspaceFailure } from "../api/failures.ts";

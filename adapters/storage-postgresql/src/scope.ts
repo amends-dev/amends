@@ -1,5 +1,5 @@
-import { Scope, Target } from "@amends/core/authorization";
-import type { Workspace } from "@amends/core/workspace";
+import { Scope, Target } from "@amends-dev/core/authorization";
+import type { Workspace } from "@amends-dev/core/workspace";
 import type { scopeKinds, targetKinds } from "./schema.ts";
 
 /** Columns encoding an assignment's scope without dropping variant information. */

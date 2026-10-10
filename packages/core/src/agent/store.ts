@@ -30,7 +30,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/agent/store/Service",
+  "@amends-dev/core/agent/store/Service",
 ) {}
 
 export * as AgentStore from "./store.ts";

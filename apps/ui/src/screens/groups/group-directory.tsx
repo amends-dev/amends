@@ -1,5 +1,5 @@
 import { For, Show } from "solid-js";
-import { IconMarkChannel, IconMarkOpen, IconUsers } from "@amends/icons";
+import { IconMarkChannel, IconMarkOpen, IconUsers } from "@amends-dev/icons";
 import { Badge } from "../../components/badge/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";

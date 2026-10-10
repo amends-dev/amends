@@ -1,7 +1,7 @@
 {
-  "name": "@amends/harness-opencode",
+  "name": "@amends-dev/harness-opencode",
   "version": "0.1.0",
-  "description": "opencode as an agent for the @amends/harness contract: opencode works in a sandbox behind its bridge, which the agent's template installs there.",
+  "description": "opencode as an agent for the @amends-dev/harness contract: opencode works in a sandbox behind its bridge, which the agent's template installs there.",
   "keywords": [
     "agent",
     "ai",
@@ -10,14 +10,14 @@
     "opencode",
     "sandbox"
   ],
-  "homepage": "https://github.com/saribmah/amends-v2/tree/main/adapters/harness-opencode#readme",
+  "homepage": "https://github.com/amends-dev/amends/tree/main/adapters/harness-opencode#readme",
   "bugs": {
-    "url": "https://github.com/saribmah/amends-v2/issues"
+    "url": "https://github.com/amends-dev/amends/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/saribmah/amends-v2.git",
+    "url": "https://github.com/amends-dev/amends.git",
     "directory": "adapters/harness-opencode"
   },
   "type": "module",
@@ -35,13 +35,13 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends/harness": "workspace:*",
-    "@amends/sandbox": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
     "@effect/platform-bun": "catalog:"
   },
   "devDependencies": {
-    "@amends/sandbox-daytona": "workspace:*",
-    "@amends/sandbox-local": "workspace:*",
+    "@amends-dev/sandbox-daytona": "workspace:*",
+    "@amends-dev/sandbox-local": "workspace:*",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"
   },

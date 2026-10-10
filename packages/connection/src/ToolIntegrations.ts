@@ -9,7 +9,7 @@
  * Checking a connection to an MCP server asks it which tools it has. Checking one to an API reads its
  * document, which the key plays no part in, so a wrong key shows when a tool first runs.
  */
-import { Http, Mcp, OpenApi, type ToolSourceError } from "@amends/toolkit";
+import { Http, Mcp, OpenApi, type ToolSourceError } from "@amends-dev/toolkit";
 import { Effect, Redacted, Schema } from "effect";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 import {

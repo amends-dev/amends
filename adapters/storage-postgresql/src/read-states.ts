@@ -1,7 +1,7 @@
-import { ReadState, ReadStateStore } from "@amends/core/read-state";
-import { Group } from "@amends/core/group";
-import { Thread } from "@amends/core/thread";
-import { Member } from "@amends/core/workspace";
+import { ReadState, ReadStateStore } from "@amends-dev/core/read-state";
+import { Group } from "@amends-dev/core/group";
+import { Thread } from "@amends-dev/core/thread";
+import { Member } from "@amends-dev/core/workspace";
 import { and, eq, sql } from "drizzle-orm";
 import { DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

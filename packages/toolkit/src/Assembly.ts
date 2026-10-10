@@ -38,10 +38,9 @@ export const Clash = Schema.Struct({
 export interface Clash extends Schema.Schema.Type<typeof Clash> {}
 
 /** More than one tool has the same name, so the model could not tell which one it calls. */
-export class NameClash extends Schema.TaggedError<NameClash>("@amends/toolkit/Assembly/NameClash")(
-  "NameClash",
-  { clashes: Schema.NonEmptyArray(Clash) },
-) {
+export class NameClash extends Schema.TaggedError<NameClash>(
+  "@amends-dev/toolkit/Assembly/NameClash",
+)("NameClash", { clashes: Schema.NonEmptyArray(Clash) }) {
   override get message(): string {
     return this.clashes
       .map(

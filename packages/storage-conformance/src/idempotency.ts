@@ -1,5 +1,5 @@
-import { Role, RoleFacts } from "@amends/core/authorization";
-import { Journal, Log, Publication, Store } from "@amends/core/journal";
+import { Role, RoleFacts } from "@amends-dev/core/authorization";
+import { Journal, Log, Publication, Store } from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema, Result } from "effect";
 import type { Harness } from "./harness.ts";

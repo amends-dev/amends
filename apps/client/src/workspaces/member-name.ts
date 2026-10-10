@@ -1,4 +1,4 @@
-import type { ChangeNameError } from "@amends/ui/screens/account";
+import type { ChangeNameError } from "@amends-dev/ui/screens/account";
 import { Exit } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { workspaceFailure } from "../api/failures.ts";

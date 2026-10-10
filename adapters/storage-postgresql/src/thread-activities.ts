@@ -1,6 +1,6 @@
-import { ThreadActivity, Thread, ThreadActivityStore } from "@amends/core/thread";
+import { ThreadActivity, Thread, ThreadActivityStore } from "@amends-dev/core/thread";
 
-import { Store } from "@amends/core/journal";
+import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, asc, desc, eq, gt, lt, sql } from "drizzle-orm";
 import { threadActivities } from "./schema.ts";

@@ -1,7 +1,7 @@
-import { Store } from "@amends/core/journal";
-import { Thread } from "@amends/core/thread";
-import { Turn, TurnStore } from "@amends/core/turn";
-import { Member } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import { Thread } from "@amends-dev/core/thread";
+import { Turn, TurnStore } from "@amends-dev/core/turn";
+import { Member } from "@amends-dev/core/workspace";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

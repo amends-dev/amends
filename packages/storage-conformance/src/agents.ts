@@ -1,18 +1,18 @@
-import { Agent, AgentPermissions, AgentService, AgentStore } from "@amends/core/agent";
+import { Agent, AgentPermissions, AgentService, AgentStore } from "@amends-dev/core/agent";
 import {
   Assignment,
   AssignmentFacts,
   AssignmentPermissions,
   BuiltinRoles,
   Grant,
-} from "@amends/core/authorization";
-import { Connection, ConnectionPermissions, ConnectionService } from "@amends/core/connection";
-import { Group } from "@amends/core/group";
-import type { Actor, Identity } from "@amends/core/identity";
-import { Journal, Publication } from "@amends/core/journal";
-import { Request } from "@amends/core/request";
-import { Member, type Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/authorization";
+import { Connection, ConnectionPermissions, ConnectionService } from "@amends-dev/core/connection";
+import { Group } from "@amends-dev/core/group";
+import type { Actor, Identity } from "@amends-dev/core/identity";
+import { Journal, Publication } from "@amends-dev/core/journal";
+import { Request } from "@amends-dev/core/request";
+import { Member, type Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Redacted } from "effect";
 import type { Harness } from "./harness.ts";

@@ -107,7 +107,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/thread/ThreadMessageStore",
+  "@amends-dev/core/thread/ThreadMessageStore",
 ) {}
 
 export * as ThreadMessageStore from "./ThreadMessageStore.ts";

@@ -1,5 +1,5 @@
 import { Show } from "solid-js";
-import { IconBell, IconBellFilled, IconMessage } from "@amends/icons";
+import { IconBell, IconBellFilled, IconMessage } from "@amends-dev/icons";
 import { IconButton } from "../../components/icon-button/index.ts";
 import { typingText } from "../../internal/when.ts";
 import { Pane } from "../../patterns/pane/index.ts";

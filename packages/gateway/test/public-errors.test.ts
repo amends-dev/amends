@@ -1,21 +1,25 @@
-import type { AssignmentService } from "@amends/core/authorization";
-import type { ReadStateService } from "@amends/core/read-state";
-import type { ChangeFeedService } from "@amends/core/change-feed";
-import type { ConnectionService } from "@amends/core/connection";
-import type { AgentService } from "@amends/core/agent";
-import type { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
-import type { NotificationService } from "@amends/core/notification";
+import type { AssignmentService } from "@amends-dev/core/authorization";
+import type { ReadStateService } from "@amends-dev/core/read-state";
+import type { ChangeFeedService } from "@amends-dev/core/change-feed";
+import type { ConnectionService } from "@amends-dev/core/connection";
+import type { AgentService } from "@amends-dev/core/agent";
+import type {
+  GroupService,
+  GroupFollowService,
+  GroupMembershipService,
+} from "@amends-dev/core/group";
+import type { NotificationService } from "@amends-dev/core/notification";
 import type {
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import type {
   InvitationService,
   MemberService,
   OwnershipService,
   WorkspaceSettingsService,
-} from "@amends/core/workspace";
+} from "@amends-dev/core/workspace";
 import { expectTypeOf, it } from "@effect/vitest";
 import type { Effect } from "effect";
 import type { GatewayErrors } from "../src/errors.ts";

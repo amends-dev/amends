@@ -35,7 +35,7 @@ jobs:
       # Migrations are generated from the schema, never edited: regenerating must change nothing.
       - name: PostgreSQL migration matches the schema
         run: |
-          bun run --filter @amends/storage-postgresql generate --name=ci_check
+          bun run --filter @amends-dev/storage-postgresql generate --name=ci_check
           if [ -n "$(git status --porcelain adapters/storage-postgresql/drizzle)" ]; then
             echo "::error::The PostgreSQL migration is out of date. Replace the baseline as adapters/storage-postgresql/README.md describes."
             git status --porcelain adapters/storage-postgresql/drizzle
@@ -70,9 +70,9 @@ jobs:
             args: --project postgresql --shard=3/3
           - suite: apps
             args: >-
-              --project @amends/icons --project @amends/ui
-              --project @amends/client
-              --project @amends/web --project @amends/desktop
+              --project @amends-dev/icons --project @amends-dev/ui
+              --project @amends-dev/client
+              --project @amends-dev/web --project @amends-dev/desktop
     env:
       # Each PostgreSQL shard starts its own cluster from the runner's installation.
       AMENDS_POSTGRES_REQUIRED: "true"

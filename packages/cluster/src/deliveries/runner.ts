@@ -6,10 +6,10 @@
  * A system that cannot be reached now fails the run, for the job to try again; one that refuses
  * the message, or the connection, fails the delivery there and then.
  */
-import { Integrations } from "@amends/connection";
-import type { Delivery, DeliveryJobs } from "@amends/core/channel";
-import { DeliveryExecution } from "@amends/core/channel";
-import { Gateway } from "@amends/gateway";
+import { Integrations } from "@amends-dev/connection";
+import type { Delivery, DeliveryJobs } from "@amends-dev/core/channel";
+import { DeliveryExecution } from "@amends-dev/core/channel";
+import { Gateway } from "@amends-dev/gateway";
 import { Data, Effect, Predicate, Ref, Result } from "effect";
 
 /** A run of the job failed before it had posted every delivery; `deliveryId` names the one it was on. */

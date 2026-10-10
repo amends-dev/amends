@@ -1,8 +1,8 @@
-import { BuiltinRoles } from "@amends/core/authorization";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
 
-import { Journal, Store } from "@amends/core/journal";
+import { Journal, Store } from "@amends-dev/core/journal";
 
-import { WorkspaceInitialization } from "@amends/core/workspace";
+import { WorkspaceInitialization } from "@amends-dev/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 

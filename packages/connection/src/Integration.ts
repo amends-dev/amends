@@ -14,12 +14,12 @@
  * An integration describes its settings as a form a person fills in, `SettingsForm`, which is how
  * MCP asks a person for input, so that settings can be asked for without code for each integration.
  */
-import type { Agent, Harness, ModelEndpoint } from "@amends/harness";
-import type { SandboxProvider } from "@amends/sandbox";
-import type { ToolSource } from "@amends/toolkit";
+import type { Agent, Harness, ModelEndpoint } from "@amends-dev/harness";
+import type { SandboxProvider } from "@amends-dev/sandbox";
+import type { ToolSource } from "@amends-dev/toolkit";
 import { type Array, Effect, type Redacted, type Result, Schema, type Scope } from "effect";
 import { McpSchema } from "effect/ai";
-import type { ChannelTransport } from "@amends/channel";
+import type { ChannelTransport } from "@amends-dev/channel";
 import {
   type AuthMethod,
   type Connection,

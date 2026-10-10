@@ -1,5 +1,5 @@
-import { Store } from "@amends/core/journal";
-import { SessionStateStore } from "@amends/core/turn";
+import { Store } from "@amends-dev/core/journal";
+import { SessionStateStore } from "@amends-dev/core/turn";
 import { Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeFailure } from "./errors.ts";

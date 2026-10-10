@@ -1,5 +1,5 @@
 {
-  "name": "@amends/storage-memory",
+  "name": "@amends-dev/storage-memory",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,13 +11,13 @@
     "test": "bun run --bun vitest run --root ../.. --config vitest.config.ts adapters/storage-memory/test"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/gateway": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/storage-conformance": "workspace:*",
+    "@amends-dev/storage-conformance": "workspace:*",
     "@effect/platform-bun": "catalog:"
   }
 }

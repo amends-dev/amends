@@ -8,7 +8,7 @@
  *
  * @since 0.1.0
  */
-import { ChannelTransport } from "@amends/channel";
+import { ChannelTransport } from "@amends-dev/channel";
 import { Array, Context, Crypto, DateTime, Effect, Layer, Option, Result, Schema } from "effect";
 import type { PlatformError } from "effect";
 import { Connection } from "../connection/connection.ts";
@@ -175,7 +175,7 @@ export interface Interface {
  * @since 0.1.0
  */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/channel/DeliveryExecution",
+  "@amends-dev/core/channel/DeliveryExecution",
 ) {}
 
 /** How many activities one read takes; reads go on until the range is done. */

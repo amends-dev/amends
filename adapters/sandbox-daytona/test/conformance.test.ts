@@ -1,6 +1,6 @@
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import { Network } from "@amends/sandbox";
-import * as Conformance from "@amends/sandbox/conformance";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+import { Network } from "@amends-dev/sandbox";
+import * as Conformance from "@amends-dev/sandbox/conformance";
 import { Daytona } from "@daytona/sdk";
 import { BunServices } from "@effect/platform-bun";
 import { afterAll, describe } from "@effect/vitest";

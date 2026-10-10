@@ -1,4 +1,4 @@
-# @amends/channel
+# @amends-dev/channel
 
 Channels bring external conversations in. A **channel transport** is how one external system,
 such as Slack, an email service, or a chat bridge, is received from and replied to: it verifies and
@@ -9,11 +9,11 @@ concerns; the transport knows its system alone. The package depends only on Effe
 ## Install
 
 ```sh
-bun add @amends/channel effect
+bun add @amends-dev/channel effect
 ```
 
 Add a transport for each system you connect, written as [an adapter](#writing-a-transport). In
-amends, [`@amends/connection`](../connection) installs a transport as what an integration gives
+amends, [`@amends-dev/connection`](../connection) installs a transport as what an integration gives
 its connections, and [core's channels](../core/README.md#channels) take its events in as threads.
 
 ## The contract
@@ -49,7 +49,7 @@ A transport is a plain object, usually made once per connection to the system wi
 connection's settings and secret. Slack, for example:
 
 ```ts
-import { ChannelTransport } from "@amends/channel";
+import { ChannelTransport } from "@amends-dev/channel";
 import { Effect, Schema } from "effect";
 
 export const slack = (options: {
@@ -91,5 +91,5 @@ repeat as nothing new.
 bun run check
 ```
 
-The package is a contract and has no tests of its own; `@amends/connection` checks what it does
-with a transport, and `@amends/storage-conformance` runs channels on a test transport.
+The package is a contract and has no tests of its own; `@amends-dev/connection` checks what it does
+with a transport, and `@amends-dev/storage-conformance` runs channels on a test transport.

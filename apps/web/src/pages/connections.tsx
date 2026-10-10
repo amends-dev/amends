@@ -1,4 +1,4 @@
-import { paths, useConnections, useWorkspace } from "@amends/client";
+import { paths, useConnections, useWorkspace } from "@amends-dev/client";
 import {
   ChooseIntegration,
   ConfigureConnection,
@@ -11,7 +11,7 @@ import {
   type ConnectionsAction,
   type ConnectionsTab,
   type IntegrationCapability,
-} from "@amends/ui/screens/connections";
+} from "@amends-dev/ui/screens/connections";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { Show, createEffect, createMemo, createSignal, on } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

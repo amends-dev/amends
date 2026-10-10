@@ -1,4 +1,4 @@
-import type { WorkspaceDirectory, WorkspaceStorage } from "@amends/gateway";
+import type { WorkspaceDirectory, WorkspaceStorage } from "@amends-dev/gateway";
 import type { Context, Crypto, Effect, Layer, Scope } from "effect";
 
 /**

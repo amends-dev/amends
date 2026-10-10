@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createSignal, createUniqueId, on } from "solid-js";
-import { IconMarkConnections } from "@amends/icons";
+import { IconMarkConnections } from "@amends-dev/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { FormFields, type FormIssue } from "../../components/form-fields/index.ts";

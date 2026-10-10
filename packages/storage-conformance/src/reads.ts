@@ -1,9 +1,14 @@
-import { AssignmentService } from "@amends/core/authorization";
-import { ChangeFeedService } from "@amends/core/change-feed";
-import { Log, Store } from "@amends/core/journal";
-import { Notification, NotificationService } from "@amends/core/notification";
-import { InvitationService, Member, MemberService, OwnershipService } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { AssignmentService } from "@amends-dev/core/authorization";
+import { ChangeFeedService } from "@amends-dev/core/change-feed";
+import { Log, Store } from "@amends-dev/core/journal";
+import { Notification, NotificationService } from "@amends-dev/core/notification";
+import {
+  InvitationService,
+  Member,
+  MemberService,
+  OwnershipService,
+} from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 import type { Harness } from "./harness.ts";

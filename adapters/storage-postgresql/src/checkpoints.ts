@@ -1,4 +1,4 @@
-import { Checkpoint, Store } from "@amends/core/journal";
+import { Checkpoint, Store } from "@amends-dev/core/journal";
 import { and, eq, sql } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

@@ -1,5 +1,5 @@
-import { Api } from "@amends/api-http";
-import { SignIn } from "@amends/gateway";
+import { Api } from "@amends-dev/api-http";
+import { SignIn } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

@@ -1,5 +1,5 @@
 import { Match, Show, Switch, type JSX } from "solid-js";
-import { IconMarkSettings, IconUsers } from "@amends/icons";
+import { IconMarkSettings, IconUsers } from "@amends-dev/icons";
 import { Button } from "../../components/button/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";
 import { Pane } from "../../patterns/pane/index.ts";

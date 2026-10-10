@@ -1,8 +1,8 @@
-import { BuiltinRoles } from "@amends/core/authorization";
-import { Group } from "@amends/core/group";
-import { Actor } from "@amends/core/identity";
-import { Journal, Log } from "@amends/core/journal";
-import { Invitation, InvitationService, Member } from "@amends/core/workspace";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { Group } from "@amends-dev/core/group";
+import { Actor } from "@amends-dev/core/identity";
+import { Journal, Log } from "@amends-dev/core/journal";
+import { Invitation, InvitationService, Member } from "@amends-dev/core/workspace";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { DateTime, Effect, Option, Result } from "effect";
 import type { Harness } from "./harness.ts";

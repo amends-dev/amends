@@ -1,5 +1,5 @@
-import type { ModelEndpoint } from "@amends/harness";
-import { LocalSandboxProvider } from "@amends/sandbox-local";
+import type { ModelEndpoint } from "@amends-dev/harness";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
 import { Effect, FileSystem, Stream } from "effect";
 import { type AiError, LanguageModel, type Response } from "effect/ai";
 import * as AmendsAgent from "../src/AmendsAgent.ts";

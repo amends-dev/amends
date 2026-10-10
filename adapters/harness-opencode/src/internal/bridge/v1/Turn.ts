@@ -16,7 +16,7 @@
  * reports the turn's tokens, and the reason its last step ended, or `error` for a turn that failed
  * or took no step.
  */
-import type { StreamPart } from "@amends/harness";
+import type { StreamPart } from "@amends-dev/harness";
 import type { Response } from "effect/ai";
 import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts";
 import {

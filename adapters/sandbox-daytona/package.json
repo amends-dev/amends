@@ -1,21 +1,21 @@
 {
-  "name": "@amends/sandbox-daytona",
+  "name": "@amends-dev/sandbox-daytona",
   "version": "0.1.0",
-  "description": "Sandboxes on Daytona for the @amends/sandbox contract: a Linux machine of its own for each sandbox, made from a snapshot of its template's version.",
+  "description": "Sandboxes on Daytona for the @amends-dev/sandbox contract: a Linux machine of its own for each sandbox, made from a snapshot of its template's version.",
   "keywords": [
     "agent",
     "daytona",
     "effect",
     "sandbox"
   ],
-  "homepage": "https://github.com/saribmah/amends-v2/tree/main/adapters/sandbox-daytona#readme",
+  "homepage": "https://github.com/amends-dev/amends/tree/main/adapters/sandbox-daytona#readme",
   "bugs": {
-    "url": "https://github.com/saribmah/amends-v2/issues"
+    "url": "https://github.com/amends-dev/amends/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/saribmah/amends-v2.git",
+    "url": "https://github.com/amends-dev/amends.git",
     "directory": "adapters/sandbox-daytona"
   },
   "type": "module",
@@ -33,7 +33,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends/sandbox": "workspace:*",
+    "@amends-dev/sandbox": "workspace:*",
     "@daytona/sdk": "catalog:"
   },
   "devDependencies": {

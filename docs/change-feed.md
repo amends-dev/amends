@@ -6,7 +6,7 @@ and cache invalidation; apps mount it once per workspace view; features show its
 
 ## Flow
 
-1. A workspace route mounts `ChangeFeedProvider` from `@amends/client` around its layout.
+1. A workspace route mounts `ChangeFeedProvider` from `@amends-dev/client` around its layout.
    The provider opens one stream per workspace per credential scope, shared by every consumer,
    and closes it when the view unmounts or the credential changes.
 2. Every read registers an invalidation key (`apps/client/src/api/keys.ts`): the directory,

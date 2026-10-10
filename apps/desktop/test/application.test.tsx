@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "@effect/vitest";
 import userEvent from "@testing-library/user-event";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@solidjs/testing-library";
 import { HashRouter } from "@solidjs/router";
-import { Session, type SessionStore } from "@amends/client";
+import { Session, type SessionStore } from "@amends-dev/client";
 import { Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import { Application } from "../src/application.tsx";

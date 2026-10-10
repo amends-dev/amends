@@ -1,4 +1,4 @@
-import { Integrations } from "@amends/connection";
+import { Integrations } from "@amends-dev/connection";
 import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 import { Connection } from "../connection/connection.ts";
 import { ConnectionCredentialStore } from "../connection/credential-store.ts";
@@ -61,7 +61,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/agent/query/Service",
+  "@amends-dev/core/agent/query/Service",
 ) {}
 
 /** `selection` as the setup whose readiness says whether it can run. */

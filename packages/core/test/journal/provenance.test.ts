@@ -1,5 +1,5 @@
 import { Performer } from "../../src/identity/performer.ts";
-import { Subject } from "@amends/core/journal";
+import { Subject } from "@amends-dev/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Cause, Context, Crypto, DateTime, Deferred, Effect, Exit, Option, Schema } from "effect";
 import { Actor } from "../../src/identity/actor.ts";
@@ -144,7 +144,7 @@ it.effect(
       );
       expect(Exit.isFailure(exit)).toBe(true);
       if (Exit.isFailure(exit))
-        expect(Cause.pretty(exit.cause)).toContain("@amends/core/journal/publication/Service");
+        expect(Cause.pretty(exit.cause)).toContain("@amends-dev/core/journal/publication/Service");
       expect((yield* fixture.snapshot).logs.size).toBe(0);
     }),
 );

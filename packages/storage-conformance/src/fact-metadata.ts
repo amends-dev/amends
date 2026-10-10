@@ -1,4 +1,4 @@
-import { Identity } from "@amends/core/identity";
+import { Identity } from "@amends-dev/core/identity";
 import {
   Codec,
   Event,
@@ -8,7 +8,7 @@ import {
   Publication,
   Store,
   Subject,
-} from "@amends/core/journal";
+} from "@amends-dev/core/journal";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 import type { Harness } from "./harness.ts";

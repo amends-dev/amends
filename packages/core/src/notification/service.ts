@@ -62,7 +62,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/notification/service/Service",
+  "@amends-dev/core/notification/service/Service",
 ) {}
 
 const decodeInboxOptions = Schema.decodeEffect(Schema.toType(NotificationInbox.Options));

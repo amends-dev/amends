@@ -49,7 +49,7 @@ export interface Interface {
   ) => Effect.Effect<void, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/read-state/service/Service",
+  "@amends-dev/core/read-state/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority per operation. @category constructors */

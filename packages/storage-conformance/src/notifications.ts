@@ -1,14 +1,18 @@
-import type * as Core from "@amends/core";
+import type * as Core from "@amends-dev/core";
 import { describe, expect, it } from "@effect/vitest";
-import { Actor, Identity } from "@amends/core/identity";
-import { Entry, Journal, Store } from "@amends/core/journal";
-import { Notification, NotificationService, NotificationStore } from "@amends/core/notification";
-import { BuiltinRoles } from "@amends/core/authorization";
-import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
-import { Thread, ThreadService, ThreadParticipation } from "@amends/core/thread";
-import { TurnId } from "@amends/core/turn";
-import { Member } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Entry, Journal, Store } from "@amends-dev/core/journal";
+import {
+  Notification,
+  NotificationService,
+  NotificationStore,
+} from "@amends-dev/core/notification";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { Group, GroupService, GroupMembershipService } from "@amends-dev/core/group";
+import { Thread, ThreadService, ThreadParticipation } from "@amends-dev/core/thread";
+import { TurnId } from "@amends-dev/core/turn";
+import { Member } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { Array, Context, DateTime, Effect, Layer, Option } from "effect";
 import { acceptInvitation, createWorkspace, invite, removeMember } from "./operations.ts";
 import {

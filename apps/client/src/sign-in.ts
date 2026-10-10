@@ -1,4 +1,4 @@
-import type { SignInCodeError, SignInEmailError } from "@amends/ui/screens/sign-in";
+import type { SignInCodeError, SignInEmailError } from "@amends-dev/ui/screens/sign-in";
 import { Cause, Data, Exit, Schema } from "effect";
 import { createSignal, type Accessor } from "solid-js";
 import { SignIn } from "./api/contracts.ts";

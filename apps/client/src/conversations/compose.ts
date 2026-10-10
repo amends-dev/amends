@@ -1,4 +1,4 @@
-import type { SendError } from "@amends/ui/screens/group";
+import type { SendError } from "@amends-dev/ui/screens/group";
 import { useAtomSet, useAtomValue } from "@effect/atom-solid";
 import { Exit } from "effect";
 import { Atom } from "effect/reactivity";

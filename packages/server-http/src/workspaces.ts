@@ -1,7 +1,7 @@
-import { Identity } from "@amends/core/identity";
-import { Api, ApiErrors, Principal } from "@amends/api-http";
-import { Gateway } from "@amends/gateway";
-import { OwnershipService, WorkspaceSettingsService } from "@amends/core/workspace";
+import { Identity } from "@amends-dev/core/identity";
+import { Api, ApiErrors, Principal } from "@amends-dev/api-http";
+import { Gateway } from "@amends-dev/gateway";
+import { OwnershipService, WorkspaceSettingsService } from "@amends-dev/core/workspace";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

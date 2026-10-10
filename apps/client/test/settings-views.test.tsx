@@ -10,7 +10,7 @@ import {
   type SessionStore,
   type SettingsDone,
 } from "../src/index.ts";
-import type { SettingsTab } from "@amends/ui/screens/settings";
+import type { SettingsTab } from "@amends-dev/ui/screens/settings";
 
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>

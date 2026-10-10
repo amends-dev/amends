@@ -31,7 +31,7 @@ export interface Interface {
 }
 /** @effect-expect-leaking Transaction */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/assignment/command/Service",
+  "@amends-dev/core/authorization/assignment/command/Service",
 ) {}
 
 /** @category constructors */

@@ -1,5 +1,5 @@
 {
-  "name": "@amends/client",
+  "name": "@amends-dev/client",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,13 +11,13 @@
     "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
-    "@amends/api-http": "workspace:*",
-    "@amends/gateway": "workspace:*",
+    "@amends-dev/api-http": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
     "@effect/atom-solid": "catalog:",
     "effect": "catalog:"
   },
   "devDependencies": {
-    "@amends/ui": "workspace:*",
+    "@amends-dev/ui": "workspace:*",
     "@solidjs/testing-library": "^0.8.9",
     "happy-dom": "^20.10.6",
     "solid-js": "^1.9.12",

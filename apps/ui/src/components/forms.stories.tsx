@@ -1,7 +1,7 @@
 import { createSignal } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { expect, userEvent, within } from "storybook/test";
-import { IconMarkNew } from "@amends/icons";
+import { IconMarkNew } from "@amends-dev/icons";
 import { Button } from "./button/index.ts";
 import { Choice } from "./choice/index.ts";
 import { Combobox } from "./combobox/index.ts";

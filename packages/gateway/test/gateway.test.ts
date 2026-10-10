@@ -1,28 +1,32 @@
-import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
-import { AgentStore } from "@amends/core/agent";
+import { ConnectionCredentialStore, ConnectionStore } from "@amends-dev/core/connection";
+import { AgentStore } from "@amends-dev/core/agent";
 import {
   ChannelBindingStore,
   ChannelStore,
   ContactStore,
   DeliveryJobs,
   DeliveryStore,
-} from "@amends/core/channel";
-import { TaskStore } from "@amends/core/task";
-import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
+} from "@amends-dev/core/channel";
+import { TaskStore } from "@amends-dev/core/task";
+import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends-dev/core/turn";
 import {
   ThreadStore,
   ThreadParticipationStore,
   ThreadMessageStore,
   ThreadActivityStore,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import { expect, it } from "@effect/vitest";
-import { ReadStateStore } from "@amends/core/read-state";
-import { SignalHub } from "@amends/core/signal";
-import { AssignmentStore, Authorization, RoleStore } from "@amends/core/authorization";
-import { Actor, Identity } from "@amends/core/identity";
-import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
-import { Checkpoint, Commit, Entry, Store } from "@amends/core/journal";
-import { Notification, NotificationService, NotificationStore } from "@amends/core/notification";
+import { ReadStateStore } from "@amends-dev/core/read-state";
+import { SignalHub } from "@amends-dev/core/signal";
+import { AssignmentStore, Authorization, RoleStore } from "@amends-dev/core/authorization";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
+import { Checkpoint, Commit, Entry, Store } from "@amends-dev/core/journal";
+import {
+  Notification,
+  NotificationService,
+  NotificationStore,
+} from "@amends-dev/core/notification";
 import {
   InvitationStore,
   Member,
@@ -30,7 +34,7 @@ import {
   MemberStore,
   Workspace,
   WorkspaceStore,
-} from "@amends/core/workspace";
+} from "@amends-dev/core/workspace";
 import {
   Cause,
   Context,

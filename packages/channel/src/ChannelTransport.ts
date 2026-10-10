@@ -104,7 +104,7 @@ export const TransportErrorReason = Schema.Literals(["rejected", "refused", "una
 export type TransportErrorReason = typeof TransportErrorReason.Type;
 
 export class TransportError extends Schema.TaggedError<TransportError>(
-  "@amends/connection/ChannelTransport/TransportError",
+  "@amends-dev/connection/ChannelTransport/TransportError",
 )("TransportError", {
   reason: TransportErrorReason,
   description: Schema.String,

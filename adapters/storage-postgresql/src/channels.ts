@@ -1,5 +1,5 @@
-import { Channel, ChannelStore } from "@amends/core/channel";
-import { Store } from "@amends/core/journal";
+import { Channel, ChannelStore } from "@amends-dev/core/channel";
+import { Store } from "@amends-dev/core/journal";
 import { and, eq } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

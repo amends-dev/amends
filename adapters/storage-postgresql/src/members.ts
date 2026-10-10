@@ -1,5 +1,5 @@
-import { Store } from "@amends/core/journal";
-import { Member, MemberStore } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import { Member, MemberStore } from "@amends-dev/core/workspace";
 import { and, eq, type SQL } from "drizzle-orm";
 import { Array, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

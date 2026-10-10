@@ -8,7 +8,7 @@ import {
   onCleanup,
   type JSX,
 } from "solid-js";
-import { IconChevronDown, IconMarkClose, IconMarkNew, IconMarkSearch } from "@amends/icons";
+import { IconChevronDown, IconMarkClose, IconMarkNew, IconMarkSearch } from "@amends-dev/icons";
 import { Avatar } from "../avatar/index.ts";
 import { useField } from "../field/index.ts";
 import type { AvatarToneName } from "../../foundations/color/tokens.ts";

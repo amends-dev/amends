@@ -1,7 +1,7 @@
-import { Notification } from "@amends/core/notification";
+import { Notification } from "@amends-dev/core/notification";
 import { describe, expect, it } from "@effect/vitest";
-import { AgentPermissions } from "@amends/core/agent";
-import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends/core/authorization";
+import { AgentPermissions } from "@amends-dev/core/agent";
+import { Assignment, AssignmentFacts, BuiltinRoles, Grant } from "@amends-dev/core/authorization";
 import {
   Group,
   GroupService,
@@ -9,11 +9,16 @@ import {
   GroupFollowService,
   GroupMembershipService,
   GroupPermissions,
-} from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Log, Publication } from "@amends/core/journal";
-import { Thread, ThreadService, ThreadParticipation, ThreadPermissions } from "@amends/core/thread";
-import { Member, MemberFacts } from "@amends/core/workspace";
+} from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import {
+  Thread,
+  ThreadService,
+  ThreadParticipation,
+  ThreadPermissions,
+} from "@amends-dev/core/thread";
+import { Member, MemberFacts } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Option } from "effect";
 import {
   type Bound,

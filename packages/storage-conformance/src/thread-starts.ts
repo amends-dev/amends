@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@effect/vitest";
-import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends/core/authorization";
-import { Group, GroupService, GroupStore, GroupMembershipStore } from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Journal, Log, Publication } from "@amends/core/journal";
-import { Notification, NotificationStore } from "@amends/core/notification";
+import { Assignment, AssignmentFacts, BuiltinRoles } from "@amends-dev/core/authorization";
+import { Group, GroupService, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Journal, Log, Publication } from "@amends-dev/core/journal";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
 import {
   Thread,
   ThreadService,
@@ -16,8 +16,8 @@ import {
   ThreadMessageStore,
   ThreadActivityStore,
   ThreadCommand,
-} from "@amends/core/thread";
-import { Member, MemberFacts, MemberStore } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { Member, MemberFacts, MemberStore } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Layer, Option, Context } from "effect";
 import {
   type Bound,

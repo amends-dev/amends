@@ -1,8 +1,8 @@
-import { ThreadParticipation } from "@amends/core/thread";
-import { Api, Authentication, Group, type ThreadTimeline } from "@amends/api-http";
-import { BuiltinRoles } from "@amends/core/authorization";
-import { Identity } from "@amends/core/identity";
-import { Request } from "@amends/core/request";
+import { ThreadParticipation } from "@amends-dev/core/thread";
+import { Api, Authentication, Group, type ThreadTimeline } from "@amends-dev/api-http";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { Identity } from "@amends-dev/core/identity";
+import { Request } from "@amends-dev/core/request";
 import { describe, expect, it } from "@effect/vitest";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { DateTime, Effect, Layer, Redacted } from "effect";

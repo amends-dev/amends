@@ -12,7 +12,7 @@
  * permission waits for `approve`. `compact` asks opencode to summarize the conversation, which it
  * does without instructions.
  */
-import { type Bridge, HarnessError, type HostToolRelay } from "@amends/harness";
+import { type Bridge, HarnessError, type HostToolRelay } from "@amends-dev/harness";
 import { Effect, FileSystem, Ref, Schedule, Schema, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import * as Driver from "../Driver.ts";

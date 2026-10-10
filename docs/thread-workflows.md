@@ -12,8 +12,8 @@ each operation under `/workspaces/:workspaceId`, with the status each outcome re
 ## Starting a conversation
 
 ```ts
-import { Group } from "@amends/core/group";
-import { ThreadService } from "@amends/core/thread";
+import { Group } from "@amends-dev/core/group";
+import { ThreadService } from "@amends-dev/core/thread";
 import { Effect } from "effect";
 
 const start = (groupId: Group.Id) =>
@@ -222,7 +222,7 @@ recipient rules alone ([turns](../packages/core/README.md#turns)).
 ## Replying to a conversation
 
 ```ts
-import { Thread, ThreadMessageService } from "@amends/core/thread";
+import { Thread, ThreadMessageService } from "@amends-dev/core/thread";
 import { Effect } from "effect";
 
 const reply = (threadId: Thread.Id) =>

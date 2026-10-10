@@ -1,5 +1,5 @@
-import type { Workspace } from "@amends/core/workspace";
-import { WorkspaceStorage } from "@amends/gateway";
+import type { Workspace } from "@amends-dev/core/workspace";
+import { WorkspaceStorage } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { Agents } from "./agents.ts";
 import { Assignments } from "./assignments.ts";

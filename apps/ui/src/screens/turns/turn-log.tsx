@@ -1,5 +1,5 @@
 import { For, Match, Show, Switch } from "solid-js";
-import { IconClock, IconMarkRetry } from "@amends/icons";
+import { IconClock, IconMarkRetry } from "@amends-dev/icons";
 import { Button, ButtonLink } from "../../components/button/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";

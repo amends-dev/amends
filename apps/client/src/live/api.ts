@@ -1,4 +1,4 @@
-import { ApiErrors, Workspace, Signal, ChangeFeed } from "@amends/api-http";
+import { ApiErrors, Workspace, Signal, ChangeFeed } from "@amends-dev/api-http";
 import {
   Cause,
   Clock,

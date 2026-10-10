@@ -12,7 +12,7 @@ import {
   Workspace,
   Identity,
   ApiErrors,
-} from "@amends/api-http";
+} from "@amends-dev/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom, Reactivity } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";

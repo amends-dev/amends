@@ -44,7 +44,7 @@ export type Effort = typeof Effort.Type;
  * **Example** (An endpoint for a model at Anthropic)
  *
  * ```ts
- * import { ModelEndpoint } from "@amends/harness";
+ * import { ModelEndpoint } from "@amends-dev/harness";
  * import { Redacted } from "effect";
  *
  * const sonnet: ModelEndpoint.ModelEndpoint = {

@@ -10,13 +10,13 @@ import {
   useTurnActivity,
   useWorkspace,
   useWorkspaceGroups,
-} from "@amends/client";
+} from "@amends-dev/client";
 import {
   GroupPane,
   GroupSettings,
   GroupThreads,
   type GroupSettingsTab,
-} from "@amends/ui/screens/group";
+} from "@amends-dev/ui/screens/group";
 import { useNavigate, useParams } from "@solidjs/router";
 import { createSignal, Show } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

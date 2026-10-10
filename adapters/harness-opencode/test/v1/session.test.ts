@@ -1,5 +1,5 @@
-import { type Bridge, GenerateResult, HostToolRelay, type StreamPart } from "@amends/harness";
-import { SessionId } from "@amends/harness/Agent";
+import { type Bridge, GenerateResult, HostToolRelay, type StreamPart } from "@amends-dev/harness";
+import { SessionId } from "@amends-dev/harness/Agent";
 import { BunServices } from "@effect/platform-bun";
 import { expect, layer } from "@effect/vitest";
 import { Deferred, Effect, Layer, Option, Schema, Stream } from "effect";

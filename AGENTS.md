@@ -49,7 +49,7 @@ currently run through TypeScript. Check compatibility before changing this setup
   fails differently. `harness` is the contract every harness implements: an agent's sessions
   and turns, streamed in one format whichever agent runs them, and the bridge through which a host
   drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements,
-  with the suites each provider runs from `@amends/sandbox/conformance`; a sandbox knows nothing
+  with the suites each provider runs from `@amends-dev/sandbox/conformance`; a sandbox knows nothing
   of what harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server
   or an HTTP API, one shape. `channel` is the contract every channel transport implements: how one
   external system's conversations are received and replied to; an adapter implements it for one

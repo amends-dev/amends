@@ -3,8 +3,8 @@ import type {
   PickerAccept,
   PickerInvitation,
   PickerWorkspace,
-} from "@amends/ui/screens/workspaces";
-import type { WorkspaceAccess } from "@amends/ui/screens/standalone";
+} from "@amends-dev/ui/screens/workspaces";
+import type { WorkspaceAccess } from "@amends-dev/ui/screens/standalone";
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
 import { directoryQuery } from "../api/directory.ts";

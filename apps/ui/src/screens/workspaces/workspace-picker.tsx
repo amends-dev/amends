@@ -1,5 +1,5 @@
 import { For, Show, createEffect, createSignal, createUniqueId, onCleanup } from "solid-js";
-import { IconMarkNew, IconMarkOpen } from "@amends/icons";
+import { IconMarkNew, IconMarkOpen } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Button } from "../../components/button/index.ts";
 import { Count } from "../../components/count/index.ts";

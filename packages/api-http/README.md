@@ -1,6 +1,6 @@
 # HTTP contract
 
-`@amends/api-http` declares the public HTTP API with Effect `HttpApi`. It contains
+`@amends-dev/api-http` declares the public HTTP API with Effect `HttpApi`. It contains
 no handlers, so servers and browser clients share it without leaking server code.
 Responses and domain errors reuse core and gateway schemas. This package owns
 HTTP paths, request envelopes, status annotations, and the authentication
@@ -9,7 +9,7 @@ declaration, including the protocol errors `Unauthorized` and `HumanRequired`.
 ## Organization and names
 
 Each HTTP group has one focused module, matched by its handler module in
-`@amends/server-http`. Keep `Api` as the aggregate contract, group classes such
+`@amends-dev/server-http`. Keep `Api` as the aggregate contract, group classes such
 as `MembersGroup` as declarations, and `ApiErrors` as the canonical error
 namespace. Resource-specific names such as `InvitationNotOwner`,
 `InvitationUnavailable`, and `InvitationInvalidExpiry` identify the source of
@@ -31,7 +31,7 @@ no additional module-level `make` functions or service layers.
 
 `Authentication` declares the middleware contract, and `Principal` identifies
 the identity supplied per request. The server implementation lives in
-`@amends/server-http`; client credential attachment uses
+`@amends-dev/server-http`; client credential attachment uses
 `HttpApiMiddleware.layerClient`. Keep those implementations out of this package
 so a client can import the complete contract without loading server code.
 

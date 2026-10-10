@@ -35,7 +35,7 @@ export interface Interface {
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/workspace/invitation-store/Service",
+  "@amends-dev/core/workspace/invitation-store/Service",
 ) {}
 
 export * as InvitationStore from "./store.ts";

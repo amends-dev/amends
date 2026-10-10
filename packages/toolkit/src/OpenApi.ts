@@ -29,7 +29,7 @@ export interface Imported {
 
 /** The document is not an OpenAPI 3 document, so there is nothing to read. */
 export class InvalidSpecError extends Schema.TaggedError<InvalidSpecError>(
-  "@amends/toolkit/OpenApi/InvalidSpecError",
+  "@amends-dev/toolkit/OpenApi/InvalidSpecError",
 )("InvalidSpecError", { description: Schema.String }) {
   override get message(): string {
     return this.description;

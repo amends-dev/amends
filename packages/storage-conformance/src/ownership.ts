@@ -4,11 +4,11 @@ import {
   BuiltinRoles,
   Grant,
   RoleFacts,
-} from "@amends/core/authorization";
+} from "@amends-dev/core/authorization";
 
-import { Actor, Identity } from "@amends/core/identity";
+import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Store, Publication } from "@amends/core/journal";
+import { Journal, Store, Publication } from "@amends-dev/core/journal";
 
 import {
   Member,
@@ -16,7 +16,7 @@ import {
   MemberPermissions,
   OwnershipService,
   OwnershipPermissions,
-} from "@amends/core/workspace";
+} from "@amends-dev/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 

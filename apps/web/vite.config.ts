@@ -18,7 +18,7 @@ export default defineConfig({
     },
   },
   test: {
-    name: "@amends/web",
+    name: "@amends-dev/web",
     environment: "happy-dom",
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
     include: ["test/**/*.test.{ts,tsx}"],

@@ -1,3 +1,3 @@
-import { Suites } from "@amends/storage-conformance";
+import { Suites } from "@amends-dev/storage-conformance";
 import { harness } from "./harness.ts";
 Suites.workspaceSettings(harness);

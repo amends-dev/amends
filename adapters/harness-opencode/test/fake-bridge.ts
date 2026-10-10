@@ -10,7 +10,7 @@
 // working directory, with its process id, its agent's options, and whether its environment holds
 // the token, and destroying a session writes `destroyed-<session>` there. The bridge exits after
 // the agent options' `idleSeconds` without a host, 10 minutes when they give none.
-import { type Bridge, BridgeServer, type StreamPart } from "@amends/harness";
+import { type Bridge, BridgeServer, type StreamPart } from "@amends-dev/harness";
 import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, Option, Path, Ref, Schedule, Schema, Stream } from "effect";
 import * as BunBridge from "../src/internal/bridge/BunBridge.ts";

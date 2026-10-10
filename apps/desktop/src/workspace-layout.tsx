@@ -22,31 +22,31 @@ import {
   useWorkspacePeople,
   useWorkspacePermission,
   type WorkspacePage,
-} from "@amends/client";
-import type { MentionCandidate } from "@amends/ui/components/composer";
-import type { PickerPerson } from "@amends/ui/components/member-picker";
-import { LiveStatus } from "@amends/ui/components/live-status";
-import { Profiles } from "@amends/ui/components/profile-card";
-import { Toast } from "@amends/ui/components/toast";
-import { Shell } from "@amends/ui/patterns/shell";
-import { ChangeName } from "@amends/ui/screens/account";
-import { agentStatus } from "@amends/ui/screens/agents";
+} from "@amends-dev/client";
+import type { MentionCandidate } from "@amends-dev/ui/components/composer";
+import type { PickerPerson } from "@amends-dev/ui/components/member-picker";
+import { LiveStatus } from "@amends-dev/ui/components/live-status";
+import { Profiles } from "@amends-dev/ui/components/profile-card";
+import { Toast } from "@amends-dev/ui/components/toast";
+import { Shell } from "@amends-dev/ui/patterns/shell";
+import { ChangeName } from "@amends-dev/ui/screens/account";
+import { agentStatus } from "@amends-dev/ui/screens/agents";
 import {
   capabilityLabels,
   capabilityNouns,
   connectionStatus,
   type IntegrationCapability,
-} from "@amends/ui/screens/connections";
-import { NewMessage } from "@amends/ui/screens/direct";
-import { CreateGroup, ThreadPane } from "@amends/ui/screens/group";
-import { JumpTo, type JumpToItem } from "@amends/ui/screens/jump-to";
+} from "@amends-dev/ui/screens/connections";
+import { NewMessage } from "@amends-dev/ui/screens/direct";
+import { CreateGroup, ThreadPane } from "@amends-dev/ui/screens/group";
+import { JumpTo, type JumpToItem } from "@amends-dev/ui/screens/jump-to";
 import {
   DestinationSidebar,
   HomeSidebar,
   WorkspaceNavigation,
   type Destination,
   type NavigationSection,
-} from "@amends/ui/screens/workspace-navigation";
+} from "@amends-dev/ui/screens/workspace-navigation";
 import {
   IconMarkAgents,
   IconMarkChannel,
@@ -55,7 +55,7 @@ import {
   IconMarkSettings,
   IconMessage,
   IconUsers,
-} from "@amends/icons";
+} from "@amends-dev/icons";
 import { useLocation, useMatch, useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import {
   createMemo,

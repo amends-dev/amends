@@ -4,7 +4,7 @@ Read [README.md](README.md) before changing this package.
 
 - Own headless session lifetime, typed API access, query state, and pure route helpers.
   Do not render pages, controls, error/loading views, styles, or a route tree here.
-- Type what hooks return as the screens' own types, imported type-only from `@amends/ui`, a
+- Type what hooks return as the screens' own types, imported type-only from `@amends-dev/ui`, a
   development dependency. Add a client type only for what no screen shows, such as a controller,
   a draft, or a screen type without the hrefs a page adds. Import no UI code, icons, styling
   tools, a router, Storybook, or platform entry points. Web and desktop connect client hooks to

@@ -1,5 +1,5 @@
-import { Agent, Harness, type ModelEndpoint } from "@amends/harness";
-import { LocalSandboxProvider } from "@amends/sandbox-local";
+import { Agent, Harness, type ModelEndpoint } from "@amends-dev/harness";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
 import { BunServices } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, FileSystem, Layer, Path, Redacted, Schema } from "effect";

@@ -1,6 +1,6 @@
 import { expect, it } from "@effect/vitest";
-import { Identity } from "@amends/core/identity";
-import { SessionTokens, SignIn } from "@amends/gateway";
+import { Identity } from "@amends-dev/core/identity";
+import { SessionTokens, SignIn } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Cause, Clock, Crypto, Deferred, Effect, Exit, Fiber, Layer, Redacted } from "effect";
 import { TestClock } from "effect/testing";

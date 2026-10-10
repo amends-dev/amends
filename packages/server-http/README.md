@@ -1,6 +1,6 @@
 # HTTP server
 
-`@amends/server-http` implements the `@amends/api-http` groups with
+`@amends-dev/server-http` implements the `@amends-dev/api-http` groups with
 `HttpApiBuilder`. Each workspace handler decodes the request, reads the
 `Principal` the authentication middleware provided, enters the workspace through
 `Gateway.asMember` or `Gateway.inWorkspace`, and calls one core application
@@ -58,7 +58,7 @@ than for every open stream. `Draining.layer` creates it, and a host builds
 ## Organization
 
 Keep one focused handler module per HTTP group, with filenames matching
-`@amends/api-http`. Names such as `MembersHandlers` and `InvitationsHandlers`
+`@amends-dev/api-http`. Names such as `MembersHandlers` and `InvitationsHandlers`
 describe endpoint collections; `Routes` composes them. `BearerAuthentication`
 implements the middleware contract. `Principal` is the authenticated human or
 agent identity; core's `Actor.Service` is the workspace member resolved by the

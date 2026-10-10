@@ -1,5 +1,5 @@
-import { ApiErrors, Connection, Workspace } from "@amends/api-http";
-import type { ConnectionsFailure } from "@amends/ui/screens/connections";
+import { ApiErrors, Connection, Workspace } from "@amends-dev/api-http";
+import type { ConnectionsFailure } from "@amends-dev/ui/screens/connections";
 import { Cause, Effect, Option, Redacted, Schema } from "effect";
 import type { Api, ApiClient } from "../api/client.ts";
 import { command, workspaceFailure } from "../api/failures.ts";

@@ -1,10 +1,10 @@
-import { Api, Authentication } from "@amends/api-http";
-import { Identity } from "@amends/core/identity";
-import { Entry, Store } from "@amends/core/journal";
-import { Notification, NotificationStore } from "@amends/core/notification";
-import { Member, MemberStore, Workspace } from "@amends/core/workspace";
-import { SessionTokens } from "@amends/gateway";
-import { PostgresDatabase, PostgresStorage } from "@amends/storage-postgresql";
+import { Api, Authentication } from "@amends-dev/api-http";
+import { Identity } from "@amends-dev/core/identity";
+import { Entry, Store } from "@amends-dev/core/journal";
+import { Notification, NotificationStore } from "@amends-dev/core/notification";
+import { Member, MemberStore, Workspace } from "@amends-dev/core/workspace";
+import { SessionTokens } from "@amends-dev/gateway";
+import { PostgresDatabase, PostgresStorage } from "@amends-dev/storage-postgresql";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";

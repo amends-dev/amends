@@ -13,7 +13,7 @@ import type {
   SetupConnection,
   SetupFieldsProps,
   SetupPart,
-} from "@amends/ui/screens/agents";
+} from "@amends-dev/ui/screens/agents";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Cause, Effect, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";

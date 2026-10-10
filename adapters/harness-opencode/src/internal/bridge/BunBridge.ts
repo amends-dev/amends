@@ -7,7 +7,7 @@
  * own, which the bridge gives a second to close after the bridge's own finalizers have run, rather
  * than wait for hosts to close their connections.
  */
-import { type Bridge, BridgeServer, HostToolRelay } from "@amends/harness";
+import { type Bridge, BridgeServer, HostToolRelay } from "@amends-dev/harness";
 import { BunHttpServer, BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, Exit, Fiber, Layer, Redacted, Schema, Scope } from "effect";
 import { FetchHttpClient } from "effect/http";

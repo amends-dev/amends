@@ -1,5 +1,5 @@
-import { Api, ApiErrors, Unauthorized } from "@amends/api-http";
-import { GatewayErrors, SignIn } from "@amends/gateway";
+import { Api, ApiErrors, Unauthorized } from "@amends-dev/api-http";
+import { GatewayErrors, SignIn } from "@amends-dev/gateway";
 import { expect, it } from "@effect/vitest";
 import type { SchemaAST } from "effect";
 import { HttpApi } from "effect/http-api";

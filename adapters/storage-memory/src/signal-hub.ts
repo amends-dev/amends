@@ -1,4 +1,4 @@
-import { SignalHub } from "@amends/core/signal";
+import { SignalHub } from "@amends-dev/core/signal";
 import { Effect, Layer } from "effect";
 import { Binding } from "./binding.ts";
 

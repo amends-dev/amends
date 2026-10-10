@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
-import type * as Core from "@amends/core";
+import type * as Core from "@amends-dev/core";
 import {
   Assignment,
   AssignmentFacts,
@@ -8,7 +8,7 @@ import {
   Role,
   RoleFacts,
   type Permission,
-} from "@amends/core/authorization";
+} from "@amends-dev/core/authorization";
 import {
   Group,
   GroupService,
@@ -18,12 +18,12 @@ import {
   GroupMembershipPermissions,
   GroupPermissions,
   GroupStore,
-} from "@amends/core/group";
-import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Journal, Log, Publication, Store } from "@amends/core/journal";
-import { Member, MemberService, MemberFacts } from "@amends/core/workspace";
-import { ThreadService } from "@amends/core/thread";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/group";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Checkpoint, Journal, Log, Publication, Store } from "@amends-dev/core/journal";
+import { Member, MemberService, MemberFacts } from "@amends-dev/core/workspace";
+import { ThreadService } from "@amends-dev/core/thread";
+import { Gateway } from "@amends-dev/gateway";
 import { Context, Effect, Option } from "effect";
 import {
   type Bound,

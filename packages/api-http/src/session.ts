@@ -1,4 +1,4 @@
-import { SignIn } from "@amends/gateway/sign-in";
+import { SignIn } from "@amends-dev/gateway/sign-in";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 

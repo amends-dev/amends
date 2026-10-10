@@ -7,7 +7,7 @@ import type {
   ConnectionsFailure,
   IntegrationCapability,
   IntegrationOption,
-} from "@amends/ui/screens/connections";
+} from "@amends-dev/ui/screens/connections";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-solid";
 import { Cause, Effect, Exit, Option } from "effect";
 import { AsyncResult } from "effect/reactivity";

@@ -14,8 +14,8 @@ Each host extends `../../tsconfig.base.json`, enables its own runtime types, and
 provides a `typecheck` script. Shared packages cannot import hosts.
 
 A host depends on the gateway, whose contracts it implements, and on the handler
-packages it serves, such as `@amends/server-http`. It does not depend on protocol
-contract packages such as `@amends/api-http`: those are for clients, and the
+packages it serves, such as `@amends-dev/server-http`. It does not depend on protocol
+contract packages such as `@amends-dev/api-http`: those are for clients, and the
 handler package owns their server-side pieces, including authentication. A host's
 tests may take a contract package as a development dependency to act as a client.
 

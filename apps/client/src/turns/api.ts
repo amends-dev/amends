@@ -1,5 +1,5 @@
-import { ApiErrors, Turn, Workspace } from "@amends/api-http";
-import type { TurnProblem } from "@amends/ui/screens/turns";
+import { ApiErrors, Turn, Workspace } from "@amends-dev/api-http";
+import type { TurnProblem } from "@amends-dev/ui/screens/turns";
 import { Cause, Effect, Exit, Option, Queue, Schema, Stream } from "effect";
 import { Atom } from "effect/reactivity";
 import { isUnauthorized, type Api, type ApiClient } from "../api/client.ts";

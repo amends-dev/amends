@@ -1,6 +1,6 @@
-import { Identity } from "@amends/core/identity";
-import { Member, Workspace } from "@amends/core/workspace";
-import { WorkspaceDirectory } from "@amends/gateway";
+import { Identity } from "@amends-dev/core/identity";
+import { Member, Workspace } from "@amends-dev/core/workspace";
+import { WorkspaceDirectory } from "@amends-dev/gateway";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { DateTime, Effect, Layer, Schema } from "effect";

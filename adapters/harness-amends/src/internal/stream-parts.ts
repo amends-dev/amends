@@ -3,7 +3,7 @@
  * each part of a response as the harness's, a response's `finish` as the end of a step, and the
  * turn's own `finish` and `error`.
  */
-import type { StreamPart } from "@amends/harness";
+import type { StreamPart } from "@amends-dev/harness";
 import { Effect, flow, Schema } from "effect";
 import { AiError, type LanguageModel, Response, type Tool, Toolkit } from "effect/ai";
 

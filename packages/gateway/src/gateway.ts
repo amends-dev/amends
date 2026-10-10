@@ -1,17 +1,17 @@
-import * as Core from "@amends/core";
-import { Authorization } from "@amends/core/authorization";
-import { Actor, Identity } from "@amends/core/identity";
-import { Checkpoint, Projection, Store } from "@amends/core/journal";
+import * as Core from "@amends-dev/core";
+import { Authorization } from "@amends-dev/core/authorization";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Checkpoint, Projection, Store } from "@amends-dev/core/journal";
 import {
   type Member,
   MemberStore,
   Workspace,
   WorkspaceInitialization,
   WorkspaceStore,
-} from "@amends/core/workspace";
-import { Request } from "@amends/core/request";
-import type { DeliveryJobs } from "@amends/core/channel";
-import type { TurnJobs } from "@amends/core/turn";
+} from "@amends-dev/core/workspace";
+import { Request } from "@amends-dev/core/request";
+import type { DeliveryJobs } from "@amends-dev/core/channel";
+import type { TurnJobs } from "@amends-dev/core/turn";
 import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "effect";
 import { type Scope } from "effect";
 import { GatewayErrors } from "./errors.ts";
@@ -61,7 +61,7 @@ export interface Interface {
 }
 
 /** Workspace bootstrap and entry; core's services are the operations. */
-export class Service extends Context.Service<Service, Interface>()("@amends/gateway/Service") {}
+export class Service extends Context.Service<Service, Interface>()("@amends-dev/gateway/Service") {}
 
 const isPublic = Schema.is(GatewayErrors.PublicError);
 const isConflict = Schema.is(Store.Conflict);

@@ -1,6 +1,6 @@
-import { Connection } from "@amends/connection";
-import { ConnectionCredentialStore } from "@amends/core/connection";
-import { Store } from "@amends/core/journal";
+import { Connection } from "@amends-dev/connection";
+import { ConnectionCredentialStore } from "@amends-dev/core/connection";
+import { Store } from "@amends-dev/core/journal";
 import { Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeFailure } from "./errors.ts";

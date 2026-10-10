@@ -1,4 +1,4 @@
-import { GroupCommand } from "@amends/core/group";
+import { GroupCommand } from "@amends-dev/core/group";
 import { Publication } from "../../../src/journal/publication.ts";
 import { GroupMembershipStore } from "../../../src/group/membership/store.ts";
 import { testCrypto, testProvenance } from "../../publication.ts";

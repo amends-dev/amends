@@ -12,7 +12,7 @@ import {
   type WorkspacePickerController,
   type SessionStore,
 } from "../src/index.ts";
-import type { WorkspaceAccess } from "@amends/ui/screens/standalone";
+import type { WorkspaceAccess } from "@amends-dev/ui/screens/standalone";
 
 afterEach(cleanup);
 const json = (body: unknown, status = 200) =>

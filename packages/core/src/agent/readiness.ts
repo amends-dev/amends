@@ -7,7 +7,7 @@ import type {
   Connection as ConnectionContract,
   Integration,
   Integrations,
-} from "@amends/connection";
+} from "@amends-dev/connection";
 import { Array, DateTime, Effect, Option, Order } from "effect";
 import { Connection } from "../connection/connection.ts";
 import type { Agent } from "./agent.ts";

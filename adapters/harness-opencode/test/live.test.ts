@@ -5,10 +5,10 @@ import {
   HostToolRelay,
   type ModelEndpoint,
   type StreamPart,
-} from "@amends/harness";
-import { SessionId } from "@amends/harness/Agent";
-import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
-import type { Sandbox, Template } from "@amends/sandbox";
+} from "@amends-dev/harness";
+import { SessionId } from "@amends-dev/harness/Agent";
+import { DaytonaSandboxProvider } from "@amends-dev/sandbox-daytona";
+import type { Sandbox, Template } from "@amends-dev/sandbox";
 import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {

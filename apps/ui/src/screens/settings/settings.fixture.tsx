@@ -1,7 +1,7 @@
 // Workshop harness: Workspace settings with the Lunacy sample members and invitations, following
 // the mocks' behavior notes over local state. Not exported.
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
-import { IconMarkSettings, IconUsers } from "@amends/icons";
+import { IconMarkSettings, IconUsers } from "@amends-dev/icons";
 import { Toast } from "../../components/toast/index.ts";
 import { Shell } from "../../patterns/shell/index.ts";
 import { navigation } from "../sample.ts";

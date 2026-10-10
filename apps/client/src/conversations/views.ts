@@ -1,15 +1,19 @@
-import type { MentionCandidate } from "@amends/ui/components/composer";
-import type { MessageAuthor } from "@amends/ui/components/message";
-import type { Profile } from "@amends/ui/components/profile-card";
-import type { RichTextMention } from "@amends/ui/components/rich-text";
-import type { TurnState } from "@amends/ui/components/turn-status";
-import type { ConversationStatus, GroupVisibility, SettingsMember } from "@amends/ui/screens/group";
+import type { MentionCandidate } from "@amends-dev/ui/components/composer";
+import type { MessageAuthor } from "@amends-dev/ui/components/message";
+import type { Profile } from "@amends-dev/ui/components/profile-card";
+import type { RichTextMention } from "@amends-dev/ui/components/rich-text";
+import type { TurnState } from "@amends-dev/ui/components/turn-status";
+import type {
+  ConversationStatus,
+  GroupVisibility,
+  SettingsMember,
+} from "@amends-dev/ui/screens/group";
 import type {
   ParticipationChange,
   TimelineMessage,
   TimelineNote,
   TimelineTurn,
-} from "@amends/ui/screens/timeline";
+} from "@amends-dev/ui/screens/timeline";
 import { useAtomValue } from "@effect/atom-solid";
 import { Option, Predicate } from "effect";
 import { AsyncResult } from "effect/reactivity";

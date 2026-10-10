@@ -1,8 +1,8 @@
-import { Api, Principal } from "@amends/api-http";
-import { ConnectionService } from "@amends/core/connection";
-import type { Actor } from "@amends/core/identity";
-import type { Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Api, Principal } from "@amends-dev/api-http";
+import { ConnectionService } from "@amends-dev/core/connection";
+import type { Actor } from "@amends-dev/core/identity";
+import type { Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect } from "effect";
 import { HttpApiBuilder } from "effect/http-api";
 

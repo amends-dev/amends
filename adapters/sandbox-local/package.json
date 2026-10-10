@@ -1,21 +1,21 @@
 {
-  "name": "@amends/sandbox-local",
+  "name": "@amends-dev/sandbox-local",
   "version": "0.1.0",
-  "description": "Sandboxes as directories on this machine, for the @amends/sandbox contract: for development, tests, and agents you would trust on this machine anyway.",
+  "description": "Sandboxes as directories on this machine, for the @amends-dev/sandbox contract: for development, tests, and agents you would trust on this machine anyway.",
   "keywords": [
     "agent",
     "effect",
     "local",
     "sandbox"
   ],
-  "homepage": "https://github.com/saribmah/amends-v2/tree/main/adapters/sandbox-local#readme",
+  "homepage": "https://github.com/amends-dev/amends/tree/main/adapters/sandbox-local#readme",
   "bugs": {
-    "url": "https://github.com/saribmah/amends-v2/issues"
+    "url": "https://github.com/amends-dev/amends/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/saribmah/amends-v2.git",
+    "url": "https://github.com/amends-dev/amends.git",
     "directory": "adapters/sandbox-local"
   },
   "type": "module",
@@ -32,7 +32,7 @@
     "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
-    "@amends/sandbox": "workspace:*"
+    "@amends-dev/sandbox": "workspace:*"
   },
   "devDependencies": {
     "@effect/platform-bun": "catalog:",

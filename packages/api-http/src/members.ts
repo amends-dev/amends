@@ -1,4 +1,4 @@
-import { Member, Workspace } from "@amends/core/workspace";
+import { Member, Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

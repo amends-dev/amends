@@ -201,7 +201,7 @@ export type TurnServices<Tools extends Record<string, Tool.Any>> = Tool.HandlerS
  * **Example** (A turn with a host tool that needs approval)
  *
  * ```ts
- * import { Agent, Harness } from "@amends/harness";
+ * import { Agent, Harness } from "@amends-dev/harness";
  * import { Effect, Schema, Stream } from "effect";
  * import { Tool, Toolkit } from "effect/ai";
  *
@@ -366,7 +366,7 @@ export interface Session {
  * **Example** (Rebuilding a conversation from logged steps)
  *
  * ```ts
- * import { Session, StreamPart } from "@amends/harness";
+ * import { Session, StreamPart } from "@amends-dev/harness";
  * import { Prompt } from "effect/ai";
  *
  * declare const prompt: Prompt.UserMessage;

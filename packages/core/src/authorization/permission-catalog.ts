@@ -16,7 +16,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/permission-catalog/Service",
+  "@amends-dev/core/authorization/permission-catalog/Service",
 ) {}
 
 const decodeDefinition = Schema.decodeEffect(Permission.Definition);

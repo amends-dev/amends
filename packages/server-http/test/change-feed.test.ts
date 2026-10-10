@@ -1,9 +1,9 @@
-import { Api, Authentication } from "@amends/api-http";
-import type * as Core from "@amends/core";
-import { ChangeFeed, ChangeFeedService } from "@amends/core/change-feed";
-import { Actor, Identity } from "@amends/core/identity";
-import { Member, Workspace } from "@amends/core/workspace";
-import { SessionTokens, Gateway, type GatewayErrors } from "@amends/gateway";
+import { Api, Authentication } from "@amends-dev/api-http";
+import type * as Core from "@amends-dev/core";
+import { ChangeFeed, ChangeFeedService } from "@amends-dev/core/change-feed";
+import { Actor, Identity } from "@amends-dev/core/identity";
+import { Member, Workspace } from "@amends-dev/core/workspace";
+import { SessionTokens, Gateway, type GatewayErrors } from "@amends-dev/gateway";
 import { expect, it } from "@effect/vitest";
 import { Cause, Effect, Exit, Layer, Logger, Option, Stream } from "effect";
 import type { Scope } from "effect";

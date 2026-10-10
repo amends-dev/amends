@@ -1,5 +1,5 @@
-import * as Core from "@amends/core";
-import { AgentPermissions } from "@amends/core/agent";
+import * as Core from "@amends-dev/core";
+import { AgentPermissions } from "@amends-dev/core/agent";
 import {
   Assignment,
   AssignmentService,
@@ -9,17 +9,17 @@ import {
   Permission,
   RoleFacts,
   Scope,
-} from "@amends/core/authorization";
-import { Identity } from "@amends/core/identity";
-import { Journal, Publication } from "@amends/core/journal";
+} from "@amends-dev/core/authorization";
+import { Identity } from "@amends-dev/core/identity";
+import { Journal, Publication } from "@amends-dev/core/journal";
 import {
   InvitationService,
   Member,
   MemberFacts,
   MemberPermissions,
   WorkspaceFacts,
-} from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Clock, DateTime, Deferred, Effect, Exit, Fiber, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";

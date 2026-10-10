@@ -1,5 +1,5 @@
-import { paths, useJoinGroup, usePublicGroups, useWorkspaceGroups } from "@amends/client";
-import { GroupDirectory, type DirectoryGroup } from "@amends/ui/screens/groups";
+import { paths, useJoinGroup, usePublicGroups, useWorkspaceGroups } from "@amends-dev/client";
+import { GroupDirectory, type DirectoryGroup } from "@amends-dev/ui/screens/groups";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createSignal } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

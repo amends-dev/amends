@@ -985,7 +985,7 @@ Cloudflare cannot write to a running process's input, and a local directory prov
 isolation. Anything the host talks to inside a sandbox therefore listens on a port rather than
 relying on standard input. A provider that can snapshot uses it to start sandboxes from a prepared
 template; a snapshot is a reference that only the provider which took it can restore or delete.
-The contract and its conformance suites are [`@amends/sandbox`](../packages/sandbox), with local
+The contract and its conformance suites are [`@amends-dev/sandbox`](../packages/sandbox), with local
 and Daytona providers in `adapters/`.
 
 ## Agreed: each participation's session works in its own sandbox
@@ -1249,7 +1249,7 @@ are granted; an OAuth client registered with a provider belongs to the host's co
 workspace, and refreshing an expired token will be part of resolving the credential for use.
 
 Connections that authenticate with an API key, or not at all, are implemented, as is the channel
-contract an integration gives ([`@amends/channel`](../packages/channel/README.md)), though no
+contract an integration gives ([`@amends-dev/channel`](../packages/channel/README.md)), though no
 installed integration gives channels yet. OAuth and refreshing tokens arrive with the integrations that need them.
 
 ## Agreed: agents select a harness, a model, and a sandbox

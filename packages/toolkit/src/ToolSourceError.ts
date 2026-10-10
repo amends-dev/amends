@@ -50,10 +50,9 @@ const withDefaults = <
 
 /** The source's credentials are missing, invalid, or not allowed to do this. */
 export class AuthenticationError extends withDefaults(
-  Schema.TaggedError<AuthenticationError>("@amends/toolkit/ToolSourceError/AuthenticationError")(
-    "AuthenticationError",
-    described,
-  ),
+  Schema.TaggedError<AuthenticationError>(
+    "@amends-dev/toolkit/ToolSourceError/AuthenticationError",
+  )("AuthenticationError", described),
   {
     message: "The credentials for this tool are missing, invalid, or not authorized",
     isRetryable: false,
@@ -62,7 +61,7 @@ export class AuthenticationError extends withDefaults(
 
 /** The source has no tool of the name it was asked to run, such as one it has removed since. */
 export class NotFoundError extends withDefaults(
-  Schema.TaggedError<NotFoundError>("@amends/toolkit/ToolSourceError/NotFoundError")(
+  Schema.TaggedError<NotFoundError>("@amends-dev/toolkit/ToolSourceError/NotFoundError")(
     "NotFoundError",
     described,
   ),
@@ -71,7 +70,7 @@ export class NotFoundError extends withDefaults(
 
 /** The input does not match the tool's parameters. Its description says what to correct. */
 export class InvalidInputError extends withDefaults(
-  Schema.TaggedError<InvalidInputError>("@amends/toolkit/ToolSourceError/InvalidInputError")(
+  Schema.TaggedError<InvalidInputError>("@amends-dev/toolkit/ToolSourceError/InvalidInputError")(
     "InvalidInputError",
     described,
   ),
@@ -84,7 +83,7 @@ export class InvalidInputError extends withDefaults(
 
 /** The tool ran and reported that it failed. Its description is what the tool said. */
 export class CallFailedError extends withDefaults(
-  Schema.TaggedError<CallFailedError>("@amends/toolkit/ToolSourceError/CallFailedError")(
+  Schema.TaggedError<CallFailedError>("@amends-dev/toolkit/ToolSourceError/CallFailedError")(
     "CallFailedError",
     described,
   ),
@@ -93,7 +92,7 @@ export class CallFailedError extends withDefaults(
 
 // TODO: Say when to try again, which a rate limit gives, once a caller retries by it.
 export class UnavailableError extends withDefaults(
-  Schema.TaggedError<UnavailableError>("@amends/toolkit/ToolSourceError/UnavailableError")(
+  Schema.TaggedError<UnavailableError>("@amends-dev/toolkit/ToolSourceError/UnavailableError")(
     "UnavailableError",
     described,
   ),
@@ -102,15 +101,14 @@ export class UnavailableError extends withDefaults(
 
 /** The source answered in a way its protocol does not allow, such as a result that is not JSON. */
 export class InvalidResponseError extends withDefaults(
-  Schema.TaggedError<InvalidResponseError>("@amends/toolkit/ToolSourceError/InvalidResponseError")(
-    "InvalidResponseError",
-    described,
-  ),
+  Schema.TaggedError<InvalidResponseError>(
+    "@amends-dev/toolkit/ToolSourceError/InvalidResponseError",
+  )("InvalidResponseError", described),
   { message: "The source answered in a way its protocol does not allow", isRetryable: false },
 ) {}
 
 export class UnsupportedError extends withDefaults(
-  Schema.TaggedError<UnsupportedError>("@amends/toolkit/ToolSourceError/UnsupportedError")(
+  Schema.TaggedError<UnsupportedError>("@amends-dev/toolkit/ToolSourceError/UnsupportedError")(
     "UnsupportedError",
     described,
   ),
@@ -118,7 +116,7 @@ export class UnsupportedError extends withDefaults(
 ) {}
 
 export class UnknownError extends withDefaults(
-  Schema.TaggedError<UnknownError>("@amends/toolkit/ToolSourceError/UnknownError")(
+  Schema.TaggedError<UnknownError>("@amends-dev/toolkit/ToolSourceError/UnknownError")(
     "UnknownError",
     described,
   ),
@@ -139,7 +137,7 @@ export const ToolSourceErrorReason = Schema.Union([
 export type ToolSourceErrorReason = typeof ToolSourceErrorReason.Type;
 
 export class ToolSourceError extends Schema.TaggedError<ToolSourceError>(
-  "@amends/toolkit/ToolSourceError",
+  "@amends-dev/toolkit/ToolSourceError",
 )("ToolSourceError", {
   /** The source that failed, as its name gives it, such as `github`. */
   source: Schema.String,

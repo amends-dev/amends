@@ -1,5 +1,5 @@
-import { ThreadParticipation } from "@amends/core/thread";
-import { type SessionLog, Turn } from "@amends/core/turn";
+import { ThreadParticipation } from "@amends-dev/core/thread";
+import { type SessionLog, Turn } from "@amends-dev/core/turn";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Result } from "effect";
 import { Prompt } from "effect/ai";

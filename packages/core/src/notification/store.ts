@@ -188,7 +188,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/notification/store/Service",
+  "@amends-dev/core/notification/store/Service",
 ) {}
 
 export * as NotificationStore from "./store.ts";

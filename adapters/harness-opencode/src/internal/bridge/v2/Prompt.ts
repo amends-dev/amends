@@ -9,7 +9,7 @@
  * opencode 2 takes files as data, so a file given at a URL other than a `data:` or `file:` URL
  * fails with `UnsupportedError`.
  */
-import { HarnessError } from "@amends/harness";
+import { HarnessError } from "@amends-dev/harness";
 import { Predicate, Result, Schema } from "effect";
 import type { Prompt } from "effect/ai";
 import { Base64 } from "effect/encoding";

@@ -1,8 +1,8 @@
-import { Identity } from "@amends/core/identity";
-import { Entry } from "@amends/core/journal";
-import { Member } from "@amends/core/workspace";
-import { Notification, type NotificationStore } from "@amends/core/notification";
-import { Suites } from "@amends/storage-conformance";
+import { Identity } from "@amends-dev/core/identity";
+import { Entry } from "@amends-dev/core/journal";
+import { Member } from "@amends-dev/core/workspace";
+import { Notification, type NotificationStore } from "@amends-dev/core/notification";
+import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect } from "effect";
 import { SqlClient } from "effect/sql";

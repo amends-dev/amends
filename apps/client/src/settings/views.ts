@@ -8,7 +8,7 @@ import type {
   SettingsPerson,
   SettingsRole,
   SettingsTab,
-} from "@amends/ui/screens/settings";
+} from "@amends-dev/ui/screens/settings";
 import { useAtomValue } from "@effect/atom-solid";
 import { Cause, DateTime, Effect, Option, Predicate } from "effect";
 import { AsyncResult } from "effect/reactivity";

@@ -1,11 +1,11 @@
-import { Api, Authentication } from "@amends/api-http";
-import { BuiltinRoles } from "@amends/core/authorization";
-import { ChangeFeed } from "@amends/core/change-feed";
-import { GroupFacts } from "@amends/core/group";
-import { Identity } from "@amends/core/identity";
-import { Thread, ThreadService } from "@amends/core/thread";
-import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Api, Authentication } from "@amends-dev/api-http";
+import { BuiltinRoles } from "@amends-dev/core/authorization";
+import { ChangeFeed } from "@amends-dev/core/change-feed";
+import { GroupFacts } from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
+import { Thread, ThreadService } from "@amends-dev/core/thread";
+import { InvitationFacts, Member, MemberFacts, Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { BunCrypto, BunHttpServer } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {
@@ -20,7 +20,7 @@ import {
   Scope,
   Stream,
 } from "effect";
-import { Streams } from "@amends/server-http";
+import { Streams } from "@amends-dev/server-http";
 import { HttpClient, HttpClientRequest, HttpRouter } from "effect/http";
 import { HttpApiClient, HttpApiMiddleware } from "effect/http-api";
 import { DevelopmentAuthentication } from "../src/authentication/authentication.ts";

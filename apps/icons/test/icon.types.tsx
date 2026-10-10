@@ -1,5 +1,5 @@
-import { IconCheck, type IconName } from "@amends/icons";
-import { IconMenu } from "@amends/icons/menu";
+import { IconCheck, type IconName } from "@amends-dev/icons";
+import { IconMenu } from "@amends-dev/icons/menu";
 
 export function iconTypeExamples() {
   <IconCheck size="md" weight={1.75} label="Completed" />;

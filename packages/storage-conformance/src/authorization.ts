@@ -1,7 +1,7 @@
-import { AssignmentFacts, Role, RoleFacts } from "@amends/core/authorization";
-import { Actor } from "@amends/core/identity";
-import { Journal, Publication } from "@amends/core/journal";
-import { MemberService, MemberPermissions } from "@amends/core/workspace";
+import { AssignmentFacts, Role, RoleFacts } from "@amends-dev/core/authorization";
+import { Actor } from "@amends-dev/core/identity";
+import { Journal, Publication } from "@amends-dev/core/journal";
+import { MemberService, MemberPermissions } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import type { Harness } from "./harness.ts";

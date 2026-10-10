@@ -179,7 +179,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/turn/execution/Service",
+  "@amends-dev/core/turn/execution/Service",
 ) {}
 
 /** How many activities one read takes; reads go on until the range is done. */

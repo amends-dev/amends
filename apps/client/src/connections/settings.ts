@@ -1,4 +1,4 @@
-import type { FormField, FormIssue } from "@amends/ui/components/form-fields";
+import type { FormField, FormIssue } from "@amends-dev/ui/components/form-fields";
 import type { Connection } from "./api.ts";
 
 /** An integration's settings form, as the host describes it: an MCP elicitation form schema. */

@@ -25,7 +25,7 @@ import { Schema } from "effect";
  * @since 0.1.0
  */
 export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
-  "@amends/harness/HarnessError/UnsupportedError",
+  "@amends-dev/harness/HarnessError/UnsupportedError",
 )("UnsupportedError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -43,7 +43,7 @@ export class UnsupportedError extends Schema.TaggedError<UnsupportedError>(
  * @since 0.1.0
  */
 export class NotFoundError extends Schema.TaggedError<NotFoundError>(
-  "@amends/harness/HarnessError/NotFoundError",
+  "@amends-dev/harness/HarnessError/NotFoundError",
 )("NotFoundError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -62,7 +62,7 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>(
  * @since 0.1.0
  */
 export class SessionReleasedError extends Schema.TaggedError<SessionReleasedError>(
-  "@amends/harness/HarnessError/SessionReleasedError",
+  "@amends-dev/harness/HarnessError/SessionReleasedError",
 )("SessionReleasedError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -81,7 +81,7 @@ export class SessionReleasedError extends Schema.TaggedError<SessionReleasedErro
  * @since 0.1.0
  */
 export class TurnInProgressError extends Schema.TaggedError<TurnInProgressError>(
-  "@amends/harness/HarnessError/TurnInProgressError",
+  "@amends-dev/harness/HarnessError/TurnInProgressError",
 )("TurnInProgressError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -99,7 +99,7 @@ export class TurnInProgressError extends Schema.TaggedError<TurnInProgressError>
  * @since 0.1.0
  */
 export class NoTurnError extends Schema.TaggedError<NoTurnError>(
-  "@amends/harness/HarnessError/NoTurnError",
+  "@amends-dev/harness/HarnessError/NoTurnError",
 )("NoTurnError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -117,7 +117,7 @@ export class NoTurnError extends Schema.TaggedError<NoTurnError>(
  * @since 0.1.0
  */
 export class TurnFailedError extends Schema.TaggedError<TurnFailedError>(
-  "@amends/harness/HarnessError/TurnFailedError",
+  "@amends-dev/harness/HarnessError/TurnFailedError",
 )("TurnFailedError", { description: Schema.optional(Schema.String), error: Schema.Unknown }) {
   get isRetryable(): boolean {
     return false;
@@ -136,7 +136,7 @@ export class TurnFailedError extends Schema.TaggedError<TurnFailedError>(
  * @since 0.1.0
  */
 export class AgentContractError extends Schema.TaggedError<AgentContractError>(
-  "@amends/harness/HarnessError/AgentContractError",
+  "@amends-dev/harness/HarnessError/AgentContractError",
 )("AgentContractError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -155,7 +155,7 @@ export class AgentContractError extends Schema.TaggedError<AgentContractError>(
  * @since 0.1.0
  */
 export class UnavailableError extends Schema.TaggedError<UnavailableError>(
-  "@amends/harness/HarnessError/UnavailableError",
+  "@amends-dev/harness/HarnessError/UnavailableError",
 )("UnavailableError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return true;
@@ -174,7 +174,7 @@ export class UnavailableError extends Schema.TaggedError<UnavailableError>(
  * @since 0.1.0
  */
 export class UnknownError extends Schema.TaggedError<UnknownError>(
-  "@amends/harness/HarnessError/UnknownError",
+  "@amends-dev/harness/HarnessError/UnknownError",
 )("UnknownError", { description: Schema.optional(Schema.String) }) {
   get isRetryable(): boolean {
     return false;
@@ -215,7 +215,7 @@ export type HarnessErrorReason = typeof HarnessErrorReason.Type;
  * **Example** (Recovering from one reason)
  *
  * ```ts
- * import { Session } from "@amends/harness";
+ * import { Session } from "@amends-dev/harness";
  * import { Effect } from "effect";
  *
  * declare const session: Session.Session;
@@ -231,15 +231,14 @@ export type HarnessErrorReason = typeof HarnessErrorReason.Type;
  * @category errors
  * @since 0.1.0
  */
-export class HarnessError extends Schema.TaggedError<HarnessError>("@amends/harness/HarnessError")(
-  "HarnessError",
-  {
-    /** The agent that failed, as `Agent.id` names it. */
-    agent: Schema.String,
-    reason: HarnessErrorReason,
-    cause: Schema.optional(Schema.Defect()),
-  },
-) {
+export class HarnessError extends Schema.TaggedError<HarnessError>(
+  "@amends-dev/harness/HarnessError",
+)("HarnessError", {
+  /** The agent that failed, as `Agent.id` names it. */
+  agent: Schema.String,
+  reason: HarnessErrorReason,
+  cause: Schema.optional(Schema.Defect()),
+}) {
   get isRetryable(): boolean {
     return this.reason.isRetryable;
   }

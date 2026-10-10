@@ -21,7 +21,7 @@ import type { Template } from "./Template.ts";
  * **Example** (The snapshot a sandbox on Daytona starts from)
  *
  * ```ts
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { Effect } from "effect";
  *
  * const program = Effect.gen(function* () {
@@ -84,7 +84,7 @@ export interface CreateOptions<E> {
  * **Example** (Creating a sandbox, stopping it, and resuming it later)
  *
  * ```ts
- * import { Network, Sandbox, SandboxProvider } from "@amends/sandbox";
+ * import { Network, Sandbox, SandboxProvider } from "@amends-dev/sandbox";
  * import { Effect, FileSystem, Path } from "effect";
  *
  * const id = Sandbox.SandboxId.make("review-42");
@@ -137,7 +137,7 @@ export class SandboxProvider extends Context.Service<
      */
     readonly resume: (id: SandboxId) => Effect.Effect<Sandbox["Service"], SandboxError>;
   }
->()("@amends/sandbox/SandboxProvider") {}
+>()("@amends-dev/sandbox/SandboxProvider") {}
 
 /**
  * The service over a provider's `create` and `resume`, with `createScoped` derived from them, as
@@ -146,7 +146,7 @@ export class SandboxProvider extends Context.Service<
  * **Example** (A sandbox for one piece of work)
  *
  * ```ts
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { Effect } from "effect";
  *
  * declare const create: SandboxProvider.SandboxProvider["Service"]["create"];

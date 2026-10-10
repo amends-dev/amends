@@ -1,4 +1,4 @@
-import { Subject } from "@amends/core/journal";
+import { Subject } from "@amends-dev/core/journal";
 import { expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Option, Schema } from "effect";
 import { Checkpoint } from "../../src/journal/checkpoint.ts";

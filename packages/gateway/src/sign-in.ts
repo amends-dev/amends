@@ -1,4 +1,4 @@
-import { Identity } from "@amends/core/identity";
+import { Identity } from "@amends-dev/core/identity";
 import { Context, Schema } from "effect";
 import type { Effect } from "effect";
 
@@ -32,7 +32,7 @@ export interface Interface {
 
 /** The ingress that produces authenticated humans; hosts own delivery and token issuance. */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/gateway/sign-in/Service",
+  "@amends-dev/gateway/sign-in/Service",
 ) {}
 
 export * as SignIn from "./sign-in.ts";

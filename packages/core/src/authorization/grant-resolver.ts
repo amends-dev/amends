@@ -25,7 +25,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/grant-resolver/Service",
+  "@amends-dev/core/authorization/grant-resolver/Service",
 ) {}
 
 /**

@@ -16,7 +16,7 @@ needs, with a check constraint that they agree. Invitations store a required rol
 
 `drizzle/` contains one generated baseline for fresh databases. During local
 development, update `src/schema.ts`, remove the previous generated baseline, and
-run `bun run --filter @amends/storage-postgresql generate --name=workspace_storage`.
+run `bun run --filter @amends-dev/storage-postgresql generate --name=workspace_storage`.
 Commit the replacement baseline and reset the development database.
 `PostgresDatabase.make()` applies that baseline once before returning the service. `PostgresDatabase.layer(config)` uses that constructor;
 `PostgresDatabase.layerClient(config)` connects the same pool without migrating, for tools that only read.
@@ -422,7 +422,7 @@ concurrent migration, and access paths, and `scope.test.ts` the scope columns. E
 project's global setup owns the shared test cluster, and individual tests own their temporary
 databases.
 
-The development-only `@amends/storage-postgresql/testing/postgres` export shares
+The development-only `@amends-dev/storage-postgresql/testing/postgres` export shares
 cluster discovery and scoped temporary databases with the feature workshop. Its
 `database(serverUrl)` returns a URL and requires a Scope; closing that scope drops
 the database. `temporary(serverUrl, use)` runs a callback in that scope. Neither

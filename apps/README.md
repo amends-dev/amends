@@ -1,7 +1,7 @@
 # User-facing applications
 
 - [icons](icons/README.md) provides canonical drawings, generated Solid icons/SVGs,
-  and a separate metadata catalog through `@amends/icons`.
+  and a separate metadata catalog through `@amends-dev/icons`.
 - [UI](ui/README.md) is the pattern-based design system from the Lunacy mocks: foundations,
   components, the six layout patterns, and presentational screens for every page, verified in
   its standalone Storybook workshop.
@@ -29,9 +29,9 @@ each app. The [sign-in design](../docs/sign-in-design.md) identifies the first U
 From the repository root after `bun install`:
 
 ```sh
-bun run --filter @amends/web dev
-bun run --filter @amends/desktop dev
-bun run --filter @amends/ui dev
+bun run --filter @amends-dev/web dev
+bun run --filter @amends-dev/desktop dev
+bun run --filter @amends-dev/ui dev
 ```
 
 Run each in its own terminal. The UI workshop serves at `http://127.0.0.1:6010/`. Client has

@@ -3,7 +3,7 @@
  * provider's operations, and a platform error for a sandbox's files and processes, as Effect's
  * own file systems and process spawners fail.
  */
-import { SandboxError } from "@amends/sandbox";
+import { SandboxError } from "@amends-dev/sandbox";
 import {
   DaytonaAuthenticationError,
   DaytonaBadGatewayError,

@@ -37,7 +37,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/change-feed/service/Service",
+  "@amends-dev/core/change-feed/service/Service",
 ) {}
 
 /** What one reader may see: their delivery scopes and resolved grants. */

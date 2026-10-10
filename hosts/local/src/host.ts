@@ -6,15 +6,15 @@ import {
   ModelCatalog,
   ModelIntegrations,
   ToolIntegrations,
-} from "@amends/connection";
-import { DeliveryJob, JobPruning, TurnJob } from "@amends/cluster";
-import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
-import { Models } from "@amends/harness-amends";
+} from "@amends-dev/connection";
+import { DeliveryJob, JobPruning, TurnJob } from "@amends-dev/cluster";
+import { Gateway, type WorkspaceDirectory } from "@amends-dev/gateway";
+import { Models } from "@amends-dev/harness-amends";
 import {
   PostgresClusterStorage,
   PostgresDatabase,
   layer as postgres,
-} from "@amends/storage-postgresql";
+} from "@amends-dev/storage-postgresql";
 import { BunClusterSocket, BunCrypto, BunServices, BunSocket } from "@effect/platform-bun";
 import { Duration, Effect, Layer, Option, Redacted } from "effect";
 import {

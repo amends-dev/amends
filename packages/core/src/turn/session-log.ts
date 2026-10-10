@@ -5,7 +5,7 @@
  * log takes part in no commit of the workspace, so a host may keep it apart, in a store built for
  * appending (`SessionLogStore`). The agent's session resumes with the conversation rebuilt from it.
  */
-import { Session, StreamPart } from "@amends/harness";
+import { Session, StreamPart } from "@amends-dev/harness";
 import { Schema } from "effect";
 import { Prompt } from "effect/ai";
 import type { ThreadMessageId } from "../thread/ThreadMessageId.ts";

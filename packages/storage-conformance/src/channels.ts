@@ -1,18 +1,23 @@
-import type * as Core from "@amends/core";
-import { Channel, ChannelIntake, ChannelService, DeliveryExecution } from "@amends/core/channel";
-import { ConnectionService } from "@amends/core/connection";
-import { Group, GroupFollowService, GroupService } from "@amends/core/group";
-import type { Actor, Identity } from "@amends/core/identity";
-import { Notification } from "@amends/core/notification";
-import { TaskService } from "@amends/core/task";
+import type * as Core from "@amends-dev/core";
+import {
+  Channel,
+  ChannelIntake,
+  ChannelService,
+  DeliveryExecution,
+} from "@amends-dev/core/channel";
+import { ConnectionService } from "@amends-dev/core/connection";
+import { Group, GroupFollowService, GroupService } from "@amends-dev/core/group";
+import type { Actor, Identity } from "@amends-dev/core/identity";
+import { Notification } from "@amends-dev/core/notification";
+import { TaskService } from "@amends-dev/core/task";
 import {
   type Thread,
   ThreadMessageService,
   ThreadParticipation,
   ThreadService,
-} from "@amends/core/thread";
-import { Member, type Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+} from "@amends-dev/core/thread";
+import { Member, type Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";

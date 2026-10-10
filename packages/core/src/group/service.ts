@@ -101,7 +101,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/group/service/Service",
+  "@amends-dev/core/group/service/Service",
 ) {}
 
 /** Capture workspace dependencies; resolve authority and member eligibility inside each commit. @category constructors */

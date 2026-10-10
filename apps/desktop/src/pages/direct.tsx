@@ -5,8 +5,8 @@ import {
   usePeople,
   useWorkspace,
   useWorkspaceGroups,
-} from "@amends/client";
-import { GroupPane, GroupThreads } from "@amends/ui/screens/group";
+} from "@amends-dev/client";
+import { GroupPane, GroupThreads } from "@amends-dev/ui/screens/group";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { createEffect, For } from "solid-js";
 

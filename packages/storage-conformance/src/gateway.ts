@@ -1,19 +1,19 @@
-import { AgentPermissions } from "@amends/core/agent";
-import { ChannelPermissions } from "@amends/core/channel";
-import { ConnectionPermissions } from "@amends/core/connection";
-import { TaskPermissions } from "@amends/core/task";
-import { TurnExecution } from "@amends/core/turn";
-import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
-import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
-import type { Identity } from "@amends/core/identity";
-import { Journal, Publication } from "@amends/core/journal";
-import * as Core from "@amends/core";
+import { AgentPermissions } from "@amends-dev/core/agent";
+import { ChannelPermissions } from "@amends-dev/core/channel";
+import { ConnectionPermissions } from "@amends-dev/core/connection";
+import { TaskPermissions } from "@amends-dev/core/task";
+import { TurnExecution } from "@amends-dev/core/turn";
+import { AssignmentPermissions, BuiltinRoles } from "@amends-dev/core/authorization";
+import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends-dev/core/group";
+import type { Identity } from "@amends-dev/core/identity";
+import { Journal, Publication } from "@amends-dev/core/journal";
+import * as Core from "@amends-dev/core";
 import {
   Thread,
   ThreadMessagePermissions,
   ThreadParticipationPermissions,
   ThreadPermissions,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import {
   InvitationService,
   InvitationPermissions,
@@ -23,8 +23,8 @@ import {
   Invitation,
   OwnershipPermissions,
   Workspace,
-} from "@amends/core/workspace";
-import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends/gateway";
+} from "@amends-dev/core/workspace";
+import { Gateway, GatewayErrors, WorkspaceDirectory } from "@amends-dev/gateway";
 import { describe, expect, expectTypeOf, it } from "@effect/vitest";
 import { Effect, Layer, Option } from "effect";
 import type { Harness } from "./harness.ts";

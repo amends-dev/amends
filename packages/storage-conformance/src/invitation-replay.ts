@@ -1,10 +1,10 @@
-import { AssignmentFacts, BuiltinRoles, Assignment } from "@amends/core/authorization";
+import { AssignmentFacts, BuiltinRoles, Assignment } from "@amends-dev/core/authorization";
 
-import { Actor, Identity } from "@amends/core/identity";
+import { Actor, Identity } from "@amends-dev/core/identity";
 
-import { Journal, Publication, Store } from "@amends/core/journal";
+import { Journal, Publication, Store } from "@amends-dev/core/journal";
 
-import { InvitationService, MemberService } from "@amends/core/workspace";
+import { InvitationService, MemberService } from "@amends-dev/core/workspace";
 
 import { describe, expect, it } from "@effect/vitest";
 

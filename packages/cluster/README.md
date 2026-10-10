@@ -1,8 +1,8 @@
 # Cluster
 
-`@amends/cluster` runs **jobs**: work outside any request that a commit asks for and Effect Cluster
-delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kinds of job are the
-**turn job**, one for each agent in each thread, which runs the agent's
+`@amends-dev/cluster` runs **jobs**: work outside any request that a commit asks for and Effect
+Cluster delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kinds of job are
+the **turn job**, one for each agent in each thread, which runs the agent's
 [turns](../core/README.md#turns) there on [harness](../harness/README.md), and the **delivery
 job**, one for each thread bound to a [channel](../core/README.md#channels)'s conversation, which
 carries what the thread's contacts were told to the conversation. Jobs enter

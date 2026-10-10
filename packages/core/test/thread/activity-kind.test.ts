@@ -1,4 +1,4 @@
-import { Thread, ThreadActivity, ThreadActivityKind } from "@amends/core/thread";
+import { Thread, ThreadActivity, ThreadActivityKind } from "@amends-dev/core/thread";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Schema } from "effect";
 import { WorkspaceId } from "../../src/workspace/id.ts";

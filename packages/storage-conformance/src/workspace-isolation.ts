@@ -1,9 +1,9 @@
-import { Agent } from "@amends/core/agent";
-import { BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
-import { Channel, Delivery } from "@amends/core/channel";
-import { Connection } from "@amends/core/connection";
-import { Group } from "@amends/core/group";
-import { Identity } from "@amends/core/identity";
+import { Agent } from "@amends-dev/core/agent";
+import { BuiltinRoles, Role, Assignment } from "@amends-dev/core/authorization";
+import { Channel, Delivery } from "@amends-dev/core/channel";
+import { Connection } from "@amends-dev/core/connection";
+import { Group } from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
 import {
   Thread,
   ThreadActivity,
@@ -11,13 +11,13 @@ import {
   ThreadMessage,
   ThreadMessageActivity,
   ThreadParticipation,
-} from "@amends/core/thread";
-import { Turn } from "@amends/core/turn";
-import { Invitation, Member } from "@amends/core/workspace";
+} from "@amends-dev/core/thread";
+import { Turn } from "@amends-dev/core/turn";
+import { Invitation, Member } from "@amends-dev/core/workspace";
 import { describe, expect, it } from "@effect/vitest";
 import { DateTime, Effect, Option } from "effect";
 import type { Harness } from "./harness.ts";
-import { Store } from "@amends/core/journal";
+import { Store } from "@amends-dev/core/journal";
 import { type Bound, forWorkspace, otherWorkspaceId, Support, workspaceId } from "./support.ts";
 
 /** One store's write of a record that names another workspace, and how to look for it after. */

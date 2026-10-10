@@ -1,16 +1,16 @@
-# @amends/sandbox-local
+# @amends-dev/sandbox-local
 
-Sandboxes as directories on this machine, for the [`@amends/sandbox`](../../packages/sandbox)
+Sandboxes as directories on this machine, for the [`@amends-dev/sandbox`](../../packages/sandbox)
 contract. Nothing is isolated: a sandbox's processes are this machine's processes, which can read
 and write the whole machine and see its environment variables. So it suits development, tests, and
 agents you would trust on this machine anyway, and lets code written against the contract run
-without a cloud account; [`@amends/sandbox-daytona`](../sandbox-daytona) runs the same code on
+without a cloud account; [`@amends-dev/sandbox-daytona`](../sandbox-daytona) runs the same code on
 machines of their own.
 
 ## Install
 
 ```sh
-bun add @amends/sandbox-local @amends/sandbox effect
+bun add @amends-dev/sandbox-local @amends-dev/sandbox effect
 ```
 
 The provider needs Effect's file system, path, crypto, and process services for this machine, as
@@ -24,8 +24,8 @@ own `FileSystem` and `ChildProcessSpawner`, and resumes them later by id, as it 
 provider.
 
 ```ts
-import { LocalSandboxProvider } from "@amends/sandbox-local";
-import { Sandbox, SandboxProvider } from "@amends/sandbox";
+import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
+import { Sandbox, SandboxProvider } from "@amends-dev/sandbox";
 import { BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, Layer, Path } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
@@ -90,6 +90,6 @@ nothing stands between the sandbox and the network to enforce a policy or set he
 ## Development
 
 Run the package's tests with `bun run test adapters/sandbox-local`: the conformance suites of
-`@amends/sandbox` over a temporary directory, and what this provider alone does. See
+`@amends-dev/sandbox` over a temporary directory, and what this provider alone does. See
 [testing](../../docs/testing.md). `bun run dist check adapters/sandbox-local` builds the package as
 npm gets it and checks it as a consumer; see [publishing](../../docs/publishing.md).

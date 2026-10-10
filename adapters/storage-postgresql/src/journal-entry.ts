@@ -1,6 +1,6 @@
-import { Performer } from "@amends/core/identity";
-import { Event, Store } from "@amends/core/journal";
-import { Workspace } from "@amends/core/workspace";
+import { Performer } from "@amends-dev/core/identity";
+import { Event, Store } from "@amends-dev/core/journal";
+import { Workspace } from "@amends-dev/core/workspace";
 import { DateTime, Effect, Schema, Predicate } from "effect";
 import { logEntries } from "./schema.ts";
 

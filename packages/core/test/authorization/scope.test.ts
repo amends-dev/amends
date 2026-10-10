@@ -1,5 +1,5 @@
 import { expect, it } from "@effect/vitest";
-import { ThreadId } from "@amends/core/thread";
+import { ThreadId } from "@amends-dev/core/thread";
 import { Scope } from "../../src/authorization/scope.ts";
 import { Target } from "../../src/authorization/target.ts";
 import { Member } from "../../src/workspace/member/member.ts";

@@ -1,4 +1,4 @@
-import { type Integration, Integrations } from "@amends/connection";
+import { type Integration, Integrations } from "@amends-dev/connection";
 import { expect, it } from "@effect/vitest";
 import { Effect } from "effect";
 import { LocalHost } from "../src/host.ts";

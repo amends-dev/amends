@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [solid(), vanillaExtractPlugin()],
   resolve: { dedupe: ["solid-js"] },
   test: {
-    name: "@amends/ui",
+    name: "@amends-dev/ui",
     environment: "happy-dom",
     setupFiles: [
       fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url)),

@@ -1,4 +1,4 @@
-import { paths, useWorkspace, useWorkspaceSettings } from "@amends/client";
+import { paths, useWorkspace, useWorkspaceSettings } from "@amends-dev/client";
 import {
   ConfirmRemoveMember,
   ConfirmRevokeInvitation,
@@ -12,7 +12,7 @@ import {
   settingsToast,
   type SettingsAction,
   type SettingsTab,
-} from "@amends/ui/screens/settings";
+} from "@amends-dev/ui/screens/settings";
 import { Navigate, useParams, useSearchParams } from "@solidjs/router";
 import { Show, createSignal } from "solid-js";
 import { useWorkspaceActions } from "../workspace-actions.ts";

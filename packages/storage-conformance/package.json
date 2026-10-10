@@ -1,5 +1,5 @@
 {
-  "name": "@amends/storage-conformance",
+  "name": "@amends-dev/storage-conformance",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,11 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/channel": "workspace:*",
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
-    "@amends/gateway": "workspace:*",
-    "@amends/harness": "workspace:*",
+    "@amends-dev/channel": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
+    "@amends-dev/gateway": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
     "@effect/vitest": "catalog:",
     "effect": "catalog:"
   }

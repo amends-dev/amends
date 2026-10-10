@@ -43,7 +43,7 @@ export interface Interface {
   ) => Effect.Effect<Workspace.Record, Error, Actor.Service>;
 }
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/workspace/settings/Service",
+  "@amends-dev/core/workspace/settings/Service",
 ) {}
 /** @category constructors */
 export const make = Effect.fn("WorkspaceSettings.make")(function* () {

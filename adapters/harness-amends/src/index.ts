@@ -1,6 +1,6 @@
 /**
- * An agent in the host's own process for the `@amends/harness` contract: a loop over an Effect AI
- * `LanguageModel`, with tools for the files and the shell of a sandbox.
+ * An agent in the host's own process for the `@amends-dev/harness` contract: a loop over an Effect
+ * AI `LanguageModel`, with tools for the files and the shell of a sandbox.
  *
  * @since 0.1.0
  */

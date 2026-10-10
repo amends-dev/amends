@@ -1,13 +1,13 @@
 # Amends icons
 
-`@amends/icons` provides shared Solid SVG components for apps and UI packages. It
+`@amends-dev/icons` provides shared Solid SVG components for apps and UI packages. It
 has no runtime dependency beyond its Solid peer, no global styles, and no dependency
-on UI packages, application contracts, or a host. Add `"@amends/icons": "workspace:*"`
+on UI packages, application contracts, or a host. Add `"@amends-dev/icons": "workspace:*"`
 to a consuming workspace's dependencies and run `bun install` at the root.
 
 ```tsx
-import { IconMarkSearch, IconCircleCheck } from "@amends/icons";
-import { IconMarkDone } from "@amends/icons/mark-done";
+import { IconMarkSearch, IconCircleCheck } from "@amends-dev/icons";
+import { IconMarkDone } from "@amends-dev/icons/mark-done";
 
 <button aria-label="Search workspace">
   <IconMarkSearch />
@@ -85,10 +85,10 @@ Search existing names and meanings before drawing another icon.
 From the repository root:
 
 ```sh
-bun run --filter @amends/icons generate
+bun run --filter @amends-dev/icons generate
 bun run check:icons
-bun run test --project @amends/icons
-bun run --filter @amends/ui dev
+bun run test --project @amends-dev/icons
+bun run --filter @amends-dev/ui dev
 ```
 
 The compiler validates the entire set before writing. Generation creates
@@ -131,14 +131,14 @@ Extend the typed language and its validation only when a new needed drawing requ
 ## Catalog and review
 
 ```ts
-import { iconCatalog, type IconName } from "@amends/icons/catalog";
+import { iconCatalog, type IconName } from "@amends-dev/icons/catalog";
 ```
 
 Catalog records contain names, titles, categories, keywords, and component export
 names. They do not import components. The component entry point does not import
 catalog data; there is no global runtime icon registry. A Vite/Solid consumer test
 checks that one named icon excludes unrelated geometry, and that catalog-only
-consumers exclude Solid. Raw assets are available at `@amends/icons/svg/<name>.svg`;
+consumers exclude Solid. Raw assets are available at `@amends-dev/icons/svg/<name>.svg`;
 copy them to a public location if needed. External images do not inherit the page's
 text color; use Solid inline icons for themed UI.
 

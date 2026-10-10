@@ -1,5 +1,5 @@
-import { Store } from "@amends/core/journal";
-import { Invitation, InvitationStore, type Workspace } from "@amends/core/workspace";
+import { Store } from "@amends-dev/core/journal";
+import { Invitation, InvitationStore, type Workspace } from "@amends-dev/core/workspace";
 import { and, asc, eq, type SQL } from "drizzle-orm";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { Binding } from "./binding.ts";

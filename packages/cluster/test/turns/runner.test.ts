@@ -1,6 +1,6 @@
-import type { SessionLog } from "@amends/core/turn";
-import { HarnessError, type StreamPart } from "@amends/harness";
-import { Gateway } from "@amends/gateway";
+import type { SessionLog } from "@amends-dev/core/turn";
+import { HarnessError, type StreamPart } from "@amends-dev/harness";
+import { Gateway } from "@amends-dev/gateway";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Fiber, Layer, Option, Stream } from "effect";
 import { Prompt } from "effect/ai";

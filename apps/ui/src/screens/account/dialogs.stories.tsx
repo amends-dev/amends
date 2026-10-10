@@ -8,7 +8,7 @@ import {
   IconMarkEnvironments,
   IconMarkMail,
   IconMarkSettings,
-} from "@amends/icons";
+} from "@amends-dev/icons";
 import { Theme } from "../../foundations/theme/index.ts";
 import { NewMessage } from "../direct/index.ts";
 import { JumpTo, type JumpToItem } from "../jump-to/index.ts";

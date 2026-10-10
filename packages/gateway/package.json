@@ -1,5 +1,5 @@
 {
-  "name": "@amends/gateway",
+  "name": "@amends-dev/gateway",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,8 +14,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/connection": "workspace:*",
-    "@amends/core": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/core": "workspace:*",
     "effect": "catalog:"
   }
 }

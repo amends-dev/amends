@@ -1,4 +1,4 @@
-import type { ModelEndpoint } from "@amends/harness";
+import type { ModelEndpoint } from "@amends-dev/harness";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Redacted, Stream } from "effect";
 import { LanguageModel } from "effect/ai";

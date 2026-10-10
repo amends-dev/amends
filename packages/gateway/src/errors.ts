@@ -2,30 +2,30 @@ import {
   ThreadService,
   ThreadMessageService,
   ThreadParticipationService,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import {
   AssignmentService,
   Authorization,
   Delegation,
   PermissionCatalog,
-} from "@amends/core/authorization";
-import { Commit } from "@amends/core/journal";
-import { ChangeFeed } from "@amends/core/change-feed";
-import { NotificationService } from "@amends/core/notification";
-import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
+} from "@amends-dev/core/authorization";
+import { Commit } from "@amends-dev/core/journal";
+import { ChangeFeed } from "@amends-dev/core/change-feed";
+import { NotificationService } from "@amends-dev/core/notification";
+import { GroupService, GroupFollowService, GroupMembershipService } from "@amends-dev/core/group";
 import {
   InvitationService,
   MemberService,
   OwnershipService,
   Workspace,
   WorkspaceSettingsService,
-} from "@amends/core/workspace";
-import { ReadStateService } from "@amends/core/read-state";
-import { ConnectionService } from "@amends/core/connection";
-import { AgentService } from "@amends/core/agent";
-import { ChannelIntake, ChannelService } from "@amends/core/channel";
-import { TaskService } from "@amends/core/task";
-import { Turn, TurnService } from "@amends/core/turn";
+} from "@amends-dev/core/workspace";
+import { ReadStateService } from "@amends-dev/core/read-state";
+import { ConnectionService } from "@amends-dev/core/connection";
+import { AgentService } from "@amends-dev/core/agent";
+import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
+import { TaskService } from "@amends-dev/core/task";
+import { Turn, TurnService } from "@amends-dev/core/turn";
 import { Schema } from "effect";
 
 export class NotMember extends Schema.TaggedError<NotMember>()("Gateway.NotMember", {

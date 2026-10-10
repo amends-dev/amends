@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "@effect/vitest";
 import { cleanup, fireEvent, render, screen } from "@solidjs/testing-library";
 import { Show, createSignal } from "solid-js";
 import { definePreview } from "storybook-solidjs-vite/next";
-import { IconMarkChannel, IconMarkHome } from "@amends/icons";
+import { IconMarkChannel, IconMarkHome } from "@amends-dev/icons";
 import preview from "../.storybook/preview.tsx";
 import { viewport } from "./viewport.ts";
 import { initialsOf } from "../src/components/avatar/index.ts";

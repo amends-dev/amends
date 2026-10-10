@@ -1,4 +1,4 @@
-import type { SettingsTab } from "@amends/ui/screens/settings";
+import type { SettingsTab } from "@amends-dev/ui/screens/settings";
 import {
   Assignment,
   Invitation,
@@ -8,7 +8,7 @@ import {
   WorkspaceSettings,
   Scope,
   Identity,
-} from "@amends/api-http";
+} from "@amends-dev/api-http";
 import { DateTime, Effect, Option, Schema } from "effect";
 import { AsyncResult, Atom } from "effect/reactivity";
 import type { Api, ApiClient } from "../api/client.ts";

@@ -1,6 +1,6 @@
 import * as Primitive from "@kobalte/core/select";
 import { Show, createMemo, createSignal } from "solid-js";
-import { IconCheck, IconChevronDown } from "@amends/icons";
+import { IconCheck, IconChevronDown } from "@amends-dev/icons";
 import { useField } from "../field/index.ts";
 import { StatusMark, type StatusMarkKind } from "../status-mark/index.ts";
 import { classes } from "../../internal/props.ts";

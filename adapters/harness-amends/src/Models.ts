@@ -8,7 +8,7 @@
  *
  * @since 0.1.0
  */
-import type { ModelEndpoint } from "@amends/harness";
+import type { ModelEndpoint } from "@amends-dev/harness";
 import { AnthropicClient, AnthropicLanguageModel } from "@effect/ai-anthropic";
 import { OpenAiClient, OpenAiLanguageModel } from "@effect/ai-openai";
 import {
@@ -34,7 +34,7 @@ export class LanguageModels extends Context.Service<
       endpoint: ModelEndpoint.ModelEndpoint,
     ) => Effect.Effect<LanguageModel.LanguageModel>;
   }
->()("@amends/harness-amends/Models/LanguageModels") {}
+>()("@amends-dev/harness-amends/Models/LanguageModels") {}
 
 /**
  * Provides `LanguageModels` over the `HttpClient` the requests go out through, such as
@@ -43,7 +43,7 @@ export class LanguageModels extends Context.Service<
  * **Example** (Generating text on OpenRouter with the model of an endpoint)
  *
  * ```ts
- * import { Models } from "@amends/harness-amends";
+ * import { Models } from "@amends-dev/harness-amends";
  * import { Config, Effect, Layer } from "effect";
  * import { LanguageModel } from "effect/ai";
  * import { FetchHttpClient } from "effect/http";

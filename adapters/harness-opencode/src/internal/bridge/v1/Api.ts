@@ -5,7 +5,7 @@
  * the client of a started server. A failed request fails with the `HarnessError` the driver
  * reports.
  */
-import type { HarnessError } from "@amends/harness";
+import type { HarnessError } from "@amends-dev/harness";
 import { Effect, Schema, type Scope, Stream } from "effect";
 import { Sse } from "effect/encoding";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";

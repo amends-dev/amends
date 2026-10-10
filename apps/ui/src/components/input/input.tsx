@@ -1,5 +1,5 @@
 import { splitProps, type JSX } from "solid-js";
-import { IconMarkSearch } from "@amends/icons";
+import { IconMarkSearch } from "@amends-dev/icons";
 import { useField } from "../field/index.ts";
 import { classes } from "../../internal/props.ts";
 import * as s from "./input.css.ts";

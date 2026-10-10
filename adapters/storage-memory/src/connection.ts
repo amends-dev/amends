@@ -12,7 +12,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/storage-memory/connection/Service",
+  "@amends-dev/storage-memory/connection/Service",
 ) {}
 
 /**

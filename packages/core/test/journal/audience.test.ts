@@ -1,13 +1,13 @@
-import { Audience, Fact, Subject } from "@amends/core/journal";
+import { Audience, Fact, Subject } from "@amends-dev/core/journal";
 import {
   Group,
   GroupFollow,
   GroupFollowFacts,
   GroupMembership,
   GroupMembershipFacts,
-} from "@amends/core/group";
-import { Identity } from "@amends/core/identity";
-import { Member, MemberFacts, Workspace } from "@amends/core/workspace";
+} from "@amends-dev/core/group";
+import { Identity } from "@amends-dev/core/identity";
+import { Member, MemberFacts, Workspace } from "@amends-dev/core/workspace";
 import { expect, it } from "@effect/vitest";
 import { DateTime, Effect, Schema } from "effect";
 

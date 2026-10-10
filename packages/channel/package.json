@@ -1,5 +1,5 @@
 {
-  "name": "@amends/channel",
+  "name": "@amends-dev/channel",
   "version": "0.1.0",
   "description": "Channels that bring external conversations in: the contract every channel transport implements, receiving what a system sends and replying in its conversations.",
   "keywords": [
@@ -8,14 +8,14 @@
     "messaging",
     "webhook"
   ],
-  "homepage": "https://github.com/saribmah/amends-v2/tree/main/packages/channel#readme",
+  "homepage": "https://github.com/amends-dev/amends/tree/main/packages/channel#readme",
   "bugs": {
-    "url": "https://github.com/saribmah/amends-v2/issues"
+    "url": "https://github.com/amends-dev/amends/issues"
   },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/saribmah/amends-v2.git",
+    "url": "https://github.com/amends-dev/amends.git",
     "directory": "packages/channel"
   },
   "type": "module",

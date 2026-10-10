@@ -31,7 +31,7 @@ export interface Interface {
 }
 
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/storage-postgresql/database/Service",
+  "@amends-dev/storage-postgresql/database/Service",
 ) {}
 
 /**

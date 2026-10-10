@@ -1,6 +1,6 @@
-import { Thread, ThreadMessage, ThreadMessageStore } from "@amends/core/thread";
+import { Thread, ThreadMessage, ThreadMessageStore } from "@amends-dev/core/thread";
 
-import { Store } from "@amends/core/journal";
+import { Store } from "@amends-dev/core/journal";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
 import { and, count, eq } from "drizzle-orm";
 import { threadMessages } from "./schema.ts";

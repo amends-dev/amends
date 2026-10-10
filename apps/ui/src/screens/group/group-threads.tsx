@@ -1,5 +1,5 @@
 import { Match, Show, Switch, createEffect, createSignal, on } from "solid-js";
-import { IconMarkAttach } from "@amends/icons";
+import { IconMarkAttach } from "@amends-dev/icons";
 import { Button } from "../../components/button/index.ts";
 import { Field } from "../../components/field/index.ts";
 import { EmptyState } from "../../components/empty-state/index.ts";

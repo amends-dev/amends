@@ -3,26 +3,26 @@ import {
   ThreadParticipationStore,
   ThreadMessageStore,
   ThreadActivityStore,
-} from "@amends/core/thread";
+} from "@amends-dev/core/thread";
 import { inject } from "@effect/vitest";
-import * as Core from "@amends/core";
-import { ReadStateStore } from "@amends/core/read-state";
-import { AssignmentStore, RoleStore } from "@amends/core/authorization";
-import { Identity, Performer } from "@amends/core/identity";
-import { Event, Checkpoint, Log, Store } from "@amends/core/journal";
-import { NotificationStore } from "@amends/core/notification";
-import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends/core/group";
+import * as Core from "@amends-dev/core";
+import { ReadStateStore } from "@amends-dev/core/read-state";
+import { AssignmentStore, RoleStore } from "@amends-dev/core/authorization";
+import { Identity, Performer } from "@amends-dev/core/identity";
+import { Event, Checkpoint, Log, Store } from "@amends-dev/core/journal";
+import { NotificationStore } from "@amends-dev/core/notification";
+import { GroupFollowStore, GroupStore, GroupMembershipStore } from "@amends-dev/core/group";
 import {
   InvitationStore,
   MemberStore,
   Workspace,
   WorkspaceInitialization,
   WorkspaceStore,
-} from "@amends/core/workspace";
-import { Integrations } from "@amends/connection";
-import { DeliveryJobs } from "@amends/core/channel";
-import { TurnJobs } from "@amends/core/turn";
-import type { WorkspaceStorage } from "@amends/gateway";
+} from "@amends-dev/core/workspace";
+import { Integrations } from "@amends-dev/connection";
+import { DeliveryJobs } from "@amends-dev/core/channel";
+import { TurnJobs } from "@amends-dev/core/turn";
+import type { WorkspaceStorage } from "@amends-dev/gateway";
 import { BunCrypto } from "@effect/platform-bun";
 import { Context, DateTime, Effect, Layer, Redacted } from "effect";
 import { SqlClient } from "effect/sql";

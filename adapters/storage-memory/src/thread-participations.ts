@@ -1,6 +1,6 @@
-import { GroupMembership } from "@amends/core/group";
-import { Store } from "@amends/core/journal";
-import { Thread, ThreadParticipation, ThreadParticipationStore } from "@amends/core/thread";
+import { GroupMembership } from "@amends-dev/core/group";
+import { Store } from "@amends-dev/core/journal";
+import { Thread, ThreadParticipation, ThreadParticipationStore } from "@amends-dev/core/thread";
 import { Effect, Layer, Option, Schema } from "effect";
 import { Binding } from "./binding.ts";
 import { storeConflict, storeFailure } from "./errors.ts";

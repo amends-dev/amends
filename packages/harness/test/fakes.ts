@@ -1,4 +1,4 @@
-import { Sandbox } from "@amends/sandbox";
+import { Sandbox } from "@amends-dev/sandbox";
 import { Cause, Deferred, Effect, Exit, FileSystem, PlatformError, Queue, Stream } from "effect";
 import type { Prompt } from "effect/ai";
 import { ChildProcessSpawner } from "effect/process";

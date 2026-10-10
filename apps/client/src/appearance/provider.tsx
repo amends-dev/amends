@@ -1,5 +1,5 @@
-import type { ColorPalette } from "@amends/ui/foundations/theme";
-import type { Appearance } from "@amends/ui/screens/workspace-navigation";
+import type { ColorPalette } from "@amends-dev/ui/foundations/theme";
+import type { Appearance } from "@amends-dev/ui/screens/workspace-navigation";
 import {
   createContext,
   createMemo,

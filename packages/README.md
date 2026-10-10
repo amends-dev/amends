@@ -102,17 +102,17 @@ inputs, and errors, never its operations, so a feature keeps the errors a protoc
 carries core's schemas and errors without their implementation; the web app's bundle test fails
 when an implementation reaches it.
 
-`@amends/core` composes one workspace's core. Its root export holds the
+`@amends-dev/core` composes one workspace's core. Its root export holds the
 composition: `layer` builds the application operations over the journal,
 authorization, and permission catalog. `HostServices` describes the storage,
 signals, and cryptography a host must supply, derived from that layer.
 `Operations` is the set of services a gateway may run, and `journalLog` names the
 workspace journal's log, whose history shows whether a workspace was ever created. Domains are subpath exports:
-`@amends/core/journal`, `@amends/core/identity`, `@amends/core/authorization`,
-`@amends/core/notification`, `@amends/core/change-feed`, `@amends/core/signal`, `@amends/core/read-state`,
-`@amends/core/request`,
-`@amends/core/group`, `@amends/core/thread`, and
-`@amends/core/agent`, and `@amends/core/workspace`, each exposing the records, facts, stores, projections,
+`@amends-dev/core/journal`, `@amends-dev/core/identity`, `@amends-dev/core/authorization`,
+`@amends-dev/core/notification`, `@amends-dev/core/change-feed`, `@amends-dev/core/signal`, `@amends-dev/core/read-state`,
+`@amends-dev/core/request`,
+`@amends-dev/core/group`, `@amends-dev/core/thread`, and
+`@amends-dev/core/agent`, and `@amends-dev/core/workspace`, each exposing the records, facts, stores, projections,
 and operations it implements. The thread surface implements private-group starts with initial
 participation, a text message, ordered activity, and notification generation.
 `ThreadMessageService.publish` adds human replies under `thread.publish`; starts and replies
@@ -137,28 +137,28 @@ as private state outside the journal. Its HTTP/UI action and other recipients' o
 pending. Member and invitation operations include listing: members you
 may read, and every invitation for holders of `invitation.manage`.
 
-`@amends/gateway` is how hosts enter core: it bootstraps workspaces, binds one
+`@amends-dev/gateway` is how hosts enter core: it bootstraps workspaces, binds one
 workspace's storage, resolves an authenticated identity into the actor, and runs
 core's services with only public outcomes. It also holds the host
 contracts: workspace storage, sign-in, session token resolution, and the workspace
-directory. `@amends/api-http` declares the HTTP contract shared by servers and
-browser clients, and `@amends/server-http` implements it over the gateway,
+directory. `@amends-dev/api-http` declares the HTTP contract shared by servers and
+browser clients, and `@amends-dev/server-http` implements it over the gateway,
 including the contract's bearer authentication over session token resolution.
 Additional protocols add their own contract and handler packages over the same
 gateway, adapting the same session token resolution to their own authentication.
 
-`@amends/storage-conformance` holds the [test suites](./storage-conformance/README.md)
+`@amends-dev/storage-conformance` holds the [test suites](./storage-conformance/README.md)
 for the gateway's storage contracts. Each storage adapter supplies a harness and runs
 them against itself.
 
-`@amends/harness` is the [harness contract](./harness/README.md): an agent's sessions and
+`@amends-dev/harness` is the [harness contract](./harness/README.md): an agent's sessions and
 turns, streamed in one format whichever agent runs them, and the bridge through which a host drives
-an agent inside a sandbox. `@amends/sandbox` is the sandbox contract every provider implements,
+an agent inside a sandbox. `@amends-dev/sandbox` is the sandbox contract every provider implements,
 with the conformance suites each provider runs against itself; it knows nothing of harnesses.
-`@amends/toolkit` gives every kind of [tool source](./toolkit/README.md) one shape.
-`@amends/connection` holds the [integrations](./connection/README.md) a host installs, what
+`@amends-dev/toolkit` gives every kind of [tool source](./toolkit/README.md) one shape.
+`@amends-dev/connection` holds the [integrations](./connection/README.md) a host installs, what
 each gives a workspace's connections, and the model catalog. The agents and sandbox providers
 themselves, with their dependencies, live in `adapters/`.
 
-`@amends/cluster` runs [jobs](./cluster/README.md), the work outside requests, on Effect Cluster,
-with their retries and pruning.
+`@amends-dev/cluster` runs [jobs](./cluster/README.md), the work outside requests, on Effect
+Cluster, with their retries and pruning.

@@ -17,7 +17,7 @@
  * out everything else on the machine. A failed request fails with the `HarnessError` the driver
  * reports, naming the agent, as `requestError` maps it.
  */
-import { HarnessError } from "@amends/harness";
+import { HarnessError } from "@amends-dev/harness";
 import {
   Crypto,
   Deferred,

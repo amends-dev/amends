@@ -1,4 +1,4 @@
-import { IconCheck } from "@amends/icons";
+import { IconCheck } from "@amends-dev/icons";
 import { Marked, type MarkedToken, type Token, type Tokens } from "marked";
 import remend from "remend";
 import { For, Show, createMemo, type JSX } from "solid-js";

@@ -1,5 +1,5 @@
 {
-  "name": "@amends/ui",
+  "name": "@amends-dev/ui",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -76,7 +76,7 @@
     "test": "bun run --bun vitest run --config vite.config.ts"
   },
   "dependencies": {
-    "@amends/icons": "workspace:*",
+    "@amends-dev/icons": "workspace:*",
     "@fontsource/figtree": "^5.3.0",
     "@fontsource/geist-mono": "^5.3.0",
     "@kobalte/core": "^0.13.14",

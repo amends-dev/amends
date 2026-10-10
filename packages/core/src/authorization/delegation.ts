@@ -42,7 +42,7 @@ export interface Interface {
 }
 /** Read screens check current policy; write operations check it inside their commit. */
 export class Service extends Context.Service<Service, Interface>()(
-  "@amends/core/authorization/delegation/Service",
+  "@amends-dev/core/authorization/delegation/Service",
 ) {}
 
 /** One member an actor would change the roles of, or remove when `selfRemoval` is set. */

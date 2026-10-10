@@ -1,5 +1,5 @@
-import { Turn } from "@amends/core/turn";
-import { Workspace } from "@amends/core/workspace";
+import { Turn } from "@amends-dev/core/turn";
+import { Workspace } from "@amends-dev/core/workspace";
 import { Schema } from "effect";
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "effect/http-api";
 import { Authentication } from "./authentication.ts";

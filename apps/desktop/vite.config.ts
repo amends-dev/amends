@@ -17,7 +17,7 @@ export default defineConfig({
   // to this target but adds no API polyfills, so it must match what the code actually uses.
   build: { target: "safari16.2" },
   test: {
-    name: "@amends/desktop",
+    name: "@amends-dev/desktop",
     environment: "happy-dom",
     setupFiles: [fileURLToPath(new URL("../../scripts/testing/jest-dom.ts", import.meta.url))],
     include: ["test/**/*.test.{ts,tsx}"],

@@ -18,14 +18,14 @@ installed, you can instead select them for one invocation without changing the
 system setting:
 
 ```sh
-DEVELOPER_DIR=/Library/Developer/CommandLineTools bun run --filter @amends/desktop dev
+DEVELOPER_DIR=/Library/Developer/CommandLineTools bun run --filter @amends-dev/desktop dev
 ```
 
 From the repository root:
 
 ```sh
 bun install --frozen-lockfile
-bun run --filter @amends/desktop dev
+bun run --filter @amends-dev/desktop dev
 ```
 
 Tauri starts Vite at `http://127.0.0.1:1420/`, compiles Rust, and opens the window.
@@ -37,11 +37,11 @@ port and bundles `dist` through `src-tauri/tauri.conf.json`.
 
 ```sh
 # Build the webview assets without native tools
-bun run --filter @amends/desktop build:frontend
+bun run --filter @amends-dev/desktop build:frontend
 # Check native formatting and compile using the committed Cargo lockfile
-bun run --filter @amends/desktop check:native
+bun run --filter @amends-dev/desktop check:native
 # Build the native application and platform bundles
-bun run --filter @amends/desktop build
+bun run --filter @amends-dev/desktop build
 bun run check
 bun run test
 ```
@@ -79,8 +79,8 @@ workspace-unavailable states with the standalone screens; their links use hash h
 The route validates new credentials before following a safe hash return path.
 `src/routes.tsx` owns routes, the session guard, and redirects. The workspace layout and its
 group, Inbox, and Settings pages are built on UI, as in web. Both platform apps import
-`@amends/client` and `@amends/ui` independently: client supplies headless state, and UI
-supplies presentation. Each app loads UI's fonts and `@amends/ui/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
+`@amends-dev/client` and `@amends-dev/ui` independently: client supplies headless state, and UI
+supplies presentation. Each app loads UI's fonts and `@amends-dev/ui/styles` explicitly. Client has no router or UI dependency; Tauri dependencies
 stay in this app.
 
 The default API URL is `http://127.0.0.1:8787`. The content security policy permits

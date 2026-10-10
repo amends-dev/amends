@@ -1,6 +1,6 @@
-import { Entry, Store } from "@amends/core/journal";
-import { Workspace } from "@amends/core/workspace";
-import { Suites } from "@amends/storage-conformance";
+import { Entry, Store } from "@amends-dev/core/journal";
+import { Workspace } from "@amends-dev/core/workspace";
+import { Suites } from "@amends-dev/storage-conformance";
 import { describe, expect, it } from "@effect/vitest";
 import {
   Cause,

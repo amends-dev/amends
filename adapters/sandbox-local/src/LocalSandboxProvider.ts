@@ -15,7 +15,7 @@
  *
  * @since 0.1.0
  */
-import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends/sandbox";
+import { Network, Sandbox, SandboxError, SandboxProvider } from "@amends-dev/sandbox";
 import {
   Crypto,
   Effect,
@@ -52,7 +52,7 @@ const Settings = Schema.fromJsonString(Schema.Struct({ ports: Schema.Array(Netwo
  * **Example** (A provider for one piece of work, over a temporary directory)
  *
  * ```ts
- * import { LocalSandboxProvider } from "@amends/sandbox-local";
+ * import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
  * import { BunServices } from "@effect/platform-bun";
  * import { Effect, FileSystem } from "effect";
  *
@@ -241,8 +241,8 @@ export const make = Effect.fn("LocalSandboxProvider.make")(function* (options: O
  * **Example** (Sandboxes under a directory of the host's)
  *
  * ```ts
- * import { LocalSandboxProvider } from "@amends/sandbox-local";
- * import { SandboxProvider } from "@amends/sandbox";
+ * import { LocalSandboxProvider } from "@amends-dev/sandbox-local";
+ * import { SandboxProvider } from "@amends-dev/sandbox";
  * import { BunServices } from "@effect/platform-bun";
  * import { Effect, Layer } from "effect";
  *

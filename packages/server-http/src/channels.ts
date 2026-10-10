@@ -1,8 +1,8 @@
-import { Api, Principal } from "@amends/api-http";
-import { ChannelIntake, ChannelService } from "@amends/core/channel";
-import type { Actor } from "@amends/core/identity";
-import type { Workspace } from "@amends/core/workspace";
-import { Gateway } from "@amends/gateway";
+import { Api, Principal } from "@amends-dev/api-http";
+import { ChannelIntake, ChannelService } from "@amends-dev/core/channel";
+import type { Actor } from "@amends-dev/core/identity";
+import type { Workspace } from "@amends-dev/core/workspace";
+import { Gateway } from "@amends-dev/gateway";
 import { Effect, Layer } from "effect";
 import { HttpServerRequest } from "effect/http";
 import { HttpApiBuilder } from "effect/http-api";

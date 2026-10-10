@@ -1,5 +1,5 @@
 {
-  "name": "@amends/core",
+  "name": "@amends-dev/core",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -27,9 +27,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@amends/channel": "workspace:*",
-    "@amends/connection": "workspace:*",
-    "@amends/harness": "workspace:*",
+    "@amends-dev/channel": "workspace:*",
+    "@amends-dev/connection": "workspace:*",
+    "@amends-dev/harness": "workspace:*",
     "effect": "catalog:"
   }
 }

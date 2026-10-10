@@ -1,6 +1,6 @@
 import { For, Show, createUniqueId } from "solid-js";
-import type { IconProps } from "@amends/icons";
-import { IconMessage, IconUsers } from "@amends/icons";
+import type { IconProps } from "@amends-dev/icons";
+import { IconMessage, IconUsers } from "@amends-dev/icons";
 import { Avatar } from "../../components/avatar/index.ts";
 import { Divider } from "../../components/divider/index.ts";
 import { Menu } from "../../components/menu/index.ts";
