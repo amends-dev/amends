@@ -2,6 +2,11 @@ import { Threads } from "./threads.ts";
 import { ThreadParticipations } from "./thread-participations.ts";
 import { ThreadMessages } from "./thread-messages.ts";
 import { ThreadActivities } from "./thread-activities.ts";
+import { Tasks } from "./tasks.ts";
+import { Channels } from "./channels.ts";
+import { ChannelBindings } from "./channel-bindings.ts";
+import { Contacts } from "./contacts.ts";
+import { Deliveries } from "./deliveries.ts";
 import type { Workspace } from "@amends/core/workspace";
 import { WorkspaceStorage } from "@amends/gateway";
 import { Effect, Layer, Option } from "effect";
@@ -59,6 +64,11 @@ const layerStores = Layer.mergeAll(
   ThreadParticipations.layer,
   ThreadMessages.layer,
   ThreadActivities.layer,
+  Tasks.layer,
+  Channels.layer,
+  ChannelBindings.layer,
+  Contacts.layer,
+  Deliveries.layer,
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,

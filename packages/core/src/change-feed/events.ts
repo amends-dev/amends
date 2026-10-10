@@ -18,13 +18,18 @@ import { Event } from "../journal/event.ts";
 import { Fact } from "../journal/fact.ts";
 import type { Log } from "../journal/log.ts";
 import { Notification } from "../notification/notification.ts";
-import { ThreadActivityFacts } from "../thread/activity/facts.ts";
-import type { ThreadId } from "../thread/id.ts";
-import { ThreadFacts } from "../thread/facts.ts";
-import { ThreadMessageFacts } from "../thread/message/facts.ts";
-import { ThreadParticipation } from "../thread/participation/participation.ts";
-import { ThreadParticipationFacts } from "../thread/participation/facts.ts";
-import { ThreadPermissions } from "../thread/permissions.ts";
+import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
+import type { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadFacts } from "../thread/ThreadFacts.ts";
+import { ThreadMessageFacts } from "../thread/ThreadMessageFacts.ts";
+import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
+import { ThreadParticipationFacts } from "../thread/ThreadParticipationFacts.ts";
+import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
+import { TaskFacts } from "../task/TaskFacts.ts";
+import { ChannelFacts } from "../channel/ChannelFacts.ts";
+import type { ChannelId } from "../channel/ChannelId.ts";
+import { ChannelPermissions } from "../channel/ChannelPermissions.ts";
+import { DeliveryFacts } from "../channel/DeliveryFacts.ts";
 import { WorkspaceFacts } from "../workspace/facts.ts";
 import type { WorkspaceId } from "../workspace/id.ts";
 import { InvitationFacts } from "../workspace/invitation/facts.ts";
@@ -158,6 +163,8 @@ const readConnectionRequirement = (connectionId: Connection.Id, workspaceId: Wor
   });
 const readAgentRequirement = (memberId: Member.Id, workspaceId: WorkspaceId.Id) =>
   Requirement.make(AgentPermissions.Read, { _tag: "Member", workspaceId, memberId });
+const readChannelRequirement = (channelId: ChannelId.Id, workspaceId: WorkspaceId.Id) =>
+  Requirement.make(ChannelPermissions.Read, { _tag: "Channel", workspaceId, channelId });
 const manageInvitationsRequirement = (_: unknown, workspaceId: WorkspaceId.Id) =>
   Requirement.make(InvitationPermissions.Manage, { _tag: "Workspace", workspaceId });
 
@@ -277,7 +284,47 @@ const registry: ReadonlyArray<Registered> = [
   registerFact(ThreadFacts.Created, {
     requirement: ({ id }, workspaceId) => readThreadRequirement(id, workspaceId),
   }),
+  registerFact(ThreadFacts.Renamed, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
   registerFact(ThreadMessageFacts.Published, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(ThreadMessageFacts.Edited, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(ThreadMessageFacts.Deleted, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(TaskFacts.Created, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(TaskFacts.Updated, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  // Channels reach those who may read them; what a channel bound and delivered reaches the
+  // thread's readers, and whom it heard from every member, as contacts write in threads.
+  registerFact(ChannelFacts.Created, {
+    requirement: ({ id }, workspaceId) => readChannelRequirement(id, workspaceId),
+  }),
+  registerFact(ChannelFacts.Redirected, {
+    requirement: ({ channelId }, workspaceId) => readChannelRequirement(channelId, workspaceId),
+  }),
+  registerFact(ChannelFacts.Removed, {
+    requirement: ({ channelId }, workspaceId) => readChannelRequirement(channelId, workspaceId),
+  }),
+  registerFact(ChannelFacts.Bound, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(ChannelFacts.ContactCreated),
+  registerFact(ChannelFacts.ContactRenamed),
+  registerFact(DeliveryFacts.Created, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(DeliveryFacts.Sent, {
+    requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
+  }),
+  registerFact(DeliveryFacts.Failed, {
     requirement: ({ threadId }, workspaceId) => readThreadRequirement(threadId, workspaceId),
   }),
   // Readers see the timeline item without whom it notified; each human or agent recipient

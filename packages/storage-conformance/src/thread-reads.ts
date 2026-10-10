@@ -33,6 +33,7 @@ import {
   ThreadActivityStore,
   ThreadMessage,
   ThreadMessageActivity,
+  ThreadMessageStore,
   ThreadMessageFacts,
   ThreadMessageTimeline,
   ThreadParticipation,
@@ -61,6 +62,10 @@ import {
 import type { Harness } from "./harness.ts";
 
 /** Thread discovery, metadata, timeline pages, and participant summaries. */
+
+/** A message's text, which a deleted message no longer has. */
+const textOf = (message: ThreadMessage.Record) =>
+  ThreadMessage.Content.isAnyOf(["Text"])(message.content) ? message.content.text : null;
 
 export const threadReads = (harness: Harness) => {
   const { core, initialized, runGateway } = Support.make(harness);
@@ -214,10 +219,9 @@ export const threadReads = (harness: Harness) => {
                 workspaceId: thread.workspaceId,
                 threadId: thread.id,
                 author: thread.createdBy,
-                text: `Message ${sequence}`,
-                mentions: [],
+                via: null,
                 publishedAt: time,
-                turnId: null,
+                content: ThreadMessage.published(`Message ${sequence}`, []),
               };
               const record = ThreadActivityKind.makeRecordUnsafe(
                 ThreadMessageActivity.Published,
@@ -739,10 +743,9 @@ export const threadReads = (harness: Harness) => {
                       workspaceId,
                       threadId: first.thread.id,
                       author: { _tag: "Member", memberId: owner.memberId },
-                      text: "Staged text",
-                      mentions: [],
+                      via: null,
                       publishedAt: first.message.publishedAt,
-                      turnId: null,
+                      content: ThreadMessage.published("Staged text", []),
                     };
                     yield* journal.publish(
                       ThreadMessageFacts.Published,
@@ -765,9 +768,9 @@ export const threadReads = (harness: Harness) => {
                     });
                     expect(
                       (yield* asActor(timeline(first.thread.id), reader)).map((item) =>
-                        "message" in item ? item.message.text : null,
+                        "message" in item ? textOf(item.message) : null,
                       ),
-                    ).toEqual([first.message.text, "Staged text"]);
+                    ).toEqual([textOf(first.message), "Staged text"]);
                     yield* journal.publish(AssignmentFacts.Revoked, {
                       workspaceId,
                       assignmentId: assignment.payload.assignmentId,
@@ -1059,16 +1062,14 @@ export const threadReads = (harness: Harness) => {
               ...Option.toArray(yield* bound.activities.get(second.activity.id)),
             ];
             expect(byId(yield* bound.activities.getFirst(threadIds))).toEqual(byId(openings));
-            const published = ThreadActivity.Kind.make(ThreadMessageActivity.Published.name);
-            const byThread = (counts: ReadonlyArray<ThreadActivityStore.Count>) =>
+            const byThread = (counts: ReadonlyArray<ThreadMessageStore.Count>) =>
               [...counts].sort((a, b) => (a.threadId < b.threadId ? -1 : 1));
-            expect(byThread(yield* bound.activities.countByKind(threadIds, published))).toEqual(
+            expect(byThread(yield* bound.messages.countByThread(threadIds))).toEqual(
               byThread([
                 { threadId: first.thread.id, count: 2 },
                 { threadId: second.thread.id, count: 1 },
               ]),
             );
-            const unused = ThreadActivity.Kind.make("participation.ended");
             // A group's threads by start: newest first, equal times in descending ID order.
             const started = (yield* bound.threads.listByGroup(group.id)).toSorted(
               (a, b) =>
@@ -1093,15 +1094,15 @@ export const threadReads = (harness: Harness) => {
               bound.participations.getMany([]),
               bound.messages.getMany([]),
               bound.activities.getFirst([]),
-              bound.activities.countByKind([], published),
-              bound.activities.countByKind(threadIds, unused),
+              bound.messages.countByThread([]),
+              bound.messages.countByThread([Thread.Id.make("missing")]),
               bound.threads.listByStart(Group.Id.make("missing"), { limit: 10 }),
               foreign.members.getMany(memberIds),
               foreign.groupMemberships.getMany(admissionIds),
               foreign.participations.getMany(participationIds),
               foreign.messages.getMany(messageIds),
               foreign.activities.getFirst(threadIds),
-              foreign.activities.countByKind(threadIds, published),
+              foreign.messages.countByThread(threadIds),
               foreign.threads.listByStart(group.id, { limit: 10 }),
             ])
               expect(yield* empty).toEqual([]);
@@ -1310,6 +1311,7 @@ export const threadReads = (harness: Harness) => {
               const { bound, owner, first } = yield* prepare();
               // Kinds only this test defines: nothing in the thread domain or storage knows them.
               const Noted = ThreadActivityKind.make("test.noted", {
+                version: 1,
                 details: Schema.Struct({
                   noteId: Schema.NonEmptyString,
                   text: Schema.String,
@@ -1320,6 +1322,7 @@ export const threadReads = (harness: Harness) => {
                 newActivity: false,
               });
               const Pinged = ThreadActivityKind.make("test.pinged", {
+                version: 1,
                 details: Schema.Struct({ count: Schema.Int }),
                 subject: () => Subject.make("thread", first.thread.id),
                 occurrence: () => null,
@@ -1368,6 +1371,7 @@ export const threadReads = (harness: Harness) => {
               expect(stored).toEqual(noted.event.payload.activity);
               expect(stored).toMatchObject({
                 kind: "test.noted",
+                version: 1,
                 subject: "note:note-1",
                 newActivity: false,
                 details: { noteId: "note-1", at: "2026-09-24T11:00:00.000Z", tags: ["a", "b"] },

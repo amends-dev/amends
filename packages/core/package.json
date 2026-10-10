@@ -19,12 +19,15 @@
     "./request": "./src/request/index.ts",
     "./signal": "./src/signal/index.ts",
     "./connection": "./src/connection/index.ts",
-    "./turn": "./src/turn/index.ts"
+    "./turn": "./src/turn/index.ts",
+    "./task": "./src/task/index.ts",
+    "./channel": "./src/channel/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@amends/channel": "workspace:*",
     "@amends/connection": "workspace:*",
     "@amends/harness": "workspace:*",
     "effect": "catalog:"

@@ -76,6 +76,8 @@ so a client can import the complete contract without loading server code.
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
 - `connections`: connections to the integrations this host installs; see
   [Connections](#connections).
+- `channels` and `channelEvents`: a connection's external conversations as threads, and what their
+  systems send; see [channels](#channels).
 - `agents` and `turns`: agents, on connections, and their turns on threads; see
   [Agents](#agents) and [Turns](#turns).
 
@@ -201,14 +203,17 @@ describe the rules behind each operation.
 | `POST …/groups/:groupId/members/:membershipId/leave` | End the caller's own admission; returns it.                                                                                                                       |
 | `POST …/groups/:groupId/follow`, `…/unfollow`        | Follow or stop following for `{ memberId }`: oneself, or an agent one may use; 204.                                                                               |
 | `POST …/groups/:groupId/read`                        | Record that the caller read the group now; 204.                                                                                                                   |
-| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, with the caller's position and unread.                                                                       |
-| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, with opening message and reply count.                                                                    |
-| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions }`; 201 with the thread and its opening message.                                                                            |
-| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions }`, reusing their direct group; 201.                                                                      |
+| `GET …/groups/:groupId/threads?limit&before`         | The group's readable threads, latest activity first, each with its task or null, the caller's position, and unread.                                               |
+| `GET …/groups/:groupId/openings?limit&before`        | The group's stream: readable threads newest start first, each with its task or null, opening message, and reply count.                                            |
+| `POST …/groups/:groupId/threads`                     | Start a thread from `{ text, mentions, title?, origin?, task? }`; 201 with the thread, its opening message, and its task or null. See [tasks](#tasks).            |
+| `POST …/threads`                                     | Start a direct thread with `{ memberIds, text, mentions, title? }`, reusing their direct group; 201 with `task` null.                                             |
 | `GET …/threads/:threadId`                            | One thread.                                                                                                                                                       |
+| `POST …/threads/:threadId/rename`                    | Give a thread `{ title, expectedTitle }` under `thread.rename`; returns it. A title no longer `expectedTitle` (`ThreadService.Changed`) is 409.                   |
 | `GET …/threads/:threadId/timeline?limit&…`           | A page of timeline items; see below.                                                                                                                              |
 | `GET …/threads/:threadId/participants?limit&after`   | Current participants in participation-ID order.                                                                                                                   |
 | `POST …/threads/:threadId/messages`                  | Reply with `{ text, mentions }`; 201 with the message.                                                                                                            |
+| `PUT …/messages/:messageId`                          | Edit one's own message from `{ text, mentions, expectedRevision }`; returns it. Another's is 403 `NotAuthor`; a deleted one or a stale revision is 409.           |
+| `DELETE …/messages/:messageId`                       | Delete one's own message, or any under `thread.moderate` on the group; returns it with its content deleted.                                                       |
 | `POST …/threads/:threadId/typing`                    | Tell the thread's readers the caller is typing there, for six seconds; 204.                                                                                       |
 | `POST …/threads/:threadId/follow`                    | Take part as the caller; returns the participation, the existing one if already taking part.                                                                      |
 | `POST …/threads/:threadId/unfollow`                  | End the caller's `{ participationId }`; 204.                                                                                                                      |
@@ -224,9 +229,11 @@ is in ascending sequence order: `afterSequence` and `beforeSequence` bound it ex
 and pages back with `beforeSequence` set to its first item's sequence. Timeline items are
 `{ activity, message }` for messages, `{ activity, participant }` for participants joining or
 leaving, and `{ activity }` for an agent's turn changing (`turn.created`, `turn.started`,
-`turn.stopping`, `turn.ended`, whose details carry the turn and how it went), with the activity's
-`kind` naming which. A message's `turnId` names the agent's turn that posted it, for an agent's
-reply, and is null otherwise.
+`turn.stopping`, `turn.ended`, whose details carry the turn and how it went) or a task changing
+(`task.created`, `task.updated`), with the activity's `kind` naming which. Edits and deletions are items of their own (`message.edited`,
+`message.deleted`) carrying the same message, whose `content` is its text, mentions, revision,
+and edit time as it is now, or its deletion. A message's `via` names the agent's turn that posted
+it, for an agent's reply, and is null otherwise.
 
 Message text keeps its whitespace and must contain a non-space character. Mentions name members
 of the group; a mentioned member who cannot take part is a 409 `ParticipantUnavailable`. Only
@@ -236,6 +243,24 @@ sequence. A direct group's members are fixed and it has nothing to follow, so ad
 following there are 409s; unfollowing an ended participation or removing an ended admission is
 also a 409. Positions, read times, and what they saw reach the caller's sessions as
 signals on the change feed, and the conversation's facts reach the group's readers as commits.
+
+### Tasks
+
+Task paths sit under `/workspaces/:workspaceId` and require active membership of the thread's
+group. A task is the work a thread tracks, keyed by the thread; [tasks](../../docs/thread-workflows.md#tasks)
+describes the rules. A thread without a task, or one the caller cannot read, answers 404 as a
+missing one does.
+
+| Endpoint                                          | Operation                                                                                                                                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/groups/:groupId/tasks?limit&status&before` | The group's readable tasks, newest created first, of one `status` when given, each as a thread list item with its task; `before` is JSON of the last item's task `{ createdAt, threadId }`. |
+| `GET …/threads/:threadId/task`                    | The thread's task.                                                                                                                                                                          |
+| `POST …/threads/:threadId/task`                   | Make the conversation a task from `{ status?, priority?, assignee? }` under `task.create` on the group; 201. A thread that is a task is 409 `AlreadyTask`.                                  |
+| `PATCH …/threads/:threadId/task`                  | Change the task by `{ change }`, a `Status`, `Assignee`, or `Priority` change with `from` and `to`, under `task.update`; returns it. A stale `from` is 409 `Changed`.                       |
+
+An assignee who cannot take part in the thread is a 409 `ParticipantUnavailable`, and assigning an
+agent needs `agent.use` on it (403 otherwise). Timeline items `{ activity }` of kind `task.created`
+carry the task's initial values in their details, and `task.updated` the change.
 
 ### Connections
 
@@ -324,6 +349,22 @@ it retries and who asked (`retry`), its reply's `messageIds`, `failure`, `cancel
 with `stoppable` and `retryable` for the caller. Stopping and retrying need permission to direct
 the agent (403 otherwise). A turn in a thread the caller cannot open answers 404. A turn is retried
 at most once, so repeating `retry` returns the turn it created.
+
+### Channels
+
+Channel paths sit under `/workspaces/:workspaceId` and require active membership, except the events
+route. A channel is a connection's external conversations as threads in one group;
+[channels](../../docs/thread-workflows.md#channels) describes the rules.
+
+| Endpoint                              | Operation                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/channels`                      | The channels the caller may read, by name.                                                                                                                                                                                                                                                                                                                |
+| `POST …/channels`                     | Create a channel from `{ connectionId, groupId, name, opensTasks }` under `channel.create`; 201. A connection that gives no channels, or that the caller may not use, is 422 `ConnectionUnavailable`; a group the caller does not belong to is 404 `GroupNotFound`.                                                                                       |
+| `GET …/channels/:channelId`           | One channel; one the caller may not read, or removed, is 404.                                                                                                                                                                                                                                                                                             |
+| `POST …/channels/:channelId/redirect` | Send new conversations to `{ groupId }` under `channel.manage`; returns the channel.                                                                                                                                                                                                                                                                      |
+| `DELETE …/channels/:channelId`        | Remove the channel under `channel.manage`; 204. Its threads and their bindings remain.                                                                                                                                                                                                                                                                    |
+| `GET …/threads/:threadId/channel`     | The conversation the thread came from: its channel, group, `conversation`, and when it was bound. A thread that came through no channel is 404 `NotBound`.                                                                                                                                                                                                |
+| `POST …/channels/:channelId/events`   | What the channel's external system sends, as text with its headers, with no session. The channel's transport verifies it and intake takes it in; the answer is the text the transport says to give, or empty. A request the transport rejects is 400 `Rejected`, a system that cannot be reached 503 `Unavailable`, and a channel missing or removed 404. |
 
 ## Authentication
 

@@ -4,7 +4,11 @@ import { Effect, Layer } from "effect";
 import { Agents } from "./agents.ts";
 import { Assignments } from "./assignments.ts";
 import { Binding } from "./binding.ts";
+import { ChannelBindings } from "./channel-bindings.ts";
+import { Channels } from "./channels.ts";
 import { Checkpoints } from "./checkpoints.ts";
+import { Contacts } from "./contacts.ts";
+import { Deliveries } from "./deliveries.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
 import { MemoryConnection } from "./connection.ts";
@@ -20,6 +24,7 @@ import { SessionLogs } from "./session-logs.ts";
 import { SessionStates } from "./session-states.ts";
 import { MemorySignalHub } from "./signal-hub.ts";
 import { Roles } from "./roles.ts";
+import { Tasks } from "./tasks.ts";
 import { ThreadActivities } from "./thread-activities.ts";
 import { ThreadMessages } from "./thread-messages.ts";
 import { ThreadParticipations } from "./thread-participations.ts";
@@ -49,6 +54,11 @@ const layerStores = Layer.mergeAll(
   ThreadParticipations.layer,
   ThreadMessages.layer,
   ThreadActivities.layer,
+  Tasks.layer,
+  Channels.layer,
+  ChannelBindings.layer,
+  Contacts.layer,
+  Deliveries.layer,
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,

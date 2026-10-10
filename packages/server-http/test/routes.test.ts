@@ -1,3 +1,5 @@
+import { Channel, ChannelIntake, ChannelService } from "@amends/core/channel";
+import { Connection } from "@amends/core/connection";
 import { Request } from "@amends/core/request";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { expect, it } from "@effect/vitest";
@@ -20,8 +22,10 @@ import {
   ThreadMessageService,
   ThreadParticipation,
   ThreadParticipationService,
+  ThreadMessage,
 } from "@amends/core/thread";
 import { ReadStateService } from "@amends/core/read-state";
+import { TaskService } from "@amends/core/task";
 import {
   Invitation,
   InvitationService,
@@ -83,6 +87,7 @@ const team: Group.TeamRecord = {
   createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
 };
 const threadId = Thread.Id.make("thread-one");
+const messageId = ThreadMessage.Id.make("message-one");
 /** Conversation services record their inputs; failures show that each tag keeps its status. */
 const conversations = Layer.mergeAll(
   Layer.succeed(
@@ -132,6 +137,9 @@ const conversations = Layer.mergeAll(
         Effect.fail(new ThreadService.DirectMembersRequired()),
       ),
       get: record("thread.get", (id) => Effect.fail(new ThreadService.NotFound({ threadId: id }))),
+      rename: record("thread.rename", (input) =>
+        Effect.fail(new ThreadService.Changed({ threadId: input.threadId })),
+      ),
       listInGroup: record("thread.list", () => Effect.succeed([])),
       listOpenings: record("thread.openings", () => Effect.succeed([])),
       readTimeline: record("thread.timeline", () => Effect.succeed([])),
@@ -139,10 +147,29 @@ const conversations = Layer.mergeAll(
     }),
   ),
   Layer.succeed(
+    TaskService.Service,
+    TaskService.Service.of({
+      create: record("task.create", (input) =>
+        Effect.fail(new TaskService.AlreadyTask({ threadId: input.threadId })),
+      ),
+      update: record("task.update", (input) =>
+        Effect.fail(new TaskService.Changed({ threadId: input.threadId })),
+      ),
+      get: record("task.get", (id) => Effect.fail(new TaskService.NotFound({ threadId: id }))),
+      listInGroup: record("task.list", () => Effect.succeed([])),
+    }),
+  ),
+  Layer.succeed(
     ThreadMessageService.Service,
     ThreadMessageService.Service.of({
       publish: record("thread.publish", () =>
         Effect.fail(new ThreadMessageService.HumanAuthorRequired({ memberId })),
+      ),
+      edit: record("thread.edit", (input) =>
+        Effect.fail(new ThreadMessageService.Changed({ messageId: input.messageId })),
+      ),
+      delete: record("thread.delete", (id) =>
+        Effect.fail(new ThreadMessageService.MessageNotFound({ messageId: id })),
       ),
       typing: record("thread.typing", () => Effect.void),
     }),
@@ -170,8 +197,42 @@ const conversations = Layer.mergeAll(
     }),
   ),
 );
+/** Channel services record their inputs; intake answers what the system is to be told. */
+const channelId = Channel.Id.make("channel-one");
+const channels = Layer.mergeAll(
+  Layer.succeed(
+    ChannelService.Service,
+    ChannelService.Service.of({
+      list: Effect.suspend(() => {
+        calls.push({ operation: "channel.list", arguments: [] });
+        return Effect.succeed([]);
+      }),
+      create: record("channel.create", (input) =>
+        Effect.fail(new ChannelService.ConnectionUnavailable({ connectionId: input.connectionId })),
+      ),
+      get: record("channel.get", (id) =>
+        Effect.fail(new ChannelService.NotFound({ channelId: id })),
+      ),
+      redirect: record("channel.redirect", (input) =>
+        Effect.fail(new ChannelService.GroupNotFound({ groupId: input.groupId })),
+      ),
+      remove: record("channel.remove", () => Effect.void),
+      getBinding: record("channel.binding", (id) =>
+        Effect.fail(new ChannelService.NotBound({ threadId: id })),
+      ),
+    }),
+  ),
+  Layer.succeed(
+    ChannelIntake.Service,
+    ChannelIntake.Service.of({
+      receive: record("channel.receive", () => Effect.succeed({ answer: "ack", intakes: [] })),
+      intake: () => Effect.die("unused"),
+    }),
+  ),
+);
 const operations = Layer.mergeAll(
   conversations,
+  channels,
   Layer.succeed(
     NotificationService.Service,
     NotificationService.Service.of({
@@ -321,11 +382,14 @@ const makeClient = HttpApiTest.groups(Api, [
   "session",
   "me",
   "workspaces",
+  "tasks",
   "members",
   "invitations",
   "notifications",
   "groups",
   "threads",
+  "channels",
+  "channelEvents",
 ]);
 it.effect("the inbox route decodes its cursor and passes the page to the application", () =>
   Effect.gen(function* () {
@@ -642,6 +706,11 @@ it.effect(
             responseMode: "response-only",
           }),
           client.threads.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.threads.rename({
+            params: { workspaceId, threadId },
+            payload: { title: "Launch plan", expectedTitle: null },
+            responseMode: "response-only",
+          }),
           client.threads.timeline({
             params: { workspaceId, threadId },
             query: { limit: 50, beforeSequence: 9, from: "newest" },
@@ -658,6 +727,15 @@ it.effect(
             payload: { text: "Reply", mentions: [] },
             responseMode: "response-only",
           }),
+          client.threads.edit({
+            params: { workspaceId, messageId },
+            payload: { text: "Edited", mentions: [], expectedRevision: 1 },
+            responseMode: "response-only",
+          }),
+          client.threads.delete({
+            params: { workspaceId, messageId },
+            responseMode: "response-only",
+          }),
           client.threads.follow({
             params: { workspaceId, threadId },
             responseMode: "response-only",
@@ -672,6 +750,22 @@ it.effect(
             payload: { throughSequence: 4 },
             responseMode: "response-only",
           }),
+          client.tasks.list({
+            params: { workspaceId, groupId },
+            query: { limit: 10, status: "todo" },
+            responseMode: "response-only",
+          }),
+          client.tasks.get({ params: { workspaceId, threadId }, responseMode: "response-only" }),
+          client.tasks.create({
+            params: { workspaceId, threadId },
+            payload: { assignee: memberId },
+            responseMode: "response-only",
+          }),
+          client.tasks.update({
+            params: { workspaceId, threadId },
+            payload: { change: { _tag: "Status", from: "triage", to: "todo" } },
+            responseMode: "response-only",
+          }),
           client.notifications.markSeen({
             params: { workspaceId, notificationId: notification.id },
             responseMode: "response-only",
@@ -679,8 +773,8 @@ it.effect(
         ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
       );
       expect(statuses).toEqual([
-        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 200,
-        200, 403, 404, 409, 409, 409,
+        201, 200, 200, 404, 200, 409, 409, 409, 404, 204, 409, 204, 200, 200, 409, 400, 404, 409,
+        200, 200, 403, 409, 404, 404, 409, 409, 200, 404, 409, 409, 409,
       ]);
       expect(calls.filter((call) => call.operation !== "asMember")).toEqual([
         {
@@ -713,6 +807,10 @@ it.effect(
         },
         { operation: "thread.get", arguments: [threadId] },
         {
+          operation: "thread.rename",
+          arguments: [{ threadId, title: "Launch plan", expectedTitle: null }],
+        },
+        {
           operation: "thread.timeline",
           arguments: [threadId, { limit: 50, beforeSequence: 9, from: "newest" }],
         },
@@ -724,10 +822,92 @@ it.effect(
           operation: "thread.publish",
           arguments: [{ threadId, text: "Reply", mentions: [] }, { requestKey: "reply-1" }],
         },
+        {
+          operation: "thread.edit",
+          arguments: [{ messageId, text: "Edited", mentions: [], expectedRevision: 1 }],
+        },
+        { operation: "thread.delete", arguments: [messageId] },
         { operation: "thread.follow", arguments: [threadId] },
         { operation: "thread.unfollow", arguments: [{ threadId, participationId }] },
         { operation: "thread.markRead", arguments: [{ threadId, throughSequence: 4 }] },
+        { operation: "task.list", arguments: [groupId, { limit: 10, status: "todo" }] },
+        { operation: "task.get", arguments: [threadId] },
+        { operation: "task.create", arguments: [{ threadId, assignee: memberId }] },
+        {
+          operation: "task.update",
+          arguments: [{ threadId, change: { _tag: "Status", from: "triage", to: "todo" } }],
+        },
         { operation: "notification.markSeen", arguments: [notification.id] },
+      ]);
+    }),
+);
+
+it.effect(
+  "channel routes pass path parameters and request keys into core inputs, and what a system sends reaches intake as text",
+  () =>
+    Effect.gen(function* () {
+      calls.length = 0;
+      const connectionId = Connection.Id.make("connection-one");
+      const key = Request.Key.make("channel-1");
+      const statuses = yield* run("alice", (client) =>
+        Effect.all([
+          client.channels.list({ params: { workspaceId }, responseMode: "response-only" }),
+          client.channels.create({
+            params: { workspaceId },
+            headers: { "idempotency-key": key },
+            payload: { connectionId, groupId, name: "Support", opensTasks: true },
+            responseMode: "response-only",
+          }),
+          client.channels.get({
+            params: { workspaceId, channelId },
+            responseMode: "response-only",
+          }),
+          client.channels.redirect({
+            params: { workspaceId, channelId },
+            payload: { groupId },
+            responseMode: "response-only",
+          }),
+          client.channels.remove({
+            params: { workspaceId, channelId },
+            responseMode: "response-only",
+          }),
+          client.channels.binding({
+            params: { workspaceId, threadId },
+            responseMode: "response-only",
+          }),
+        ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
+      );
+      expect(statuses).toEqual([200, 422, 404, 404, 204, 404]);
+      // The system's request needs no session; its body and headers go to intake as they came.
+      const answer = yield* run("", (client) =>
+        client.channelEvents.receive({
+          params: { workspaceId, channelId },
+          payload: '{"events":[]}',
+        }),
+      );
+      expect(answer).toBe("ack");
+      expect(
+        calls.filter((call) => call.operation !== "asMember" && call.operation !== "inWorkspace"),
+      ).toMatchObject([
+        { operation: "channel.list", arguments: [] },
+        {
+          operation: "channel.create",
+          arguments: [
+            { connectionId, groupId, name: "Support", opensTasks: true },
+            { requestKey: key },
+          ],
+        },
+        { operation: "channel.get", arguments: [channelId] },
+        { operation: "channel.redirect", arguments: [{ channelId, groupId }] },
+        { operation: "channel.remove", arguments: [channelId] },
+        { operation: "channel.binding", arguments: [threadId] },
+        {
+          operation: "channel.receive",
+          arguments: [
+            channelId,
+            { body: '{"events":[]}', headers: { "content-type": "text/plain" } },
+          ],
+        },
       ]);
     }),
 );

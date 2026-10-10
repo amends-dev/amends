@@ -1,11 +1,14 @@
 import type * as Core from "@amends/core";
 import { AgentService } from "@amends/core/agent";
 import { BuiltinRoles } from "@amends/core/authorization";
+import { ChannelIntake, ChannelService } from "@amends/core/channel";
 import { ConnectionService } from "@amends/core/connection";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Actor, Identity } from "@amends/core/identity";
 import { Notification } from "@amends/core/notification";
+import { TaskService } from "@amends/core/task";
 import {
+  Thread,
   ThreadService,
   type ThreadMessage,
   ThreadMessageService,
@@ -124,7 +127,8 @@ const brief = (message: Turn.LogMessage | "done" | "unavailable") => {
 
 /** A timeline item in brief: a message's text, or a turn's change. */
 const told = (item: ThreadTimeline.Item) => {
-  if ("message" in item) return `message: ${item.message.text}`;
+  if ("message" in item)
+    return `message: ${item.message.content._tag === "Text" ? item.message.content.text : "(deleted)"}`;
   const activity = item.activity;
   switch (activity.kind) {
     case "turn.created":
@@ -273,6 +277,63 @@ const unfollow = (
       ),
     );
   });
+/**
+ * A channel over the test channels into the general group, which opens tasks, and what the contact
+ * Dana Customer sends through it: each message received as the system's event.
+ */
+const channelInto = (id: Workspace.Id) =>
+  Effect.gen(function* () {
+    const connection = yield* as(
+      id,
+      alice,
+      Effect.flatMap(ConnectionService.Service, (connectionService) =>
+        connectionService.create({
+          integration: "test-channels",
+          name: "Support desk",
+          settings: {},
+          auth: "none",
+        }),
+      ),
+    );
+    const channel = yield* as(
+      id,
+      alice,
+      Effect.flatMap(ChannelService.Service, (channelService) =>
+        channelService.create({
+          connectionId: connection.id,
+          groupId: Group.GeneralId,
+          name: "Support",
+          opensTasks: true,
+        }),
+      ),
+    );
+    const receive = (messageId: string, text: string) =>
+      Effect.flatMap(Gateway.Service, (gateway) =>
+        Effect.scoped(
+          gateway.inWorkspace(
+            id,
+            Effect.flatMap(ChannelIntake.Service, (channelIntake) =>
+              channelIntake.receive(channel.id, {
+                headers: {},
+                body: JSON.stringify({
+                  events: [
+                    {
+                      _tag: "MessageReceived",
+                      conversation: { id: "conv-1", details: { room: "C1" } },
+                      messageId,
+                      sender: { id: "U1", name: "Dana Customer" },
+                      text,
+                      receivedAt: "2026-10-10T12:00:00.000Z",
+                    },
+                  ],
+                }),
+              }),
+            ),
+          ),
+        ),
+      );
+    return { channel, receive };
+  });
 type Ready = Extract<TurnExecution.Start, { readonly _tag: "Ready" }>;
 /** Nothing for a turn job to run. */
 const idle = TurnExecution.Start.cases.Idle.make({});
@@ -377,7 +438,11 @@ export const turns = (harness: ConformanceHarness) => {
               expect(yield* bound.notifications.get(asked!.id)).toEqual(
                 Option.some(
                   Object.assign({}, asked, {
-                    state: { _tag: "Accepted", turnId: turn.id, acceptedAt: turn.createdAt },
+                    state: {
+                      _tag: "Accepted",
+                      by: { _tag: "Turn", turnId: turn.id },
+                      acceptedAt: turn.createdAt,
+                    },
                   }),
                 ),
               );
@@ -435,8 +500,8 @@ export const turns = (harness: ConformanceHarness) => {
                 message: {
                   id: closed.messageIds[0],
                   author: { _tag: "Member", memberId: agent.memberId },
-                  text: "The plan is on track.",
-                  turnId: turn.id,
+                  via: { _tag: "Turn", turnId: turn.id },
+                  content: { text: "The plan is on track." },
                 },
               });
               // What the session resumes from is kept for the agent's next turn there, as prompted
@@ -900,6 +965,233 @@ export const turns = (harness: ConformanceHarness) => {
           }),
         ),
       ),
+    );
+
+    it.effect(
+      "an agent taken off a task has its turn there stopped, and is asked anew as work resumes",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent } = yield* workspaceWithAgent;
+              // Assigned at the start, the agent is asked to work the task.
+              const started = yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.startInGroup({
+                    groupId: Group.GeneralId,
+                    text: "Plan the launch.",
+                    mentions: [],
+                    task: { assignee: agent.memberId },
+                  }),
+                ),
+              );
+              const threadId = started.thread.id;
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "run", memberId: agent.memberId, threadId },
+              ]);
+              yield* reply(workspace.id, threadId, "Planner, start with the budget.");
+              yield* takeTurnJobs(workspace.id);
+              const { turn } = yield* startReady(workspace.id, agent.memberId, threadId);
+              const change = (change: Parameters<TaskService.Interface["update"]>[0]["change"]) =>
+                as(
+                  workspace.id,
+                  alice,
+                  Effect.flatMap(TaskService.Service, (taskService) =>
+                    taskService.update({ threadId, change }),
+                  ),
+                );
+              // Holding the task asks the agent's job to stop its turn, which it confirms.
+              yield* change({ _tag: "Status", from: "todo", to: "held" });
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "stop", memberId: agent.memberId, threadId, turnId: turn.id },
+              ]);
+              yield* execute(workspace.id, (turnExecution) =>
+                turnExecution.confirmStopped(turn.id, { resume }),
+              );
+              expect(yield* turnOf(workspace.id, turn.id)).toMatchObject({
+                status: "cancelled",
+                cancelReason: "task-changed",
+              });
+              // The turn's end runs the job again, for work that waited; nothing does.
+              yield* takeTurnJobs(workspace.id);
+              // Resuming the work asks the agent again; taking it off the task stops that turn too.
+              yield* reply(workspace.id, threadId, "Planner, pick it up again.");
+              yield* change({ _tag: "Status", from: "held", to: "todo" });
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "run", memberId: agent.memberId, threadId },
+                { kind: "run", memberId: agent.memberId, threadId },
+              ]);
+              const { turn: resumed } = yield* startReady(workspace.id, agent.memberId, threadId);
+              yield* change({ _tag: "Assignee", from: agent.memberId, to: null });
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "stop", memberId: agent.memberId, threadId, turnId: resumed.id },
+              ]);
+              yield* execute(workspace.id, (turnExecution) =>
+                turnExecution.confirmStopped(resumed.id, { resume }),
+              );
+              expect((yield* timelineOf(workspace.id, threadId)).map(told)).toEqual([
+                "message: Plan the launch.",
+                "task.created",
+                "message: Planner, start with the budget.",
+                `created ${turn.id}`,
+                `started ${turn.id}`,
+                "task.updated",
+                `stopping ${turn.id} task-changed`,
+                `ended ${turn.id} cancelled task-changed`,
+                "message: Planner, pick it up again.",
+                "task.updated",
+                `created ${resumed.id}`,
+                `started ${resumed.id}`,
+                "task.updated",
+                `stopping ${resumed.id} task-changed`,
+                `ended ${resumed.id} cancelled task-changed`,
+              ]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "an agent given a task is asked with the thread as it stands and what made it a task, then told each change in its words",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent } = yield* workspaceWithAgent;
+              const asAlice = <A, E>(
+                program: Effect.Effect<A, E, Core.Operations | Actor.Service>,
+              ) => as(workspace.id, alice, program);
+              const started = yield* asAlice(
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.startInGroup({
+                    groupId: Group.GeneralId,
+                    title: Thread.Title.make("Launch plan"),
+                    text: "Plan the launch.",
+                    mentions: [],
+                  }),
+                ),
+              );
+              const threadId = started.thread.id;
+              // Making the thread a task assigned to the agent asks it to work, though no message does.
+              yield* asAlice(
+                Effect.flatMap(TaskService.Service, (taskService) =>
+                  taskService.create({ threadId, assignee: agent.memberId, priority: "high" }),
+                ),
+              );
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "run", memberId: agent.memberId, threadId },
+              ]);
+              // Its prompt is the thread as it stands, then what told it: the task's creation.
+              const first = yield* startReady(workspace.id, agent.memberId, threadId);
+              expect(textsOf(first.prompt)).toEqual([
+                "The thread is titled “Launch plan”. It is a task: status to do, priority high, assigned to you.",
+                "Alice made this thread a task: status to do, priority high, assigned to you.",
+              ]);
+              expect(first.messages).toBe(0);
+              // What was said before it joined is the conversation its session starts with.
+              expect(yield* joinedOf(workspace.id, first.turn.id)).toEqual([
+                { role: "user", texts: ["Alice: Plan the launch."] },
+              ]);
+              yield* execute(workspace.id, (turnExecution) =>
+                turnExecution.close(first.turn.id, { reply: "On it.", resume }),
+              );
+              yield* takeTurnJobs(workspace.id);
+              // The thread is renamed, its opening message edited, and the task started; a message
+              // said and deleted before the turn tells nothing.
+              yield* asAlice(
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.rename({
+                    threadId,
+                    title: Thread.Title.make("Launch plan, revised"),
+                    expectedTitle: Thread.Title.make("Launch plan"),
+                  }),
+                ),
+              );
+              yield* asAlice(
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.edit({
+                    messageId: started.message.id,
+                    text: "Plan the launch by Friday.",
+                    mentions: [],
+                    expectedRevision: 1,
+                  }),
+                ),
+              );
+              yield* asAlice(
+                Effect.flatMap(TaskService.Service, (taskService) =>
+                  taskService.update({
+                    threadId,
+                    change: { _tag: "Status", from: "todo", to: "doing" },
+                  }),
+                ),
+              );
+              const aside = yield* reply(workspace.id, threadId, "Mind the budget.");
+              yield* asAlice(
+                Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                  threadMessageService.delete(aside.message.id),
+                ),
+              );
+              yield* takeTurnJobs(workspace.id);
+              const second = yield* startReady(workspace.id, agent.memberId, threadId);
+              expect(textsOf(second.prompt)).toEqual([
+                "The thread is titled “Launch plan, revised”. It is a task: status doing, priority high, assigned to you.",
+                "The thread was renamed to “Launch plan, revised”.",
+                "Alice edited their message: Plan the launch by Friday.",
+                "The task's status is now doing.",
+              ]);
+              expect(second.messages).toBe(0);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "an agent assigned a channel's task is told the contact's messages by the contact's name",
+      () =>
+        harness.withStorage((storage) =>
+          runGateway(
+            storage,
+            Effect.gen(function* () {
+              const { workspace, agent } = yield* workspaceWithAgent;
+              const { receive } = yield* channelInto(workspace.id);
+              // The contact's message opens a task in triage, which alice assigns to the agent.
+              const opened = (yield* receive("m1", "Where is my order?")).intakes[0];
+              if (opened?._tag !== "Opened")
+                return expect.fail(`Expected a thread opened, not ${opened?._tag}`);
+              const { threadId } = opened;
+              yield* takeTurnJobs(workspace.id);
+              yield* as(
+                workspace.id,
+                alice,
+                Effect.flatMap(TaskService.Service, (taskService) =>
+                  taskService.update({
+                    threadId,
+                    change: { _tag: "Assignee", from: null, to: agent.memberId },
+                  }),
+                ),
+              );
+              // The contact writes again, which asks the agent to work.
+              yield* receive("m2", "It was order 42.");
+              expect(yield* takeTurnJobs(workspace.id)).toEqual([
+                { kind: "run", memberId: agent.memberId, threadId },
+              ]);
+              const ready = yield* startReady(workspace.id, agent.memberId, threadId);
+              expect(textsOf(ready.prompt)).toEqual([
+                "This thread is a task: status triage, assigned to you.",
+                "The task was assigned to you.",
+                "Dana Customer: It was order 42.",
+              ]);
+              expect(ready.messages).toBe(1);
+              expect(yield* joinedOf(workspace.id, ready.turn.id)).toEqual([
+                { role: "user", texts: ["Dana Customer: Where is my order?"] },
+              ]);
+            }),
+          ),
+        ),
     );
 
     it.effect(

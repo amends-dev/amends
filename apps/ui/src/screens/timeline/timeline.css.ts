@@ -26,3 +26,9 @@ export const event = style({
 export const eventIcon = style({ flex: "none", width: "0.875rem", height: "0.875rem" });
 
 export const eventTime = style({ ...typeScale.meta, color: vars.color.text.muted });
+
+/** In place of a deleted message's text. */
+export const deleted = style({ color: vars.color.text.muted, fontStyle: "italic" });
+
+/** After an edited message's text. */
+export const edited = style({ ...typeScale.meta, color: vars.color.text.muted });

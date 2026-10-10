@@ -53,11 +53,13 @@ it.effect(
       const groupLatest: Array<Group.Latest> = [];
       const threads: ThreadStore.Interface = {
         get: () => Effect.die("Unexpected thread read"),
+        getMany: () => Effect.die("Unexpected thread read"),
         listByGroup: () => Effect.die("Unexpected thread read"),
         listByLatest: () => Effect.die("Unexpected thread read"),
         listByStart: () => Effect.die("Unexpected thread read"),
         getLatest: () => Effect.die("Unexpected thread read"),
         insert: (record) => Effect.sync(() => void inserted.push(record)),
+        rename: () => Effect.die("Unexpected thread rename"),
         recordLatest: (latest) => Effect.sync(() => void threadLatest.push(latest)),
       };
       const groups: GroupStore.Interface = {
@@ -94,6 +96,8 @@ it.effect(
             id: threadId,
             workspaceId,
             groupId,
+            title: null,
+            origin: null,
             createdBy: { _tag: "Member", memberId },
             createdAt: at(0),
           });

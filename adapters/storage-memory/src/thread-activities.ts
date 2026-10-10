@@ -48,18 +48,6 @@ export const make = Effect.fn("ThreadActivities.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadActivityStore, "getFirst")),
     ),
-    countByKind: Effect.fn("ThreadActivities.countByKind")(
-      function* (input, kindInput) {
-        const ids = new Set(yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input));
-        const kind = yield* Schema.decodeEffect(ThreadActivity.Kind)(kindInput);
-        const counts = new Map<Thread.Id, number>();
-        for (const record of yield* rows.all((yield* read).records.threadActivities))
-          if (ids.has(record.threadId) && record.kind === kind)
-            counts.set(record.threadId, (counts.get(record.threadId) ?? 0) + 1);
-        return [...counts].map(([threadId, count]) => ({ threadId, count }));
-      },
-      Effect.mapError(storeFailure(ThreadActivityStore, "countByKind")),
-    ),
     readPage: Effect.fn("ThreadActivities.readPage")(
       function* (input, options) {
         const id = yield* Schema.decodeEffect(Thread.Id)(input);

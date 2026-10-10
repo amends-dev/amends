@@ -5,8 +5,8 @@ import type { FormField } from "../../components/form-fields/index.ts";
 import type { Status } from "../../components/status-mark/index.ts";
 import * as s from "./connections.css.ts";
 
-/** What an integration's connections give: models, tools, sandboxes, or harnesses. */
-export type IntegrationCapability = "models" | "tools" | "sandboxes" | "harnesses";
+/** What an integration's connections give: models, tools, sandboxes, harnesses, or channels. */
+export type IntegrationCapability = "models" | "tools" | "sandboxes" | "harnesses" | "channels";
 /** How a connection authenticates, chosen when it is created. */
 export type AuthMethod = "apiKey" | "none";
 
@@ -109,6 +109,7 @@ export const capabilityLabels = {
   tools: "Tools",
   sandboxes: "Sandboxes",
   harnesses: "Harnesses",
+  channels: "Channels",
 } as const satisfies Record<IntegrationCapability, string>;
 
 /** "model", "tool", "sandbox", or "harness", as in "Add tool connection". */
@@ -117,6 +118,7 @@ export const capabilityNouns = {
   tools: "tool",
   sandboxes: "sandbox",
   harnesses: "harness",
+  channels: "channel",
 } as const satisfies Record<IntegrationCapability, string>;
 
 export const authLabels = {

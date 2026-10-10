@@ -2,7 +2,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { Schema } from "effect";
 import { Connection } from "../src/connection/connection.ts";
 import { Group } from "../src/group/group.ts";
-import { ThreadMessage } from "../src/thread/message/message.ts";
+import { ThreadMessage } from "../src/thread/ThreadMessage.ts";
 import { Member } from "../src/workspace/member/member.ts";
 import { Workspace } from "../src/workspace/workspace.ts";
 

@@ -351,15 +351,14 @@ it("explains an unavailable workspace under the account header and returns to th
 /** A group with one thread and its reply, as the host answers them. */
 const at = "2026-09-25T12:00:00.000Z";
 const author = { _tag: "Member", memberId: "owner-one" };
-const message = (id: string, text: string) => ({
+const message = (id: string, text: string, mentions: ReadonlyArray<string> = []) => ({
   id,
   workspaceId: "one",
   threadId: "t1",
   author,
-  text,
-  mentions: [],
+  via: null,
   publishedAt: at,
-  turnId: null,
+  content: { _tag: "Text", text, mentions, revision: 1, editedAt: null },
 });
 const item = (sequence: number, id: string, text: string) => ({
   activity: {
@@ -369,6 +368,7 @@ const item = (sequence: number, id: string, text: string) => ({
     sequence,
     occurredAt: at,
     kind: "message.published",
+    version: 1,
     subject: `message:${id}`,
     occurrence: `message:${id}`,
     newActivity: true,
@@ -376,11 +376,21 @@ const item = (sequence: number, id: string, text: string) => ({
   },
   message: message(id, text),
 });
+const thread = {
+  id: "t1",
+  workspaceId: "one",
+  groupId: "g1",
+  title: null,
+  origin: null,
+  createdBy: author,
+  createdAt: at,
+};
 const conversation = (path: string) =>
   path.endsWith("/groups/g1/openings")
     ? [
         {
-          thread: { id: "t1", workspaceId: "one", groupId: "g1", createdBy: author, createdAt: at },
+          thread,
+          task: null,
           message: message("m1", "Can you look at the terms?"),
           replies: 1,
           latest: { threadId: "t1", sequence: 2, occurredAt: at },
@@ -388,9 +398,11 @@ const conversation = (path: string) =>
           unread: false,
         },
       ]
-    : path.endsWith("/threads/t1/timeline")
-      ? [item(1, "m1", "Can you look at the terms?"), item(2, "m2", "On it.")]
-      : undefined;
+    : path.endsWith("/threads/t1")
+      ? thread
+      : path.endsWith("/threads/t1/timeline")
+        ? [item(1, "m1", "Can you look at the terms?"), item(2, "m2", "On it.")]
+        : undefined;
 
 it("shows a group's stream at its route and an open thread beside it", async () => {
   const fetch = vi.fn<typeof globalThis.fetch>((input, init) => {
@@ -452,7 +464,7 @@ const mentioned = () => ({
   },
   source: {
     ...item(2, "m2", "On it."),
-    message: { ...message("m2", "On it."), mentions: ["owner-one"] },
+    message: message("m2", "On it.", ["owner-one"]),
   },
 });
 it("lists the inbox at its hash route, and opening one marks it seen and shows its thread", async () => {
@@ -637,8 +649,17 @@ it("drafts a first direct message at its hash route and opens the conversation",
     if (request.method === "POST" && path === "/workspaces/one/threads")
       return response(
         {
-          thread: { id: "t9", workspaceId: "one", groupId: "g9", createdBy: author, createdAt: at },
+          thread: {
+            id: "t9",
+            workspaceId: "one",
+            groupId: "g9",
+            title: null,
+            origin: null,
+            createdBy: author,
+            createdAt: at,
+          },
           message: message("m9", "Are you free?"),
+          task: null,
           activity: { ...item(1, "m9", "Are you free?").activity, threadId: "t9" },
         },
         201,

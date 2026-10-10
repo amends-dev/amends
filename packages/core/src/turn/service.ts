@@ -26,10 +26,10 @@ import { Store } from "../journal/store.ts";
 import { Request } from "../request/request.ts";
 import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
-import { ThreadQuery } from "../thread/query.ts";
-import type { ThreadId } from "../thread/id.ts";
-import { ThreadParticipationStore } from "../thread/participation/store.ts";
-import { ThreadPermissions } from "../thread/permissions.ts";
+import { ThreadQuery } from "../thread/ThreadQuery.ts";
+import type { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadParticipationStore } from "../thread/ThreadParticipationStore.ts";
+import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
 import { NotActive, NotFound, NotRetryable } from "./errors.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnCommand } from "./command.ts";
@@ -370,39 +370,6 @@ export const make = Effect.fn("TurnService.make")(function* () {
     );
   });
 
-  /**
-   * Ask an active turn to stop, in the caller's commit: a queued one ends cancelled at once, since
-   * nothing runs it yet; a running one is marked stopping, which its job confirms once it has
-   * stopped. Returns the turn as it now stands.
-   */
-  const requestStop = Effect.fnUntraced(function* (turn: Turn.Record) {
-    const requestedAt = yield* DateTime.now;
-    const requested = yield* journal.publish(TurnFacts.CancelRequested, {
-      workspaceId,
-      groupId: turn.groupId,
-      threadId: turn.threadId,
-      memberId: turn.memberId,
-      turnId: turn.id,
-      reason: "requested",
-      requestedAt,
-    });
-    if (turn.status === "queued") {
-      yield* turnCommand.endTurn(turn, { outcome: "cancelled", cancelReason: "requested" });
-      return Turn.change(turn, {
-        status: "cancelled",
-        cancelReason: "requested",
-        finishedAt: requestedAt,
-      });
-    }
-    yield* turnCommand.recordActivity(
-      turn.threadId,
-      TurnActivity.Stopping,
-      { turnId: turn.id, cancelReason: "requested" },
-      requested,
-    );
-    return Turn.change(turn, { status: "cancelling", cancelReason: "requested" });
-  });
-
   const cancel = Effect.fn("TurnService.cancel")(
     function* (turnId: Turn.Id) {
       const turn = yield* requireReadableTurn(yield* Schema.decodeEffect(Turn.Id)(turnId));
@@ -410,7 +377,7 @@ export const make = Effect.fn("TurnService.make")(function* () {
       if (!Turn.active(turn.status))
         return yield* new NotActive({ turnId: turn.id, status: turn.status });
       if (turn.status === "cancelling") return yield* toView(turn);
-      return yield* toView(yield* requestStop(turn));
+      return yield* toView(yield* turnCommand.requestStop(turn, "requested"));
     },
     Publication.withActor,
     Effect.provideService(Crypto.Crypto, crypto),

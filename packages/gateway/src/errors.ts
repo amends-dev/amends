@@ -23,6 +23,8 @@ import {
 import { ReadStateService } from "@amends/core/read-state";
 import { ConnectionService } from "@amends/core/connection";
 import { AgentService } from "@amends/core/agent";
+import { ChannelIntake, ChannelService } from "@amends/core/channel";
+import { TaskService } from "@amends/core/task";
 import { Turn, TurnService } from "@amends/core/turn";
 import { Schema } from "effect";
 
@@ -94,13 +96,23 @@ export const PublicError = Schema.Union([
   ThreadService.ParticipantUnavailable,
   ThreadService.HumanAuthorRequired,
   ThreadService.DirectMembersRequired,
+  ThreadService.Changed,
   ThreadMessageService.NotFound,
   ThreadMessageService.ParticipantUnavailable,
   ThreadMessageService.HumanAuthorRequired,
+  ThreadMessageService.MessageNotFound,
+  ThreadMessageService.NotAuthor,
+  ThreadMessageService.Deleted,
+  ThreadMessageService.Changed,
   ThreadParticipationService.ThreadNotFound,
   ThreadParticipationService.NotFound,
   ThreadParticipationService.AlreadyEnded,
   ThreadParticipationService.FixedParticipation,
+  TaskService.NotFound,
+  TaskService.AlreadyTask,
+  TaskService.Changed,
+  TaskService.ParticipantUnavailable,
+  TaskService.GroupNotFound,
   GroupService.MemberNotFound,
   GroupService.NotFound,
   GroupService.InactiveMember,
@@ -140,6 +152,12 @@ export const PublicError = Schema.Union([
   TurnService.NotFound,
   TurnService.NotActive,
   TurnService.NotRetryable,
+  ChannelService.NotFound,
+  ChannelService.GroupNotFound,
+  ChannelService.ConnectionUnavailable,
+  ChannelService.NotBound,
+  ChannelIntake.Rejected,
+  ChannelIntake.Unavailable,
 ]);
 export type PublicError = typeof PublicError.Type;
 

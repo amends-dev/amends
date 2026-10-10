@@ -12,7 +12,7 @@ remaining gaps with links to their owning code.
 | [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                                       |
 | [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                              |
 | [Group workflows](group-workflows.md)                                | Team groups: creation, public groups and joining, reads, membership, and following.                                             |
-| [Thread workflows](thread-workflows.md)                              | Starts, replies, participation, reads, notifications, read state, and typing.                                                   |
+| [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, read state, and typing.                                  |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers.             |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                                         |
 | [Publishing](publishing.md)                                          | Building a package's distribution, checking it as a consumer would use it, and publishing it to npm.                            |
@@ -25,6 +25,7 @@ remaining gaps with links to their owning code.
 | [Storage conformance](../packages/storage-conformance/README.md)     | Test suites every storage adapter runs, and the harness an adapter supplies.                                                    |
 | [Harness](../packages/harness/README.md)                             | The harness contract: an agent's sessions and turns in one stream format, and the bridge into sandboxes.                        |
 | [Sandbox](../packages/sandbox/README.md)                             | The sandbox contract: Effect's file system and processes inside, ports, network, lifecycle, and the suites every provider runs. |
+| [Channel](../packages/channel/README.md)                             | The channel transport contract: receiving what an external system sends and replying in its conversations.                      |
 | [Connections](../packages/connection/README.md)                      | Integrations a host installs, the connections workspaces make to them, and the model catalog.                                   |
 | [Toolkit](../packages/toolkit/README.md)                             | Tool sources, such as MCP servers and HTTP APIs, as one shape, and the toolkit built from them.                                 |
 | [opencode harness](../adapters/harness-opencode/README.md)           | opencode as an agent for the harness contract, behind its bridge in a sandbox, on opencode 1 or opencode 2.                     |
@@ -59,6 +60,9 @@ drawings, generation, and visual review in the UI workshop.
   [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
+  [Threads](threads.md) fixes the thread model that conversations, tasks, and channel
+  conversations share: the thread record, messages and their editing, tasks and channel
+  bindings as rows on threads, and what changes to implement it.
 - [Design-system references](../design-system/) are product and visual mocks, not
   implemented API schemas. [Token sync](../design-system/sync/README.md) explains the
   historical handoff and points to the current token and style modules.

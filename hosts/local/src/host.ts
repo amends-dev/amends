@@ -7,7 +7,7 @@ import {
   ModelIntegrations,
   ToolIntegrations,
 } from "@amends/connection";
-import { JobPruning, TurnJob } from "@amends/cluster";
+import { DeliveryJob, JobPruning, TurnJob } from "@amends/cluster";
 import { Gateway, type WorkspaceDirectory } from "@amends/gateway";
 import { Models } from "@amends/harness-amends";
 import {
@@ -148,8 +148,9 @@ export const layerDatabase = (url: Redacted.Redacted<string>, options: Options =
 
 /**
  * The gateway and the workspace directory over one PostgreSQL database, through the storage
- * adapter, with the turn jobs that run agents' turns on the integrations the host installs, and
- * handled job requests pruned after seven days. The HTTP server resolves bearer tokens before
+ * adapter, with the turn jobs that run agents' turns and the delivery jobs that carry messages to
+ * channels, both on the integrations the host installs, and handled job requests pruned after
+ * seven days. The HTTP server resolves bearer tokens before
  * entering the gateway.
  *
  * @category layers
@@ -161,15 +162,14 @@ export const layer = (url: Redacted.Redacted<string>, options: Options = {}): Ho
     (integrations) => {
       const gateway = Gateway.layer({ integrations }).pipe(
         Layer.provideMerge(postgres({ credentialKey: options.credentialKey })),
-        Layer.provide(TurnJob.layerRequests),
+        Layer.provide(Layer.merge(TurnJob.layerRequests, DeliveryJob.layerRequests)),
       );
+      const installed = Layer.effect(Integrations.Integrations, Integrations.make(integrations));
       return Layer.mergeAll(
-        TurnJob.layerWorker.pipe(
-          Layer.provide(Layer.effect(Integrations.Integrations, Integrations.make(integrations))),
-        ),
+        Layer.merge(TurnJob.layerWorker, DeliveryJob.layerWorker).pipe(Layer.provide(installed)),
         JobPruning.layer({
           prune: PostgresClusterStorage.prune,
-          entityTypes: [TurnJob.entity.type],
+          entityTypes: [TurnJob.entity.type, DeliveryJob.entity.type],
         }),
       ).pipe(Layer.provideMerge(gateway));
     },

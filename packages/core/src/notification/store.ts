@@ -5,9 +5,8 @@ import type { Store } from "../journal/store.ts";
 import { Notification } from "./notification.ts";
 import type { GroupId } from "../group/id.ts";
 import type { MemberId } from "../workspace/member/id.ts";
-import type { ThreadId } from "../thread/id.ts";
-import type { ThreadParticipationId } from "../thread/participation/id.ts";
-import type { TurnId } from "../turn/id.ts";
+import type { ThreadId } from "../thread/ThreadId.ts";
+import type { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 
 /** Exclusive keyset boundary for listing; not a journal position or live delivery cursor. */
 export const Cursor = Schema.Struct({
@@ -52,11 +51,22 @@ export class Conflict extends Schema.TaggedError<Conflict>()("NotificationStore.
  * internal reads do not authorize callers; application operations must do so.
  * Every storage adapter implements this contract.
  *
- * The journal settles notifications as Pending, Discarded, or Informational, and an agent's as
- * Accepted when a turn takes them. A human recipient's Seen is private state, written by markSeen
+ * The journal settles notifications as Pending, Discarded, or Informational, an agent's as
+ * Accepted when a turn takes them, and a contact's when a delivery does. A human recipient's Seen is private state, written by markSeen
  * outside the journal and kept when projections are rebuilt: a notification projected again as
  * Pending reads as Seen, with its first time, once its recipient has seen it.
  */
+/**
+ * A range of one thread's timeline positions: after one, through another.
+ *
+ * @category schemas
+ */
+export const ThreadRange = Schema.Struct({
+  afterSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  throughSequence: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+});
+export interface ThreadRange extends Schema.Schema.Type<typeof ThreadRange> {}
+
 export interface Interface {
   /** Find a notification in this workspace; None if absent. */
   readonly get: (id: Notification.Id) => Effect.Effect<Option.Option<Notification.Record>, Failure>;
@@ -87,6 +97,16 @@ export interface Interface {
     options: LatestOptions,
   ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
 
+  /**
+   * Every notification of the recipient from one thread's activity in a range of timeline
+   * positions, whatever its state, ordered by position, then ID in binary lexical order: what the
+   * recipient was told there.
+   */
+  readonly listByThread: (
+    recipient: Notification.Recipient,
+    threadId: ThreadId.Id,
+    range: ThreadRange,
+  ) => Effect.Effect<ReadonlyArray<Notification.Record>, Failure>;
   /**
    * The recipient's pending notifications from one thread's activity at or before a timeline
    * position, ordered by that position, then ID in binary lexical order.
@@ -141,13 +161,14 @@ export interface Interface {
     seenAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict>;
   /**
-   * Record that an agent accepted these pending notifications into a turn, in the turn's commit.
-   * Each must be a pending notification of an agent in this workspace, all of the same agent;
-   * otherwise the call conflicts and writes nothing. An empty request writes nothing.
+   * Record that `by` accepted these pending notifications, in its commit: a turn, which takes
+   * pending notifications of one agent in this workspace, or a delivery, which takes pending
+   * notifications of contacts. Anything else conflicts and writes nothing. An empty request writes
+   * nothing.
    */
   readonly accept: (
     ids: ReadonlyArray<Notification.Id>,
-    turnId: TurnId.Id,
+    by: Notification.AcceptedBy,
     acceptedAt: DateTime.Utc,
   ) => Effect.Effect<void, Failure | Conflict, Store.Transaction>;
   /** Settle pending agent input for this ended participation, preserving source and recipient history. */

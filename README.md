@@ -47,6 +47,7 @@ packages/
   connection/      @amends/connection: integrations, connections, and the model catalog
   harness/         @amends/harness: the harness contract, its stream format, and the bridge
   sandbox/         @amends/sandbox: the sandbox provider contract and its suites
+  channel/         @amends/channel: the channel transport contract
   toolkit/            @amends/toolkit: tool sources, such as MCP servers and HTTP APIs
 adapters/
   storage-postgresql/ @amends/storage-postgresql: PostgreSQL storage and directory

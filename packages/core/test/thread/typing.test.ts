@@ -11,11 +11,11 @@ import { Store } from "../../src/journal/store.ts";
 import { ReadStateCommand } from "../../src/read-state/command.ts";
 import { SignalHub } from "../../src/signal/hub.ts";
 import { Signal } from "../../src/signal/signal.ts";
-import { ThreadCommand } from "../../src/thread/command.ts";
-import { ThreadMessageService } from "../../src/thread/message/service.ts";
-import { ThreadMessageStore } from "../../src/thread/message/store.ts";
-import { ThreadQuery } from "../../src/thread/query.ts";
-import { Thread } from "../../src/thread/thread.ts";
+import { ThreadCommand } from "../../src/thread/ThreadCommand.ts";
+import { ThreadMessageService } from "../../src/thread/ThreadMessageService.ts";
+import { ThreadMessageStore } from "../../src/thread/ThreadMessageStore.ts";
+import { ThreadQuery } from "../../src/thread/ThreadQuery.ts";
+import { Thread } from "../../src/thread/Thread.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 import { Workspace } from "../../src/workspace/workspace.ts";
 import { make } from "../memory-store.ts";
@@ -31,6 +31,8 @@ const thread = (id: string): Thread.Record => ({
   id: Thread.Id.make(id),
   workspaceId,
   groupId,
+  title: null,
+  origin: null,
   createdBy: { _tag: "Member", memberId: actor.memberId },
   createdAt: DateTime.makeUnsafe("2026-09-23T12:00:00.000Z"),
 });
@@ -61,9 +63,11 @@ const run = <A, E>(
           : Effect.fail(new ThreadQuery.NotFound({ threadId })),
       requireReadable: unexpected,
       eligibleMembers: unexpected,
+      followers: unexpected,
       currentParticipants: unexpected,
       pageParticipants: unexpected,
       findParticipants: unexpected,
+      listReadable: unexpected,
       readTimeline: unexpected,
       readTimelineItem: unexpected,
     });

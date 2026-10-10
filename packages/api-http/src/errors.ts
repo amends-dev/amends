@@ -13,10 +13,12 @@ import {
 import { GatewayErrors } from "@amends/gateway/errors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
 import { AgentService } from "@amends/core/agent";
+import { ChannelIntake, ChannelService } from "@amends/core/channel";
 import { TurnService } from "@amends/core/turn";
 import { ConnectionService } from "@amends/core/connection";
 import { NotificationService } from "@amends/core/notification";
 import { ReadStateService } from "@amends/core/read-state";
+import { TaskService } from "@amends/core/task";
 import {
   ThreadService,
   ThreadMessageService,
@@ -144,10 +146,29 @@ export const thread = [
   ThreadService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
   ThreadService.DirectMembersRequired.pipe(HttpApiSchema.status(400)),
 ] as const;
+/** A thread renamed since the caller last saw its title refuses another title with 409. */
+export const ThreadChanged = ThreadService.Changed.pipe(HttpApiSchema.status(409));
 export const message = [
   ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404)),
   ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
   ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const;
+/**
+ * Editing a message: a missing one, or one in a thread outside the caller's groups, is 404; one
+ * someone else wrote is 403; a deleted one, a stale revision, and an unavailable mention are 409.
+ */
+export const messageEdit = [
+  ThreadMessageService.MessageNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
+  ThreadMessageService.NotAuthor.pipe(HttpApiSchema.status(403)),
+  ThreadMessageService.Deleted.pipe(HttpApiSchema.status(409)),
+  ThreadMessageService.Changed.pipe(HttpApiSchema.status(409)),
+  ThreadMessageService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const;
+/** Deleting a message: a missing or unreadable one is 404; an agent principal is 403. */
+export const messageDelete = [
+  ThreadMessageService.MessageNotFound.pipe(HttpApiSchema.status(404)),
+  ThreadMessageService.HumanAuthorRequired.pipe(HttpApiSchema.status(403)),
 ] as const;
 export const typing = [ThreadMessageService.NotFound.pipe(HttpApiSchema.status(404))] as const;
 export const participation = [
@@ -155,6 +176,26 @@ export const participation = [
   ThreadParticipationService.NotFound.pipe(HttpApiSchema.status(404)),
   ThreadParticipationService.AlreadyEnded.pipe(HttpApiSchema.status(409)),
   ThreadParticipationService.FixedParticipation.pipe(HttpApiSchema.status(409)),
+] as const;
+
+/**
+ * Task outcomes. A thread the caller cannot read, or without a task, is 404, as is a group the
+ * caller does not belong to; a thread that is a task already, a change to a value that changed
+ * meanwhile, and an assignee who cannot take part are 409.
+ */
+export const taskRead = [
+  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  TaskService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+] as const;
+export const taskCreate = [
+  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  TaskService.AlreadyTask.pipe(HttpApiSchema.status(409)),
+  TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
+] as const;
+export const taskUpdate = [
+  TaskService.NotFound.pipe(HttpApiSchema.status(404)),
+  TaskService.Changed.pipe(HttpApiSchema.status(409)),
+  TaskService.ParticipantUnavailable.pipe(HttpApiSchema.status(409)),
 ] as const;
 
 /** Read-state outcomes: only people keep it, and a position cannot pass the latest activity. */
@@ -214,5 +255,31 @@ export const workspace = [
 
 /** Outcomes every member operation shares: the workspace set plus membership. */
 export const member = [NotMember, ...workspace] as const;
+
+/**
+ * Channel outcomes. A channel the caller may not read, or removed, is 404, as is a group the caller
+ * does not belong to and a thread bound to no conversation; a connection that gives no channels, or
+ * that the caller may not use, is 422.
+ */
+export const channelRead = [ChannelService.NotFound.pipe(HttpApiSchema.status(404))] as const;
+export const channelCreate = [
+  ...channelRead,
+  ChannelService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  ChannelService.ConnectionUnavailable.pipe(HttpApiSchema.status(422)),
+] as const;
+export const channelRedirect = [
+  ...channelRead,
+  ChannelService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+] as const;
+export const channelBinding = [ChannelService.NotBound.pipe(HttpApiSchema.status(404))] as const;
+/**
+ * What an external system's request to a channel can be answered with: a channel missing or removed
+ * is 404, a request its transport rejects 400, and a system that cannot be reached 503.
+ */
+export const channelEvents = [
+  ...channelRead,
+  ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
+  ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
+] as const;
 
 export * as ApiErrors from "./errors.ts";

@@ -225,8 +225,7 @@ export function useGroupConversation(workspaceId: string, groupId: string) {
     id: opening.thread.id,
     author: people.authorOf(opening.message.author),
     at: toDate(opening.message.publishedAt),
-    text: opening.message.text,
-    mentions: people.mentionsOf(opening.message.text),
+    ...shownContent(opening.message.content, people.mentionsOf),
     thread: {
       replies: opening.replies,
       unread: opening.unread,
@@ -252,11 +251,34 @@ export type ThreadEntry =
   | TimelineNote
   | (Omit<TimelineTurn, "agentHref"> & { readonly agentId?: string });
 
-type Published = Extract<ThreadTimeline.Item, { readonly message: unknown }>;
+type MessageItem = Extract<ThreadTimeline.Item, { readonly message: unknown }>;
+type Published = Extract<
+  MessageItem,
+  { readonly activity: { readonly kind: "message.published" } }
+>;
 type Participation = Extract<ThreadTimeline.Item, { readonly participant: unknown }>;
-type TurnItem = Exclude<ThreadTimeline.Item, Published | Participation>;
-const isMessage = (item: ThreadTimeline.Item): item is Published => "message" in item;
+type TurnItem = Exclude<ThreadTimeline.Item, MessageItem | Participation>;
+/** A message's publication, which shows the message as it is now; its edits and deletion do not. */
+const isMessage = (item: ThreadTimeline.Item): item is Published =>
+  item.activity.kind === "message.published";
+const isMessageChange = (item: ThreadTimeline.Item): item is MessageItem => "message" in item;
 const isParticipation = (item: ThreadTimeline.Item): item is Participation => "participant" in item;
+
+/**
+ * A message's content as the timeline shows it: its text and mentions, marked edited when they
+ * were, or a deleted mark with no text.
+ */
+const shownContent = (
+  content: ThreadMessage.Content,
+  mentionsOf: (text: string) => ReadonlyArray<RichTextMention>,
+): Pick<TimelineMessage, "text" | "mentions" | "edited" | "deleted"> =>
+  ThreadMessage.Content.isAnyOf(["Text"])(content)
+    ? {
+        text: content.text,
+        mentions: mentionsOf(content.text),
+        ...(content.editedAt === null ? {} : { edited: true }),
+      }
+    : { text: "", deleted: true };
 
 /**
  * Which agents the reader may see, by member ID, with whether they may direct each, live while
@@ -284,11 +306,17 @@ interface TurnSoFar {
   readonly sequence: number;
   state: TurnState;
   failure?: string;
-  stoppedBy?: "request" | "departure";
+  stoppedBy?: "request" | "departure" | "task";
   replied: boolean;
 }
-const stoppedBy = (reason: "requested" | "participation-ended" | null) =>
-  reason === null ? undefined : reason === "participation-ended" ? "departure" : "request";
+const stoppedBy = (reason: "requested" | "participation-ended" | "task-changed" | null) =>
+  reason === null
+    ? undefined
+    : reason === "participation-ended"
+      ? "departure"
+      : reason === "task-changed"
+        ? "task"
+        : "request";
 
 /** Carry a turn's later item into what it tells so far; its creation began it. */
 function advance(turn: TurnSoFar, item: TurnItem) {
@@ -371,11 +399,12 @@ export function useThreadConversation(
           id: item.message.id,
           author: people.authorOf(item.message.author),
           at: toDate(item.message.publishedAt),
-          text: item.message.text,
-          mentions: people.mentionsOf(item.message.text),
-          ...(item.message.turnId === null ? {} : { turn: { id: item.message.turnId } }),
+          ...shownContent(item.message.content, people.mentionsOf),
+          ...(item.message.via?._tag === "Turn" ? { turn: { id: item.message.via.turnId } } : {}),
         });
-      else if (isParticipation(item)) {
+      else if (isMessageChange(item)) {
+        // An edit or deletion shows on the message's publication, which carries its content now.
+      } else if (isParticipation(item)) {
         const participant = item.participant.participant;
         if (
           item.activity.kind !== "participation.followed" &&
@@ -396,6 +425,10 @@ export function useThreadConversation(
         turns.set(turn.id, turn);
         latest.set(turn.memberId, turn.id);
         shown.push(turn);
+      } else if (item.activity.kind === "thread.renamed") {
+        // The thread's title shows in its pane's header; a rename has no entry of its own yet.
+      } else if (item.activity.kind === "task.created" || item.activity.kind === "task.updated") {
+        // A task's state shows with its thread; its changes have no entry of their own yet.
       } else {
         // A turn that began before the pages loaded shows once they reach its start.
         const turn = turns.get(item.activity.details.turnId);
@@ -456,7 +489,12 @@ export function useThreadConversation(
       const item = timeline.value()?.find((entry) => entry.activity.sequence === target);
       if (!item || !isMessage(item)) return undefined;
       const self = people.selfId();
-      if (item.message.mentions.some((memberId) => memberId === self)) return "mention";
+      const { content } = item.message;
+      if (
+        ThreadMessage.Content.isAnyOf(["Text"])(content) &&
+        content.mentions.some((memberId) => memberId === self)
+      )
+        return "mention";
       return item.activity.sequence === 1 ? "thread" : "reply";
     },
     /** The names of people typing a reply now. */

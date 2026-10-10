@@ -1,7 +1,7 @@
 import { Context, Schema } from "effect";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { ThreadId } from "../thread/id.ts";
+import type { ThreadId } from "../thread/ThreadId.ts";
 
 import type { MemberId } from "../workspace/member/id.ts";
 import type { Turn } from "./turn.ts";

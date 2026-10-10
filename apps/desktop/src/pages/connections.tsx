@@ -34,6 +34,7 @@ const capabilities: readonly IntegrationCapability[] = [
   "tools",
   "sandboxes",
   "harnesses",
+  "channels",
 ];
 /** What `?tab=` and `?add=` name: one capability, or none for all of them. */
 const capabilityOf = (value: string | undefined): IntegrationCapability | undefined =>
@@ -152,6 +153,7 @@ function Connections(props: { readonly workspaceId: string }) {
                     tools: count("tools"),
                     sandboxes: count("sandboxes"),
                     harnesses: count("harnesses"),
+                    channels: count("channels"),
                   }
             }
             onAdd={view.canCreate() ? add : undefined}

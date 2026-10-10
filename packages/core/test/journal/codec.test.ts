@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import { Effect, Result, Schema } from "effect";
 import { Hex } from "effect/encoding";
 import { Codec } from "../../src/journal/codec.ts";
-import { ThreadMessageFacts } from "../../src/thread/message/facts.ts";
+import { ThreadMessageFacts } from "../../src/thread/ThreadMessageFacts.ts";
 import { WorkspaceFacts } from "../../src/workspace/facts.ts";
 import { fixtures } from "./codec-fixtures.ts";
 
@@ -21,6 +21,6 @@ it.effect("preserves workspace initialization bytes written with Effect rc.115",
   verifyStoredPayload(WorkspaceFacts.Initialized.payload, fixtures.workspace),
 );
 
-it.effect("preserves message bytes with dates, Unicode, mentions, and a nullable turn", () =>
+it.effect("preserves message bytes with dates, Unicode, mentions, a turn, and edited content", () =>
   verifyStoredPayload(ThreadMessageFacts.Published.payload, fixtures.message),
 );

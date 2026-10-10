@@ -266,10 +266,16 @@ describe.skipIf(!available)("PostgreSQL", () => {
               condition: "thread_group_id =",
               query: sql`UPDATE notifications SET state = 'Discarded', discard_reason = 'access-lost' WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_group_id = ${thread.groupId}`,
             },
+            // A reader's notifications from one thread seek by position, pending or in any state.
             {
-              index: "pending_notifications_by_thread",
+              index: "notifications_by_thread",
               condition: "thread_id =",
               query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Human' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND state = 'Pending' AND seen_at IS NULL AND thread_id = ${thread.id} AND thread_sequence <= 10`,
+            },
+            {
+              index: "notifications_by_thread",
+              condition: "thread_sequence >",
+              query: sql`SELECT id FROM notifications WHERE workspace_id = ${workspaceId} AND recipient_kind = 'Agent' AND coalesce(recipient_member_id, recipient_id, '') = ${memberIds[0]!} AND thread_id = ${thread.id} AND thread_sequence > 0 AND thread_sequence <= 10 ORDER BY thread_sequence, id COLLATE "C"`,
             },
             {
               index: "pending_agent_notifications_by_participation",

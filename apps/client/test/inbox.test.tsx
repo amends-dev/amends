@@ -67,10 +67,9 @@ const message = (id: string, text: string, mentions: string[]) => ({
   workspaceId: "one",
   threadId: "t1",
   author: { _tag: "Member", memberId: "ada" },
-  text,
-  mentions,
+  via: null,
   publishedAt: at(1),
-  turnId: null,
+  content: { _tag: "Text", text, mentions, revision: 1, editedAt: null },
 });
 const notification = (
   id: string,
@@ -97,6 +96,7 @@ const notification = (
       sequence,
       occurredAt: at(minute),
       kind: "message.published",
+      version: 1,
       subject: `message:m${sequence}`,
       occurrence: `message:m${sequence}`,
       newActivity: true,

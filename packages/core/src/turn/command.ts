@@ -4,10 +4,10 @@ import { Journal } from "../journal/journal.ts";
 import type { Projection } from "../journal/projection.ts";
 import { Publication } from "../journal/publication.ts";
 import { Store } from "../journal/store.ts";
-import { ThreadCommand } from "../thread/command.ts";
-import type { ThreadId } from "../thread/id.ts";
-import { ThreadStore } from "../thread/store.ts";
-import type { ThreadMessageId } from "../thread/message/id.ts";
+import { ThreadCommand } from "../thread/ThreadCommand.ts";
+import type { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadStore } from "../thread/ThreadStore.ts";
+import type { ThreadMessageId } from "../thread/ThreadMessageId.ts";
 import { TurnActivity } from "./activity.ts";
 import { TurnFacts } from "./facts.ts";
 import { Turn } from "./turn.ts";
@@ -51,6 +51,15 @@ export interface Interface {
     turn: Turn.Record,
     ending: Ending,
   ) => Effect.Effect<void, EndError, Store.Transaction | Publication.Service>;
+  /**
+   * Ask an active turn to stop for `reason`, in the caller's commit: a queued one ends cancelled at
+   * once, since nothing runs it yet; a running one is marked stopping, which its job confirms once
+   * it has stopped. Returns the turn as it now stands. Callers give an active turn not yet asked.
+   */
+  readonly requestStop: (
+    turn: Turn.Record,
+    reason: Turn.CancelReason,
+  ) => Effect.Effect<Turn.Record, EndError, Store.Transaction | Publication.Service>;
 }
 
 /** @effect-expect-leaking Transaction */
@@ -116,7 +125,35 @@ export const make = Effect.fn("TurnCommand.make")(function* () {
     );
   });
 
-  return Service.of({ recordActivity, endTurn });
+  const requestStop: Interface["requestStop"] = Effect.fnUntraced(function* (turn, reason) {
+    const requestedAt = yield* DateTime.now;
+    const requested = yield* journal.publish(TurnFacts.CancelRequested, {
+      workspaceId: turn.workspaceId,
+      groupId: turn.groupId,
+      threadId: turn.threadId,
+      memberId: turn.memberId,
+      turnId: turn.id,
+      reason,
+      requestedAt,
+    });
+    if (turn.status === "queued") {
+      yield* endTurn(turn, { outcome: "cancelled", cancelReason: reason });
+      return Turn.change(turn, {
+        status: "cancelled",
+        cancelReason: reason,
+        finishedAt: requestedAt,
+      });
+    }
+    yield* recordActivity(
+      turn.threadId,
+      TurnActivity.Stopping,
+      { turnId: turn.id, cancelReason: reason },
+      requested,
+    );
+    return Turn.change(turn, { status: "cancelling", cancelReason: reason });
+  });
+
+  return Service.of({ recordActivity, endTurn, requestStop });
 });
 
 /** Internal writes shared by turn operations and execution. @category layers */

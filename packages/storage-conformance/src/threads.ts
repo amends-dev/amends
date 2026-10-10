@@ -31,6 +31,7 @@ import {
   ThreadActivity,
   ThreadActivityFacts,
   ThreadActivityKind,
+  ThreadFacts,
   ThreadMessage,
   ThreadMessageActivity,
   ThreadParticipation,
@@ -38,6 +39,7 @@ import {
   ThreadParticipationStore,
   ThreadPermissions,
   ThreadCommand,
+  ThreadTitleActivity,
 } from "@amends/core/thread";
 
 import { Gateway } from "@amends/gateway";
@@ -107,7 +109,7 @@ export const threads = (harness: Harness) => {
     ) {
       const started = yield* startOnly(groupId, mentions, text);
       // A start returns its thread and opening message; the activity is read back from the store.
-      expect(Object.keys(started).sort()).toEqual(["message", "thread"]);
+      expect(Object.keys(started).sort()).toEqual(["message", "task", "thread"]);
       const result = yield* placed(started);
       const threadParticipationStore = yield* ThreadParticipationStore.Service;
       return Object.assign({}, result, {
@@ -192,8 +194,10 @@ export const threads = (harness: Harness) => {
                 workspaceId,
                 createdBy: { _tag: "Member", memberId: owner.memberId },
               });
-              expect(result.message.text).toBe("  Here's the proposal\n");
-              expect(result.message.mentions).toEqual([]);
+              expect(result.message.content).toEqual(
+                ThreadMessage.published("  Here's the proposal\n", []),
+              );
+              expect(result.message.via).toBeNull();
               expect(result.activity).toMatchObject({
                 threadId: result.thread.id,
                 details: { messageId: result.message.id },
@@ -786,7 +790,7 @@ export const threads = (harness: Harness) => {
                 owner,
                 startOnly(group.id, [workspace.ownerMemberId, humanId, agentId]),
               );
-              expect(Object.keys(result).sort()).toEqual(["message", "thread"]);
+              expect(Object.keys(result).sort()).toEqual(["message", "task", "thread"]);
               expect(yield* bound.participations.listByThread(result.thread.id)).toHaveLength(3);
               expect(
                 yield* Effect.flip(
@@ -845,7 +849,7 @@ export const threads = (harness: Harness) => {
                     bound.messages.insert(
                       Object.assign({}, first.message, {
                         id: ThreadMessage.Id.make("blank"),
-                        text: "  ",
+                        content: ThreadMessage.published("  ", []),
                       }),
                     ),
                   ),
@@ -1156,6 +1160,159 @@ export const threads = (harness: Harness) => {
                 ({ sequence }) => sequence,
               ),
             ).toEqual([1, 2, 3]);
+          }),
+        ),
+      ),
+    );
+
+    it.effect("renaming a thread records one fact and a quiet activity that replay applies", () =>
+      harness.withStorage((storage) =>
+        runHost(
+          storage,
+          Effect.gen(function* () {
+            const { bound, owner, group, human } = yield* prepare();
+            const other = Actor.Value.make({
+              workspaceId,
+              memberId: otherId,
+              identity: { _tag: "Human", id: Identity.HumanId.make("other") },
+            });
+            const rename = (
+              by: Actor.Value,
+              threadId: Thread.Id,
+              title: string,
+              expectedTitle: string | null = null,
+            ) =>
+              run(
+                bound,
+                by,
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.rename({ threadId, title, expectedTitle }),
+                ),
+              );
+            // A start titles its thread only when asked; a thread derives from no other at a start.
+            const started = yield* run(bound, owner, startOnly(group.id));
+            expect(started.thread).toMatchObject({ title: null, origin: null });
+            const before = yield* history(bound);
+            // Only a member granted thread.rename may rename; belonging to the group is not enough.
+            expect(
+              yield* Effect.flip(rename(human, started.thread.id, "Launch plan")),
+            ).toMatchObject({ _tag: "Authorization.Denied" });
+            // To anyone outside the group, the thread is missing.
+            expect(yield* Effect.flip(rename(other, started.thread.id, "Launch plan"))).toEqual(
+              new ThreadService.NotFound({ threadId: started.thread.id }),
+            );
+            expect(yield* history(bound)).toEqual(before);
+            const renamed = yield* rename(owner, started.thread.id, "Launch plan");
+            expect(renamed).toEqual(Object.assign({}, started.thread, { title: "Launch plan" }));
+            expect(yield* bound.threads.get(started.thread.id)).toEqual(Option.some(renamed));
+            // One commit holds the fact and the quiet activity it causes, at the next position.
+            expect(yield* history(bound)).toHaveLength(before.length + 1);
+            const batches = yield* publish(
+              bound,
+              Effect.flatMap(Journal.Service, (journal) => journal.log.read({ limit: 100 })),
+            );
+            const entries = batches.at(-1)?.entries ?? [];
+            expect(entries.map((entry) => entry.payload.name)).toEqual([
+              ThreadFacts.Renamed.name,
+              ThreadActivityFacts.Recorded.name,
+            ]);
+            expect(entries[0]?.payload.provenance.performedBy).toMatchObject({
+              _tag: "Member",
+              memberId: owner.memberId,
+            });
+            const recorded = (yield* bound.activities.listByThread(started.thread.id)).at(-1);
+            if (recorded === undefined) return yield* Effect.die("Missing rename activity");
+            const activity = yield* ThreadActivityKind.decode(
+              ThreadTitleActivity.Renamed,
+              recorded,
+            );
+            expect(activity).toMatchObject({
+              sequence: 2,
+              kind: ThreadTitleActivity.Renamed.name,
+              version: 1,
+              newActivity: false,
+              occurrence: null,
+              details: { title: "Launch plan", previous: null },
+            });
+            // Quiet: the latest activity stays the opening message, and no one hears of it.
+            expect(yield* bound.threads.getLatest([started.thread.id])).toMatchObject([
+              { sequence: 1 },
+            ]);
+            for (const [memberId, identity] of [
+              [humanId, humanIdentity],
+              [agentId, agentIdentity],
+            ] as const)
+              expect(yield* notifications(bound, memberId, identity)).toEqual([]);
+            // The timeline shows the rename from its own details.
+            const items = yield* run(
+              bound,
+              owner,
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.readTimeline(started.thread.id, { limit: 10 }),
+              ),
+            );
+            expect(items.at(-1)).toEqual({ activity });
+            // The same title again records nothing, whatever title the renamer last saw.
+            expect(yield* rename(owner, started.thread.id, "Launch plan", "Other")).toEqual(
+              renamed,
+            );
+            expect(yield* history(bound)).toHaveLength(before.length + 1);
+            // Another title from a renamer who last saw none would replace the rename made
+            // meanwhile, so it is refused, and nothing is recorded; from the current one, it is not.
+            expect(yield* Effect.flip(rename(owner, started.thread.id, "Launch review"))).toEqual(
+              new ThreadService.Changed({ threadId: started.thread.id }),
+            );
+            expect(yield* history(bound)).toHaveLength(before.length + 1);
+            const reviewed = yield* rename(
+              owner,
+              started.thread.id,
+              "Launch review",
+              "Launch plan",
+            );
+            expect(reviewed).toEqual(Object.assign({}, renamed, { title: "Launch review" }));
+            expect(yield* history(bound)).toHaveLength(before.length + 2);
+            // A title is a trimmed line of 1 to 200 characters without hidden ones.
+            for (const title of ["", " Launch", "x".repeat(201), "Launch\u0000 plan"])
+              expect(
+                (yield* Effect.flip(rename(owner, started.thread.id, title, "Launch review")))._tag,
+              ).toBe("SchemaError");
+            expect(
+              yield* Effect.flip(rename(owner, Thread.Id.make("missing"), "Launch plan")),
+            ).toEqual(new ThreadService.NotFound({ threadId: Thread.Id.make("missing") }));
+            // A start may title the thread; the title is the thread's own, apart from its message.
+            const titled = yield* run(
+              bound,
+              owner,
+              Effect.flatMap(ThreadService.Service, (threadService) =>
+                threadService.startInGroup({
+                  groupId: group.id,
+                  mentions: [],
+                  text: "Here's the proposal",
+                  title: "Proposal",
+                }),
+              ),
+            );
+            expect(titled.thread.title).toBe("Proposal");
+            expect(yield* bound.threads.get(titled.thread.id)).toEqual(Option.some(titled.thread));
+            // The store refuses a rename of a missing thread, or of one in another workspace.
+            const foreign = yield* boundTo(otherWorkspaceId);
+            for (const [space, input] of [
+              [bound, { threadId: Thread.Id.make("missing") }],
+              [foreign, { threadId: started.thread.id }],
+            ] as const)
+              expect(
+                yield* Effect.flip(
+                  space.store.transaction(
+                    space.threads.rename({
+                      workspaceId,
+                      groupId: group.id,
+                      title: "Elsewhere",
+                      ...input,
+                    }),
+                  ),
+                ),
+              ).toMatchObject({ _tag: "ThreadStore.Conflict" });
+            expect(yield* bound.threads.get(started.thread.id)).toEqual(Option.some(reviewed));
           }),
         ),
       ),

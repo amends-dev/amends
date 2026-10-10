@@ -239,6 +239,44 @@ revisions[8] = Object.fromEntries(
   ]),
 );
 
+// Members rename the threads of their groups, as they rename the groups.
+revisions[9] = Object.fromEntries(
+  Object.entries(revisions[8]!).map(([roleId, names]) => [
+    roleId,
+    names.flatMap((name) => (name === "thread.read" ? [name, "thread.rename"] : [name])),
+  ]),
+);
+
+// Administrators and the owner delete others' messages in their groups' threads.
+revisions[10] = Object.fromEntries(
+  Object.entries(revisions[9]!).map(([roleId, names]) => [
+    roleId,
+    roleId === BuiltinRoles.MemberId
+      ? names
+      : names.flatMap((name) => (name === "thread.publish" ? [name, "thread.moderate"] : [name])),
+  ]),
+);
+
+// Members create tasks in their groups and change them, as they start and rename threads.
+revisions[11] = Object.fromEntries(
+  Object.entries(revisions[10]!).map(([roleId, names]) => [
+    roleId,
+    names.flatMap((name) =>
+      name === "thread.follow" ? [name, "task.create", "task.update"] : [name],
+    ),
+  ]),
+);
+
+// Administrators create and manage channels; members read them.
+revisions[12] = Object.fromEntries(
+  Object.entries(revisions[11]!).map(([roleId, names]) => [
+    roleId,
+    roleId === BuiltinRoles.MemberId
+      ? [...names, "channel.read"]
+      : [...names, "channel.create", "channel.read", "channel.manage"],
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

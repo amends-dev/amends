@@ -6,6 +6,7 @@ import { Notification, NotificationService, NotificationStore } from "@amends/co
 import { BuiltinRoles } from "@amends/core/authorization";
 import { Group, GroupService, GroupMembershipService } from "@amends/core/group";
 import { Thread, ThreadService, ThreadParticipation } from "@amends/core/thread";
+import { TurnId } from "@amends/core/turn";
 import { Member } from "@amends/core/workspace";
 import { Gateway } from "@amends/gateway";
 import { Array, Context, DateTime, Effect, Layer, Option } from "effect";
@@ -13,6 +14,7 @@ import { acceptInvitation, createWorkspace, invite, removeMember } from "./opera
 import {
   boundTo,
   future,
+  layerRecordedDeliveryJobs,
   layerRecordedTurnJobs,
   listOldestFirst,
   otherWorkspaceId,
@@ -167,6 +169,82 @@ export const notifications = (harness: Harness) => {
                   red,
                 ]),
               ).toEqual([]);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "a recipient's notifications from one thread list by position in a range, whatever their state",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const bound = yield* boundTo(workspaceId);
+              yield* initialized(bound);
+              const from = (threadId: string, sequence: number, groupId = Group.GeneralId) => ({
+                thread: { threadId: Thread.Id.make(threadId), groupId, sequence },
+              });
+              // One is accepted, and one, from a group the agent leaves, discarded.
+              const told = [
+                record("first", { ...from("thread", 1), recipient: agent }),
+                record("second", { ...from("thread", 2), recipient: agent }),
+                record("third-b", { ...from("thread", 3), recipient: agent }),
+                record("third-a", {
+                  ...from("thread", 3, Group.Id.make("left")),
+                  recipient: agent,
+                }),
+                record("fourth", { ...from("thread", 4), recipient: agent }),
+              ];
+              const others = [
+                record("someone-else", from("thread", 2)),
+                record("elsewhere", { ...from("other-thread", 2), recipient: agent }),
+                record("no-thread", { recipient: agent }),
+              ];
+              yield* bound.store.transaction(
+                Effect.gen(function* () {
+                  yield* bound.notifications.insertMany([...told, ...others]);
+                  yield* bound.notifications.accept(
+                    [told[1]!.id],
+                    { _tag: "Turn", turnId: TurnId.Id.make("turn") },
+                    recordedAt,
+                  );
+                  yield* bound.notifications.discardPendingForGroup(
+                    Member.Id.make("agent-member"),
+                    Group.Id.make("left"),
+                  );
+                }),
+              );
+              const threadId = Thread.Id.make("thread");
+              const listed = (afterSequence: number, throughSequence: number) =>
+                Effect.map(
+                  bound.notifications.listByThread(agent, threadId, {
+                    afterSequence,
+                    throughSequence,
+                  }),
+                  (records) => records.map((record) => [record.id, record.state._tag]),
+                );
+              // Positions after the first through the third: whatever their state, equal positions by ID.
+              expect(yield* listed(1, 3)).toEqual([
+                ["second", "Accepted"],
+                ["third-a", "Discarded"],
+                ["third-b", "Pending"],
+              ]);
+              expect(yield* listed(0, 10)).toEqual([
+                ["first", "Pending"],
+                ["second", "Accepted"],
+                ["third-a", "Discarded"],
+                ["third-b", "Pending"],
+                ["fourth", "Pending"],
+              ]);
+              expect(yield* listed(4, 4)).toEqual([]);
+              expect(
+                yield* bound.notifications.listByThread(human, threadId, {
+                  afterSequence: 0,
+                  throughSequence: 10,
+                }),
+              ).toEqual([others[0]]);
             }),
           ),
         ),
@@ -657,7 +735,9 @@ export const notifications = (harness: Harness) => {
               yield* b.store.transaction(b.notifications.insert(foreign));
               const before = yield* a.store.read(Entry.LogId.make("journal"), { limit: 20 });
               const gateway = yield* Gateway.make().pipe(
-                Effect.provide(Layer.mergeAll(harness.crypto, layerRecordedTurnJobs)),
+                Effect.provide(
+                  Layer.mergeAll(harness.crypto, layerRecordedTurnJobs, layerRecordedDeliveryJobs),
+                ),
               );
               yield* gateway.asMember(
                 workspaceId,

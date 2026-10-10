@@ -107,6 +107,8 @@ const thread = (id: Thread.Id, group: Group.Id) => ({
   id,
   workspaceId,
   groupId: group,
+  title: null,
+  origin: null,
   createdBy: { _tag: "Member" as const, memberId: bobMember },
   createdAt: at,
 });
@@ -116,10 +118,9 @@ const message = (id: string, thread: Thread.Id, group: Group.Id) => ({
   groupId: group,
   threadId: thread,
   author: { _tag: "Member" as const, memberId: bobMember },
-  text: `Message ${id}`,
-  mentions: [],
+  via: null,
   publishedAt: at,
-  turnId: null,
+  content: ThreadMessage.published(`Message ${id}`, []),
 });
 const workspaceGrant = (permission: Permission.Definition) =>
   Assignment.Source.cases.Direct.make({
@@ -597,6 +598,7 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
               threadId,
               sequence: 1,
               kind: "message.published",
+              version: 1,
               subject: "message:message",
               occurrence: JSON.stringify(["message.published", "message:message"]),
               newActivity: true,

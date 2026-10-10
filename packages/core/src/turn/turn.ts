@@ -3,9 +3,9 @@ import { Agent } from "../agent/agent.ts";
 import { GroupId } from "../group/id.ts";
 import { Identity } from "../identity/identity.ts";
 import { Notification } from "../notification/notification.ts";
-import { ThreadId } from "../thread/id.ts";
-import { ThreadMessageId } from "../thread/message/id.ts";
-import { ThreadParticipationId } from "../thread/participation/id.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadMessageId } from "../thread/ThreadMessageId.ts";
+import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { TurnId } from "./id.ts";
@@ -34,8 +34,11 @@ export const active = (status: Status) =>
 
 const Sequence = Schema.Int.check(Schema.isGreaterThanOrEqualTo(0));
 
-/** Why a turn stopped short: execution failed, or its cancellation was requested. */
-export const CancelReason = Schema.Literals(["requested", "participation-ended"]);
+/**
+ * Why a turn was asked to stop: someone asked, its agent stopped taking part in the thread, or the
+ * thread's task was taken from the agent or stopped asking for work.
+ */
+export const CancelReason = Schema.Literals(["requested", "participation-ended", "task-changed"]);
 export type CancelReason = typeof CancelReason.Type;
 
 /** How a turn ended. */

@@ -1,0 +1,40 @@
+{
+  "name": "@amends/channel",
+  "version": "0.1.0",
+  "description": "Channels that bring external conversations in: the contract every channel transport implements, receiving what a system sends and replying in its conversations.",
+  "keywords": [
+    "channel",
+    "effect",
+    "messaging",
+    "webhook"
+  ],
+  "homepage": "https://github.com/saribmah/amends-v2/tree/main/packages/channel#readme",
+  "bugs": {
+    "url": "https://github.com/saribmah/amends-v2/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/saribmah/amends-v2.git",
+    "directory": "packages/channel"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json"
+  },
+  "devDependencies": {
+    "effect": "catalog:"
+  },
+  "peerDependencies": {
+    "effect": "catalog:"
+  }
+}

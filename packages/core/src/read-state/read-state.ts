@@ -1,6 +1,6 @@
 import { Schema } from "effect";
 import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/id.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import type { Notification } from "../notification/notification.ts";

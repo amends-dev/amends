@@ -35,8 +35,13 @@ turns, one active turn per agent per thread. Each agent in each thread has a tur
 its turns there outside any request, one harness turn each, writes its conversation to the
 participation's session log, and closes each turn by posting the agent's answer; see
 [core's turns](../packages/core/README.md#turns) and [cluster](../packages/cluster/README.md).
-Other participation management, the task and channel workflows that admit contacts and triage,
-toolkits, contact/triage acknowledgment, and channel delivery below remain design intent.
+Tasks and channels, with their contacts and deliveries, are built as [threads](threads.md) fixes
+them; other participation management, toolkits, and triage's acknowledgment below remain design
+intent.
+[Threads](threads.md) fixes the model that conversations, tasks, and channel conversations
+share: the thread record with its title and origin, messages and their editing, tasks and
+channel bindings as rows keyed by thread, and the recipients of each activity kind. Where it
+differs from the task and channel sections below, it governs.
 “Agreed” records a design decision, not its implementation status.
 
 ## Architecture summary
@@ -1243,8 +1248,9 @@ integration will declare the scopes each part needs, so readiness can differ per
 are granted; an OAuth client registered with a provider belongs to the host's configuration, not a
 workspace, and refreshing an expired token will be part of resolving the credential for use.
 
-Connections that authenticate with an API key, or not at all, are implemented. OAuth, channels,
-and refreshing tokens arrive with the integrations that need them.
+Connections that authenticate with an API key, or not at all, are implemented, as is the channel
+contract an integration gives ([`@amends/channel`](../packages/channel/README.md)), though no
+installed integration gives channels yet. OAuth and refreshing tokens arrive with the integrations that need them.
 
 ## Agreed: agents select a harness, a model, and a sandbox
 

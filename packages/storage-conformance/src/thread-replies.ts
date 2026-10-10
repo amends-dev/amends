@@ -33,8 +33,10 @@ import {
   Thread,
   ThreadService,
   ThreadActivityFacts,
+  ThreadActivityKind,
   ThreadActivityStore,
   ThreadMessage,
+  ThreadMessageActivity,
   ThreadMessageService,
   ThreadMessagePermissions,
   ThreadMessageStore,
@@ -247,8 +249,8 @@ export const threadReplies = (harness: Harness) => {
               );
               expect(result.message).toMatchObject({
                 author: { _tag: "Member", memberId: humanId },
-                text: "  Reply\nverbatim  ",
-                mentions: [],
+                via: null,
+                content: ThreadMessage.published("  Reply\nverbatim  ", []),
                 publishedAt: yield* DateTime.now,
               });
               expect(result.activity).toMatchObject({
@@ -1141,6 +1143,7 @@ export const threadReplies = (harness: Harness) => {
                     mentions: [],
                     participants,
                     occurredAt: yield* DateTime.now,
+                    via: null,
                   }),
                 );
               }).pipe(
@@ -1191,6 +1194,204 @@ export const threadReplies = (harness: Harness) => {
                 Effect.flatMap(Journal.Service, (journal) => journal.replay),
               );
               expect(yield* inboxes).toEqual(expected);
+            }),
+          ),
+        ),
+    );
+
+    it.effect(
+      "an edit replaces a reply's text at its next revision and tells only the newly mentioned, and a deletion keeps its place",
+      () =>
+        harness.withStorage((storage) =>
+          runHost(
+            storage,
+            Effect.gen(function* () {
+              const { bound, owner, group, first, human, agent } = yield* prepare();
+              const other = actorFor(otherId);
+              yield* grant(
+                bound,
+                humanId,
+                ThreadMessagePermissions.Publish,
+                threadTarget(first.thread.id),
+              );
+              const replied = yield* run(bound, human, reply(first.thread.id, [], "Draft"));
+              const messageId = replied.message.id;
+              const edit = (
+                by: Actor.Value,
+                id: ThreadMessage.Id,
+                text: string,
+                mentions: ReadonlyArray<Member.Id>,
+                expectedRevision = 1,
+              ) =>
+                run(
+                  bound,
+                  by,
+                  Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                    threadMessageService.edit({ messageId: id, text, mentions, expectedRevision }),
+                  ),
+                );
+              const remove = (by: Actor.Value, id: ThreadMessage.Id) =>
+                run(
+                  bound,
+                  by,
+                  Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+                    threadMessageService.delete(id),
+                  ),
+                );
+              const openings = () =>
+                run(
+                  bound,
+                  owner,
+                  Effect.flatMap(ThreadService.Service, (threadService) =>
+                    threadService.listOpenings(group.id, { limit: 10 }),
+                  ),
+                );
+              const toldSoFar = {
+                human: (yield* notifications(bound, humanId)).length,
+                agent: (yield* notifications(bound, agentId)).length,
+              };
+              const before = yield* history(bound);
+              // Only the author edits a message; agents edit through their turns; to anyone
+              // outside the group, and for a message that does not exist, there is no message.
+              expect(yield* Effect.flip(edit(owner, messageId, "Final", []))).toEqual(
+                new ThreadMessageService.NotAuthor({ messageId }),
+              );
+              expect(yield* Effect.flip(edit(agent, messageId, "Final", []))).toEqual(
+                new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              );
+              expect(yield* Effect.flip(edit(other, messageId, "Final", []))).toEqual(
+                new ThreadMessageService.MessageNotFound({ messageId }),
+              );
+              const missing = ThreadMessage.Id.make("missing");
+              expect(yield* Effect.flip(edit(human, missing, "Final", []))).toEqual(
+                new ThreadMessageService.MessageNotFound({ messageId: missing }),
+              );
+              expect(yield* history(bound)).toEqual(before);
+              // The edit newly mentions a group member who did not take part: they join and are told.
+              yield* run(
+                bound,
+                owner,
+                Effect.flatMap(GroupMembershipService.Service, (groupMembershipService) =>
+                  groupMembershipService.add({ groupId: group.id, memberId: otherId }),
+                ),
+              );
+              yield* TestClock.adjust("1 second");
+              const editedAt = yield* DateTime.now;
+              const text = "Final [@Other](member:other)";
+              const edited = yield* edit(human, messageId, text, [otherId]);
+              expect(edited).toEqual(
+                Object.assign({}, replied.message, {
+                  content: { _tag: "Text", text, mentions: [otherId], revision: 2, editedAt },
+                }),
+              );
+              expect(yield* bound.messages.get(messageId)).toEqual(Option.some(edited));
+              expect(yield* history(bound)).toHaveLength(before.length + 2);
+              const activities = yield* bound.activities.listByThread(first.thread.id);
+              const recorded = activities.at(-1);
+              if (recorded === undefined) return yield* Effect.die("Missing edit activity");
+              const editActivity = yield* ThreadActivityKind.decode(
+                ThreadMessageActivity.Edited,
+                recorded,
+              );
+              expect(editActivity).toMatchObject({
+                sequence: 3,
+                kind: ThreadMessageActivity.Edited.name,
+                newActivity: false,
+                occurrence: JSON.stringify(["message.edited", `message:${messageId}`, "2"]),
+                details: { messageId, revision: 2 },
+              });
+              // Quiet: the reply stays the thread's latest activity, and only the newly mentioned
+              // member hears of the edit.
+              expect(yield* bound.threads.getLatest([first.thread.id])).toMatchObject([
+                { sequence: 2 },
+              ]);
+              expect(yield* notifications(bound, otherId)).toMatchObject([
+                { thread: { threadId: first.thread.id, sequence: editActivity.sequence } },
+              ]);
+              expect((yield* notifications(bound, humanId)).length).toBe(toldSoFar.human);
+              expect((yield* notifications(bound, agentId)).length).toBe(toldSoFar.agent);
+              expect(
+                (yield* bound.participations.listByThread(first.thread.id)).flatMap(
+                  ({ participant }) => ThreadParticipation.memberOf(participant) ?? [],
+                ),
+              ).toContain(otherId);
+              // The timeline shows the publication with its content now, and the edit beside it.
+              const items = yield* run(
+                bound,
+                owner,
+                Effect.flatMap(ThreadService.Service, (threadService) =>
+                  threadService.readTimeline(first.thread.id, { limit: 10 }),
+                ),
+              );
+              expect(
+                items.map((item) => [
+                  item.activity.kind,
+                  "message" in item ? item.message.content : null,
+                ]),
+              ).toEqual([
+                ["message.published", first.message.content],
+                ["message.published", edited.content],
+                ["message.edited", edited.content],
+              ]);
+              expect((yield* openings()).map((opening) => opening.replies)).toEqual([1]);
+              // The same text and mentions again record nothing, whatever revision the editor
+              // last saw; another text from a stale revision would replace an edit made
+              // meanwhile, so it is refused; a mention who cannot take part is unavailable.
+              expect(yield* edit(human, messageId, text, [otherId], 7)).toEqual(edited);
+              expect(yield* Effect.flip(edit(human, messageId, "Again", [otherId], 1))).toEqual(
+                new ThreadMessageService.Changed({ messageId }),
+              );
+              expect(
+                yield* Effect.flip(
+                  edit(human, messageId, "Again", [otherId, Member.Id.make("nobody")], 2),
+                ),
+              ).toEqual(
+                new ThreadMessageService.ParticipantUnavailable({
+                  memberId: Member.Id.make("nobody"),
+                }),
+              );
+              expect(yield* history(bound)).toHaveLength(before.length + 2);
+              // Only the author or a moderator of the group deletes; the owner moderates.
+              expect(yield* Effect.flip(remove(other, messageId))).toMatchObject({
+                _tag: "Authorization.Denied",
+              });
+              expect(yield* Effect.flip(remove(agent, messageId))).toEqual(
+                new ThreadMessageService.HumanAuthorRequired({ memberId: agentId }),
+              );
+              yield* TestClock.adjust("1 second");
+              const deletedAt = yield* DateTime.now;
+              const deleted = yield* remove(owner, messageId);
+              expect(deleted).toEqual(
+                Object.assign({}, replied.message, { content: { _tag: "Deleted", deletedAt } }),
+              );
+              expect(yield* bound.messages.get(messageId)).toEqual(Option.some(deleted));
+              const deletion = (yield* bound.activities.listByThread(first.thread.id)).at(-1);
+              if (deletion === undefined) return yield* Effect.die("Missing deletion activity");
+              expect(
+                yield* ThreadActivityKind.decode(ThreadMessageActivity.Deleted, deletion),
+              ).toMatchObject({
+                sequence: 4,
+                kind: ThreadMessageActivity.Deleted.name,
+                newActivity: false,
+                details: { messageId },
+              });
+              expect(yield* notifications(bound, otherId)).toHaveLength(1);
+              // A deleted message has no text to edit, and is deleted once; it no longer counts
+              // as a reply, and deleting the opening message leaves the thread its title alone.
+              expect(yield* Effect.flip(edit(human, messageId, "Back", [], 2))).toEqual(
+                new ThreadMessageService.Deleted({ messageId }),
+              );
+              expect(yield* remove(human, messageId)).toEqual(deleted);
+              expect(yield* history(bound)).toHaveLength(before.length + 3);
+              expect((yield* openings()).map((opening) => opening.replies)).toEqual([0]);
+              const opened = yield* remove(owner, first.message.id);
+              expect(opened.content).toMatchObject({ _tag: "Deleted" });
+              expect(
+                (yield* openings()).map((opening) => [
+                  opening.message.content._tag,
+                  opening.replies,
+                ]),
+              ).toEqual([["Deleted", 0]]);
             }),
           ),
         ),

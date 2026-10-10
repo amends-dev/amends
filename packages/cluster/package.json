@@ -17,5 +17,8 @@
     "@amends/harness": "workspace:*",
     "@amends/sandbox": "workspace:*",
     "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@amends/channel": "workspace:*"
   }
 }

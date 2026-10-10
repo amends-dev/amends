@@ -1,6 +1,6 @@
 import { Context, Schema } from "effect";
 import type { Array, Effect } from "effect";
-import type { ThreadParticipationId } from "../thread/participation/id.ts";
+import type { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 import type { SessionLog } from "./session-log.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("SessionLogStore.Failure", {

@@ -1,5 +1,6 @@
 import * as Core from "@amends/core";
 import { BuiltinRoleUpgrade } from "@amends/core/authorization";
+import { DeliveryJobs } from "@amends/core/channel";
 import { TurnJobs } from "@amends/core/turn";
 import { type Integration, Integrations } from "@amends/connection";
 import { Journal } from "@amends/core/journal";
@@ -63,6 +64,7 @@ export interface Interface {
 export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Options = {}) {
   const workspaceStorage = yield* WorkspaceStorage.Service;
   const turnJobs = yield* TurnJobs.Service;
+  const deliveryJobs = yield* DeliveryJobs.Service;
   const crypto = yield* Crypto.Crypto;
   const hostContext = yield* Effect.context<never>();
   const integrations = yield* Integrations.make(options.integrations ?? []);
@@ -77,6 +79,7 @@ export const make = Effect.fn("WorkspaceRuntime.make")(function* (options: Optio
           Layer.succeedContext(bindings),
           Layer.succeed(Crypto.Crypto, crypto),
           Layer.succeed(TurnJobs.Service, turnJobs),
+          Layer.succeed(DeliveryJobs.Service, deliveryJobs),
           Layer.succeed(Integrations.Integrations, integrations),
         ),
       ),

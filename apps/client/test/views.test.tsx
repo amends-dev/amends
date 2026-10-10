@@ -94,10 +94,9 @@ const message = (
   workspaceId: "one",
   threadId,
   author: author(by),
-  text,
-  mentions,
+  via: null,
   publishedAt: at(1),
-  turnId: null,
+  content: { _tag: "Text", text, mentions, revision: 1, editedAt: null },
 });
 const openings = [
   {
@@ -105,9 +104,12 @@ const openings = [
       id: "t1",
       workspaceId: "one",
       groupId: "g1",
+      title: null,
+      origin: null,
       createdBy: author("ada"),
       createdAt: at(1),
     },
+    task: null,
     message: message("m1", "t1", "ada", "Can [@Scout](member:scout) check the terms?", ["scout"]),
     replies: 2,
     latest: { threadId: "t1", sequence: 3, occurredAt: at(3) },
@@ -122,6 +124,7 @@ const activity = (sequence: number, kind: string, subject: string, details: unkn
   sequence,
   occurredAt: at(sequence),
   kind,
+  version: 1,
   subject,
   occurrence: subject,
   newActivity: true,
@@ -155,7 +158,10 @@ const timeline = [
   },
   {
     activity: activity(4, "message.published", "message:m2", { messageId: "m2" }),
-    message: { ...message("m2", "t1", "scout", "All clear."), turnId: "turn-9" },
+    message: {
+      ...message("m2", "t1", "scout", "All clear."),
+      via: { _tag: "Turn", turnId: "turn-9" },
+    },
   },
 ];
 const roster = ["owner", "ada"].map((memberId, index) => ({

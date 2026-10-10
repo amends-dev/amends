@@ -293,13 +293,15 @@ export const threadStarts = (harness: Harness) => {
                         threadCommand.create({
                           threadId: Thread.Id.make("late-order"),
                           groupId: team.id,
+                          title: null,
+                          origin: null,
                           participants: [{ _tag: "Contact", contactId }, { _tag: "Triage" }],
-                          first: {
-                            _tag: "Message",
+                          message: {
                             messageId: ThreadMessage.Id.make("late-order-opening"),
                             author: { _tag: "Contact", contactId },
                             text: "My order is late",
                             mentions: [],
+                            via: null,
                           },
                           occurredAt,
                         }),

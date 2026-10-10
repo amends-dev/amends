@@ -41,6 +41,15 @@ import {
 } from "@amends/core/workspace";
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
+import {
+  ChannelBindingStore,
+  ChannelStore,
+  ContactStore,
+  DeliveryJobs,
+  DeliveryStore,
+} from "@amends/core/channel";
+import { TaskStore, TaskTimeline } from "@amends/core/task";
+import { ChannelTransport } from "@amends/channel";
 import { Integration, Integrations, type ModelCatalog } from "@amends/connection";
 import {
   SessionLogStore,
@@ -93,12 +102,51 @@ const idleHarness = (id: string, requiresSandbox: boolean) =>
     }),
   );
 
+/** A message the test channel transport posted to an external conversation. */
+export interface PostedMessage {
+  readonly conversation: ChannelTransport.Conversation;
+  readonly outgoing: ChannelTransport.Outgoing;
+  readonly messageId: ChannelTransport.ExternalId;
+}
+
+/** What the test channel transport posted and no suite has taken yet, in order. */
+const postedMessages: Array<PostedMessage> = [];
+
+/** The messages the test channel transport posted since the last take, in order. */
+export const takePosted = Effect.sync(() => postedMessages.splice(0));
+
+/**
+ * The test channel transport, which the `test-channels` integration gives every connection: the
+ * external system sends it what it received as JSON, the body being a `Received` as is, and it
+ * records what it posts, naming each message `posted-N`. Its own id in the system is `bot`.
+ */
+const decodeReceived = Schema.decodeUnknownEffect(Schema.fromJsonString(ChannelTransport.Received));
+export const testTransport: ChannelTransport.ChannelTransport = {
+  self: ChannelTransport.ExternalId.make("bot"),
+  receive: (inbound) =>
+    decodeReceived(inbound.body).pipe(
+      Effect.mapError(
+        (error) =>
+          new ChannelTransport.TransportError({
+            reason: "rejected",
+            description: "The body is not what the test system sends",
+            cause: error,
+          }),
+      ),
+    ),
+  post: (conversation, outgoing) =>
+    Effect.sync(() => {
+      const messageId = ChannelTransport.ExternalId.make(`posted-${postedMessages.length + 1}`);
+      postedMessages.push({ conversation, outgoing, messageId });
+      return { messageId };
+    }),
+};
 /**
  * The integrations the suites' hosts install: models at an endpoint a connection gives, reached
  * with a key or none, which list `testModel` and offer any other, and whose check accepts only
  * `goodKey`; tools that take no settings or key; a harness whose agent works only in a sandbox, and
- * one whose agent works in the host's process; and sandboxes. No suite starts a session or makes a
- * sandbox.
+ * one whose agent works in the host's process; sandboxes; and channels over `testTransport`. No
+ * suite starts a session or makes a sandbox.
  */
 export const testIntegrations = [
   Integration.make({
@@ -156,6 +204,13 @@ export const testIntegrations = [
     sandboxes: () => Effect.die("No suite makes a sandbox"),
     check: () => Effect.succeed({ status: "healthy" }),
   }),
+  Integration.make({
+    id: "test-channels",
+    name: "Test channels",
+    auth: ["none"],
+    channels: () => Effect.succeed(testTransport),
+    check: () => Effect.succeed({ status: "healthy" }),
+  }),
 ];
 
 /** What the suites' gateways install. */
@@ -198,6 +253,36 @@ export const recordedTurnJobs = TurnJobs.Service.of({
 });
 export const layerRecordedTurnJobs = Layer.succeed(TurnJobs.Service, recordedTurnJobs);
 
+/** The delivery job requests each workspace's commits made and no suite has taken yet, in order. */
+const requestedDeliveryJobs = new Map<Workspace.Id, Array<Thread.Id>>();
+
+/**
+ * Delivery jobs the suites run themselves: a commit's requests are kept once it commits, and
+ * `takeDeliveryJobs` hands the threads to the suite, which delivers through delivery execution as a
+ * host's delivery jobs would.
+ */
+export const recordedDeliveryJobs = DeliveryJobs.Service.of({
+  requestDeliver: ({ workspaceId, threadId }) =>
+    Effect.flatMap(Store.Transaction, (storeTransaction) =>
+      storeTransaction.afterCommit(
+        Effect.sync(() => {
+          const requested = requestedDeliveryJobs.get(workspaceId) ?? [];
+          if (!requested.includes(threadId))
+            requestedDeliveryJobs.set(workspaceId, [...requested, threadId]);
+        }),
+      ),
+    ),
+});
+export const layerRecordedDeliveryJobs = Layer.succeed(DeliveryJobs.Service, recordedDeliveryJobs);
+
+/** The threads whose delivery the workspace's commits requested since the last take, in order. */
+export const takeDeliveryJobs = (id: Workspace.Id) =>
+  Effect.sync(() => {
+    const requested = requestedDeliveryJobs.get(id) ?? [];
+    requestedDeliveryJobs.delete(id);
+    return requested;
+  });
+
 /** The turn job requests the workspace's commits made since the last take, in order. */
 export const takeTurnJobs = (id: Workspace.Id) =>
   Effect.sync(() => {
@@ -209,7 +294,7 @@ export const takeTurnJobs = (id: Workspace.Id) =>
 /** The bound stores by name, for direct assertions beside the context core receives. */
 export const bind = (
   context: Context.Context<
-    WorkspaceStorage.Bindings | TurnJobs.Service | Integrations.Integrations
+    WorkspaceStorage.Bindings | TurnJobs.Service | DeliveryJobs.Service | Integrations.Integrations
   >,
 ) => ({
   context,
@@ -217,6 +302,11 @@ export const bind = (
   participations: Context.get(context, ThreadParticipationStore.Service),
   messages: Context.get(context, ThreadMessageStore.Service),
   activities: Context.get(context, ThreadActivityStore.Service),
+  tasks: Context.get(context, TaskStore.Service),
+  channels: Context.get(context, ChannelStore.Service),
+  channelBindings: Context.get(context, ChannelBindingStore.Service),
+  contacts: Context.get(context, ContactStore.Service),
+  deliveries: Context.get(context, DeliveryStore.Service),
   store: Context.get(context, Store.Service),
   checkpoints: Context.get(context, Checkpoint.Service),
   workspace: Context.get(context, WorkspaceStore.Service),
@@ -260,6 +350,7 @@ const withHostServices = (context: Context.Context<WorkspaceStorage.Bindings>) =
     bind(
       context.pipe(
         Context.add(TurnJobs.Service, recordedTurnJobs),
+        Context.add(DeliveryJobs.Service, recordedDeliveryJobs),
         Context.add(Integrations.Integrations, integrations),
       ),
     ),
@@ -307,7 +398,12 @@ export const make = (harness: Harness) => {
   const gateway = (host: Context.Context<Host>, options: Gateway.Options = installed) =>
     Gateway.layer(options).pipe(
       Layer.provideMerge(
-        Layer.mergeAll(Layer.succeedContext(host), harness.crypto, layerRecordedTurnJobs),
+        Layer.mergeAll(
+          Layer.succeedContext(host),
+          harness.crypto,
+          layerRecordedTurnJobs,
+          layerRecordedDeliveryJobs,
+        ),
       ),
     );
   return {
@@ -399,6 +495,7 @@ export const threadInternals = ThreadCommand.layer.pipe(
         ThreadMessageTimeline.resolver,
         ThreadParticipationTimeline.resolver,
         TurnTimeline.resolver,
+        TaskTimeline.resolver,
       ]),
     ),
   ),

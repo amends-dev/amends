@@ -1,5 +1,6 @@
 import type { Integrations } from "@amends/connection";
 import type * as Core from "@amends/core";
+import type { DeliveryJobs } from "@amends/core/channel";
 import type { TurnJobs } from "@amends/core/turn";
 import type { Workspace } from "@amends/core/workspace";
 import { Context } from "effect";
@@ -7,11 +8,11 @@ import type { Crypto, Effect } from "effect";
 
 /**
  * What storage binds to one workspace: its stores and its signal hub. The gateway supplies
- * cryptography, the turn jobs, and the integrations the host installs.
+ * cryptography, the turn and delivery jobs, and the integrations the host installs.
  */
 export type Bindings = Exclude<
   Core.HostServices,
-  Crypto.Crypto | Integrations.Integrations | TurnJobs.Service
+  Crypto.Crypto | Integrations.Integrations | TurnJobs.Service | DeliveryJobs.Service
 >;
 
 export interface Interface {

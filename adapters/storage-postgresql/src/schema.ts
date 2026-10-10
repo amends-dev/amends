@@ -38,10 +38,20 @@ export const recipientKinds = [...identityKinds, "Triage"] as const;
 export const memberStatuses = ["active", "removed"] as const;
 export const groupKinds = ["Team", "Direct"] as const;
 export const participantKinds = ["Member", "Contact", "Triage"] as const;
+export const taskStatuses = ["triage", "todo", "doing", "held", "done", "dismissed"] as const;
+export const taskPriorities = ["none", "low", "medium", "high", "urgent"] as const;
 export const assignmentStatuses = ["active", "revoked"] as const;
 export const sourceKinds = ["Role", "Direct"] as const;
 export const scopeKinds = ["Workspace", "Target"] as const;
-export const targetKinds = ["Workspace", "Member", "Thread", "Group", "Connection"] as const;
+export const targetKinds = [
+  "Workspace",
+  "Member",
+  "Thread",
+  "Group",
+  "Connection",
+  "Channel",
+] as const;
+export const deliveryStatuses = ["requested", "sent", "failed"] as const;
 export const invitationStates = ["Pending", "Accepted", "Revoked"] as const;
 /** A notification's state; a human recipient's Seen is also kept in notification_seen. */
 export const notificationStates = [
@@ -60,6 +70,7 @@ const scopeColumns = {
   targetThreadId: text("target_thread_id"),
   targetGroupId: text("target_group_id"),
   targetConnectionId: text("target_connection_id"),
+  targetChannelId: text("target_channel_id"),
 };
 /** The column holding each kind of target's ID; a workspace target needs none. */
 const targetIds = {
@@ -67,6 +78,7 @@ const targetIds = {
   Thread: "targetThreadId",
   Group: "targetGroupId",
   Connection: "targetConnectionId",
+  Channel: "targetChannelId",
 } as const;
 const scopeAgrees = (name: string, columns: Record<keyof typeof scopeColumns, AnyPgColumn>) => {
   /** Only the named target ID column is set, or none. */
@@ -298,8 +310,10 @@ export const notifications = pgTable(
     sourceEntryId: text("source_entry_id").notNull(),
     participationId: text("participation_id"),
     discardReason: text("discard_reason", { enum: ["participation-ended", "access-lost"] }),
-    // The turn an agent accepted the notification into, and when.
+    // What accepted the notification, and when: an agent's turn, or a delivery to a contact.
+    acceptedByKind: text("accepted_by_kind", { enum: ["Turn", "Delivery"] }),
     acceptedTurnId: text("accepted_turn_id"),
+    acceptedDeliveryId: text("accepted_delivery_id"),
     acceptedAt: instant("accepted_at"),
     recipientKind: text("recipient_kind", { enum: recipientKinds }).notNull(),
     recipientId: text("recipient_id"),
@@ -319,7 +333,7 @@ export const notifications = pgTable(
     // Each state holds its own columns and no other's.
     check(
       "notification_state",
-      sql`(${table.discardReason} IS NOT NULL) = (${table.state} = 'Discarded') AND (${table.acceptedTurnId} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL) = (${table.state} = 'Accepted') AND (${table.acceptedTurnId} IS NULL) = (${table.acceptedAt} IS NULL) AND (${table.seenAt} IS NOT NULL) = (${table.state} = 'Seen') AND (${table.state} <> 'Accepted' OR ${table.recipientKind} = 'Agent') AND (${table.state} <> 'Seen' OR ${table.recipientKind} = 'Human')`,
+      sql`(${table.discardReason} IS NOT NULL) = (${table.state} = 'Discarded') AND (${table.acceptedByKind} IS NOT NULL AND ${table.acceptedAt} IS NOT NULL) = (${table.state} = 'Accepted') AND (${table.acceptedByKind} IS NULL) = (${table.acceptedAt} IS NULL) AND (${table.acceptedTurnId} IS NOT NULL) = (${table.acceptedByKind} IS NOT DISTINCT FROM 'Turn') AND (${table.acceptedDeliveryId} IS NOT NULL) = (${table.acceptedByKind} IS NOT DISTINCT FROM 'Delivery') AND (${table.acceptedByKind} IS DISTINCT FROM 'Turn' OR ${table.recipientKind} = 'Agent') AND (${table.acceptedByKind} IS DISTINCT FROM 'Delivery' OR ${table.recipientKind} = 'Contact') AND (${table.seenAt} IS NOT NULL) = (${table.state} = 'Seen') AND (${table.state} <> 'Seen' OR ${table.recipientKind} = 'Human')`,
     ),
     check(
       "notification_recipient",
@@ -363,16 +377,16 @@ export const notifications = pgTable(
         table.threadGroupId,
       )
       .where(sql`${table.state} = 'Pending'`),
-    // A reader's pending notifications from one thread, settled when they read it.
-    index("pending_notifications_by_thread")
-      .on(
-        table.workspaceId,
-        table.recipientKind,
-        sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
-        table.threadId,
-        table.threadSequence,
-      )
-      .where(sql`${table.state} = 'Pending'`),
+    // A reader's notifications from one thread by position: what they were told there, and the
+    // pending ones settled when they read it.
+    index("notifications_by_thread").on(
+      table.workspaceId,
+      table.recipientKind,
+      sql`coalesce(${table.recipientMemberId}, ${table.recipientId}, '')`,
+      table.threadId,
+      table.threadSequence,
+      sql`${table.id} COLLATE "C"`,
+    ),
     // An ended participation's pending agent input, settled in the commit that ends it.
     index("pending_agent_notifications_by_participation")
       .on(table.workspaceId, table.participationId)
@@ -543,6 +557,9 @@ export const threads = pgTable(
     workspaceId: text("workspace_id").notNull(),
     id: text("id").notNull(),
     groupId: text("group_id").notNull(),
+    // The thread's own title, when it has one, and the thread it was derived from, if any.
+    title: text("title"),
+    origin: text("origin"),
     // A member starts a conversation in the app; a contact starts one a channel receives.
     createdByKind: text("created_by_kind", { enum: ["Member", "Contact"] }).notNull(),
     createdByMemberId: text("created_by_member_id"),
@@ -672,16 +689,68 @@ export const threadMessages = pgTable(
     authorKind: text("author_kind", { enum: ["Member", "Contact"] }).notNull(),
     authorMemberId: text("author_member_id"),
     authorContactId: text("author_contact_id"),
-    text: text("text").notNull(),
-    mentions: text("mentions").array().notNull(),
-    publishedAt: instant("published_at").notNull(),
+    // How it came about: an agent's turn, a channel's message, or null for one written in amends.
+    viaKind: text("via_kind", { enum: ["Turn", "Channel"] }),
     turnId: text("turn_id"),
+    channelId: text("channel_id"),
+    externalMessageId: text("external_message_id"),
+    publishedAt: instant("published_at").notNull(),
+    // Its content: text and mentions at a revision, as last edited, or its deletion.
+    contentKind: text("content_kind", { enum: ["Text", "Deleted"] }).notNull(),
+    text: text("text"),
+    mentions: text("mentions").array(),
+    revision: integer("revision"),
+    editedAt: instant("edited_at"),
+    deletedAt: instant("deleted_at"),
   },
   (t) => [
     primaryKey({ columns: [t.workspaceId, t.id] }),
     check(
       "thread_message_author",
       sql`(${t.authorKind} = 'Member' AND ${t.authorMemberId} IS NOT NULL AND ${t.authorContactId} IS NULL) OR (${t.authorKind} = 'Contact' AND ${t.authorMemberId} IS NULL AND ${t.authorContactId} IS NOT NULL)`,
+    ),
+    check(
+      "thread_message_via",
+      sql`(${t.viaKind} IS NULL AND ${t.turnId} IS NULL AND ${t.channelId} IS NULL AND ${t.externalMessageId} IS NULL) OR (${t.viaKind} = 'Turn' AND ${t.turnId} IS NOT NULL AND ${t.channelId} IS NULL AND ${t.externalMessageId} IS NULL) OR (${t.viaKind} = 'Channel' AND ${t.turnId} IS NULL AND ${t.channelId} IS NOT NULL AND ${t.externalMessageId} IS NOT NULL)`,
+    ),
+    check(
+      "thread_message_content",
+      sql`(${t.contentKind} = 'Text' AND ${t.text} IS NOT NULL AND ${t.mentions} IS NOT NULL AND ${t.revision} > 0 AND ${t.deletedAt} IS NULL) OR (${t.contentKind} = 'Deleted' AND ${t.text} IS NULL AND ${t.mentions} IS NULL AND ${t.revision} IS NULL AND ${t.editedAt} IS NULL AND ${t.deletedAt} IS NOT NULL)`,
+    ),
+    // A thread's messages that still have text, counted per thread for reply counts.
+    index("thread_messages_by_thread")
+      .on(t.workspaceId, t.threadId)
+      .where(sql`${t.contentKind} = 'Text'`),
+  ],
+);
+/** A thread's task: its current status, priority, and assignee. A thread has at most one, keyed by it. */
+export const tasks = pgTable(
+  "tasks",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    groupId: text("group_id").notNull(),
+    status: text("status", { enum: taskStatuses }).notNull(),
+    priority: text("priority", { enum: taskPriorities }).notNull(),
+    assignee: text("assignee"),
+    // A member creates a task in the app; a contact's conversation opens one through a channel.
+    createdByKind: text("created_by_kind", { enum: ["Member", "Contact"] }).notNull(),
+    createdByMemberId: text("created_by_member_id"),
+    createdByContactId: text("created_by_contact_id"),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.threadId] }),
+    check(
+      "task_creator",
+      sql`(${t.createdByKind} = 'Member' AND ${t.createdByMemberId} IS NOT NULL AND ${t.createdByContactId} IS NULL) OR (${t.createdByKind} = 'Contact' AND ${t.createdByMemberId} IS NULL AND ${t.createdByContactId} IS NOT NULL)`,
+    ),
+    // A group's tasks by when they were created, newest first.
+    index("tasks_by_group").on(
+      t.workspaceId,
+      t.groupId,
+      t.createdAt,
+      sql`${t.threadId} COLLATE "C"`,
     ),
   ],
 );
@@ -697,8 +766,9 @@ export const threadActivities = pgTable(
     threadId: text("thread_id").notNull(),
     sequence: integer("sequence").notNull(),
     // Every kind shares these columns; its definition in core reads `details`, the change the
-    // activity reports, so a new kind needs no schema change.
+    // activity reports, at the kind's version, so a new kind or version needs no schema change.
     kind: text("kind").notNull(),
+    version: integer("version").notNull(),
     subject: text("subject").notNull(),
     occurrence: text("occurrence"),
     newActivity: boolean("new_activity").notNull(),
@@ -711,6 +781,7 @@ export const threadActivities = pgTable(
     // At most one activity per occurrence key; activities without one are repeatable.
     uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
+    check("thread_activity_positive_version", sql`${t.version} > 0`),
   ],
 );
 
@@ -733,6 +804,107 @@ export const connections = pgTable(
     createdAt: instant("created_at").notNull(),
   },
   (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/** A channel: one connection's conversations, which become threads in one group. */
+export const channels = pgTable(
+  "channels",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    connectionId: text("connection_id").notNull(),
+    groupId: text("group_id").notNull(),
+    name: text("name").notNull(),
+    // Whether a new conversation opens as a task in triage, or as a conversation alone.
+    opensTasks: boolean("opens_tasks").notNull(),
+    status: text("status", { enum: memberStatuses }).notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/**
+ * A thread's external conversation: which channel it came through, and the conversation as the
+ * channel's transport identifies it, with what the transport needs to post there. Each conversation
+ * binds one thread.
+ */
+export const channelBindings = pgTable(
+  "channel_bindings",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    channelId: text("channel_id").notNull(),
+    groupId: text("group_id").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    conversationDetails: jsonb("conversation_details").$type<Record<string, unknown>>().notNull(),
+    boundAt: instant("bound_at").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.threadId] }),
+    uniqueIndex("channel_bindings_by_conversation").on(
+      t.workspaceId,
+      t.channelId,
+      t.conversationId,
+    ),
+  ],
+);
+
+/** A person outside the workspace who writes through a channel, named as the channel knows them. */
+export const contacts = pgTable(
+  "contacts",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    channelId: text("channel_id").notNull(),
+    externalId: text("external_id").notNull(),
+    name: text("name").notNull(),
+    createdAt: instant("created_at").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.workspaceId, t.id] })],
+);
+
+/**
+ * A message's delivery to a bound thread's conversation: requested when the delivery job accepts
+ * the contacts' notifications of it, then sent, with the id the external system gave it, or failed.
+ */
+export const channelDeliveries = pgTable(
+  "channel_deliveries",
+  {
+    workspaceId: text("workspace_id").notNull(),
+    id: text("id").notNull(),
+    channelId: text("channel_id").notNull(),
+    threadId: text("thread_id").notNull(),
+    groupId: text("group_id").notNull(),
+    conversationId: text("conversation_id").notNull(),
+    messageId: text("message_id").notNull(),
+    sequence: integer("sequence").notNull(),
+    status: text("status", { enum: deliveryStatuses }).notNull(),
+    externalMessageId: text("external_message_id"),
+    attempts: integer("attempts").notNull(),
+    failure: text("failure"),
+    requestedAt: instant("requested_at").notNull(),
+    finishedAt: instant("finished_at"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.workspaceId, t.id] }),
+    // Each status holds its own columns: sent has the external id, failed the reason, and both are finished.
+    check(
+      "channel_delivery_status",
+      sql`(${t.status} = 'requested') = (${t.finishedAt} IS NULL) AND (${t.status} = 'sent') = (${t.externalMessageId} IS NOT NULL) AND (${t.status} = 'failed') = (${t.failure} IS NOT NULL) AND ${t.sequence} > 0 AND ${t.attempts} >= 0`,
+    ),
+    // A thread's deliveries still to send, in the order their messages were published.
+    index("channel_deliveries_requested_by_thread")
+      .on(t.workspaceId, t.threadId, t.sequence)
+      .where(sql`${t.status} = 'requested'`),
+    // The delivery that posted an external message, so that receiving it again is known as an echo.
+    index("channel_deliveries_by_external_message").on(
+      t.workspaceId,
+      t.channelId,
+      t.conversationId,
+      t.externalMessageId,
+    ),
+  ],
 );
 
 /**
@@ -813,7 +985,9 @@ export const turns = pgTable(
     sandboxConnectionId: text("sandbox_connection_id"),
     messageIds: text("message_ids").array().notNull(),
     failure: text("failure"),
-    cancelReason: text("cancel_reason", { enum: ["requested", "participation-ended"] }),
+    cancelReason: text("cancel_reason", {
+      enum: ["requested", "participation-ended", "task-changed"],
+    }),
     createdAt: instant("created_at").notNull(),
     startedAt: instant("started_at"),
     finishedAt: instant("finished_at"),

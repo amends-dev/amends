@@ -62,7 +62,11 @@ export type TurnLogActivity =
   | { readonly kind: "replied"; readonly at: Date }
   | { readonly kind: "finished"; readonly at: Date }
   | { readonly kind: "failed"; readonly at: Date; readonly reason: string }
-  | { readonly kind: "stopped"; readonly at: Date; readonly by: "request" | "departure" };
+  | {
+      readonly kind: "stopped";
+      readonly at: Date;
+      readonly by: "request" | "departure" | "task";
+    };
 
 export interface TurnLogPaneProps {
   /** The turn, once loaded. */
@@ -127,7 +131,9 @@ function describe(entry: TurnLogActivity, agent: string): { title: string; text?
         text:
           entry.by === "departure"
             ? `${agent} stopped taking part in this thread.`
-            : "It stopped as asked. Its output stays in this log.",
+            : entry.by === "task"
+              ? `The task no longer asks ${agent} to work on it. Its output stays in this log.`
+              : "It stopped as asked. Its output stays in this log.",
       };
   }
 }

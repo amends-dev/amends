@@ -1,9 +1,10 @@
 # Thread workflows
 
-Conversations in groups: starting them, replying, following, reading, and the notifications and
-read state around them. The operations are `ThreadService`, `ThreadMessageService`,
-`ThreadParticipationService`, `NotificationService`, and `ReadStateService` in a workspace
-context, such as `Gateway.asMember`. The gateway preserves the
+Conversations in groups: starting them, as tasks or not, renaming them, replying, editing and
+deleting messages, following, reading, tracking tasks, and the notifications and read state around
+them. The operations are `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`,
+`TaskService`, `NotificationService`, and `ReadStateService` in a workspace context, such as
+`Gateway.asMember`. The gateway preserves the
 outcomes named below and maps malformed input to `Gateway.InvalidInput`. Storage and consistency
 failures remain failures. The [HTTP contract](../packages/api-http/README.md#conversations) exposes
 each operation under `/workspaces/:workspaceId`, with the status each outcome returns.
@@ -27,7 +28,9 @@ const start = (groupId: Group.Id) =>
 ```
 
 The result contains `thread` and `message`; the timeline holds the activity that places the
-message. The operation accepts non-whitespace
+message. The thread's `title` is null unless the start gives one, a trimmed line of 1 to 200
+characters without hidden ones, and its `origin` is null: a start derives from no other thread.
+The operation accepts non-whitespace
 text and preserves it verbatim, including indentation and newlines. NUL characters and unpaired
 surrogate halves, which storage cannot keep as given, are rejected as invalid input. `mentions` is an explicit
 array of distinct workspace-member IDs; text such as `@Reviewer` does not itself address anyone.
@@ -71,6 +74,125 @@ which must name members, only narrow notification. Fewer than two distinct membe
 group, returns `ThreadService.ParticipantUnavailable`. Later threads in the same direct group
 can also start with `startInGroup`.
 
+## Renaming a thread
+
+`ThreadService.rename({ threadId, title, expectedTitle })` requires `thread.rename` on the thread,
+which every built-in role holds, and membership of its group. To anyone outside the group, the
+thread is `ThreadService.NotFound`, as a missing or foreign one is. The title follows the start's
+rule, while `expectedTitle` is the title the renamer last saw, or null for a thread that had none.
+Renaming records `thread.renamed` with the new title and, in the same commit, a quiet
+`thread.renamed` activity whose details carry the new and previous titles; it returns the renamed
+thread. The same title again records nothing. Otherwise `expectedTitle` must still be the thread's
+title: one renamed meanwhile is `ThreadService.Changed`, so a rename is never silently replaced,
+and nothing is recorded. The activity notifies no one and makes nothing unread, and the title
+never derives from a message: editing the opening message leaves the title as it is, and renaming
+leaves every message as it is. Readers see the new title through the thread and its group's
+stream, and the change feed delivers the fact to the group's readers. The [thread model](threads.md)
+sets these rules.
+
+## Tasks
+
+A task is work a thread tracks: a row keyed by the thread with a `status` (`triage`, `todo`,
+`doing`, `held`, `done`, or `dismissed`), a `priority` (`none` to `urgent`), and an `assignee`, a
+member or null. Its title is the thread's and its description the thread's opening message, so it
+holds no text; `Thread.ListItem` and `Thread.Opening` carry each thread's `task`, or null, and
+`TaskService.get(threadId)` reads one under `thread.read`. A task comes about in three ways:
+
+- **With its thread.** `ThreadService.startInGroup` with `task: { status?, priority?, assignee? }`
+  creates the task at the thread's second position, in the same commit as the opening message,
+  under `thread.start` and `task.create` on the group. A start may also name an `origin`, a thread
+  the author can read that this one splits work out of; the origin grants no access either way.
+- **From a conversation.** `TaskService.create({ threadId, status?, priority?, assignee? })` makes
+  a thread the actor's group can reach a task, under `task.create`; the opening message becomes the
+  description, and the title stays as it is. A thread that is a task already is
+  `TaskService.AlreadyTask`.
+- **Through a channel** ([channels](#channels)) that opens tasks, in `triage`, created by the
+  contact whose message opened the conversation.
+
+Without a status, a task starts in `triage`, or `todo` when assigned. An assignee must be able to
+take part in the thread, or the operation is `TaskService.ParticipantUnavailable`, and assigning an
+agent needs `agent.use` on it, as mentioning one does. The task's creation records `task.created`
+and a quiet `task.created` activity whose details hold the initial values; it admits triage while
+the task is in triage, and the assignee, and tells them: an agent assignee is asked for work when
+the task is being worked (`todo` or `doing`).
+
+`TaskService.update({ threadId, change })` changes one thing under `task.update` on the thread:
+`{ _tag: "Status", from, to }`, `{ _tag: "Assignee", from, to }`, or
+`{ _tag: "Priority", from, to }`, where `from` is the value the changer last saw. The same value
+again records nothing; a task that changed meanwhile is `TaskService.Changed`. Each change
+records `task.updated` and a quiet `task.updated` activity whose details are the change, so a later
+change cannot alter what an earlier item meant. The change admits and tells by its kind, and
+whoever made it is told nothing:
+
+| Change                                   | Admits           | Tells                                                          |
+| ---------------------------------------- | ---------------- | -------------------------------------------------------------- |
+| Assignee                                 | The new assignee | The new assignee, asked for work when the task is being worked |
+| Status to `triage`                       | Triage           | Triage                                                         |
+| Status to `todo` or `doing`              | The assignee     | Every participant; the assignee agent is asked for work        |
+| Status to `held`, `done`, or `dismissed` | Nobody           | Every participant                                              |
+| Priority                                 | Nobody           | Every participant                                              |
+
+An agent taken off a task, by reassignment or by a status that asks no work, has its active turn
+in the thread asked to stop in the same commit, as a person's stop request does; the turn ends
+with the reason `task-changed`. A task's title and description are its requirements: renaming the
+thread or editing its opening message tells every participant and asks the assignee agent anew
+while the task is being worked. `done` does not close the thread; messages continue, and a later
+status reopens the work. `TaskService.listInGroup(groupId, { status?, before?, limit })` pages a
+group's tasks newest created first, each as a `Thread.ListItem` under the rules of
+`ThreadService.listInGroup`. To anyone outside a thread's group, and for a thread without a task,
+the task is `TaskService.NotFound`. Triage is a participant and recipient only: nothing yet
+evaluates a policy or records a decision.
+
+## Channels
+
+A channel is a connection's external conversations, which become threads in one group: a support
+inbox or a chat room, whatever the connection's integration gives as a `ChannelTransport`
+([channel](../packages/channel/README.md)). `ChannelService.create({ connectionId,
+groupId, name, opensTasks })` makes one under `channel.create`, over a connection the actor may read
+and use whose integration gives channels (`ConnectionUnavailable` otherwise), into a group the actor
+belongs to and may start threads in (`GroupNotFound` otherwise), since every member of that group
+reads the channel's conversations. `list` and `get` read channels under `channel.read`;
+`redirect({ channelId, groupId })` sends new conversations to another group, and `remove` stops the
+channel's use, both under `channel.manage`. A removed channel's record and its threads' bindings
+remain, and it receives nothing more. `getBinding(threadId)` is the external conversation a thread
+came from, under `thread.read`; a thread that came through no channel is `NotBound`.
+
+What the external system sends the host reaches `ChannelIntake.receive(channelId, { headers, body })`
+as no member: the channel's transport verifies the request, makes `events` of it, and says what to
+`answer` the system with when it expects one. Each event is taken in as `intake` does, in a commit
+of its own attributed to the **contact** who sent it, a person outside the workspace named as the
+system names them, created when first heard from and renamed when called otherwise:
+
+- A message in a conversation the channel has not heard before opens a thread in the channel's
+  group, bound to that conversation, with the contact, the group's human followers, and, when the
+  channel opens tasks, triage as participants, and the message as its opening, `via` the channel
+  with the system's message id. The system's title, if any, is the thread's. A channel that opens
+  tasks creates the task in `triage` at the second position, created by the contact.
+- A message in a conversation it knows is published in its thread, readmitting the contact if their
+  participation ended; everyone taking part is told, and no contact, since a contact's message tells
+  no contact.
+- An edit or a deletion of the contact's own message is applied to it, recording `message.edited` or
+  `message.deleted`; one of a message intake never took in, or that is not theirs, and an edit that
+  changes nothing, take in nothing (`Ignored`).
+- Every id intake gives is derived from the external one, so an event the system sends again is a
+  retry and takes in nothing more (`duplicate`); a message with no text to keep is `empty`; what the
+  transport itself posted, received back, is an `echo`.
+
+A contact is told of messages alone: a task's changes, follows, and departures are not delivered.
+Activity that tells a contact something requests the thread's **delivery job** in its commit
+(`DeliveryJobs`). The job accepts the contacts' pending notifications into **deliveries**, one for
+each message, keyed by the channel, the conversation, and the message, so the contacts a message
+notifies share one; accepting settles their notifications as `Accepted` by the delivery, in one
+commit. Then, for each delivery still requested, in the order of the messages, it readies the
+delivery (`DeliveryExecution.start`): the message's text with its author's name, the conversation
+as the transport needs it, and the channel's connection with its key; posts it through the
+connection's integration; and records the id the system gave the message (`sent`), or why it gave
+up (`failed`). A message deleted before it was sent, a channel removed meanwhile, and a connection
+that can no longer be reached fail the delivery as it stands. Edits and deletions of a sent message
+are not carried yet. Over HTTP, channels sit under `/workspaces/:workspaceId/channels`, and systems'
+requests arrive at `POST …/channels/:channelId/events` without a session
+([channels over HTTP](../packages/api-http/README.md#channels)).
+
 ## Participation and recipients
 
 These rules follow the agreed [attention
@@ -90,9 +212,12 @@ Participation and notification are separate recorded decisions. Other group memb
 thread when they hold `thread.read`; reading does not enroll them. A later group addition does not
 enroll that member in existing threads or create retroactive notifications.
 
-Participants are members, contacts, or triage. Only the member workflows above exist today;
-task and channel workflows will start threads with contacts and triage through the same internal
-start. Notifications to agents are pending input for them to handle; no agent work runs yet.
+Participants are members, contacts, or triage. Tasks admit triage and their assignees through the
+same internal start and activity, and [channels](#channels) admit contacts the same way. Notifications
+to agents are pending input for them to handle, which their turns take up: a turn's prompt tells the
+agent the thread as it stands, its title and its task, then every activity that notified it since
+it was last prompted, each in its kind's words, so what an agent is told follows from these
+recipient rules alone ([turns](../packages/core/README.md#turns)).
 
 ## Replying to a conversation
 
@@ -107,8 +232,10 @@ const reply = (threadId: Thread.Id) =>
   });
 ```
 
-The result is the published message. Text and mentions are validated as for starts.
-Without a request key, every call publishes a new message; see [retrying safely](#retrying-safely).
+The result is the published message: its `content` holds the text and mentions at revision 1, and
+its `via` is null for a message written in amends, or names the agent's turn that posted it. Text
+and mentions are validated as for starts. Without a request key, every call publishes a new
+message; see [retrying safely](#retrying-safely).
 
 The caller must be a human with active workspace membership, current membership in the thread's
 group, and `thread.publish` on the thread. Replying needs no `thread.read`, `thread.start`,
@@ -140,6 +267,33 @@ Missing, foreign, and outside-audience threads share `ThreadMessageService.NotFo
 Ineligible mentions return `ThreadMessageService.ParticipantUnavailable`, and agent callers get
 `ThreadMessageService.HumanAuthorRequired`. Admission, the message, its timeline activity, and
 its notifications commit together; the timeline never has gaps or duplicate positions.
+
+## Editing and deleting a message
+
+`ThreadMessageService.edit({ messageId, text, mentions, expectedRevision })` replaces what a
+message says. Only its author edits it, with `thread.publish` on the thread and membership of the
+group; anyone else gets `ThreadMessageService.NotAuthor`, and to someone outside the group the
+message is `MessageNotFound`, as a missing one is. Agents edit their own replies through their
+turns, so an agent caller gets `HumanAuthorRequired`. The text and mentions follow a reply's
+rules. The same text and mentions again record nothing; otherwise `expectedRevision`, the revision
+the editor last saw, must still be the message's: one edited meanwhile is `Changed`, and nothing is
+recorded. A deleted message is `Deleted`.
+
+An edit records `thread.message.edited` with the next revision, the new text and mentions, and the
+time, and a quiet `message.edited` activity whose occurrence is the message and revision, in one
+commit. The projection replaces the message's `content`, so the timeline shows the publication with
+the content as it is now, and clients collapse the edit into an edited mark. Members the edit newly
+mentions join the thread and are told, under a reply's rules, and nobody else hears of it; an
+ineligible mention is `ParticipantUnavailable`.
+
+`ThreadMessageService.delete(messageId)` deletes a message: its own author's under
+`thread.publish` on the thread, anyone's under `thread.moderate` on the thread's group, which the
+built-in administrator and owner roles hold. It records `thread.message.deleted` and a quiet
+`message.deleted` activity; the content becomes `{ _tag: "Deleted", deletedAt }`, the text is gone
+from the row, and the message's place in the thread stays, since read positions, notifications,
+and turns refer to sequences. No one is told, and one already deleted records nothing. A deleted
+reply no longer counts among a thread's replies, and a deleted opening message leaves the thread
+with its title alone.
 
 ## Retrying safely
 
@@ -229,8 +383,8 @@ first item's `activity.sequence` as `beforeSequence` until a page comes back emp
 by passing the last item's sequence as `afterSequence`, where an empty page means no later activity
 yet. Cursors belong to the thread; they are not journal or notification cursors.
 
-Every item's `activity` has the thread position, a dotted `kind`, its `subject`, `newActivity`,
-and kind-specific `details`. Message items (`message.published`) contain `{ activity, message }`,
+Every item's `activity` has the thread position, a dotted `kind` and the `version` of its details,
+its `subject`, `newActivity`, and kind-specific `details`. Message items (`message.published`) contain `{ activity, message }`,
 with `details: { messageId }`. Participation items (`participation.followed` and
 `participation.ended`) contain `{ activity, participant }`, where `participant` is a public joining
 summary, even for a participation that later ended, and `details` holds the `participationId`; an
@@ -303,8 +457,8 @@ group settles while it is being marked.
 `Seen` is private state, like read positions: it is kept outside the journal, takes no place in the
 workspace's write order, and survives rebuilding projections. It creates no activity or
 notifications. The person's other connected sessions hear of it as a `NotificationsSeen`
-[signal](../packages/core/README.md#signals). Handing work to an agent's turn or a channel will be
-recorded by those workflows, not by marking it seen.
+[signal](../packages/core/README.md#signals). Handing work to an agent's turn, or a message to a
+delivery, is recorded by those workflows as `Accepted`, not by marking it seen.
 
 ## Marking conversations read
 

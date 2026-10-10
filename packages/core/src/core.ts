@@ -4,6 +4,8 @@ import { AgentService } from "./agent/service.ts";
 import { TurnCommand } from "./turn/command.ts";
 import { TurnService } from "./turn/service.ts";
 import { TurnJobs } from "./turn/jobs.ts";
+import type { TurnStore } from "./turn/store.ts";
+import type { Reaction } from "./journal/reaction.ts";
 import { TurnExecution } from "./turn/execution.ts";
 import type { SessionLogStore } from "./turn/session-log-store.ts";
 import { AgentQuery } from "./agent/query.ts";
@@ -11,23 +13,37 @@ import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
-import { ThreadService } from "./thread/service.ts";
-import { ThreadCommand } from "./thread/command.ts";
+import { ThreadService } from "./thread/ThreadService.ts";
+import { ThreadCommand } from "./thread/ThreadCommand.ts";
 import { GroupCommand } from "./group/command.ts";
-import { ThreadQuery } from "./thread/query.ts";
-import { ThreadMessageService } from "./thread/message/service.ts";
-import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
-import { ThreadParticipationService } from "./thread/participation/service.ts";
-import { ThreadParticipationPermissions } from "./thread/participation/permissions.ts";
-import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
-import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
-import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
+import { ThreadQuery } from "./thread/ThreadQuery.ts";
+import { ThreadMessageService } from "./thread/ThreadMessageService.ts";
+import { ThreadMessagePermissions } from "./thread/ThreadMessagePermissions.ts";
+import { ThreadParticipationService } from "./thread/ThreadParticipationService.ts";
+import { ThreadParticipationPermissions } from "./thread/ThreadParticipationPermissions.ts";
+import { ThreadActivityResolvers } from "./thread/ThreadActivityResolvers.ts";
+import { ThreadMessageTimeline } from "./thread/ThreadMessageTimeline.ts";
+import { ThreadParticipationTimeline } from "./thread/ThreadParticipationTimeline.ts";
+import { ThreadTitleTimeline } from "./thread/ThreadTitleTimeline.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
-import { ThreadPermissions } from "./thread/permissions.ts";
-import { ThreadProjection } from "./thread/projection.ts";
-import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
-import { ThreadMessageProjection } from "./thread/message/projection.ts";
-import { ThreadActivityProjection } from "./thread/activity/projection.ts";
+import { ThreadPermissions } from "./thread/ThreadPermissions.ts";
+import { ThreadProjection } from "./thread/ThreadProjection.ts";
+import { ThreadParticipationProjection } from "./thread/ThreadParticipationProjection.ts";
+import { ThreadMessageProjection } from "./thread/ThreadMessageProjection.ts";
+import { ThreadActivityProjection } from "./thread/ThreadActivityProjection.ts";
+import { TaskCommand } from "./task/TaskCommand.ts";
+import { TaskPermissions } from "./task/TaskPermissions.ts";
+import { TaskProjection } from "./task/TaskProjection.ts";
+import { TaskService } from "./task/TaskService.ts";
+import { TaskTimeline } from "./task/TaskTimeline.ts";
+import { ChannelIntake } from "./channel/ChannelIntake.ts";
+import { ChannelPermissions } from "./channel/ChannelPermissions.ts";
+import { ChannelProjection } from "./channel/ChannelProjection.ts";
+import { ChannelQuery } from "./channel/ChannelQuery.ts";
+import { ChannelService } from "./channel/ChannelService.ts";
+import { DeliveryExecution } from "./channel/DeliveryExecution.ts";
+import { DeliveryJobs } from "./channel/DeliveryJobs.ts";
+import { DeliveryProjection } from "./channel/DeliveryProjection.ts";
 /**
  * Compose one workspace's core from its domains. Hosts bind storage to a
  * workspace and supply cryptography; a gateway resolves the acting member and
@@ -90,6 +106,9 @@ export const projections = [
   ThreadParticipationProjection.definition,
   ThreadMessageProjection.definition,
   ThreadActivityProjection.definition,
+  TaskProjection.definition,
+  ChannelProjection.definition,
+  DeliveryProjection.definition,
   NotificationProjection.definition,
   ConnectionProjection.definition,
   AgentProjection.definition,
@@ -117,8 +136,12 @@ export const permissions = [
   GroupMembershipPermissions.Join,
   ThreadPermissions.Start,
   ThreadPermissions.Read,
+  ThreadPermissions.Rename,
   ThreadMessagePermissions.Publish,
+  ThreadMessagePermissions.Moderate,
   ThreadParticipationPermissions.Follow,
+  TaskPermissions.Create,
+  TaskPermissions.Update,
   AgentPermissions.Use,
   ConnectionPermissions.Create,
   ConnectionPermissions.Read,
@@ -127,6 +150,9 @@ export const permissions = [
   AgentPermissions.Create,
   AgentPermissions.Read,
   AgentPermissions.Configure,
+  ChannelPermissions.Create,
+  ChannelPermissions.Read,
+  ChannelPermissions.Manage,
 ];
 
 /**
@@ -136,7 +162,9 @@ export const permissions = [
 const activityResolvers = [
   ThreadMessageTimeline.resolver,
   ThreadParticipationTimeline.resolver,
+  ThreadTitleTimeline.resolver,
   TurnTimeline.resolver,
+  TaskTimeline.resolver,
 ] as const;
 
 /**
@@ -147,13 +175,15 @@ export const journalLog = Log.Id.make("journal");
 
 /**
  * The domain journal and its log, over host storage. A commit that publishes a fact that changes
- * an agent's work in a thread requests that agent's turn job in the same commit.
+ * an agent's work in a thread requests that agent's turn job in the same commit, and one that
+ * tells a contact something requests the thread's delivery job.
  */
-const journal = Journal.layer({
-  logId: journalLog,
-  projections,
-  reactions: TurnJobs.reactions,
-}).pipe(Layer.provideMerge(Log.layer));
+const reactions: ReadonlyArray<
+  Reaction.Definition<TurnJobs.Service | TurnStore.Service | DeliveryJobs.Service>
+> = [...TurnJobs.reactions, ...DeliveryJobs.reactions];
+const journal = Journal.layer({ logId: journalLog, projections, reactions }).pipe(
+  Layer.provideMerge(Log.layer),
+);
 
 /** Authorization for the acting member, with its grant resolution. */
 const authorization = Authorization.layer.pipe(Layer.provide(GrantResolver.layer));
@@ -168,6 +198,10 @@ const threadCommand = ThreadCommand.layer.pipe(Layer.provide(threadQuery));
 const turnCommand = TurnCommand.layer.pipe(
   Layer.provide(Layer.mergeAll(threadQuery, threadCommand)),
 );
+const taskCommand = TaskCommand.layer.pipe(
+  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand)),
+);
+const channelQuery = ChannelQuery.layer;
 const readStateCommand = ReadStateCommand.layer;
 const memberCommand = MemberCommand.layer.pipe(Layer.provide(AssignmentCommand.layer));
 /**
@@ -200,6 +234,8 @@ const operations = Layer.mergeAll(
   ReadStateService.layer,
   ThreadMessageService.layer,
   ThreadParticipationService.layer,
+  TaskService.layer,
+  ChannelService.layer,
   ConnectionService.layer,
   AgentService.layer,
   TurnService.layer,
@@ -215,17 +251,33 @@ const operations = Layer.mergeAll(
       threadCommand,
       readStateCommand,
       turnCommand,
+      taskCommand,
+      channelQuery,
       changeFeedSource,
     ),
   ),
 );
 
 /**
- * What jobs call, outside requests: turn execution, which an agent's turn job drives in a thread.
- * It is not an operation an actor calls.
+ * What jobs and hosts call outside requests, as no actor: turn execution, which an agent's turn job
+ * drives in a thread; intake, which a host calls for what its channels receive; and delivery
+ * execution, which a thread's delivery job drives. None is an operation an actor calls.
  */
-const jobServices = TurnExecution.layer.pipe(
-  Layer.provide(Layer.mergeAll(threadQuery, threadCommand, turnCommand, AgentQuery.layer)),
+const jobServices = Layer.mergeAll(
+  TurnExecution.layer,
+  ChannelIntake.layer,
+  DeliveryExecution.layer,
+).pipe(
+  Layer.provide(
+    Layer.mergeAll(
+      threadQuery,
+      threadCommand,
+      turnCommand,
+      taskCommand,
+      channelQuery,
+      AgentQuery.layer,
+    ),
+  ),
 );
 
 /**
@@ -260,9 +312,9 @@ export type Operations = Layer.Success<typeof operations>;
 
 /**
  * The services a host's jobs call: what they ask of the workspace, and the session logs a turn's
- * job writes, which take part in no commit. They act as the agent or the product and check no
- * actor's permissions, so only jobs a host trusts run them, never a protocol's handlers for an
- * actor.
+ * job writes, which take part in no commit. They act as the agent, the contact, or the product and
+ * check no actor's permissions, so only jobs a host trusts run them, and intake for what the host's
+ * channels received, never a protocol's handlers for an actor.
  *
  * @category models
  */

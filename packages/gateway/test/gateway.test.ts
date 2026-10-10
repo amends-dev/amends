@@ -1,5 +1,13 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
+import {
+  ChannelBindingStore,
+  ChannelStore,
+  ContactStore,
+  DeliveryJobs,
+  DeliveryStore,
+} from "@amends/core/channel";
+import { TaskStore } from "@amends/core/task";
 import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
 import {
   ThreadStore,
@@ -146,6 +154,7 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           listPendingByRecipient: unexpected,
           listLatestByRecipient: unexpected,
           listLatestPendingByRecipient: unexpected,
+          listByThread: unexpected,
           listPendingByThread: unexpected,
           countPendingByRecipient: unexpected,
           countPendingByGroup: unexpected,
@@ -153,12 +162,21 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
           insertMany: unexpected,
         }),
       ),
+      Context.add(TaskStore.Service, {
+        get: unexpected,
+        getMany: unexpected,
+        listByGroup: unexpected,
+        insert: unexpected,
+        apply: unexpected,
+      }),
       Context.add(ThreadStore.Service, {
         get: unexpected,
+        getMany: unexpected,
         listByGroup: unexpected,
         listByLatest: unexpected,
         listByStart: unexpected,
         insert: unexpected,
+        rename: unexpected,
         getLatest: unexpected,
         recordLatest: unexpected,
       }),
@@ -175,14 +193,16 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       Context.add(ThreadMessageStore.Service, {
         get: unexpected,
         getMany: unexpected,
+        countByThread: unexpected,
         insert: unexpected,
+        edit: unexpected,
+        delete: unexpected,
       }),
       Context.add(ThreadActivityStore.Service, {
         latest: unexpected,
         get: unexpected,
         listByThread: unexpected,
         getFirst: unexpected,
-        countByKind: unexpected,
         readPage: unexpected,
         insert: unexpected,
       }),
@@ -270,6 +290,30 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       ),
     )
     .pipe(
+      Context.add(ChannelStore.Service, {
+        get: unexpected,
+        listActive: unexpected(),
+        insert: unexpected,
+        update: unexpected,
+      }),
+      Context.add(ChannelBindingStore.Service, {
+        get: unexpected,
+        findByConversation: unexpected,
+        insert: unexpected,
+      }),
+      Context.add(ContactStore.Service, {
+        get: unexpected,
+        getMany: unexpected,
+        insert: unexpected,
+        update: unexpected,
+      }),
+      Context.add(DeliveryStore.Service, {
+        get: unexpected,
+        listRequestedByThread: unexpected,
+        findByExternalMessage: unexpected,
+        insert: unexpected,
+        update: unexpected,
+      }),
       Context.add(
         SessionStateStore.Service,
         SessionStateStore.Service.of({ get: unexpected, set: unexpected }),
@@ -323,6 +367,7 @@ const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
     TurnJobs.layerNoRunner,
+    DeliveryJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,
       Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),

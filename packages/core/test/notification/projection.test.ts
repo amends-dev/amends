@@ -49,6 +49,7 @@ const refusing: NotificationStore.Interface = {
   listPendingByRecipient: () => Effect.die("Unexpected notification read"),
   listLatestByRecipient: () => Effect.die("Unexpected notification read"),
   listLatestPendingByRecipient: () => Effect.die("Unexpected notification read"),
+  listByThread: () => Effect.die("Unexpected notification read"),
   listPendingByThread: () => Effect.die("Unexpected notification read"),
   countPendingByRecipient: () => Effect.die("Unexpected notification read"),
   countPendingByGroup: () => Effect.die("Unexpected notification read"),

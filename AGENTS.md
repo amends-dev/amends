@@ -51,8 +51,11 @@ currently run through TypeScript. Check compatibility before changing this setup
   drives an agent inside a sandbox. `sandbox` is the contract every sandbox provider implements,
   with the suites each provider runs from `@amends/sandbox/conformance`; a sandbox knows nothing
   of what harness runs inside it. `toolkit` gives every kind of tool source, such as an MCP server
-  or an HTTP API, one shape. `connection` holds the integrations a host installs, what each
-  gives a workspace's connections (models, tools, sandboxes, and harnesses), and the model catalog.
+  or an HTTP API, one shape. `channel` is the contract every channel transport implements: how one
+  external system's conversations are received and replied to; an adapter implements it for one
+  system, and the host declares that system's integration. `connection` holds the integrations a
+  host installs, what each gives a workspace's connections (models, tools, sandboxes, harnesses,
+  and channels), and the model catalog.
   `cluster` runs jobs, the work outside requests, on Effect Cluster: entities whose requests a
   commit stores, with their retries and pruning. Jobs enter workspaces through the gateway like
   any other caller. Its turn job, one for each agent in each thread, runs the agent's turns on

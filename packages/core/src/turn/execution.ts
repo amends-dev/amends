@@ -5,6 +5,7 @@ import type { Agent } from "../agent/agent.ts";
 import { AgentQuery } from "../agent/query.ts";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
+import { ContactStore } from "../channel/ContactStore.ts";
 import { Actor } from "../identity/actor.ts";
 import { Identity } from "../identity/identity.ts";
 import { Performer } from "../identity/performer.ts";
@@ -15,17 +16,20 @@ import { Store } from "../journal/store.ts";
 import { Notification } from "../notification/notification.ts";
 import { NotificationStore } from "../notification/store.ts";
 import { SignalHub } from "../signal/hub.ts";
-import { ThreadActivityKind } from "../thread/activity/kind.ts";
-import { ThreadActivityStore } from "../thread/activity/store.ts";
-import { ThreadCommand } from "../thread/command.ts";
-import { ThreadId } from "../thread/id.ts";
-import { ThreadMessageActivity } from "../thread/message/activity.ts";
-import { ThreadMessage } from "../thread/message/message.ts";
-import { ThreadMessagePermissions } from "../thread/message/permissions.ts";
-import { ThreadMessageStore } from "../thread/message/store.ts";
-import { ThreadParticipation } from "../thread/participation/participation.ts";
-import { ThreadParticipationStore } from "../thread/participation/store.ts";
-import { ThreadQuery } from "../thread/query.ts";
+import { TaskStore } from "../task/TaskStore.ts";
+import type { Thread } from "../thread/Thread.ts";
+import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
+import { ThreadActivityStore } from "../thread/ThreadActivityStore.ts";
+import { ThreadCommand } from "../thread/ThreadCommand.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadMessageActivity } from "../thread/ThreadMessageActivity.ts";
+import { ThreadMessage } from "../thread/ThreadMessage.ts";
+import { ThreadMessagePermissions } from "../thread/ThreadMessagePermissions.ts";
+import { ThreadMessageStore } from "../thread/ThreadMessageStore.ts";
+import { ThreadParticipation } from "../thread/ThreadParticipation.ts";
+import { ThreadParticipationStore } from "../thread/ThreadParticipationStore.ts";
+import { ThreadQuery } from "../thread/ThreadQuery.ts";
+import { ThreadStore } from "../thread/ThreadStore.ts";
 import type { Member } from "../workspace/member/member.ts";
 import { MemberStore } from "../workspace/member/store.ts";
 import { NotActive, NotFound } from "./errors.ts";
@@ -55,14 +59,17 @@ export type AcceptError =
   | SessionLogStore.Failure;
 export type StartError =
   | Error
+  | Exclude<ThreadQuery.TimelineError, ThreadQuery.NotFound | Authorization.Denied>
+  | NotificationStore.Failure
   | MemberStore.Failure
+  | ContactStore.Failure
+  | TaskStore.Failure
   | ThreadParticipationStore.Failure
-  | ThreadActivityStore.Failure
-  | ThreadMessageStore.Failure
   | AgentQuery.BuildError;
 export type ReadError =
   | Error
   | MemberStore.Failure
+  | ContactStore.Failure
   | ThreadParticipationStore.Failure
   | ThreadActivityStore.Failure
   | ThreadMessageStore.Failure;
@@ -83,8 +90,9 @@ export const Start = Schema.TaggedUnion({
     turn: Turn.Record,
     runnable: AgentQuery.Runnable,
     /**
-     * The prompt: the thread's messages the agent was not told yet, through what the turn
-     * accepted, each named by its author, and who asked when someone retried the turn.
+     * The prompt: the thread as it stands, then what told the agent since it was last prompted,
+     * through what the turn accepted, each in its kind's words, and who asked when someone
+     * retried the turn.
      */
     prompt: Prompt.UserMessage,
     /** How many of the thread's messages the prompt tells. */
@@ -200,6 +208,9 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   const sessionLogStore = yield* SessionLogStore.Service;
   const notificationStore = yield* NotificationStore.Service;
   const memberStore = yield* MemberStore.Service;
+  const contactStore = yield* ContactStore.Service;
+  const taskStore = yield* TaskStore.Service;
+  const threadStore = yield* ThreadStore.Service;
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
   const threadMessageStore = yield* ThreadMessageStore.Service;
@@ -323,11 +334,24 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     });
   });
 
-  /** What members are called, as the agent is told; a member without a name is "A member". */
-  const readNames = Effect.fnUntraced(function* (memberIds: ReadonlyArray<Member.Id>) {
-    const members = yield* memberStore.getMany([...new Set(memberIds)]);
-    const names = new Map(members.map((member) => [member.id as string, member.name]));
-    return (memberId: Member.Id) => names.get(memberId) ?? "A member";
+  /**
+   * What the thread's people are called, as the agent is told them; a member without a name is
+   * "A member", and a contact no longer found "A contact".
+   */
+  const readNames = Effect.fnUntraced(function* (people: ReadonlyArray<ThreadMessage.Author>) {
+    const memberIds = new Set<Member.Id>();
+    const contactIds = new Set<Identity.ContactId>();
+    for (const person of people)
+      if (ThreadMessage.Author.isAnyOf(["Member"])(person)) memberIds.add(person.memberId);
+      else contactIds.add(person.contactId);
+    const members = yield* memberStore.getMany([...memberIds]);
+    const contacts = yield* contactStore.getMany([...contactIds]);
+    const memberNames = new Map(members.map((member) => [member.id as string, member.name]));
+    const contactNames = new Map(contacts.map((contact) => [contact.id as string, contact.name]));
+    return {
+      member: (memberId) => memberNames.get(memberId) ?? "A member",
+      contact: (contactId) => contactNames.get(contactId) ?? "A contact",
+    } satisfies TurnPrompt.Names;
   });
 
   /** The thread's messages in a range, as the agent `memberId` is told them. */
@@ -337,16 +361,65 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
     range: { readonly after: number; readonly through: number },
   ) {
     const messages = yield* readMessagesBetween(threadId, range);
-    const nameOf = yield* readNames(
-      messages.flatMap(({ author }) =>
-        ThreadMessage.Author.isAnyOf(["Member"])(author) ? [author.memberId] : [],
+    const names = yield* readNames(messages.map(({ author }) => author));
+    // A deleted message has no text to tell; what the agent was told of it stays in its log.
+    return messages.flatMap(({ author, content }): ReadonlyArray<TurnPrompt.Input> => {
+      if (!ThreadMessage.Content.isAnyOf(["Text"])(content)) return [];
+      const { text } = content;
+      return ThreadMessage.Author.isAnyOf(["Member"])(author)
+        ? [{ author: names.member(author.memberId), own: author.memberId === memberId, text }]
+        : [{ author: names.contact(author.contactId), own: false, text }];
+    });
+  });
+
+  /**
+   * The thread's timeline items in a range of positions that told the agent, oldest first: those
+   * at the positions of its notifications there, whatever their state, resolved as the agent reads
+   * the timeline.
+   */
+  const readTold = Effect.fnUntraced(function* (
+    turn: Turn.Record,
+    range: { readonly after: number; readonly through: number },
+  ) {
+    if (range.through < 1 || range.after >= range.through) return [];
+    const told = yield* notificationStore.listByThread(
+      Notification.ofMember(
+        turn.memberId,
+        Identity.MemberReference.cases.Agent.make({ id: turn.agentId }),
       ),
+      turn.threadId,
+      { afterSequence: range.after, throughSequence: range.through },
     );
-    return messages.map(({ author, text }): TurnPrompt.Input =>
-      ThreadMessage.Author.isAnyOf(["Member"])(author)
-        ? { author: nameOf(author.memberId), own: author.memberId === memberId, text }
-        : { author: "A contact", own: false, text },
+    const sequences = new Set(
+      told.flatMap((record) => (record.thread === undefined ? [] : [record.thread.sequence])),
     );
+    if (sequences.size === 0) return [];
+    const items: Array<Thread.TimelineItem> = [];
+    const through = Math.max(...sequences);
+    let after = Math.min(...sequences) - 1;
+    for (;;) {
+      const page = yield* threadQuery.readTimeline(turn.threadId, {
+        afterSequence: after,
+        beforeSequence: through + 1,
+        from: "oldest",
+        limit: pageSize,
+      });
+      for (const item of page) if (sequences.has(item.activity.sequence)) items.push(item);
+      const last = page.at(-1);
+      if (last === undefined || page.length < pageSize || last.activity.sequence >= through) break;
+      after = last.activity.sequence;
+    }
+    return items;
+  });
+
+  /** The thread as it stands, for the agent: its title, and its task when it is one. */
+  const readContext = Effect.fnUntraced(function* (threadId: ThreadId.Id) {
+    const thread = yield* threadStore.get(threadId);
+    const task = yield* taskStore.get(threadId);
+    return {
+      title: Option.isSome(thread) ? thread.value.title : null,
+      task: Option.getOrUndefined(task),
+    } satisfies TurnPrompt.Context;
   });
 
   /**
@@ -471,23 +544,29 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
   ) {
     const participation = yield* requireParticipation(turn);
     const saved = yield* sessionStateStore.get(turn.participationId);
-    const inputs = yield* readInputs(turn.memberId, turn.threadId, {
+    const items = yield* readTold(turn, {
       after: Option.match(saved, {
         onNone: () => participation.joinedAtSequence - 1,
         onSome: ({ promptedThroughSequence }) => promptedThroughSequence,
       }),
       through: turn.acceptedThroughSequence,
     });
-    const retriedBy =
-      turn.retry === null ? undefined : (yield* readNames([turn.retry.by]))(turn.retry.by);
-    const prompt = TurnPrompt.promptOf(inputs, retriedBy);
-    // Nothing to say, as when what the turn accepted was all the agent's own.
+    const context = yield* readContext(turn.threadId);
+    const retriedBy: ReadonlyArray<ThreadMessage.Author> =
+      turn.retry === null ? [] : [{ _tag: "Member", memberId: turn.retry.by }];
+    const names = yield* readNames([...TurnPrompt.peopleOf(context, items), ...retriedBy]);
+    const prompt = TurnPrompt.promptOf(context, items, {
+      self: turn.memberId,
+      names,
+      retriedBy: turn.retry === null ? undefined : names.member(turn.retry.by),
+    });
+    // Nothing to say, as when what told the agent has no words for it.
     if (prompt === undefined)
       return yield* endAsIdle(turn, { outcome: "completed", messageIds: [] });
     const ready = {
       runnable,
       prompt,
-      messages: inputs.filter(({ own }) => !own).length,
+      messages: TurnPrompt.countMessages(items),
       resume: Option.match(saved, {
         onNone: () => null,
         onSome: ({ agent, agentState }): SessionStateStore.Resume =>
@@ -546,6 +625,17 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
               }),
             "AgentQuery.NotFound": () =>
               endAsIdle(turn, { outcome: "failed", reason: "The agent can no longer run." }),
+            // The thread is gone or closed to the agent: the turn fails rather than tells nothing.
+            "ThreadQuery.NotFound": () =>
+              endAsIdle(turn, {
+                outcome: "failed",
+                reason: "The agent can no longer read the thread.",
+              }),
+            "Authorization.Denied": () =>
+              endAsIdle(turn, {
+                outcome: "failed",
+                reason: "The agent can no longer read the thread.",
+              }),
           }),
         );
       }),
@@ -651,7 +741,7 @@ export const make = Effect.fn("TurnExecution.make")(function* () {
           mentions: [],
           participants: participants.success,
           occurredAt: yield* DateTime.now,
-          turnId: turn.id,
+          via: { _tag: "Turn", turnId: turn.id },
         });
         const messageIds = [published.message.id];
         yield* turnCommand.endTurn(turn, { outcome: "completed", messageIds });

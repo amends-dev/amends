@@ -14,27 +14,28 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                                               |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.           |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                     |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                           |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                         |
-| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.               |
-| `thread`        | Private-group starts, human replies, authorized reads, participation, timeline activity, and projection storage.        |
-| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on. |
-| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                              |
-| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.  |
-| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                   |
-| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                          |
-| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                   |
-| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                   |
+| Domain          | Ownership                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.                                                        |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                                                                  |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                                                                        |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                                                                      |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                                                            |
+| `thread`        | Private-group starts, renames, human replies and their edits and deletions, authorized reads, participation, timeline activity, and projection storage.              |
+| `task`          | The work a thread tracks: its status, priority, and assignee, created with the thread or in a conversation, changed one way at a time, and read by group.            |
+| `channel`       | Channels: a connection's external conversations as threads in one group, their contacts, what they send taken in, and what they are told carried back as deliveries. |
+| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.                                              |
+| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                                                           |
+| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.                                               |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                                                             |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                                                                |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                                                                       |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                                                                |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                                                                |
 
 Permission, grant, requirement, scope, and target remain focused modules within
-authorization. Future features such as thread and task belong beside these
-domains; workspace scoping alone does not make a feature part of workspace
-management.
+authorization. Future features belong beside these domains; workspace scoping alone does not make
+a feature part of workspace management.
 
 `@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
 contract, `NotificationService`, and the projection that generates notifications. A record
@@ -243,16 +244,21 @@ job could call them from another process. Each change is its own commit, attribu
   agent cannot run on it. `start` answers `Idle`, or `Ready` with the turn, the agent's `Runnable`,
   its prompt and how many messages it tells, and what the participation's session resumes from
   (`SessionStateStore.Resume`), or none when it starts anew. The prompt (`TurnPrompt.promptOf`) is
-  the others' messages since the agent was last prompted there, through what the turn accepted,
-  each named by its author, and, for a retry, who asked. A running turn, as a run cut short leaves
-  it, is ready again as it was.
+  the agent's view of the timeline since it was last prompted there, through what the turn
+  accepted: first the thread as it stands, its title and its task's state, then each activity that
+  told the agent, in its kind's words, as a person reads it in the timeline, and, for a retry, who
+  asked. What told the agent is its notifications from the thread in that range, whatever their
+  state, so the recipient rules decide what an agent is told and the prompt only how each kind
+  reads: a message by its author, an edit by its new text, a deletion as such, a task's creation
+  and changes by their values, with the agent itself as "you"; a turn's own activity tells no one.
+  A running turn, as a run cut short leaves it, is ready again as it was.
 - `joinedConversation` is the conversation the agent joined: the thread's messages before it took
   part (`TurnPrompt.conversationOf`: others' as the user's, each named, the agent's own as its
   answers), which a new session log starts with.
 - `showDraft` shows readers more of the step being written, as a `TurnDraft` signal.
 - `close` posts the reply its job gives, the text of the turn's last step
   (`SessionLog.answerOf`), as the agent's own message to the thread's current participants, naming
-  the turn (`turnId` on the message), saves what the session resumes from, and completes the turn,
+  the turn (the message's `via`), saves what the session resumes from, and completes the turn,
   in one commit. A reply of only space posts nothing, and one the agent may no longer post, as it
   can no longer open or post in the thread, fails the turn. A turn asked to stop meanwhile stops
   instead.
@@ -358,27 +364,33 @@ every thread belongs to one group.
 ## Threads
 
 `@amends/core/thread` holds threads, participations, messages, and their timeline activity, with
-four store contracts. Its operations are `ThreadService` (`startInGroup`, `startDirect`, `get`,
-`listInGroup`, `listOpenings`, `readTimeline`, `listParticipants`), `ThreadMessageService.publish`, and
+four store contracts. Its operations are `ThreadService` (`startInGroup`, which also starts a
+thread as a task, `startDirect`, `rename`, `get`, `listInGroup`, `listOpenings`, `readTimeline`,
+`listParticipants`), `ThreadMessageService` (`publish`, `edit`, `delete`, `typing`), and
 `ThreadParticipationService` (`follow`, `unfollow`). A participant is a member, a contact, or
 triage: member participation references the exact group admission, while contacts and triage take
-part without group access. A message author is a member or a contact.
+part without group access. A message author is a member or a contact. `@amends/core/task` builds on
+it: `Task.Record` is a row keyed by the thread, `TaskService` (`create`, `update`, `get`,
+`listInGroup`) the operations, and `TaskCommand` the writes that create and change a task at the
+thread's next position, telling and admitting by the change, and asking an agent's turn to stop when
+a change takes the agent off the task; the thread's list items carry each thread's task.
 
 Two internal services carry the work operations share, with no action checks of their own; they
 are excluded from `Core.Operations`. `ThreadQuery` holds the reads and `ThreadCommand` the writes,
 which run inside the caller's commit and publication context. A command may read through
 `ThreadQuery`; a query never writes.
 
-| Method                                                                    | Role                                                                                                  |
-| ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                   |
-| `ThreadQuery.requireReadable`                                             | The thread under that access and `thread.read`, as every read of its conversation needs               |
-| `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                |
-| `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                          |
-| `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                   |
-| `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message |
-| `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients                                     |
-| `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording            |
+| Method                                                                    | Role                                                                                                         |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `ThreadQuery.requireAccess`                                               | Checks current group access to a thread, shared by reads and writes                                          |
+| `ThreadQuery.requireReadable`                                             | The thread under that access and `thread.read`, as every read of its conversation needs                      |
+| `ThreadQuery.eligibleMembers`                                             | The members with a current group admission and active membership, of those asked about                       |
+| `ThreadQuery.currentParticipants`, `pageParticipants`, `findParticipants` | Current participants: all of them, a page, or the given ones                                                 |
+| `ThreadQuery.listReadable`                                                | A page of a group's threads the actor can read, from any listing, with tasks, latest activity, and positions |
+| `ThreadQuery.readTimeline`, `readTimelineItem`                            | Resolve timeline subjects under access, for timeline pages and notification sources                          |
+| `ThreadCommand.create`                                                    | The one start every workflow uses: creates the thread, admits its starters, records the first message        |
+| `ThreadCommand.publishMessage`                                            | Publishes a message with its admissions, activity, and recipients                                            |
+| `ThreadCommand.publishActivity`                                           | Publishes one activity of any kind: position, admissions, the domain's step, and recording                   |
 
 `ThreadActivityResolvers` routes each activity kind to the resolver its domain registers.
 
@@ -389,15 +401,20 @@ envelope into their own store. Domain facts own state, and activity owns timelin
 ### Activity kinds
 
 An activity has one shape for every kind, `ThreadActivity.Record`: its position, a dotted `kind`
-such as `message.published`, its `subject`, an `occurrence` key, `newActivity`, and the kind's
-`details` in encoded JSON. Storage, facts, and the change feed carry that shape, so a new kind
-changes none of them and needs no migration. The domain that owns a kind defines it next to its
-facts with `ThreadActivityKind.make(name, { details, subject, occurrence?, newActivity })`:
-`ThreadMessageActivity.Published`, `ThreadParticipationActivity.Followed` and `Ended`, and
+such as `message.published` and the `version` of its details, its `subject`, an `occurrence` key,
+`newActivity`, and the kind's `details` in encoded JSON. Storage, facts, and the change feed carry
+that shape, so a new kind or version changes none of them and needs no migration. The domain that
+owns a kind defines it next to its facts with
+`ThreadActivityKind.make(name, { version, details, subject?, occurrence?, newActivity })`:
+`ThreadMessageActivity.Published`, `Edited`, and `Deleted`, `ThreadParticipationActivity.Followed`
+and `Ended`, `ThreadTitleActivity.Renamed`, `TaskActivity.Created` and `Updated`, and
 `TurnActivity.Created`, `Started`, `Stopping`, and `Ended`.
 
 - `details` is the kind's schema, encoded to JSON when recorded and decoded when read.
-- `subject` names what the activity is about, derived from its details.
+- `version` is the details schema's version, recorded on the activity. A kind whose details change
+  takes the next, and reading an activity at another version is a `Mismatch`, as decoding a fact of
+  another version is.
+- `subject` names what the activity is about, derived from its details; without one, its thread.
 - `occurrence` gives the parts that make it unique; by default its subject, so each subject has
   at most one activity of the kind. Returning `null` makes the kind repeatable.
 - `newActivity` says whether it becomes its thread's and group's latest activity for readers;
@@ -413,8 +430,8 @@ operation asks for, then runs the domain's step, which publishes the domain fact
 kind, details, and recipients. The activity is recorded at that position, caused by that fact.
 
 A kind appears in timelines through a resolver its domain registers:
-`ThreadMessageTimeline.resolver`, `ThreadParticipationTimeline.resolver`, and
-`TurnTimeline.resolver`. Each loads what its
+`ThreadMessageTimeline.resolver`, `ThreadParticipationTimeline.resolver`,
+`ThreadTitleTimeline.resolver`, `TaskTimeline.resolver`, and `TurnTimeline.resolver`. Each loads what its
 kinds reference in one batch per page and returns typed items; each timeline module adds its item
 type to `ThreadActivityKind.Item` by module augmentation. `src/core.ts` registers the resolvers, and
 `ThreadTimeline.Item` is the closed schema of every item, for protocols that encode timelines; a new
@@ -629,6 +646,26 @@ them, so a client may call it on each keystroke; clients hide their own member's
 `ReadStateService` and `NotificationService.markSeen` and `markSeenThrough` publish the read-state
 signals after their writes; the reader's sessions, the one that wrote included, refresh from them.
 
+## Channels
+
+`@amends/core/channel` is a channel, a connection's external conversations as threads in one group,
+as [threads](../../docs/threads.md#channels) fixes it and
+[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Record` names the connection,
+the group new conversations open in, and whether they open tasks; `ChannelBinding.Record` is a bound
+thread's conversation, keyed by the thread, as the connection's transport
+([channel](../channel/README.md)) identifies it;
+`Contact.Record` a person heard from through a channel, named as the system names them; and
+`Delivery.Record` one message's delivery to a conversation, `requested`, `sent`, or `failed`.
+`ChannelService` (`create`, `list`, `get`, `redirect`, `remove`, `getBinding`) is the operations,
+under `channel.create` on the workspace and `channel.read` and `channel.manage` on the channel.
+`ChannelIntake` takes in what a channel's system sent, as no member: `receive` gives the request to
+the channel's transport and takes in each event it makes, and `intake` takes one event in, each in a
+commit of its own as the contact. `DeliveryExecution` is what the delivery job asks of the
+workspace: `accept` the contacts' pending notifications into deliveries, `start` one with what to
+post and how to reach the system, and `recordSent` or `recordFailed`; the job posts. `ChannelQuery`
+is the reads they share: the channel as it stands, and its connection's integration, access, and
+transport. The `channel` projection applies `ChannelFacts`, and `channel-delivery` `DeliveryFacts`.
+
 ## Jobs
 
 A job is work a commit asks for that runs outside any request. Core declares which facts request
@@ -644,13 +681,18 @@ agent's job names the agent by its membership.
   that asks the agent for work, and a turn's end or retry, request a run; a request to stop a
   turn, and the end of the agent's participation in the thread or its leaving the thread's group,
   request a stop.
+- A **delivery job** (`DeliveryJobs`), one for each thread bound to a channel's conversation,
+  carries what the thread's contacts were told to the conversation, asking the workspace through
+  `DeliveryExecution`. Activity that tells a contact something requests it.
 
-`TurnJobs.Service` is a host service, shared by every workspace, which delivers each request to
-whatever runs turn jobs; `TurnJobs.layerNoRunner` accepts requests and runs nothing. What the job
-calls, `TurnExecution`, is part of `Core.layer`, and `Core.JobServices` names it with the
-`SessionLogStore` the job writes, apart from `Core.Operations`, since no actor calls them: they act
-as the agent. A host's jobs reach them through the gateway's `inWorkspace`.
-[Cluster](../cluster/README.md)'s `TurnJob` runs turn jobs, as the local host does.
+`TurnJobs.Service` and `DeliveryJobs.Service` are host services, shared by every workspace, which
+deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests and runs
+nothing. What the jobs call, `TurnExecution` and `DeliveryExecution`, is part of `Core.layer`, and
+`Core.JobServices` names them with `ChannelIntake`, which a host calls for what its channels
+receive, and the `SessionLogStore` a turn's job writes, apart from `Core.Operations`, since no actor
+calls them: they act as the agent, the contact, or delivery itself. A host's jobs reach them through
+the gateway's `inWorkspace`. [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run
+them, as the local host does.
 
 ## Module dependencies and exports
 
@@ -668,6 +710,14 @@ module and preserve its authorization and transaction boundaries.
 Inside core, import the owning leaf module directly. Each leaf establishes its
 canonical ES module namespace with a self-export, and public barrels relay those
 names. Avoid importing an aggregate barrel from an internal module.
+
+The thread feature is written as the published packages are, and the other domains
+follow when touched: one module per namespace, named after it and flat in the feature
+directory (`thread/ThreadMessageService.ts` exports `ThreadMessageService`), with
+helpers no consumer imports under `internal/`; a header paragraph and `@since` on every
+module; `@category` and `@since` on every export, documented one by one; and a service
+key that names its module, `@amends/core/thread/ThreadStore`. The categories and the
+rest of the convention are in [threads](../../docs/threads.md#code-conventions).
 
 ```ts
 // Inside the member feature:

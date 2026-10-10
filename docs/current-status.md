@@ -12,14 +12,19 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - A group's visibility is chosen at creation and cannot change afterwards. Public groups show
   their threads only to members, with no read-only preview before joining. Direct groups exist,
   with fixed membership.
-- Only member workflows exist. Task and channel workflows, which will start threads with contacts
-  and triage and admit human followers, are not implemented, and neither are managing other
-  participants or muting.
+- Member, task, and [channel](thread-workflows.md#channels) workflows exist; managing other
+  participants and muting are not implemented. No installed integration gives channels yet, so the
+  local host can create no channel until one does; the conformance suites run channels on a test
+  transport. Contacts are told of messages alone, which the delivery job carries to their
+  conversation; a sent message's edits and deletions are not carried, and a channel's readiness is
+  not shown. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision
+  for it, and a task's cross-group views, such as everything assigned to one member, are not read.
 - Agents accept the work asked of them into [turns](../packages/core/README.md#turns), which the
   local host runs as [cluster](../packages/cluster/README.md)'s turn jobs on
   [harness](../packages/harness/README.md). Core starts each turn as one
   harness turn on what [agents](../packages/core/README.md#agents) select, prompted with the
-  thread's messages since the agent's last turn there, and posts the reply its job gives, the text
+  thread as it stands and what told the agent since its last turn there, each in its kind's
+  words, and posts the reply its job gives, the text
   of the turn's last step; a turn that fails or is stopped posts nothing. The job records the
   conversation in each participation's session log, from which the agent's next turn there
   resumes; resuming reads the whole log each turn and goes on from its latest compaction. A turn
@@ -29,12 +34,11 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   a stream of its items and the step being written; the text being written is best effort, and a
   reader who starts following midway, or misses a draft while reconnecting, sees a step's text
   from its next text part, or once the step finishes. The [turn screens](turns.md) follow, stop,
-  and retry turns in threads and show each turn's log; threads have no titles, so the log names a
-  thread by its group.
+  and retry turns in threads and show each turn's log; they do not show a thread's title yet, so the
+  log names a thread by its group.
   A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
   activity for participants is not built. The active turns read covers at most a hundred active
-  turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
-  outside the store. Task activity kinds remain design intent.
+  turns in the workspace. Triage has no inbox outside the store.
 - The [harness](../packages/harness/README.md) runs amends's own agent
   ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
@@ -222,14 +226,15 @@ closes, and shows "You're all caught up" only once nothing unread and nothing op
 "Mark all seen" marks everything through the newest one listed so that later arrivals stay
 unread. There is no way to mark one seen without opening it. The inbox reads each listed
 notification's source under current access, so a page of 25 makes up to 25 source reads. Triage, which routes tasks, stays a
-placeholder until tasks exist.
+placeholder: tasks admit and tell it, but nothing evaluates a policy for it yet.
 
 Settings follows the Lunacy mocks, with Workspace and Members as sections in its sidebar, each
 its own page, and invitations as modals from Members. A member's access lists each assignment by its role or permission and whether it covers
 the workspace or one item; which item is not shown. Search is Jump to, over what the app already
 reads: pages, groups, conversations, people, agents, and connections, by name.
-Searching messages has no backend. A group shows its Threads tab alone; the mocks' Tasks and Files
-tabs, reactions, and task references have no backend and are not shown.
+Searching messages has no backend. A group shows its Threads tab alone: tasks have a backend, but
+the mocks' Tasks tab is not connected to it, and a thread's task shows nowhere yet; Files, reactions,
+and task references have no backend and are not shown.
 
 ## Storage cost
 

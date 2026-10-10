@@ -2,7 +2,8 @@
 
 What amends connects to, and what it knows of the models it can run. It depends on Effect, and on the contracts of the
 [harness](../harness), [sandboxes](../sandbox), and the [toolkit](../toolkit), whose
-`Harness`, `ModelEndpoint`, `SandboxProvider`, and `ToolSource` are what a connection gives.
+`Harness`, `ModelEndpoint`, `SandboxProvider`, and `ToolSource` are what a connection gives, and
+the [channel](../channel) contract, whose `ChannelTransport` is the fifth.
 
 ## Integrations, connections, and credentials
 
@@ -10,7 +11,8 @@ An **integration** is a kind of system amends connects to, declared in code with
 its `settings`, a schema of what a connection to it gives besides a secret, such as a URL, left out
 when it takes none; the `auth` methods a connection can authenticate by, `apiKey` or `none` until
 OAuth comes; what a connection gives, of `harnesses` that run agents, `models` an agent runs on,
-`sandboxes` it works in, and `tools` it calls; and a `check`. The code of an integration is given a
+`sandboxes` it works in, `tools` it calls, and `channels` whose conversations become threads; and a
+`check`. The code of an integration is given a
 connection with its settings decoded and its key, which it always has when a connection to it
 authenticates only with a key. An integration that gives harnesses says whether their agent
 `requiresSandbox`, so that an agent can be set up to run on it before any harness is made. One that
@@ -79,6 +81,24 @@ in a header the connection names, or with none. The key goes on the requests to 
 alone; an API's document is read without it. Checking an MCP server asks it which tools it has.
 Checking an API reads its document, which the key plays no part in, so a wrong key there shows when a
 tool first runs.
+
+## Channels
+
+[`@amends/channel`](../channel)'s `ChannelTransport` is what an integration gives a channel: how its
+external system's conversations are received and replied to. `receive` takes a request the system sent the host, its headers and
+body as they came, verifies it as the system signs it, and gives the `events` in it, each a
+`MessageReceived`, `MessageEdited`, or `MessageDeleted` with the external `conversation`, its id and
+what the transport needs to post there, the message's id, its `sender`, and when, and the `answer`
+the system expects when it does, as Slack's URL verification does; a request it cannot read is a
+`TransportError` of reason `rejected`. `post` sends `Outgoing`, a text and its author's name, as a
+reply in a conversation, and gives the id the system assigned the message; `edit` and `delete`,
+when the system allows them, change a posted message. `self` is the transport's own identity in the
+system, so that what it posted and receives back is known as an echo. A `TransportError` is
+`refused` when the system refused the request for good, and `unavailable`, which `isRetryable`, when
+it could not be reached. An integration gives transports with `channels: (access) =>
+Effect<ChannelTransport>`, and `Integration.channelTransport(connection, credential?)` makes one
+for a connection. No installed integration gives channels yet; the conformance suites run channels
+on a test transport.
 
 ## Testing
 

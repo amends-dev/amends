@@ -19,7 +19,7 @@
     },
     "adapters/harness-amends": {
       "name": "@amends/harness-amends",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -39,7 +39,7 @@
     },
     "adapters/harness-opencode": {
       "name": "@amends/harness-opencode",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "dependencies": {
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
@@ -266,6 +266,16 @@
         "effect": "catalog:",
       },
     },
+    "packages/channel": {
+      "name": "@amends/channel",
+      "version": "0.1.0",
+      "devDependencies": {
+        "effect": "catalog:",
+      },
+      "peerDependencies": {
+        "effect": "catalog:",
+      },
+    },
     "packages/cluster": {
       "name": "@amends/cluster",
       "version": "0.0.0",
@@ -277,11 +287,15 @@
         "@amends/sandbox": "workspace:*",
         "effect": "catalog:",
       },
+      "devDependencies": {
+        "@amends/channel": "workspace:*",
+      },
     },
     "packages/connection": {
       "name": "@amends/connection",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/channel": "workspace:*",
         "@amends/harness": "workspace:*",
         "@amends/sandbox": "workspace:*",
         "@amends/toolkit": "workspace:*",
@@ -298,6 +312,7 @@
       "name": "@amends/core",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/channel": "workspace:*",
         "@amends/connection": "workspace:*",
         "@amends/harness": "workspace:*",
         "effect": "catalog:",
@@ -355,6 +370,7 @@
       "name": "@amends/storage-conformance",
       "version": "0.0.0",
       "dependencies": {
+        "@amends/channel": "workspace:*",
         "@amends/connection": "workspace:*",
         "@amends/core": "workspace:*",
         "@amends/gateway": "workspace:*",
@@ -398,6 +414,8 @@
     "@adobe/css-tools": ["@adobe/css-tools@4.5.0", "", {}, "sha512-6OzddxPio9UiWTCemp4N8cYLV2ZN1ncRnV1cVGtve7dhPOtRkleRyx32GQCYSwDYgaHU3USMm84tNsvKzRCa1Q=="],
 
     "@amends/api-http": ["@amends/api-http@workspace:packages/api-http"],
+
+    "@amends/channel": ["@amends/channel@workspace:packages/channel"],
 
     "@amends/client": ["@amends/client@workspace:apps/client"],
 

@@ -73,6 +73,20 @@ export const layer = HttpApiBuilder.group(
             ),
           ),
         ),
+      rename: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadService.Service, (threadService) =>
+              threadService.rename({
+                threadId: params.threadId,
+                title: payload.title,
+                expectedTitle: payload.expectedTitle,
+              }),
+            ),
+          ),
+        ),
       timeline: ({ params, query }) =>
         Effect.flatMap(Principal, (principal) =>
           gateway.asMember(
@@ -103,6 +117,26 @@ export const layer = HttpApiBuilder.group(
                 { threadId: params.threadId, ...payload },
                 { requestKey: headers["idempotency-key"] },
               ),
+            ),
+          ),
+        ),
+      edit: ({ params, payload }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.edit({ messageId: params.messageId, ...payload }),
+            ),
+          ),
+        ),
+      delete: ({ params }) =>
+        Effect.flatMap(Principal, (principal) =>
+          gateway.asMember(
+            params.workspaceId,
+            principal,
+            Effect.flatMap(ThreadMessageService.Service, (threadMessageService) =>
+              threadMessageService.delete(params.messageId),
             ),
           ),
         ),

@@ -31,6 +31,13 @@ export const make = Effect.fn("Threads.make")(function* () {
       },
       Effect.mapError(storeFailure(ThreadStore, "get")),
     ),
+    getMany: Effect.fn("Threads.getMany")(
+      function* (input) {
+        const ids = yield* Schema.decodeEffect(Schema.Array(Thread.Id))(input);
+        return yield* rows.getMany((yield* read).records.threads, ids);
+      },
+      Effect.mapError(storeFailure(ThreadStore, "getMany")),
+    ),
     listByGroup: Effect.fn("Threads.listByGroup")(
       function* (input) {
         const groupId = yield* Schema.decodeEffect(Group.Id)(input);
@@ -119,6 +126,30 @@ export const make = Effect.fn("Threads.make")(function* () {
         .encode(latest)
         .pipe(Effect.mapError(storeFailure(ThreadStore, "recordLatest")));
       space.records.threadLatest.set(latest.threadId, row);
+    }),
+    rename: Effect.fn("Threads.rename")(function* (input) {
+      yield* Store.Transaction;
+      const renamed = yield* Schema.decodeEffect(Schema.toType(Thread.Renamed))(input).pipe(
+        Effect.mapError(storeConflict(ThreadStore, "rename")),
+      );
+      if (renamed.workspaceId !== workspaceId)
+        return yield* new ThreadStore.Conflict({
+          operation: "rename",
+          message: "Expected a thread in this workspace",
+        });
+      const space = yield* write.pipe(Effect.mapError(storeFailure(ThreadStore, "rename")));
+      const found = yield* rows
+        .get(space.records.threads, renamed.threadId)
+        .pipe(Effect.mapError(storeFailure(ThreadStore, "rename")));
+      if (Option.isNone(found))
+        return yield* new ThreadStore.Conflict({
+          operation: "rename",
+          message: "Thread is missing",
+        });
+      const row = yield* rows
+        .encode({ ...found.value, title: renamed.title })
+        .pipe(Effect.mapError(storeFailure(ThreadStore, "rename")));
+      space.records.threads.set(renamed.threadId, row);
     }),
     insert: Effect.fn("Threads.insert")(function* (input) {
       yield* Store.Transaction;

@@ -12,7 +12,9 @@ import { WorkspacesHandlers } from "./workspaces.ts";
 import { ChangeFeedHandlers } from "./change-feed.ts";
 import { ConnectionsHandlers } from "./connections.ts";
 import { AgentsHandlers } from "./agents.ts";
+import { ChannelsHandlers } from "./channels.ts";
 import { GroupsHandlers } from "./groups.ts";
+import { TasksHandlers } from "./tasks.ts";
 import { ThreadsHandlers } from "./threads.ts";
 import { TurnsHandlers } from "./turns.ts";
 
@@ -30,10 +32,12 @@ export const layerHandlers = Layer.mergeAll(
   AssignmentsHandlers.layer,
   GroupsHandlers.layer,
   ThreadsHandlers.layer,
+  TasksHandlers.layer,
   NotificationsHandlers.layer,
   ConnectionsHandlers.layer,
   AgentsHandlers.layer,
   TurnsHandlers.layer,
+  ChannelsHandlers.layer,
   ChangeFeedHandlers.layer,
 ).pipe(Layer.provideMerge(BearerAuthentication.layer));
 

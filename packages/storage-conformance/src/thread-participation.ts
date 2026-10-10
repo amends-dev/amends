@@ -1610,10 +1610,9 @@ export const threadParticipation = (harness: Harness) => {
                 workspaceId,
                 threadId,
                 author: { _tag: "Contact", contactId },
-                text: "Hello from outside",
-                mentions: [],
+                via: null,
                 publishedAt: at,
-                turnId: null,
+                content: ThreadMessage.published("Hello from outside", []),
               } satisfies ThreadMessage.Record;
               yield* facts(
                 bound,

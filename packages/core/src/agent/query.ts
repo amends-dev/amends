@@ -1,4 +1,4 @@
-import { Connection as ConnectionContract, Integrations } from "@amends/connection";
+import { Integrations } from "@amends/connection";
 import { Array, Context, Effect, Layer, Option, Schema } from "effect";
 import { Connection } from "../connection/connection.ts";
 import { ConnectionCredentialStore } from "../connection/credential-store.ts";
@@ -22,13 +22,6 @@ export type SelectError = ReadError | ConnectionStore.Failure | Incomplete;
 /** Building can also meet a connection whose key cannot be read. */
 export type BuildError = SelectError | ConnectionCredentialStore.Failure;
 
-/** A connection as its integration takes it, with its key when it authenticates with one. */
-export const Access = Schema.Struct({
-  connection: ConnectionContract.Connection,
-  credential: Schema.NullOr(ConnectionContract.Credential),
-});
-export interface Access extends Schema.Schema.Type<typeof Access> {}
-
 /**
  * An agent ready to run on a selection, as data: what it works by, and the connections of its
  * harness, model, and sandbox, each with its key. Whoever runs the agent builds it from them with
@@ -36,11 +29,11 @@ export interface Access extends Schema.Schema.Type<typeof Access> {}
  */
 export const Runnable = Schema.Struct({
   instructions: Agent.Instructions,
-  harness: Access,
+  harness: Connection.Access,
   /** The model's connection, and the model as its integration's endpoint takes it. */
-  model: Schema.Struct({ ...Access.fields, model: Agent.Model }),
+  model: Schema.Struct({ ...Connection.Access.fields, model: Agent.Model }),
   /** The sandbox's connection, or none for an agent that works without a sandbox. */
-  sandbox: Schema.NullOr(Access),
+  sandbox: Schema.NullOr(Connection.Access),
 });
 export interface Runnable extends Schema.Schema.Type<typeof Runnable> {}
 
@@ -146,7 +139,8 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
     if (resolved._tag !== "Installed")
       return yield* new Incomplete({ issues: [{ _tag: resolved._tag, part }] });
     const { connection } = resolved;
-    if (connection.auth === "none") return { connection, credential: null } satisfies Access;
+    if (connection.auth === "none")
+      return { connection, credential: null } satisfies Connection.Access;
     const credential = yield* connectionCredentialStore
       .get(connectionId)
       .pipe(
@@ -156,7 +150,7 @@ export const make = Effect.fn("AgentQuery.make")(function* () {
       );
     if (Option.isNone(credential))
       return yield* invalid(part, `The connection ${connection.name} has no API key`);
-    return { connection, credential: credential.value } satisfies Access;
+    return { connection, credential: credential.value } satisfies Connection.Access;
   });
 
   const select = Effect.fn("AgentQuery.select")(function* (

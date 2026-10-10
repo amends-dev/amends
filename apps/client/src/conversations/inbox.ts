@@ -2,7 +2,13 @@ import type { ConversationStatus } from "@amends/ui/screens/group";
 import type { InboxItem } from "@amends/ui/screens/inbox";
 import { Exit } from "effect";
 import { createMemo, createSignal, type Accessor } from "solid-js";
-import { markSeen, type InboxFilter, type NotificationInbox, Notification } from "./api.ts";
+import {
+  markSeen,
+  type InboxFilter,
+  type NotificationInbox,
+  Notification,
+  ThreadMessage,
+} from "./api.ts";
 import { workspaceFailure, type WorkspaceFailure } from "../api/failures.ts";
 import { useMutation } from "../api/mutation.ts";
 import { useInbox, useInboxPending } from "./reads.ts";
@@ -85,11 +91,16 @@ export function useInboxView(
   };
   const entryOf = ({ notification, source }: Item): InboxEntry => {
     const readable = source !== undefined && "message" in source ? source : undefined;
+    // A deleted message has no text to show; the notification still says where it was.
+    const content =
+      readable !== undefined && ThreadMessage.Content.isAnyOf(["Text"])(readable.message.content)
+        ? readable.message.content
+        : undefined;
     const recipient = notification.recipient;
     const mentioned =
-      readable !== undefined &&
+      content !== undefined &&
       "memberId" in recipient &&
-      readable.message.mentions.includes(recipient.memberId);
+      content.mentions.includes(recipient.memberId);
     return {
       id: notification.id,
       at: toDate(notification.recordedAt),
@@ -106,8 +117,8 @@ export function useInboxView(
               : "reply",
       author: readable && people.authorOf(readable.message.author),
       place: readable ? placeOf(notification.thread?.groupId) : undefined,
-      text: readable?.message.text,
-      mentions: readable ? people.mentionsOf(readable.message.text) : [],
+      text: content?.text,
+      mentions: content ? people.mentionsOf(content.text) : [],
       thread: readable ? notification.thread : undefined,
     };
   };

@@ -10,6 +10,7 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Request } from "@amends/core/request";
+import type { DeliveryJobs } from "@amends/core/channel";
 import type { TurnJobs } from "@amends/core/turn";
 import { Context, Crypto, Data, Effect, Layer, Option, Schema, Cause } from "effect";
 import { type Scope } from "effect";
@@ -144,7 +145,7 @@ export const make = Effect.fn("Gateway.make")(function* (
 ): Effect.fn.Return<
   Interface,
   never,
-  WorkspaceStorage.Service | TurnJobs.Service | Crypto.Crypto | Scope.Scope
+  WorkspaceStorage.Service | TurnJobs.Service | DeliveryJobs.Service | Crypto.Crypto | Scope.Scope
 > {
   const runtimes = yield* WorkspaceRuntime.make(options);
   /**

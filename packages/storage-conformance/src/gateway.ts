@@ -1,5 +1,7 @@
 import { AgentPermissions } from "@amends/core/agent";
+import { ChannelPermissions } from "@amends/core/channel";
 import { ConnectionPermissions } from "@amends/core/connection";
+import { TaskPermissions } from "@amends/core/task";
 import { TurnExecution } from "@amends/core/turn";
 import { AssignmentPermissions, BuiltinRoles } from "@amends/core/authorization";
 import { GroupService, GroupMembershipPermissions, GroupPermissions } from "@amends/core/group";
@@ -118,12 +120,16 @@ export const gateway = (harness: Harness) => {
                     GroupMembershipPermissions.Join.name,
                     ThreadPermissions.Start.name,
                     ThreadPermissions.Read.name,
+                    ThreadPermissions.Rename.name,
                     ThreadMessagePermissions.Publish.name,
                     ThreadParticipationPermissions.Follow.name,
+                    TaskPermissions.Create.name,
+                    TaskPermissions.Update.name,
                     AgentPermissions.Use.name,
                     ConnectionPermissions.Read.name,
                     ConnectionPermissions.Use.name,
                     AgentPermissions.Read.name,
+                    ChannelPermissions.Read.name,
                   ],
                 }),
               );
@@ -153,8 +159,12 @@ export const gateway = (harness: Harness) => {
                       GroupMembershipPermissions.Join.name,
                       ThreadPermissions.Start.name,
                       ThreadPermissions.Read.name,
+                      ThreadPermissions.Rename.name,
                       ThreadMessagePermissions.Publish.name,
+                      ThreadMessagePermissions.Moderate.name,
                       ThreadParticipationPermissions.Follow.name,
+                      TaskPermissions.Create.name,
+                      TaskPermissions.Update.name,
                       AgentPermissions.Use.name,
                       ConnectionPermissions.Create.name,
                       ConnectionPermissions.Read.name,
@@ -163,6 +173,9 @@ export const gateway = (harness: Harness) => {
                       AgentPermissions.Create.name,
                       AgentPermissions.Read.name,
                       AgentPermissions.Configure.name,
+                      ChannelPermissions.Create.name,
+                      ChannelPermissions.Read.name,
+                      ChannelPermissions.Manage.name,
                     ],
                   }),
                 );

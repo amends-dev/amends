@@ -133,6 +133,12 @@ export const connections = (harness: Harness) => {
                 provides: ["sandboxes"],
                 requiresSandbox: false,
               },
+              {
+                id: "test-channels",
+                auth: ["none"],
+                provides: ["channels"],
+                requiresSandbox: false,
+              },
             ]);
             expect(integrations[0]).toMatchObject({
               name: "Test models",

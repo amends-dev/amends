@@ -1,4 +1,4 @@
-import { ThreadQuery } from "../../src/thread/query.ts";
+import { ThreadQuery } from "../../src/thread/ThreadQuery.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";
@@ -88,6 +88,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
     listPendingByRecipient: list,
     listLatestByRecipient: list,
     listLatestPendingByRecipient: list,
+    listByThread: unexpected,
     listPendingByThread: unexpected,
     countPendingByRecipient: (recipient) =>
       Effect.succeed(records.filter((value) => sameRecipient(value.recipient, recipient)).length),
@@ -120,9 +121,11 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
         requireAccess: unexpected,
         requireReadable: unexpected,
         eligibleMembers: unexpected,
+        followers: unexpected,
         currentParticipants: unexpected,
         pageParticipants: unexpected,
         findParticipants: unexpected,
+        listReadable: unexpected,
         readTimeline: unexpected,
         readTimelineItem: unexpected,
       }),
