@@ -152,19 +152,13 @@ Judge additions at their actual small sizes beside related icons and inside thei
 controls. Check gaps, balance, centering, disabled appearance, theme inheritance,
 RTL where relevant, and enlarged root text. Numeric validation is not visual approval.
 
-## Provenance and current scope
+## Current scope
 
-Drawings and rounded-corner construction are adapted from
-[Regen Icons](https://github.com/kazdenc/regen-icons/tree/64c0e165c3ce6d5c9d7329acf5762306f86d6b1d)
-under the included [MIT license](LICENSE). All 23 initial compiled paths were checked
-against that revision's outline SVGs. The compiler is a smaller typed adaptation for
-our current set, not a compatibility implementation of Regen's entire drawing language.
+The compiler supports only what the current set draws, not a general drawing language.
 The 26 mark drawings were added from the Amends Primitives v2 reference's named glyphs;
-`mark-settings` reuses the existing MIT-licensed gear construction. Their SVG paths are
-our drawings, not embedded text glyphs, so they keep the package's theming, sizing, and
-accessibility contract across platforms.
+`mark-settings` reuses the existing gear construction. Their SVG paths are our drawings,
+not embedded text glyphs, so they keep the package's theming, sizing, and accessibility
+contract across platforms.
 
-Intentional differences are Solid output, Bun execution, rem-based named sizes,
-constant default stroke weight, separate metadata, and Storybook review. Tonal variants,
-sprites, automatic optical-balance reports, transforms, and public npm publishing are not
-implemented. Add them only with a concrete consumer and verification.
+Tonal variants, sprites, automatic optical-balance reports, transforms, and public npm
+publishing are not implemented. Add them only with a concrete consumer and verification.

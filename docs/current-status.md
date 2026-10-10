@@ -59,15 +59,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   reach opencode's configuration in the sandbox, where the commands it runs can read them; and each
   launch of a bridge exposes another port of its sandbox, which is never taken back. opencode's
   bridge program is bundled from the package's files when the agent is made, with `Bun.build`, so a
-  host that runs opencode runs on Bun, where AI SDK ships its bridge prebuilt. An agent's own tools
-  run without asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode
-  saying which of them an agent may use and which it asks about, amends's agent runs its `read`,
-  `write`, `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default
-  permissions. opencode streams the requests its permissions make, which a session's `approve`
-  answers, but the turn job answers none, so a turn whose tool opencode asks about waits until it is
-  stopped. A running turn takes no further input: a message sent during a turn starts the next,
-  where Claude Code, Codex, and opencode take input while they work, and AI SDK's harness passes it
-  on to them.
+  host that runs opencode runs on Bun; a bridge shipped prebuilt would not need it. An agent's own
+  tools run without asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission
+  mode saying which of them an agent may use and which it asks about, amends's agent runs its
+  `read`, `write`, `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its
+  default permissions. opencode streams the requests its permissions make, which a session's
+  `approve` answers, but the turn job answers none, so a turn whose tool opencode asks about waits
+  until it is stopped. A running turn takes no further input: a message sent during a turn starts
+  the next, where Claude Code, Codex, and opencode take input while they work.
 - The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
   [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare
@@ -78,14 +77,14 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   where a snapshot of the whole set of agents would start at once. A sandbox's request
   transformations have one owner, who replaces the whole set: the host, since the harness gives
   an agent its credentials on the bridge's standard input. A harness that set credentials outside
-  the sandbox instead would need to add transformations beside the host's, as AI SDK's adapters
-  do with its additive operation. On Daytona, a network policy applies a moment after Daytona
-  answers, and lifting `DenyAll` for an allow list opens the network for a moment, so code that must
-  not reach out runs under the policy its sandbox was created with. Daytona's secrets set
-  credentials outside the sandbox as request transformations promise, but Daytona chooses the
-  placeholder the sandbox sends, where the contract lets the host match its own headers, and a
-  sandbox created without secrets must restart for attached ones to work; the Daytona provider
-  fails with `UnsupportedError` until the contract takes Daytona's shape.
+  the sandbox instead would need an operation that adds transformations beside the host's. On
+  Daytona, a network policy applies a moment after Daytona answers, and lifting `DenyAll` for an
+  allow list opens the network for a moment, so code that must not reach out runs under the policy
+  its sandbox was created with. Daytona's secrets set credentials outside the sandbox as request
+  transformations promise, but Daytona chooses the placeholder the sandbox sends, where the contract
+  lets the host match its own headers, and a sandbox created without secrets must restart for
+  attached ones to work; the Daytona provider fails with `UnsupportedError` until the contract takes
+  Daytona's shape.
 - [Connections](../packages/core/README.md#connections) are set up over HTTP and on the
   [Connections page](connections.md), from the integrations the
   [local host](../hosts/local/README.md) installs of every kind. They authenticate with an API key

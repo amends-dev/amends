@@ -151,3 +151,9 @@ Run the package's tests with `bun run test packages/sandbox`; each provider runs
 suites in its own tests. See [testing](../../docs/testing.md). `bun run dist check packages/sandbox`
 builds the package as npm gets it and checks it as a consumer; see
 [publishing](../../docs/publishing.md).
+
+## Inspiration
+
+The contract is modelled on the sandboxes of Vercel's
+[AI SDK Harnesses](https://ai-sdk.dev/docs/ai-sdk-harnesses): a sandbox's files and processes, the
+ports and network policy a provider may offer, and templates that prepare a sandbox for an agent.

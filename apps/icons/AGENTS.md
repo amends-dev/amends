@@ -6,9 +6,8 @@ Read [README.md](README.md) before editing this package.
   Do not hand-edit `src/generated`, `src/index.ts`, `src/catalog.ts`, or `svg`.
 - Keep runtime source independent of other Amends packages and of build tools. It may
   import Solid. Put searchable metadata in the separate catalog entry point.
-- Add only needed drawings. Reuse existing constructions; preserve the Regen Icons
-  license and provenance for adapted material. Unsupported language features must
-  fail explicitly rather than be ignored.
+- Add only needed drawings and reuse existing constructions. Unsupported language
+  features must fail explicitly rather than be ignored.
 - Test compiler contract changes and generated-output drift. Verify Solid reactivity,
   accessible naming, and consumer tree shaking when changing the rendering/export layer.
 - Extend the UI package's Foundations / Icons stories for new rendering capabilities.

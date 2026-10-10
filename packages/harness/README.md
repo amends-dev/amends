@@ -2,9 +2,8 @@
 
 Runs an agent, such as opencode, Codex, Claude Code, or one in your own process over an Effect AI
 `LanguageModel`, and streams every agent's turns in one format, so your code does not depend on
-which agent works for it. It is to agents what Effect AI is to model providers, and is modelled on
-AI SDK's harnesses. The package depends only on Effect and on [`@amends-dev/sandbox`](../sandbox),
-the sandboxes agents work in.
+which agent works for it. It is to agents what Effect AI is to model providers. The package depends
+only on Effect and on [`@amends-dev/sandbox`](../sandbox), the sandboxes agents work in.
 
 ## Install
 
@@ -301,7 +300,7 @@ How bridges run:
   or once the listening file names another bridge of its id, as when two hosts launched one at
   once. A bridge started again serves a turn that ended before it exited from the turn's file, and
   continues one it aborted, as when it exited or died during the turn, by prompting the agent with
-  `Continue.`, as AI SDK's harness does, if the agent kept the conversation that holds the turn.
+  `Continue.` if the agent kept the conversation that holds the turn.
 - On the host, a session connects while it uses the bridge and closes the connection when it
   releases the session, or after a minute unused. A connection that drops is not opened again:
   requests it dropped are sent again over another, for up to 30 seconds, except a tool's result, an
@@ -349,3 +348,11 @@ handlers, and the relay over fakes, without a transport; the bridge over a real 
 in a local sandbox, is tested in the opencode adapter. See [testing](../../docs/testing.md).
 `bun run dist check packages/harness` builds the package as npm gets it and checks it as a consumer;
 see [publishing](../../docs/publishing.md).
+
+## Inspiration
+
+The harness is modelled on Vercel's [AI SDK Harnesses](https://ai-sdk.dev/docs/ai-sdk-harnesses),
+which run agents such as Claude Code and Codex through one interface. From them come one stream
+format for every agent, the bridge that drives an agent inside its sandbox, and how the bridge
+recovers: it keeps each turn's parts for a host to read again after its connection drops, and
+continues a turn it did not finish by prompting the agent with `Continue.`.

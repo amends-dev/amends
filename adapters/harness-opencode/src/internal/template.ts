@@ -2,11 +2,11 @@
  * Installs an opencode agent's bridge in a sandbox, and launches it there. The template gives the
  * sandbox a pinned Bun and a pinned opencode in `~/.amends/opencode/<programs>`, a directory named
  * for their versions, and beside them the agent's bridge program bundled into one file, named for
- * its contents: like AI SDK's harness, it keeps what it installs in the sandbox's home, out of the
- * directory sessions work in. Bun and opencode come from their npm packages for the sandbox's
- * platform, which the sandbox downloads and checks against the integrity npm published for them,
- * as a lockfile pins them. Each version of opencode has its programs and its directory: opencode 1
- * from `opencode-ai`, and opencode 2 from `@opencode/cli`.
+ * its contents. It keeps what it installs in the sandbox's home, out of the directory sessions work
+ * in. Bun and opencode come from their npm packages for the sandbox's platform, which the sandbox
+ * downloads and checks against the integrity npm published for them, as a lockfile pins them. Each
+ * version of opencode has its programs and its directory: opencode 1 from `opencode-ai`, and
+ * opencode 2 from `@opencode/cli`.
  *
  * What a sandbox has already is kept: one created from a snapshot of a prepared one, or a local
  * sandbox sharing this machine's home with one prepared before, is ready at once, and a new bridge
