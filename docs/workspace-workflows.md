@@ -238,7 +238,7 @@ rule (`Delegation.recipientDenial`) that role changes and removals enforce.
 records `workspace.renamed` with the old and new name. A different current name
 returns 409 `WorkspaceSettings.Changed`; retrying an already-applied name succeeds
 without another fact. This compares names, not a version: a rename away and back
-is not detected. Creation attribution and ownership remain unchanged. Built-in
-Owner bundle revision 2 includes rename permission. The directory reads the updated
+is not detected. Creation attribution and ownership remain unchanged. The built-in
+Owner bundle includes rename permission. The directory reads the updated
 name. The change feed delivers `workspace.renamed` to every member. See the
 [Settings UI guide](workspace-settings.md) for connected behavior.

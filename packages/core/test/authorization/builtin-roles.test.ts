@@ -71,33 +71,65 @@ it("invalid or duplicate declarations cannot silently produce built-in roles", (
  * them until a host with a later one upgrades it, so an entry never changes once released: to
  * change the declarations, add the next revision here and raise `BuiltinRoles.revision`.
  */
-const conversation = [
-  "group.create",
-  "group.read",
-  "group.follow",
-  "group.rename",
-  "group.membership.manage",
-  "group.join",
-  "thread.start",
-  "thread.read",
-  "thread.publish",
-  "thread.follow",
-  "agent.use",
-];
 const revisions: Record<number, Readonly<Record<string, ReadonlyArray<string>>>> = {
-  // Members take part in and start conversations, and create groups; administrators manage
-  // people and moderate public groups; the owner also renames and transfers the workspace.
+  // Members take part in conversations and tasks, and see and use connections and agents;
+  // administrators also manage people, moderate groups, and add connections, agents, and
+  // channels; the owner also renames and transfers the workspace.
   1: {
-    [BuiltinRoles.MemberId]: ["member.read", "assignment.read", ...conversation],
+    [BuiltinRoles.MemberId]: [
+      "member.read",
+      "assignment.read",
+      "group.create",
+      "group.read",
+      "group.follow",
+      "group.rename",
+      "group.membership.manage",
+      "group.join",
+      "thread.start",
+      "thread.read",
+      "thread.rename",
+      "thread.publish",
+      "thread.follow",
+      "task.create",
+      "task.update",
+      "agent.use",
+      "connection.read",
+      "connection.use",
+      "agent.read",
+      "channel.read",
+    ],
     [BuiltinRoles.AdministratorId]: [
       "member.read",
       "member.remove",
       "invitation.manage",
       "assignment.read",
       "assignment.manage",
-      ...conversation.flatMap((name) =>
-        name === "group.rename" ? [name, "group.moderate"] : [name],
-      ),
+      "group.create",
+      "group.read",
+      "group.follow",
+      "group.rename",
+      "group.moderate",
+      "group.membership.manage",
+      "group.join",
+      "thread.start",
+      "thread.read",
+      "thread.rename",
+      "thread.publish",
+      "thread.moderate",
+      "thread.follow",
+      "task.create",
+      "task.update",
+      "agent.use",
+      "connection.create",
+      "connection.read",
+      "connection.manage",
+      "connection.use",
+      "agent.create",
+      "agent.read",
+      "agent.configure",
+      "channel.create",
+      "channel.read",
+      "channel.manage",
     ],
     [BuiltinRoles.OwnerId]: [
       "workspace.rename",
@@ -107,175 +139,35 @@ const revisions: Record<number, Readonly<Record<string, ReadonlyArray<string>>>>
       "assignment.read",
       "assignment.manage",
       "workspace.transfer-ownership",
-      ...conversation.flatMap((name) =>
-        name === "group.rename" ? [name, "group.moderate"] : [name],
-      ),
+      "group.create",
+      "group.read",
+      "group.follow",
+      "group.rename",
+      "group.moderate",
+      "group.membership.manage",
+      "group.join",
+      "thread.start",
+      "thread.read",
+      "thread.rename",
+      "thread.publish",
+      "thread.moderate",
+      "thread.follow",
+      "task.create",
+      "task.update",
+      "agent.use",
+      "connection.create",
+      "connection.read",
+      "connection.manage",
+      "connection.use",
+      "agent.create",
+      "agent.read",
+      "agent.configure",
+      "channel.create",
+      "channel.read",
+      "channel.manage",
     ],
   },
 };
-// Connections: members see and use them; administrators and the owner also add and manage them.
-revisions[2] = {
-  [BuiltinRoles.MemberId]: [
-    ...revisions[1]![BuiltinRoles.MemberId]!,
-    "connection.read",
-    "connection.use",
-  ],
-  [BuiltinRoles.AdministratorId]: [
-    ...revisions[1]![BuiltinRoles.AdministratorId]!,
-    "connection.create",
-    "connection.read",
-    "connection.manage",
-    "connection.use",
-  ],
-  [BuiltinRoles.OwnerId]: [
-    ...revisions[1]![BuiltinRoles.OwnerId]!,
-    "connection.create",
-    "connection.read",
-    "connection.manage",
-    "connection.use",
-  ],
-};
-revisions[3] = {
-  [BuiltinRoles.MemberId]: [
-    ...revisions[2]![BuiltinRoles.MemberId]!,
-    "environment.read",
-    "environment.use",
-  ],
-  [BuiltinRoles.AdministratorId]: [
-    ...revisions[2]![BuiltinRoles.AdministratorId]!,
-    "environment.create",
-    "environment.read",
-    "environment.manage",
-    "environment.use",
-  ],
-  [BuiltinRoles.OwnerId]: [
-    ...revisions[2]![BuiltinRoles.OwnerId]!,
-    "environment.create",
-    "environment.read",
-    "environment.manage",
-    "environment.use",
-  ],
-};
-revisions[4] = {
-  [BuiltinRoles.MemberId]: [...revisions[3]![BuiltinRoles.MemberId]!, "agent.read"],
-  [BuiltinRoles.AdministratorId]: [
-    ...revisions[3]![BuiltinRoles.AdministratorId]!,
-    "agent.create",
-    "agent.read",
-    "agent.configure",
-  ],
-  [BuiltinRoles.OwnerId]: [
-    ...revisions[3]![BuiltinRoles.OwnerId]!,
-    "agent.create",
-    "agent.read",
-    "agent.configure",
-  ],
-};
-
-revisions[5] = {
-  [BuiltinRoles.MemberId]: [...revisions[4]![BuiltinRoles.MemberId]!, "connection-v2.read"],
-  [BuiltinRoles.AdministratorId]: [
-    ...revisions[4]![BuiltinRoles.AdministratorId]!,
-    "connection-v2.create",
-    "connection-v2.read",
-    "connection-v2.manage",
-  ],
-  [BuiltinRoles.OwnerId]: [
-    ...revisions[4]![BuiltinRoles.OwnerId]!,
-    "connection-v2.create",
-    "connection-v2.read",
-    "connection-v2.manage",
-  ],
-};
-
-revisions[6] = {
-  [BuiltinRoles.MemberId]: [
-    ...revisions[5]![BuiltinRoles.MemberId]!,
-    "connection-v2.use",
-    "agent-v2.read",
-  ],
-  [BuiltinRoles.AdministratorId]: [
-    ...revisions[5]![BuiltinRoles.AdministratorId]!,
-    "connection-v2.use",
-    "agent-v2.create",
-    "agent-v2.read",
-    "agent-v2.configure",
-  ],
-  [BuiltinRoles.OwnerId]: [
-    ...revisions[5]![BuiltinRoles.OwnerId]!,
-    "connection-v2.use",
-    "agent-v2.create",
-    "agent-v2.read",
-    "agent-v2.configure",
-  ],
-};
-
-// The connections, environments, and agents that agents v2 and connections v2 replaced are gone.
-const replaced = new Set([
-  "connection.create",
-  "connection.read",
-  "connection.manage",
-  "connection.use",
-  "environment.create",
-  "environment.read",
-  "environment.manage",
-  "environment.use",
-  "agent.create",
-  "agent.read",
-  "agent.configure",
-]);
-revisions[7] = Object.fromEntries(
-  Object.entries(revisions[6]!).map(([roleId, names]) => [
-    roleId,
-    names.filter((name) => !replaced.has(name)),
-  ]),
-);
-
-// Agents v2 and connections v2 took the names of the agents and connections they replaced.
-revisions[8] = Object.fromEntries(
-  Object.entries(revisions[7]!).map(([roleId, names]) => [
-    roleId,
-    names.map((name) => name.replace(/^(agent|connection)-v2\./, "$1.")),
-  ]),
-);
-
-// Members rename the threads of their groups, as they rename the groups.
-revisions[9] = Object.fromEntries(
-  Object.entries(revisions[8]!).map(([roleId, names]) => [
-    roleId,
-    names.flatMap((name) => (name === "thread.read" ? [name, "thread.rename"] : [name])),
-  ]),
-);
-
-// Administrators and the owner delete others' messages in their groups' threads.
-revisions[10] = Object.fromEntries(
-  Object.entries(revisions[9]!).map(([roleId, names]) => [
-    roleId,
-    roleId === BuiltinRoles.MemberId
-      ? names
-      : names.flatMap((name) => (name === "thread.publish" ? [name, "thread.moderate"] : [name])),
-  ]),
-);
-
-// Members create tasks in their groups and change them, as they start and rename threads.
-revisions[11] = Object.fromEntries(
-  Object.entries(revisions[10]!).map(([roleId, names]) => [
-    roleId,
-    names.flatMap((name) =>
-      name === "thread.follow" ? [name, "task.create", "task.update"] : [name],
-    ),
-  ]),
-);
-
-// Administrators create and manage channels; members read them.
-revisions[12] = Object.fromEntries(
-  Object.entries(revisions[11]!).map(([roleId, names]) => [
-    roleId,
-    roleId === BuiltinRoles.MemberId
-      ? [...names, "channel.read"]
-      : [...names, "channel.create", "channel.read", "channel.manage"],
-  ]),
-);
 
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
