@@ -292,7 +292,7 @@ export function ConfigureConnection(props: ConfigureConnectionProps) {
   );
 }
 
-export interface ReplaceKeyV2Props {
+export interface ReplaceKeyProps {
   readonly open: boolean;
   readonly onClose: () => void;
   /** The connection, by name. */
@@ -311,7 +311,7 @@ export interface ReplaceKeyV2Props {
  * Entering a new key, masked, in place of the saved one, which stays until the new one is saved.
  * Closing discards what was typed.
  */
-export function ReplaceKeyV2(props: ReplaceKeyV2Props) {
+export function ReplaceKey(props: ReplaceKeyProps) {
   const formId = `replace-key-${createUniqueId()}`;
   const busy = () => props.pending || props.refreshing;
   const close = () => {

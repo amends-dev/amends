@@ -6,7 +6,7 @@ import {
   ConnectionList,
   ConnectionPane,
   ConnectionsPane,
-  ReplaceKeyV2,
+  ReplaceKey,
   connectionsToast,
   type ConnectionsAction,
   type ConnectionsTab,
@@ -245,7 +245,7 @@ function Connections(props: { readonly workspaceId: string }) {
       <Show when={selected()}>
         {(connection) => (
           <>
-            <ReplaceKeyV2
+            <ReplaceKey
               open={dialog() === "replace-key"}
               onClose={close}
               name={connection().name}

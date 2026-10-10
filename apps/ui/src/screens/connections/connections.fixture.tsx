@@ -18,7 +18,7 @@ import {
   ConnectionList,
   ConnectionPane,
   ConnectionsPane,
-  ReplaceKeyV2,
+  ReplaceKey,
   capabilityLabels,
   capabilityNouns,
   connectionStatus,
@@ -631,7 +631,7 @@ export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
       <Show when={current()}>
         {(connection) => (
           <>
-            <ReplaceKeyV2
+            <ReplaceKey
               open={dialog() === "replace-key"}
               onClose={close}
               name={connection().name}
