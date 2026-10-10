@@ -16,6 +16,7 @@ import { ThreadActivityKind } from "./ThreadActivityKind.ts";
  * @since 0.1.0
  */
 export const Renamed = ThreadActivityKind.make("thread.renamed", {
+  version: 1,
   details: Schema.Struct({
     title: Thread.Title,
     /** The title it replaced, or null when the thread had none. */

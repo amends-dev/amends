@@ -17,6 +17,7 @@ import { ThreadMessageId } from "./ThreadMessageId.ts";
  * @since 0.1.0
  */
 export const Published = ThreadActivityKind.make("message.published", {
+  version: 1,
   details: Schema.Struct({ messageId: ThreadMessageId.Id }),
   subject: ({ messageId }) => Subject.make("message", messageId),
   newActivity: true,

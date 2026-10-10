@@ -1,10 +1,10 @@
 /**
  * How a domain defines a kind of thread activity, and how activity of that kind is recorded and
- * read back. A kind names itself, gives its details a schema, says what an activity of it is
- * about, its thread unless the kind says otherwise, and whether it is repeatable, and whether it
- * counts as new activity for readers. A domain defines its kinds beside its facts, records them
- * through `ThreadCommand.publishActivity`, and shows them in timelines with a resolver it registers
- * in `ThreadActivityResolvers`.
+ * read back. A kind names itself, gives its details a schema and a version, says what an activity
+ * of it is about, its thread unless the kind says otherwise, and whether it is repeatable, and
+ * whether it counts as new activity for readers. A domain defines its kinds beside its facts,
+ * records them through `ThreadCommand.publishActivity`, and shows them in timelines with a
+ * resolver it registers in `ThreadActivityResolvers`.
  *
  * @since 0.1.0
  */
@@ -41,10 +41,15 @@ export type Item = Items[keyof Items];
 export type Details = Schema.Codec<any, Schema.Json>;
 
 /** The activity with its kind's details decoded. */
-const activitySchema = <const Name extends string, D extends Details>(name: Name, details: D) =>
+const activitySchema = <const Name extends string, const Version extends number, D extends Details>(
+  name: Name,
+  version: Version,
+  details: D,
+) =>
   Schema.Struct({
     ...ThreadActivity.Common.fields,
     kind: Schema.Literal(name),
+    version: Schema.Literal(version),
     subject: Subject.Value,
     occurrence: ThreadActivity.Record.fields.occurrence,
     newActivity: ThreadActivity.Record.fields.newActivity,
@@ -57,13 +62,22 @@ const activitySchema = <const Name extends string, D extends Details>(name: Name
  * @category models
  * @since 0.1.0
  */
-export interface Definition<Name extends string = string, D extends Details = Details> {
+export interface Definition<
+  Name extends string = string,
+  Version extends number = number,
+  D extends Details = Details,
+> {
   readonly name: Name;
+  /**
+   * The version of the details' schema. A kind whose details change takes the next, and activity
+   * recorded at another version reads back as a `Mismatch`, as a fact of another version does.
+   */
+  readonly version: Version;
   readonly details: D;
   /** Whether activity of this kind counts as its thread's and group's latest activity. */
   readonly newActivity: boolean;
   /** The activity with its details decoded, as timelines and handlers read it. */
-  readonly Activity: ReturnType<typeof activitySchema<Name, D>>;
+  readonly Activity: ReturnType<typeof activitySchema<Name, Version, D>>;
   /** Pure: what the activity is about, given its details and the thread it is in. */
   subject(details: D["Type"], threadId: ThreadId.Id): Subject.Value;
   /** Pure: the activity's identity within the workspace, or null to leave it repeatable. */
@@ -86,15 +100,16 @@ export type Activity<K extends Definition> = K["Activity"]["Type"];
  * @category constructors
  * @since 0.1.0
  */
-export const make = <const Name extends string, D extends Details>(
+export const make = <const Name extends string, const Version extends number, D extends Details>(
   name: Name,
   options: {
+    readonly version: Version;
     readonly details: D;
     readonly subject?: (details: NoInfer<D["Type"]>) => Subject.Value;
     readonly occurrence?: (details: NoInfer<D["Type"]>) => ReadonlyArray<string> | null;
     readonly newActivity: boolean;
   },
-): Readonly<Definition<Name, D>> => {
+): Readonly<Definition<Name, Version, D>> => {
   ThreadActivity.Kind.make(name);
   const subject =
     options.subject === undefined
@@ -102,9 +117,10 @@ export const make = <const Name extends string, D extends Details>(
       : options.subject;
   return Object.freeze({
     name,
+    version: options.version,
     details: options.details,
     newActivity: options.newActivity,
-    Activity: activitySchema(name, options.details),
+    Activity: activitySchema(name, options.version, options.details),
     subject,
     occurrence:
       options.occurrence ??
@@ -120,15 +136,16 @@ export const make = <const Name extends string, D extends Details>(
  */
 export interface Prepared extends Pick<
   ThreadActivity.Record,
-  "kind" | "subject" | "occurrence" | "newActivity" | "details"
+  "kind" | "version" | "subject" | "occurrence" | "newActivity" | "details"
 > {}
 
 const occurrenceKey = (name: string, parts: ReadonlyArray<string> | null) =>
   parts === null ? null : JSON.stringify([name, ...parts]);
 
 /**
- * Derive what an activity of a kind records in a thread from its details: the kind's name, the
- * subject and occurrence key the kind gives the details there, and the details encoded.
+ * Derive what an activity of a kind records in a thread from its details: the kind's name and
+ * version, the subject and occurrence key the kind gives the details there, and the details
+ * encoded.
  *
  * @category constructors
  * @since 0.1.0
@@ -140,6 +157,7 @@ export const prepare = Effect.fn("ThreadActivityKind.prepare")(function* <K exte
 ) {
   return {
     kind: ThreadActivity.Kind.make(kind.name),
+    version: kind.version,
     subject: kind.subject(details, threadId),
     occurrence: occurrenceKey(kind.name, kind.occurrence(details, threadId)),
     newActivity: kind.newActivity,
@@ -159,18 +177,20 @@ export const is =
     activity.kind === kind.name;
 
 /**
- * An activity was read as a kind it is not.
+ * An activity was read as a kind, at a version, it is not.
  *
  * @category errors
  * @since 0.1.0
  */
 export class Mismatch extends Schema.TaggedError<Mismatch>()("ThreadActivityKind.Mismatch", {
   kind: Schema.String,
+  version: Schema.Int,
   activityId: ThreadActivity.Id,
 }) {}
 
 /**
- * Read an activity as this kind, decoding its details; one of another kind is a `Mismatch`.
+ * Read an activity as this kind, decoding its details; one of another kind or version is a
+ * `Mismatch`.
  *
  * @category utils
  * @since 0.1.0
@@ -179,8 +199,8 @@ export const decode = Effect.fn("ThreadActivityKind.decode")(function* <K extend
   kind: K,
   activity: ThreadActivity.Record,
 ) {
-  if (activity.kind !== kind.name)
-    return yield* new Mismatch({ kind: kind.name, activityId: activity.id });
+  if (activity.kind !== kind.name || activity.version !== kind.version)
+    return yield* new Mismatch({ kind: kind.name, version: kind.version, activityId: activity.id });
   const details = yield* Schema.decodeEffect(kind.details)(activity.details);
   return Object.assign({}, activity, { details }) as Activity<K>;
 });

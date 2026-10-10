@@ -282,13 +282,15 @@ CREATE TABLE "thread_activities" (
 	"thread_id" text NOT NULL,
 	"sequence" integer NOT NULL,
 	"kind" text NOT NULL,
+	"version" integer NOT NULL,
 	"subject" text NOT NULL,
 	"occurrence" text,
 	"new_activity" boolean NOT NULL,
 	"details" jsonb NOT NULL,
 	"occurred_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "thread_activities_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "thread_activity_positive_sequence" CHECK ("sequence" > 0)
+	CONSTRAINT "thread_activity_positive_sequence" CHECK ("sequence" > 0),
+	CONSTRAINT "thread_activity_positive_version" CHECK ("version" > 0)
 );
 --> statement-breakpoint
 CREATE TABLE "thread_messages" (

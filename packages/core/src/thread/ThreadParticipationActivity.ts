@@ -21,6 +21,7 @@ const subject = ({ participationId }: { readonly participationId: ThreadParticip
  * @since 0.1.0
  */
 export const Followed = ThreadActivityKind.make("participation.followed", {
+  version: 1,
   details: Schema.Struct({ participationId: ThreadParticipationId.Id }),
   subject,
   newActivity: false,
@@ -39,6 +40,7 @@ export type Followed = ThreadActivityKind.Activity<typeof Followed>;
  * @since 0.1.0
  */
 export const Ended = ThreadActivityKind.make("participation.ended", {
+  version: 1,
   details: Schema.Struct({
     participationId: ThreadParticipationId.Id,
     reason: ThreadParticipation.EndReason,

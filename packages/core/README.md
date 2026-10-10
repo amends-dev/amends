@@ -389,15 +389,19 @@ envelope into their own store. Domain facts own state, and activity owns timelin
 ### Activity kinds
 
 An activity has one shape for every kind, `ThreadActivity.Record`: its position, a dotted `kind`
-such as `message.published`, its `subject`, an `occurrence` key, `newActivity`, and the kind's
-`details` in encoded JSON. Storage, facts, and the change feed carry that shape, so a new kind
-changes none of them and needs no migration. The domain that owns a kind defines it next to its
-facts with `ThreadActivityKind.make(name, { details, subject, occurrence?, newActivity })`:
-`ThreadMessageActivity.Published`, `ThreadParticipationActivity.Followed` and `Ended`, and
-`TurnActivity.Created`, `Started`, `Stopping`, and `Ended`.
+such as `message.published` and the `version` of its details, its `subject`, an `occurrence` key,
+`newActivity`, and the kind's `details` in encoded JSON. Storage, facts, and the change feed carry
+that shape, so a new kind or version changes none of them and needs no migration. The domain that
+owns a kind defines it next to its facts with
+`ThreadActivityKind.make(name, { version, details, subject?, occurrence?, newActivity })`:
+`ThreadMessageActivity.Published`, `ThreadParticipationActivity.Followed` and `Ended`,
+`ThreadTitleActivity.Renamed`, and `TurnActivity.Created`, `Started`, `Stopping`, and `Ended`.
 
 - `details` is the kind's schema, encoded to JSON when recorded and decoded when read.
-- `subject` names what the activity is about, derived from its details.
+- `version` is the details schema's version, recorded on the activity. A kind whose details change
+  takes the next, and reading an activity at another version is a `Mismatch`, as decoding a fact of
+  another version is.
+- `subject` names what the activity is about, derived from its details; without one, its thread.
 - `occurrence` gives the parts that make it unique; by default its subject, so each subject has
   at most one activity of the kind. Returning `null` makes the kind repeatable.
 - `newActivity` says whether it becomes its thread's and group's latest activity for readers;

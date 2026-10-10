@@ -1310,6 +1310,7 @@ export const threadReads = (harness: Harness) => {
               const { bound, owner, first } = yield* prepare();
               // Kinds only this test defines: nothing in the thread domain or storage knows them.
               const Noted = ThreadActivityKind.make("test.noted", {
+                version: 1,
                 details: Schema.Struct({
                   noteId: Schema.NonEmptyString,
                   text: Schema.String,
@@ -1320,6 +1321,7 @@ export const threadReads = (harness: Harness) => {
                 newActivity: false,
               });
               const Pinged = ThreadActivityKind.make("test.pinged", {
+                version: 1,
                 details: Schema.Struct({ count: Schema.Int }),
                 subject: () => Subject.make("thread", first.thread.id),
                 occurrence: () => null,
@@ -1368,6 +1370,7 @@ export const threadReads = (harness: Harness) => {
               expect(stored).toEqual(noted.event.payload.activity);
               expect(stored).toMatchObject({
                 kind: "test.noted",
+                version: 1,
                 subject: "note:note-1",
                 newActivity: false,
                 details: { noteId: "note-1", at: "2026-09-24T11:00:00.000Z", tags: ["a", "b"] },

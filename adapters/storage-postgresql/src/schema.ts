@@ -700,8 +700,9 @@ export const threadActivities = pgTable(
     threadId: text("thread_id").notNull(),
     sequence: integer("sequence").notNull(),
     // Every kind shares these columns; its definition in core reads `details`, the change the
-    // activity reports, so a new kind needs no schema change.
+    // activity reports, at the kind's version, so a new kind or version needs no schema change.
     kind: text("kind").notNull(),
+    version: integer("version").notNull(),
     subject: text("subject").notNull(),
     occurrence: text("occurrence"),
     newActivity: boolean("new_activity").notNull(),
@@ -714,6 +715,7 @@ export const threadActivities = pgTable(
     // At most one activity per occurrence key; activities without one are repeatable.
     uniqueIndex("thread_activity_occurrence").on(t.workspaceId, t.occurrence),
     check("thread_activity_positive_sequence", sql`${t.sequence} > 0`),
+    check("thread_activity_positive_version", sql`${t.version} > 0`),
   ],
 );
 

@@ -69,6 +69,8 @@ export const Common = Schema.Struct({
 export const Record = Schema.Struct({
   ...Common.fields,
   kind: Kind,
+  /** The version of its kind's details it was recorded with; a kind whose details change takes the next. */
+  version: Schema.Int.check(Schema.isGreaterThan(0)),
   /** What the activity is about, such as a message, participation, turn, or task. */
   subject: Subject.Value,
   /** A workspace holds at most one activity with a key; null leaves the activity repeatable. */

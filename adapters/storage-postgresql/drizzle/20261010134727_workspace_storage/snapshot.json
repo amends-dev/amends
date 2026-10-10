@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "19aced87-c9e3-460d-ba6a-36043ae59413",
+  "id": "d12d29fb-388c-4bd0-9174-f7b678c53c8d",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -2477,6 +2477,19 @@
       "generated": null,
       "identity": null,
       "name": "kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "version",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_activities"
@@ -5307,6 +5320,13 @@
     {
       "value": "\"sequence\" > 0",
       "name": "thread_activity_positive_sequence",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "thread_activities"
+    },
+    {
+      "value": "\"version\" > 0",
+      "name": "thread_activity_positive_version",
       "entityType": "checks",
       "schema": "public",
       "table": "thread_activities"

@@ -823,6 +823,7 @@ const item = (sequence: number, id: string, text: string) => ({
     sequence,
     occurredAt: at,
     kind: "message.published",
+    version: 1,
     subject: `message:${id}`,
     occurrence: `message:${id}`,
     newActivity: true,

@@ -13,6 +13,7 @@ const turnSubject = ({ turnId }: { readonly turnId: Turn.Id }) => Subject.make("
  * replies the turn posts are.
  */
 export const Created = ThreadActivityKind.make("turn.created", {
+  version: 1,
   details: Schema.Struct({
     turnId: Turn.Id,
     /** The agent's membership. */
@@ -26,6 +27,7 @@ export type Created = ThreadActivityKind.Activity<typeof Created>;
 
 /** Execution took the turn: it is working. */
 export const Started = ThreadActivityKind.make("turn.started", {
+  version: 1,
   details: Schema.Struct({ turnId: Turn.Id }),
   subject: turnSubject,
   newActivity: false,
@@ -34,6 +36,7 @@ export type Started = ThreadActivityKind.Activity<typeof Started>;
 
 /** Someone asked the working turn to stop, or its agent stopped taking part: it is stopping. */
 export const Stopping = ThreadActivityKind.make("turn.stopping", {
+  version: 1,
   details: Schema.Struct({ turnId: Turn.Id, cancelReason: Turn.CancelReason }),
   subject: turnSubject,
   newActivity: false,
@@ -45,6 +48,7 @@ export type Stopping = ThreadActivityKind.Activity<typeof Stopping>;
  * why it was asked to.
  */
 export const Ended = ThreadActivityKind.make("turn.ended", {
+  version: 1,
   details: Schema.Struct({
     turnId: Turn.Id,
     outcome: Turn.Outcome,

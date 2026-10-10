@@ -1227,6 +1227,7 @@ export const threads = (harness: Harness) => {
             expect(activity).toMatchObject({
               sequence: 2,
               kind: ThreadTitleActivity.Renamed.name,
+              version: 1,
               newActivity: false,
               occurrence: null,
               details: { title: "Launch plan", previous: null },

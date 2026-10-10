@@ -87,6 +87,7 @@ const item = (sequence: number) => ({
     sequence,
     occurredAt: minute(sequence),
     kind: "message.published",
+    version: 1,
     subject: `message:message-${sequence}`,
     occurrence: `message:message-${sequence}`,
     newActivity: true,

@@ -247,8 +247,8 @@ first item's `activity.sequence` as `beforeSequence` until a page comes back emp
 by passing the last item's sequence as `afterSequence`, where an empty page means no later activity
 yet. Cursors belong to the thread; they are not journal or notification cursors.
 
-Every item's `activity` has the thread position, a dotted `kind`, its `subject`, `newActivity`,
-and kind-specific `details`. Message items (`message.published`) contain `{ activity, message }`,
+Every item's `activity` has the thread position, a dotted `kind` and the `version` of its details,
+its `subject`, `newActivity`, and kind-specific `details`. Message items (`message.published`) contain `{ activity, message }`,
 with `details: { messageId }`. Participation items (`participation.followed` and
 `participation.ended`) contain `{ activity, participant }`, where `participant` is a public joining
 summary, even for a participation that later ended, and `details` holds the `participationId`; an

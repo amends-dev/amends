@@ -124,6 +124,7 @@ const activity = (sequence: number, kind: string, subject: string, details: unkn
   sequence,
   occurredAt: at(sequence),
   kind,
+  version: 1,
   subject,
   occurrence: subject,
   newActivity: true,

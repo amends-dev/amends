@@ -97,6 +97,7 @@ const notification = (
       sequence,
       occurredAt: at(minute),
       kind: "message.published",
+      version: 1,
       subject: `message:m${sequence}`,
       occurrence: `message:m${sequence}`,
       newActivity: true,

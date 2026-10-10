@@ -599,6 +599,7 @@ it.effect("follows reach only their owner, and thread views hide recipients and 
               threadId,
               sequence: 1,
               kind: "message.published",
+              version: 1,
               subject: "message:message",
               occurrence: JSON.stringify(["message.published", "message:message"]),
               newActivity: true,
