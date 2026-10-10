@@ -198,3 +198,7 @@ Journal payloads use SchemaBinary. The [codec fixtures](packages/core/test/journ
 check representative bytes captured on rc.115 independently of the current encoder.
 Preserve those fixtures across upgrades; [coverage remains partial](docs/current-status.md#payload-format-compatibility),
 and round-trip tests alone do not establish compatibility for other payloads.
+
+## License
+
+amends is released under the [MIT license](LICENSE).

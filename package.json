@@ -1,6 +1,7 @@
 {
   "name": "amends",
   "private": true,
+  "license": "MIT",
   "workspaces": {
     "packages": [
       "packages/*",
