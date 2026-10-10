@@ -311,7 +311,7 @@ exists.
 Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
 future work.
-Route focus management, Tauri signing/updates, production artwork,
+Route focus management, Tauri signing/updates,
 and cross-platform installer verification are pending.
 
 ## Development data

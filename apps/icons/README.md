@@ -19,9 +19,7 @@ import { IconMarkDone } from "@amends-dev/icons/mark-done";
 <IconMarkDone size={24} weight={1.75} />;
 ```
 
-The `mark-*` drawings reinterpret the named glyphs in the
-[Primitives v2 Marks reference](<../../design-system/Amends Primitives v2.dc.html>) as portable
-SVGs, and are the reference for navigation and actions wherever it names the control. Their paths
+The `mark-*` drawings are amends's own marks, drawn as portable SVGs, and are the reference for navigation and actions wherever it names the control. Their paths
 are drawings, not embedded text glyphs, so they keep the package's theming, sizing, and
 accessibility across platforms. Outline utility icons cover controls without a mark, such as the
 mobile hamburger (`IconMenu`), the sidebar toggles, notifications, and delete. `IconBellFilled` is

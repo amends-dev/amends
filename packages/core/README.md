@@ -156,7 +156,7 @@ from them the cumulative Member, Administrator, and Owner roles for one workspac
 records all three and makes its creator the owner. Tiers only build these bundles: authorization
 checks stored permission names and scopes, and services enforce ownership and delegation.
 
-In the current bundles, revision 12, Member takes part in conversations and tasks, creates, joins,
+In the current bundles, revision 1, Member takes part in conversations and tasks, creates, joins,
 renames, and manages the groups it belongs to, reads members, access, agents, connections, and
 channels, directs agents, and uses connections. Administrator adds removing members, invitations,
 assigning roles, moderating groups and threads, and creating and configuring agents, connections,

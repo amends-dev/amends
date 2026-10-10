@@ -2,11 +2,11 @@ export {
   ChooseIntegration,
   ConfigureConnection,
   ConfirmRemoveConnection,
-  ReplaceKeyV2,
+  ReplaceKey,
   type ChooseIntegrationProps,
   type ConfigureConnectionProps,
   type ConfirmRemoveConnectionProps,
-  type ReplaceKeyV2Props,
+  type ReplaceKeyProps,
 } from "./add-connection.tsx";
 export { ConnectionPane, type ConnectionPaneProps } from "./connection-pane.tsx";
 export {

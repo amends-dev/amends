@@ -437,7 +437,7 @@ work, or Couldn’t reach it), then holds its name, its integration's settings t
 its key, which is only replaced, its details with the integration's documentation, and removal. A
 connection whose integration is gone lists its saved settings and offers only removal.
 `ChooseIntegration` searches the integrations by name, `ConfigureConnection` takes the name,
-settings, way of authenticating, and key in one step, and `ReplaceKeyV2` and
+settings, way of authenticating, and key in one step, and `ReplaceKey` and
 `ConfirmRemoveConnection` are its other modals.
 
 **Connections** walks adding and checking a connection, a refused key and a refused setup, a gone

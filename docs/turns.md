@@ -3,8 +3,8 @@
 An agent's turn is one harness turn at the work asked of it on a thread (see
 [core's turns](../packages/core/README.md#turns)). Both apps show turns where the work happens:
 in the thread's timeline, as marks where agents are at work, and in each turn's log. The
-screens follow the Lunacy "Turn activity" frames, with the Amends Logo board's motions for the
-states of a turn at work.
+screens follow the Lunacy "Turn activity" frames, with the mark's motions for the states of a
+turn at work.
 
 - **In the thread:** each turn is a compact row in the timeline where its agent took on the work,
   read from the thread's own activity: the agent, its state (Queued, Working, Stopping…, Stopped,

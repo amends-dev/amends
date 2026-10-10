@@ -27,10 +27,8 @@ one card that opens the history; member details, invite, and history fill the sc
 ## Boundaries and recovery
 
 Core supplies settings/member-management reads and records `workspace.renamed`.
-Rename requires `workspace.rename`, included in Owner bundle revision 2; loading an
-older workspace upgrades its built-in bundles through the existing mechanism.
-No SQL migration is needed. Both adapters update the directory name; pending
-invitations include `workspaceName` when available.
+Rename requires `workspace.rename`, which the Owner bundle includes. Both adapters update the
+directory name; pending invitations include `workspaceName` when available.
 
 Client's `useWorkspaceSettings` reads one tab: settings and ownership for Workspace, plus the
 roster and invitations for Members. It shapes them for the screens, keeps each draft with what it

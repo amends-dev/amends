@@ -58,8 +58,8 @@ import connectionsMeta, {
   NoMatchingConnections,
   ReadOnly as ConnectionsReadOnly,
   RemoveConnection,
-  RenamedMeanwhile as RenamedMeanwhileV2,
-  ReplaceKey as ReplaceKeyV2,
+  RenamedMeanwhile as ConnectionRenamedMeanwhile,
+  ReplaceKey as ConnectionReplaceKey,
   SetupRefused,
   ToolConnections,
 } from "../src/screens/connections/connections.stories.tsx";
@@ -324,7 +324,7 @@ describe("connections screen", () => {
       ChooseToolIntegration,
       ConfigureMcpServer,
       ConfigureWithoutAuthentication,
-      ReplaceKeyV2,
+      ConnectionReplaceKey,
       RemoveConnection,
       EmptyConnections,
       ConnectionsLoading,
@@ -370,7 +370,7 @@ describe("connections screen", () => {
     viewport(1600);
     await stories.story(NoMatchingConnections).run();
     cleanup();
-    await stories.story(RenamedMeanwhileV2).run();
+    await stories.story(ConnectionRenamedMeanwhile).run();
   });
 });
 

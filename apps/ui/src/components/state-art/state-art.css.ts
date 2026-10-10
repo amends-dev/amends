@@ -1,8 +1,8 @@
 import { keyframes, style } from "@vanilla-extract/css";
 import { vars } from "../../foundations/theme/vars.css.ts";
 
-// Drawn from the Amends Logo "States" board (turn 7): the mark's square, patch, and stitches in
-// the current text color, cut out in the color of the surface behind, which a parent can set.
+// The mark's square, patch, and stitches in the current text color, cut out in the color of the
+// surface behind, which a parent can set.
 const knockout = `var(--amends-art-knockout, ${vars.color.surface.canvas})`;
 const still = "(prefers-reduced-motion: reduce)";
 

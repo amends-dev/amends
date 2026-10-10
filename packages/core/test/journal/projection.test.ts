@@ -437,7 +437,7 @@ it.effect(
   () =>
     Effect.gen(function* () {
       const fixture = yield* make();
-      const ChangedV2 = Fact.make(Changed.name, {
+      const ChangedRevised = Fact.make(Changed.name, {
         subject: testSubject,
         version: 2,
         payload: Schema.Struct({ amount: Schema.Finite }),
@@ -450,7 +450,7 @@ it.effect(
           yield* journal.commit(
             Effect.gen(function* () {
               yield* journal.publish(Changed, { amount: 1 });
-              yield* journal.publish(ChangedV2, { amount: 2 });
+              yield* journal.publish(ChangedRevised, { amount: 2 });
             }),
           );
           const original = yield* runner;
@@ -461,7 +461,7 @@ it.effect(
           const checkpoint = yield* original.checkpoint;
           expect(Option.isSome(checkpoint) && checkpoint.value.position).toBe(Log.Position.make(0));
           const compatible = yield* Projection.makeRunner({
-            definition: definition.on(ChangedV2, (event) =>
+            definition: definition.on(ChangedRevised, (event) =>
               Effect.flatMap(Counter, (counter) => counter.add(event.payload.amount)),
             ),
             log: journal.log,

@@ -288,5 +288,4 @@ fact columns (`fact-metadata.test.ts`), a refused statement still aborting its t
 (`invitations.test.ts`), waiters woken through notifications (`journal.test.ts`), construction,
 concurrent schema application, and the plan test (`database.test.ts`), scope columns
 (`scope.test.ts`), and Cluster's tables (`cluster-storage.test.ts`). `test/postgres.ts` finds or
-starts the server and makes temporary databases; the package exports it as
-`@amends-dev/storage-postgresql/testing/postgres`. See [testing](../../docs/testing.md).
+starts the server and makes temporary databases. See [testing](../../docs/testing.md).
