@@ -7,7 +7,7 @@ const spring = "transform 0.35s cubic-bezier(.3,1.7,.5,1)";
 const settle = "cubic-bezier(.3,1.4,.5,1)";
 const still = "(prefers-reduced-motion: reduce)";
 
-// Motions from the Amends Logo board (turn 6), each built from the mark's own parts.
+// The mark's motions, each built from its own parts.
 export const sewOn = style({});
 export const thread = style({});
 export const tug = style({});

@@ -48,14 +48,11 @@ recovery before entering the created workspace.
 
 ## Following slices
 
-The earlier [picker reference](<../design-system/Amends Screen · Sign in.dc.html>) also shows
-activity. Recipient decline needs a backend contract;
-separate human/agent counts, general role labels, and activity indicators
-need richer directory data. Remembering the last workspace and arrow-key shortcuts
-are not implemented. Links use native Tab/Enter and modifier-key behavior.
+Recipient decline needs a backend contract; separate human/agent counts, general role labels,
+and activity indicators need richer directory data. Remembering the last workspace and arrow-key
+shortcuts are not implemented. Links use native Tab/Enter and modifier-key behavior.
 
-The [first-run reference](<../design-system/Amends Screen · First run.dc.html>) is a
-larger onboarding flow. Environment, credentials, agent, and first-task setup remain
+A larger onboarding flow, setting up credentials, an agent, and a first task, remains
 separate work. This creation form promises only the workspace it actually creates.
 
 ## Standalone states

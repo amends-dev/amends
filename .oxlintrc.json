@@ -28,7 +28,6 @@
   },
   "ignorePatterns": [
     "repos/**",
-    "design-system/support.js",
     "**/node_modules/**",
     "**/dist/**",
     "**/out/**",

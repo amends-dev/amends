@@ -3,7 +3,7 @@ import { classes } from "../../internal/props.ts";
 import * as s from "./state-art.css.ts";
 
 /**
- * The empty and error states of the Amends Logo board, each drawn from the mark's own parts.
+ * The mark's empty and error states, each drawn from its own parts.
  * Empty states are outlines waiting to be filled; errors are stitches that came undone.
  *
  * - `sew-in`: a new piece sewn in beside empty outlines, for a first thing to make.

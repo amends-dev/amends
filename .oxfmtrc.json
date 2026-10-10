@@ -3,8 +3,6 @@
   "ignorePatterns": [
     "repos/**",
     "adapters/*/drizzle/**",
-    "design-system/*.dc.html",
-    "design-system/support.js",
     "**/node_modules/**",
     "**/dist/**",
     "**/out/**",

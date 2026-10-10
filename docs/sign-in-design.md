@@ -68,9 +68,8 @@ The [HTTP contract](../packages/api-http/src/session.ts) already provides
 (`mismatch`, `expired`, `unknown`). Resend uses the email endpoint again. Sign-in
 belongs to the gateway/host; this slice needs no new core operation.
 
-Use the [sign-in reference](<../design-system/Amends Screen · Sign in.dc.html>) for
-composition, with the reviewed UI tokens and control sizing. Its keypad is demo
-scaffolding; real code entry uses the native control. Passkeys, Google sign-in,
+Use the sign-in frames in the [Lunacy mocks](../design-system/) for composition, with the
+reviewed UI tokens and control sizing. Real code entry uses the native control. Passkeys, Google sign-in,
 and workspace screens are outside this slice. The current host logs codes and
 expires them after ten minutes; delivery guidance must describe that behavior.
 The reference's device-binding claim is not implemented.

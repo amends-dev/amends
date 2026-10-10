@@ -55,7 +55,7 @@ const motions: ReadonlyArray<{ readonly motion: LogoMotion; readonly use: string
   { motion: "working", use: "Loading" },
 ];
 
-/** The Amends Logo "5a in motion" board: the mark's own parts, looping. */
+/** The mark's motions: its own parts, looping. */
 export const LogoMotions = {
   render: () => (
     <div class={s.page}>
@@ -93,7 +93,7 @@ const states: ReadonlyArray<{ readonly kind: StateArtKind; readonly use: string 
 ];
 
 /**
- * The Amends Logo "States" board: empty states are outlines waiting to be filled, errors are
+ * The mark's empty and error states: empty states are outlines waiting to be filled, errors are
  * stitches that came undone. EmptyState shows them above its title.
  */
 export const StateArtStates = {

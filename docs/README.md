@@ -65,9 +65,8 @@ drawings, generation, and visual review in the UI workshop.
   [Threads](threads.md) fixes the thread model that conversations, tasks, and channel
   conversations share: the thread record, messages and their editing, tasks and channel
   bindings as rows on threads, and what changes to implement it.
-- [Design-system references](../design-system/) are product and visual mocks, not
-  implemented API schemas. [Token sync](../design-system/sync/README.md) explains the
-  historical handoff and points to the current token and style modules.
+- [Design-system references](../design-system/) are the Lunacy files the UI is built from:
+  product and visual mocks, not implemented API schemas.
 - [Vendored Effect](../repos/effect/LLMS.md) is read-only upstream reference material.
   Its documentation describes Effect, not the Amends application's capabilities.
 

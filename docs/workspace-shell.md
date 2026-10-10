@@ -112,9 +112,9 @@ Try again under a note when a page fails. A notification whose thread the reader
 
 Settings follows its Lunacy mocks; see [workspace settings](workspace-settings.md). A page's own
 side panel, such as Settings' member details, attaches beside the main content like the thread
-panel. [Agents](agents.md) follows the Agents v02 navigation frames, and
+panel. [Agents](agents.md) follows the Agents navigation frames in Lunacy, and
 [Connections](connections.md) the same pattern. The workspace's own address redirects to the Inbox; Triage and Tasks are placeholders
-drawn with UI's EmptyState. Empty and error states across the apps show the Amends Logo board's animated states
+drawn with UI's EmptyState. Empty and error states across the apps show the mark's animated states
 above their words, such as a new piece sewn in for no workspaces or agents, a thread reaching an
 empty outline for no connections, and a loose patch for a load that failed; the rail's mark lifts
 on hover, and checking a restored session shows the mark at work. Search jumps to a page, group,
