@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- The app icon: the mark from apps/ui's Logo, on a tile with the system's icon margins. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="#111111"/>
+  <g transform="translate(249.6 249.6) scale(8.2)" fill="none">
+    <rect x="3" y="3" width="42" height="42" fill="#ffffff"/>
+    <rect x="22" y="22" width="39" height="39" fill="#ffffff" stroke="#111111" stroke-width="2.6"/>
+    <path d="M18.5 37 H25.5 M18.5 30 H25.5 M30 18.5 V25.5 M37 18.5 V25.5" stroke="#111111" stroke-width="2.4" stroke-linecap="square"/>
+  </g>
+</svg>

@@ -46,9 +46,18 @@ bun run --filter @amends-dev/desktop build
 Tauri configuration. After changing startup, check the native window as well as both frontend
 builds.
 
-Native output goes to `src-tauri/target`, with installers under `release/bundle`. The window uses
-Tauri's default icons; signing, artwork, installers on other operating systems, and updates are
+Native output goes to `src-tauri/target`, with installers under `release/bundle`. Signing,
+installers on other operating systems, and updates are
 [known limitations](../../docs/current-status.md#shared-client-foundation).
+
+The app's icons in `src-tauri/icons` are generated from `app-icon.svg`, the mark on its tile. After
+changing it, regenerate them from this directory and drop the mobile icons Tauri adds, which the
+app does not use:
+
+```sh
+bun run tauri icon app-icon.svg
+rm -r src-tauri/icons/android src-tauri/icons/ios
+```
 
 ## Supported systems
 
