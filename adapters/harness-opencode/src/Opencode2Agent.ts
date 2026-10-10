@@ -106,7 +106,7 @@ export interface Options extends Agent.Options {
  * @since 0.1.0
  */
 export const make = Effect.fn("Opencode2Agent.make")(function* (options: Options) {
-  const models = yield* Effect.fromResult(modelsOf(options)).pipe(
+  const models = yield* Effect.fromResult(modelsOf(2, options)).pipe(
     Effect.mapError((reason) => new HarnessError.HarnessError({ agent: "opencode2", reason })),
   );
   const installation = yield* makeInstallation(2);
@@ -118,8 +118,8 @@ export const make = Effect.fn("Opencode2Agent.make")(function* (options: Options
     agentOptions: {
       model: models.model,
       models: models.models,
-      config: { ...options.config, providers: models.providers },
-      env: options.env ?? {},
+      config: { ...options.config, ...models.config },
+      env: { ...options.env, ...models.env },
     } satisfies DriverOptions,
   };
   const agent: Agent.Agent = {

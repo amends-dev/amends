@@ -1,19 +1,31 @@
 /**
- * The models opencode runs on, made from model endpoints: the providers of opencode's configuration
- * that serve them, and each endpoint's model as opencode names it. opencode serves a model through
- * the endpoint's protocol, at its URL, with its output limit, and with the key and headers of its
- * provider. An endpoint's effort is a variant of the model, which the endpoint's model names.
+ * The models opencode runs on, made from model endpoints: what opencode's server takes to serve
+ * them, its providers and the variables it runs with, and each endpoint's model as opencode names
+ * it. opencode serves a model through the endpoint's protocol, at its URL, within its limits, and
+ * with the key and headers of its provider. An endpoint's effort is a variant of the model, which
+ * the endpoint's model names.
  *
- * opencode finds the providers and models that models.dev lists by their ids, as endpoints name
- * them, and knows the rest of a model from there, such as whether it calls tools.
+ * opencode 1 and opencode 2 configure providers apart. opencode 1 names them `provider` and gives
+ * a model's AI SDK package, its URL, and its variants' AI SDK options, and opencode 2 names them
+ * `providers` and gives the fields of the requests a model's variant sends. Both find the
+ * providers and models that models.dev lists by their ids, as endpoints name them, and know the
+ * rest of a model from there, such as whether it calls tools.
  */
 import { HarnessError, type ModelEndpoint } from "@amends/harness";
 import { Array, Record, Redacted, Result, type Schema } from "effect";
 import type { ModelRef } from "./bridge/Driver.ts";
+import type { Version } from "./template.ts";
+
+type Endpoints = Array.NonEmptyReadonlyArray<ModelEndpoint.ModelEndpoint>;
+
+type JsonObject = { readonly [field: string]: Schema.Json };
 
 export interface Models {
-  /** The `providers` of opencode's configuration, which serve the endpoints' models. */
-  readonly providers: { readonly [providerId: string]: Schema.Json };
+  /** The fields of opencode's configuration that serve the endpoints' models: its providers. */
+  readonly config: JsonObject;
+
+  /** The environment variables opencode's server serves the models with. */
+  readonly env: { readonly [name: string]: string };
 
   /** The model a turn runs on when it names none. */
   readonly model: ModelRef;
@@ -23,30 +35,33 @@ export interface Models {
 }
 
 /**
- * The models opencode runs on for the endpoint `model`, and `models` by name. opencode presents one
- * key, with one set of headers, for each provider, and serves a model through one protocol, at one
- * URL, with one output limit, so endpoints that differ in them fail with `UnsupportedError`.
+ * The models opencode `version` runs on for the endpoint `model`, and `models` by name. opencode
+ * presents one key, with one set of headers, for each provider, and serves a model through one
+ * protocol, at one URL, within one output limit and context window, so endpoints that differ in
+ * them fail with `UnsupportedError`.
  */
-export const modelsOf = (endpoints: {
-  readonly model: ModelEndpoint.ModelEndpoint;
-  readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>> | undefined;
-}): Result.Result<Models, HarnessError.UnsupportedError> => {
-  const byProvider = Object.entries(
-    Array.groupBy(
-      [endpoints.model, ...Object.values(endpoints.models ?? {})],
-      (endpoint) => endpoint.provider,
-    ),
-  );
+export const modelsOf = (
+  version: Version,
+  endpoints: {
+    readonly model: ModelEndpoint.ModelEndpoint;
+    readonly models?: Readonly<Record<string, ModelEndpoint.ModelEndpoint>> | undefined;
+  },
+): Result.Result<Models, HarnessError.UnsupportedError> => {
+  const all = [endpoints.model, ...Object.values(endpoints.models ?? {})] as const;
+  const byProvider = Object.entries(Array.groupBy(all, (endpoint) => endpoint.provider));
   for (const [providerId, ofProvider] of byProvider) {
     const conflict = conflictIn(providerId, ofProvider);
     if (conflict !== undefined) {
       return Result.fail(new HarnessError.UnsupportedError({ description: conflict }));
     }
   }
+  const providers = Object.fromEntries(
+    byProvider.map(([providerId, ofProvider]) => [providerId, providerOf[version](ofProvider)]),
+  );
+  const config: JsonObject = version === 1 ? { provider: providers } : { providers };
   return Result.succeed({
-    providers: Object.fromEntries(
-      byProvider.map(([providerId, ofProvider]) => [providerId, providerOf(ofProvider)]),
-    ),
+    config,
+    env: version === 1 ? outputCeilingOf(all) : {},
     model: modelRefOf(endpoints.model),
     models: Object.fromEntries(
       Object.entries(endpoints.models ?? {}).map(([name, endpoint]) => [
@@ -62,7 +77,7 @@ const conflictIn = (
   providerId: string,
   endpoints: ReadonlyArray<ModelEndpoint.ModelEndpoint>,
 ): string | undefined => {
-  if (new Set(endpoints.map((endpoint) => JSON.stringify(requestOf(endpoint)))).size > 1) {
+  if (new Set(endpoints.map((endpoint) => JSON.stringify(secretsOf(endpoint)))).size > 1) {
     return (
       "opencode presents one key, with one set of headers, for each provider, and the " +
       `endpoints for ${providerId} differ in them`
@@ -73,13 +88,18 @@ const conflictIn = (
   )) {
     const served = new Set(
       ofModel.map((endpoint) =>
-        JSON.stringify([endpoint.protocol, urlOf(endpoint), endpoint.maxOutputTokens]),
+        JSON.stringify([
+          endpoint.protocol,
+          urlOf(endpoint),
+          endpoint.maxOutputTokens,
+          endpoint.contextWindow,
+        ]),
       ),
     );
     if (served.size > 1) {
       return (
-        "opencode serves a model through one protocol, at one URL, with one output limit, and " +
-        `the endpoints for ${providerId}/${modelId} differ in them`
+        "opencode serves a model through one protocol, at one URL, within one output limit and " +
+        `context window, and the endpoints for ${providerId}/${modelId} differ in them`
       );
     }
   }
@@ -87,26 +107,63 @@ const conflictIn = (
 };
 
 /** The configuration of the provider that serves `endpoints`, which share their provider. */
-const providerOf = (endpoints: Array.NonEmptyReadonlyArray<ModelEndpoint.ModelEndpoint>) => {
-  const request = requestOf(endpoints[0]);
-  const provider: Schema.Json = {
-    ...(request === undefined ? {} : { request }),
-    models: Object.fromEntries(
-      Object.entries(Array.groupBy(endpoints, (endpoint) => endpoint.model)).map(
-        ([modelId, ofModel]) => [modelId, modelOf(ofModel)],
-      ),
-    ),
-  };
-  return provider;
+const providerOf: Record<Version, (endpoints: Endpoints) => Schema.Json> = {
+  1: (endpoints) => {
+    const options: JsonObject = secretsOf(endpoints[0]);
+    return {
+      ...(Record.isEmptyRecord(options) ? {} : { options }),
+      models: modelsByIdOf(endpoints, opencode1ModelOf),
+    };
+  },
+  2: (endpoints) => {
+    const { apiKey, headers } = secretsOf(endpoints[0]);
+    const request: JsonObject = {
+      ...(apiKey === undefined ? {} : { body: { apiKey } }),
+      ...(headers === undefined ? {} : { headers }),
+    };
+    return {
+      ...(Record.isEmptyRecord(request) ? {} : { request }),
+      models: modelsByIdOf(endpoints, opencode2ModelOf),
+    };
+  },
 };
 
-/** The configuration of the model that `endpoints`, which share their model, name. */
-const modelOf = (endpoints: Array.NonEmptyReadonlyArray<ModelEndpoint.ModelEndpoint>) => {
+/** The configuration of each model that `endpoints` name, by its id, as `modelOf` writes it. */
+const modelsByIdOf = (endpoints: Endpoints, modelOf: (endpoints: Endpoints) => Schema.Json) =>
+  Object.fromEntries(
+    Object.entries(Array.groupBy(endpoints, (endpoint) => endpoint.model)).map(
+      ([modelId, ofModel]) => [modelId, modelOf(ofModel)],
+    ),
+  );
+
+/**
+ * A model in opencode 1's configuration. opencode 1 takes a model's limits together, so an
+ * endpoint with an output limit gives its context window too, or 0, which opencode takes as
+ * unknown; an endpoint without one leaves both to what opencode knows of the model from models.dev.
+ * A variant gives the AI SDK options that ask for its effort.
+ */
+const opencode1ModelOf = (endpoints: Endpoints): Schema.Json => {
   const [endpoint] = endpoints;
-  const efforts = [
-    ...new Set(endpoints.flatMap(({ effort }) => (effort === undefined ? [] : [effort]))),
-  ];
-  const model: Schema.Json = {
+  const variants = efforts(endpoints).map(
+    (effort) => [variantOf(effort), effortOptions[endpoint.protocol](effort)] as const,
+  );
+  return {
+    provider: { npm: packages[endpoint.protocol], api: urlOf(endpoint) },
+    ...(endpoint.maxOutputTokens === undefined
+      ? {}
+      : { limit: { context: endpoint.contextWindow ?? 0, output: endpoint.maxOutputTokens } }),
+    ...(variants.length === 0 ? {} : { variants: Object.fromEntries(variants) }),
+  };
+};
+
+/** A model in opencode 2's configuration, whose variants give the fields of their requests. */
+const opencode2ModelOf = (endpoints: Endpoints): Schema.Json => {
+  const [endpoint] = endpoints;
+  const variants = efforts(endpoints).map((effort) => ({
+    id: variantOf(effort),
+    body: effortFields[endpoint.protocol](effort),
+  }));
+  return {
     api: {
       id: endpoint.model,
       type: "aisdk",
@@ -116,17 +173,14 @@ const modelOf = (endpoints: Array.NonEmptyReadonlyArray<ModelEndpoint.ModelEndpo
     ...(endpoint.maxOutputTokens === undefined
       ? {}
       : { limit: { output: endpoint.maxOutputTokens } }),
-    ...(efforts.length === 0
-      ? {}
-      : {
-          variants: efforts.map((effort) => ({
-            id: variantOf(effort),
-            body: effortFields[endpoint.protocol](effort),
-          })),
-        }),
+    ...(variants.length === 0 ? {} : { variants }),
   };
-  return model;
 };
+
+/** The efforts that `endpoints` ask for, each once. */
+const efforts = (endpoints: Endpoints) => [
+  ...new Set(endpoints.flatMap(({ effort }) => (effort === undefined ? [] : [effort]))),
+];
 
 const modelRefOf = (endpoint: ModelEndpoint.ModelEndpoint): ModelRef => ({
   providerID: endpoint.provider,
@@ -145,13 +199,21 @@ const packages: Record<ModelEndpoint.Protocol, string> = {
 };
 
 /**
- * The fields of a request's body that ask for an effort, as each protocol takes them. opencode adds
- * a variant's fields to the requests of a model that runs in it.
+ * The AI SDK options that ask for an effort, as each protocol's package takes them, which
+ * opencode 1 gives the requests of a model that runs in a variant of them.
  */
-const effortFields: Record<
-  ModelEndpoint.Protocol,
-  (effort: ModelEndpoint.Effort) => { readonly [field: string]: Schema.Json }
-> = {
+const effortOptions: Record<ModelEndpoint.Protocol, (effort: ModelEndpoint.Effort) => JsonObject> =
+  {
+    "anthropic-messages": (effort) => ({ effort }),
+    "openai-responses": (effort) => ({ reasoningEffort: effort }),
+    "openai-chat": (effort) => ({ reasoningEffort: effort }),
+  };
+
+/**
+ * The fields of a request's body that ask for an effort, as each protocol takes them, which
+ * opencode 2 adds to the requests of a model that runs in a variant of them.
+ */
+const effortFields: Record<ModelEndpoint.Protocol, (effort: ModelEndpoint.Effort) => JsonObject> = {
   "anthropic-messages": (effort) => ({ output_config: { effort } }),
   "openai-responses": (effort) => ({ reasoning: { effort } }),
   "openai-chat": (effort) => ({ reasoning_effort: effort }),
@@ -166,15 +228,25 @@ const variantOf = (effort: ModelEndpoint.Effort) => `amends-${effort}`;
 /** The endpoint's URL without a slash at its end, which the protocol's paths follow. */
 const urlOf = (endpoint: ModelEndpoint.ModelEndpoint) => endpoint.url.replace(/\/+$/, "");
 
-/**
- * What opencode's requests to the endpoint's provider carry: its key, which opencode presents as
- * the protocol presents keys, and its headers. Nothing for a provider that asks for neither.
- */
-const requestOf = (endpoint: ModelEndpoint.ModelEndpoint) => {
+/** The key and headers the endpoint's requests carry, each absent when it gives none. */
+const secretsOf = (
+  endpoint: ModelEndpoint.ModelEndpoint,
+): { readonly apiKey?: string; readonly headers?: { readonly [name: string]: string } } => {
   const headers = Record.map(endpoint.headers ?? {}, Redacted.value);
-  const request: { readonly [field: string]: Schema.Json } = {
-    ...(endpoint.apiKey === undefined ? {} : { body: { apiKey: Redacted.value(endpoint.apiKey) } }),
+  return {
+    ...(endpoint.apiKey === undefined ? {} : { apiKey: Redacted.value(endpoint.apiKey) }),
     ...(Record.isEmptyRecord(headers) ? {} : { headers }),
   };
-  return Record.isEmptyRecord(request) ? undefined : request;
+};
+
+/**
+ * The most tokens opencode 1 lets a model write in a response is 32,000, whatever its output
+ * limit, unless its server is given a higher ceiling. It is given the highest output limit of the
+ * endpoints when one is higher, which leaves the models without one as they were.
+ */
+const outputCeilingOf = (
+  endpoints: ReadonlyArray<ModelEndpoint.ModelEndpoint>,
+): { readonly [name: string]: string } => {
+  const highest = Math.max(...endpoints.map((endpoint) => endpoint.maxOutputTokens ?? 0));
+  return highest > 32_000 ? { OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX: String(highest) } : {};
 };

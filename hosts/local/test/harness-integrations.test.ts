@@ -44,6 +44,7 @@ const connectionTo = (
 
 const amends = connectionTo("amends", "amends", "none");
 const opencode = connectionTo("opencode-agent", "opencode", "none");
+const opencode2 = connectionTo("opencode2-agent", "opencode 2", "none");
 const id = Agent.SessionId.make("session-one");
 
 /** The tokens each scripted response uses. */
@@ -188,6 +189,21 @@ layer(Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor))(
         expect(harness.agent.requiresSandbox).toBe(true);
         expect(harness.agent.template?.name).toBe("opencode");
         expect(yield* integration.check(opencode, undefined)).toEqual({ status: "healthy" });
+      }),
+    );
+
+    it.effect("gives harnesses of opencode 2 in an integration of their own", () =>
+      Effect.gen(function* () {
+        const integration = yield* HarnessIntegrations.opencode2({
+          token: () => Redacted.make("bridge-token"),
+        });
+
+        const harness = yield* integration.harness(opencode2, undefined, { model: sonnet });
+
+        expect(integration.id).toBe("opencode2-agent");
+        expect(integration.requiresSandbox).toBe(true);
+        expect(harness.agent.id).toBe("opencode2");
+        expect(harness.agent.template?.name).toBe("opencode2");
       }),
     );
 
@@ -382,15 +398,21 @@ const daytonaSandboxes: Sandboxes = {
 };
 
 /** What the host does with opencode set up from connections, in a new sandbox of `sandboxes`. */
+/** opencode's integrations, one for each of its session APIs, and the connection to each. */
+const opencodeIntegrations = [
+  { name: "opencode", make: HarnessIntegrations.opencode, connection: opencode },
+  { name: "opencode 2", make: HarnessIntegrations.opencode2, connection: opencode2 },
+];
+
 const describeOpencode = (title: string, enabled: boolean, sandboxes: Sandboxes, timeout: number) =>
-  describe.skipIf(!enabled)(title, () => {
+  describe.skipIf(!enabled).each(opencodeIntegrations)(`$name ${title}`, (integration) => {
     it.live(
       "runs a turn on a model connection, in a sandbox",
       () =>
         Effect.gen(function* () {
           const integrations = yield* Integrations.make([
             ...(yield* ModelIntegrations.catalogProviders),
-            yield* HarnessIntegrations.opencode({
+            yield* integration.make({
               token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
               config,
               env: yield* sandboxes.env,
@@ -398,11 +420,9 @@ const describeOpencode = (title: string, enabled: boolean, sandboxes: Sandboxes,
           ]);
 
           const model = yield* openRouterEndpoint(integrations);
-          const harness = yield* (yield* integrations.find(opencode.integration)).harness(
-            opencode,
-            undefined,
-            { model },
-          );
+          const harness = yield* (yield* integrations.find(
+            integration.connection.integration,
+          )).harness(integration.connection, undefined, { model });
           const sandbox = yield* sandboxes.create(harness.agent.template);
           const session = yield* harness.createSession({ sandbox, id });
           const result = yield* session.generate({
@@ -422,7 +442,7 @@ const describeOpencode = (title: string, enabled: boolean, sandboxes: Sandboxes,
 const opencodeEnabled = process.env.AMENDS_TEST_OPENCODE === "1" && openRouterKey !== undefined;
 
 describeOpencode(
-  "opencode set up from connections, in this machine's sandboxes",
+  "set up from connections, in this machine's sandboxes",
   opencodeEnabled,
   localSandboxes,
   timeout,
@@ -430,7 +450,7 @@ describeOpencode(
 
 // Daytona's sandboxes cost money, so opencode is set up there only with `AMENDS_TEST_DAYTONA=1` too.
 describeOpencode(
-  "opencode set up from connections, in Daytona's sandboxes",
+  "set up from connections, in Daytona's sandboxes",
   opencodeEnabled &&
     process.env.AMENDS_TEST_DAYTONA === "1" &&
     process.env.DAYTONA_API_KEY !== undefined,

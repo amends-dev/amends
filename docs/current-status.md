@@ -38,28 +38,35 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - The [harness](../packages/harness/README.md) runs amends's own agent
   ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;
-  the local host runs turns on both. Amends's agent compacts by itself only for a model whose
-  context window the catalog knows, not one of an OpenAI-compatible connection; it tells the
-  model nothing of its own beyond a turn's instructions and its tools' descriptions, such as where
-  it works; and it asks Anthropic's models for an effort but never for adaptive thinking, which an
-  endpoint does not say its model takes. opencode's session
-  API takes no instructions for a turn, so opencode refuses a turn that gives some: only an agent
-  without instructions runs on it, and it compacts only by itself. opencode's session API also
-  offers its model none of the host's tools, answers in no JSON, and takes no files in a prompt, so
-  opencode refuses such turns; its turns stream no `file-change` parts, as opencode records which
-  files a step changed but not how; a model that models.dev does not list runs on opencode without
-  tools, as an endpoint does not say whether its model calls them; the endpoints' keys reach
-  opencode's configuration in the sandbox, where the commands it runs can read them; and each
-  launch of a bridge exposes another port of its sandbox, which is never taken back. opencode's
-  bridge program is bundled from the package's files when the agent is made, with `Bun.build`, so
-  a host that runs opencode runs on Bun, where AI SDK ships its bridge prebuilt. An agent's own tools run without
-  asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode saying
-  which of them an agent may use and which it asks about, amends's agent runs its `read`, `write`,
-  `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default permissions,
-  its permission requests neither streamed nor answered. A session's `approve` answers only the
-  requests for the host's tools. A running turn takes no further input: a message sent during a
-  turn starts the next, where Claude Code, Codex, and opencode take input while they work, and
-  AI SDK's harness passes it on to them.
+  the local host runs turns on both, opencode as two integrations, one for each of opencode's
+  session APIs. Amends's agent compacts by itself only for a model whose context window the
+  catalog knows, not one of an OpenAI-compatible connection; it tells the model nothing of its own
+  beyond a turn's instructions and its tools' descriptions, such as where it works; and it asks
+  Anthropic's models for an effort but never for adaptive thinking, which an endpoint does not say
+  its model takes. opencode 1's session API, which the `opencode` integration drives, takes all of
+  a turn, but a conversation that started on another agent reaches opencode as one message the
+  model reads, not as opencode's own record, and opencode summarizes a conversation on request
+  only without instructions. opencode 2's session API, which the `opencode 2` integration drives,
+  takes no instructions for a turn, so it refuses a turn that gives some: only an agent without
+  instructions runs on it, and it compacts only by itself. It also offers its model none of the
+  host's tools, answers in no JSON, and takes no files in a prompt, so it refuses such turns, and
+  its turns stream no `file-change` parts, as opencode 2 records which files a step changed but
+  not how. Both run the opencode 1.18 the template installs, whose preview of opencode 2's API
+  `Opencode2Agent` drives, not opencode 2's own release. opencode 1 takes a model that models.dev
+  does not list as one that calls tools but reads no files, and opencode 2 runs it without tools,
+  as an endpoint does not say what its model takes; the endpoints' keys reach opencode's
+  configuration in the sandbox, where the commands it runs can read them; and each launch of a
+  bridge exposes another port of its sandbox, which is never taken back. opencode's bridge
+  program is bundled from the package's files when the agent is made, with `Bun.build`, so a host
+  that runs opencode runs on Bun, where AI SDK ships its bridge prebuilt. An agent's own tools run
+  without asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode
+  saying which of them an agent may use and which it asks about, amends's agent runs its `read`,
+  `write`, `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default
+  permissions. opencode 1 streams the requests its permissions make, which a session's `approve`
+  answers, but the turn job answers none, so a turn whose tool opencode asks about waits until it
+  is stopped; opencode 2's requests are neither streamed nor answered. A running turn takes no
+  further input: a message sent during a turn starts the next, where Claude Code, Codex, and
+  opencode take input while they work, and AI SDK's harness passes it on to them.
 - The [sandbox contract](../packages/sandbox) has two providers: directories on this machine
   ([sandbox-local](../adapters/sandbox-local)), for development, and
   [Daytona](../adapters/sandbox-daytona/README.md). No provider for E2B, Vercel, or Cloudflare

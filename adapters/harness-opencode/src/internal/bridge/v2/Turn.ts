@@ -11,11 +11,10 @@
  * `finishStopped`.
  */
 import { HarnessError, type StreamPart } from "@amends/harness";
-import { Result, Schema } from "effect";
-import { Response } from "effect/ai";
-import type { SessionEvent, StepEnded } from "./Event.ts";
-
-type Tokens = (typeof StepEnded.Type)["data"]["tokens"];
+import { Result } from "effect";
+import type { Response } from "effect/ai";
+import { addTokens, finishReasonOf, noTokens, type Tokens, usageOf } from "../Steps.ts";
+import type { SessionEvent } from "./Event.ts";
 
 /** What a turn has done so far, as its events told. */
 export interface Turn {
@@ -32,7 +31,7 @@ export interface Turn {
 /** A turn none of whose events were translated yet. */
 export const initial: Turn = {
   toolNames: new Map(),
-  tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+  tokens: noTokens,
   finished: false,
 };
 
@@ -208,33 +207,4 @@ const finishOf = (turn: Turn, reason: Response.FinishReason): StreamPart.StreamP
   type: "finish",
   reason,
   usage: usageOf(turn.tokens),
-});
-
-/** A finish reason as Effect AI names it; opencode names them as AI SDK does. */
-const finishReasonOf = (finish: string): Response.FinishReason =>
-  Schema.is(Response.FinishReason)(finish) ? finish : "other";
-
-/**
- * Tokens as Effect AI counts them. opencode counts input without cached tokens, and output
- * without reasoning.
- */
-const usageOf = (tokens: Tokens): typeof Response.Usage.Encoded => ({
-  inputTokens: {
-    uncached: tokens.input,
-    total: tokens.input + tokens.cache.read + tokens.cache.write,
-    cacheRead: tokens.cache.read,
-    cacheWrite: tokens.cache.write,
-  },
-  outputTokens: {
-    total: tokens.output + tokens.reasoning,
-    text: tokens.output,
-    reasoning: tokens.reasoning,
-  },
-});
-
-const addTokens = (a: Tokens, b: Tokens): Tokens => ({
-  input: a.input + b.input,
-  output: a.output + b.output,
-  reasoning: a.reasoning + b.reasoning,
-  cache: { read: a.cache.read + b.cache.read, write: a.cache.write + b.cache.write },
 });

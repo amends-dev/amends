@@ -31,7 +31,7 @@ describe("Server", () => {
       expect(health.status).toBe(200);
       expect(yield* startsIn(directory)).toMatchObject([
         {
-          args: ["serve", "--hostname=127.0.0.1", "--port=0"],
+          args: ["serve", "--hostname=127.0.0.1", expect.stringMatching(/^--port=[1-9]\d*$/)],
           config: { model: "opencode/default-model" },
           greeting: "hello",
         },

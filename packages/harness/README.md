@@ -277,8 +277,9 @@ sandbox exposes of the agent, on a port of its own, to hosts that present its to
    bridge, and how to derive its token from a sandbox's id.
 
 Each module's documentation shows one. [`@amends/harness-opencode`](../../adapters/harness-opencode)
-is a complete adapter: its template installs opencode and the bridge program, and its driver runs
-opencode's server on the sandbox's loopback.
+is a complete adapter: its template installs opencode and the bridge program, its driver runs
+opencode's server on the sandbox's loopback, and its `OpencodeAgent` serves the host's tools
+through the relay.
 
 How bridges run:
 
@@ -335,10 +336,11 @@ keeps a call that waits on the host alive with progress notifications every ten 
 agent with a time limit for a request, until it gives up after an hour. The relay's server must not
 close idle connections: Bun's does after ten seconds, unless it is made with `idleTimeout: 0`.
 
-No adapter in this repository uses the relay yet. opencode's session API runs its model with the
-tools registered in its own process only, not those of MCP servers, so the adapter refuses a turn
-with host tools; the relay was run against opencode's older session API, where the model called a
-host tool through it and answered with the result the host gave.
+`OpencodeAgent` in [`@amends/harness-opencode`](../../adapters/harness-opencode) uses the relay:
+opencode 1 connects to it as an MCP server in each session's directory, and lists its tools again
+when a turn's tools change. opencode 2's session API runs its model with the tools registered in
+its own process only, not those of MCP servers, so `Opencode2Agent` refuses a turn with host
+tools.
 
 ## Development
 

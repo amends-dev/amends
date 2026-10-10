@@ -74,13 +74,17 @@ export interface Driver extends Bridge.Driver {
 /**
  * Creates a session on opencode's server, as the API of one version of opencode does: the
  * session's turns run on `options`' models, and `sessionOptions` say where it works and what
- * conversation it starts from.
+ * conversation it starts from. It reads the sandbox's files with the bridge's file system.
  */
 export type CreateSession = (
   server: Server.Server,
   options: Pick<Options, "model" | "models">,
   sessionOptions: Bridge.CreateSessionOptions,
-) => Effect.Effect<Bridge.DriverSession, HarnessError.HarnessError, Scope.Scope>;
+) => Effect.Effect<
+  Bridge.DriverSession,
+  HarnessError.HarnessError,
+  Scope.Scope | FileSystem.FileSystem
+>;
 
 /**
  * The driver of the agent `id`, which starts opencode's server with `options` when the first
@@ -134,7 +138,9 @@ export const make = Effect.fn("Driver.make")(function* (
     id,
     serverExited: Deferred.await(serverExited),
     createSession: (sessionOptions) =>
-      Effect.flatMap(startedServer, (server) => createSession(server, options, sessionOptions)),
+      Effect.flatMap(startedServer, (server) =>
+        createSession(server, options, sessionOptions).pipe(Effect.provide(services)),
+      ),
   };
   return driver;
 });

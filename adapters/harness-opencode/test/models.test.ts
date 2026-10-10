@@ -29,63 +29,21 @@ const gptOss = {
   url: "https://openrouter.ai/api/v1",
   effort: "low",
   maxOutputTokens: 8000,
+  contextWindow: 131_072,
 } satisfies ModelEndpoint.ModelEndpoint;
 
 /** Why opencode cannot serve `endpoints`, or nothing when it can. */
-const refusalOf = (endpoints: Parameters<typeof modelsOf>[0]) => {
-  const models = modelsOf(endpoints);
+const refusalOf = (endpoints: Parameters<typeof modelsOf>[1]) => {
+  const models = modelsOf(1, endpoints);
   return Result.isFailure(models) ? models.failure : undefined;
 };
 
 describe("modelsOf", () => {
-  it("serves each endpoint's model through its protocol, at its URL, with its key", () => {
+  it("names each endpoint's model, and its effort as a variant of it", () => {
     const models = Result.getOrThrow(
-      modelsOf({ model: sonnet, models: { deep: gpt, open: gptOss } }),
+      modelsOf(1, { model: sonnet, models: { deep: gpt, open: gptOss } }),
     );
 
-    expect(models.providers).toEqual({
-      anthropic: {
-        request: { body: { apiKey: "secret-key" } },
-        models: {
-          "claude-sonnet-5-5": {
-            api: {
-              id: "claude-sonnet-5-5",
-              type: "aisdk",
-              package: "@ai-sdk/anthropic",
-              url: "https://api.anthropic.com/v1",
-            },
-          },
-        },
-      },
-      openai: {
-        request: { body: { apiKey: "other-key" } },
-        models: {
-          "gpt-5.6": {
-            api: {
-              id: "gpt-5.6",
-              type: "aisdk",
-              package: "@ai-sdk/openai",
-              url: "https://api.openai.com/v1",
-            },
-            variants: [{ id: "amends-xhigh", body: { reasoning: { effort: "xhigh" } } }],
-          },
-        },
-      },
-      openrouter: {
-        models: {
-          "openai/gpt-oss-120b": {
-            api: {
-              id: "openai/gpt-oss-120b",
-              type: "aisdk",
-              package: "@ai-sdk/openai-compatible",
-              url: "https://openrouter.ai/api/v1",
-            },
-            limit: { output: 8000 },
-            variants: [{ id: "amends-low", body: { reasoning_effort: "low" } }],
-          },
-        },
-      },
-    });
     expect(models.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5" });
     expect(models.models).toEqual({
       deep: { providerID: "openai", id: "gpt-5.6", variant: "amends-xhigh" },
@@ -93,22 +51,129 @@ describe("modelsOf", () => {
     });
   });
 
-  it("asks a model on the Messages API for an effort in `output_config`", () => {
-    const models = Result.getOrThrow(modelsOf({ model: { ...sonnet, effort: "max" }, models: {} }));
+  it("configures opencode 1's providers to serve each model through its protocol, at its URL, with its key", () => {
+    const models = Result.getOrThrow(
+      modelsOf(1, { model: sonnet, models: { deep: gpt, open: gptOss } }),
+    );
 
-    expect(models.providers["anthropic"]).toMatchObject({
-      models: {
-        "claude-sonnet-5-5": {
-          variants: [{ id: "amends-max", body: { output_config: { effort: "max" } } }],
+    expect(models.config).toEqual({
+      provider: {
+        anthropic: {
+          options: { apiKey: "secret-key" },
+          models: {
+            "claude-sonnet-5-5": {
+              provider: { npm: "@ai-sdk/anthropic", api: "https://api.anthropic.com/v1" },
+            },
+          },
+        },
+        openai: {
+          options: { apiKey: "other-key" },
+          models: {
+            "gpt-5.6": {
+              provider: { npm: "@ai-sdk/openai", api: "https://api.openai.com/v1" },
+              variants: { "amends-xhigh": { reasoningEffort: "xhigh" } },
+            },
+          },
+        },
+        openrouter: {
+          models: {
+            "openai/gpt-oss-120b": {
+              provider: {
+                npm: "@ai-sdk/openai-compatible",
+                api: "https://openrouter.ai/api/v1",
+              },
+              limit: { context: 131_072, output: 8000 },
+              variants: { "amends-low": { reasoningEffort: "low" } },
+            },
+          },
         },
       },
     });
-    expect(models.model.variant).toBe("amends-max");
+    expect(models.env).toEqual({});
+  });
+
+  it("configures opencode 2's providers to serve each model through its protocol, at its URL, with its key", () => {
+    const models = Result.getOrThrow(
+      modelsOf(2, { model: sonnet, models: { deep: gpt, open: gptOss } }),
+    );
+
+    expect(models.config).toEqual({
+      providers: {
+        anthropic: {
+          request: { body: { apiKey: "secret-key" } },
+          models: {
+            "claude-sonnet-5-5": {
+              api: {
+                id: "claude-sonnet-5-5",
+                type: "aisdk",
+                package: "@ai-sdk/anthropic",
+                url: "https://api.anthropic.com/v1",
+              },
+            },
+          },
+        },
+        openai: {
+          request: { body: { apiKey: "other-key" } },
+          models: {
+            "gpt-5.6": {
+              api: {
+                id: "gpt-5.6",
+                type: "aisdk",
+                package: "@ai-sdk/openai",
+                url: "https://api.openai.com/v1",
+              },
+              variants: [{ id: "amends-xhigh", body: { reasoning: { effort: "xhigh" } } }],
+            },
+          },
+        },
+        openrouter: {
+          models: {
+            "openai/gpt-oss-120b": {
+              api: {
+                id: "openai/gpt-oss-120b",
+                type: "aisdk",
+                package: "@ai-sdk/openai-compatible",
+                url: "https://openrouter.ai/api/v1",
+              },
+              limit: { output: 8000 },
+              variants: [{ id: "amends-low", body: { reasoning_effort: "low" } }],
+            },
+          },
+        },
+      },
+    });
+    expect(models.env).toEqual({});
+  });
+
+  it("asks a model on the Messages API for an effort as each opencode takes it", () => {
+    const endpoints = { model: { ...sonnet, effort: "max" }, models: {} } as const;
+    const opencode1 = Result.getOrThrow(modelsOf(1, endpoints));
+    const opencode2 = Result.getOrThrow(modelsOf(2, endpoints));
+
+    expect(opencode1.config).toMatchObject({
+      provider: {
+        anthropic: {
+          models: { "claude-sonnet-5-5": { variants: { "amends-max": { effort: "max" } } } },
+        },
+      },
+    });
+    expect(opencode2.config).toMatchObject({
+      providers: {
+        anthropic: {
+          models: {
+            "claude-sonnet-5-5": {
+              variants: [{ id: "amends-max", body: { output_config: { effort: "max" } } }],
+            },
+          },
+        },
+      },
+    });
+    expect(opencode1.model.variant).toBe("amends-max");
   });
 
   it("names one model at several efforts as variants of it", () => {
     const models = Result.getOrThrow(
-      modelsOf({
+      modelsOf(1, {
         model: sonnet,
         models: {
           quick: { ...sonnet, effort: "low" },
@@ -118,13 +183,14 @@ describe("modelsOf", () => {
       }),
     );
 
-    expect(models.providers["anthropic"]).toMatchObject({
-      models: {
-        "claude-sonnet-5-5": {
-          variants: [
-            { id: "amends-low", body: { output_config: { effort: "low" } } },
-            { id: "amends-high", body: { output_config: { effort: "high" } } },
-          ],
+    expect(models.config).toMatchObject({
+      provider: {
+        anthropic: {
+          models: {
+            "claude-sonnet-5-5": {
+              variants: { "amends-low": { effort: "low" }, "amends-high": { effort: "high" } },
+            },
+          },
         },
       },
     });
@@ -133,9 +199,48 @@ describe("modelsOf", () => {
     expect(models.models["deep"]).toEqual(models.models["deeper"]);
   });
 
+  it("gives opencode 1 a model's limits together, the context window unknown without one", () => {
+    const { contextWindow: _, ...unknownWindow } = gptOss;
+    const models = Result.getOrThrow(
+      modelsOf(1, {
+        model: unknownWindow,
+        models: { large: { ...sonnet, contextWindow: 200_000 } },
+      }),
+    );
+
+    expect(models.config).toMatchObject({
+      provider: {
+        openrouter: { models: { "openai/gpt-oss-120b": { limit: { context: 0, output: 8000 } } } },
+      },
+    });
+    // Without an output limit, opencode knows the model's limits from models.dev.
+    expect(models.config).not.toHaveProperty([
+      "provider",
+      "anthropic",
+      "models",
+      "claude-sonnet-5-5",
+      "limit",
+    ]);
+  });
+
+  it("raises the most tokens opencode 1 writes in a response to the highest output limit", () => {
+    const opencode1 = Result.getOrThrow(
+      modelsOf(1, {
+        model: { ...sonnet, maxOutputTokens: 64_000 },
+        models: { open: gptOss },
+      }),
+    );
+    const opencode2 = Result.getOrThrow(
+      modelsOf(2, { model: { ...sonnet, maxOutputTokens: 64_000 }, models: {} }),
+    );
+
+    expect(opencode1.env).toEqual({ OPENCODE_EXPERIMENTAL_OUTPUT_TOKEN_MAX: "64000" });
+    expect(opencode2.env).toEqual({});
+  });
+
   it("serves the models of one provider at URLs of their own, under its key", () => {
     const models = Result.getOrThrow(
-      modelsOf({
+      modelsOf(1, {
         model: sonnet,
         models: {
           gateway: { ...sonnet, model: "claude-opus-5-5", url: "https://gateway.example/v1" },
@@ -143,34 +248,49 @@ describe("modelsOf", () => {
       }),
     );
 
-    expect(models.providers["anthropic"]).toMatchObject({
-      request: { body: { apiKey: "secret-key" } },
-      models: {
-        "claude-sonnet-5-5": { api: { url: "https://api.anthropic.com/v1" } },
-        "claude-opus-5-5": { api: { url: "https://gateway.example/v1" } },
+    expect(models.config).toMatchObject({
+      provider: {
+        anthropic: {
+          options: { apiKey: "secret-key" },
+          models: {
+            "claude-sonnet-5-5": { provider: { api: "https://api.anthropic.com/v1" } },
+            "claude-opus-5-5": { provider: { api: "https://gateway.example/v1" } },
+          },
+        },
       },
     });
   });
 
   it("sends a provider's requests with the headers its endpoints ask for", () => {
     const headers = { "cf-aig-authorization": Redacted.make("Bearer gateway-token") };
-    const models = Result.getOrThrow(
-      modelsOf({
-        model: { ...sonnet, headers },
-        models: { other: { ...gptOss, headers } },
-      }),
-    );
+    const endpoints = { model: { ...sonnet, headers }, models: { other: { ...gptOss, headers } } };
+    const opencode1 = Result.getOrThrow(modelsOf(1, endpoints));
+    const opencode2 = Result.getOrThrow(modelsOf(2, endpoints));
 
-    expect(models.providers["anthropic"]).toMatchObject({
-      request: {
-        body: { apiKey: "secret-key" },
-        headers: { "cf-aig-authorization": "Bearer gateway-token" },
+    expect(opencode1.config).toMatchObject({
+      provider: {
+        anthropic: {
+          options: {
+            apiKey: "secret-key",
+            headers: { "cf-aig-authorization": "Bearer gateway-token" },
+          },
+        },
+        openrouter: { options: { headers: { "cf-aig-authorization": "Bearer gateway-token" } } },
       },
     });
-    expect(models.providers["openrouter"]).toMatchObject({
-      request: { headers: { "cf-aig-authorization": "Bearer gateway-token" } },
+    expect(opencode1.config).not.toHaveProperty(["provider", "openrouter", "options", "apiKey"]);
+    expect(opencode2.config).toMatchObject({
+      providers: {
+        anthropic: {
+          request: {
+            body: { apiKey: "secret-key" },
+            headers: { "cf-aig-authorization": "Bearer gateway-token" },
+          },
+        },
+        openrouter: { request: { headers: { "cf-aig-authorization": "Bearer gateway-token" } } },
+      },
     });
-    expect(models.providers["openrouter"]).not.toHaveProperty("request.body");
+    expect(opencode2.config).not.toHaveProperty(["providers", "openrouter", "request", "body"]);
   });
 
   it("refuses endpoints of one provider with different keys or headers", () => {
@@ -200,6 +320,7 @@ describe("modelsOf", () => {
       { url: "https://gateway.example/v1" },
       { protocol: "openai-chat" },
       { maxOutputTokens: 4096 },
+      { contextWindow: 100_000 },
     ] as const;
 
     const refusals = differences.map((difference) =>
@@ -210,14 +331,14 @@ describe("modelsOf", () => {
       expect(refused).toMatchObject({
         _tag: "UnsupportedError",
         description:
-          "opencode serves a model through one protocol, at one URL, with one output limit, and the endpoints for anthropic/claude-sonnet-5-5 differ in them",
+          "opencode serves a model through one protocol, at one URL, within one output limit and context window, and the endpoints for anthropic/claude-sonnet-5-5 differ in them",
       });
     }
   });
 
   it("takes a URL that ends in a slash as the one without it", () => {
     const models = Result.getOrThrow(
-      modelsOf({
+      modelsOf(1, {
         model: sonnet,
         models: { slashed: { ...sonnet, url: "https://api.anthropic.com/v1/" } },
       }),

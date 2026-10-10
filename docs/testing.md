@@ -189,22 +189,24 @@ host tool relay without a transport, with the test clock for its progress notifi
 time limit. The bridge over a real WebSocket, launched in a local sandbox, and the relay's HTTP
 server are tested in the opencode adapter.
 
-The opencode agent in `adapters/harness-opencode` runs everywhere against a fake of
-opencode's server, which the tests script turn by turn. Starting the server, and the bridge program
-a host launches, run everywhere too, against a stand-in for `opencode serve` in
+The opencode agents in `adapters/harness-opencode` run everywhere against a fake of each of
+opencode's session APIs, which the tests script turn by turn. Starting the server, and the bridge
+programs a host launches, run everywhere too, against a stand-in for `opencode serve` in
 `test/fake-opencode-server.js`, which the tests install as an executable that runs on the Bun
 running them. The template's tests run everywhere with its commands answered as a sandbox would
-answer them. Its live tests run real opencode, whose turns OpenCode Zen's free model answers over
-the network; they take about a minute, so they run only with `AMENDS_TEST_OPENCODE=1`.
-`AMENDS_TEST_OPENCODE_MODEL` names another of OpenCode Zen's models, and
+answer them. Its live tests run real opencode under both agents, whose turns OpenCode Zen's free
+model answers over the network; they take about two minutes, so they run only with
+`AMENDS_TEST_OPENCODE=1`. `AMENDS_TEST_OPENCODE_MODEL` names another of OpenCode Zen's models, and
 `AMENDS_TEST_OPENCODE_API_KEY` the key for it. One of them has opencode send turns on endpoints of
-each protocol to a fake of their APIs on a local port, to check what opencode sends. The agent as
-the bridge runs it runs opencode 1.18.23 on the `PATH`. The agent as hosts run it runs the Bun and
-opencode its template installs in this machine's home, under `~/.amends/opencode`, once for each
-version; the template's own live test installs them afresh in a temporary home directory. Each
-keeps opencode's configuration and data in temporary directories, apart from this machine's
-opencode. With `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on
-Daytona, in sandboxes started from the snapshot of the template's version once Daytona has made it.
+each protocol to a fake of their APIs on a local port, to check what opencode sends. The opencode 1
+agent's also give turns instructions, an answer in JSON, a file, the host's tools across two turns,
+a request to compact, and a tool that asks permission. The agents as the bridge runs them run the
+opencode 1.18 on the `PATH`. The agents as hosts run them run the Bun and opencode their template
+installs in this machine's home, under `~/.amends/opencode`, once for each version; the template's
+own live test installs them afresh in a temporary home directory. Each keeps opencode's
+configuration and data in temporary directories, apart from this machine's opencode. With
+`AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY` too, the hosts' tests also run on Daytona, in
+sandboxes started from the snapshot of the template's version once Daytona has made it.
 
 The sandbox providers in `adapters/sandbox-local` and
 `adapters/sandbox-daytona` run the suites `@amends/sandbox/conformance` exports, and
@@ -300,7 +302,7 @@ agent over scripted models and opencode as far as its bundled bridge. With `OPEN
 from the `.env` too, they set the agents up as the host does from a workspace's connections, on
 OpenRouter's free model: with `AMENDS_TEST_MODELS=1`, amends's agent runs a turn calling the tool
 of an MCP connection to a server on this machine; with `AMENDS_TEST_OPENCODE=1`, opencode runs a
-turn in this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, Daytona's.
+turn under each of its integrations in this machine's sandboxes or, with `AMENDS_TEST_DAYTONA=1` and `DAYTONA_API_KEY`, Daytona's.
 After changing host runtime setup, also perform the temporary-port startup check.
 Verify both app builds and native hash navigation after changing app composition.
 

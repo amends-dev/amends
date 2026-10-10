@@ -3,6 +3,7 @@ import { SessionId } from "@amends/harness/Agent";
 import { Sandbox } from "@amends/sandbox";
 import { BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
+import { dirname } from "node:path";
 import { Effect, FileSystem, Layer, Path, Redacted } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import { type Installation, makeInstallation, platformOf } from "../src/internal/template.ts";
@@ -89,6 +90,17 @@ describe("Template", () => {
           bridge: `.amends/opencode/${programs}/bridge-${bundle}.js`,
         });
       }).pipe(Effect.provide(BunServices.layer)),
+  );
+
+  it.effect("installs each agent's own bridge program beside the programs both agents share", () =>
+    Effect.gen(function* () {
+      const [one, two] = yield* Effect.all([makeInstallation(1), makeInstallation(2)]);
+
+      expect([one.template.name, two.template.name]).toEqual(["opencode", "opencode2"]);
+      expect(dirname(launchedFrom(one).bun)).toBe(dirname(launchedFrom(two).bun));
+      expect(launchedFrom(one).bridge).not.toBe(launchedFrom(two).bridge);
+      expect(one.template.identity).not.toBe(two.template.identity);
+    }).pipe(Effect.provide(BunServices.layer)),
   );
 
   it.effect("keeps the programs and the bridge program the sandbox has", () =>

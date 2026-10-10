@@ -2,13 +2,14 @@ import {
   type Bridge,
   GenerateResult,
   Harness,
+  HostToolRelay,
   type ModelEndpoint,
   type StreamPart,
 } from "@amends/harness";
 import { SessionId } from "@amends/harness/Agent";
 import { DaytonaSandboxProvider } from "@amends/sandbox-daytona";
 import type { Sandbox, Template } from "@amends/sandbox";
-import { BunServices, BunSocket } from "@effect/platform-bun";
+import { BunHttpServer, BunServices, BunSocket } from "@effect/platform-bun";
 import { describe, expect, it } from "@effect/vitest";
 import {
   Deferred,
@@ -23,30 +24,55 @@ import {
   type Scope,
   Stream,
 } from "effect";
-import { Prompt } from "effect/ai";
+import { Prompt, Tool, Toolkit } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import * as Driver from "../src/internal/bridge/Driver.ts";
-import { createSession } from "../src/internal/bridge/v2/Session.ts";
+import { makeCreateSession } from "../src/internal/bridge/v1/Session.ts";
+import { createSession as createSession2 } from "../src/internal/bridge/v2/Session.ts";
 import { modelsOf } from "../src/internal/models.ts";
 import * as Opencode2Agent from "../src/Opencode2Agent.ts";
+import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import { makeSandbox } from "./fixtures.ts";
 
 /**
- * These tests run real opencode, whose turns a model answers over the network, so they take a
- * minute and run only with `AMENDS_TEST_OPENCODE=1`. opencode's driver, as the bridge runs it, runs
- * opencode 1.18.23 on the `PATH`; the agent as hosts run it runs the opencode its template installs
- * in this machine's home, under `~/.amends/opencode`, once for each version. Their model is OpenCode
- * Zen's free one, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names another of OpenCode Zen's
- * models, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
+ * These tests run real opencode, whose turns a model answers over the network, so they take
+ * minutes and run only with `AMENDS_TEST_OPENCODE=1`. Each agent's driver, as its bridge runs it,
+ * runs the opencode 1.18 on the `PATH`; the agents as hosts run them run the opencode their template
+ * installs in this machine's home, under `~/.amends/opencode`, once for each version. Their model is
+ * one of OpenCode Zen's free ones, which needs no key; `AMENDS_TEST_OPENCODE_MODEL` names another
+ * of OpenCode Zen's models, and `AMENDS_TEST_OPENCODE_API_KEY` the key for it.
  */
 const enabled = process.env.AMENDS_TEST_OPENCODE === "1";
-const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "fledge-alpha-free";
+const modelName = process.env.AMENDS_TEST_OPENCODE_MODEL ?? "space-bunny-free";
 const apiKey = process.env.AMENDS_TEST_OPENCODE_API_KEY;
 
 const id = SessionId.make("live");
-const timeout = 120_000;
-const LiveLayer = Layer.merge(BunServices.layer, FetchHttpClient.layer);
+const timeout = 180_000;
+
+/** The relay through which opencode 1 calls the host's tools, as its bridge program serves it. */
+const RelayLayer = HostToolRelay.layer().pipe(
+  Layer.provide(BunHttpServer.layer({ hostname: "127.0.0.1", port: 0, idleTimeout: 0 })),
+  Layer.provide(BunServices.layer),
+);
+const LiveLayer = Layer.mergeAll(BunServices.layer, FetchHttpClient.layer, RelayLayer);
 const HostLayer = Layer.merge(BunServices.layer, BunSocket.layerWebSocketConstructor);
+
+/** The version of opencode each agent runs, and how its driver creates sessions. */
+interface Version {
+  readonly version: 1 | 2;
+  readonly agent: string;
+  readonly makeCreateSession: (
+    relay: HostToolRelay.HostToolRelay["Service"],
+  ) => Driver.CreateSession;
+}
+
+const opencode1: Version = { version: 1, agent: "opencode", makeCreateSession };
+const opencode2: Version = {
+  version: 2,
+  agent: "opencode2",
+  makeCreateSession: () => createSession2,
+};
+const versions = [opencode1, opencode2];
 
 /** The endpoint of OpenCode Zen's model that `AMENDS_TEST_OPENCODE_MODEL` names. */
 const endpoint = {
@@ -76,24 +102,31 @@ const makeOpencodeEnv = Effect.gen(function* () {
 });
 
 /**
- * opencode's driver as a bridge runs it, on this machine, on `endpoints` or the model the tests
- * run on, and a directory for its session. opencode's server stops when the scope closes.
+ * The driver of `version` as a bridge runs it, on this machine, on `endpoints` or the model the
+ * tests run on, with `extraConfig` beside its own, and a directory for its session. opencode's
+ * server stops when the scope closes.
  */
-const makeLiveDriver = (endpoints?: Parameters<typeof modelsOf>[0]) =>
+const makeLiveDriver = (
+  version: Version,
+  endpoints?: Parameters<typeof modelsOf>[1],
+  extraConfig: Record<string, Schema.Json> = {},
+) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* fs.makeTempDirectoryScoped();
-    const models = Result.getOrThrow(modelsOf(endpoints ?? { model: endpoint, models: {} }));
+    const models = Result.getOrThrow(
+      modelsOf(version.version, endpoints ?? { model: endpoint, models: {} }),
+    );
     const driver = yield* Driver.make(
-      "opencode2",
+      version.agent,
       {
         model: models.model,
         models: models.models,
         command: "opencode",
-        config: { ...config, providers: models.providers },
-        env: yield* makeOpencodeEnv,
+        config: { ...config, ...extraConfig, ...models.config },
+        env: { ...(yield* makeOpencodeEnv), ...models.env },
       },
-      createSession,
+      version.makeCreateSession(yield* HostToolRelay.HostToolRelay),
     );
     return { driver, directory };
   });
@@ -131,21 +164,21 @@ const daytonaSandboxes: Sandboxes = {
 };
 
 /**
- * Harnesses over the opencode agent as two hosts run it, which share the secret their bridge tokens
- * derive from, and a new sandbox of `sandboxes` prepared with the agent's template. The bridge and
+ * Harnesses over the agent of `version` as two hosts run it, which share the secret their bridge
+ * tokens derive from, and a new sandbox of `sandboxes` prepared with the agent's template. The bridge and
  * opencode's server stop with the sandbox when the scope closes.
  */
-const makeLiveHosts = (sandboxes: Sandboxes) =>
+const makeLiveHosts = (sandboxes: Sandboxes, version: Version) =>
   Effect.gen(function* () {
     const env = yield* sandboxes.env;
-    const model = endpoint;
+    const options = {
+      model: endpoint,
+      token: (sandboxId: Sandbox.SandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
+      config,
+      ...(env === undefined ? {} : { env }),
+    };
     const makeHarness = Effect.map(
-      Opencode2Agent.make({
-        model,
-        token: (sandboxId) => Redacted.make(`the hosts' secret/${sandboxId}`),
-        config,
-        ...(env === undefined ? {} : { env }),
-      }),
+      version.version === 1 ? OpencodeAgent.make(options) : Opencode2Agent.make(options),
       Harness.make,
     );
     const harness = yield* makeHarness;
@@ -227,14 +260,14 @@ const makeFakeModelApi = Effect.gen(function* () {
 /** The opencode session a session's state names. */
 const OpencodeState = Schema.Struct({ sessionID: Schema.String });
 
-describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
+describe.skipIf(!enabled).each(versions)("opencode $version as the bridge runs it", (version) => {
   it.live(
     "sends a turn to its model's endpoint, with the endpoint's key, effort, and output limit",
     () =>
       Effect.gen(function* () {
         const api = yield* makeFakeModelApi;
         // Models that opencode knows from models.dev, at the fake's URL.
-        const { driver, directory } = yield* makeLiveDriver({
+        const { driver, directory } = yield* makeLiveDriver(version, {
           model: {
             provider: "openrouter",
             model: "openai/gpt-oss-120b",
@@ -252,6 +285,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
               apiKey: Redacted.make("anthropic-key"),
               effort: "high",
               maxOutputTokens: 2048,
+              contextWindow: 200_000,
             },
             gpt: {
               provider: "openai",
@@ -294,7 +328,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "runs a turn in which opencode runs a command with its own tool",
     () =>
       Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver();
+        const { driver, directory } = yield* makeLiveDriver(version);
         const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         const result = yield* runTurn(
@@ -320,7 +354,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "answers from another agent's conversation, the results of its tools included",
     () =>
       Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver();
+        const { driver, directory } = yield* makeLiveDriver(version);
         const history = Prompt.make([
           {
             role: "user",
@@ -371,7 +405,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     () =>
       Effect.gen(function* () {
         const model = endpoint;
-        const { driver, directory } = yield* makeLiveDriver({
+        const { driver, directory } = yield* makeLiveDriver(version, {
           model,
           models: { missing: { ...model, model: "no-such-model" } },
         });
@@ -388,7 +422,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "deletes the session in opencode when it is destroyed",
     () =>
       Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver();
+        const { driver, directory } = yield* makeLiveDriver(version);
         const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
         const agentState = yield* session.state;
 
@@ -412,7 +446,7 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
     "stops the turn in opencode when its stream ends before the turn does",
     () =>
       Effect.gen(function* () {
-        const { driver, directory } = yield* makeLiveDriver();
+        const { driver, directory } = yield* makeLiveDriver(version);
         const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
 
         yield* session
@@ -430,14 +464,203 @@ describe.skipIf(!enabled)("opencode as the bridge runs it", () => {
   );
 });
 
+/** The weather in a city, which the host's tool gives. */
+const lookupWeather: Bridge.ToolDefinition = {
+  name: "lookup_weather",
+  description: "Looks up the weather in a city",
+  parameters: { type: "object", properties: { city: { type: "string" } }, required: ["city"] },
+};
+
+const lookupTime: Bridge.ToolDefinition = {
+  name: "lookup_time",
+  description: "Looks up the time in a city",
+  parameters: lookupWeather.parameters,
+};
+
+/**
+ * Runs a turn asking `text` with the host's `tools`, answering each call of them with `result`, as
+ * the host would.
+ */
+const runTurnWithTools = (
+  session: Bridge.DriverSession,
+  text: string,
+  tools: ReadonlyArray<Bridge.ToolDefinition>,
+  result: unknown,
+) =>
+  session.promptTurn(turnOptions(text, { tools })).pipe(
+    Stream.tap((part) =>
+      part.type === "tool-call" && part.providerExecuted !== true
+        ? session.submitToolResult({ id: part.id, name: part.name, result, isFailure: false })
+        : Effect.void,
+    ),
+    Stream.runCollect,
+    Effect.map((parts) => new GenerateResult.GenerateResult(parts)),
+  );
+
+describe.skipIf(!enabled)("opencode 1 as the bridge runs it, with all of a turn", () => {
+  it.live(
+    "gives the model the turn's instructions",
+    () =>
+      Effect.gen(function* () {
+        const { driver, directory } = yield* makeLiveDriver(opencode1);
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+        const result = yield* runTurn(session, "Say hello.", {
+          instructions: "End every answer with the word LIVE-INSTRUCTIONS-OK.",
+        });
+
+        expect(result.text).toContain("LIVE-INSTRUCTIONS-OK");
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+
+  it.live(
+    "answers in JSON that matches the turn's schema",
+    () =>
+      Effect.gen(function* () {
+        const { driver, directory } = yield* makeLiveDriver(opencode1);
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+        const result = yield* runTurn(session, "Give the city Lisbon and its country.", {
+          responseFormat: {
+            type: "json",
+            objectName: "city",
+            schema: {
+              type: "object",
+              properties: { city: { type: "string" }, country: { type: "string" } },
+              required: ["city", "country"],
+              additionalProperties: false,
+            },
+          },
+        });
+
+        expect(result.finishReason).toBe("stop");
+        expect(JSON.parse(result.text)).toMatchObject({ city: "Lisbon", country: "Portugal" });
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+
+  it.live(
+    "reads a file the prompt attaches",
+    () =>
+      Effect.gen(function* () {
+        const { driver, directory } = yield* makeLiveDriver(opencode1);
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+        const parts = yield* Stream.runCollect(
+          session.promptTurn({
+            tools: [],
+            responseFormat: { type: "text" },
+            prompt: Prompt.makeMessage("user", {
+              content: [
+                Prompt.makePart("text", {
+                  text: "What is the secret word in the attached file? Reply with just the word.",
+                }),
+                Prompt.makePart("file", {
+                  mediaType: "text/plain",
+                  fileName: "secret.txt",
+                  data: btoa("The secret word is MARMALADE-77."),
+                }),
+              ],
+            }),
+          }),
+        );
+
+        expect(new GenerateResult.GenerateResult(parts).text).toContain("MARMALADE-77");
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+
+  it.live(
+    "calls the host's tools, and those of a later turn when they change",
+    () =>
+      Effect.gen(function* () {
+        const { driver, directory } = yield* makeLiveDriver(opencode1);
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+        const weather = yield* runTurnWithTools(
+          session,
+          "Use the lookup_weather tool for Lisbon, then tell me how many degrees it returned.",
+          [lookupWeather],
+          { forecast: "foggy", celsius: 14 },
+        );
+        const time = yield* runTurnWithTools(
+          session,
+          "Use the lookup_time tool for Lisbon, then tell me the time it returned.",
+          [lookupTime],
+          { time: "13:37" },
+        );
+
+        expect(weather.parts.find((part) => part.type === "tool-call")).toMatchObject({
+          name: "lookup_weather",
+          params: { city: "Lisbon" },
+        });
+        expect(weather.text).toContain("14");
+        expect(time.parts.find((part) => part.type === "tool-call")).toMatchObject({
+          name: "lookup_time",
+        });
+        expect(time.text).toContain("13:37");
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+
+  it.live(
+    "compacts on request, the conversation going on from the summary",
+    () =>
+      Effect.gen(function* () {
+        const { driver, directory } = yield* makeLiveDriver(opencode1);
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+        yield* runTurn(session, "Remember the codename BLUE-MARLIN-9. Reply OK.");
+
+        const compaction = yield* session.compact();
+        const after = yield* runTurn(session, "What is the codename? Reply with just it.");
+
+        expect(compaction).toMatchObject({ type: "compaction", trigger: "manual" });
+        expect(compaction.summary).toContain("BLUE-MARLIN-9");
+        expect(after.text).toContain("BLUE-MARLIN-9");
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+
+  it.live(
+    "asks for approval when a tool asks permission, and runs it once approved",
+    () =>
+      Effect.gen(function* () {
+        const { driver, directory } = yield* makeLiveDriver(opencode1, undefined, {
+          permission: { bash: "ask" },
+        });
+        const session = yield* driver.createSession({ id, directory, history: Prompt.empty });
+
+        const parts = yield* session
+          .promptTurn(
+            turnOptions(
+              "Run `echo live-approved` with your bash tool, then reply with what it printed.",
+            ),
+          )
+          .pipe(
+            Stream.tap((part) =>
+              part.type === "tool-approval-request"
+                ? session.approve({ approvalId: part.approvalId, approved: true })
+                : Effect.void,
+            ),
+            Stream.runCollect,
+          );
+
+        expect(parts.some((part) => part.type === "tool-approval-request")).toBe(true);
+        expect(new GenerateResult.GenerateResult(parts).text).toContain("live-approved");
+      }).pipe(Effect.provide(LiveLayer)),
+    timeout,
+  );
+});
+
 /** What hosts do with opencode through its bridge, on sandboxes of `sandboxes`. */
 const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, timeout: number) =>
-  describe.skipIf(!enabled)(title, () => {
+  describe.skipIf(!enabled).each(versions)(title, (version) => {
     it.live(
       "runs a turn in which opencode runs a command with its own tool",
       () =>
         Effect.gen(function* () {
-          const { sandbox, harness } = yield* makeLiveHosts(sandboxes);
+          const { sandbox, harness } = yield* makeLiveHosts(sandboxes, version);
           const session = yield* harness.createSession({ sandbox, id });
 
           const result = yield* session.generate({
@@ -457,7 +680,7 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
       "continues on another host a suspended turn, which opencode went on with, from the step it was in",
       () =>
         Effect.gen(function* () {
-          const { sandbox, harness, nextHarness } = yield* makeLiveHosts(sandboxes);
+          const { sandbox, harness, nextHarness } = yield* makeLiveHosts(sandboxes, version);
           const session = yield* harness.createSession({ sandbox, id });
           const before: Array<StreamPart.StreamPart> = [];
           const calledTool = yield* Deferred.make<void>();
@@ -502,11 +725,50 @@ const describeHosts = (title: string, enabled: boolean, sandboxes: Sandboxes, ti
     );
   });
 
-describeHosts("opencode as hosts run it, through its bridge", enabled, localSandboxes, timeout);
+/** The host's tool the hosts' tests give opencode 1, with the weather it always gives. */
+const Weather = Tool.make("lookup_weather", {
+  description: "Looks up the weather in a city",
+  parameters: Schema.Struct({ city: Schema.String }),
+  success: Schema.Struct({ forecast: Schema.String, celsius: Schema.Finite }),
+});
+const WeatherToolkit = Toolkit.make(Weather);
+const WeatherHandlers = WeatherToolkit.toLayer({
+  lookup_weather: () => Effect.succeed({ forecast: "foggy", celsius: 14 }),
+});
+
+describe.skipIf(!enabled)("opencode 1 as hosts run it, with the host's tools", () => {
+  it.live(
+    "calls the host's tool through the relay its bridge serves in the sandbox",
+    () =>
+      Effect.gen(function* () {
+        const { sandbox, harness } = yield* makeLiveHosts(localSandboxes, opencode1);
+        const session = yield* harness.createSession({ sandbox, id });
+
+        const result = yield* session.generate({
+          prompt:
+            "Use the lookup_weather tool for Lisbon, then tell me how many degrees it returned.",
+          toolkit: yield* WeatherToolkit,
+        });
+
+        expect(result.parts.find((part) => part.type === "tool-call")).toMatchObject({
+          name: "lookup_weather",
+        });
+        expect(result.text).toContain("14");
+      }).pipe(Effect.provide(Layer.merge(HostLayer, WeatherHandlers))),
+    timeout,
+  );
+});
+
+describeHosts(
+  "opencode $version as hosts run it, through its bridge",
+  enabled,
+  localSandboxes,
+  timeout,
+);
 
 // Daytona's sandboxes cost money, so hosts run opencode there only with `AMENDS_TEST_DAYTONA=1` too.
 describeHosts(
-  "opencode as hosts run it on Daytona, through its bridge",
+  "opencode $version as hosts run it on Daytona, through its bridge",
   enabled && process.env.AMENDS_TEST_DAYTONA === "1" && process.env.DAYTONA_API_KEY !== undefined,
   daytonaSandboxes,
   300_000,

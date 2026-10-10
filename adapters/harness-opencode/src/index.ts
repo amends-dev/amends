@@ -9,6 +9,14 @@
  */
 
 /**
+ * The agent over opencode 1's session API, what it is made with, and its sessions, each an
+ * opencode session in the sandbox.
+ *
+ * @since 0.1.0
+ */
+export * as OpencodeAgent from "./OpencodeAgent.ts";
+
+/**
  * The agent over opencode 2's session API, what it is made with, and its sessions, each an
  * opencode session in the sandbox.
  *

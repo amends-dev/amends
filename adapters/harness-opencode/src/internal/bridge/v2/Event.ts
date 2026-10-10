@@ -12,6 +12,7 @@
  */
 import { Schema } from "effect";
 import { ModelRef } from "../Driver.ts";
+import { Tokens } from "../Steps.ts";
 
 /** Where an event falls in its session's numbered events. */
 const Durable = Schema.Struct({
@@ -91,13 +92,6 @@ const Provider = Schema.Struct({
 const SessionError = Schema.Struct({
   type: Schema.Literal("unknown"),
   message: Schema.String,
-});
-
-const Tokens = Schema.Struct({
-  input: Schema.Int,
-  output: Schema.Int,
-  reasoning: Schema.Int,
-  cache: Schema.Struct({ read: Schema.Int, write: Schema.Int }),
 });
 
 /** The session took a prompt: the user's message that starts a turn. */

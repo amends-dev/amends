@@ -1,11 +1,12 @@
 /**
  * opencode's server, which the bridge starts in its sandbox. One server serves every session in the
  * sandbox, each in its own directory. `start` runs the server until the scope closes, listening
- * only on 127.0.0.1, at a port the server picks, behind a password that `start` makes and gives
- * the server in its environment. The bridge is the server's only client and lives exactly as long
- * as it, so the password is kept nowhere else. The requests the bridge makes of the server are
- * those of the API its version of opencode speaks, in `v1/Api.ts` and `v2/Api.ts`, over the
- * client `start` returns.
+ * only on 127.0.0.1, behind a password that `start` makes and gives the server in its environment.
+ * `start` picks a free port for it, since opencode takes port 0 as its default port, 4096, where
+ * the server of a bridge with other options may listen already. The bridge is the server's only
+ * client and lives exactly as long as it, so the password is kept nowhere else. The requests the
+ * bridge makes of the server are those of the API its version of opencode speaks, in `v1/Api.ts`
+ * and `v2/Api.ts`, over the client `start` returns.
  *
  * opencode reads the configuration `start` is given from a directory that `start` makes for it and
  * removes when the scope closes, in place of the global configuration of the sandbox's user, which
@@ -79,8 +80,9 @@ export const start = Effect.fn("Server.start")(
       JSON.stringify(options.config),
       { mode: 0o600 },
     );
+    const port = yield* freePort;
     const process = yield* spawner.spawn(
-      ChildProcess.make(options.command, ["serve", "--hostname=127.0.0.1", "--port=0"], {
+      ChildProcess.make(options.command, ["serve", "--hostname=127.0.0.1", `--port=${port}`], {
         extendEnv: true,
         env: {
           ...options.env,
@@ -122,6 +124,17 @@ export const start = Effect.fn("Server.start")(
       ),
     ),
 );
+
+/**
+ * A port nothing listens on at 127.0.0.1 right now, which the server listens on next. Another
+ * process taking it meanwhile leaves the server unable to listen, which fails the start.
+ */
+const freePort = Effect.sync(() => {
+  const listener = Bun.listen({ hostname: "127.0.0.1", port: 0, socket: { data: () => {} } });
+  const { port } = listener;
+  listener.stop(true);
+  return port;
+});
 
 /**
  * The URL the server announces on its output once it listens. Fails when the server exits first,
