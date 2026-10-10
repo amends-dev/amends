@@ -81,7 +81,8 @@ beside them as `bridge-<bundle>.js`, named for its contents. Preparing a sandbox
 `uname`, `curl`, `tar`, `sha512sum` or `shasum`, and access to `registry.npmjs.org`. What the
 sandbox has already is kept: a sandbox whose home has the programs, such as every local sandbox
 after the first on this machine, gets only a new bridge program, and a sandbox from a snapshot of
-a prepared one is ready at once. The template's identity changes with the versions and the bundle.
+a prepared one is ready at once. The template's identity changes with the versions and the bundle;
+the programs and bridge programs of versions no host launches any more are not removed.
 
 A session launches the bridge, when none answers, with
 `sh -c 'exec "$HOME/…/bun" "$HOME/…/bridge-<bundle>.js"'`, giving it its launch options on

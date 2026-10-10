@@ -298,8 +298,6 @@ export const CompactionEnded = Schema.Struct({
   }),
 });
 
-// TODO: Add the events of a person working in the session through opencode itself, such as
-// `shell.started` and `revert.committed`, and of a switched agent or model, once a turn needs them.
 export const SessionEvent = Schema.Union([
   Prompted,
   StepStarted,

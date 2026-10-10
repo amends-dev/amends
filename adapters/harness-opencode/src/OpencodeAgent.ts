@@ -22,8 +22,6 @@ import type { Options as DriverOptions } from "./internal/bridge/Driver.ts";
 import { modelsOf } from "./internal/models.ts";
 import { makeInstallation } from "./internal/template.ts";
 
-// TODO: Keep the endpoints' keys out of the sandbox, giving opencode stand-ins that the sandbox
-// replaces with the keys in the requests that leave it, once a sandbox provider can.
 /**
  * What the agent is made with: the endpoints its turns run on, as `Agent.Options` give them, and
  * what only opencode takes. All of it, the keys included, names the bridge, so an agent made with

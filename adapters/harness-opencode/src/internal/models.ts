@@ -11,9 +11,6 @@ import { HarnessError, type ModelEndpoint } from "@amends/harness";
 import { Array, Record, Redacted, Result, type Schema } from "effect";
 import type { ModelRef } from "./bridge/SessionEvent.ts";
 
-// TODO: Tell opencode what a model it does not find in models.dev takes and how much, such as
-// whether it calls tools and its context window, once endpoints say: opencode runs such a model
-// without tools.
 export interface Models {
   /** The `providers` of opencode's configuration, which serve the endpoints' models. */
   readonly providers: { readonly [providerId: string]: Schema.Json };

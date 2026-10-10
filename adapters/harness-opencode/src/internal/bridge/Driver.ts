@@ -240,9 +240,6 @@ const createSession = Effect.fn("Driver.createSession")(function* (
 
     promptTurn: runTurn,
 
-    // TODO: Give opencode the host's tools through `HostToolRelay`, as an MCP server in the bridge,
-    // once its session API shows MCP tools to the model, which 1.18.23 does not: the runner behind
-    // `/api/session` takes only the tools registered in its process. Its older session API does.
     submitToolResult: () =>
       Effect.fail(
         harnessError(
@@ -261,7 +258,6 @@ const createSession = Effect.fn("Driver.createSession")(function* (
         ),
       ),
 
-    // TODO: Compact through opencode's session API, once opencode implements it there.
     compact: () =>
       Effect.fail(
         harnessError(
@@ -343,10 +339,6 @@ const eventsOfTurn = (server: Server.Server, sessionID: string, admittedSeq: num
     }),
   );
 
-// TODO: Run a turn whose instructions opencode cannot take without them, rather than refusing
-// it, and give opencode the instructions once its session API takes them.
-// TODO: Answer in JSON, once opencode's session API takes a response format.
-// TODO: Send the files a prompt carries, once `Server.prompt` sends files.
 /** Why opencode cannot run a turn with `turnOptions`, or nothing when it can. */
 const unsupportedIn = (turnOptions: Bridge.TurnOptions): string | undefined => {
   if (turnOptions.instructions !== undefined) {

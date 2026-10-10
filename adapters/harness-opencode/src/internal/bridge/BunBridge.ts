@@ -28,9 +28,6 @@ export const serve = Effect.fnUntraced(function* (
       Effect.ignore,
     ),
   );
-  // TODO: Listen on the port the bridge's last listening file names, when it is free, so that a
-  // bridge launched again keeps its port, rather than add one to the ports its sandbox exposes, which
-  // are never taken back, each time it is launched.
   const server = yield* Layer.buildWithScope(
     BunHttpServer.layer({ hostname: "0.0.0.0", port: 0, disablePreemptiveShutdown: true }),
     serverScope,

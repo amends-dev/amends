@@ -36,10 +36,6 @@ export const initial: Turn = {
   finished: false,
 };
 
-// TODO: Report the files a step changed as `file-change` parts, once opencode says how each changed.
-// TODO: Give a tool's result what the tool reported beside what the model read (`structured`), once
-// a caller needs it.
-// TODO: Translate a prompt that steers the running turn, once the driver sends messages mid-turn.
 /**
  * Translates the turn's next event into the parts it streams and the turn after it. Fails with
  * `AgentContractError` for the result of a call the turn did not make.

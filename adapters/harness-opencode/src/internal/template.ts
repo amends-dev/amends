@@ -16,8 +16,6 @@ import { Crypto, Effect, FileSystem, Path, PlatformError, Result, Stream } from 
 import { Base64, Hex } from "effect/encoding";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-// TODO: Add Linux on musl, as Alpine has, and the baseline builds for x64 processors without AVX2,
-// once a sandbox needs them.
 /** The platforms the bridge installs on, as `platformOf` names them. */
 export type Platform = `${"darwin" | "linux"}-${"arm64" | "x64"}`;
 
@@ -102,8 +100,6 @@ export interface Installation {
   readonly args: ReadonlyArray<string>;
 }
 
-// TODO: Remove the programs and bridge programs that no host launches any more, which build up in
-// a home that sandboxes share, as on this machine.
 /**
  * Bundles the bridge program, giving the template that installs it with the command that launches
  * it. The template's identity changes with anything it installs.

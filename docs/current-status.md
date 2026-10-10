@@ -44,7 +44,13 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   it works; and it asks Anthropic's models for an effort but never for adaptive thinking, which an
   endpoint does not say its model takes. opencode's session
   API takes no instructions for a turn, so opencode refuses a turn that gives some: only an agent
-  without instructions runs on it, and it compacts only by itself. An agent's own tools run without
+  without instructions runs on it, and it compacts only by itself. opencode's session API also
+  offers its model none of the host's tools, answers in no JSON, and takes no files in a prompt, so
+  opencode refuses such turns; its turns stream no `file-change` parts, as opencode records which
+  files a step changed but not how; a model that models.dev does not list runs on opencode without
+  tools, as an endpoint does not say whether its model calls them; the endpoints' keys reach
+  opencode's configuration in the sandbox, where the commands it runs can read them; and each
+  launch of a bridge exposes another port of its sandbox, which is never taken back. An agent's own tools run without
   asking: the [agent contract](../packages/harness/src/Agent.ts) has no permission mode saying
   which of them an agent may use and which it asks about, amends's agent runs its `read`, `write`,
   `edit`, and `bash` tools in the sandbox unasked, and opencode runs with its default permissions,

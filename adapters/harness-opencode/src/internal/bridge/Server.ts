@@ -50,7 +50,6 @@ export interface ServerOptions {
   readonly env: Record.ReadonlyRecord<string, string>;
 }
 
-// TODO: Give `prompt` the files a user message carries, once a turn's prompt has files.
 export interface Server {
   /** Completes when the server exits, which it does before the scope closes only when it fails. */
   readonly exited: Effect.Effect<void>;
@@ -123,10 +122,6 @@ export interface Server {
   ) => Effect.Effect<void, HarnessError.HarnessError>;
 }
 
-// TODO: Stop a server left running by a bridge that died, as one killed does. In a process group of
-// its own, the server outlives the bridge and goes on with the turn the bridge ran, while the next
-// bridge's server continues the same session. AI SDK's harness leaves its server running so too.
-// Its configuration, with the models' keys, stays in its directory with it.
 /** Starts the server, which runs until the scope closes, and waits until it listens. */
 export const start = Effect.fn("Server.start")(
   function* (options: ServerOptions) {
