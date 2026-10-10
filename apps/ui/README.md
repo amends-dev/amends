@@ -4,8 +4,8 @@ The pattern-based design system for web and desktop, built from the Lunacy mocks
 [`design-system/Amends Group Exploration.free`](../../design-system/). The mocks are the
 reference: open the file in Lunacy and compare a screen with its story.
 
-This package was built as `@amends-dev/ui-v2` and took the `@amends-dev/ui` name once it had replaced
-the earlier UI and the retired `@amends-dev/features` in web and desktop. Screens here are
+This package was built as `ui-v2` and took the `ui` name once it had replaced the earlier UI
+and the retired `features` package in web and desktop. Screens here are
 presentation only: data arrives as props and actions leave as callbacks. Connected logic lives
 in [client](../client/README.md) as hooks, and web and desktop join the two. `@amends-dev/ui/styles`
 holds the global styles app entry points load.

@@ -45,18 +45,11 @@ for (const { path, manifest } of packages) {
   }
 }
 
-// Reject the old UI package names and the retired design-system package.
+// UI stays presentational and client stays headless, whatever either declares.
 for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })) {
   const manifest: PackageManifest = await Bun.file(`${root}/${path}`).json();
   for (const section of sections) {
     for (const name of Object.keys(manifest[section] ?? {})) {
-      if (
-        name === "@amends-dev/frontend" ||
-        name === "@amends-dev/ui-v2" ||
-        name === "@amends-dev/design-system"
-      ) {
-        errors.push(`${path}: ${section}.${name} is renamed or retired; use @amends-dev/ui.`);
-      }
       if (
         path === "apps/ui/package.json" &&
         ((name.startsWith("@amends-dev/") && name !== "@amends-dev/icons") ||
@@ -152,15 +145,6 @@ for await (const path of new Bun.Glob(
       errors.push(
         `${path}: icon runtime must depend only on Solid and its own source (${dependency}).`,
       );
-    if (
-      dependency === "@amends-dev/frontend" ||
-      dependency.startsWith("@amends-dev/frontend/") ||
-      dependency === "@amends-dev/ui-v2" ||
-      dependency.startsWith("@amends-dev/ui-v2/") ||
-      dependency === "@amends-dev/design-system" ||
-      dependency.startsWith("@amends-dev/design-system/")
-    )
-      errors.push(`${path}: ${dependency} is renamed or retired; use @amends-dev/ui.`);
     const uiImport = dependency === "@amends-dev/ui" || dependency.startsWith("@amends-dev/ui/");
     const clientImport =
       dependency === "@amends-dev/client" || dependency.startsWith("@amends-dev/client/");
