@@ -1,5 +1,6 @@
 import { Agent } from "@amends/core/agent";
 import { BuiltinRoles, Role, Assignment } from "@amends/core/authorization";
+import { Channel, Delivery } from "@amends/core/channel";
 import { Connection } from "@amends/core/connection";
 import { Group } from "@amends/core/group";
 import { Identity } from "@amends/core/identity";
@@ -162,6 +163,62 @@ export const workspaceIsolation = (harness: Harness) => {
                   createdAt: now,
                 }),
                 kept: (on) => on.tasks.get(threadId),
+              },
+              {
+                store: "ChannelStore",
+                write: bound.channels.insert({
+                  id: Channel.Id.make("foreign-channel"),
+                  workspaceId: otherWorkspaceId,
+                  connectionId: Connection.Id.make("connection"),
+                  groupId: Group.GeneralId,
+                  name: "Foreign",
+                  opensTasks: true,
+                  status: "active",
+                  createdBy: memberId,
+                  createdAt: now,
+                }),
+                kept: (on) => on.channels.get(Channel.Id.make("foreign-channel")),
+              },
+              {
+                store: "ChannelBindingStore",
+                write: bound.channelBindings.insert({
+                  threadId,
+                  workspaceId: otherWorkspaceId,
+                  channelId: Channel.Id.make("channel"),
+                  groupId: Group.GeneralId,
+                  conversation: { id: "conversation", details: {} },
+                  boundAt: now,
+                }),
+                kept: (on) => on.channelBindings.get(threadId),
+              },
+              {
+                store: "ContactStore",
+                write: bound.contacts.insert({
+                  id: Identity.ContactId.make("foreign-contact"),
+                  workspaceId: otherWorkspaceId,
+                  channelId: Channel.Id.make("channel"),
+                  externalId: "someone",
+                  name: "Someone",
+                  createdAt: now,
+                }),
+                kept: (on) => on.contacts.get(Identity.ContactId.make("foreign-contact")),
+              },
+              {
+                store: "DeliveryStore",
+                write: bound.deliveries.insert(
+                  Delivery.requested({
+                    id: Delivery.Id.make("foreign-delivery"),
+                    workspaceId: otherWorkspaceId,
+                    channelId: Channel.Id.make("channel"),
+                    threadId,
+                    groupId: Group.GeneralId,
+                    conversationId: "conversation",
+                    messageId,
+                    sequence: 1,
+                    requestedAt: now,
+                  }),
+                ),
+                kept: (on) => on.deliveries.get(Delivery.Id.make("foreign-delivery")),
               },
               {
                 store: "ThreadMessageStore",

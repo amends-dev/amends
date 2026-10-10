@@ -2,8 +2,9 @@
  * An integration is a kind of system amends connects to, such as opencode, Anthropic's API, Daytona,
  * or an MCP server, declared in code: the settings a connection to it gives, the ways a connection
  * can authenticate, what a connection gives amends, and how a connection is checked. A connection
- * gives any of four things: harnesses, which run agents, models an agent runs on, sandboxes it works
- * in, and tools it calls.
+ * gives any of five things: harnesses, which run agents, models an agent runs on, sandboxes it works
+ * in, tools it calls, and channels, through which people outside the workspace are heard and
+ * answered.
  *
  * `make` declares an integration from what it does with a connection, given the connection's
  * settings decoded and its key, as `Access`. Each operation of the integration it makes takes a
@@ -18,6 +19,7 @@ import type { SandboxProvider } from "@amends/sandbox";
 import type { ToolSource } from "@amends/toolkit";
 import { type Array, Effect, type Redacted, type Result, Schema, type Scope } from "effect";
 import { McpSchema } from "effect/ai";
+import type { ChannelTransport } from "./ChannelTransport.ts";
 import {
   type AuthMethod,
   type Connection,
@@ -31,7 +33,13 @@ import {
 import type * as ModelCatalog from "./ModelCatalog.ts";
 
 /** What a connection gives amends. */
-export const Capability = Schema.Literals(["harnesses", "models", "sandboxes", "tools"]);
+export const Capability = Schema.Literals([
+  "harnesses",
+  "models",
+  "sandboxes",
+  "tools",
+  "channels",
+]);
 
 export type Capability = typeof Capability.Type;
 
@@ -145,6 +153,11 @@ export interface Options<Settings, Auth extends AuthMethod = AuthMethod> {
     access: Access<Settings, Auth>,
   ) => Effect.Effect<ToolSource.ToolSource, ConnectionErrorReason>;
 
+  /** The channel transport of a connection, which receives the system's events and posts there. */
+  readonly channels?: (
+    access: Access<Settings, Auth>,
+  ) => Effect.Effect<ChannelTransport, ConnectionErrorReason>;
+
   /** Checks a connection, as by asking the system for something only a working connection gets. */
   readonly check: (access: Access<Settings, Auth>) => Effect.Effect<Health>;
 }
@@ -218,6 +231,12 @@ export interface Integration {
     connection: Connection,
     credential: Credential | undefined,
   ) => Effect.Effect<ToolSource.ToolSource, ConnectionError>;
+
+  /** The channel transport of `connection`. */
+  readonly channelTransport: (
+    connection: Connection,
+    credential: Credential | undefined,
+  ) => Effect.Effect<ChannelTransport, ConnectionError>;
 
   /** Checks `connection`. */
   readonly check: (
@@ -304,6 +323,7 @@ export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod
       ...(options.models === undefined ? [] : ["models" as const]),
       ...(options.sandboxes === undefined ? [] : ["sandboxes" as const]),
       ...(options.tools === undefined ? [] : ["tools" as const]),
+      ...(options.channels === undefined ? [] : ["channels" as const]),
     ],
     requiresSandbox: options.harnesses?.requiresSandbox ?? false,
     models,
@@ -361,6 +381,14 @@ export const make = <Settings = NoSettings, Auth extends AuthMethod = AuthMethod
       if (tools === undefined) return notProvided("tools");
       return accessOf(connection, credential).pipe(
         Effect.flatMap((access) => Effect.mapError(tools(access), (reason) => fail(reason))),
+      );
+    },
+
+    channelTransport: (connection, credential) => {
+      const { channels } = options;
+      if (channels === undefined) return notProvided("channels");
+      return accessOf(connection, credential).pipe(
+        Effect.flatMap((access) => Effect.mapError(channels(access), (reason) => fail(reason))),
       );
     },
 

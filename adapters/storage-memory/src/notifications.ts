@@ -2,7 +2,6 @@ import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
 import { Thread, ThreadParticipation } from "@amends/core/thread";
-import { Turn } from "@amends/core/turn";
 import { Member } from "@amends/core/workspace";
 import { DateTime, Effect, Layer, Option, Schema, Predicate } from "effect";
 import { Binding } from "./binding.ts";
@@ -278,32 +277,39 @@ export const make = Effect.fn("Notifications.make")(function* () {
         ),
       );
     }),
-    accept: Effect.fn("Notifications.accept")(function* (inputs, turnInput, acceptedInput) {
+    accept: Effect.fn("Notifications.accept")(function* (inputs, byInput, acceptedInput) {
       yield* Store.Transaction;
       if (inputs.length === 0) return;
       const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(inputs).pipe(
         Effect.mapError(storeConflict(NotificationStore, "accept")),
       );
-      const turnId = yield* Schema.decodeEffect(Turn.Id)(turnInput).pipe(
+      const by = yield* Schema.decodeEffect(Schema.toType(Notification.AcceptedBy))(byInput).pipe(
         Effect.mapError(storeConflict(NotificationStore, "accept")),
       );
       const space = yield* write.pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
+      // A turn takes pending notifications of one agent; a delivery takes those of contacts.
+      const takes = Notification.AcceptedBy.isAnyOf(["Turn"])(by)
+        ? (recipient: Notification.Recipient, first: Notification.Recipient | undefined) =>
+            Notification.Recipient.isAnyOf(["Agent"])(recipient) &&
+            (!Predicate.isTagged(first, "Agent") || first.memberId === recipient.memberId)
+        : (recipient: Notification.Recipient) =>
+            Notification.Recipient.isAnyOf(["Contact"])(recipient);
       const accepted: Array<Notification.Record> = [];
       for (const id of new Set(ids)) {
         const found = yield* rows
           .get(space.records.notifications, id)
           .pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
         const record = Option.getOrUndefined(found);
-        const first = accepted[0]?.recipient;
         if (
           record === undefined ||
-          !Notification.Recipient.isAnyOf(["Agent"])(record.recipient) ||
           !Notification.State.isAnyOf(["Pending"])(record.state) ||
-          (Predicate.isTagged(first, "Agent") && first.memberId !== record.recipient.memberId)
+          !takes(record.recipient, accepted[0]?.recipient)
         )
           return yield* new NotificationStore.Conflict({
             operation: "accept",
-            message: "Expected pending notifications of one agent",
+            message: Notification.AcceptedBy.isAnyOf(["Turn"])(by)
+              ? "Expected pending notifications of one agent"
+              : "Expected pending notifications of contacts",
           });
         accepted.push(record);
       }
@@ -312,7 +318,7 @@ export const make = Effect.fn("Notifications.make")(function* () {
         const row = yield* rows
           .encode(
             Object.assign({}, record, {
-              state: Notification.State.cases.Accepted.make({ turnId, acceptedAt }),
+              state: Notification.State.cases.Accepted.make({ by, acceptedAt }),
             }),
           )
           .pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));

@@ -23,6 +23,10 @@ combine the path's group or thread ID with the body into the operation's input a
 `Idempotency-Key` header as its request key; core authorizes, validates, and chooses who takes
 part. Management reads of groups the caller does not belong to are not exposed.
 
+Channel handlers enter through `Gateway.asMember` and call `ChannelService`. The events route
+enters through `Gateway.inWorkspace` with no principal and hands the request's headers and body,
+as text, to `ChannelIntake.receive`, answering with the text the transport says to give.
+
 `ChangeFeedHandlers.watch` enters through `Gateway.asMember` and calls
 `ChangeFeedService.watch`. Effect's HTTP server transfers the request scope
 to the response stream, keeping the workspace services and subscription alive until

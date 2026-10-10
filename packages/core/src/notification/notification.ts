@@ -8,6 +8,7 @@ import { ThreadId } from "../thread/ThreadId.ts";
 import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { TurnId } from "../turn/id.ts";
+import { DeliveryId } from "../channel/DeliveryId.ts";
 
 export const Id = Schema.NonEmptyString.pipe(Schema.brand("NotificationId"));
 export type Id = typeof Id.Type;
@@ -51,16 +52,26 @@ export const ofMember = <const I extends Identity.MemberReference>(
 ) => Object.assign({}, identity, { memberId });
 
 /**
- * Where a notification stands. Pending waits for its recipient: a person sees it, or an agent
- * accepts it into a turn, which owns the work from then on. Seen is private to the person, kept
- * outside the journal; the journal settles everything else.
+ * What accepted a notification and owns the work from then on: an agent's turn, for an agent's,
+ * or a delivery, for a contact's.
+ */
+export const AcceptedBy = Schema.TaggedUnion({
+  Turn: { turnId: TurnId.Id },
+  Delivery: { deliveryId: DeliveryId.Id },
+});
+export type AcceptedBy = typeof AcceptedBy.Type;
+
+/**
+ * Where a notification stands. Pending waits for its recipient: a person sees it, an agent accepts
+ * it into a turn, or a delivery accepts it to carry it to a contact, which owns the work from then
+ * on. Seen is private to the person, kept outside the journal; the journal settles everything else.
  */
 export const State = Schema.TaggedUnion({
   Pending: {},
   /** Its human recipient saw it. */
   Seen: { seenAt: Schema.DateTimeUtcFromString },
-  /** Its agent recipient accepted it into a turn. */
-  Accepted: { turnId: TurnId.Id, acceptedAt: Schema.DateTimeUtcFromString },
+  /** An agent's turn, or a delivery to a contact, accepted it. */
+  Accepted: { by: AcceptedBy, acceptedAt: Schema.DateTimeUtcFromString },
   /**
    * Settled without handling: an agent's input when its participation ends, or a person's pending
    * notifications from a group they no longer belong to, whose threads they cannot open.
@@ -74,10 +85,16 @@ export const State = Schema.TaggedUnion({
 });
 export type State = typeof State.Type;
 
-/** Only people see their notifications, and only agents accept theirs. */
+/**
+ * Only people see their notifications; only an agent's are accepted by a turn, and only a
+ * contact's by a delivery.
+ */
 export const fitsRecipient = (recipient: Recipient, state: State) =>
   (!State.isAnyOf(["Seen"])(state) || Recipient.isAnyOf(["Human"])(recipient)) &&
-  (!State.isAnyOf(["Accepted"])(state) || Recipient.isAnyOf(["Agent"])(recipient));
+  (!State.isAnyOf(["Accepted"])(state) ||
+    (AcceptedBy.isAnyOf(["Turn"])(state.by)
+      ? Recipient.isAnyOf(["Agent"])(recipient)
+      : Recipient.isAnyOf(["Contact"])(recipient)));
 
 /**
  * One recipient's notification of a recorded source. Generation chooses

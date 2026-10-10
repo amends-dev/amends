@@ -1,5 +1,12 @@
 import { ConnectionCredentialStore, ConnectionStore } from "@amends/core/connection";
 import { AgentStore } from "@amends/core/agent";
+import {
+  ChannelBindingStore,
+  ChannelStore,
+  ContactStore,
+  DeliveryJobs,
+  DeliveryStore,
+} from "@amends/core/channel";
 import { TaskStore } from "@amends/core/task";
 import { SessionLogStore, SessionStateStore, TurnJobs, TurnStore } from "@amends/core/turn";
 import {
@@ -282,6 +289,30 @@ const bindings = (options: BindingOptions = {}): Context.Context<WorkspaceStorag
       ),
     )
     .pipe(
+      Context.add(ChannelStore.Service, {
+        get: unexpected,
+        listActive: unexpected(),
+        insert: unexpected,
+        update: unexpected,
+      }),
+      Context.add(ChannelBindingStore.Service, {
+        get: unexpected,
+        findByConversation: unexpected,
+        insert: unexpected,
+      }),
+      Context.add(ContactStore.Service, {
+        get: unexpected,
+        getMany: unexpected,
+        insert: unexpected,
+        update: unexpected,
+      }),
+      Context.add(DeliveryStore.Service, {
+        get: unexpected,
+        listRequestedByThread: unexpected,
+        findByExternalMessage: unexpected,
+        insert: unexpected,
+        update: unexpected,
+      }),
       Context.add(
         SessionStateStore.Service,
         SessionStateStore.Service.of({ get: unexpected, set: unexpected }),
@@ -335,6 +366,7 @@ const host = (storage: WorkspaceStorage.Interface) =>
   Layer.mergeAll(
     Layer.succeed(WorkspaceStorage.Service, storage),
     TurnJobs.layerNoRunner,
+    DeliveryJobs.layerNoRunner,
     Layer.succeed(
       Crypto.Crypto,
       Crypto.make({ randomBytes: (size) => new Uint8Array(size), digest: unexpected }),

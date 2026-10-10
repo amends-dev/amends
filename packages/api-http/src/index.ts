@@ -1,6 +1,7 @@
 export { AgentsGroup } from "./agents.ts";
 export { Api } from "./api.ts";
 export { ChangeFeedGroup } from "./change-feed.ts";
+export { ChannelEventsGroup, ChannelsGroup } from "./channels.ts";
 export { ConnectionsGroup } from "./connections.ts";
 export { Authentication, Principal, Unauthorized } from "./authentication.ts";
 export { ApiErrors } from "./errors.ts";
@@ -34,3 +35,4 @@ export { Notification, NotificationInbox } from "@amends/core/notification";
 export { Connection } from "@amends/core/connection";
 export { Agent } from "@amends/core/agent";
 export { Turn } from "@amends/core/turn";
+export { Channel, ChannelBinding } from "@amends/core/channel";

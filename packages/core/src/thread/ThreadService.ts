@@ -29,7 +29,7 @@ import { ThreadStore } from "./ThreadStore.ts";
 import { ThreadCommand } from "./ThreadCommand.ts";
 import { GroupStore } from "../group/store.ts";
 import { GroupCommand } from "../group/command.ts";
-import { GroupFollowStore } from "../group/follow/store.ts";
+import type { GroupFollowStore } from "../group/follow/store.ts";
 import { ThreadQuery } from "./ThreadQuery.ts";
 import { ThreadPermissions } from "./ThreadPermissions.ts";
 import { ThreadMessageStore } from "./ThreadMessageStore.ts";
@@ -229,7 +229,6 @@ export const make = Effect.fn("ThreadService.make")(function* () {
   const threadCommand = yield* ThreadCommand.Service;
   const groupStore = yield* GroupStore.Service;
   const groupCommand = yield* GroupCommand.Service;
-  const groupFollowStore = yield* GroupFollowStore.Service;
   const threadQuery = yield* ThreadQuery.Service;
   const threadStore = yield* ThreadStore.Service;
   const readStateCommand = yield* ReadStateCommand.Service;
@@ -341,6 +340,7 @@ export const make = Effect.fn("ThreadService.make")(function* () {
           author: { _tag: "Member", memberId: author.memberId },
           text: opening.text,
           mentions: opening.mentions,
+          via: null,
         },
         occurredAt,
       })
@@ -381,17 +381,14 @@ export const make = Effect.fn("ThreadService.make")(function* () {
     authorId: Member.Id,
     mentions: ReadonlyArray<Member.Id>,
   ) {
-    const follows = yield* groupFollowStore.listActiveByGroup(groupId);
-    const eligible = yield* threadQuery.eligibleMembers(groupId, [
-      authorId,
-      ...mentions,
-      ...follows.map((follow) => follow.memberId),
+    const followers = yield* threadQuery.followers(groupId);
+    const named = yield* threadQuery.eligibleMembers(groupId, [authorId, ...mentions]);
+    const eligible = new Map([
+      ...named,
+      ...followers.map((follower) => [follower.member.id, follower] as const),
     ]);
-    const followers = follows
-      .filter((follow) => eligible.get(follow.memberId)?.admission.id === follow.groupMembershipId)
-      .map((follow) => follow.memberId)
-      .sort();
-    return { starters: [...new Set([authorId, ...mentions, ...followers])], eligible };
+    const followerIds = followers.map((follower) => follower.member.id).sort();
+    return { starters: [...new Set([authorId, ...mentions, ...followerIds])], eligible };
   });
 
   const startDirect = Effect.fn("ThreadService.startDirect")(

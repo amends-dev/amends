@@ -26,8 +26,8 @@ type Failure<F> = F extends (...args: never) => Effect.Effect<unknown, infer E, 
   ? E
   : never;
 /**
- * Every failure the workspace, member, access, invitation, conversation, connection, agent, and
- * turn endpoints report.
+ * Every failure the workspace, member, access, invitation, conversation, connection, agent, turn,
+ * and channel endpoints report.
  */
 type Reported =
   | Failure<Client["workspaces"][keyof Client["workspaces"]]>
@@ -41,6 +41,7 @@ type Reported =
   | Failure<Client["connections"][keyof Client["connections"]]>
   | Failure<Client["agents"][keyof Client["agents"]]>
   | Failure<Client["turns"][keyof Client["turns"]]>
+  | Failure<Client["channels"][keyof Client["channels"]]>
   | InvalidCommand;
 // Keyed by every reported tag, so a new or renamed failure fails to compile until it is placed.
 const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
@@ -93,6 +94,12 @@ const failures: { readonly [Tag in Reported["_tag"]]: WorkspaceFailure } = {
   "TurnService.NotActive": "changed",
   "TurnService.NotRetryable": "changed",
   "TurnService.NotFound": "gone",
+  // Channels: one gone or out of reach, a group the reader left, a thread bound to no conversation;
+  // a connection that gives no channels, or the reader may not use, is refused with the draft kept.
+  "ChannelService.NotFound": "gone",
+  "ChannelService.GroupNotFound": "gone",
+  "ChannelService.NotBound": "gone",
+  "ChannelService.ConnectionUnavailable": "invalid",
   // Following a turn's log stopped short, or too many streams are open: following again may work.
   "Turn.LogUnavailable": "failed",
   "Api.TooManyStreams": "failed",

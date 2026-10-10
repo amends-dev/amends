@@ -4,7 +4,11 @@ import { Effect, Layer } from "effect";
 import { Agents } from "./agents.ts";
 import { Assignments } from "./assignments.ts";
 import { Binding } from "./binding.ts";
+import { ChannelBindings } from "./channel-bindings.ts";
+import { Channels } from "./channels.ts";
 import { Checkpoints } from "./checkpoints.ts";
+import { Contacts } from "./contacts.ts";
+import { Deliveries } from "./deliveries.ts";
 import { ConnectionCredentials } from "./connection-credentials.ts";
 import { Connections } from "./connections.ts";
 import { MemoryConnection } from "./connection.ts";
@@ -51,6 +55,10 @@ const layerStores = Layer.mergeAll(
   ThreadMessages.layer,
   ThreadActivities.layer,
   Tasks.layer,
+  Channels.layer,
+  ChannelBindings.layer,
+  Contacts.layer,
+  Deliveries.layer,
   ReadStates.layer,
   Connections.layer,
   ConnectionCredentials.layer,

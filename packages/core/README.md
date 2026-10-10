@@ -14,27 +14,28 @@ exist; a small feature does not need an empty version of every module.
 
 The current domains contain these features:
 
-| Domain          | Ownership                                                                                                                                                 |
-| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.                                             |
-| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                                                       |
-| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                                                             |
-| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                                                           |
-| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                                                 |
-| `thread`        | Private-group starts, renames, human replies and their edits and deletions, authorized reads, participation, timeline activity, and projection storage.   |
-| `task`          | The work a thread tracks: its status, priority, and assignee, created with the thread or in a conversation, changed one way at a time, and read by group. |
-| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.                                   |
-| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                                                |
-| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.                                    |
-| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                                                  |
-| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                                                     |
-| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                                                            |
-| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                                                     |
-| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                                                     |
+| Domain          | Ownership                                                                                                                                                            |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `workspace`     | Workspace metadata and initialization, with `member/`, `invitation/`, `ownership/`, and `settings/` features.                                                        |
+| `authorization` | Access evaluation and permission concepts, with `role/` and `assignment/` features.                                                                                  |
+| `identity`      | Human, agent, and contact references, with human/agent actors and membership.                                                                                        |
+| `journal`       | Shared log, transaction, fact, codec, and projection machinery.                                                                                                      |
+| `notification`  | Notification records, the inbox, marking them seen, activity-driven generation, and departure settlement.                                                            |
+| `thread`        | Private-group starts, renames, human replies and their edits and deletions, authorized reads, participation, timeline activity, and projection storage.              |
+| `task`          | The work a thread tracks: its status, priority, and assignee, created with the thread or in a conversation, changed one way at a time, and read by group.            |
+| `channel`       | Channels: a connection's external conversations as threads in one group, their contacts, what they send taken in, and what they are told carried back as deliveries. |
+| `agent`         | Agents: instructions, harness, model, and sandbox over connections, as a workspace membership, and what a turn runs on.                                              |
+| `connection`    | Workspaces' connections to the integrations a host installs, with their settings and keys.                                                                           |
+| `turn`          | Agents' turns in threads: accepting work, each participation's session and session log, execution steps, and stopping.                                               |
+| `group`         | Team creation, public discovery and joining, authorized reads, audience policy, membership, and storage.                                                             |
+| `change-feed`   | Live workspace changes for consumers that refresh their current view.                                                                                                |
+| `signal`        | Ephemeral signals, such as typing and read-state changes, for connected readers; never stored.                                                                       |
+| `request`       | Request keys, so a creating operation's retry returns what its first attempt created.                                                                                |
+| `text`          | Rules for text people enter: what storage keeps as given, and what a name may hold. Internal to core.                                                                |
 
 Permission, grant, requirement, scope, and target remain focused modules within
-authorization. Future features such as channels belong beside these domains; workspace scoping
-alone does not make a feature part of workspace management.
+authorization. Future features belong beside these domains; workspace scoping alone does not make
+a feature part of workspace management.
 
 `@amends/core/notification` holds the `Notification.Record` model, the `NotificationStore`
 contract, `NotificationService`, and the projection that generates notifications. A record
@@ -640,6 +641,25 @@ them, so a client may call it on each keystroke; clients hide their own member's
 `ReadStateService` and `NotificationService.markSeen` and `markSeenThrough` publish the read-state
 signals after their writes; the reader's sessions, the one that wrote included, refresh from them.
 
+## Channels
+
+`@amends/core/channel` is a channel, a connection's external conversations as threads in one group,
+as [threads](../../docs/threads.md#channels) fixes it and
+[channels](../../docs/thread-workflows.md#channels) describes. `Channel.Record` names the connection,
+the group new conversations open in, and whether they open tasks; `ChannelBinding.Record` is a bound
+thread's conversation, keyed by the thread, as the connection's `ChannelTransport` identifies it;
+`Contact.Record` a person heard from through a channel, named as the system names them; and
+`Delivery.Record` one message's delivery to a conversation, `requested`, `sent`, or `failed`.
+`ChannelService` (`create`, `list`, `get`, `redirect`, `remove`, `getBinding`) is the operations,
+under `channel.create` on the workspace and `channel.read` and `channel.manage` on the channel.
+`ChannelIntake` takes in what a channel's system sent, as no member: `receive` gives the request to
+the channel's transport and takes in each event it makes, and `intake` takes one event in, each in a
+commit of its own as the contact. `DeliveryExecution` is what the delivery job asks of the
+workspace: `accept` the contacts' pending notifications into deliveries, `start` one with what to
+post and how to reach the system, and `recordSent` or `recordFailed`; the job posts. `ChannelQuery`
+is the reads they share: the channel as it stands, and its connection's integration, access, and
+transport. The `channel` projection applies `ChannelFacts`, and `channel-delivery` `DeliveryFacts`.
+
 ## Jobs
 
 A job is work a commit asks for that runs outside any request. Core declares which facts request
@@ -655,13 +675,18 @@ agent's job names the agent by its membership.
   that asks the agent for work, and a turn's end or retry, request a run; a request to stop a
   turn, and the end of the agent's participation in the thread or its leaving the thread's group,
   request a stop.
+- A **delivery job** (`DeliveryJobs`), one for each thread bound to a channel's conversation,
+  carries what the thread's contacts were told to the conversation, asking the workspace through
+  `DeliveryExecution`. Activity that tells a contact something requests it.
 
-`TurnJobs.Service` is a host service, shared by every workspace, which delivers each request to
-whatever runs turn jobs; `TurnJobs.layerNoRunner` accepts requests and runs nothing. What the job
-calls, `TurnExecution`, is part of `Core.layer`, and `Core.JobServices` names it with the
-`SessionLogStore` the job writes, apart from `Core.Operations`, since no actor calls them: they act
-as the agent. A host's jobs reach them through the gateway's `inWorkspace`.
-[Cluster](../cluster/README.md)'s `TurnJob` runs turn jobs, as the local host does.
+`TurnJobs.Service` and `DeliveryJobs.Service` are host services, shared by every workspace, which
+deliver each request to whatever runs the jobs; each one's `layerNoRunner` accepts requests and runs
+nothing. What the jobs call, `TurnExecution` and `DeliveryExecution`, is part of `Core.layer`, and
+`Core.JobServices` names them with `ChannelIntake`, which a host calls for what its channels
+receive, and the `SessionLogStore` a turn's job writes, apart from `Core.Operations`, since no actor
+calls them: they act as the agent, the contact, or delivery itself. A host's jobs reach them through
+the gateway's `inWorkspace`. [Cluster](../cluster/README.md)'s `TurnJob` and `DeliveryJob` run
+them, as the local host does.
 
 ## Module dependencies and exports
 

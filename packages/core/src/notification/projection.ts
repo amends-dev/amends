@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { DeliveryFacts } from "../channel/DeliveryFacts.ts";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
 import { Projection } from "../journal/projection.ts";
 import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
@@ -13,9 +14,9 @@ import { NotificationStore } from "./store.ts";
  * is private state, outside the journal. Everything comes from the
  * recorded facts and this read model's own notifications, so it rebuilds without reading other
  * read models: recipients were selected when the activity was recorded. A turn accepting an
- * agent's notifications settles them as accepted into it.
+ * agent's notifications settles them as accepted into it, and a delivery a contact's.
  */
-export const definition = Projection.make("notifications", { version: 3 })
+export const definition = Projection.make("notifications", { version: 4 })
   .on(
     ThreadActivityFacts.Recorded,
     Effect.fn("NotificationProjection.activity")(function* (event) {
@@ -55,7 +56,23 @@ export const definition = Projection.make("notifications", { version: 3 })
     Effect.fn("NotificationProjection.turnCreated")(function* ({ payload }) {
       // A turn's acceptance settles the notifications it took, in the same commit.
       const notificationStore = yield* NotificationStore.Service;
-      yield* notificationStore.accept(payload.notificationIds, payload.id, payload.createdAt);
+      yield* notificationStore.accept(
+        payload.notificationIds,
+        { _tag: "Turn", turnId: payload.id },
+        payload.createdAt,
+      );
+    }),
+  )
+  .on(
+    DeliveryFacts.Created,
+    Effect.fn("NotificationProjection.deliveryCreated")(function* ({ payload }) {
+      // A delivery's acceptance settles the contact notifications it carries, in the same commit.
+      const notificationStore = yield* NotificationStore.Service;
+      yield* notificationStore.accept(
+        payload.notificationIds,
+        { _tag: "Delivery", deliveryId: payload.id },
+        payload.requestedAt,
+      );
     }),
   );
 export * as NotificationProjection from "./projection.ts";

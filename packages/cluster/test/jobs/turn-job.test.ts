@@ -13,6 +13,7 @@ import {
   ShardingConfig,
 } from "effect/cluster";
 import { TestClock } from "effect/testing";
+import { JobRequests } from "../../src/jobs/requests.ts";
 import { TurnJob } from "../../src/jobs/turn-job.ts";
 import {
   type FakeWorkspace,
@@ -132,13 +133,13 @@ describe("a turn job", () => {
         expect(recovers.workspace.endings()).toMatchObject([{ kind: "close", reply: "Done." }]);
 
         const failing = turnJobsFor(Stream.fromIterable([...writing("Done."), finish]), {
-          failedStarts: TurnJob.maxFailures,
+          failedStarts: JobRequests.maxFailures,
         });
         yield* Effect.gen(function* () {
           yield* inCommit("commit-1", (turnJobs) => turnJobs.requestRun(job));
           yield* until(hasEnded(failing.workspace), "20 minutes");
         }).pipe(Effect.provide(failing.layer), Effect.scoped);
-        expect(failing.workspace.starts()).toBe(TurnJob.maxFailures);
+        expect(failing.workspace.starts()).toBe(JobRequests.maxFailures);
         expect(failing.workspace.endings()).toEqual([
           { kind: "fail", reason: "Its turn job kept failing to run it.", resume: undefined },
         ]);

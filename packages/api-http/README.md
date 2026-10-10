@@ -76,6 +76,8 @@ so a client can import the complete contract without loading server code.
 - `groups` and `threads`: conversations; see [Conversations](#conversations).
 - `connections`: connections to the integrations this host installs; see
   [Connections](#connections).
+- `channels` and `channelEvents`: a connection's external conversations as threads, and what their
+  systems send; see [channels](#channels).
 - `agents` and `turns`: agents, on connections, and their turns on threads; see
   [Agents](#agents) and [Turns](#turns).
 
@@ -347,6 +349,22 @@ it retries and who asked (`retry`), its reply's `messageIds`, `failure`, `cancel
 with `stoppable` and `retryable` for the caller. Stopping and retrying need permission to direct
 the agent (403 otherwise). A turn in a thread the caller cannot open answers 404. A turn is retried
 at most once, so repeating `retry` returns the turn it created.
+
+### Channels
+
+Channel paths sit under `/workspaces/:workspaceId` and require active membership, except the events
+route. A channel is a connection's external conversations as threads in one group;
+[channels](../../docs/thread-workflows.md#channels) describes the rules.
+
+| Endpoint                              | Operation                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET …/channels`                      | The channels the caller may read, by name.                                                                                                                                                                                                                                                                                                                |
+| `POST …/channels`                     | Create a channel from `{ connectionId, groupId, name, opensTasks }` under `channel.create`; 201. A connection that gives no channels, or that the caller may not use, is 422 `ConnectionUnavailable`; a group the caller does not belong to is 404 `GroupNotFound`.                                                                                       |
+| `GET …/channels/:channelId`           | One channel; one the caller may not read, or removed, is 404.                                                                                                                                                                                                                                                                                             |
+| `POST …/channels/:channelId/redirect` | Send new conversations to `{ groupId }` under `channel.manage`; returns the channel.                                                                                                                                                                                                                                                                      |
+| `DELETE …/channels/:channelId`        | Remove the channel under `channel.manage`; 204. Its threads and their bindings remain.                                                                                                                                                                                                                                                                    |
+| `GET …/threads/:threadId/channel`     | The conversation the thread came from: its channel, group, `conversation`, and when it was bound. A thread that came through no channel is 404 `NotBound`.                                                                                                                                                                                                |
+| `POST …/channels/:channelId/events`   | What the channel's external system sends, as text with its headers, with no session. The channel's transport verifies it and intake takes it in; the answer is the text the transport says to give, or empty. A request the transport rejects is 400 `Rejected`, a system that cannot be reached 503 `Unavailable`, and a channel missing or removed 404. |
 
 ## Authentication
 

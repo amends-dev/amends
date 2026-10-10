@@ -23,6 +23,7 @@ import {
 import { ReadStateService } from "@amends/core/read-state";
 import { ConnectionService } from "@amends/core/connection";
 import { AgentService } from "@amends/core/agent";
+import { ChannelIntake, ChannelService } from "@amends/core/channel";
 import { TaskService } from "@amends/core/task";
 import { Turn, TurnService } from "@amends/core/turn";
 import { Schema } from "effect";
@@ -151,6 +152,12 @@ export const PublicError = Schema.Union([
   TurnService.NotFound,
   TurnService.NotActive,
   TurnService.NotRetryable,
+  ChannelService.NotFound,
+  ChannelService.GroupNotFound,
+  ChannelService.ConnectionUnavailable,
+  ChannelService.NotBound,
+  ChannelIntake.Rejected,
+  ChannelIntake.Unavailable,
 ]);
 export type PublicError = typeof PublicError.Type;
 

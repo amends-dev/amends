@@ -454,6 +454,7 @@ export function ConnectionsWorkspace(props: ConnectionsWorkspaceProps) {
                       tools: all().filter((entry) => inTab(entry, "tools")).length,
                       sandboxes: all().filter((entry) => inTab(entry, "sandboxes")).length,
                       harnesses: all().filter((entry) => inTab(entry, "harnesses")).length,
+                      channels: all().filter((entry) => inTab(entry, "channels")).length,
                     }
               }
               onAdd={add()}

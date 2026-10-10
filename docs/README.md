@@ -12,7 +12,7 @@ remaining gaps with links to their owning code.
 | [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                                       |
 | [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                              |
 | [Group workflows](group-workflows.md)                                | Team groups: creation, public groups and joining, reads, membership, and following.                                             |
-| [Thread workflows](thread-workflows.md)                              | Starts, replies, participation, reads, notifications, read state, and typing.                                                   |
+| [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, read state, and typing.                                  |
 | [Journal and logs](journal.md)                                       | Storage envelopes, publication, transactions, replay, and durable tails. Turn examples illustrate future consumers.             |
 | [Testing](testing.md)                                                | Test commands, Effect test APIs, and database fixtures.                                                                         |
 | [Publishing](publishing.md)                                          | Building a package's distribution, checking it as a consumer would use it, and publishing it to npm.                            |

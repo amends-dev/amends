@@ -120,6 +120,7 @@ const configured = (fixture: Fixture, overrides: Partial<NotificationStore.Inter
         requireAccess: unexpected,
         requireReadable: unexpected,
         eligibleMembers: unexpected,
+        followers: unexpected,
         currentParticipants: unexpected,
         pageParticipants: unexpected,
         findParticipants: unexpected,

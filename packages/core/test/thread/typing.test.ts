@@ -63,6 +63,7 @@ const run = <A, E>(
           : Effect.fail(new ThreadQuery.NotFound({ threadId })),
       requireReadable: unexpected,
       eligibleMembers: unexpected,
+      followers: unexpected,
       currentParticipants: unexpected,
       pageParticipants: unexpected,
       findParticipants: unexpected,

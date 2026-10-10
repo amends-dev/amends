@@ -301,6 +301,7 @@ export const threadStarts = (harness: Harness) => {
                             author: { _tag: "Contact", contactId },
                             text: "My order is late",
                             mentions: [],
+                            via: null,
                           },
                           occurredAt,
                         }),

@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "acf057a1-33dd-4597-9854-87f11ec22400",
+  "id": "89761730-1eed-43f6-9c31-f1ece7fe293c",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -26,6 +26,24 @@
     },
     {
       "isRlsEnabled": false,
+      "name": "channel_bindings",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "channel_deliveries",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "channels",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
       "name": "checkpoints",
       "entityType": "tables",
       "schema": "public"
@@ -45,6 +63,12 @@
     {
       "isRlsEnabled": false,
       "name": "connections",
+      "entityType": "tables",
+      "schema": "public"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "contacts",
       "entityType": "tables",
       "schema": "public"
     },
@@ -501,6 +525,19 @@
     {
       "type": "text",
       "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "target_channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "assignments"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -523,6 +560,396 @@
       "entityType": "columns",
       "schema": "public",
       "table": "builtin_role_revisions"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "conversation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "jsonb",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "conversation_details",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "bound_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "thread_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "conversation_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "message_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "sequence",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "external_message_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "integer",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "attempts",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "failure",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "requested_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "finished_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "connection_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "group_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "boolean",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "opens_tasks",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "status",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_by",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "channels"
     },
     {
       "type": "text",
@@ -835,6 +1262,84 @@
       "entityType": "columns",
       "schema": "public",
       "table": "connections"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "workspace_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "contacts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "contacts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "contacts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "external_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "contacts"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "name",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "contacts"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "created_at",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "contacts"
     },
     {
       "type": "text",
@@ -2014,7 +2519,33 @@
       "default": null,
       "generated": null,
       "identity": null,
+      "name": "accepted_by_kind",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
       "name": "accepted_turn_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "notifications"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "accepted_delivery_id",
       "entityType": "columns",
       "schema": "public",
       "table": "notifications"
@@ -2795,6 +3326,32 @@
       "generated": null,
       "identity": null,
       "name": "turn_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_messages"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "channel_id",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "thread_messages"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "external_message_id",
       "entityType": "columns",
       "schema": "public",
       "table": "thread_messages"
@@ -3689,6 +4246,118 @@
       "entityType": "indexes",
       "schema": "public",
       "table": "assignments"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "channel_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "conversation_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "channel_bindings_by_conversation",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "thread_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "sequence",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": "\"status\" = 'requested'",
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "channel_deliveries_requested_by_thread",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "nameExplicit": true,
+      "columns": [
+        {
+          "value": "workspace_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "channel_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "conversation_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        },
+        {
+          "value": "external_message_id",
+          "isExpression": false,
+          "asc": true,
+          "nullsFirst": false,
+          "opclass": null
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "with": "",
+      "method": "btree",
+      "concurrently": false,
+      "name": "channel_deliveries_by_external_message",
+      "entityType": "indexes",
+      "schema": "public",
+      "table": "channel_deliveries"
     },
     {
       "nameExplicit": true,
@@ -5155,6 +5824,39 @@
     {
       "columns": [
         "workspace_id",
+        "thread_id"
+      ],
+      "nameExplicit": false,
+      "name": "channel_bindings_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "channel_bindings"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "channel_deliveries_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "channel_deliveries"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "channels_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "channels"
+    },
+    {
+      "columns": [
+        "workspace_id",
         "log_id",
         "name",
         "version"
@@ -5197,6 +5899,17 @@
       "entityType": "pks",
       "schema": "public",
       "table": "connections"
+    },
+    {
+      "columns": [
+        "workspace_id",
+        "id"
+      ],
+      "nameExplicit": false,
+      "name": "contacts_pkey",
+      "entityType": "pks",
+      "schema": "public",
+      "table": "contacts"
     },
     {
       "columns": [
@@ -5474,7 +6187,7 @@
       "table": "assignments"
     },
     {
-      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL)))",
+      "value": "(\"scope_kind\" = 'Workspace' AND \"target_kind\" IS NULL AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_channel_id\" IS NULL) OR (\"scope_kind\" = 'Target' AND \"target_kind\" IS NOT NULL AND ((\"target_kind\" = 'Workspace' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_channel_id\" IS NULL) OR (\"target_kind\" = 'Member' AND \"target_member_id\" IS NOT NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_channel_id\" IS NULL) OR (\"target_kind\" = 'Thread' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NOT NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_channel_id\" IS NULL) OR (\"target_kind\" = 'Group' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NOT NULL AND \"target_connection_id\" IS NULL AND \"target_channel_id\" IS NULL) OR (\"target_kind\" = 'Connection' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NOT NULL AND \"target_channel_id\" IS NULL) OR (\"target_kind\" = 'Channel' AND \"target_member_id\" IS NULL AND \"target_thread_id\" IS NULL AND \"target_group_id\" IS NULL AND \"target_connection_id\" IS NULL AND \"target_channel_id\" IS NOT NULL)))",
       "name": "assignments_scope_agrees",
       "entityType": "checks",
       "schema": "public",
@@ -5486,6 +6199,13 @@
       "entityType": "checks",
       "schema": "public",
       "table": "builtin_role_revisions"
+    },
+    {
+      "value": "(\"status\" = 'requested') = (\"finished_at\" IS NULL) AND (\"status\" = 'sent') = (\"external_message_id\" IS NOT NULL) AND (\"status\" = 'failed') = (\"failure\" IS NOT NULL) AND \"sequence\" > 0 AND \"attempts\" >= 0",
+      "name": "channel_delivery_status",
+      "entityType": "checks",
+      "schema": "public",
+      "table": "channel_deliveries"
     },
     {
       "value": "(\"status\" = 'active' AND \"ended_at\" IS NULL) OR (\"status\" = 'ended' AND \"ended_at\" IS NOT NULL)",
@@ -5558,7 +6278,7 @@
       "table": "members"
     },
     {
-      "value": "(\"discard_reason\" IS NOT NULL) = (\"state\" = 'Discarded') AND (\"accepted_turn_id\" IS NOT NULL AND \"accepted_at\" IS NOT NULL) = (\"state\" = 'Accepted') AND (\"accepted_turn_id\" IS NULL) = (\"accepted_at\" IS NULL) AND (\"seen_at\" IS NOT NULL) = (\"state\" = 'Seen') AND (\"state\" <> 'Accepted' OR \"recipient_kind\" = 'Agent') AND (\"state\" <> 'Seen' OR \"recipient_kind\" = 'Human')",
+      "value": "(\"discard_reason\" IS NOT NULL) = (\"state\" = 'Discarded') AND (\"accepted_by_kind\" IS NOT NULL AND \"accepted_at\" IS NOT NULL) = (\"state\" = 'Accepted') AND (\"accepted_by_kind\" IS NULL) = (\"accepted_at\" IS NULL) AND (\"accepted_turn_id\" IS NOT NULL) = (\"accepted_by_kind\" IS NOT DISTINCT FROM 'Turn') AND (\"accepted_delivery_id\" IS NOT NULL) = (\"accepted_by_kind\" IS NOT DISTINCT FROM 'Delivery') AND (\"accepted_by_kind\" IS DISTINCT FROM 'Turn' OR \"recipient_kind\" = 'Agent') AND (\"accepted_by_kind\" IS DISTINCT FROM 'Delivery' OR \"recipient_kind\" = 'Contact') AND (\"seen_at\" IS NOT NULL) = (\"state\" = 'Seen') AND (\"state\" <> 'Seen' OR \"recipient_kind\" = 'Human')",
       "name": "notification_state",
       "entityType": "checks",
       "schema": "public",
@@ -5628,7 +6348,7 @@
       "table": "thread_messages"
     },
     {
-      "value": "(\"via_kind\" IS NULL AND \"turn_id\" IS NULL) OR (\"via_kind\" = 'Turn' AND \"turn_id\" IS NOT NULL)",
+      "value": "(\"via_kind\" IS NULL AND \"turn_id\" IS NULL AND \"channel_id\" IS NULL AND \"external_message_id\" IS NULL) OR (\"via_kind\" = 'Turn' AND \"turn_id\" IS NOT NULL AND \"channel_id\" IS NULL AND \"external_message_id\" IS NULL) OR (\"via_kind\" = 'Channel' AND \"turn_id\" IS NULL AND \"channel_id\" IS NOT NULL AND \"external_message_id\" IS NOT NULL)",
       "name": "thread_message_via",
       "entityType": "checks",
       "schema": "public",

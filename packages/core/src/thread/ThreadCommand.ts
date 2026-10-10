@@ -182,6 +182,7 @@ export const CreateInput = Schema.Struct({
     author: MessageInput.fields.author,
     text: MessageInput.fields.text,
     mentions: MessageInput.fields.mentions,
+    via: MessageInput.fields.via,
   }),
   occurredAt: Schema.DateTimeUtcFromString,
 });
@@ -345,8 +346,8 @@ const authorAsParticipant = (author: ThreadMessage.Author): ThreadParticipation.
 /**
  * Whom a message by `author` notifies, of the participants selected for it. Mentions address
  * members; without them the message reaches every selected participant. A message never notifies
- * its own author, and an agent's message asks no work of other agents, so agents cannot keep
- * setting each other to work.
+ * its own author; an agent's message asks no work of other agents, so agents cannot keep setting
+ * each other to work; and a contact's message tells no contact, who heard it where it came from.
  */
 const recipientsOf = (
   author: ThreadMessage.Author,
@@ -360,8 +361,11 @@ const recipientsOf = (
   const byAgent =
     Predicate.isTagged(writer, "Member") &&
     Identity.MemberReference.isAnyOf(["Agent"])(writer.identity);
+  const byContact = ThreadMessage.Author.isAnyOf(["Contact"])(author);
   const addressed = (participant: ThreadParticipation.Participant) => {
     if (ThreadParticipation.keyOf(participant) === authorKey) return false;
+    if (byContact && ThreadParticipation.Participant.isAnyOf(["Contact"])(participant))
+      return false;
     const memberId = ThreadParticipation.memberOf(participant);
     return mentions.length === 0 || (memberId !== undefined && mentions.includes(memberId));
   };
@@ -716,7 +720,6 @@ export const make = Effect.fn("ThreadCommand.make")(function* () {
     const published = yield* publishMessage({
       ...message,
       threadId: thread.id,
-      via: null,
       participants: input.participants,
       occurredAt,
     }).pipe(Publication.withCause(created, occurredAt));

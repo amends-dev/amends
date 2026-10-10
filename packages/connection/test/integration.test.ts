@@ -3,6 +3,7 @@ import { SandboxProvider } from "@amends/sandbox";
 import type { ToolSource } from "@amends/toolkit";
 import { describe, expect, it } from "@effect/vitest";
 import { Effect, Exit, Redacted, Result, Schema } from "effect";
+import type * as ChannelTransport from "../src/ChannelTransport.ts";
 import * as Connection from "../src/Connection.ts";
 import * as Integration from "../src/Integration.ts";
 import * as Integrations from "../src/Integrations.ts";
@@ -25,6 +26,13 @@ const source: ToolSource.ToolSource = {
   name: "unused",
   discover: Effect.succeed([]),
   call: () => Effect.die("unused"),
+};
+
+/** A channel transport that never receives or posts. */
+const transport: ChannelTransport.ChannelTransport = {
+  self: "bot",
+  receive: () => Effect.die("unused"),
+  post: () => Effect.die("unused"),
 };
 
 /** An agent that is never started. */
@@ -76,6 +84,7 @@ const everything = Integration.make({
   },
   sandboxes: (access) => Effect.sync(() => given.push(access)).pipe(Effect.as(provider)),
   tools: (access) => Effect.sync(() => given.push(access)).pipe(Effect.as(source)),
+  channels: (access) => Effect.sync(() => given.push(access)).pipe(Effect.as(transport)),
   check: (access) =>
     Effect.sync(() => given.push(access)).pipe(Effect.as({ status: "healthy" as const })),
 });
@@ -147,7 +156,7 @@ const reasonOf = <A, R>(effect: Effect.Effect<A, Connection.ConnectionError, R>)
 
 describe("Integration.make", () => {
   it("says what a connection to the integration gives", () => {
-    expect(everything.provides).toEqual(["harnesses", "models", "sandboxes", "tools"]);
+    expect(everything.provides).toEqual(["harnesses", "models", "sandboxes", "tools", "channels"]);
     expect(modelsOnly.provides).toEqual(["models"]);
     expect(everything.models).toEqual({ listed: [], unlisted: true });
     expect(modelsOnly.models).toEqual({ listed: [modelOne], unlisted: false });
@@ -354,6 +363,7 @@ describe("Integration.make", () => {
       );
       yield* Effect.scoped(everything.sandboxProvider(connection(), { apiKey: key }));
       yield* everything.toolSource(connection(), { apiKey: key });
+      const channelTransport = yield* everything.channelTransport(connection(), { apiKey: key });
       const health = yield* everything.check(connection(), { apiKey: key });
 
       expect(harness.agent.id).toBe("everything");
@@ -361,7 +371,8 @@ describe("Integration.make", () => {
       expect(endpoint).toMatchObject({ model: "m", url: "https://eu.everything.example/v1" });
       expect(endpoint.apiKey).toBe(key);
       expect(health).toEqual({ status: "healthy" });
-      expect(given).toHaveLength(5);
+      expect(channelTransport.self).toBe("bot");
+      expect(given).toHaveLength(6);
       for (const access of given) {
         expect(access.settings).toEqual({ region: "eu" });
         expect(access.apiKey).toBe(key);
@@ -425,6 +436,7 @@ describe("Integration.make", () => {
           Effect.scoped(modelsOnly.sandboxProvider(connection(settled), { apiKey: key })),
         ),
         yield* reasonOf(modelsOnly.toolSource(connection(settled), { apiKey: key })),
+        yield* reasonOf(modelsOnly.channelTransport(connection(settled), { apiKey: key })),
         yield* reasonOf(
           modelsOnly.harness(connection(settled), { apiKey: key }, { model: chatEndpoint }),
         ),
@@ -450,6 +462,11 @@ describe("Integration.make", () => {
           integration: "models-only",
           tag: "UnsupportedError",
           description: "Models only gives no tools",
+        },
+        {
+          integration: "models-only",
+          tag: "UnsupportedError",
+          description: "Models only gives no channels",
         },
         {
           integration: "models-only",

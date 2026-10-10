@@ -112,8 +112,9 @@ workspace. Each part of its setup is its connection's id as a column: a null
 allows one active turn per agent and thread, and the harness, model, and sandbox a turn started on
 as columns set all together or not at all. Each turn holds how far into its thread its input
 reaches, where its entries begin in its session log, the turn it retries and who asked, both or
-neither, and its reply as a text array. A notification an agent accepted into a turn is
-`Accepted`, with its turn and time. `session_states` holds each participation's harness session as
+neither, and its reply as a text array. A notification accepted is `Accepted`, with what accepted
+it, an agent's turn or a delivery to a contact, and the time, as columns constrained to agree with
+its recipient's kind. `session_states` holds each participation's harness session as
 its last turn left it, beside its conversation: the harness's agent, what that agent returned as
 JSON, how far into the thread it was prompted, and what it ran on, as columns.
 `session_log_entries` holds each participation's session log, keyed by its position, each entry's
@@ -125,6 +126,15 @@ taken meanwhile, which is the store's `Conflict`; it then notifies on the append
 outside the projections a rebuild discards. Changing these replaced the
 development baseline too; recreate disposable PostgreSQL databases when adopting it.
 
+`channels` holds each channel; `channel_bindings` each bound thread's conversation, keyed by the
+thread, with the conversation's id as a column and its details as JSON, unique per channel and
+conversation; `contacts` the people heard from through channels; and `channel_deliveries` each
+message's delivery to a conversation, its status's columns constrained to agree, with a partial
+index of a thread's requested deliveries by sequence and an index by channel, conversation, and
+external message id, which knows an echo. `thread_messages` holds how a message came about, an
+agent's turn or a channel's message, as `via_kind` with the turn's or the channel's columns. Adding
+these replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
+
 Fact entries require complete provenance. There are no upgrade migrations,
 backfills, or legacy envelope formats. See the
 [storage envelope](../../docs/journal.md#storage-envelope).
@@ -134,8 +144,9 @@ backfills, or legacy envelope formats. See the
 One module per store, each exporting `make` and a `layer` for the core service it implements:
 `journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`, `roles.ts`, `assignments.ts`,
 `invitations.ts`, `notifications.ts`, `groups.ts`, and `group-memberships.ts`, `group-follows.ts`,
-`read-states.ts`, `threads.ts`, `thread-participations.ts`, `thread-messages.ts`, and
-`thread-activities.ts`. They share `binding.ts`, which is one workspace's view of the database: its
+`read-states.ts`, `threads.ts`, `thread-participations.ts`, `thread-messages.ts`,
+`thread-activities.ts`, `tasks.ts`, `channels.ts`, `channel-bindings.ts`, `contacts.ts`, and
+`deliveries.ts`. They share `binding.ts`, which is one workspace's view of the database: its
 identity, the transaction boundary, and the guard each statement runs under. `storage.ts` exports
 `layerWorkspace(workspaceId, options)` to compose the store layers over a binding for the requested
 workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing

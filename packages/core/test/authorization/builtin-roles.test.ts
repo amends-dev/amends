@@ -267,6 +267,16 @@ revisions[11] = Object.fromEntries(
   ]),
 );
 
+// Administrators create and manage channels; members read them.
+revisions[12] = Object.fromEntries(
+  Object.entries(revisions[11]!).map(([roleId, names]) => [
+    roleId,
+    roleId === BuiltinRoles.MemberId
+      ? [...names, "channel.read"]
+      : [...names, "channel.create", "channel.read", "channel.manage"],
+  ]),
+);
+
 it("the registered declarations make the current revision's bundles", () => {
   expect(Math.max(...Object.keys(revisions).map(Number))).toBe(BuiltinRoles.revision);
   expect(

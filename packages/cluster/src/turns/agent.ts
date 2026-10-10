@@ -5,6 +5,7 @@
  */
 import { Integrations } from "@amends/connection";
 import type { AgentQuery } from "@amends/core/agent";
+import type { Connection } from "@amends/core/connection";
 import type { Agent, Session } from "@amends/harness";
 import { Sandbox } from "@amends/sandbox";
 import { Effect } from "effect";
@@ -17,7 +18,7 @@ export interface Started {
 }
 
 /** A connection's key, as its integration takes it. */
-const credentialOf = (access: AgentQuery.Access) => access.credential ?? undefined;
+const credentialOf = (access: Connection.Access) => access.credential ?? undefined;
 
 // TODO: Stop a session's sandbox once its agent has been idle there for a while, and destroy it
 // once the participation ends; sandboxes are left running between turns.
@@ -63,7 +64,7 @@ export const startSession = Effect.fn("TurnAgent.startSession")(function* (
  * when it does not exist yet, for the scope.
  */
 const resumeSandbox = Effect.fnUntraced(function* (
-  access: AgentQuery.Access,
+  access: Connection.Access,
   sessionId: Agent.SessionId,
   template: Agent.Agent["template"],
 ) {

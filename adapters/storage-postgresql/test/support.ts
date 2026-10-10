@@ -20,6 +20,7 @@ import {
   WorkspaceStore,
 } from "@amends/core/workspace";
 import { Integrations } from "@amends/connection";
+import { DeliveryJobs } from "@amends/core/channel";
 import { TurnJobs } from "@amends/core/turn";
 import type { WorkspaceStorage } from "@amends/gateway";
 import { BunCrypto } from "@effect/platform-bun";
@@ -44,7 +45,9 @@ export const workspaceId = Workspace.Id.make("workspace-one");
 export const journalLog = Log.Id.make("journal");
 
 /** The bound stores by name, for direct assertions beside the context core receives. */
-export const bind = (context: Context.Context<WorkspaceStorage.Bindings | TurnJobs.Service>) => ({
+export const bind = (
+  context: Context.Context<WorkspaceStorage.Bindings | TurnJobs.Service | DeliveryJobs.Service>,
+) => ({
   context,
   threads: Context.get(context, ThreadStore.Service),
   participations: Context.get(context, ThreadParticipationStore.Service),
@@ -71,7 +74,12 @@ export const views = (options: PostgresStorage.Options = {}) =>
     return {
       forWorkspace: (workspaceId: Workspace.Id) =>
         Effect.map(service.forWorkspace(workspaceId), (context) =>
-          bind(context.pipe(Context.add(TurnJobs.Service, TurnJobs.noRunner))),
+          bind(
+            context.pipe(
+              Context.add(TurnJobs.Service, TurnJobs.noRunner),
+              Context.add(DeliveryJobs.Service, DeliveryJobs.noRunner),
+            ),
+          ),
         ),
     };
   });

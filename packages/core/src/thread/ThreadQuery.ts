@@ -10,6 +10,7 @@
 import { Context, Effect, Layer, Option, Schema } from "effect";
 import { Authorization } from "../authorization/authorization.ts";
 import { Requirement } from "../authorization/requirement.ts";
+import { GroupFollowStore } from "../group/follow/store.ts";
 import { Group } from "../group/group.ts";
 import { GroupQuery } from "../group/query.ts";
 import { GroupMembership } from "../group/membership/membership.ts";
@@ -74,6 +75,14 @@ export type ParticipantsError =
   | GroupMembershipStore.Failure
   | MemberStore.Failure
   | ThreadParticipationStore.Failure;
+
+/**
+ * What reading a group's followers can fail with.
+ *
+ * @category errors
+ * @since 0.1.0
+ */
+export type FollowersError = ParticipantsError | GroupFollowStore.Failure;
 
 /**
  * What reading a timeline can fail with.
@@ -147,6 +156,11 @@ export interface Interface {
     memberIds: ReadonlyArray<Member.Id>,
   ) => Effect.Effect<ReadonlyMap<Member.Id, Eligible>, ParticipantsError>;
   /**
+   * The group's followers whose follow is through their current admission, with both records, in
+   * follow order: those a new thread in the group admits.
+   */
+  readonly followers: (groupId: Group.Id) => Effect.Effect<ReadonlyArray<Eligible>, FollowersError>;
+  /**
    * Every current participant: an active participation whose member, if any, still has a current
    * group admission. Read in pages; a reply that addresses everyone needs them all.
    */
@@ -215,6 +229,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
   const groupQuery = yield* GroupQuery.Service;
   const threadStore = yield* ThreadStore.Service;
   const groupMembershipStore = yield* GroupMembershipStore.Service;
+  const groupFollowStore = yield* GroupFollowStore.Service;
   const memberStore = yield* MemberStore.Service;
   const threadParticipationStore = yield* ThreadParticipationStore.Service;
   const threadActivityStore = yield* ThreadActivityStore.Service;
@@ -265,6 +280,18 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
       if (member?.status === "active") result.set(member.id, { admission, member });
     }
     return result;
+  });
+
+  const followers = Effect.fn("ThreadQuery.followers")(function* (groupId: Group.Id) {
+    const follows = yield* groupFollowStore.listActiveByGroup(groupId);
+    const eligible = yield* eligibleMembers(
+      groupId,
+      follows.map((follow) => follow.memberId),
+    );
+    return follows.flatMap((follow) => {
+      const entry = eligible.get(follow.memberId);
+      return entry !== undefined && entry.admission.id === follow.groupMembershipId ? [entry] : [];
+    });
   });
 
   /**
@@ -433,6 +460,7 @@ export const make = Effect.fn("ThreadQuery.make")(function* () {
     requireAccess,
     requireReadable,
     eligibleMembers,
+    followers,
     currentParticipants,
     pageParticipants,
     findParticipants,

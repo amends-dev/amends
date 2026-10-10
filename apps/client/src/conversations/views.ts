@@ -400,7 +400,7 @@ export function useThreadConversation(
           author: people.authorOf(item.message.author),
           at: toDate(item.message.publishedAt),
           ...shownContent(item.message.content, people.mentionsOf),
-          ...(item.message.via === null ? {} : { turn: { id: item.message.via.turnId } }),
+          ...(item.message.via?._tag === "Turn" ? { turn: { id: item.message.via.turnId } } : {}),
         });
       else if (isMessageChange(item)) {
         // An edit or deletion shows on the message's publication, which carries its content now.

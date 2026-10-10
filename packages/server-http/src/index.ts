@@ -8,6 +8,7 @@ export { Routes } from "./routes.ts";
 export { ChangeFeedHandlers } from "./change-feed.ts";
 export { ConnectionsHandlers } from "./connections.ts";
 export { AgentsHandlers } from "./agents.ts";
+export { ChannelsHandlers } from "./channels.ts";
 export { Draining } from "./draining.ts";
 export { SessionHandlers } from "./session.ts";
 export { Streams } from "./streams.ts";

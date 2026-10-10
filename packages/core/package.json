@@ -20,7 +20,8 @@
     "./signal": "./src/signal/index.ts",
     "./connection": "./src/connection/index.ts",
     "./turn": "./src/turn/index.ts",
-    "./task": "./src/task/index.ts"
+    "./task": "./src/task/index.ts",
+    "./channel": "./src/channel/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

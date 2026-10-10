@@ -12,9 +12,12 @@ in-memory reference storage. The guides describe what exists; this page lists wh
 - A group's visibility is chosen at creation and cannot change afterwards. Public groups show
   their threads only to members, with no read-only preview before joining. Direct groups exist,
   with fixed membership.
-- Member and task workflows exist. Channel workflows, which will start threads with contacts and
-  admit human followers, are not implemented, and neither are managing other participants or
-  muting. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision for
+- Member, task, and [channel](thread-workflows.md#channels) workflows exist; managing other
+  participants and muting are not implemented. No installed integration gives channels yet, so the
+  local host can create no channel until one does; the conformance suites run channels on a test
+  transport. Contacts are told of messages alone, which the delivery job carries to their
+  conversation; a sent message's edits and deletions are not carried, a channel's readiness is not
+  shown, and an agent's prompt does not yet name a contact. Tasks admit triage and tell it, but nothing evaluates a policy or records a decision for
   it; a task's cross-group views, such as everything assigned to one member, are not read; and a
   turn prompted by a task assignment alone is told nothing of the task yet, so it completes until
   a message follows.
@@ -36,8 +39,7 @@ in-memory reference storage. The guides describe what exists; this page lists wh
   log names a thread by its group.
   A turn's changes show in its thread's timeline, but inform no one: the design's informational turn
   activity for participants is not built. The active turns read covers at most a hundred active
-  turns in the workspace. Channel delivery does not run, and contacts and triage have no inbox
-  outside the store.
+  turns in the workspace. Triage has no inbox outside the store.
 - The [harness](../packages/harness/README.md) runs amends's own agent
   ([harness-amends](../adapters/harness-amends)) and
   [opencode](../adapters/harness-opencode/README.md), which works in a sandbox behind its bridge;

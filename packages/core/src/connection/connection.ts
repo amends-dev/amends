@@ -147,6 +147,16 @@ export const View = Schema.Struct({
 });
 export interface View extends Schema.Schema.Type<typeof View> {}
 
+/**
+ * A connection as its integration takes it, with its key when it authenticates with one: what
+ * whoever reaches the connection's system, such as a turn's job or a channel's, is given.
+ */
+export const Access = Schema.Struct({
+  connection: Connection.Connection,
+  credential: Schema.NullOr(Connection.Credential),
+});
+export interface Access extends Schema.Schema.Type<typeof Access> {}
+
 /** The connection as its integration takes it. */
 export const connectionOf = (record: Record): Connection.Connection => ({
   id: record.id,

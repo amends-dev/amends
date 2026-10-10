@@ -13,6 +13,7 @@ import {
 import { GatewayErrors } from "@amends/gateway/errors";
 import { GroupService, GroupFollowService, GroupMembershipService } from "@amends/core/group";
 import { AgentService } from "@amends/core/agent";
+import { ChannelIntake, ChannelService } from "@amends/core/channel";
 import { TurnService } from "@amends/core/turn";
 import { ConnectionService } from "@amends/core/connection";
 import { NotificationService } from "@amends/core/notification";
@@ -254,5 +255,31 @@ export const workspace = [
 
 /** Outcomes every member operation shares: the workspace set plus membership. */
 export const member = [NotMember, ...workspace] as const;
+
+/**
+ * Channel outcomes. A channel the caller may not read, or removed, is 404, as is a group the caller
+ * does not belong to and a thread bound to no conversation; a connection that gives no channels, or
+ * that the caller may not use, is 422.
+ */
+export const channelRead = [ChannelService.NotFound.pipe(HttpApiSchema.status(404))] as const;
+export const channelCreate = [
+  ...channelRead,
+  ChannelService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+  ChannelService.ConnectionUnavailable.pipe(HttpApiSchema.status(422)),
+] as const;
+export const channelRedirect = [
+  ...channelRead,
+  ChannelService.GroupNotFound.pipe(HttpApiSchema.status(404)),
+] as const;
+export const channelBinding = [ChannelService.NotBound.pipe(HttpApiSchema.status(404))] as const;
+/**
+ * What an external system's request to a channel can be answered with: a channel missing or removed
+ * is 404, a request its transport rejects 400, and a system that cannot be reached 503.
+ */
+export const channelEvents = [
+  ...channelRead,
+  ChannelIntake.Rejected.pipe(HttpApiSchema.status(400)),
+  ChannelIntake.Unavailable.pipe(HttpApiSchema.status(503)),
+] as const;
 
 export * as ApiErrors from "./errors.ts";

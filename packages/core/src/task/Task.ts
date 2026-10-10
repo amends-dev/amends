@@ -272,6 +272,8 @@ export const recipients = (
 ): ReadonlyArray<ThreadActivity.Recipient> => {
   const byKey = by === undefined ? undefined : ThreadParticipation.keyOf(by);
   return participants.flatMap(({ id, participant }) => {
+    // A task's changes are never delivered: contacts are told of messages alone.
+    if (ThreadParticipation.Participant.isAnyOf(["Contact"])(participant)) return [];
     if (ThreadParticipation.keyOf(participant) === byKey) return [];
     const recipient = ThreadParticipation.recipientOf(participant);
     return [

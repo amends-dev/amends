@@ -27,15 +27,59 @@ CREATE TABLE "assignments" (
 	"target_thread_id" text,
 	"target_group_id" text,
 	"target_connection_id" text,
+	"target_channel_id" text,
 	CONSTRAINT "assignments_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "assignments_source_agrees" CHECK (("source_kind" = 'Role' AND "role_id" IS NOT NULL AND "permission" IS NULL) OR ("source_kind" = 'Direct' AND "permission" IS NOT NULL AND "role_id" IS NULL)),
-	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_member_id" IS NULL AND "target_thread_id" IS NOT NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Group' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NOT NULL AND "target_connection_id" IS NULL) OR ("target_kind" = 'Connection' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NOT NULL))))
+	CONSTRAINT "assignments_scope_agrees" CHECK (("scope_kind" = 'Workspace' AND "target_kind" IS NULL AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_channel_id" IS NULL) OR ("scope_kind" = 'Target' AND "target_kind" IS NOT NULL AND (("target_kind" = 'Workspace' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_channel_id" IS NULL) OR ("target_kind" = 'Member' AND "target_member_id" IS NOT NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_channel_id" IS NULL) OR ("target_kind" = 'Thread' AND "target_member_id" IS NULL AND "target_thread_id" IS NOT NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_channel_id" IS NULL) OR ("target_kind" = 'Group' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NOT NULL AND "target_connection_id" IS NULL AND "target_channel_id" IS NULL) OR ("target_kind" = 'Connection' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NOT NULL AND "target_channel_id" IS NULL) OR ("target_kind" = 'Channel' AND "target_member_id" IS NULL AND "target_thread_id" IS NULL AND "target_group_id" IS NULL AND "target_connection_id" IS NULL AND "target_channel_id" IS NOT NULL))))
 );
 --> statement-breakpoint
 CREATE TABLE "builtin_role_revisions" (
 	"workspace_id" text PRIMARY KEY,
 	"revision" integer NOT NULL,
 	CONSTRAINT "builtin_role_revision_positive" CHECK ("revision" > 0)
+);
+--> statement-breakpoint
+CREATE TABLE "channel_bindings" (
+	"workspace_id" text,
+	"thread_id" text,
+	"channel_id" text NOT NULL,
+	"group_id" text NOT NULL,
+	"conversation_id" text NOT NULL,
+	"conversation_details" jsonb NOT NULL,
+	"bound_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "channel_bindings_pkey" PRIMARY KEY("workspace_id","thread_id")
+);
+--> statement-breakpoint
+CREATE TABLE "channel_deliveries" (
+	"workspace_id" text,
+	"id" text,
+	"channel_id" text NOT NULL,
+	"thread_id" text NOT NULL,
+	"group_id" text NOT NULL,
+	"conversation_id" text NOT NULL,
+	"message_id" text NOT NULL,
+	"sequence" integer NOT NULL,
+	"status" text NOT NULL,
+	"external_message_id" text,
+	"attempts" integer NOT NULL,
+	"failure" text,
+	"requested_at" timestamp with time zone NOT NULL,
+	"finished_at" timestamp with time zone,
+	CONSTRAINT "channel_deliveries_pkey" PRIMARY KEY("workspace_id","id"),
+	CONSTRAINT "channel_delivery_status" CHECK (("status" = 'requested') = ("finished_at" IS NULL) AND ("status" = 'sent') = ("external_message_id" IS NOT NULL) AND ("status" = 'failed') = ("failure" IS NOT NULL) AND "sequence" > 0 AND "attempts" >= 0)
+);
+--> statement-breakpoint
+CREATE TABLE "channels" (
+	"workspace_id" text,
+	"id" text,
+	"connection_id" text NOT NULL,
+	"group_id" text NOT NULL,
+	"name" text NOT NULL,
+	"opens_tasks" boolean NOT NULL,
+	"status" text NOT NULL,
+	"created_by" text NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "channels_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "checkpoints" (
@@ -76,6 +120,16 @@ CREATE TABLE "connections" (
 	"created_by" text NOT NULL,
 	"created_at" timestamp with time zone NOT NULL,
 	CONSTRAINT "connections_pkey" PRIMARY KEY("workspace_id","id")
+);
+--> statement-breakpoint
+CREATE TABLE "contacts" (
+	"workspace_id" text,
+	"id" text,
+	"channel_id" text NOT NULL,
+	"external_id" text NOT NULL,
+	"name" text NOT NULL,
+	"created_at" timestamp with time zone NOT NULL,
+	CONSTRAINT "contacts_pkey" PRIMARY KEY("workspace_id","id")
 );
 --> statement-breakpoint
 CREATE TABLE "group_follows" (
@@ -223,7 +277,9 @@ CREATE TABLE "notifications" (
 	"source_entry_id" text NOT NULL,
 	"participation_id" text,
 	"discard_reason" text,
+	"accepted_by_kind" text,
 	"accepted_turn_id" text,
+	"accepted_delivery_id" text,
 	"accepted_at" timestamp with time zone,
 	"recipient_kind" text NOT NULL,
 	"recipient_id" text,
@@ -235,7 +291,7 @@ CREATE TABLE "notifications" (
 	"thread_group_id" text,
 	"thread_sequence" integer,
 	CONSTRAINT "notifications_pkey" PRIMARY KEY("workspace_id","id"),
-	CONSTRAINT "notification_state" CHECK (("discard_reason" IS NOT NULL) = ("state" = 'Discarded') AND ("accepted_turn_id" IS NOT NULL AND "accepted_at" IS NOT NULL) = ("state" = 'Accepted') AND ("accepted_turn_id" IS NULL) = ("accepted_at" IS NULL) AND ("seen_at" IS NOT NULL) = ("state" = 'Seen') AND ("state" <> 'Accepted' OR "recipient_kind" = 'Agent') AND ("state" <> 'Seen' OR "recipient_kind" = 'Human')),
+	CONSTRAINT "notification_state" CHECK (("discard_reason" IS NOT NULL) = ("state" = 'Discarded') AND ("accepted_by_kind" IS NOT NULL AND "accepted_at" IS NOT NULL) = ("state" = 'Accepted') AND ("accepted_by_kind" IS NULL) = ("accepted_at" IS NULL) AND ("accepted_turn_id" IS NOT NULL) = ("accepted_by_kind" IS NOT DISTINCT FROM 'Turn') AND ("accepted_delivery_id" IS NOT NULL) = ("accepted_by_kind" IS NOT DISTINCT FROM 'Delivery') AND ("accepted_by_kind" IS DISTINCT FROM 'Turn' OR "recipient_kind" = 'Agent') AND ("accepted_by_kind" IS DISTINCT FROM 'Delivery' OR "recipient_kind" = 'Contact') AND ("seen_at" IS NOT NULL) = ("state" = 'Seen') AND ("state" <> 'Seen' OR "recipient_kind" = 'Human')),
 	CONSTRAINT "notification_recipient" CHECK (CASE "recipient_kind" WHEN 'Triage' THEN "recipient_id" IS NULL AND "recipient_member_id" IS NULL WHEN 'Contact' THEN "recipient_id" IS NOT NULL AND "recipient_member_id" IS NULL ELSE "recipient_id" IS NOT NULL AND "recipient_member_id" IS NOT NULL END),
 	CONSTRAINT "notification_thread" CHECK (("thread_id" IS NULL AND "thread_group_id" IS NULL AND "thread_sequence" IS NULL) OR ("thread_id" IS NOT NULL AND "thread_group_id" IS NOT NULL AND "thread_sequence" > 0)),
 	CONSTRAINT "notifications_recipient_kind" CHECK (("recipient_kind" = 'Triage' AND "recipient_id" IS NULL) OR ("recipient_kind" IN ('Human', 'Agent', 'Contact') AND "recipient_id" IS NOT NULL AND "recipient_id" <> ''))
@@ -317,6 +373,8 @@ CREATE TABLE "thread_messages" (
 	"author_contact_id" text,
 	"via_kind" text,
 	"turn_id" text,
+	"channel_id" text,
+	"external_message_id" text,
 	"published_at" timestamp with time zone NOT NULL,
 	"content_kind" text NOT NULL,
 	"text" text,
@@ -326,7 +384,7 @@ CREATE TABLE "thread_messages" (
 	"deleted_at" timestamp with time zone,
 	CONSTRAINT "thread_messages_pkey" PRIMARY KEY("workspace_id","id"),
 	CONSTRAINT "thread_message_author" CHECK (("author_kind" = 'Member' AND "author_member_id" IS NOT NULL AND "author_contact_id" IS NULL) OR ("author_kind" = 'Contact' AND "author_member_id" IS NULL AND "author_contact_id" IS NOT NULL)),
-	CONSTRAINT "thread_message_via" CHECK (("via_kind" IS NULL AND "turn_id" IS NULL) OR ("via_kind" = 'Turn' AND "turn_id" IS NOT NULL)),
+	CONSTRAINT "thread_message_via" CHECK (("via_kind" IS NULL AND "turn_id" IS NULL AND "channel_id" IS NULL AND "external_message_id" IS NULL) OR ("via_kind" = 'Turn' AND "turn_id" IS NOT NULL AND "channel_id" IS NULL AND "external_message_id" IS NULL) OR ("via_kind" = 'Channel' AND "turn_id" IS NULL AND "channel_id" IS NOT NULL AND "external_message_id" IS NOT NULL)),
 	CONSTRAINT "thread_message_content" CHECK (("content_kind" = 'Text' AND "text" IS NOT NULL AND "mentions" IS NOT NULL AND "revision" > 0 AND "deleted_at" IS NULL) OR ("content_kind" = 'Deleted' AND "text" IS NULL AND "mentions" IS NULL AND "revision" IS NULL AND "edited_at" IS NULL AND "deleted_at" IS NOT NULL))
 );
 --> statement-breakpoint
@@ -414,6 +472,9 @@ CREATE TABLE "workspaces" (
 CREATE UNIQUE INDEX "agents_by_member" ON "agents" ("workspace_id","member_id");--> statement-breakpoint
 CREATE INDEX "assignments_by_member" ON "assignments" ("workspace_id","member_id","status");--> statement-breakpoint
 CREATE INDEX "assignments_by_role" ON "assignments" ("workspace_id","role_id","status");--> statement-breakpoint
+CREATE UNIQUE INDEX "channel_bindings_by_conversation" ON "channel_bindings" ("workspace_id","channel_id","conversation_id");--> statement-breakpoint
+CREATE INDEX "channel_deliveries_requested_by_thread" ON "channel_deliveries" ("workspace_id","thread_id","sequence") WHERE "status" = 'requested';--> statement-breakpoint
+CREATE INDEX "channel_deliveries_by_external_message" ON "channel_deliveries" ("workspace_id","channel_id","conversation_id","external_message_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_group_follow" ON "group_follows" ("workspace_id","group_membership_id") WHERE "status" = 'active';--> statement-breakpoint
 CREATE INDEX "group_follows_by_group" ON "group_follows" ("workspace_id","group_id","id" COLLATE "C");--> statement-breakpoint
 CREATE UNIQUE INDEX "active_group_membership" ON "group_memberships" ("workspace_id","group_id","member_id") WHERE "status" = 'active';--> statement-breakpoint

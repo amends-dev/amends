@@ -1,3 +1,4 @@
+export * as ChannelTransport from "./ChannelTransport.ts";
 export * as Connection from "./Connection.ts";
 export * as Integration from "./Integration.ts";
 export * as Integrations from "./Integrations.ts";

@@ -379,7 +379,11 @@ export const turns = (harness: ConformanceHarness) => {
               expect(yield* bound.notifications.get(asked!.id)).toEqual(
                 Option.some(
                   Object.assign({}, asked, {
-                    state: { _tag: "Accepted", turnId: turn.id, acceptedAt: turn.createdAt },
+                    state: {
+                      _tag: "Accepted",
+                      by: { _tag: "Turn", turnId: turn.id },
+                      acceptedAt: turn.createdAt,
+                    },
                   }),
                 ),
               );

@@ -3,7 +3,6 @@ import { Member } from "@amends/core/workspace";
 import { Store } from "@amends/core/journal";
 import { Group } from "@amends/core/group";
 import { Notification, NotificationStore } from "@amends/core/notification";
-import { Turn } from "@amends/core/turn";
 import { and, asc, desc, eq, inArray, lte, sql } from "drizzle-orm";
 import type { PgInsertValue } from "drizzle-orm/pg-core";
 import { Array, DateTime, Effect, Layer, Schema } from "effect";
@@ -72,7 +71,14 @@ const toEncodedRecord = (row: NotificationRow) => ({
     row.state === "Seen"
       ? { _tag: "Seen", seenAt: row.seenAt }
       : row.state === "Accepted"
-        ? { _tag: "Accepted", turnId: row.acceptedTurnId, acceptedAt: row.acceptedAt }
+        ? {
+            _tag: "Accepted",
+            by:
+              row.acceptedByKind === "Turn"
+                ? { _tag: "Turn", turnId: row.acceptedTurnId }
+                : { _tag: "Delivery", deliveryId: row.acceptedDeliveryId },
+            acceptedAt: row.acceptedAt,
+          }
         : row.state === "Discarded"
           ? { _tag: "Discarded", reason: row.discardReason }
           : { _tag: row.state },
@@ -353,12 +359,12 @@ export const make = Effect.fn("Notifications.make")(function* () {
           ON CONFLICT DO NOTHING`),
       ).pipe(Effect.mapError(storeError(NotificationStore, "markSeen")));
     }),
-    accept: Effect.fn("Notifications.accept")(function* (input, turnInput, at) {
+    accept: Effect.fn("Notifications.accept")(function* (input, byInput, at) {
       yield* Store.Transaction;
       const ids = yield* Schema.decodeEffect(Schema.Array(Notification.Id))(input).pipe(
         Effect.mapError(storeConflict(NotificationStore, "accept")),
       );
-      const turnId = yield* Schema.decodeEffect(Turn.Id)(turnInput).pipe(
+      const by = yield* Schema.decodeEffect(Schema.toType(Notification.AcceptedBy))(byInput).pipe(
         Effect.mapError(storeConflict(NotificationStore, "accept")),
       );
       const acceptedAt = yield* Schema.decodeEffect(Schema.toType(Schema.DateTimeUtcFromString))(
@@ -366,7 +372,9 @@ export const make = Effect.fn("Notifications.make")(function* () {
       ).pipe(Effect.mapError(storeConflict(NotificationStore, "accept")));
       const unique = [...new Set(ids)];
       if (unique.length === 0) return;
-      // Check every notification is a pending one of the same agent, then settle them together.
+      // A turn takes pending notifications of one agent; a delivery takes those of contacts. Check
+      // every notification is one, then settle them together.
+      const byTurn = Notification.AcceptedBy.isAnyOf(["Turn"])(by);
       const eligible = yield* guard(
         db
           .select({ id: notifications.id, memberId: notifications.recipientMemberId })
@@ -375,25 +383,29 @@ export const make = Effect.fn("Notifications.make")(function* () {
             and(
               inWorkspace,
               inIds(notifications.id, unique),
-              eq(notifications.recipientKind, "Agent"),
+              eq(notifications.recipientKind, byTurn ? "Agent" : "Contact"),
               eq(notifications.state, "Pending"),
             ),
           ),
       ).pipe(Effect.mapError(storeFailure(NotificationStore, "accept")));
       if (
         eligible.length !== unique.length ||
-        new Set(eligible.map((row) => row.memberId)).size !== 1
+        (byTurn && new Set(eligible.map((row) => row.memberId)).size !== 1)
       )
         return yield* new NotificationStore.Conflict({
           operation: "accept",
-          message: "Expected pending notifications of one agent",
+          message: byTurn
+            ? "Expected pending notifications of one agent"
+            : "Expected pending notifications of contacts",
         });
       yield* guard(
         db
           .update(notifications)
           .set({
             state: "Accepted",
-            acceptedTurnId: turnId,
+            acceptedByKind: by._tag,
+            acceptedTurnId: byTurn ? by.turnId : null,
+            acceptedDeliveryId: byTurn ? null : by.deliveryId,
             acceptedAt: DateTime.toDate(acceptedAt),
           })
           .where(and(inWorkspace, inIds(notifications.id, unique))),

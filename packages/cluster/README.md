@@ -1,15 +1,20 @@
 # Cluster
 
 `@amends/cluster` runs **jobs**: work outside any request that a commit asks for and Effect Cluster
-delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kind of job is the
+delivers, runs, and retries ([core's jobs](../core/README.md#jobs)). Its kinds of job are the
 **turn job**, one for each agent in each thread, which runs the agent's
-[turns](../core/README.md#turns) there on [harness](../harness/README.md). Jobs enter
+[turns](../core/README.md#turns) there on [harness](../harness/README.md), and the **delivery
+job**, one for each thread bound to a [channel](../core/README.md#channels)'s conversation, which
+carries what the thread's contacts were told to the conversation. Jobs enter
 workspaces through the [gateway](../gateway/README.md)'s `inWorkspace`, as any caller without an
 actor does. The [local host](../../hosts/local/README.md) runs them.
 
 | Module                        | What it holds                                                                                                               |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `jobs/turn-job.ts`            | `TurnJob`: the `amends/TurnJob` entity, its `Run` and `Stop` requests, the requests commits store, and the worker for them. |
+| `jobs/delivery-job.ts`        | `DeliveryJob`: the `amends/DeliveryJob` entity, its `Deliver` request, the requests commits store, and the worker for them. |
+| `jobs/requests.ts`            | `JobRequests`: how every job handles a request that fails, tried again until it holds or is dropped.                        |
+| `deliveries/runner.ts`        | `DeliveryRunner`: a bound thread's deliveries, accepted and posted one at a time; see [delivering](#delivering).            |
 | `turns/runner.ts`             | `TurnRunner`: an agent's turns in one thread, run one at a time; see [running a turn](#running-a-turn).                     |
 | `turns/session-log-writer.ts` | `SessionLogWriter`: what a run writes to its participation's session log.                                                   |
 | `turns/agent.ts`              | `TurnAgent`: starting the session of the agent a turn runs, built from what core gives with the host's integrations.        |
@@ -45,13 +50,23 @@ for a job another process runs waits for that process's next read, unless socket
 `TurnJob.layerWorker` registers the entity and handles its requests, and `TurnJob.layer` provides
 both. Every runner over the same storage runs the worker, as Cluster requires of every entity type.
 
-A request that fails is tried again where it is, after `TurnJob.retryDelays`, which doubles from
-two seconds up to five minutes, until it holds or has failed `maxFailures` (eight) times in a row.
-Then a run that accepted a turn gives the turn up, which fails it and is tried until it holds, so a
+A request that fails is tried again where it is, after `JobRequests.retryDelays`, which doubles from
+two seconds up to five minutes, until it holds or has failed `JobRequests.maxFailures` (eight) times
+in a row, as every kind of job does. Then a run that accepted a turn gives the turn up, which fails it and is tried until it holds, so a
 turn never stays active with nothing to run it; any other request is dropped, its work left for the
 next request to find. The request stays unhandled in storage meanwhile, so one cut short as its
 runner shuts down is left to Cluster, which delivers it again, and its tries start over. A request
 whose workspace was never created is dropped at once. Failures are logged.
+
+### Delivery jobs
+
+A delivery job is one bound thread: an entity, `amends/DeliveryJob`, keyed by workspace and thread,
+whose one request, `Deliver`, asks it to carry what the thread's contacts were told to the
+conversation. `DeliveryJob.layerRequests` provides core's `DeliveryJobs.Service`, storing requests
+as `TurnJob`'s does, keyed by the commit; `DeliveryJob.layerWorker` handles them one at a time, so a
+thread's messages reach its conversation in order, and `DeliveryJob.layer` provides both. A request
+that fails is tried again as above; then the delivery its runs could not post is given up, which
+fails it and is tried until it holds, so a delivery never stays requested with nothing to post it.
 
 ### Pruning
 
@@ -61,6 +76,20 @@ older than `keep` (seven days by default), every hour on one runner, through `Cl
 removes neither, and only the host's storage knows how, so the host supplies `prune`. By then a
 request's key no longer needs to stop a repeat, since nothing asks again days later, and requests
 not yet handled are kept however old.
+
+## Delivering
+
+`DeliveryRunner.make(job)` carries one bound thread's messages to its conversation over
+`Gateway.Service` and the host's `Integrations`, each call entering the workspace through the
+gateway for itself. `deliver` asks core's `DeliveryExecution` to `accept` what the thread's contacts
+were told into deliveries, then for each still requested, in the order of the messages: `start` it,
+which answers `Idle` for one no longer requested or failed as it stood, and otherwise `Ready` with
+the text and its author's name, the conversation as the transport needs it, and the channel's
+connection with its key; build the transport from the connection's integration and `post`; and
+`recordSent` with the id the system gave the message, or `recordFailed` when the system refused it.
+A system that cannot be reached (`TransportError` with `isRetryable`) fails the run with the
+delivery it was on, for the job to try again, and `giveUp` fails that delivery once the job stops
+trying. The runner counts the tries it made of each delivery, which the delivery records.
 
 ## Running a turn
 
@@ -128,5 +157,8 @@ with a scripted agent: the log a run writes, drafts, closing, failing, stopping,
 short again, and a run another one replaced; it also checks `advance`, part by part, on its own.
 `test/jobs/turn-job.test.ts` runs the entity on Cluster in memory: a commit's run and stop
 requests, runs that fail and run again, giving a turn up, and a workspace never created.
-`test/jobs/pruning.test.ts` checks that pruning runs every hour for the entity types it is given and
-its own runs.
+`test/jobs/delivery-job.test.ts` runs the delivery entity on Cluster in memory over a fake workspace
+and a scripted transport: deliveries posted in order, a system that cannot be reached tried again
+and the delivery given up once it keeps failing, one the system refuses failed there and then, and a
+workspace never created. `test/jobs/pruning.test.ts` checks that pruning runs every hour for the
+entity types it is given and its own runs.

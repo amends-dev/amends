@@ -31,6 +31,7 @@ const tabs: ReadonlyArray<{ readonly id: ConnectionsTab; readonly label: string 
   { id: "tools", label: capabilityLabels.tools },
   { id: "sandboxes", label: capabilityLabels.sandboxes },
   { id: "harnesses", label: capabilityLabels.harnesses },
+  { id: "channels", label: capabilityLabels.channels },
 ];
 
 export interface ConnectionsPaneProps {
@@ -186,8 +187,8 @@ export function ConnectionList(props: ConnectionListProps) {
             title="No connections yet"
             lines={[
               props.onAdd
-                ? "Connect the models, tools, sandboxes, and harnesses your workspace works with."
-                : "An administrator can connect models, tools, sandboxes, and harnesses for your workspace.",
+                ? "Connect the models, tools, sandboxes, harnesses, and channels your workspace works with."
+                : "An administrator can connect models, tools, sandboxes, harnesses, and channels for your workspace.",
             ]}
           >
             <Show when={props.onAdd}>

@@ -15,6 +15,7 @@ import { WorkspaceId } from "../workspace/id.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { Identity } from "../identity/identity.ts";
 import { Text as Characters } from "../text/text.ts";
+import { ChannelId } from "../channel/ChannelId.ts";
 import { TurnId } from "../turn/id.ts";
 
 /**
@@ -107,13 +108,15 @@ export type Author = typeof Author.Type;
 
 /**
  * How a message came about, when not written in amends: an agent's reply names the turn that
- * posted it, whose log tells how. A message a channel received will name the channel.
+ * posted it, whose log tells how, and a message a channel received names the channel and the id
+ * the external system gave the message.
  *
  * @category schemas
  * @since 0.1.0
  */
 export const Via = Schema.TaggedUnion({
   Turn: { turnId: TurnId.Id },
+  Channel: { channelId: ChannelId.Id, externalMessageId: Schema.NonEmptyString },
 });
 
 /**

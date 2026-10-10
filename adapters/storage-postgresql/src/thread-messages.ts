@@ -36,6 +36,8 @@ const toRecord = ({
   authorContactId,
   viaKind,
   turnId,
+  channelId,
+  externalMessageId,
   contentKind,
   text,
   mentions,
@@ -49,7 +51,12 @@ const toRecord = ({
     authorKind === "Member"
       ? { _tag: authorKind, memberId: authorMemberId }
       : { _tag: authorKind, contactId: authorContactId },
-  via: viaKind === null ? null : { _tag: viaKind, turnId },
+  via:
+    viaKind === null
+      ? null
+      : viaKind === "Turn"
+        ? { _tag: viaKind, turnId }
+        : { _tag: viaKind, channelId, externalMessageId },
   content:
     contentKind === "Text"
       ? { _tag: contentKind, text, mentions, revision, editedAt }
@@ -61,8 +68,19 @@ const authorColumns = (
   ThreadMessage.Author.isAnyOf(["Member"])(author)
     ? { authorKind: "Member", authorMemberId: author.memberId, authorContactId: null }
     : { authorKind: "Contact", authorMemberId: null, authorContactId: author.contactId };
-const viaColumns = (via: ThreadMessage.Via | null): Pick<Insert, "viaKind" | "turnId"> =>
-  via === null ? { viaKind: null, turnId: null } : { viaKind: "Turn", turnId: via.turnId };
+const viaColumns = (
+  via: ThreadMessage.Via | null,
+): Pick<Insert, "viaKind" | "turnId" | "channelId" | "externalMessageId"> =>
+  via === null
+    ? { viaKind: null, turnId: null, channelId: null, externalMessageId: null }
+    : ThreadMessage.Via.isAnyOf(["Turn"])(via)
+      ? { viaKind: "Turn", turnId: via.turnId, channelId: null, externalMessageId: null }
+      : {
+          viaKind: "Channel",
+          turnId: null,
+          channelId: via.channelId,
+          externalMessageId: via.externalMessageId,
+        };
 const contentColumns = (
   content: ThreadMessage.Content,
 ): Pick<Insert, "contentKind" | "text" | "mentions" | "revision" | "editedAt" | "deletedAt"> =>

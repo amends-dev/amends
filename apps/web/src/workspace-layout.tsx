@@ -584,7 +584,7 @@ function AgentsSidebar(props: { readonly workspaceId: string }) {
 }
 
 /**
- * The Connections sidebar: the connections that give models, tools, sandboxes, and harnesses,
+ * The Connections sidebar: the connections that give models, tools, sandboxes, harnesses, and channels,
  * each marked when its integration refuses its setup. A connection whose integration this host no
  * longer installs gives none of them, so it shows only in the full list. A section's title and
  * Browse open the list of that capability; its + opens Add connection over the current page for
@@ -628,7 +628,7 @@ function ConnectionsSidebar(props: { readonly workspaceId: string }) {
   });
   return (
     <DestinationSidebar
-      sections={(["models", "tools", "sandboxes", "harnesses"] as const).map(section)}
+      sections={(["models", "tools", "sandboxes", "harnesses", "channels"] as const).map(section)}
     />
   );
 }

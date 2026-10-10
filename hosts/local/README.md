@@ -81,8 +81,10 @@ holds one of the pool's connections for its shard locks. Every hour, one runner 
 requests handled more than seven days ago.
 
 The host runs [turn jobs](../../packages/core/README.md#jobs) as
-[cluster](../../packages/cluster/README.md)'s `TurnJob`, entering workspaces through its gateway,
-and builds each turn's harness, model, and sandbox from the integrations it installs.
+[cluster](../../packages/cluster/README.md)'s `TurnJob`, and delivery jobs as its `DeliveryJob`,
+entering workspaces through its gateway, and builds each turn's harness, model, and sandbox, and
+each delivery's channel transport, from the integrations it installs. None of them gives channels
+yet, so no channel can be created on this host until one does.
 
 Several host processes can serve one database, each with its own `AMENDS_RUNNER_ADDRESS`: they
 share out the jobs, and when one stops answering, the others take its
@@ -117,15 +119,15 @@ Different web origins require a same-origin proxy or an explicit host CORS chang
 Follow the [host conventions](../README.md). Each implementation owns its
 constructor and layer; related authentication modules share one directory.
 
-| Module                             | Responsibility                                                                                                                                                                                                                                                      |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                  |
-| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                        |
-| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                               |
-| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                 |
-| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with turn jobs and job pruning, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `makeIntegrations` is what workspaces connect to. |
-| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                            |
-| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                  |
+| Module                             | Responsibility                                                                                                                                                                                                                                                                   |
+| ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/sign-in.ts`        | `DevelopmentSignIn.make(deliver?)` and `layer(deliver?)`, with pending-code state per acquisition.                                                                                                                                                                               |
+| `authentication/session-tokens.ts` | `DevelopmentSessionTokens.make()` and `layer`, resolving asserted human IDs.                                                                                                                                                                                                     |
+| `authentication/authentication.ts` | `DevelopmentAuthentication.layer(deliver?)`, composing both services.                                                                                                                                                                                                            |
+| `config.ts`                        | `LocalConfig.load()`, validating the port, database URL, and pool size before resource acquisition.                                                                                                                                                                              |
+| `host.ts`                          | `LocalHost.layer(url, options?)`, providing the gateway and workspace directory over PostgreSQL, with turn and delivery jobs and job pruning, as a `HostLayer`; `layerDatabase` is the database and the cluster over its pool; `makeIntegrations` is what workspaces connect to. |
+| `server.ts`                        | `LocalServer.layerRoutes` for routes and documentation; `layer(host, port)` adds authentication and the Bun HTTP server.                                                                                                                                                         |
+| `index.ts`                         | Load configuration, build the host layer, and launch through `BunRuntime.runMain`.                                                                                                                                                                                               |
 
 Importing any module other than the execution entry point does not read
 configuration or start the application. Sign-in construction requires

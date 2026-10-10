@@ -1,3 +1,5 @@
+import { Channel, ChannelIntake, ChannelService } from "@amends/core/channel";
+import { Connection } from "@amends/core/connection";
 import { Request } from "@amends/core/request";
 import { BuiltinRoles } from "@amends/core/authorization";
 import { expect, it } from "@effect/vitest";
@@ -195,8 +197,42 @@ const conversations = Layer.mergeAll(
     }),
   ),
 );
+/** Channel services record their inputs; intake answers what the system is to be told. */
+const channelId = Channel.Id.make("channel-one");
+const channels = Layer.mergeAll(
+  Layer.succeed(
+    ChannelService.Service,
+    ChannelService.Service.of({
+      list: Effect.suspend(() => {
+        calls.push({ operation: "channel.list", arguments: [] });
+        return Effect.succeed([]);
+      }),
+      create: record("channel.create", (input) =>
+        Effect.fail(new ChannelService.ConnectionUnavailable({ connectionId: input.connectionId })),
+      ),
+      get: record("channel.get", (id) =>
+        Effect.fail(new ChannelService.NotFound({ channelId: id })),
+      ),
+      redirect: record("channel.redirect", (input) =>
+        Effect.fail(new ChannelService.GroupNotFound({ groupId: input.groupId })),
+      ),
+      remove: record("channel.remove", () => Effect.void),
+      getBinding: record("channel.binding", (id) =>
+        Effect.fail(new ChannelService.NotBound({ threadId: id })),
+      ),
+    }),
+  ),
+  Layer.succeed(
+    ChannelIntake.Service,
+    ChannelIntake.Service.of({
+      receive: record("channel.receive", () => Effect.succeed({ answer: "ack", intakes: [] })),
+      intake: () => Effect.die("unused"),
+    }),
+  ),
+);
 const operations = Layer.mergeAll(
   conversations,
+  channels,
   Layer.succeed(
     NotificationService.Service,
     NotificationService.Service.of({
@@ -352,6 +388,8 @@ const makeClient = HttpApiTest.groups(Api, [
   "notifications",
   "groups",
   "threads",
+  "channels",
+  "channelEvents",
 ]);
 it.effect("the inbox route decodes its cursor and passes the page to the application", () =>
   Effect.gen(function* () {
@@ -800,6 +838,76 @@ it.effect(
           arguments: [{ threadId, change: { _tag: "Status", from: "triage", to: "todo" } }],
         },
         { operation: "notification.markSeen", arguments: [notification.id] },
+      ]);
+    }),
+);
+
+it.effect(
+  "channel routes pass path parameters and request keys into core inputs, and what a system sends reaches intake as text",
+  () =>
+    Effect.gen(function* () {
+      calls.length = 0;
+      const connectionId = Connection.Id.make("connection-one");
+      const key = Request.Key.make("channel-1");
+      const statuses = yield* run("alice", (client) =>
+        Effect.all([
+          client.channels.list({ params: { workspaceId }, responseMode: "response-only" }),
+          client.channels.create({
+            params: { workspaceId },
+            headers: { "idempotency-key": key },
+            payload: { connectionId, groupId, name: "Support", opensTasks: true },
+            responseMode: "response-only",
+          }),
+          client.channels.get({
+            params: { workspaceId, channelId },
+            responseMode: "response-only",
+          }),
+          client.channels.redirect({
+            params: { workspaceId, channelId },
+            payload: { groupId },
+            responseMode: "response-only",
+          }),
+          client.channels.remove({
+            params: { workspaceId, channelId },
+            responseMode: "response-only",
+          }),
+          client.channels.binding({
+            params: { workspaceId, threadId },
+            responseMode: "response-only",
+          }),
+        ]).pipe(Effect.map((responses) => responses.map((response) => response.status))),
+      );
+      expect(statuses).toEqual([200, 422, 404, 404, 204, 404]);
+      // The system's request needs no session; its body and headers go to intake as they came.
+      const answer = yield* run("", (client) =>
+        client.channelEvents.receive({
+          params: { workspaceId, channelId },
+          payload: '{"events":[]}',
+        }),
+      );
+      expect(answer).toBe("ack");
+      expect(
+        calls.filter((call) => call.operation !== "asMember" && call.operation !== "inWorkspace"),
+      ).toMatchObject([
+        { operation: "channel.list", arguments: [] },
+        {
+          operation: "channel.create",
+          arguments: [
+            { connectionId, groupId, name: "Support", opensTasks: true },
+            { requestKey: key },
+          ],
+        },
+        { operation: "channel.get", arguments: [channelId] },
+        { operation: "channel.redirect", arguments: [{ channelId, groupId }] },
+        { operation: "channel.remove", arguments: [channelId] },
+        { operation: "channel.binding", arguments: [threadId] },
+        {
+          operation: "channel.receive",
+          arguments: [
+            channelId,
+            { body: '{"events":[]}', headers: { "content-type": "text/plain" } },
+          ],
+        },
       ]);
     }),
 );

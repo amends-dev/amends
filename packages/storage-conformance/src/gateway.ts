@@ -1,4 +1,5 @@
 import { AgentPermissions } from "@amends/core/agent";
+import { ChannelPermissions } from "@amends/core/channel";
 import { ConnectionPermissions } from "@amends/core/connection";
 import { TaskPermissions } from "@amends/core/task";
 import { TurnExecution } from "@amends/core/turn";
@@ -128,6 +129,7 @@ export const gateway = (harness: Harness) => {
                     ConnectionPermissions.Read.name,
                     ConnectionPermissions.Use.name,
                     AgentPermissions.Read.name,
+                    ChannelPermissions.Read.name,
                   ],
                 }),
               );
@@ -171,6 +173,9 @@ export const gateway = (harness: Harness) => {
                       AgentPermissions.Create.name,
                       AgentPermissions.Read.name,
                       AgentPermissions.Configure.name,
+                      ChannelPermissions.Create.name,
+                      ChannelPermissions.Read.name,
+                      ChannelPermissions.Manage.name,
                     ],
                   }),
                 );
