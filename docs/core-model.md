@@ -37,6 +37,10 @@ participation's session log, and closes each turn by posting the agent's answer;
 [core's turns](../packages/core/README.md#turns) and [cluster](../packages/cluster/README.md).
 Other participation management, the task and channel workflows that admit contacts and triage,
 toolkits, contact/triage acknowledgment, and channel delivery below remain design intent.
+[Threads](threads.md) fixes the model that conversations, tasks, and channel conversations
+share: the thread record with its title and origin, messages and their editing, tasks and
+channel bindings as rows keyed by thread, and the recipients of each activity kind. Where it
+differs from the task and channel sections below, it governs.
 “Agreed” records a design decision, not its implementation status.
 
 ## Architecture summary

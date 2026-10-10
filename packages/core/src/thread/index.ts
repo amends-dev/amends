@@ -1,63 +1,270 @@
-export { ThreadId } from "./id.ts";
+/**
+ * Threads: one conversation in exactly one group, with participants and an ordered timeline of
+ * typed activity. `Thread`, `ThreadMessage`, and `ThreadParticipation` are the records;
+ * `ThreadActivity` and `ThreadActivityKind` the timeline and how domains add kinds to it;
+ * `ThreadService`, `ThreadMessageService`, and `ThreadParticipationService` the operations an
+ * actor calls; `ThreadQuery` and `ThreadCommand` the reads and writes other domains share; and the
+ * stores the contracts every storage adapter implements.
+ *
+ * @since 0.1.0
+ */
 
-export { Thread } from "./thread.ts";
+/**
+ * A thread's record, the views lists show of it, and the inputs that start one.
+ *
+ * @since 0.1.0
+ */
+export { Thread } from "./Thread.ts";
 
-export { ThreadFacts } from "./facts.ts";
+/**
+ * One item of a thread's timeline, in the shape every kind shares, and the recipients recorded
+ * with it.
+ *
+ * @since 0.1.0
+ */
+export { ThreadActivity } from "./ThreadActivity.ts";
 
-export { ThreadStore } from "./store.ts";
+/**
+ * The one fact every kind of activity is recorded with.
+ *
+ * @since 0.1.0
+ */
+export { ThreadActivityFacts } from "./ThreadActivityFacts.ts";
 
-export { ThreadProjection } from "./projection.ts";
+/**
+ * How a domain defines a kind of activity, and how activity of that kind is recorded and read.
+ *
+ * @since 0.1.0
+ */
+export { ThreadActivityKind } from "./ThreadActivityKind.ts";
 
-export { ThreadMessage } from "./message/message.ts";
+/**
+ * The projection that keeps a thread's timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadActivityProjection } from "./ThreadActivityProjection.ts";
 
-export { ThreadMessageService } from "./message/service.ts";
+/**
+ * How recorded activity becomes timeline items: one resolver per domain, routed by kind.
+ *
+ * @since 0.1.0
+ */
+export { ThreadActivityResolvers } from "./ThreadActivityResolvers.ts";
 
-export { ThreadMessagePermissions } from "./message/permissions.ts";
+/**
+ * The storage contract for activity.
+ *
+ * @since 0.1.0
+ */
+export { ThreadActivityStore } from "./ThreadActivityStore.ts";
 
-export { ThreadMessageFacts } from "./message/facts.ts";
+/**
+ * The writes to threads that operations share, run inside the caller's commit.
+ *
+ * @since 0.1.0
+ */
+export { ThreadCommand } from "./ThreadCommand.ts";
 
-export { ThreadMessageStore } from "./message/store.ts";
+/**
+ * The outcomes `ThreadService` reports that a caller can act on.
+ *
+ * @since 0.1.0
+ */
+export { ThreadErrors } from "./ThreadErrors.ts";
 
-export { ThreadMessageProjection } from "./message/projection.ts";
+/**
+ * The facts recorded about a thread itself.
+ *
+ * @since 0.1.0
+ */
+export { ThreadFacts } from "./ThreadFacts.ts";
 
-export { ThreadParticipation } from "./participation/participation.ts";
+/**
+ * The identity of a thread.
+ *
+ * @since 0.1.0
+ */
+export { ThreadId } from "./ThreadId.ts";
 
-export { ThreadParticipationService } from "./participation/service.ts";
+/**
+ * A message: markdown written by a member or a contact, and whom it addresses.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessage } from "./ThreadMessage.ts";
 
-export { ThreadParticipationPermissions } from "./participation/permissions.ts";
+/**
+ * The kind of activity a message records in its thread's timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageActivity } from "./ThreadMessageActivity.ts";
 
-export { ThreadParticipationFacts } from "./participation/facts.ts";
+/**
+ * The outcomes `ThreadMessageService` reports that a caller can act on.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageErrors } from "./ThreadMessageErrors.ts";
 
-export { ThreadParticipationStore } from "./participation/store.ts";
+/**
+ * The facts recorded about messages.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageFacts } from "./ThreadMessageFacts.ts";
 
-export { ThreadParticipationProjection } from "./participation/projection.ts";
+/**
+ * The identity of a message.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageId } from "./ThreadMessageId.ts";
 
-export { ThreadActivity } from "./activity/activity.ts";
+/**
+ * The action on messages that needs a grant.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessagePermissions } from "./ThreadMessagePermissions.ts";
 
-export { ThreadActivityKind } from "./activity/kind.ts";
+/**
+ * The projection that keeps the message read model.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageProjection } from "./ThreadMessageProjection.ts";
 
-export { ThreadActivityResolvers } from "./activity/resolvers.ts";
+/**
+ * The operations on messages an actor calls: replying, and saying one is typing.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageService } from "./ThreadMessageService.ts";
 
-export { ThreadMessageActivity } from "./message/activity.ts";
+/**
+ * The storage contract for messages.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageStore } from "./ThreadMessageStore.ts";
 
-export { ThreadMessageTimeline } from "./message/timeline.ts";
+/**
+ * How messages appear in a timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadMessageTimeline } from "./ThreadMessageTimeline.ts";
 
-export { ThreadParticipationActivity } from "./participation/activity.ts";
+/**
+ * Who takes part in a thread, and from where in it.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipation } from "./ThreadParticipation.ts";
 
-export { ThreadParticipationTimeline } from "./participation/timeline.ts";
+/**
+ * The kinds of activity participation records in a thread's timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationActivity } from "./ThreadParticipationActivity.ts";
 
-export { ThreadTimeline } from "./timeline.ts";
+/**
+ * The outcomes `ThreadParticipationService` reports that a caller can act on.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationErrors } from "./ThreadParticipationErrors.ts";
 
-export { ThreadActivityFacts } from "./activity/facts.ts";
+/**
+ * The facts recorded about participations.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationFacts } from "./ThreadParticipationFacts.ts";
 
-export { ThreadActivityStore } from "./activity/store.ts";
+/**
+ * The identity of a participation.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationId } from "./ThreadParticipationId.ts";
 
-export { ThreadActivityProjection } from "./activity/projection.ts";
+/**
+ * The action on participation that needs a grant.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationPermissions } from "./ThreadParticipationPermissions.ts";
 
-export { ThreadService } from "./service.ts";
+/**
+ * The projection that keeps the participation read model.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationProjection } from "./ThreadParticipationProjection.ts";
 
-export { ThreadCommand } from "./command.ts";
+/**
+ * The operations on participation an actor calls: following and unfollowing.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationService } from "./ThreadParticipationService.ts";
 
-export { ThreadQuery } from "./query.ts";
+/**
+ * The storage contract for participations.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationStore } from "./ThreadParticipationStore.ts";
 
-export { ThreadPermissions } from "./permissions.ts";
+/**
+ * How participation appears in a timeline.
+ *
+ * @since 0.1.0
+ */
+export { ThreadParticipationTimeline } from "./ThreadParticipationTimeline.ts";
+
+/**
+ * The actions on a thread that need a grant: starting one, and reading one.
+ *
+ * @since 0.1.0
+ */
+export { ThreadPermissions } from "./ThreadPermissions.ts";
+
+/**
+ * The projection that keeps the thread read model.
+ *
+ * @since 0.1.0
+ */
+export { ThreadProjection } from "./ThreadProjection.ts";
+
+/**
+ * The reads of threads that operations share.
+ *
+ * @since 0.1.0
+ */
+export { ThreadQuery } from "./ThreadQuery.ts";
+
+/**
+ * The operations on threads an actor calls: starting and reading them.
+ *
+ * @since 0.1.0
+ */
+export { ThreadService } from "./ThreadService.ts";
+
+/**
+ * The storage contract for threads.
+ *
+ * @since 0.1.0
+ */
+export { ThreadStore } from "./ThreadStore.ts";
+
+/**
+ * The closed set of timeline items, for protocols that encode timelines.
+ *
+ * @since 0.1.0
+ */
+export { ThreadTimeline } from "./ThreadTimeline.ts";

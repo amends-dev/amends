@@ -1,5 +1,5 @@
 import { Schema } from "effect";
-import { ThreadTimeline } from "../thread/timeline.ts";
+import { ThreadTimeline } from "../thread/ThreadTimeline.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 

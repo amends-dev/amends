@@ -2,7 +2,7 @@ import { Context, Schema } from "effect";
 import { Agent } from "../agent/agent.ts";
 import type { Effect, Option } from "effect";
 import type { Store } from "../journal/store.ts";
-import type { ThreadParticipationId } from "../thread/participation/id.ts";
+import type { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 
 export class Failure extends Schema.TaggedError<Failure>()("SessionStateStore.Failure", {
   operation: Schema.String,

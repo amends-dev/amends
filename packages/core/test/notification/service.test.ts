@@ -1,4 +1,4 @@
-import { ThreadQuery } from "../../src/thread/query.ts";
+import { ThreadQuery } from "../../src/thread/ThreadQuery.ts";
 import { Publication } from "../../src/journal/publication.ts";
 import { testProvenance } from "../publication.ts";
 import { expect, expectTypeOf, it } from "@effect/vitest";

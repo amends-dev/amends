@@ -59,6 +59,9 @@ drawings, generation, and visual review in the UI workshop.
   [Change feed](change-feed.md) covers the client, invalidation, and reconnection.
 - [Core model](core-model.md) is living design intent, not a description of the
   implementation; [known limitations](current-status.md) lists what is not built yet.
+  [Threads](threads.md) fixes the thread model that conversations, tasks, and channel
+  conversations share: the thread record, messages and their editing, tasks and channel
+  bindings as rows on threads, and what changes to implement it.
 - [Design-system references](../design-system/) are product and visual mocks, not
   implemented API schemas. [Token sync](../design-system/sync/README.md) explains the
   historical handoff and points to the current token and style modules.

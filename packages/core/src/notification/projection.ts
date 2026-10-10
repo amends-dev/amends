@@ -1,9 +1,9 @@
 import { Effect } from "effect";
 import { GroupMembershipFacts } from "../group/membership/facts.ts";
 import { Projection } from "../journal/projection.ts";
-import { ThreadActivityFacts } from "../thread/activity/facts.ts";
-import { ThreadActivityKind } from "../thread/activity/kind.ts";
-import { ThreadParticipationActivity } from "../thread/participation/activity.ts";
+import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
+import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
+import { ThreadParticipationActivity } from "../thread/ThreadParticipationActivity.ts";
 import { TurnFacts } from "../turn/facts.ts";
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";

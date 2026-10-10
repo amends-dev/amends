@@ -4,8 +4,8 @@ import { Identity } from "../identity/identity.ts";
 import { Entry } from "../journal/entry.ts";
 import { WorkspaceId } from "../workspace/id.ts";
 import { GroupId } from "../group/id.ts";
-import { ThreadId } from "../thread/id.ts";
-import { ThreadParticipationId } from "../thread/participation/id.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
+import { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { TurnId } from "../turn/id.ts";
 

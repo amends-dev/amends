@@ -4,7 +4,7 @@ import { Group } from "../../src/group/group.ts";
 import { GroupMembership } from "../../src/group/membership/membership.ts";
 import { Scope } from "../../src/authorization/scope.ts";
 import { Target } from "../../src/authorization/target.ts";
-import { ThreadId } from "../../src/thread/id.ts";
+import { ThreadId } from "../../src/thread/ThreadId.ts";
 import { WorkspaceId } from "../../src/workspace/id.ts";
 import { Member } from "../../src/workspace/member/member.ts";
 

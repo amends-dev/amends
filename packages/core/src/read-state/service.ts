@@ -5,10 +5,10 @@ import { Requirement } from "../authorization/requirement.ts";
 import { GroupQuery } from "../group/query.ts";
 import { GroupPermissions } from "../group/permissions.ts";
 import { Actor } from "../identity/actor.ts";
-import { ThreadQuery } from "../thread/query.ts";
+import { ThreadQuery } from "../thread/ThreadQuery.ts";
 
-import { ThreadActivityStore } from "../thread/activity/store.ts";
-import { ThreadPermissions } from "../thread/permissions.ts";
+import { ThreadActivityStore } from "../thread/ThreadActivityStore.ts";
+import { ThreadPermissions } from "../thread/ThreadPermissions.ts";
 
 import { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";

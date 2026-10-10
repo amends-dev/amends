@@ -3,7 +3,7 @@ import { describe, expect, it } from "@effect/vitest";
 import { DateTime } from "effect";
 import { Prompt } from "effect/ai";
 import { SessionLog } from "../../src/turn/session-log.ts";
-import { ThreadMessage } from "../../src/thread/message/message.ts";
+import { ThreadMessage } from "../../src/thread/ThreadMessage.ts";
 import { Turn } from "../../src/turn/turn.ts";
 
 const at = DateTime.makeUnsafe("2026-10-06T12:00:00.000Z");

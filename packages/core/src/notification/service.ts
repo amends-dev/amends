@@ -4,13 +4,13 @@ import { Actor } from "../identity/actor.ts";
 import { Event } from "../journal/event.ts";
 import { Journal } from "../journal/journal.ts";
 import type { Log } from "../journal/log.ts";
-import { ThreadActivityFacts } from "../thread/activity/facts.ts";
-import { ThreadQuery } from "../thread/query.ts";
+import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
+import { ThreadQuery } from "../thread/ThreadQuery.ts";
 
 import { Notification } from "./notification.ts";
 import { NotificationStore } from "./store.ts";
 import { NotificationInbox } from "./inbox.ts";
-import type { Thread } from "../thread/thread.ts";
+import type { Thread } from "../thread/Thread.ts";
 import { Signal } from "../signal/signal.ts";
 import { SignalHub } from "../signal/hub.ts";
 import { AlreadyHandled, HumanRecipientRequired, NotFound } from "./errors.ts";

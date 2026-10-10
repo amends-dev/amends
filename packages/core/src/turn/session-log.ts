@@ -8,7 +8,7 @@
 import { Session, StreamPart } from "@amends/harness";
 import { Schema } from "effect";
 import { Prompt } from "effect/ai";
-import type { ThreadMessageId } from "../thread/message/id.ts";
+import type { ThreadMessageId } from "../thread/ThreadMessageId.ts";
 import { Turn } from "./turn.ts";
 
 export const Entry = Schema.TaggedUnion({

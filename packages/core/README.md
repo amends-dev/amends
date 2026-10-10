@@ -669,6 +669,14 @@ Inside core, import the owning leaf module directly. Each leaf establishes its
 canonical ES module namespace with a self-export, and public barrels relay those
 names. Avoid importing an aggregate barrel from an internal module.
 
+The thread feature is written as the published packages are, and the other domains
+follow when touched: one module per namespace, named after it and flat in the feature
+directory (`thread/ThreadMessageService.ts` exports `ThreadMessageService`), with
+helpers no consumer imports under `internal/`; a header paragraph and `@since` on every
+module; `@category` and `@since` on every export, documented one by one; and a service
+key that names its module, `@amends/core/thread/ThreadStore`. The categories and the
+rest of the convention are in [threads](../../docs/threads.md#code-conventions).
+
 ```ts
 // Inside the member feature:
 import { MemberStore } from "./store.ts";

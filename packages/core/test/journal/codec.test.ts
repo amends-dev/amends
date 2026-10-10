@@ -2,7 +2,7 @@ import { expect, it } from "@effect/vitest";
 import { Effect, Result, Schema } from "effect";
 import { Hex } from "effect/encoding";
 import { Codec } from "../../src/journal/codec.ts";
-import { ThreadMessageFacts } from "../../src/thread/message/facts.ts";
+import { ThreadMessageFacts } from "../../src/thread/ThreadMessageFacts.ts";
 import { WorkspaceFacts } from "../../src/workspace/facts.ts";
 import { fixtures } from "./codec-fixtures.ts";
 

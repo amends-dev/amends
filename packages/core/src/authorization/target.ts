@@ -1,6 +1,6 @@
 import { Record, Schema } from "effect";
 import { Connection } from "../connection/connection.ts";
-import { ThreadId } from "../thread/id.ts";
+import { ThreadId } from "../thread/ThreadId.ts";
 import { GroupId } from "../group/id.ts";
 import { Member } from "../workspace/member/member.ts";
 import { Workspace } from "../workspace/workspace.ts";

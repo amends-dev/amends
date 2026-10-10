@@ -1,8 +1,8 @@
 import { Effect, Schema } from "effect";
-import type { Thread } from "../thread/thread.ts";
-import type { ThreadActivity } from "../thread/activity/activity.ts";
-import { ThreadActivityKind } from "../thread/activity/kind.ts";
-import { ThreadActivityResolvers } from "../thread/activity/resolvers.ts";
+import type { Thread } from "../thread/Thread.ts";
+import type { ThreadActivity } from "../thread/ThreadActivity.ts";
+import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
+import { ThreadActivityResolvers } from "../thread/ThreadActivityResolvers.ts";
 import { TurnActivity } from "./activity.ts";
 
 /** A turn accepted here: where its row shows. */
@@ -22,7 +22,7 @@ type Created = CreatedItem;
 type Started = StartedItem;
 type Stopping = StoppingItem;
 type Ended = EndedItem;
-declare module "../thread/activity/kind.ts" {
+declare module "../thread/ThreadActivityKind.ts" {
   interface Items {
     "turn.created": Created;
     "turn.started": Started;

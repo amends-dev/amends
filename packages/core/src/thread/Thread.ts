@@ -1,0 +1,298 @@
+/**
+ * A thread is one conversation in exactly one group, with participants and an ordered timeline of
+ * typed activity. This module holds its record, the views a group's lists show of it, and the
+ * inputs of the operations that start one; `ThreadService` is those operations. The messages,
+ * participations, and activity hang off the thread by its ID, in modules of their own.
+ *
+ * @since 0.1.0
+ */
+import { DateTime, Schema } from "effect";
+import { GroupId } from "../group/id.ts";
+import { WorkspaceId } from "../workspace/id.ts";
+import { MemberId } from "../workspace/member/id.ts";
+import { ThreadId } from "./ThreadId.ts";
+import { ThreadMessage } from "./ThreadMessage.ts";
+import type { ThreadActivityKind } from "./ThreadActivityKind.ts";
+
+/**
+ * Names a thread; `ThreadId.Id`, where models that only refer to threads import it from.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Id = ThreadId.Id;
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export type Id = ThreadId.Id;
+
+/**
+ * A thread as created. Its group, which never changes, is whose members may read it.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Record = Schema.Struct({
+  id: Id,
+  workspaceId: WorkspaceId.Id,
+  groupId: GroupId.Id,
+  /** Who started the conversation: a member, or the contact whose message a channel received. */
+  createdBy: ThreadMessage.Author,
+  createdAt: Schema.DateTimeUtcFromString,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Record extends Schema.Schema.Type<typeof Record> {}
+
+/**
+ * A thread's latest content activity: the timeline position and time of its latest message.
+ * Quiet participation changes do not count, so they never make a thread unread.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Latest = Schema.Struct({
+  threadId: ThreadId.Id,
+  sequence: Schema.Int.check(Schema.isGreaterThan(0)),
+  occurredAt: Schema.DateTimeUtcFromString,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Latest extends Schema.Schema.Type<typeof Latest> {}
+
+/**
+ * Exclusive boundary for listing a group's threads by latest activity, newest first: the last
+ * listed thread's latest activity time and ID.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const ListCursor = Schema.Struct({
+  latestActivityAt: Latest.fields.occurredAt,
+  threadId: ThreadId.Id,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface ListCursor extends Schema.Schema.Type<typeof ListCursor> {}
+
+/**
+ * One page of a group's threads by latest activity: at most `limit`, after the exclusive `before`
+ * cursor, or the newest without one.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const ListOptions = Schema.Struct({
+  before: Schema.optionalKey(ListCursor),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface ListOptions extends Schema.Schema.Type<typeof ListOptions> {}
+
+/**
+ * A readable thread with its latest activity and the reader's position. `unread` holds when the
+ * latest message is past the position or, for a thread never read, came after the reader joined.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const ListItem = Schema.Struct({
+  thread: Record,
+  latest: Latest,
+  readThrough: Schema.NullOr(Latest.fields.sequence),
+  unread: Schema.Boolean,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface ListItem extends Schema.Schema.Type<typeof ListItem> {}
+
+/**
+ * Whether a thread whose latest message is `latest` is unread by a reader who read through
+ * `readThrough`, or, having never read it, joined its group at `admittedAt`: a thread never read
+ * is new only if its latest message came after the reader joined.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const isUnread = (
+  latest: Latest,
+  readThrough: number | null,
+  admittedAt: DateTime.Utc,
+): boolean =>
+  readThrough === null
+    ? DateTime.isGreaterThan(latest.occurredAt, admittedAt)
+    : latest.sequence > readThrough;
+
+/**
+ * `thread` as a reader lists it, who read through `readThrough` and joined at `admittedAt`.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const listItem = (
+  thread: Record,
+  latest: Latest,
+  readThrough: number | null,
+  admittedAt: DateTime.Utc,
+): ListItem => ({ thread, latest, readThrough, unread: isUnread(latest, readThrough, admittedAt) });
+
+/**
+ * Exclusive boundary for paging a group's threads by when they started, newest first: the last
+ * listed thread's creation time and ID.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const OpeningCursor = Schema.Struct({
+  createdAt: Record.fields.createdAt,
+  threadId: ThreadId.Id,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface OpeningCursor extends Schema.Schema.Type<typeof OpeningCursor> {}
+
+/**
+ * One page of a group's threads by when they started: at most `limit`, after the exclusive
+ * `before` cursor, or the newest without one.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const OpeningOptions = Schema.Struct({
+  before: Schema.optionalKey(OpeningCursor),
+  limit: Schema.Int.check(Schema.isGreaterThan(0)),
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface OpeningOptions extends Schema.Schema.Type<typeof OpeningOptions> {}
+
+/**
+ * A readable thread as its group's stream shows it: the message that opened it, how many replies
+ * followed, its latest message, and the reader's position, with `unread` as in `ListItem`.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Opening = Schema.Struct({
+  thread: Record,
+  message: ThreadMessage.Record,
+  replies: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  latest: Latest,
+  readThrough: ListItem.fields.readThrough,
+  unread: Schema.Boolean,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Opening extends Schema.Schema.Type<typeof Opening> {}
+
+/**
+ * A listed thread as its group's stream shows it, with its opening `message` and `replies`.
+ *
+ * @category utils
+ * @since 0.1.0
+ */
+export const opening = (
+  item: ListItem,
+  message: ThreadMessage.Record,
+  replies: number,
+): Opening => ({
+  thread: item.thread,
+  message,
+  replies,
+  latest: item.latest,
+  readThrough: item.readThrough,
+  unread: item.unread,
+});
+
+/**
+ * What starts a thread in a group: the opening message and whom it mentions.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const StartInGroupInput = Schema.Struct({
+  groupId: GroupId.Id,
+  text: ThreadMessage.Text,
+  mentions: Schema.UniqueArray(MemberId.Id),
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface StartInGroupInput extends Schema.Schema.Type<typeof StartInGroupInput> {}
+
+/**
+ * What starts a thread in a direct group: the other members of the group, which the author always
+ * belongs to, and the opening message.
+ *
+ * @category options
+ * @since 0.1.0
+ */
+export const StartDirectInput = Schema.Struct({
+  memberIds: Schema.UniqueArray(MemberId.Id).check(Schema.isMinLength(1)),
+  text: ThreadMessage.Text,
+  mentions: Schema.UniqueArray(MemberId.Id),
+});
+
+/**
+ * @category options
+ * @since 0.1.0
+ */
+export interface StartDirectInput extends Schema.Schema.Type<typeof StartDirectInput> {}
+
+/**
+ * What a start returns: the thread and its opening message.
+ *
+ * @category schemas
+ * @since 0.1.0
+ */
+export const Started = Schema.Struct({
+  thread: Record,
+  message: ThreadMessage.Record,
+});
+
+/**
+ * @category schemas
+ * @since 0.1.0
+ */
+export interface Started extends Schema.Schema.Type<typeof Started> {}
+
+/**
+ * One resolved timeline item: an activity with the records it references. Each domain that records
+ * activity adds its kinds' items, so this covers every registered kind; `ThreadTimeline.Item` is
+ * its schema.
+ *
+ * @category models
+ * @since 0.1.0
+ */
+export type TimelineItem = ThreadActivityKind.Item;
+
+export * as Thread from "./Thread.ts";

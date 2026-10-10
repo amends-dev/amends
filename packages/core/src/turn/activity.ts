@@ -1,7 +1,7 @@
 import { Schema } from "effect";
 import { Subject } from "../journal/subject.ts";
-import { ThreadActivityKind } from "../thread/activity/kind.ts";
-import { ThreadMessageId } from "../thread/message/id.ts";
+import { ThreadActivityKind } from "../thread/ThreadActivityKind.ts";
+import { ThreadMessageId } from "../thread/ThreadMessageId.ts";
 import { MemberId } from "../workspace/member/id.ts";
 import { Turn } from "./turn.ts";
 

@@ -5,8 +5,8 @@ import type { Store } from "../journal/store.ts";
 import { Notification } from "./notification.ts";
 import type { GroupId } from "../group/id.ts";
 import type { MemberId } from "../workspace/member/id.ts";
-import type { ThreadId } from "../thread/id.ts";
-import type { ThreadParticipationId } from "../thread/participation/id.ts";
+import type { ThreadId } from "../thread/ThreadId.ts";
+import type { ThreadParticipationId } from "../thread/ThreadParticipationId.ts";
 import type { TurnId } from "../turn/id.ts";
 
 /** Exclusive keyset boundary for listing; not a journal position or live delivery cursor. */

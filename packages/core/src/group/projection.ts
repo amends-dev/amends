@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { Projection } from "../journal/projection.ts";
-import { ThreadActivityFacts } from "../thread/activity/facts.ts";
+import { ThreadActivityFacts } from "../thread/ThreadActivityFacts.ts";
 import { GroupFacts } from "./facts.ts";
 import { GroupStore } from "./store.ts";
 

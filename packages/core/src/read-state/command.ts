@@ -1,7 +1,7 @@
 import { Context, DateTime, Effect, Layer } from "effect";
 import { Store } from "../journal/store.ts";
 import { NotificationStore } from "../notification/store.ts";
-import type { Thread } from "../thread/thread.ts";
+import type { Thread } from "../thread/Thread.ts";
 import type { ReadState } from "./read-state.ts";
 import { ReadStateStore } from "./store.ts";
 

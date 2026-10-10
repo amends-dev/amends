@@ -11,23 +11,23 @@ import { TurnProjection } from "./turn/projection.ts";
 import { ConnectionService } from "./connection/service.ts";
 import { ConnectionPermissions } from "./connection/permissions.ts";
 import { ConnectionProjection } from "./connection/projection.ts";
-import { ThreadService } from "./thread/service.ts";
-import { ThreadCommand } from "./thread/command.ts";
+import { ThreadService } from "./thread/ThreadService.ts";
+import { ThreadCommand } from "./thread/ThreadCommand.ts";
 import { GroupCommand } from "./group/command.ts";
-import { ThreadQuery } from "./thread/query.ts";
-import { ThreadMessageService } from "./thread/message/service.ts";
-import { ThreadMessagePermissions } from "./thread/message/permissions.ts";
-import { ThreadParticipationService } from "./thread/participation/service.ts";
-import { ThreadParticipationPermissions } from "./thread/participation/permissions.ts";
-import { ThreadActivityResolvers } from "./thread/activity/resolvers.ts";
-import { ThreadMessageTimeline } from "./thread/message/timeline.ts";
-import { ThreadParticipationTimeline } from "./thread/participation/timeline.ts";
+import { ThreadQuery } from "./thread/ThreadQuery.ts";
+import { ThreadMessageService } from "./thread/ThreadMessageService.ts";
+import { ThreadMessagePermissions } from "./thread/ThreadMessagePermissions.ts";
+import { ThreadParticipationService } from "./thread/ThreadParticipationService.ts";
+import { ThreadParticipationPermissions } from "./thread/ThreadParticipationPermissions.ts";
+import { ThreadActivityResolvers } from "./thread/ThreadActivityResolvers.ts";
+import { ThreadMessageTimeline } from "./thread/ThreadMessageTimeline.ts";
+import { ThreadParticipationTimeline } from "./thread/ThreadParticipationTimeline.ts";
 import { TurnTimeline } from "./turn/timeline.ts";
-import { ThreadPermissions } from "./thread/permissions.ts";
-import { ThreadProjection } from "./thread/projection.ts";
-import { ThreadParticipationProjection } from "./thread/participation/projection.ts";
-import { ThreadMessageProjection } from "./thread/message/projection.ts";
-import { ThreadActivityProjection } from "./thread/activity/projection.ts";
+import { ThreadPermissions } from "./thread/ThreadPermissions.ts";
+import { ThreadProjection } from "./thread/ThreadProjection.ts";
+import { ThreadParticipationProjection } from "./thread/ThreadParticipationProjection.ts";
+import { ThreadMessageProjection } from "./thread/ThreadMessageProjection.ts";
+import { ThreadActivityProjection } from "./thread/ThreadActivityProjection.ts";
 /**
  * Compose one workspace's core from its domains. Hosts bind storage to a
  * workspace and supply cryptography; a gateway resolves the acting member and
