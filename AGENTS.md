@@ -94,9 +94,7 @@ currently run through TypeScript. Check compatibility before changing this setup
   return as the screens' own types, through type-only imports, and imports no UI code. `web` and
   `desktop` consume these libraries and own route trees, page composition, API URL, and
   persistence configuration; each page connects client hooks to UI screens. `desktop` owns the
-  Tauri shell; platform APIs stay in the entry apps.
-  The earlier UI implementations, the `design-system` package, and the `features` package
-  were removed; `ui` was built as `ui-v2` and took the name when it replaced them. Apps may install UI
+  Tauri shell; platform APIs stay in the entry apps. Apps may install UI
   dependencies and consume shared packages. Run desktop's `check:native` after
   changing Rust or Tauri configuration; root checks cover its TypeScript only.
 

@@ -9,7 +9,9 @@ remaining gaps with links to their owning code.
 
 | Guide                                                                | Scope                                                                                                                           |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| [Repository README](../README.md)                                    | Setup, workspace layout, tooling, and dependency updates.                                                                       |
+| [Repository README](../README.md)                                    | What amends is, its published packages, running it locally, and the repository's layout.                                        |
+| [Contributing](../CONTRIBUTING.md)                                   | Setting up, the checks every change passes, making a change, adding an integration, and updating Effect.                        |
+| [Security policy](../SECURITY.md)                                    | Reporting a vulnerability, supported versions, and what is not a vulnerability by design.                                       |
 | [Workspace workflows](workspace-workflows.md)                        | Creation, membership, invitations, access, and ownership transfer.                                                              |
 | [Group workflows](group-workflows.md)                                | Team groups: creation, public groups and joining, reads, membership, and following.                                             |
 | [Thread workflows](thread-workflows.md)                              | Starts, replies, tasks, channels, participation, reads, notifications, read state, and typing.                                  |
@@ -71,7 +73,7 @@ drawings, generation, and visual review in the UI workshop.
 
 ## Contributor instructions
 
-[Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
+Start with [contributing](../CONTRIBUTING.md). [Root AGENTS.md](../AGENTS.md) applies throughout the project. More specific guidance
 lives in [packages](../packages/AGENTS.md), [core](../packages/core/AGENTS.md),
 [UI](../apps/ui/AGENTS.md), [client](../apps/client/AGENTS.md),
 [adapters](../adapters/AGENTS.md), and [hosts](../hosts/AGENTS.md). `CLAUDE.md` links to
