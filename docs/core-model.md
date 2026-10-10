@@ -870,12 +870,11 @@ amends.
 Native interfaces differ in meaningful ways. ACP reports assistant content through
 `agent_message_chunk`, and tool activity through `tool_call` and partial `tool_call_update`
 notifications; see the official [prompt turn](https://agentclientprotocol.com/protocol/v1/prompt-turn)
-and [tool call](https://agentclientprotocol.com/protocol/v1/tool-calls) contracts. AI SDK's
-`fullStream` includes text deltas, tool calls, tool results, and errors; see the official
-[streamText reference](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text). Normalization
-therefore belongs with the adapter that understands the native semantics. It may need to retain
-state, combine updates, or interpret completion responses; renaming fields alone may be
-insufficient.
+and [tool call](https://agentclientprotocol.com/protocol/v1/tool-calls) contracts. Effect AI's
+`streamText` streams text deltas, tool calls, tool results, and errors as `Response` parts, each
+with its own fields. Normalization therefore belongs with the adapter that understands the native
+semantics. It may need to retain state, combine updates, or interpret completion responses; renaming
+fields alone may be insufficient.
 
 ### Further translation must introduce meaning
 
@@ -905,12 +904,11 @@ suspended a turn. The agent that saved the state resumes from its own; any other
 conversation it records, so a session can move from one harness to another.
 
 Continuation must preserve the information needed to carry on faithfully; replaying every
-original notification is not the requirement. Native interfaces do not restore alike: AI SDK and
-Effect AI take an ordered conversation through their
-[message prompt interface](https://ai-sdk.dev/docs/foundations/prompts), while ACP's documented
+original notification is not the requirement. Native interfaces do not restore alike: Effect AI
+takes an ordered conversation as a `Prompt` of messages, while ACP's documented
 [session loading](https://agentclientprotocol.com/protocol/v1/session-setup#loading-sessions)
-restores only a session the agent itself kept, by its ID. An adapter that cannot take a
-conversation says so rather than pretending, so a session is never moved to it.
+restores only a session the agent itself kept, by its ID. An adapter that cannot take a conversation
+says so rather than pretending, so a session is never moved to it.
 
 The application preserves its own entities and supplies their relevant context. A harness never
 reads amends storage or takes ownership of tasks, threads, or resources.
@@ -1613,9 +1611,9 @@ its entries in the log.
 ## Agreed: a turn posts its answer when it closes
 
 When a turn closes, it posts its answer: the text of the last step its harness finished, verbatim,
-as the agent's own message, naming the turn, as AI SDK gives a generation's text. No other model
-rewrites or summarizes it. Text written before a tool call, earlier steps, reasoning, and tool
-calls stay in the session log, where readers follow them; they are not rewritten into the answer.
+as the agent's own message, naming the turn. No other model rewrites or summarizes it. Text written
+before a tool call, earlier steps, reasoning, and tool calls stay in the session log, where readers
+follow them; they are not rewritten into the answer.
 
 Closing posts the answer, saves what the session resumes from, and completes the turn in one
 commit. A turn asked to stop meanwhile stops instead, and one whose agent may no longer post in

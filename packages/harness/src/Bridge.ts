@@ -15,8 +15,7 @@
  * and keeps them, so that a host reads them from any number: again after its connection drops, or
  * to continue a turn that another host suspended. The agent behind it needs to do neither. A turn
  * the bridge did not finish, as one it ran when it died, it continues when a host starts it again,
- * by prompting the agent with `Continue.` in the conversation that holds the turn, as AI SDK's
- * harness does.
+ * by prompting the agent with `Continue.` in the conversation that holds the turn.
  *
  * An agent's adapter implements `Driver`, which drives the agent behind a bridge, and
  * `BridgeServer.serve` serves the driver in the sandbox. The adapter's `Agent.Agent`, which hosts

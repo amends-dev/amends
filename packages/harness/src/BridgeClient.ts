@@ -13,8 +13,8 @@
  * the session, or once it has gone unused for a minute. Each connection launches the bridge when
  * none answers, and starts the session there from the state the bridge last gave, so that a bridge
  * that restarted, as after it died or exited idle, has the session again. A connection that drops
- * is not opened again: a request it dropped is sent again over another, for up to 30 seconds, as
- * AI SDK's harness reconnects, unless the bridge must not receive it twice.
+ * is not opened again: a request it dropped is sent again over another, for up to 30 seconds,
+ * unless the bridge must not receive it twice.
  *
  * A turn is two requests: `StartTurn`, under an id the host picks, and `ReadTurn`, which reads the
  * turn's parts, on from the last part read after the connection drops. The turn runs in the bridge

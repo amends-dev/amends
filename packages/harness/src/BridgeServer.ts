@@ -283,7 +283,7 @@ type TurnStart = Data.TaggedEnum<{
 
 const TurnStart = Data.taggedEnum<TurnStart>();
 
-/** What the bridge prompts an agent with to continue a turn it aborted, as AI SDK's harness. */
+/** What the bridge prompts an agent with to continue a turn it aborted. */
 const continuePrompt = Prompt.makeMessage("user", {
   content: [Prompt.makePart("text", { text: "Continue." })],
 });

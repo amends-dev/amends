@@ -1,8 +1,8 @@
 /**
  * The tools the agent works with in a session's sandbox: reading, writing, and editing files, and
  * running shell commands. Their names and inputs are those of Claude Code's and opencode's tools,
- * which AI SDK's harnesses share, so a model meets the tools it knows whichever agent runs it;
- * searching goes through `bash`, with `grep` and `find`.
+ * so a model meets the tools it knows whichever agent runs it; searching goes through `bash`, with
+ * `grep` and `find`.
  *
  * File paths resolve against the session's directory, and the tools refuse a path that names a place
  * outside it. That keeps the model's work in its directory but confines nothing: a symbolic link in

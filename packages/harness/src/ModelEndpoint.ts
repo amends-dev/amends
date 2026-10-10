@@ -75,9 +75,9 @@ export const ModelEndpoint = Schema.Struct({
   protocol: Protocol,
 
   /**
-   * The base URL of the API, which the protocol's paths follow, as AI SDK takes it: such as
-   * `https://api.anthropic.com/v1` for `/messages`, or `https://api.openai.com/v1` for
-   * `/responses` and `/chat/completions`.
+   * The base URL of the API, which the protocol's paths follow: such as
+   * `https://api.anthropic.com/v1` for `/messages`, or `https://api.openai.com/v1` for `/responses`
+   * and `/chat/completions`.
    */
   url: Schema.String,
 

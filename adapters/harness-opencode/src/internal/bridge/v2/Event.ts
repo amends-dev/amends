@@ -75,7 +75,7 @@ export const StepStarted = sessionEvent("session.step.started", {
   started: Schema.Finite,
 });
 
-/** A step ended, `finish` saying why, as AI SDK's finish reasons do. */
+/** A step ended, `finish` saying why. */
 export const StepEnded = sessionEvent("session.step.ended", {
   ...inStep,
   finish: Schema.String,

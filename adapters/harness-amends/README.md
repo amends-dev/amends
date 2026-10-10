@@ -70,18 +70,17 @@ streams in its last chunk.
 ## Tools
 
 In a sandbox, the agent offers the model `read`, `write`, `edit`, and `bash`, named and taking
-their inputs as Claude Code's and opencode's tools do, which AI SDK's harnesses share, so a model
-meets the tools it knows whichever agent runs it. `read` returns a file's `limit` lines from line
-`offset`, the first 2,000 by default, saying how many follow; `edit` replaces a text where it
-appears once, or everywhere with `replace_all`; searching goes through `bash`, with `grep` and
-`find`. File paths resolve against the session's directory, and the tools refuse a path that names
-a place outside it, reading the path alone, not where a symbolic link in it leads. `bash` runs
-`sh -c` in the directory, answers with the exit code and the output, stdout and stderr
-interleaved, keeps the first and last 15,000 characters of long output, and kills a command that
-outruns `commandTimeout`, 2 minutes by default. A tool that cannot do what it was asked, such as
-an `edit` whose text is not in the file, answers the model with why, so the model can try again.
-That keeps the model's work in its directory but confines nothing: `bash` reaches anything the
-sandbox can.
+their inputs as Claude Code's and opencode's tools do, so a model meets the tools it knows whichever
+agent runs it. `read` returns a file's `limit` lines from line `offset`, the first 2,000 by default,
+saying how many follow; `edit` replaces a text where it appears once, or everywhere with
+`replace_all`; searching goes through `bash`, with `grep` and `find`. File paths resolve against the
+session's directory, and the tools refuse a path that names a place outside it, reading the path
+alone, not where a symbolic link in it leads. `bash` runs `sh -c` in the directory, answers with the
+exit code and the output, stdout and stderr interleaved, keeps the first and last 15,000 characters
+of long output, and kills a command that outruns `commandTimeout`, 2 minutes by default. A tool that
+cannot do what it was asked, such as an `edit` whose text is not in the file, answers the model with
+why, so the model can try again. That keeps the model's work in its directory but confines nothing:
+`bash` reaches anything the sandbox can.
 
 The host's tools reach the model through stand-ins, which answer each call with the result the
 host submits, and carry the tool's JSON schema and its `Tool.Strict` annotation as the host gave

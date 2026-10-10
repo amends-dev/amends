@@ -44,6 +44,6 @@ export const usageOf = (tokens: Tokens): typeof Response.Usage.Encoded => ({
   },
 });
 
-/** A finish reason as Effect AI names it; opencode names them as AI SDK does. */
+/** A finish reason as Effect AI names it, which opencode's share; any other reads as `other`. */
 export const finishReasonOf = (finish: string): Response.FinishReason =>
   Schema.is(Response.FinishReason)(finish) ? finish : "other";

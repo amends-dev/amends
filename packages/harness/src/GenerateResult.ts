@@ -2,8 +2,8 @@
  * What `generate` returns: a whole turn, with the parts it streamed and getters for what callers
  * usually read, as Effect AI's `GenerateTextResponse` has for one model response. A turn takes one
  * or more steps, each one response from the model and the tools it called, and the turn's answer
- * is the text of its last step, as in AI SDK. `generateObject` returns `GenerateObjectResult`,
- * which adds the object that answer decoded to.
+ * is the text of its last step. `generateObject` returns `GenerateObjectResult`, which adds the
+ * object that answer decoded to.
  *
  * @since 0.1.0
  */
