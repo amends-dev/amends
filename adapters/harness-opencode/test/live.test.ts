@@ -25,7 +25,7 @@ import {
 } from "effect";
 import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
-import * as OpencodeDriver from "../src/bridge/Driver.ts";
+import * as Driver from "../src/bridge/Driver.ts";
 import * as Models from "../src/Models.ts";
 import * as OpencodeAgent from "../src/OpencodeAgent.ts";
 import { makeSandbox } from "./fixtures.ts";
@@ -85,7 +85,7 @@ const makeLiveDriver = (endpoints?: Parameters<typeof Models.fromEndpoints>[0]) 
     const models = Result.getOrThrow(
       Models.fromEndpoints(endpoints ?? { model: endpoint, models: {} }),
     );
-    const driver = yield* OpencodeDriver.make({
+    const driver = yield* Driver.make({
       model: models.model,
       models: models.models,
       command: "opencode",

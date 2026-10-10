@@ -63,7 +63,10 @@ const conflictIn = (
   endpoints: ReadonlyArray<ModelEndpoint.ModelEndpoint>,
 ): string | undefined => {
   if (new Set(endpoints.map((endpoint) => JSON.stringify(requestOf(endpoint)))).size > 1) {
-    return `opencode presents one key, with one set of headers, for each provider, and the endpoints for ${providerId} differ in them`;
+    return (
+      "opencode presents one key, with one set of headers, for each provider, and the " +
+      `endpoints for ${providerId} differ in them`
+    );
   }
   for (const [modelId, ofModel] of Object.entries(
     Array.groupBy(endpoints, (endpoint) => endpoint.model),
@@ -74,7 +77,10 @@ const conflictIn = (
       ),
     );
     if (served.size > 1) {
-      return `opencode serves a model through one protocol, at one URL, with one output limit, and the endpoints for ${providerId}/${modelId} differ in them`;
+      return (
+        "opencode serves a model through one protocol, at one URL, with one output limit, and " +
+        `the endpoints for ${providerId}/${modelId} differ in them`
+      );
     }
   }
   return undefined;

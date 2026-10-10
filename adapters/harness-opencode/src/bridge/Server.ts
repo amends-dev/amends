@@ -1,9 +1,9 @@
 /**
- * opencode's server, which the bridge starts in its sandbox, and the requests the driver makes of it.
- * One server serves every session in the sandbox, each in its own directory. `start` runs the server
- * until the scope closes, listening only on 127.0.0.1, at a port the server picks, behind a password
- * that `start` makes and gives the server in its environment. The bridge is the server's only client
- * and lives exactly as long as it, so the password is kept nowhere else.
+ * opencode's server, which the bridge starts in its sandbox, and the requests the driver makes of
+ * it. One server serves every session in the sandbox, each in its own directory. `start` runs the
+ * server until the scope closes, listening only on 127.0.0.1, at a port the server picks, behind
+ * a password that `start` makes and gives the server in its environment. The bridge is the
+ * server's only client and lives exactly as long as it, so the password is kept nowhere else.
  *
  * opencode reads the configuration `start` is given from a directory that `start` makes for it and
  * removes when the scope closes, in place of the global configuration of the sandbox's user, which
@@ -62,8 +62,8 @@ export interface Server {
   }) => Effect.Effect<string, HarnessError.HarnessError>;
 
   /**
-   * Whether opencode has loaded the model provider `providerID`, which a server loads a moment after
-   * it starts answering, and only when it can use the provider.
+   * Whether opencode has loaded the model provider `providerID`, which a server loads a moment
+   * after it starts answering, and only when it can use the provider.
    */
   readonly hasProvider: (providerID: string) => Effect.Effect<boolean, HarnessError.HarnessError>;
 

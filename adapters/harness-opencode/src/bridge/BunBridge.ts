@@ -1,7 +1,7 @@
 /**
- * Serves a bridge from Bun, as a bridge program does once it has made its driver: on every interface
- * of the sandbox, at a port the sandbox picks, until the bridge exits idle or another takes its
- * place.
+ * Serves a bridge from Bun, as a bridge program does once it has made its driver: on every
+ * interface of the sandbox, at a port the sandbox picks, until the bridge exits idle or another
+ * takes its place.
  *
  * Bun's server never finishes stopping once a WebSocket has been open, so it runs in a scope of its
  * own, which the bridge gives a second to close after the bridge's own finalizers have run, rather

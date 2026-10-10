@@ -1,10 +1,10 @@
 /**
  * opencode's driver, which runs opencode for the bridge in its sandbox. One opencode server, which
- * the driver starts when the first session starts, serves every session there, each an opencode session in the session's
- * directory. A turn is a prompt to it, whose parts `Turn` translates from the events opencode
- * records for the turn, as they happen. A session that starts with a conversation from another
- * agent has it written into opencode's record by `History`, tool calls included, before its first
- * turn.
+ * the driver starts when the first session starts, serves every session there, each an opencode
+ * session in the session's directory. A turn is a prompt to it, whose parts `Turn` translates from
+ * the events opencode records for the turn, as they happen. A session that starts with a
+ * conversation from another agent has it written into opencode's record by `History`, tool calls
+ * included, before its first turn.
  *
  * opencode's server runs until the bridge stops. A server that fails to start is started again by
  * the next session, and one that exits by itself completes `serverExited`, for the bridge to exit
@@ -42,16 +42,21 @@ export const Options = Schema.Struct({
   /** The model a turn runs on when it names none. */
   model: ModelRef,
 
-  /** The models a turn can name, by name. A turn that names another fails with `UnsupportedError`. */
+  /**
+   * The models a turn can name, by name. A turn that names another fails with
+   * `UnsupportedError`.
+   */
   models: Schema.Record(Schema.String, ModelRef),
 
   /**
-   * The command that runs opencode in the sandbox, when it is not the opencode the template installs
-   * beside the bridge program.
+   * The command that runs opencode in the sandbox, when it is not the opencode the template
+   * installs beside the bridge program.
    */
   command: Schema.optionalKey(Schema.String),
 
-  /** opencode's configuration, as its `opencode.json` takes it, with the providers of the models. */
+  /**
+   * opencode's configuration, as its `opencode.json` takes it, with the providers of the models.
+   */
   config: Schema.Record(Schema.String, Schema.Json),
 
   /** Environment variables opencode runs with. */
@@ -82,7 +87,7 @@ const StateJson = Schema.toCodecJson(State);
  * The driver, which starts opencode's server with `options` when the first session starts. The
  * server runs in the scope the driver is made in.
  */
-export const make = Effect.fn("OpencodeDriver.make")(function* (options: Required<Options>) {
+export const make = Effect.fn("Driver.make")(function* (options: Required<Options>) {
   const services = yield* Effect.context<
     | ChildProcessSpawner.ChildProcessSpawner
     | HttpClient.HttpClient
@@ -129,7 +134,7 @@ export const make = Effect.fn("OpencodeDriver.make")(function* (options: Require
   return driver;
 });
 
-const createSession = Effect.fn("OpencodeDriver.createSession")(function* (
+const createSession = Effect.fn("Driver.createSession")(function* (
   server: Server.Server,
   options: Pick<Options, "model" | "models">,
   sessionOptions: Bridge.CreateSessionOptions,

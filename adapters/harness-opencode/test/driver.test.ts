@@ -7,7 +7,7 @@ import { Prompt } from "effect/ai";
 import { FetchHttpClient } from "effect/http";
 import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
-import * as OpencodeDriver from "../src/bridge/Driver.ts";
+import * as Driver from "../src/bridge/Driver.ts";
 import {
   type FakeOpencodeOptions,
   type FakeTurn,
@@ -34,7 +34,7 @@ const makeDriver = (
     const processes = yield* makeFakeServerProcesses(`http://127.0.0.1:${fake.port}`, {
       failing: options.failingStarts,
     });
-    const driver = yield* OpencodeDriver.make({
+    const driver = yield* Driver.make({
       model: { providerID: "opencode", id: "default-model" },
       models: {
         other: { providerID: "opencode", id: "other-model" },

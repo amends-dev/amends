@@ -74,14 +74,15 @@ export const eventsOf = (
     });
   };
 
-  const writePart = (
+  /** The events that record `part` of the assistant message `assistantMessageID`. */
+  const eventsOfPart = (
     assistantMessageID: string,
     part: Prompt.AssistantMessagePart,
     index: number,
-  ) => {
+  ): ReadonlyArray<SessionEvent> => {
     switch (part.type) {
       case "text":
-        return events.push(
+        return [
           {
             ...envelope(1),
             type: "session.next.text.started",
@@ -92,9 +93,9 @@ export const eventsOf = (
             type: "session.next.text.ended",
             data: { ...inSession, assistantMessageID, textID: `text-${index}`, text: part.text },
           },
-        );
+        ];
       case "reasoning":
-        return events.push(
+        return [
           {
             ...envelope(1),
             type: "session.next.reasoning.started",
@@ -110,11 +111,11 @@ export const eventsOf = (
               text: part.text,
             },
           },
-        );
+        ];
       case "tool-call": {
         if (step !== undefined) step.calledTools = true;
         const input = inputOf(part.params);
-        return events.push(
+        return [
           {
             ...envelope(1),
             type: "session.next.tool.input.started",
@@ -142,45 +143,47 @@ export const eventsOf = (
               provider: { executed: false },
             },
           },
-        );
+        ];
       }
       case "tool-result":
-        return writeResult(assistantMessageID, part);
+        return [resultEvent(assistantMessageID, part)];
       // `unsupportedIn` refused files, and an approval changes what the model reads only through
       // the result that follows it.
       case "file":
       case "tool-approval-request":
-        return;
+        return [];
     }
   };
 
-  const writeResult = (assistantMessageID: string, part: Prompt.ToolResultPart) =>
-    events.push(
-      part.isFailure
-        ? {
-            ...envelope(1),
-            type: "session.next.tool.failed",
-            data: {
-              ...inSession,
-              assistantMessageID,
-              callID: part.id,
-              error: { type: "unknown", message: textOf(part.result) },
-              provider: { executed: false },
-            },
-          }
-        : {
-            ...envelope(1),
-            type: "session.next.tool.success",
-            data: {
-              ...inSession,
-              assistantMessageID,
-              callID: part.id,
-              structured: {},
-              content: contentOf(part.result),
-              provider: { executed: false },
-            },
+  /**
+   * The event that records the result `part` of a call in the assistant message
+   * `assistantMessageID`.
+   */
+  const resultEvent = (assistantMessageID: string, part: Prompt.ToolResultPart): SessionEvent =>
+    part.isFailure
+      ? {
+          ...envelope(1),
+          type: "session.next.tool.failed",
+          data: {
+            ...inSession,
+            assistantMessageID,
+            callID: part.id,
+            error: { type: "unknown", message: textOf(part.result) },
+            provider: { executed: false },
           },
-    );
+        }
+      : {
+          ...envelope(1),
+          type: "session.next.tool.success",
+          data: {
+            ...inSession,
+            assistantMessageID,
+            callID: part.id,
+            structured: {},
+            content: contentOf(part.result),
+            provider: { executed: false },
+          },
+        };
 
   const endStep = () => {
     if (step === undefined) return;
@@ -209,13 +212,13 @@ export const eventsOf = (
         endStep();
         startStep(messageID);
         for (const [partIndex, part] of message.content.entries()) {
-          writePart(messageID, part, partIndex);
+          events.push(...eventsOfPart(messageID, part, partIndex));
         }
         break;
       case "tool":
         for (const part of message.content) {
           if (step !== undefined && part.type === "tool-result") {
-            writeResult(step.assistantMessageID, part);
+            events.push(resultEvent(step.assistantMessageID, part));
           }
         }
         break;
@@ -255,14 +258,19 @@ const historyModel: ModelRef = { providerID: "amends", id: "history" };
  * within it, then a random part. The session's own random part keeps the ids written for it unique
  * to it.
  */
-const opencodeId = (prefix: string, session: Session, count: number) =>
-  `${prefix}_${((BigInt(session.now) * 0x1000n + BigInt(count)) & 0xffff_ffff_ffffn).toString(16).padStart(12, "0")}${session.sessionID.slice(-14)}`;
+const opencodeId = (prefix: string, session: Session, count: number) => {
+  const time = (BigInt(session.now) * 0x1000n + BigInt(count)) & 0xffff_ffff_ffffn;
+  return `${prefix}_${time.toString(16).padStart(12, "0")}${session.sessionID.slice(-14)}`;
+};
 
 /** A tool's input as opencode keeps it: an object, wrapping any other value as opencode does. */
 const inputOf = (params: unknown): Record<string, unknown> =>
   Predicate.isObject(params) ? params : { value: params };
 
-/** What the model reads of a tool's result: the content opencode returned, or the result as text. */
+/**
+ * What the model reads of a tool's result: the content opencode returned, or the result as
+ * text.
+ */
 const contentOf = (result: unknown): ReadonlyArray<ToolContent> =>
   Schema.is(Schema.Array(ToolContent))(result) ? result : [{ type: "text", text: textOf(result) }];
 

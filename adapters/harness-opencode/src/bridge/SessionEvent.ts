@@ -120,7 +120,10 @@ export const Prompted = Schema.Struct({
   }),
 });
 
-/** A step started: one response of the model, given as the assistant message `assistantMessageID`. */
+/**
+ * A step started: one response of the model, given as the assistant message
+ * `assistantMessageID`.
+ */
 export const StepStarted = Schema.Struct({
   ...envelope,
   type: Schema.tag("session.next.step.started"),

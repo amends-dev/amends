@@ -12,12 +12,12 @@ import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, Layer, Schema } from "effect";
 import { FetchHttpClient } from "effect/http";
 import * as BunBridge from "./BunBridge.ts";
-import * as OpencodeDriver from "./Driver.ts";
+import * as Driver from "./Driver.ts";
 
 const program = Effect.gen(function* () {
   const launch = yield* BridgeServer.readLaunchOptions;
-  const options = yield* Schema.decodeUnknownEffect(OpencodeDriver.Options)(launch.agentOptions);
-  const driver = yield* OpencodeDriver.make({
+  const options = yield* Schema.decodeUnknownEffect(Driver.Options)(launch.agentOptions);
+  const driver = yield* Driver.make({
     command: `${import.meta.dirname}/opencode`,
     ...options,
   });

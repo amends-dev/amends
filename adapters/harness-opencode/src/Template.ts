@@ -21,7 +21,10 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 /** The platforms the bridge installs on, as `platformOf` names them. */
 export type Platform = `${"darwin" | "linux"}-${"arm64" | "x64"}`;
 
-/** An npm package holding one program as `bin/<program>`, and the integrity npm published for it. */
+/**
+ * An npm package holding one program as `bin/<program>`, and the integrity npm published for
+ * it.
+ */
 interface Package {
   readonly name: string;
   readonly integrity: string;
@@ -105,7 +108,7 @@ export interface Installation {
  * Bundles the bridge program, giving the template that installs it with the command that launches
  * it. The template's identity changes with anything it installs.
  */
-export const make = Effect.fn("OpencodeTemplate.make")(function* () {
+export const make = Effect.fn("Template.make")(function* () {
   const crypto = yield* Crypto.Crypto;
   const hashOf = (text: string) =>
     Effect.map(crypto.digest("SHA-256", new TextEncoder().encode(text)), (digest) =>
@@ -147,7 +150,10 @@ export const platformOf = (uname: string): Platform | undefined => {
 
 // TODO: Ship the bundle built with the package, as AI SDK ships its bridge, once the package is
 // published without its sources.
-/** The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for Bun. */
+/**
+ * The bridge program, `bridge/main.ts`, bundled with everything it imports into one file for
+ * Bun.
+ */
 const bundleBridge = Effect.promise(async () => {
   const { outputs } = await Bun.build({
     entrypoints: [`${import.meta.dirname}/bridge/main.ts`],
@@ -191,7 +197,8 @@ const installPrograms = (installed: string) =>
     if (platform === undefined) {
       return yield* failure(
         "Unknown",
-        `opencode's bridge installs on macOS and on Linux with glibc, on arm64 and x64, not on ${uname.trim()}`,
+        "opencode's bridge installs on macOS and on Linux with glibc, on arm64 and x64, not on " +
+          uname.trim(),
       );
     }
 
@@ -305,7 +312,7 @@ const hexOf = (integrity: string) =>
 const failure = (tag: PlatformError.SystemErrorTag, description: string) =>
   PlatformError.systemError({
     _tag: tag,
-    module: "OpencodeTemplate",
+    module: "Template",
     method: "prepare",
     description,
   });
