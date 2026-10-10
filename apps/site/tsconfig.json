@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": ["bun"]
+  },
+  "include": [".astro/types.d.ts", "src", "scripts", "test", "astro.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

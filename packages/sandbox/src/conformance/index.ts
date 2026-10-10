@@ -17,7 +17,15 @@ import { lifecycle } from "./internal/lifecycle.ts";
 import { network } from "./internal/network.ts";
 import { processes } from "./internal/processes.ts";
 
-export type { Fixture } from "./Fixture.ts";
+export type {
+  /**
+   * What a provider's tests give the suites, re-exported so they need only this module.
+   *
+   * @category testing
+   * @since 0.1.0
+   */
+  Fixture,
+} from "./Fixture.ts";
 
 /**
  * Runs every suite against the provider `fixture` makes, in the test file that calls it.

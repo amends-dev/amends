@@ -42,6 +42,7 @@ remaining gaps with links to their owning code.
 | [Desktop](../apps/desktop/README.md)                                 | Tauri prerequisites, host connection, and native verification.                                                                  |
 | [Client](../apps/client/README.md)                                   | Headless credential scopes, API/query state, view hooks, and route helpers.                                                     |
 | [UI](../apps/ui/README.md)                                           | Pattern-based design system from the Lunacy mocks, with every app screen.                                                       |
+| [Site](../apps/site/README.md)                                       | amends.dev on Astro and Starlight, with docs generated from the packages' READMEs and sources.                                  |
 
 The shared [icons guide](../apps/icons/README.md) covers current Solid imports, canonical
 drawings, generation, and visual review in the UI workshop.

@@ -37,9 +37,19 @@ would be published. It needs an npm login with publish rights on the `@amends-de
   distribution turns into the caret range of the catalog's version. A workspace dependency is
   declared `workspace:*` and becomes the caret range of that package's version.
 - Every export carries `@since` with the version that introduced it, which starts at the first
-  published version, and `@category`, for the documentation generated from them.
+  published version, and `@category`, for the [documentation](#the-documentation) generated from
+  them.
 - Each package has a `LICENSE`, a `README.md` that opens with install and usage, and a
   `tsconfig.build.json` extending the base configuration with emit turned on.
+
+## The documentation
+
+The [site](../apps/site/README.md) builds each package's documentation for
+`amends.dev/docs`: its README as the package's guide, and an API reference that `@effect/docgen`
+generates from its doc comments, a page for each module, leaving out `internal` modules. The site
+lists every package whose manifest is published, so a new one appears there without changes to
+the site. Its build runs docgen, which typechecks the examples in doc comments, so an export
+without `@since` or an example that no longer compiles fails the build, in CI too.
 
 ## Order and versions
 

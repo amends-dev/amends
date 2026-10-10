@@ -19,6 +19,7 @@ bun run test --project @amends-dev/ui
 bun run test --project @amends-dev/client
 bun run test --project @amends-dev/web
 bun run test --project @amends-dev/desktop
+bun run test --project @amends-dev/site
 bun run test --watch packages/core/test
 bun run check
 ```
@@ -28,7 +29,9 @@ covers shared packages and the memory adapter. The `postgresql` project covers t
 PostgreSQL adapter and the local host, which stores in PostgreSQL, under one global setup. UI, client, web, and desktop use Solid/Vite transforms and Happy DOM. Client tests
 headless state; web and desktop test their own route/UI integration, and web's bundle test builds the app and fails when
 core's implementation reaches the browser bundle; verify both frontend builds and desktop
-startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). Vendored repositories are outside test discovery.
+startup as described in the [desktop guide](../apps/desktop/README.md#run-and-verify). The site's
+tests cover its documentation generator's Markdown transforms, in Node. Vendored repositories are
+outside test discovery.
 
 The [icons package](../apps/icons/README.md) tests geometry validation, composition,
 Solid naming/prop reactivity, and consumer bundles. Its build tests run in the Node
@@ -103,7 +106,7 @@ pushes to it, as parallel jobs, so a run takes as long as its slowest job:
 | Static         | Lint, format, package boundaries, generated icons, and the PostgreSQL migration          |
 | Types          | `bun run typecheck`                                                                      |
 | Tests          | `backend`, `postgresql` in three shards, and the app projects together, two workers each |
-| Frontend build | The web and desktop bundles and both workshops                                           |
+| Frontend build | The web and desktop bundles, the UI workshop, and the site                               |
 | Check          | Succeeds only when every job above does; require it for merging                          |
 
 Each job installs the pinned Bun and the locked dependencies through

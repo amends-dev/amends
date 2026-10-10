@@ -82,21 +82,24 @@ currently run through TypeScript. Check compatibility before changing this setup
   implements gateway contracts and serves protocol handler packages; it does not
   depend on a protocol's contract package, which is for clients. A host's tests may
   take a contract as a development dependency to act as a client.
-- `apps/*`: user-facing clients and shared UI. `icons` holds canonical drawings and generated
-  Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume it.
-  `ui` is the pattern-based design system built from the Lunacy mocks in
+- `apps/*`: user-facing clients, the site, and shared UI. `icons` holds canonical drawings and
+  generated Solid icons, raw SVGs, and a separate metadata catalog; apps and UI packages may consume
+  it. `ui` is the pattern-based design system built from the Lunacy mocks in
   `design-system/Amends Group Exploration.free`, which are its visual reference: foundations,
-  components, the six layout patterns, and presentational screens, with a standalone Storybook
-  workshop. Introduce and verify one piece at a time. It is UI-only and must not depend on
-  client state, routing, or API contracts. `client` owns headless session lifetime, typed API
-  access, query state, the view hooks screens connect through, and pure route helpers. UI never
-  depends on client. Client takes UI as a development dependency only to type what its hooks
-  return as the screens' own types, through type-only imports, and imports no UI code. `web` and
-  `desktop` consume these libraries and own route trees, page composition, API URL, and
-  persistence configuration; each page connects client hooks to UI screens. `desktop` owns the
-  Tauri shell; platform APIs stay in the entry apps. Apps may install UI
-  dependencies and consume shared packages. Run desktop's `check:native` after
-  changing Rust or Tauri configuration; root checks cover its TypeScript only.
+  components, the six layout patterns, presentational screens, and the site's sections, with a
+  standalone Storybook workshop.
+  Introduce and verify one piece at a time. It is UI-only and must not depend on client state,
+  routing, or API contracts. `client` owns headless session lifetime, typed API access, query state,
+  the view hooks screens connect through, and pure route helpers. UI never depends on client. Client
+  takes UI as a development dependency only to type what its hooks return as the screens' own types,
+  through type-only imports, and imports no UI code. `web` and `desktop` consume these libraries and
+  own route trees, page composition, API URL, and persistence configuration; each page connects
+  client hooks to UI screens. `desktop` owns the Tauri shell; platform APIs stay in the entry apps.
+  `site` is amends.dev on Astro and Starlight: static pages composed from UI's site sections without
+  client, and docs whose package guides and API reference are generated from each published
+  package's README and source. Apps may install UI dependencies and consume shared packages. Run
+  desktop's `check:native` after changing Rust or Tauri configuration; root checks cover its
+  TypeScript only.
 
 Each workspace has its own manifest, source exports or entry point, `tsconfig.json`
 extending `tsconfig.base.json`, and `typecheck` script. Shared packages inherit no
@@ -105,11 +108,11 @@ Root `tsconfig.json` checks repository scripts, shared-package tests, and the Vi
 configuration; `bun run typecheck` checks these and every workspace. Use declared
 package names for cross-workspace imports, not relative paths into another workspace.
 
-Compose pages and UI declaratively through nested children and named parts. Use props
-for data, options, and callbacks rather than custom slots carrying whole components or
-JSX trees. Follow framework-required render APIs where needed. Pages live in `apps/web`
-and `apps/desktop`; UI owns reusable visual pieces, and client owns connected state and
-actions as hooks. Neither shared package owns application pages.
+Compose pages and UI declaratively through nested children and named parts. Use props for data,
+options, and callbacks rather than custom slots carrying whole components or JSX trees. Follow
+framework-required render APIs where needed. Pages live in `apps/web`, `apps/desktop`, and
+`apps/site`; UI owns reusable visual pieces, and client owns connected state and actions as hooks.
+Neither shared package owns application pages.
 UI screens are presentational: they take data and callbacks and render a pane or
 the navigation, while the apps own routes, data, and which screen shows.
 Every rail destination follows one navigation pattern
@@ -118,11 +121,11 @@ Create, the main content shows the list or one item with tabs as links, and the 
 only something inside what the main content shows. A page about one item puts its sections in
 `Pane.Column`, one column; never lay details or forms side by side in the main content.
 
-Web and desktop compose UI; they do not define styles, inline style objects, or
-local stylesheets. Shared UI stylesheet/font imports and component options are
-allowed. Before filling a visual gap, inspect the existing components (including
-Shell), evaluate whether a reusable addition fits the design system, and verify
-that UI component in its workshop before composing it into an app page.
+Web, desktop, and site compose UI; they do not define styles, style elements, inline style objects,
+or local stylesheets. Shared UI stylesheet/font imports and component options are allowed. Before
+filling a visual gap, inspect the existing components (including Shell), evaluate whether a reusable
+addition fits the design system, and verify that UI component in its workshop before composing it
+into an app page.
 
 Use the root Bun catalog for Effect package versions and `workspace:*` for local
 package links. Run `bun install` at the repository root after manifest changes.

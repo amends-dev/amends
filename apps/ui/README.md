@@ -1,8 +1,8 @@
 # @amends-dev/ui
 
 The amends design system: foundations, components, the six layout patterns, and a presentational
-screen for every page of the [web](../web/README.md) and [desktop](../desktop/README.md) apps, with
-a Storybook workshop to build and review them in. It is built from the Lunacy mocks in
+screen for every page of the [web](../web/README.md) and [desktop](../desktop/README.md) apps, the
+sections of the [site](../site/README.md), and a Storybook workshop to build and review them in. It is built from the Lunacy mocks in
 [`design-system/Amends Group Exploration.free`](../../design-system/), which are the visual
 reference: open the file in Lunacy and compare a screen with its story.
 
@@ -265,8 +265,8 @@ the keyboard.
 ## Forms and the modal
 
 - `Button` is primary, secondary, or quiet, with an optional icon or menu chevron, and a large size
-  for centered screens. `ButtonLink` is a link drawn as a button, for actions such as Agent
-  settings that lead elsewhere.
+  for centered screens. `ButtonLink` is a link drawn as a button, in the same sizes, for actions
+  such as Agent settings that lead elsewhere.
 - `Field` gives one control a label, help, and error text, with a warning icon on errors; `Input`
   and the member picker pick those associations up. `TextArea` is the Input's look for several
   lines, and `SearchField` is the quiet filled search.
@@ -496,6 +496,28 @@ refused connection, Auto with no harness, removal, a read-only member, search, a
 - The mocks draw different composer toolbars per size; the screens use Attach and Mention, which the
   icon set covers, at every size, and add Formatting and its toggle, which the mocks do not draw.
   Pressed formats share the selected row's fill.
+
+## The site
+
+`@amends-dev/ui/site` holds the sections the [site](../site/README.md) at amends.dev is composed
+of, drawn from the "Site / amends.dev" frames in the Lunacy file:
+
+- `SiteHeader` and `SiteFooter` frame every page, and `Hero` opens one, with an optional preview
+  beside it and a "Coming soon" note for what is not offered yet.
+- `Section` is a band in the panel, canvas, or inverse tone, with a header, a grid of cards, a
+  split of two parts, rows of terms, and notes. `FeatureCard`, `PackageCard`, and `Steps` fill it.
+- The illustrations are built from the components themselves, not screenshots: `AppPreview` is a
+  workspace with its rail, sidebar, group, and thread, and `FeatureArt` draws threads, tasks,
+  agents, or connections. Both are hidden from assistive technology and inert, and labeled once.
+- `CodeWindow` shows a file in the dark palette, `Command` a shell command to copy, and
+  `PackageDiagram` the contracts with the adapters that implement each.
+
+The display type is Instrument Serif, which `@amends-dev/ui/site/fonts` loads beside the
+foundations' fonts. `@amends-dev/ui/site/document` sets the theme's variables on the document
+itself, following the `data-theme` attribute, since the site has no `Theme` around its pages.
+`@amends-dev/ui/site/starlight` maps Starlight's variables onto the same tokens, so the docs share
+the site's palette, type, and square corners. **Site / Sections** composes the home and packages
+pages from sample data.
 
 ## Development
 

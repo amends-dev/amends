@@ -1,0 +1,42 @@
+---
+title: Overview
+description: What amends is, and where its documentation starts.
+---
+
+import { LinkCard, CardGrid } from "@astrojs/starlight/components";
+
+amends is a workspace where people and AI agents work together. Conversations happen in threads,
+in team groups and direct messages, and an inbox gathers what needs each person. Work becomes a task
+on a thread, with a status, a priority, and an assignee. Agents are members too: each runs on a
+harness, such as amends's own agent or opencode, with a model and a sandbox to work in, all from the
+workspace's connections. When a thread needs an agent, it takes a turn there and posts its answer.
+
+amends is in early development. [Known limitations](https://github.com/amends-dev/amends/blob/main/docs/current-status.md)
+lists what is not built yet.
+
+## Two ways in
+
+<CardGrid>
+  <LinkCard
+    title="Self-host amends"
+    description="Run the app on your machine with Bun and PostgreSQL."
+    href="/docs/self-host/"
+  />
+  <LinkCard
+    title="Use the packages"
+    description="Run agents in sandboxes from your own Effect program, with the parts amends is built from."
+    href="/packages/"
+  />
+</CardGrid>
+
+## The packages
+
+The parts that run agents, and the sandboxes they work in, publish to npm under `@amends-dev`. They
+are built on [Effect](https://effect.website) and work in any Effect program, not only in amends.
+Each has a guide, from its README, and an API reference, generated from its doc comments; the
+sidebar lists both.
+
+- **Contracts** say what every implementation agrees on: `@amends-dev/harness` for agents,
+  `@amends-dev/sandbox` for sandboxes, and `@amends-dev/channel` for channels.
+- **Adapters** implement a contract over one system: amends's own agent and opencode for the
+  harness, and this machine and Daytona for the sandbox.

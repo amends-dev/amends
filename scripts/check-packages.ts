@@ -82,13 +82,23 @@ for await (const path of new Bun.Glob("apps/*/package.json").scan({ cwd: root })
   }
 }
 
-// Platform apps compose shared UI without defining styles of their own.
+// Platform apps and the site compose shared UI without defining styles of their own.
 for await (const path of new Bun.Glob(
-  "apps/{web,desktop}/src/**/*.{css,scss,sass,less,css.ts,style.ts,styles.ts}",
+  "apps/{web,desktop,site}/src/**/*.{css,scss,sass,less,css.ts,style.ts,styles.ts}",
 ).scan({ cwd: root })) {
   errors.push(
     `${path}: styles belong in UI; evaluate and verify a shared component before composing it in an app.`,
   );
+}
+
+// Nor do their pages carry style elements, style props, or style objects.
+for await (const path of new Bun.Glob("apps/{web,desktop,site}/src/**/*.{astro,ts,tsx}").scan({
+  cwd: root,
+})) {
+  const source = await Bun.file(`${root}/${path}`).text();
+  if (/<style\b|\bstyle\s*=|\bCSSProperties\b/.test(source)) {
+    errors.push(`${path}: app-local styles belong in UI; use reviewed component options.`);
+  }
 }
 
 // UI owns presentation; client's API modules own its contract imports.
@@ -98,11 +108,6 @@ for await (const path of new Bun.Glob(
   cwd: root,
 })) {
   const source = await Bun.file(`${root}/${path}`).text();
-  if (/^apps\/(web|desktop)\/src\//.test(path) && /\bstyle\s*=|\bCSSProperties\b/.test(source)) {
-    errors.push(
-      `${path}: app-local style props/objects belong in UI; use reviewed component options.`,
-    );
-  }
   const imports = new Bun.Transpiler({ loader: path.endsWith(".tsx") ? "tsx" : "ts" }).scanImports(
     source,
   );
@@ -210,6 +215,6 @@ if (errors.length > 0) {
   process.exitCode = 1;
 } else {
   console.log(
-    `Checked ${packages.length} shared packages and icons/ui/client/web/desktop import boundaries.`,
+    `Checked ${packages.length} shared packages, icons/ui/client/web/desktop import boundaries, and app styles.`,
   );
 }

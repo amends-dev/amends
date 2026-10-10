@@ -61,7 +61,7 @@ your machine.
 packages/        shared packages on Effect alone: core, the contracts, and the HTTP API
 adapters/        implementations over one external system each, such as PostgreSQL or Daytona
 hosts/           runtime composition: the local Bun host
-apps/            the design system, the headless client, and the web and desktop apps
+apps/            the design system, the headless client, the web and desktop apps, and the site
 docs/            guides, design documents, and known limitations
 design-system/   the visual references the design system is built from
 scripts/         repository tooling
