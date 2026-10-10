@@ -1,63 +1,44 @@
-# User-facing applications
+# Apps
 
-- [icons](icons/README.md) provides canonical drawings, generated Solid icons/SVGs,
-  and a separate metadata catalog through `@amends-dev/icons`.
-- [UI](ui/README.md) is the pattern-based design system from the Lunacy mocks: foundations,
-  components, the six layout patterns, and presentational screens for every page, verified in
-  its standalone Storybook workshop.
-- [client](client/README.md) owns headless sessions, API/query state, the view hooks screens
-  are connected through, and pure route helpers. It imports only UI's screen types, and nothing
-  of styling, router libraries, or Storybook.
-- [web](web/README.md) composes client and UI with browser routing on port 4321.
-- [desktop](desktop/README.md) composes client and UI in Tauri 2 with hash routing and a
-  Solid/Vite webview on development port 1420.
+The apps are what people use: a web app and a desktop app, built from two shared libraries, the
+design system and the headless client. None of them is published to npm.
 
-The earlier UI implementations and the `design-system` and `features` workspaces were removed;
-`ui` was built as `ui-v2` and took the name when it replaced them. Both apps compose the
-client and UI packages. They own route
-trees and page composition, while client owns session/API state and the hooks that shape
-it for each screen. Workspace pages use the persistent Shell/Navigation layout and the
-account menu. Appearance state is headless, with platform persistence and system
-appearance supplied by each app. See [workspace shell](../docs/workspace-shell.md).
+| Package                        | What it is                                                                       |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| [`ui`](ui/README.md)           | The design system: foundations, components, layout patterns, and every screen.   |
+| [`client`](client/README.md)   | The headless client: sessions, API access, query state, and the hooks pages use. |
+| [`web`](web/README.md)         | The web app, with browser routing, served on port 4321 in development.           |
+| [`desktop`](desktop/README.md) | The desktop app on Tauri 2, with hash routing.                                   |
+| [`icons`](icons/README.md)     | The icons, drawn as data and generated as Solid components and SVGs.             |
 
-The [feature development flow](../docs/feature-development.md) describes adding a screen:
-its presentational parts in UI, its state and actions as client hooks, and the page in
-each app. The [sign-in design](../docs/sign-in-design.md) identifies the first UI pieces.
+## How they fit
+
+UI and client are independent libraries. UI draws: its screens take data and callbacks and render
+a pane or the navigation, and know nothing of the API, the session, or routes. Client knows the
+host: it holds the session, calls the API, keeps query state, and shapes it into hooks whose values
+are the screens' props. Neither imports the other's code; client takes UI as a development
+dependency only, to type its hooks by the screens' own types.
+
+Web and desktop each own their route tree and pages. A page connects a client hook to a UI screen,
+and decides which screen shows. Each app owns its platform too: web proxies the API in
+development, and desktop reaches the host at port 8787 and keeps platform APIs, such as
+appearance persistence, to itself. The apps compose UI; they define no styles of their own.
+[Feature development](../docs/feature-development.md) walks through adding a screen, and the
+[workspace shell](../docs/workspace-shell.md) describes the navigation every page shares.
+
+`bun run check:packages` enforces these boundaries: UI depends on no client, router, Effect, or
+platform package; client stays headless; and the icons' runtime depends on Solid alone.
 
 ## Development
 
-From the repository root after `bun install`:
+From the repository root, after `bun install`, run each in its own terminal:
 
 ```sh
-bun run --filter @amends-dev/web dev
-bun run --filter @amends-dev/desktop dev
-bun run --filter @amends-dev/ui dev
+bun run --filter @amends-dev/web dev       # http://127.0.0.1:4321/
+bun run --filter @amends-dev/desktop dev   # the Tauri app, its webview on port 1420
+bun run --filter @amends-dev/ui dev        # the design system's workshop, http://127.0.0.1:6010/
 ```
 
-Run each in its own terminal. The UI workshop serves at `http://127.0.0.1:6010/`. Client has
-no workshop.
-Desktop requires [native tools](desktop/README.md#run-and-verify); web and UI
-Storybook need only Bun. The [local host](../hosts/local/README.md#run) runs separately.
-
-## Client and UI boundaries
-
-`client` and `ui` are independent libraries. Client supplies providers, hooks, and
-operations. UI supplies presentation components, styles, and fonts. Neither imports
-the other in source, tests, or manifests; dependency checks enforce both directions.
-
-Web and desktop each own a route tree and application composition, importing both
-libraries through public exports. Client hooks shape state and actions for the screens'
-props, and each page passes one to the other. Web
-uses browser routing and an API proxy; desktop uses hash routing and the existing Bun
-host at port 8787. Platform APIs remain in these apps. Shared path helpers live in
-client, but client does not decide what a route renders.
-
-Apps may consume shared packages through `workspace:*`. Shared packages cannot
-import apps. `bun run check:packages` enforces shared-package declarations,
-icon runtime isolation, UI/client/platform boundaries, and the retirement of the
-old UI dependencies. Cross-workspace imports use declared package names.
-
-Each workspace has its own manifest, `typecheck` script, and `tsconfig.json`
-extending the root configuration. Root checks cover both bootstraps' TypeScript;
-`desktop` has a separate native check. Install at the repository root to keep
-one Bun lockfile.
+The apps need the [local host](../hosts/local/README.md#run) running. The desktop app needs
+[Rust and Tauri's prerequisites](desktop/README.md#run-and-verify); the others need only Bun.
+`bun run test apps` runs every app's tests, and each package's README covers its own checks.

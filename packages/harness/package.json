@@ -1,7 +1,7 @@
 {
   "name": "@amends-dev/harness",
   "version": "0.1.0",
-  "description": "Runs an agent, such as opencode, Codex, Claude Code, or one in your own process over an Effect AI language model, and streams every agent's turns in one format.",
+  "description": "Runs an agent, such as opencode or one in your own process over an Effect AI language model, and streams every agent's turns in one format.",
   "keywords": [
     "agent",
     "ai",

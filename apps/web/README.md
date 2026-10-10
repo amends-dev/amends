@@ -1,14 +1,17 @@
-# Amends web
+# @amends-dev/web
 
-Solid/Vite browser application composing the independent [client](../client/README.md)
-and [UI](../ui/README.md) packages.
-It supplies browser-history routing, API configuration, and browser session persistence.
-The app owns its sign-in, workspace picker, and creation pages, pairing client hooks with UI
-screens; workspace pages share the persistent sidebar layout.
+The amends app in the browser. It is a Solid app, built with Vite, that connects
+[client](../client/README.md) hooks to [UI](../ui/README.md) screens: client holds the session,
+the API, and what each screen shows, and UI draws it. This app owns what is particular to the
+browser: its routes, the API URL, and where the session is kept.
 
-## Run and verify
+The package is internal to this repository and not published to npm. The
+[desktop app](../desktop/README.md) composes the same pages in Tauri.
 
-From the repository root:
+## Run
+
+The app talks to the [local host](../../hosts/local/README.md#run), which needs a PostgreSQL
+database. From the repository root:
 
 ```sh
 bun install --frozen-lockfile
@@ -16,80 +19,92 @@ createdb amends
 AMENDS_DATABASE_URL=postgresql://localhost/amends bun run start
 ```
 
-The host requires a PostgreSQL database; see the [local host guide](../../hosts/local/README.md#run).
-
-In another terminal:
+Then, in another terminal:
 
 ```sh
 bun run --filter @amends-dev/web dev
 ```
 
-Open `http://127.0.0.1:4321/`. Guests reach the sign-in form without contacting
-the host. Requesting a code calls the host, which logs it in its terminal. Restored sessions are validated before protected routes render. Vite proxies
-`/api` to `http://127.0.0.1:8787`; the local host remains a separate process.
+Open `http://127.0.0.1:4321/`. Vite proxies `/api` to the host at `http://127.0.0.1:8787`.
+Signing in sends a code, which the local host prints in its terminal. A guest reaches the sign-in
+page without contacting the host, and a restored session is validated before any workspace page
+renders.
+
+## Build and serve
 
 ```sh
 bun run --filter @amends-dev/web build
 bun run --filter @amends-dev/web preview
-bun run check
-bun run test
 ```
 
-Build output is `apps/web/dist`. The local host does not serve these files. A production
-web server must serve `index.html` for application routes and proxy `/api` to the API.
-Alternatively set `VITE_AMENDS_API_URL` at build/dev startup to an HTTP(S) API base URL;
-that host must allow the web origin when cross-origin. The endpoint is public configuration,
-never a place for secrets. Sessions are stored separately for each normalized API URL.
+The build writes `apps/web/dist`, which the local host does not serve. In production, a web server
+serves `index.html` for the app's routes and proxies `/api` to the host. To reach a host at
+another address instead, set `VITE_AMENDS_API_URL` to its HTTP(S) URL when building or starting
+the dev server; that host must allow the app's origin. The URL is public configuration, never a
+place for secrets, and the app keeps a separate session for each API URL.
 
-## Ownership
+## Routes
 
-`src/main.tsx` mounts Solid and loads UI's fonts and global styles.
-`src/app.tsx` chooses `Router`, resolves the endpoint (default `/api`), and supplies the
-session store. It nests the router and routes declaratively inside `Application`.
-`src/application.tsx` applies the UI `Theme` in the resolved appearance and connects the
-headless `ClientProvider` to its children and error boundary, whose fallback is the UI
-`CrashedScreen`. `src/routes.tsx` owns routes, redirects, and the session guard, which shows
-`CheckingSessionScreen` or `HostUnavailableScreen`.
+| Path                                           | Page                                                         |
+| ---------------------------------------------- | ------------------------------------------------------------ |
+| `/sign-in`                                     | Sign-in: an email, then the code sent to it                  |
+| `/workspaces`, `/workspaces/new`               | The workspace picker, and Create workspace over it           |
+| `/workspaces/:workspaceId`                     | Redirects to the workspace's Inbox                           |
+| `…/inbox`                                      | The Inbox; a thread opened from it shows beside it           |
+| `…/groups`, `…/groups/:groupId`                | The groups, and one group's stream; a thread opens beside it |
+| `…/direct`                                     | A first message to people with no direct group yet           |
+| `…/agents`, `…/agents/:agentId`                | The workspace's agents, and one agent's page                 |
+| `…/connections`, `…/connections/:connectionId` | The workspace's connections, and one connection's page       |
+| `…/settings/workspace`, `…/settings/members`   | Workspace and member settings                                |
+| `…/triage`, `…/tasks`                          | Placeholder pages                                            |
 
-Pages outside a workspace pair client hooks with UI screens, which own their layout and
-wording: `src/pages/sign-in.tsx` switches `SignInEmail` and `SignInCode` on `useSignIn`'s step,
-`src/pages/workspace-picker.tsx` passes `useWorkspacePicker` to `WorkspacePicker` and, at
-`/workspaces/new`, mounts one `useCreateWorkspace` intent in the `CreateWorkspace` modal over
-it, and the not-found and workspace-unavailable pages use `NotFoundScreen` and
-`WorkspaceUnavailableScreen` with `useWorkspaceAccess`. `src/account.ts` supplies the signed-in
-identity and Sign out to their headers. The route validates a new credential before following a
-safe return path. Client and the UI packages never import each other. Route integration tests
-live in this app. Vite deduplicates Solid and compiles the shared vanilla-extract styles.
+A thread's address adds `/threads/:threadId` to its group's or the Inbox's, and `?log=` opens one
+of its turns' logs in its place. Any other address shows Not found, inside the workspace when it is
+under one.
 
-Page compositions contain no inline styles or local stylesheets. `src/workspace-layout.tsx` builds
-the workspace on the UI Shell: `WorkspaceNavigation` with the account menu around the current
-destination's sidebar (`HomeSidebar`, or `DestinationSidebar` for Agents, Connections, and
-Settings from the client list hooks), one pane per page in `Shell.Main`, the
-thread panel as `ThreadPane`, and the Create group, New message, and Change your name modals, over
-client view hooks. `Profiles.Root` around the shell opens members' cards from `useMemberProfiles`:
-Message goes to the direct conversation with them or drafts a first message, Open agent goes to
-the agent's page, and Change name opens the modal. A sidebar's + asks its page to open the create modal through `?add=`. Group, directory, direct-draft, and placeholder pages compose
-UI screens, as do the Inbox with `useInboxView` and `InboxPane` and Settings with
-`useWorkspaceSettings` and the settings screens. A page may render a `Shell.Aside`, such as
-Settings' member details or an agent's turn log (`src/turn-log.tsx`, shared with the thread
-panel), and it attaches beside the main content. Agents and Connections each route their
-list and each item's page to one page component, which owns its dialogs. `src/workspace-actions.ts`
-lets pages offer the layout's Create group and show toasts. Visual gaps are evaluated and verified in the UI workshop before app
-consumption; `check:packages` rejects app-local styles.
+## How it is composed
 
-The [workspace entry guide](../../docs/workspace-entry.md) covers picker/creation
-composition, idempotent retry, directory refresh, and invitation acceptance.
+- `src/main.tsx` mounts the app and loads UI's fonts and global styles.
+- `src/app.tsx` resolves the API URL, `/api` by default, and makes the session store and the router.
+- `src/application.tsx` applies UI's `Theme` in the chosen appearance and mounts `ClientProvider`,
+  with `CrashedScreen` as its error boundary's fallback.
+- `src/routes.tsx` holds the routes, redirects, and the session guard, which shows
+  `CheckingSessionScreen` or `HostUnavailableScreen` while a session is checked or the host cannot
+  be reached. It mounts `ChangeFeedProvider` around the workspace, so its pages stay current over
+  the [change feed](../../docs/change-feed.md).
+- `src/workspace-layout.tsx` builds the workspace on UI's Shell: `WorkspaceNavigation` with the
+  account menu, the current destination's sidebar, the page in `Shell.Main`, the thread panel, the
+  Create group, New message, and Change your name modals, and `LiveStatus` from
+  `useChangeFeedStatus`. `Profiles.Root` opens a member's card, whose Message, Open agent, and
+  Change name actions go to their conversation, the agent's page, or the modal.
+- `src/pages/` holds the pages. Each pairs a client hook with UI screens, which own their layout
+  and wording. Agents and Connections each route their list and an item's page to one component,
+  which owns its dialogs, and a sidebar's + asks its page to open the create dialog through
+  `?add=`. A page may also show a side panel from UI, such as Settings' member details.
+- `src/turn-log.tsx` shows a turn's log in the thread panel.
+- `src/account.ts` gives the standalone screens the signed-in identity and Sign out;
+  `src/appearance.ts` keeps the appearance, a mode of Light, Dark, or System and a palette of
+  Neutral, Linen, Sage, or Slate, and follows the system's; `src/workspace-actions.ts` lets pages
+  offer the layout's Create group and show toasts.
 
-The [workspace shell guide](../../docs/workspace-shell.md) covers nested workspace
-routes, the responsive shell, groups and threads, and the account menu. The workspace's own
-address redirects to its Inbox, which opens on Unread; Triage and Tasks remain placeholders. `src/pages/connections.tsx` composes the
-[Connections page](../../docs/connections.md) from `useConnections` and UI's Connections
-screens, and `src/pages/agents.tsx` the [Agents page](../../docs/agents.md) from
-`useAgents`. The app-owned [Settings pages](../../docs/workspace-settings.md)
-compose the Workspace and Members sections, which the Settings sidebar lists, and their modals. `src/appearance.ts` supplies
-local mode and palette persistence and system appearance; Application wraps the session
-with AppearanceProvider and applies the resolved mode and chosen palette through the UI Theme.
-The account menu offers Neutral, Linen, Sage, and Slate independently of Light, Dark, or System.
-`src/routes.tsx` mounts `ChangeFeedProvider` around the workspace layout, so workspace pages
-stay current over the change feed; the layout shows `LiveStatus` from `useChangeFeedStatus()`. See
-[change feed](../../docs/change-feed.md).
+Pages compose UI and add no styles of their own: no inline styles or local stylesheets, which
+`bun run check:packages` rejects. A visual gap is filled in UI and verified in its workshop first;
+see [apps](../README.md).
+
+The guides cover each part in depth: [workspace entry](../../docs/workspace-entry.md) for the
+picker, creation, and invitations; [workspace shell](../../docs/workspace-shell.md) for the
+workspace's routes, the responsive shell, groups and threads, and the account menu; and
+[connections](../../docs/connections.md), [agents](../../docs/agents.md), and
+[workspace settings](../../docs/workspace-settings.md) for their pages.
+
+## Development
+
+```sh
+bun run --filter @amends-dev/web typecheck
+bun run --filter @amends-dev/web test
+```
+
+The tests render the app's routes over fake transports and a fake change feed: sign-in and the
+session guard, the workspace picker, the workspace layout and its pages, appearance, and recovery
+from host failures. One builds the app and fails when core's implementation reaches the browser
+bundle. See [testing](../../docs/testing.md).

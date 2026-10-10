@@ -1,376 +1,13 @@
-# PostgreSQL storage
+# @amends-dev/storage-postgresql
 
-Workspace storage, with each workspace's signal hub, and the workspace directory over PostgreSQL. Statements are
-written with Drizzle and run through `@effect/sql-pg`, so they share the Effect
-client's transaction service; the journal opens each commit on a reserved
-connection and every Drizzle statement inside it lands on that connection.
+Workspace storage, each workspace's signal hub, and the workspace directory over PostgreSQL: the
+storage the [local host](../../hosts/local/README.md) runs on. Statements are written with Drizzle
+and run through `@effect/sql-pg`, so they share the Effect client's transaction service: the journal
+opens each commit on a reserved connection, and every statement inside it lands there. The adapter
+passes the [conformance suites](../../packages/storage-conformance/README.md) every storage adapter
+runs. It is internal to this repository and not published to npm.
 
-## Schema
-
-`src/schema.ts` gives every record field its own column. Each table leads its
-primary key with `workspace_id`, and each reference between tables carries the
-workspace, so a join that starts scoped stays scoped. Projection tables have no foreign keys to
-one another: each read model rebuilds alone, in any order, and core checks references when it
-publishes the facts they come from. The log's own tables keep theirs. Tagged unions become a discriminator column plus the columns each case
-needs, with a check constraint that they agree. Invitations store a required role ID; role permissions are a text array.
-
-`drizzle/` contains one generated baseline for fresh databases. During local
-development, update `src/schema.ts`, remove the previous generated baseline, and
-run `bun run --filter @amends-dev/storage-postgresql generate --name=workspace_storage`.
-Commit the replacement baseline and reset the development database.
-`PostgresDatabase.make()` applies that baseline once before returning the service. `PostgresDatabase.layer(config)` uses that constructor;
-`PostgresDatabase.layerClient(config)` connects the same pool without migrating, for tools that only read.
-
-Journal entries keep `subject`, `fact_name`, and `fact_version` in columns and only the domain
-payload as binary. Provenance has separate performer, cause, correlation, and time
-columns; the containing row supplies its workspace ID. Check constraints enforce
-complete headers and performer/cause variants. Generic execution entries leave
-these columns null. `log_entries_by_fact` supports ordered queries by fact name;
-filtered entry pages remain separate from complete-batch replay reads.
-
-`log_entries_by_subject` supports entity history across fact names using the
-workspace, log, subject, position, and entry index. Fact subjects are required;
-generic execution entries leave the entire fact header null.
-
-`log_entries_by_commit` supports keyed append receipts and batch reads by workspace, log,
-commit, and entry index; a plan test checks that commit lookups use this index. Adding it replaced the
-development baseline; recreate disposable PostgreSQL databases when adopting it.
-
-`group_follows` stores each follow with its group, member, admission, and times;
-`group_follow_state` ties `ended_at` to the status, `active_group_follow` allows one active follow
-per admission, and `group_follows_by_group` serves a group's active followers at thread start in
-binary ID order. Adding it replaced the development baseline.
-
-Threads keep `latest_sequence` and `latest_activity_at` for their latest message, constrained by
-`thread_latest`, and groups `latest_activity_at`; updates only move them forward. Notifications
-carry `thread_id`, `thread_group_id`, and `thread_sequence` for thread activity.
-`notifications_by_thread` serves a reader's notifications from one thread by position, what they
-were told there and the pending ones settled when they read it, and
-`pending_notifications_by_group` counts them per group for the sidebar. `thread_read_positions` and
-`group_read_times` hold private read state; their upserts keep the later value with `greatest` and
-run on their own, without the workspace lock, when the caller has no transaction.
-
-Read-state tables reference no projection rows, so rebuilding projections keeps them.
-`threads_by_latest` serves a group's threads newest latest activity first, from an exclusive
-`(latest_activity_at, id)` cursor, and `threads_by_start` newest start first, from an exclusive
-`(created_at, id)` cursor. A stream page reads its threads' first activities through the
-`(thread_id, sequence)` index and counts their messages with one grouped query.
-
-`active_group_memberships_by_member` pages a member's current groups in group-ID order for
-group lists; rosters page a group's active admissions by admission ID.
-
-`active_participations_by_thread` pages a thread's current participants by participation ID,
-and `active_thread_participation`, the index that keeps one active participation per participant,
-also finds the participants a start or reply names. `active_group_membership` likewise finds the
-current admissions of the members it names.
-
-`participations_by_thread` and `group_memberships_by_member` serve a thread's participation
-history, participant checks, and a member's group admissions; they and `threads_by_group` and
-`participations_by_admission` end with `id COLLATE "C"`, so results come back in binary ID
-order without a sort. Notification and fact pages compare `(recorded_at, id)` and
-`(position, entry_index)` cursors as rows, which bounds the index scan instead of filtering
-earlier rows; newest-first inbox pages scan the same recipient indexes backwards. The directory reads across workspaces through `members_by_identity` and
-`pending_invitations_by_recipient`, and counts active members only for the identity's own
-workspaces; a workspace whose members were all removed still lists with a count of zero.
-A plan test checks these access paths, and the pending notification indexes, with sequential
-scans and sorts disabled, and that a pending read filters out none of the reader's seen rows. These indexes
-replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
-
-Members keep the name they chose in a nullable `name` column, which the directory also returns;
-a null reads as a member without a name. Renaming updates only an active member's row. Adding
-the column replaced the development baseline; recreate disposable PostgreSQL databases when
-adopting it.
-
-Batch reads (`getMany` on members, group admissions, thread participations, and messages) match
-`id = any($1)` with the IDs bound as one array against each table's workspace/ID key, so every
-batch size shares one prepared statement. Notification pending counts and `markSeen` match their
-group and notification IDs the same way, `markSeen` records them from that array in one
-statement, and a message's mentions are checked against its thread's participations in one
-query. `@effect/sql-pg` binds at most 32767 parameters in one statement, fewer than PostgreSQL
-itself allows, so multi-row inserts, `NotificationStore.insertMany` and a commit's batches,
-entries, and append keys, use as few statements as stay within one parameter per column and row.
-
-`Store.getEntry(logId, entryId)` uses the existing workspace/entry primary key and filters by
-log ID. It decodes the stored envelope through the same path as journal pages, honors a caller's
-transaction, and opens none. This supports notification-source reads without scanning the log
-or changing the schema.
-
-`connections` holds the records of connections, with an integration's settings as JSON since
-each integration declares its own. `connection_credentials` holds each connection's credential,
-one for each connection, outside the read models, so rebuilding projections keeps it: the JSON of
-its encoded form, sealed with the host's credential key and bound to its workspace and connection,
-and replaced in place when its key is. `PostgresStorage.make({ credentialKey })` takes that key as
-32 bytes of base64 and refuses a malformed one when the host starts; without one the store reports
-`Unavailable`. Sealing is AES-256-GCM with a random nonce, bound to the row as additional data.
-Grant scopes have `target_connection_id` for `Connection` targets.
-
-`agents` holds the records of agents, one row per agent with a unique membership per
-workspace. Each part of its setup is its connection's id as a column: a null
-`harness_connection_id` is `Auto`, a null `model_effort` the model's default, and a null
-`sandbox_connection_id` no sandbox.
-
-`turns` holds agents' turns, with a partial unique index that
-allows one active turn per agent and thread, and the harness, model, and sandbox a turn started on
-as columns set all together or not at all. Each turn holds how far into its thread its input
-reaches, where its entries begin in its session log, the turn it retries and who asked, both or
-neither, and its reply as a text array. A notification accepted is `Accepted`, with what accepted
-it, an agent's turn or a delivery to a contact, and the time, as columns constrained to agree with
-its recipient's kind. `session_states` holds each participation's harness session as
-its last turn left it, beside its conversation: the harness's agent, what that agent returned as
-JSON, how far into the thread it was prompted, and what it ran on, as columns.
-`session_log_entries` holds each participation's session log, keyed by its position, each entry's
-kind and turn as columns and the rest of it as JSON in `details`, as a thread activity's are. Its
-statements run on their own, apart from any transaction the caller is in, since the log takes
-part in no commit: an append checks the log's latest position, and the key refuses a position
-taken meanwhile, which is the store's `Conflict`; it then notifies on the append channel, which
-`waitForAppend` listens on, polling as the journal's readers do. Like credentials, both are
-outside the projections a rebuild discards. Changing these replaced the
-development baseline too; recreate disposable PostgreSQL databases when adopting it.
-
-`channels` holds each channel; `channel_bindings` each bound thread's conversation, keyed by the
-thread, with the conversation's id as a column and its details as JSON, unique per channel and
-conversation; `contacts` the people heard from through channels; and `channel_deliveries` each
-message's delivery to a conversation, its status's columns constrained to agree, with a partial
-index of a thread's requested deliveries by sequence and an index by channel, conversation, and
-external message id, which knows an echo. `thread_messages` holds how a message came about, an
-agent's turn or a channel's message, as `via_kind` with the turn's or the channel's columns. Adding
-these replaced the development baseline; recreate disposable PostgreSQL databases when adopting it.
-
-Fact entries require complete provenance. There are no upgrade migrations,
-backfills, or legacy envelope formats. See the
-[storage envelope](../../docs/journal.md#storage-envelope).
-
-## Layout
-
-One module per store, each exporting `make` and a `layer` for the core service it implements:
-`journal.ts`, `checkpoints.ts`, `workspaces.ts`, `members.ts`, `roles.ts`, `assignments.ts`,
-`invitations.ts`, `notifications.ts`, `groups.ts`, and `group-memberships.ts`, `group-follows.ts`,
-`read-states.ts`, `threads.ts`, `thread-participations.ts`, `thread-messages.ts`,
-`thread-activities.ts`, `tasks.ts`, `channels.ts`, `channel-bindings.ts`, `contacts.ts`, and
-`deliveries.ts`. They share `binding.ts`, which is one workspace's view of the database: its
-identity, the transaction boundary, and the guard each statement runs under. `storage.ts` exports
-`layerWorkspace(workspaceId, options)` to compose the store layers over a binding for the requested
-workspace. Its private `layerStores` merge registers each store. `database.ts` prepares an existing
-SQL client in `make` and acquires the pool in `layer`; `directory.ts` reads across workspaces, and
-`schema.ts` holds the tables. `notices.ts` is the pool's notice channel and listener, which
-`signal-hub.ts` binds to each workspace as its signal hub, `turns.ts` the queue in which a process's writers to
-one workspace or log wait for each other, and `cluster-storage.ts` the upkeep of Effect
-Cluster's tables. Bindings and raw tables are internal to the adapter's public package
-surface.
-
-Follow the [adapter naming and validation conventions](../README.md).
-`PostgresDatabase.Interface` holds the `DrizzleClient` and the Effect SQL client.
-Records are validated before converting them to columns, including scope/workspace
-consistency and invitation expiry. Edited fields use their core schemas.
-Invalid write values return the corresponding store's `Conflict` before any
-statement changes data. Query results are assembled as encoded records and then
-decoded with core schemas; corrupt rows remain `Failure` outcomes.
-
-Notification recipients are Human, Agent, Contact, or workspace-singleton Triage.
-Triage has no person ID. Recipient indexes normalize the missing ID only for
-indexing, preserving source/recipient uniqueness for concurrent Triage inserts.
-A human or agent recipient also records `recipient_member_id`, the membership notified, which
-`notification_recipient` requires for them alone. The inbox indexes key on that membership, or on
-the contact's ID, so a member who rejoins under a new ID reads none of the earlier membership's.
-Notification reads match both recipient kind and inbox, with bounded pages ordered
-by recorded time and ID using `COLLATE "C"`, which orders IDs by their bytes.
-Notification IDs and source/recipient associations are unique within the workspace.
-Inserts join the journal transaction; source existence and recipient selection
-remain generation responsibilities. The notification projection generates opening and reply message notifications from recorded thread activity
-and discards pending agent input when its participation ends, and a person's pending notifications
-from a group they leave, with one update through `pending_notifications_by_group`, which the plan
-test checks. Adding the `access-lost` reason replaced the development baseline.
-The row's `state` is the notification's: `Pending`, `Seen`, `Accepted`, `Discarded`, or
-`Informational`, and `notification_state` checks each holds its own columns and no other's. A
-human's `Seen` is private state outside the journal, so it is also kept in `notification_seen`,
-keyed by workspace and notification with the first `seen_at`, which is not a projection table: it
-has no foreign key to `notifications`, so truncating and rebuilding them keeps it. An insert of a
-pending human notification restores `Seen` and its `seen_at` from `notification_seen` in the same
-statement, so a rebuild keeps what was seen. The pending indexes cover only `Pending` rows, so
-pending reads and counts never visit a reader's seen history however long it grows.
-`markSeen` checks every notification in one query, then in one statement sets the pending rows to
-`Seen` and records `notification_seen`, in the caller's transaction or on its own; updating the
-rows first makes concurrent calls take turns on their locks, and the later one finds the row
-already `Seen`, so both agree on the first time.
-A departure that settles a row between the check and the update leaves it unseen; core reads the
-notification again and reports it handled.
-`pending_agent_notifications_by_participation` finds the pending agent input a departure settles.
-
-## Transactions
-
-Groups are team or direct rows. Team groups fill `visibility`, `Private` or `Public`, and `name`;
-direct groups fill `member_ids` and `direct_key`, derived from the ordered member set, and
-`groups_kind` rejects rows mixing them. `direct_groups_by_members` allows one direct group per
-member set, and `findDirect` resolves a set in any order. `public_groups` pages the public groups
-in binary ID order for browsing, and `summarize` sizes a page of them, with whether the reader
-belongs, in one grouped read over `active_group_membership`; the plan test checks both. Adding
-public groups replaced the development baseline; recreate disposable PostgreSQL databases when
-adopting it.
-Team creation records its group and explicit initial admissions in the shared
-workspace commit. Group admissions reference workspace memberships and have distinct IDs;
-a unique index prevents competing active admissions for the same group/member pair.
-Stores validate their own records before writes and take references to other read models as
-recorded; whether those exist and are current belongs to application operations.
-The group suite covers permission grants, rollback, reopening, replay, and direct-store
-constraints. See [group creation](../../docs/group-workflows.md) for the implemented scope.
-Later member additions reuse the same store and admission facts. The membership suite
-also verifies exact group grants, concurrent additions over independent connections,
-duplicate rejection, current eligibility, rollback, and replay. Removal and self-leave end a
-specific admission through a conditional status update; readmission uses a fresh ID. Workspace
-removal lists and settles active group admissions within the same transaction. Departure tests
-cover attribution, stale requests, partial-cleanup rollback, replay, and concurrent departure
-and admission/removal races. Departure reuses the existing schema baseline.
-Authorized group reads also reuse these stores: reads require audience membership and
-`group.read`, and no read reaches a group from outside it.
-The read suite verifies permission and audience separation, current rosters, staged changes,
-revocation, and reads without opening transactions. `builtin_role_revisions` holds the built-in
-bundle revision of each workspace's roles, which an upsert only moves forward.
-
-Thread opening persists the thread, its initial participants, a text message, ordered activity, and
-notifications in one workspace commit. A team-group opening enrolls its author and mentioned
-members; a direct-group opening enrolls all its members. A participant is a member, a contact, or
-triage, stored in `participant_kind` with its own columns: members fill `member_id`,
-`group_membership_id`, and their identity; contacts fill a `Contact` identity; triage fills none.
-`participation_participant` rejects mixed rows, and `active_thread_participation` keeps one active
-participation per member, contact, or triage in a thread. Message authors use `author_kind` with a
-member or contact column, and thread creators `created_by_kind` likewise; core requires every
-author to participate in the thread and decides which authors may publish. Departure ends a
-participation and discards pending agent input. Activity facts preserve recipient selection for
-replay. Thread reads enforce audience and action permissions in core. Timeline paging uses the
-existing workspace/thread/sequence index with an exclusive sequence cursor and a row limit. No new
-schema is needed for reads. Adapter tests cover page boundaries, ordering, workspace isolation,
-staged activity, current grants and admission state, and rejection of inconsistent references. Human
-replies use the same tables and transaction boundary. The latest-activity lookup uses the
-workspace/thread/sequence index; insertion still rejects duplicate positions and gaps. Reply tests
-cover scoped publishing grants, new and returning participants, addressing, concurrent
-replies/departures, rollback, reopening, and replay. Self-follow records a quiet activity
-referencing its participation, with no message or notifications. Activity rows hold every kind in
-one shape: the common position columns, the dotted `kind`, its `subject`, a nullable `occurrence`
-key, `new_activity`, and the kind's encoded `details` as `jsonb`, the one field not given its own
-columns, so a new kind needs no migration. A unique index on the workspace and `occurrence` keeps a
-kind recorded once per subject, as with one activity per message or per participation ending;
-repeatable kinds leave it null. Core defines and validates each kind; the table has no per-kind
-constraint. An unfollow's ending activity follows the participation's ending in the same commit and
-preserves its reason, and discards that participation's pending agent input. A group or workspace
-departure ends every participation of the admission in one `UPDATE` through
-`participations_by_admission`, and settles the member's pending notifications from the group in
-one statement per recipient kind through `pending_notifications_by_group`, however many threads
-they took part in. Every kind uses the common
-activity-recorded fact and notification generator. The participation suite covers scoped grants,
-quiet follows, rejoining, stale requests, concurrent publication, rollback, historical reads, and
-replay. Participation lifecycle activity updates the development baseline: recreate disposable
-databases rather than applying an upgrade chain. See [thread
-workflows](../../docs/thread-workflows.md).
-
-`checkpoints` holds the progress of a projection being rebuilt, and `live_projections` the
-projection versions each log's commits apply, one row per name. Live commits write neither;
-going live replaces the log's rows in the rebuild's last step. See [live
-projections](../../docs/journal.md#live-projections).
-
-Appends are staged in the transaction's session. A commit reads each log's last position once,
-the first time it appends to that log, and tracks the batch it opens and the next entry index in
-memory. Just before `COMMIT` it writes the commit row with its entry count, the new batches, the
-entries (in inserts of up to 500 rows), and the append keys, a statement each unless they exceed
-the driver's parameter limit; a transaction that reads whole batches of the log writes what it
-has staged first. Key and entry lookups inside
-the transaction answer staged appends from memory, and a transaction remembers the keys it has
-looked up, since it holds the log from its first lookup or append. A reply therefore spends one statement per
-fact on journal bookkeeping, for its idempotency key, plus a few per commit.
-
-`log_append_keys` stores durable append receipts, scoped by workspace, log, and
-idempotency key. Key lookup precedes expected-position checks; matching bytes
-return the original append slice, while conflicting bytes or count fail. The key,
-entries, and projection writes commit or roll back together. See the [journal contract](../../docs/journal.md#idempotent-publication-and-append).
-
-### Locks and timeouts
-
-Writers to one workspace take turns: each commit takes a transaction-scoped
-advisory lock keyed by the workspace before it runs. A commit also holds each log it appends
-to, or looks up a key of, with a transaction-scoped advisory lock keyed by workspace and log.
-`Store.append` opens a commit that takes only its log's lock, so execution output does not
-wait for the workspace's writers, and a transaction waits for it only on a log both write.
-
-A process's writers to one workspace, or its standalone appends to one log, first queue in
-memory (`turns.ts`), so only the one at the front takes a pooled connection and waits for
-PostgreSQL's lock. A busy workspace therefore holds at most one connection per process while
-its writers wait, and leaves the rest of the pool to other workspaces. Waiting in that queue,
-for a free connection, and for the lock share one budget, `lockTimeout` (five seconds by
-default); a writer still waiting when it runs out fails with a store conflict saying what it
-waited for, without retrying. Lock timeouts, serialization failures, and deadlocks at the
-transaction boundary map to the same conflict. The commit's `recordedAt` is taken once the
-writer holds its lock, so commit times follow commit order.
-
-Once it holds the lock, a transaction sets its own session limits, which end with it:
-`statement_timeout` (`statementTimeout`, ten seconds by default, at least `lockTimeout`)
-for each statement, and `idle_in_transaction_session_timeout` at twice `transactionTimeout`
-(thirty seconds by default). A program that runs past `transactionTimeout` rolls back and fails
-with a store failure; if the process itself stalls, PostgreSQL ends its session after twice that
-long idle, which releases its locks. The margin keeps PostgreSQL from ending a live transaction's
-session as it rolls back, which would return a closed connection to the pool. Every duration must be finite and at least a millisecond, since
-PostgreSQL reads zero as no limit; `PostgresStorage.make` refuses others when the host starts.
-
-Reads outside a transaction see committed state, each on a pooled connection of its own. A
-process's statements for one workspace outside its transactions use at most `readConnections`
-connections at once (three by default, queued in `reads.ts`), so a burst of reads for one busy
-workspace leaves the rest of the pool to the others; the reads beyond it wait for the workspace's
-own. A statement PostgreSQL
-refuses aborts its transaction; the commit checks what PostgreSQL actually did,
-so a program that swallowed such a refusal fails rather than losing its writes.
-A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the
-workspace and log once COMMIT succeeds, as one statement of its own on the commit's connection,
-so a notification means a commit and a rolled-back transaction sends none. Inside the
-transaction, the notification queue's lock would be held through the commit's WAL flush and
-serialize every notifying commit on the server. A notice lost to a failure between the two leaves
-waiters to their poll. Each pool's listener, started by the first waiting reader or signal subscriber and
-stopped 30 seconds after the last, holds one pooled connection on `LISTEN` and wakes that log's
-waiters in the process.
-A waiter takes its wakeup before checking the log, so an append between the check and the
-wait still wakes it; the log is the truth and the notification only says when to look again.
-When its connection fails, the listener listens again after a second and then wakes every waiter
-to re-check what it missed. Waiters also re-check every `pollInterval` (five seconds by default)
-without a notification. `LISTEN` needs a session connection, so behind a transaction-pooling proxy
-the adapter falls back to that interval.
-
-Each workspace's signal hub, bound with its stores, relays
-[signals](../../packages/core/README.md#signals) on the same channel: `publish` sends the
-JSON-encoded signal with its workspace through `pg_notify` outside any transaction, and the
-listener in every pool, including the sender's, decodes it once and offers it to that workspace's
-subscribers in the pool's `SignalHub.makeLocal`. Each subscriber misses the oldest once 256
-behind; a signal this version cannot decode is skipped. Nothing is stored. Signals sent while a
-listener reconnects are lost, a failed publish is logged rather than failing its operation, and a
-payload over PostgreSQL's 8000-byte notification limit is not delivered; current signals are far
-smaller. Behind a transaction-pooling proxy, signals are unavailable.
-
-Ordinary application reads and SSE authorization do not open a transaction or take
-the workspace advisory lock. They use available pool connections to query committed
-state while writers hold that lock. Separate queries may observe concurrent changes;
-reads inside an existing transaction use its staged state.
-
-The binding opens transactions with plain `BEGIN`; it does not pin isolation.
-The database/session default therefore still controls snapshot behavior despite
-the workspace advisory lock. Tests do not cover arbitrary changed isolation
-defaults. Every failed COMMIT effect currently returns `Store.CommitUncertain`,
-including errors that could be classified as definite rollback. See the
-[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
-
-## Effect Cluster's tables
-
-A host that runs jobs on Effect Cluster over this database keeps Cluster's tables
-beside the adapter's; Cluster creates them itself, with its default `cluster` prefix, and never
-removes a message or its reply. `PostgresClusterStorage.prune(entityTypes, before, options?)`
-removes the handled messages of those entity types stored before a time, with their replies, and
-returns how many went. A message's ID carries when Cluster stored it; messages not yet handled
-stay, however old, and so do other entity types'. Each statement removes at most `batch`
-messages, a thousand by default.
-
-`PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
-processes over the database never run Cluster at one address: it fails with `AddressTaken`
-while another process holds it. The claim is a session-level advisory lock on a connection it
-keeps, released before the connection goes back to the pool, or by PostgreSQL when the process
-dies. `cluster-storage.test.ts` checks pruning over a test job's real requests, and the claim
-across pools.
-
-## Composition
+## Use
 
 ```ts
 Gateway.layer().pipe(
@@ -379,51 +16,277 @@ Gateway.layer().pipe(
 );
 ```
 
-The root `layer(options)` provides the storage and directory contracts, with the
-[lock and timeout options](#locks-and-timeouts); `PostgresDatabase.layer` takes the Effect
-client's pool configuration, such as `maxConnections` (ten by default). The local host also
-supplies cryptography and composes this over the database at `AMENDS_DATABASE_URL`, with
-`AMENDS_DATABASE_POOL_SIZE` connections.
+The root `layer(options)` provides the storage contract, with its signal hubs, and the directory,
+leaving the database to the host. Its options are the [lock and timeout](#locks-and-timeouts)
+settings and `credentialKey`, the 32 bytes, as base64, that seal connections' credentials; without
+it the store keeps none and reports `Unavailable`. `PostgresDatabase.layer` takes the Effect
+client's pool configuration, such as `maxConnections` (ten by default), and applies the schema
+before returning; `PostgresDatabase.layerClient` connects the same pool without applying it, for
+tools that only read. `PostgresDatabase.make()` instead takes a `SqlClient.SqlClient` from the
+context and applies the schema through it, inside a transaction holding an advisory lock, so
+processes starting together on an empty database take turns. Keep the client's scope open while
+using the result; bindings, queries, and journal transactions all share it.
 
-`PostgresDatabase.make()` instead accepts `SqlClient.SqlClient` through Effect's
-context. It constructs the Drizzle facade and migrates through that same client, inside a
-transaction holding an advisory lock, so processes starting together on an empty database
-take turns and the later ones find nothing left to apply.
-Keep the client's scope open while using the result. Workspace bindings, Drizzle
-queries, and journal transactions all share the resulting database service.
+## Schema
 
-## Testing
+`src/schema.ts` gives every record field its own column, except a few whose shape varies by kind,
+stored as JSON: an activity's details, a session log entry's details, a connection's settings, a
+channel binding's conversation, and what a harness's agent returned of its session. Each table leads
+its primary key with `workspace_id`, and each reference between tables carries the workspace, so a
+join that starts scoped stays scoped. Projection tables have no foreign keys to one another: each
+read model rebuilds alone, in any order, and core checks references when it publishes the facts they
+come from. The log's own tables keep theirs. Tagged unions become a discriminator column plus the
+columns each case needs, with a check constraint that they agree.
 
-Tests need a PostgreSQL server. `AMENDS_POSTGRES_URL` names one the tests may
-create databases on. Without it, the tests start a throwaway cluster from a local
-installation found on PATH or in the usual Homebrew and Debian locations, and stop
-it afterwards. Without either, the tests skip. Each test creates its own database
-and drops it when done.
-Construction tests cover both `make` and `layer`, including initialization of all
-stores and reopening without data loss.
+`drizzle/` holds one generated baseline for a fresh database, which `PostgresDatabase.make` applies
+once. There are no upgrade migrations, backfills, or legacy formats; see [Development](#development)
+for changing the schema.
 
-`test/harness.ts` runs the [conformance suites](../../packages/storage-conformance/README.md) over a
-database per test: another host is another pool, woken by notifications with the default
-fallback interval, and with a 100-millisecond lock timeout when a test asks for prompt
-contention. Discarding projections truncates the projection tables, and the footprint counts the rows of every table. Each test file
-registers one suite. Beside the registrations, only what PostgreSQL stores or fails differently is
-tested here: `transactions.test.ts` injects a failed `COMMIT` to check `CommitUncertain`, and
-checks the limits: queued writers leave a small pool to other workspaces, each wait ends in a
-conflict naming it, a program past its deadline rolls back, a stalled process's session ends and
-releases the workspace, the session limits end with the transaction, a writer that waited
-records when it wrote, and invalid durations stop the storage from starting;
-`fact-metadata.test.ts` checks the fact columns, `invitations.test.ts` checks that a refused
-statement the program ignores still aborts its transaction, and `notifications.test.ts` checks that
-a malformed stored record fails reads. `journal.test.ts` checks, with an hour-long fallback
-interval, that a waiting reader wakes on another pool's commit through its notification, and still
-wakes when an append lands while its listener reconnects. The signals suite covers relaying
-between pools. `database.test.ts` covers construction,
-concurrent migration, and access paths, and `scope.test.ts` the scope columns. Each file creates its fixture through `support.ts`; the Vitest
-project's global setup owns the shared test cluster, and individual tests own their temporary
-databases.
+### Journal
 
-The development-only `@amends-dev/storage-postgresql/testing/postgres` export shares
-cluster discovery and scoped temporary databases with the feature workshop. Its
-`database(serverUrl)` returns a URL and requires a Scope; closing that scope drops
-the database. `temporary(serverUrl, use)` runs a callback in that scope. Neither
-helper is part of the adapter's runtime entry point.
+Journal entries keep `subject`, `fact_name`, and `fact_version` in columns and only the domain
+payload as binary, with the provenance's performer, cause, correlation, and time in columns of their
+own; check constraints require a complete header and a valid performer and cause. Execution log
+entries leave the header null. `log_entries_by_fact` serves ordered reads by fact name,
+`log_entries_by_subject` an entity's history across fact names, and `log_entries_by_commit` keyed
+append receipts and batch reads by commit. `log_append_keys` stores durable append receipts by
+workspace, log, and key: a matching retry returns the original append, and conflicting content
+fails. `Store.getEntry(logId, entryId)` reads one entry by its key, in the caller's transaction or
+none. `checkpoints` holds the progress of a projection being rebuilt and `live_projections` the
+versions each log's commits apply; live commits write neither. See the
+[storage envelope](../../docs/journal.md#storage-envelope) and
+[live projections](../../docs/journal.md#live-projections).
+
+### Members, access, and groups
+
+Members keep the name they chose in a nullable `name` column, which the directory also returns.
+Invitations store a required role ID, role permissions are a text array, and grant scopes have a
+column for each target kind, such as `target_connection_id`. `builtin_role_revisions` holds each
+workspace's built-in bundle revision, which an upsert only moves forward.
+
+Groups are team or direct rows: team groups fill `visibility` and `name`, direct groups `member_ids`
+and `direct_key`, derived from the ordered member set, and `groups_kind` rejects rows that mix them.
+`direct_groups_by_members` allows one direct group per member set. Group admissions reference
+memberships, and a unique index allows one active admission per group and member; removal and
+leaving end a specific admission with a conditional update, and readmission takes a fresh ID.
+`group_follows` stores each follow with its admission, and `active_group_follow` allows one active
+follow per admission.
+
+### Threads and activity
+
+A participant is a member, a contact, or triage, stored in `participant_kind` with its own columns;
+`participation_participant` rejects mixed rows, and `active_thread_participation` keeps one active
+participation per participant in a thread. Message authors and thread creators use a kind column the
+same way, and `thread_messages` records how a message came about, an agent's turn or a channel's
+message, as `via_kind` with that source's columns.
+
+Activity rows hold every kind in one shape: the position columns, the dotted `kind`, its `subject`,
+a nullable `occurrence` key, `new_activity`, and the kind's `details` as `jsonb`, so a new kind
+needs no migration. A unique index on the workspace and `occurrence` keeps a kind recorded once per
+subject; repeatable kinds leave it null. Core defines and validates each kind, and the table has no
+per-kind constraint. Inserting at a thread's sequence rejects duplicates and gaps.
+
+Threads keep `latest_sequence` and `latest_activity_at` for their latest message, and groups
+`latest_activity_at`; updates only move them forward. `threads_by_latest` serves a group's threads
+newest activity first and `threads_by_start` newest start first, each from an exclusive row cursor;
+a stream page reads its threads' first activities through the `(thread_id, sequence)` index and
+counts their messages in one grouped query. A group or workspace departure ends every participation
+of the admission in one `UPDATE` through `participations_by_admission`.
+
+### Notifications and read state
+
+A notification's recipient is a human, agent, or contact, or the workspace's one triage, which has
+no ID; recipient indexes normalize the missing ID for indexing alone, so concurrent triage inserts
+stay unique. A human or agent recipient also records `recipient_member_id`, the membership notified,
+and the inbox indexes key on it or on the contact's ID, so a member who rejoins under a new ID reads
+none of the earlier membership's. The row's `state` is the notification's, and `notification_state`
+checks that each state holds its own columns and no other's; an accepted notification records what
+accepted it, an agent's turn or a delivery to a contact.
+
+A person's `Seen` is private state outside the journal, so it is also kept in `notification_seen`,
+which has no foreign key to `notifications`: rebuilding them keeps it, and inserting a pending human
+notification restores `Seen` from it in the same statement. `markSeen` checks every notification in
+one query, then sets the pending rows to `Seen` and records `notification_seen` in one statement, so
+concurrent calls take turns on the rows' locks and agree on the first time. The pending indexes
+cover only pending rows, so pending reads and counts never visit a reader's seen history.
+`notifications_by_thread` serves a reader's notifications from one thread by position, and
+`pending_notifications_by_group` counts them per group and settles a departing member's pending ones
+in one statement per recipient kind.
+
+`thread_read_positions` and `group_read_times` hold private read state, reference no projection
+rows, and survive rebuilds. Their upserts keep the later value with `greatest`, and run on their
+own, without the workspace lock, when the caller has no transaction.
+
+### Connections, agents, and turns
+
+`connections` holds connections, with an integration's settings as JSON. `connection_credentials`
+holds each connection's credential outside the read models, sealed with the host's credential key
+using AES-256-GCM with a random nonce, bound to its workspace and connection as additional data, and
+replaced in place when its key is. A malformed key stops the storage from starting.
+
+`agents` holds one row per agent, with a unique membership per workspace; each part of its setup is
+its connection's ID as a column, where a null `harness_connection_id` is `Auto`, a null
+`model_effort` the model's default, and a null `sandbox_connection_id` no sandbox. `turns` holds
+agents' turns, with a partial unique index allowing one active turn per agent and thread, and the
+harness, model, and sandbox a turn started on as columns set all together or not at all.
+
+`session_states` holds each participation's harness session as its last turn left it, and
+`session_log_entries` each participation's session log, keyed by position, with each entry's kind
+and turn as columns and the rest in `details`. Session log statements run apart from any transaction
+the caller is in, since the log takes part in no commit: an append checks the log's latest position,
+the key refuses a position taken meanwhile, which is the store's `Conflict`, and it then notifies
+readers waiting for an append. Both tables, like credentials, survive rebuilds.
+
+### Channels
+
+`channels` holds each channel, `channel_bindings` each bound thread's conversation, keyed by the
+thread and unique per channel and conversation, `contacts` the people heard from through channels,
+and `channel_deliveries` each message's delivery to a conversation. Deliveries keep a partial index
+of a thread's requested deliveries by sequence, and an index by channel, conversation, and external
+message ID that recognizes an echo.
+
+### Access paths
+
+Indexes that list IDs end with `id COLLATE "C"`, so results come back in binary ID order without a
+sort, and page cursors such as `(recorded_at, id)` and `(position, entry_index)` compare as rows,
+which bounds the index scan; newest-first inbox pages scan the recipient indexes backwards. The
+directory reads across workspaces through `members_by_identity` and
+`pending_invitations_by_recipient`, counting active members only for the identity's own workspaces.
+
+Batch reads match `id = any($1)` with the IDs bound as one array, so every batch size shares one
+prepared statement, as do pending counts, `markSeen`, and checking a message's mentions.
+`@effect/sql-pg` binds at most 32,767 parameters in one statement, so multi-row inserts, such as
+`NotificationStore.insertMany` and a commit's batches, entries, and append keys, use as few
+statements as stay within that. A plan test checks these access paths with sequential scans and
+sorts disabled.
+
+## Transactions
+
+Appends are staged in the transaction's session. A commit reads each log's last position the first
+time it appends to the log, and tracks the batch it opens and the next entry index in memory. Just
+before `COMMIT` it writes the commit row, the new batches, the entries, in inserts of up to 500
+rows, and the append keys; a transaction that reads whole batches of the log writes what it staged
+first. Key and entry lookups inside the transaction answer staged appends from memory. A reply
+therefore spends one statement per fact on journal bookkeeping, for its idempotency key, plus a few
+per commit.
+
+The adapter checks what it writes before writing: records are validated against core's schemas,
+including scope and workspace consistency and invitation expiry, and an invalid value returns the
+store's `Conflict` before any statement changes data. Rows read back are assembled as encoded
+records and decoded with core's schemas, so a corrupt row fails the read. A statement PostgreSQL
+refuses aborts its transaction, and the commit checks what PostgreSQL actually did, so a program
+that swallowed such a refusal fails rather than losing its writes.
+
+### Locks and timeouts
+
+Writers to one workspace take turns: each commit takes a transaction-scoped advisory lock keyed by
+the workspace before it runs. A commit also holds each log it appends to, or looks up a key of, with
+an advisory lock keyed by workspace and log. `Store.append` opens a commit that takes only its log's
+lock, so execution output does not wait for the workspace's writers.
+
+A process's writers to one workspace, or its standalone appends to one log, first queue in memory
+(`turns.ts`), so only the one at the front takes a pooled connection and waits for PostgreSQL's
+lock. A busy workspace therefore holds at most one connection per process while its writers wait.
+Waiting in that queue, for a free connection, and for the lock share one budget, `lockTimeout` (five
+seconds by default); a writer still waiting when it runs out fails with a store conflict saying what
+it waited for, without retrying. Lock timeouts, serialization failures, and deadlocks at the
+transaction boundary map to the same conflict. A commit's `recordedAt` is taken once the writer
+holds its lock, so commit times follow commit order.
+
+Once it holds the lock, a transaction sets its own session limits, which end with it:
+`statement_timeout` from `statementTimeout` (ten seconds by default, at least `lockTimeout`), and
+`idle_in_transaction_session_timeout` at twice `transactionTimeout` (thirty seconds by default). A
+program that runs past `transactionTimeout` rolls back and fails with a store failure; if the
+process itself stalls, PostgreSQL ends its session after twice that long idle, releasing its locks.
+Every duration must be finite and at least a millisecond, since PostgreSQL reads zero as no limit;
+`PostgresStorage.make` refuses others when the host starts.
+
+Reads outside a transaction see committed state, each on a pooled connection of its own, and take no
+lock, so they proceed while writers hold the workspace. A process's statements for one workspace
+outside its transactions use at most `readConnections` connections at once (three by default, queued
+in `reads.ts`), so a burst of reads for one busy workspace leaves the rest of the pool to the
+others. Separate queries may observe concurrent changes; reads inside a transaction see its staged
+state.
+
+A commit that appends to a log sends `pg_notify` on the `amends_notices` channel with the workspace
+and log once `COMMIT` succeeds, as a statement of its own on the commit's connection, so a
+notification means a commit. Each pool's listener, started by the first waiting reader or signal
+subscriber and stopped 30 seconds after the last, holds one connection on `LISTEN` and wakes that
+log's waiters. A waiter takes its wakeup before checking the log, so an append in between still
+wakes it; the log is the truth, and the notification only says when to look again. When its
+connection fails, the listener listens again after a second and wakes every waiter to check what it
+missed, and waiters also check every `pollInterval` (five seconds by default). `LISTEN` needs a
+session connection, so behind a transaction-pooling proxy the adapter falls back to that interval.
+
+The binding opens transactions with plain `BEGIN` and does not pin isolation, so the database's
+default still controls snapshots. Every failed `COMMIT` returns `Store.CommitUncertain`, including
+errors that could be classified as a definite rollback; see
+[known limitations](../../docs/current-status.md#commit-outcomes-and-postgresql-contention).
+
+## Signals
+
+Each workspace's [signal hub](../../packages/core/README.md#signals) relays signals on the same
+channel: `publish` sends the JSON-encoded signal with its workspace through `pg_notify` outside any
+transaction, and the listener in every pool, the sender's included, decodes it once and offers it to
+that workspace's subscribers through the pool's `SignalHub.makeLocal`. A subscriber more than 256
+behind misses the oldest, and a signal this version cannot decode is skipped. Nothing is stored:
+signals sent while a listener reconnects are lost, a failed publish is logged rather than failing
+its operation, and a payload over PostgreSQL's 8,000-byte notification limit is not delivered.
+Behind a transaction-pooling proxy, signals are unavailable.
+
+## Effect Cluster's tables
+
+A host that runs jobs on Effect Cluster over this database keeps Cluster's tables beside the
+adapter's, which Cluster creates itself with its `cluster` prefix and never prunes.
+`PostgresClusterStorage.prune(entityTypes, before, options?)` removes the handled messages of those
+entity types stored before a time, with their replies, at most `batch` per statement (a thousand by
+default), and returns how many went; messages not yet handled stay however old.
+`PostgresClusterStorage.claimAddress(address)` holds a runner address for its scope, so two
+processes never run Cluster at one address: it fails with `AddressTaken` while another holds it. The
+claim is a session-level advisory lock on a connection it keeps, released before the connection
+returns to the pool, or by PostgreSQL when the process dies.
+
+## Layout
+
+One module per store, each exporting `make` and a `layer` for the core store it implements, such as
+`members.ts`, `threads.ts`, `turn-records.ts`, `session-logs.ts`, and `deliveries.ts`. They share
+`binding.ts`, one workspace's view of the database: its identity, the transaction boundary, and the
+guard each statement runs under. `storage.ts` composes every store over a binding for one workspace
+(`layerWorkspace`), and its private `layerStores` registers each store. `database.ts` prepares the
+SQL client, `directory.ts` reads across workspaces, `schema.ts` holds the tables, `notices.ts` is
+the pool's notification listener that `signal-hub.ts` binds to each workspace, `turns.ts` and
+`reads.ts` are the writer queue and read cap above, `credential-key.ts` seals credentials, and
+`cluster-storage.ts` is the upkeep of Cluster's tables. Bindings and raw tables stay internal.
+Follow the [adapter conventions](../README.md).
+
+## Development
+
+To change the schema, edit `src/schema.ts`, remove the generated baseline in `drizzle/`, generate a
+new one, commit it, and reset development databases:
+
+```sh
+bun run --filter @amends-dev/storage-postgresql generate --name=workspace_storage
+```
+
+CI regenerates the baseline and fails when it differs from the committed one. The adapter's tests
+run in the `postgresql` project:
+
+```sh
+bun run test --project postgresql adapters/storage-postgresql
+```
+
+They need a PostgreSQL server: `AMENDS_POSTGRES_URL` names one the tests may create databases on.
+Without it, the tests start a throwaway cluster from a local installation found on `PATH` or in the
+usual Homebrew and Debian locations, and stop it afterwards; without either, they are skipped. Each
+test creates its own database and drops it when done.
+
+`test/harness.ts` runs the conformance suites over a database per test: another host is another
+pool, and a test that asks for prompt contention gets a 100-millisecond lock timeout. Beside the
+registrations, only what PostgreSQL stores or fails differently is tested here, such as a failed
+`COMMIT` returning `CommitUncertain` and the lock and session limits (`transactions.test.ts`), the
+fact columns (`fact-metadata.test.ts`), a refused statement still aborting its transaction
+(`invitations.test.ts`), waiters woken through notifications (`journal.test.ts`), construction,
+concurrent schema application, and the plan test (`database.test.ts`), scope columns
+(`scope.test.ts`), and Cluster's tables (`cluster-storage.test.ts`). `test/postgres.ts` finds or
+starts the server and makes temporary databases; the package exports it as
+`@amends-dev/storage-postgresql/testing/postgres`. See [testing](../../docs/testing.md).

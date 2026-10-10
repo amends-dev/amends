@@ -1,9 +1,12 @@
-# Amends icons
+# @amends-dev/icons
 
-`@amends-dev/icons` provides shared Solid SVG components for apps and UI packages. It
-has no runtime dependency beyond its Solid peer, no global styles, and no dependency
-on UI packages, application contracts, or a host. Add `"@amends-dev/icons": "workspace:*"`
-to a consuming workspace's dependencies and run `bun install` at the root.
+The icons the amends apps draw: Solid SVG components generated from canonical drawings, with their
+raw SVGs and a separate metadata catalog. The [UI package](../ui/README.md) draws every icon it
+shows from here. The package has no runtime dependency beyond its Solid peer, no global styles,
+and no dependency on UI, application contracts, or a host.
+
+The package is internal to this repository and not published to npm. A workspace uses it by adding
+`"@amends-dev/icons": "workspace:*"` to its dependencies and running `bun install` at the root.
 
 ```tsx
 import { IconMarkSearch, IconCircleCheck } from "@amends-dev/icons";
@@ -16,19 +19,19 @@ import { IconMarkDone } from "@amends-dev/icons/mark-done";
 <IconMarkDone size={24} weight={1.75} />;
 ```
 
-The 26 `mark-*` drawings reinterpret the named glyphs in the
-[Primitives v2 Marks reference](<../../design-system/Amends Primitives v2.dc.html>) as
-portable SVGs. They are the visual reference for frontend navigation and actions when
-the reference names the control. The earlier 23 outline utility icons remain for
-controls without a corresponding mark, including the mobile hamburger, sidebar toggles,
-notifications, and delete. `IconBellFilled` is the bell's filled state, for following. `IconList`
-opens a destination's full list from its sidebar section. `IconMarkMenu` is the reference's downward menu caret;
-`IconMenu` remains the mobile hamburger. The composer's formatting controls use nine drawings of
-our own: `bold`, `italic`, `strikethrough`, `link`, `list-ordered`, `quote`, `code`, `code-block`,
-and `type`, which shows or hides them; its bulleted list reuses `list`. Named exports and individual subpaths both
-point to generated Solid source.
-Consumers must compile dependency TSX with their Solid plugin, as our Vite apps do.
-The UI package draws every icon it shows from this package.
+The `mark-*` drawings reinterpret the named glyphs in the
+[Primitives v2 Marks reference](<../../design-system/Amends Primitives v2.dc.html>) as portable
+SVGs, and are the reference for navigation and actions wherever it names the control. Their paths
+are drawings, not embedded text glyphs, so they keep the package's theming, sizing, and
+accessibility across platforms. Outline utility icons cover controls without a mark, such as the
+mobile hamburger (`IconMenu`), the sidebar toggles, notifications, and delete. `IconBellFilled` is
+the bell's filled state, for following; `IconList` opens a destination's full list from its sidebar
+section; and `IconMarkMenu` is the reference's downward menu caret. The composer's formatting
+controls use nine drawings, `bold`, `italic`, `strikethrough`, `link`, `list-ordered`, `quote`,
+`code`, `code-block`, and `type`, which shows or hides them; its bulleted list reuses `list`.
+
+Named exports and individual subpaths both point to generated Solid source, so a consumer compiles
+the package's TSX with its Solid plugin, as the apps' Vite builds do.
 
 ## Rendering contract
 
@@ -57,7 +60,21 @@ Directional mirroring belongs to the consumer: Shell mirrors sidebar glyphs in R
 the package does not mirror every icon. Animation and reduced-motion behavior also
 belong to the consuming control.
 
-## Source and generation
+## Catalog and raw SVGs
+
+```ts
+import { iconCatalog, type IconName } from "@amends-dev/icons/catalog";
+```
+
+Catalog records contain names, titles, categories, keywords, and component export
+names. They do not import components. The component entry point does not import
+catalog data; there is no global runtime icon registry. A Vite/Solid consumer test
+checks that one named icon excludes unrelated geometry, and that catalog-only
+consumers exclude Solid. Raw assets are available at `@amends-dev/icons/svg/<name>.svg`;
+copy them to a public location if needed. External images do not inherit the page's
+text color; use Solid inline icons for themed UI.
+
+## Adding an icon
 
 `drawings/<name>.icon.json` is canonical. Each file contains a shape-based kebab-case
 name, a title, nonempty category/keyword lists, and a small list of drawing primitives.
@@ -82,17 +99,8 @@ Search existing names and meanings before drawing another icon.
 }
 ```
 
-From the repository root:
-
-```sh
-bun run --filter @amends-dev/icons generate
-bun run check:icons
-bun run test --project @amends-dev/icons
-bun run --filter @amends-dev/ui dev
-```
-
-The compiler validates the entire set before writing. Generation creates
-`src/generated/*.tsx`, the named-export `src/index.ts`, metadata-only `src/catalog.ts`,
+`bun run --filter @amends-dev/icons generate` validates the entire set before writing, then
+creates `src/generated/*.tsx`, the named-export `src/index.ts`, metadata-only `src/catalog.ts`,
 and `svg/*.svg`. Commit these alongside the canonical drawings. Do not hand-edit
 generated outputs. Removing a drawing and regenerating removes its obsolete outputs;
 references to the removed drawing fail validation. `check:icons` compares generated
@@ -103,7 +111,7 @@ The build tools run directly on Bun. The compiler has no geometry-library depend
 the generator uses the root Oxfmt installation to produce deterministic formatted
 source. Runtime components never import the generator or its dependencies.
 
-## Drawing rules
+### Drawing rules
 
 The numeric contract lives in [scripts/compiler.ts](scripts/compiler.ts). Canvas is
 24 by 24; coordinates stay between 2 and 22 on integer or half-unit grid positions.
@@ -128,19 +136,7 @@ primitives/modifiers, malformed metadata, invalid coordinates/radii, duplicate n
 missing references, and cycles fail explicitly. There is no raw path escape hatch.
 Extend the typed language and its validation only when a new needed drawing requires it.
 
-## Catalog and review
-
-```ts
-import { iconCatalog, type IconName } from "@amends-dev/icons/catalog";
-```
-
-Catalog records contain names, titles, categories, keywords, and component export
-names. They do not import components. The component entry point does not import
-catalog data; there is no global runtime icon registry. A Vite/Solid consumer test
-checks that one named icon excludes unrelated geometry, and that catalog-only
-consumers exclude Solid. Raw assets are available at `@amends-dev/icons/svg/<name>.svg`;
-copy them to a public location if needed. External images do not inherit the page's
-text color; use Solid inline icons for themed UI.
+### Review
 
 Open **Foundations / Icons** in the UI Storybook to review the set in light and dark. Gallery
 searches names, keywords, and categories across marks and utility icons. Sizes compares
@@ -152,13 +148,23 @@ Judge additions at their actual small sizes beside related icons and inside thei
 controls. Check gaps, balance, centering, disabled appearance, theme inheritance,
 RTL where relevant, and enlarged root text. Numeric validation is not visual approval.
 
-## Current scope
+## Scope
 
-The compiler supports only what the current set draws, not a general drawing language.
-The 26 mark drawings were added from the Amends Primitives v2 reference's named glyphs;
-`mark-settings` reuses the existing gear construction. Their SVG paths are our drawings,
-not embedded text glyphs, so they keep the package's theming, sizing, and accessibility
-contract across platforms.
+The compiler supports only what the current set draws, not a general drawing language. Tonal
+variants, sprites, automatic optical-balance reports, transforms, and publishing to npm are not
+implemented. Add them only with a concrete consumer and verification.
 
-Tonal variants, sprites, automatic optical-balance reports, transforms, and public npm
-publishing are not implemented. Add them only with a concrete consumer and verification.
+## Development
+
+From the repository root:
+
+```sh
+bun run --filter @amends-dev/icons generate
+bun run check:icons
+bun run test --project @amends-dev/icons
+bun run --filter @amends-dev/ui dev
+```
+
+`generate` writes the generated files, `check:icons` verifies them without writing, and the tests
+cover the compiler's validation, the components' naming and reactivity, and what consumer bundles
+include. The last command opens the UI workshop for review. See [testing](../../docs/testing.md).

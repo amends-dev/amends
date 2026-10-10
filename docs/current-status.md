@@ -310,7 +310,7 @@ from other workspaces appear only when the page wakes or reloads, since no ident
 exists.
 Only local sign-out exists; server revocation,
 token refresh, native credential storage, and web/desktop login synchronization are
-future work. The removed legacy web screens remain available in Git history.
+future work.
 Route focus management, Tauri signing/updates, production artwork,
 and cross-platform installer verification are pending.
 

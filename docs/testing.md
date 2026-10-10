@@ -249,7 +249,7 @@ The suite checks journal round trips, transactional behavior, inbox isolation, a
 ordinary SSE reconnects. Fixed SchemaBinary fixtures cover representative workspace,
 message, and turn-checkpoint payloads from rc.115; other payload variants remain unverified.
 The suite does not yet include PostgreSQL isolation-default variations or deadlock classification,
-repeated Ready/disconnect backoff behavior, or an application request-body limit.
+or repeated Ready/disconnect backoff behavior.
 These [known limitations](current-status.md) remain open even when the existing
 suite passes. Notification storage and inbox tests seed records; thread workflow tests verify
 opening and reply publication, participation admission, recipient selection, concurrent sequencing,

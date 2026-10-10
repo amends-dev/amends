@@ -1,10 +1,12 @@
-# Amends client
+# @amends-dev/client
 
-`@amends-dev/client` is the headless half of web and desktop. It talks to the host, keeps what it
-read current, and gives each screen a hook that returns what to show and the actions it offers.
-It renders nothing: web and desktop connect these hooks to [UI](../ui/README.md) screens and own
-routes, navigation, and page composition. Its hooks return the screens' own types, which it
-imports type-only from UI; UI imports nothing from client. The package lives under `apps/*`
+The headless half of the [web](../web/README.md) and [desktop](../desktop/README.md) apps. It talks
+to the host, keeps what it read current, and gives each screen a hook that returns what to show and
+the actions it offers. It renders nothing: web and desktop connect these hooks to
+[UI](../ui/README.md) screens and own routes, navigation, and page composition. Its hooks return
+the screens' own types, which it imports type-only from UI; UI imports nothing from client.
+
+The package is internal to this repository and not published to npm. It lives under `apps/`
 because its hooks use Solid and browser storage.
 
 ## Layout
@@ -12,6 +14,7 @@ because its hooks use Solid and browser storage.
 ```text
 src/
   provider.tsx    ClientProvider: the credential, and an API client and atom registry made for it
+  configuration.ts  resolveApiBaseUrl: the API URL an app resolves once at startup
   sign-in.ts      useSignIn
   api/            shared plumbing: the client, failures, invalidation keys, useMutation,
                   useChanges, refreshResult, the directory read
@@ -26,8 +29,8 @@ src/
 
 A feature's hooks return plain data and callbacks, typed as the screens' types: names instead of
 IDs where screens show names, and failure codes the screens word. Where a page links what a hook
-returns, the hook gives the screen's type without its hrefs and with the IDs the page links by. Each hook's doc comment states its contract; the tests in
-`test/` exercise them.
+returns, the hook gives the screen's type without its hrefs and with the IDs the page links by.
+Each hook's doc comment states its contract; the tests in `test/` exercise them.
 
 ## Reads
 
@@ -112,14 +115,15 @@ on decoded values. The client exports `DirectoryState`, `SignInState`, and
 `CreateWorkspaceState` as constructor bundles alongside their types, so app pages
 can use their `$is` guards without comparing `_tag` directly.
 
-## Verification
+## Development
 
 ```sh
 bun run --filter @amends-dev/client typecheck
 bun run --filter @amends-dev/client test
-bun run check
 ```
 
 Tests mount hooks inside `ClientProvider` over fake fetch transports, with no UI or router. They
 cover sign-in, session storage and replacement, rejected credentials, the directory, the change
 feed over a fake event stream, and each feature's reads, writes, failures, and cancellation.
+`bun run check` at the repository root also enforces the package's boundaries. See
+[testing](../../docs/testing.md).

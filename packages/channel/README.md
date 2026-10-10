@@ -87,9 +87,7 @@ repeat as nothing new.
 
 ## Development
 
-```sh
-bun run check
-```
-
-The package is a contract and has no tests of its own; `@amends-dev/connection` checks what it does
-with a transport, and `@amends-dev/storage-conformance` runs channels on a test transport.
+The package is a contract and has no tests of its own: `@amends-dev/connection` checks what it does
+with a transport, and `@amends-dev/storage-conformance` runs channels on a test transport. See
+[testing](../../docs/testing.md). `bun run dist check packages/channel` builds the package as npm
+gets it and checks it as a consumer; see [publishing](../../docs/publishing.md).

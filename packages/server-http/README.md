@@ -1,121 +1,90 @@
-# HTTP server
+# @amends-dev/server-http
 
-`@amends-dev/server-http` implements the `@amends-dev/api-http` groups with
-`HttpApiBuilder`. Each workspace handler decodes the request, reads the
-`Principal` the authentication middleware provided, enters the workspace through
-`Gateway.asMember` or `Gateway.inWorkspace`, and calls one core application
-service. The session and directory handlers call the host's `SignIn` and
-`WorkspaceDirectory` services directly. Encoding, status codes, and error decoding
-come from the contract. Handlers read principals and enforce human-only entry
-points; credential verification belongs to the authentication middleware, and
-domain rules belong to core.
+The HTTP server for the [HTTP contract](../api-http/README.md): one handler module per endpoint
+group, built with Effect's `HttpApiBuilder`, and the bearer authentication the contract declares. A
+host mounts its routes over the [gateway](../gateway/README.md), and the
+[local host](../../hosts/local/README.md) does so on Bun. It is internal to this repository and not
+published to npm.
 
-Notification handlers enter through `Gateway.asMember` and call
-`NotificationService.inbox`, `countPending`, `markSeen`, or `markSeenThrough`. The contract
-decodes the page size, cursor, and optional pending-only filter; core derives the
-recipient from the actor and checks active membership and recipient ownership. The HTTP layer adds
-no notification generation or delivery.
+Each workspace handler decodes the request, reads the `Principal` the authentication middleware
+provided, enters the workspace through `Gateway.asMember`, or `Gateway.inWorkspace` where no member
+acts, and calls one core service. Encoding, status codes, and error decoding come from the contract.
+Credential verification belongs to the middleware and domain rules to core; handlers only pass
+principals, paths, bodies, and `Idempotency-Key` headers into core's inputs, and refuse agents at
+the endpoints only a person may call.
 
-Group and thread handlers enter through `Gateway.asMember` and call one of `GroupService`,
-`GroupMembershipService`, `GroupFollowService`, `ThreadService`,
-`ThreadMessageService`, `ThreadParticipationService`, or `ReadStateService`. They
-combine the path's group or thread ID with the body into the operation's input and pass the
-`Idempotency-Key` header as its request key; core authorizes, validates, and chooses who takes
-part. Management reads of groups the caller does not belong to are not exposed.
+## Use
 
-Channel handlers enter through `Gateway.asMember` and call `ChannelService`. The events route
-enters through `Gateway.inWorkspace` with no principal and hands the request's headers and body,
-as text, to `ChannelIntake.receive`, answering with the text the transport says to give.
-
-`ChangeFeedHandlers.watch` enters through `Gateway.asMember` and calls
-`ChangeFeedService.watch`. Effect's HTTP server transfers the request scope
-to the response stream, keeping the workspace services and subscription alive until
-completion or disconnect. The `after` query resumes from a cursor. HTTP owns SSE
-encoding, cache headers, and comment heartbeats; core owns the Ready/Committed schemas,
-payload views, and per-event authorization. The handler sends no frontend query keys.
-Effect's SSE encoder would send a stream's whole failure cause to the client, defects included,
-so the handler logs an unexpected failure at error level and ends the stream with
-`ChangeFeed.Unavailable` alone.
-
-`TurnsHandlers.watchLog` serves `TurnService.watchLog` the same way, ending with
-`Turn.LogUnavailable` where the change feed ends with `ChangeFeed.Unavailable`. Both streams share
-`Streams`: their heartbeats and headers, the containment of unexpected failures, the end as the
-server drains, and the limits below.
-
-Each process serves a limited number of streams at once, change streams and turn logs alike:
-`Streams.Limits`, a
-context reference, allows a thousand per workspace and twenty per member of it by default, and
-a host provides its own to change them. A stream holds its place from before the gateway admits
-it until its response ends; a stream beyond either limit fails with `Api.TooManyStreams` (429),
-naming which limit it met.
-
-`Draining.Service` is the server beginning to shut down. Where a host provides it, open change
-streams end with `ChangeFeed.Unavailable`, and turn logs with `Turn.LogUnavailable`, as it completes, so their clients reconnect, to another
-process if one runs, and the HTTP server's graceful stop waits only for ordinary requests rather
-than for every open stream. `Draining.layer` creates it, and a host builds
-`Draining.layerOnRelease` after its HTTP server so that releasing it, first, begins the drain.
-
-## Organization
-
-Keep one focused handler module per HTTP group, with filenames matching
-`@amends-dev/api-http`. Names such as `MembersHandlers` and `InvitationsHandlers`
-describe endpoint collections; `Routes` composes them. `BearerAuthentication`
-implements the middleware contract. `Principal` is the authenticated human or
-agent identity; core's `Actor.Service` is the workspace member resolved by the
-gateway for an operation.
-
-Handlers and host stubs use the decoded gateway models: `humanId` on a sign-in
-session and `activeMemberCount` on a directory membership. The contract codecs
-preserve the existing `identity` and `people` JSON keys.
-
-## Construction and registration
-
-`BearerAuthentication.make()` constructs the contract's `Authentication`
-implementation from `SessionTokens.Service`. `BearerAuthentication.layer`
-delegates to it. Construction captures the resolver; each request resolves its
-own bearer token and supplies its own `Principal`. Hosts provide the token
-resolver through the gateway contract.
-
-Each handler module exports `layer`, using Effect's `HttpApiBuilder.group` to
-register its endpoints. The group callback captures stable host services and
-reads `Principal` during each protected request. This is Effect's registration
-API, so no separate constructor or service tag is added around the handler
-collection. `HttpApiBuilder` checks that every declared endpoint is implemented.
-
-`Routes.layer` registers every group and serves the OpenAPI document at
-`/openapi.json`; `Routes.layerDocs` serves interactive documentation at `/docs`.
-`Routes.layerHandlers` exposes the group layers and authentication for tests.
 A host supplies `Gateway.Service`, `SignIn.Service`, `SessionTokens.Service`,
-`WorkspaceDirectory.Service`, and its platform HTTP services, then mounts the
-route layers with `HttpRouter.serve` or `HttpRouter.toWebHandler`.
+`WorkspaceDirectory.Service`, and its platform's HTTP services, then mounts the routes with
+`HttpRouter.serve` or `HttpRouter.toWebHandler`:
 
-## Testing
+- `Routes.layer` registers every group, with the OpenAPI document at `/openapi.json`.
+- `Routes.layerDocs` serves interactive documentation at `/docs`.
+- `Routes.layerHandlers` is the group layers and authentication alone, for tests.
+- `BearerAuthentication.make()` builds the contract's `Authentication` from `SessionTokens.Service`,
+  and `BearerAuthentication.layer` provides it. Each request resolves its own bearer token and
+  supplies its own `Principal`.
 
-Tests run the handlers through `HttpApiTest` against a gateway stub that
-records entry and runs programs over stubbed core services, covering principal
-and parameter passing, tag and status preservation, unauthorized rejection
-before any gateway call, human-only endpoints, and JSON round-tripping of dates
-and grants, and compatibility of session and directory JSON fields. The local host's tests cover the same routes
-over real PostgreSQL storage, including through its spawned server entry point.
-Notification tests cover cursor and date round-trips, filter selection, malformed
-queries, human and agent inbox isolation, workspace boundaries, and loss of access
-after membership removal. Host fixtures seed notification records to reach agent
-recipients, whose admission is not implemented.
-A handler test checks that group and thread routes merge path parameters, cursors, and request
-keys into core inputs and keep each outcome's status. Conversation host tests run a team
-conversation over PostgreSQL: group creation and its retry, starts, mentions reaching the inbox
-and resolving to their source, replies, timeline pages from either end, participants, following,
-read positions, leaving, and the 404s after it; and direct threads, thread-list cursors, fixed
-direct groups, outsiders, malformed queries, and the OpenAPI document. Connection host tests add a
-connection over PostgreSQL, key it, check that no read carries the key, rename it through a
-conflict, remove it, and refuse a key on a host without a credential key. Environment host tests
-list the installed harness and providers and the in-process environment, add a Daytona environment
-under a Daytona account connection whose readiness follows its key, and rename, reconfigure, and
-remove it. Agent host tests add an agent over an Anthropic connection, ready once its key is set,
-list it among the members, refuse a reasoning level amends does not take, and reconfigure, rename,
-and remove it. Turn host tests ask an agent in a thread and follow its turn over HTTP to its reply
-from a local model server, retry a turn whose key was refused, and stop a running one.
-Change-feed host tests exercise real streaming response lifetimes, two subscribers,
-cross-user delivery, workspace isolation, payload encoding, active membership,
-resuming from a cursor, and rejection of invalid cursors. A handler test checks that a stream
-failing unexpectedly is logged and reaches its client as `ChangeFeed.Unavailable` alone.
+## Handlers
+
+The session and directory handlers call the host's `SignIn` and `WorkspaceDirectory` directly. Every
+other group enters a workspace and calls the core service it is named for: notifications call
+`NotificationService`, groups and threads call `GroupService`, `GroupMembershipService`,
+`GroupFollowService`, `ThreadService`, `ThreadMessageService`, `ThreadParticipationService`, and
+`ReadStateService`, and so on for tasks, connections, agents, turns, and channels. A handler merges
+the path's IDs, the body, and any cursor into the operation's input; core authorizes, validates, and
+chooses who takes part.
+
+The channel events route has no principal. It enters through `Gateway.inWorkspace` and hands the
+request's headers and body, as text, to `ChannelIntake.receive`, answering with the text the
+channel's transport says to give.
+
+## Streams
+
+`ChangeFeedHandlers.watch` serves `ChangeFeedService.watch`, and `TurnsHandlers.watchLog` serves
+`TurnService.watchLog`, both as server-sent events. Effect's HTTP server moves the request's scope
+to the response stream, so the workspace and the subscription stay open until the stream completes
+or the client disconnects. HTTP owns the SSE encoding, cache headers, and comment heartbeats every
+five seconds; core owns the messages and who may see each one. The handlers send no frontend query
+keys.
+
+Both streams share `Streams`, which also contains unexpected failures: Effect's SSE encoder would
+send a stream's whole failure cause to the client, so the handler logs it and ends the change feed
+with `ChangeFeed.Unavailable`, or a turn log with `Turn.LogUnavailable`, alone.
+
+Each process serves a limited number of streams at once, change feeds and turn logs together.
+`Streams.Limits`, a context reference, allows a thousand per workspace and twenty per member of it
+by default, and a host provides its own to change them. A stream holds its place from before the
+gateway admits it until its response ends, and a stream beyond either limit fails with
+`Api.TooManyStreams` (429), naming the limit it met.
+
+`Draining.Service` is the server beginning to shut down. Where a host provides it, open streams end
+with their `Unavailable` error as it completes, so their clients reconnect, to another process if
+one runs, and the HTTP server's graceful stop waits only for ordinary requests. `Draining.layer`
+creates it, and a host builds `Draining.layerOnRelease` after its HTTP server so that releasing it,
+first, begins the drain.
+
+## Conventions
+
+Keep one handler module per contract group, with the contract's filename: `src/invitations.ts` here
+implements `api-http/src/invitations.ts`. `MembersHandlers` and the like name endpoint collections
+and `Routes` composes them. Each handler module exports `layer`, built with `HttpApiBuilder.group`,
+which checks that every declared endpoint is implemented; no constructor or service tag wraps it.
+`Principal` is the authenticated human or agent; core's `Actor.Service` is the member the gateway
+resolves for an operation. Handlers use the gateway's decoded field names, such as `humanId` and
+`activeMemberCount`, and the contract's codecs encode them.
+
+## Development
+
+```sh
+bun run test packages/server-http
+```
+
+The tests run the handlers through `HttpApiTest` against a gateway stub that records how each
+request entered and runs programs over stubbed core services. They cover principals and parameters
+reaching core, tags and statuses kept, unauthorized requests refused before any gateway call,
+human-only endpoints, JSON round trips, stream limits and containment, and that every error a route
+declares is public in the gateway or raised by HTTP itself. The
+[local host](../../hosts/local/README.md)'s tests run the same routes over PostgreSQL, through its
+spawned server too. See [testing](../../docs/testing.md).

@@ -1,164 +1,88 @@
 # Shared packages
 
-Each `packages/<name>/` directory is an independent Bun workspace containing
-portable application code. Effect is the only external dependency allowed in
-these packages, besides `@effect/vitest` for a package that ships test suites, such as
-`storage-conformance`; both use the root catalog. They may also depend on other workspaces
-in this directory using `workspace:*`. Host and app packages cannot be dependencies of
-shared packages.
+The packages here hold amends's portable code: the workspace domain, the contracts hosts and
+integrations implement, and the HTTP API. They run on Effect alone, with no runtime of their own,
+so a Bun host, a browser, or another runtime can use them. Implementations over an external system
+live in [adapters](../adapters/README.md), runtime composition in [hosts](../hosts/README.md), and
+the user interface in [apps](../apps/README.md).
 
-Keep development tooling at the repository root. The restriction applies to
-dependencies, devDependencies, peerDependencies, and optionalDependencies.
-`bun run check:packages` checks these manifests and runs before commits.
+| Package                                                | What it is                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| [`core`](core/README.md)                               | One workspace's domain: its journal, authorization, and operations.                  |
+| [`gateway`](gateway/README.md)                         | How a host enters core, and what a host implements: storage, sign-in, the directory. |
+| [`api-http`](api-http/README.md)                       | The HTTP API's contract, shared by the server and clients.                           |
+| [`server-http`](server-http/README.md)                 | The HTTP API's server, over the gateway, with its authentication.                    |
+| [`storage-conformance`](storage-conformance/README.md) | The test suites every storage adapter runs against itself.                           |
+| [`cluster`](cluster/README.md)                         | Jobs, the work outside requests, on Effect Cluster: agents' turns and deliveries.    |
+| [`connection`](connection/README.md)                   | The integrations a host installs, a workspace's connections, and the model catalog.  |
+| [`toolkit`](toolkit/README.md)                         | Tool sources, such as MCP servers and HTTP APIs, in one shape.                       |
+| [`harness`](harness/README.md)                         | Runs an agent and streams its turns in one format. Published to npm.                 |
+| [`sandbox`](sandbox/README.md)                         | The contract every sandbox provider implements. Published to npm.                    |
+| [`channel`](channel/README.md)                         | The contract every channel transport implements. Published to npm.                   |
 
-Packages extend `../../tsconfig.base.json` and do not receive Bun, Node, or browser
-globals. Use Effect services to describe runtime requirements. External-system
-implementations belong in `adapters/`; runtime composition and host-owned ingress
-belong in `hosts/`, and browser integration belongs in `apps/`.
+## Dependencies
 
-Use `effect: "catalog:"` to share the root Effect version. Export source through
-`package.json` and import other packages by their declared workspace names;
-do not use relative paths across workspace boundaries.
+A shared package depends on `effect` and on other packages here, through `workspace:*`, and on
+nothing else: no host, adapter, or app, and no other external package, except `@effect/vitest` for
+a package that ships test suites, such as `storage-conformance`. Effect's version comes from the
+root catalog, as `catalog:`. The rule covers every dependency section, so development tools live at
+the repository root. `bun run check:packages` enforces it.
+
+Packages extend `../../tsconfig.base.json`, which gives them no Bun, Node, or browser globals:
+what a package needs from its runtime, it asks for as an Effect service. Each package exports its
+TypeScript source through its manifest, and others import it by its package name, never by a
+relative path into it.
+
+Every package declares `"sideEffects": false`: importing a module runs nothing beyond its
+declarations, so a bundler drops what a client does not use. A protocol contract reaches core's
+records, inputs, and errors, never its operations, so each core feature keeps the errors a protocol
+exposes in an `errors.ts` of schemas alone. A browser bundle then carries core's schemas without
+their implementation; the web app's bundle test fails when an implementation reaches it.
 
 ## Features and module names
 
-A feature owns a coherent concept, its rules, and its lifecycle. It can begin as
-one focused module. Introduce a feature directory when its related models,
-operations, facts, projections, or contracts need separate modules. Keep those
-modules together and add only the responsibilities the feature has.
+A feature owns one concept, its rules, and its lifecycle. It starts as one module, and becomes a
+directory when its models, operations, facts, projections, or contracts need modules of their own.
+A core feature keeps the operations actors call in `service.ts`, the writes other operations
+share in `command.ts`, and its reads in `query.ts`, as far as it has each, as
+[AGENTS.md](../AGENTS.md) describes. An HTTP contract module and its handler share a filename, so
+`api-http/src/invitations.ts` leads to `server-http/src/invitations.ts`.
 
-Core has multi-module features. Gateway's host contracts and the HTTP packages'
-individual groups fit in focused files today. Keep HTTP contract and handler
-filenames aligned so `api-http/src/invitations.ts` is easy to trace to
-`server-http/src/invitations.ts`.
+Each namespace module gives its concept one name, such as `ThreadErrors` or `ThreadActivityStore`.
+A package's index re-exports that name, and modules inside the package import the owning module
+directly. A name that would be ambiguous in a shared namespace says what it is about, such as
+`ApiErrors.InvitationNotFound`. [Core's schema vocabulary](core/README.md#schema-and-type-names) applies throughout.
 
-Each namespace-style leaf establishes one canonical name, such as `GatewayErrors`
-or `MemberStore`. Public barrels relay that name; internal imports target the
-owning leaf. Framework declarations such as `Api`, `MembersGroup`, and
-`Authentication` retain their named class exports. Error schemas belong to the
-errors module rather than also appearing on an operations namespace.
+A decoded TypeScript name and its encoded field name are separate contracts: renaming a field keeps
+its encoded name with a schema codec, or plans the migration, and tests both directions. Models the
+HTTP API carries have stable schema identifiers for its generated documentation, and HTTP status
+annotations stay in the contract package.
 
-Use [core's schema vocabulary](./core/README.md#schema-and-type-names) throughout
-shared packages. Qualify names that would be ambiguous in a shared namespace:
-`ApiErrors.InvitationNotOwner` identifies the relevant resource. Keep field
-names precise: `humanId` is a human ID, and `activeMemberCount` counts active
-human and agent memberships.
-
-Decoded TypeScript names and encoded field names are separate contracts. When
-renaming an existing field, preserve its encoded name with a schema codec or
-plan an explicit migration. Test both encoding and decoding. Public models used
-by HTTP carry stable schema identifiers for generated documentation. Keep
-transport status annotations in the HTTP contract package.
-
-Use Effect's variant helpers for types that already provide them: `Option.isNone`,
-`Result.isFailure`, and the corresponding guards for other built-in types. For
-decoded `Schema.TaggedUnion` values, use `.isAnyOf([...tags])` for tag-only checks
-and `.match` or `.matchOrElse` for dispatch. Schema `.guards` and `Schema.is` validate
-the variant's fields too; use them when checking unknown values. `Data.taggedEnum`
-provides tag-only `$is` guards and exhaustive `$match`. `Predicate.isTagged` handles
-optional tagged values without requiring another decode.
-
-Internal workflow states use `Data.TaggedEnum` with `Data.taggedEnum` to derive
-their constructors and helpers. This includes turn preparation and closing,
-runner steps and endings, gateway admission, and internal change-feed and turn-log
-inputs. Keep schemas for the values that cross validation or persistence boundaries.
+Use Effect's own helpers for the variants of its types: `Option.isNone`, `Result.isFailure`, and
+their kin. For a decoded `Schema.TaggedUnion`, use `.isAnyOf([...tags])` to check tags and `.match`
+or `.matchOrElse` to dispatch; `Schema.is` and a union's `.guards` also validate fields, for unknown
+values. A workflow's internal states, such as a turn's runner steps or the gateway's admission, are
+a `Data.TaggedEnum`, built with `Data.taggedEnum` for its constructors, `$is`, and `$match`. Schemas
+are for values that cross a validation or persistence boundary.
 
 ## Constructors and layers
 
-Use Effect's public library pattern across shared packages:
+Packages follow Effect's library pattern:
 
-- `make(...)` constructs a module's primary value or service implementation.
-  Named secondary constructors use `makeRunner`, `makeSchema`, or another
-  specific `make...` name. Pure construction returns a value; effectful
-  construction returns a lazy Effect with explicit errors and dependencies.
-- Service implementations expose a public `make` and a `layer` that delegates
-  to it. Keep initialization and validation in the constructor. `Service.of`
-  type-checks the implementation; it does not initialize or provide it.
-- Use `layer` for the main layer and `layer...` for named variants or
-  compositions. Use `Layer.provide` for internal dependencies and
-  `Layer.provideMerge` when consumers also need those services.
-- Acquire stable dependencies during construction. Resolve request identity,
-  the active transaction, and other invocation context during operations.
-  Scoped resources must remain within their acquisition scope.
-- Keep operation names such as `createWorkspace`, `resolve`, and `decode`.
-  Constructing an Effect that performs an operation does not make that
-  operation a constructor.
-- Contracts and composition-only modules do not need artificial constructors.
-  Host-owned service tags have no default implementation here. HTTP declarations
-  use Effect's `HttpApi.make` and `HttpApiGroup.make`; HTTP registration uses
-  `HttpApiBuilder.group` and layer composition directly.
+- `make(...)` constructs a module's main value or service implementation; a second constructor has a
+  specific name, such as `makeRunner`. Pure construction returns a value, and effectful construction
+  returns an Effect with its errors and requirements in its type.
+- A service implementation exports `make` and a `layer` that provides it. Initialization and
+  validation stay in `make`; `Service.of` only checks the implementation's type.
+- `layer` is the main layer, and `layer...` names variants and compositions. `Layer.provide` supplies
+  internal dependencies, and `Layer.provideMerge` keeps them for consumers that need them too.
+- Construction acquires stable dependencies. The caller's identity, the active transaction, and
+  other context of one call are resolved when an operation runs, and scoped resources stay within
+  their scope.
+- An operation keeps its own name, such as `createWorkspace` or `resolve`: returning an Effect does
+  not make it a constructor.
+- Contracts and modules that only compose need no constructor of their own. HTTP declarations use
+  `HttpApi.make` and `HttpApiGroup.make`, and handlers register with `HttpApiBuilder.group`.
 
-Mark public constructor documentation with `@category constructors` and layer
-exports with `@category layers`. Add configuration and acquisition variants only
-when they have a real use case. [Core's README](./core/README.md) provides the
-service inventory and examples; each protocol package documents its own surface.
-
-## Package boundaries
-
-Shared packages declare `"sideEffects": false`: importing a module runs nothing beyond its
-declarations, so a bundler drops what a client does not use. Contracts reach core's records,
-inputs, and errors, never its operations, so a feature keeps the errors a protocol exposes in its
-`errors.ts`, which holds schemas only, and its application re-exports them. A browser bundle then
-carries core's schemas and errors without their implementation; the web app's bundle test fails
-when an implementation reaches it.
-
-`@amends-dev/core` composes one workspace's core. Its root export holds the
-composition: `layer` builds the application operations over the journal,
-authorization, and permission catalog. `HostServices` describes the storage,
-signals, and cryptography a host must supply, derived from that layer.
-`Operations` is the set of services a gateway may run, and `journalLog` names the
-workspace journal's log, whose history shows whether a workspace was ever created. Domains are subpath exports:
-`@amends-dev/core/journal`, `@amends-dev/core/identity`, `@amends-dev/core/authorization`,
-`@amends-dev/core/notification`, `@amends-dev/core/change-feed`, `@amends-dev/core/signal`, `@amends-dev/core/read-state`,
-`@amends-dev/core/request`,
-`@amends-dev/core/group`, `@amends-dev/core/thread`, and
-`@amends-dev/core/agent`, and `@amends-dev/core/workspace`, each exposing the records, facts, stores, projections,
-and operations it implements. The thread surface implements private-group starts with initial
-participation, a text message, ordered activity, and notification generation.
-`ThreadMessageService.publish` adds human replies under `thread.publish`; starts and replies
-reuse internal admission and publication services without requiring each other’s action grants.
-`ThreadParticipationService` implements self-follow/unfollow. Following adds quiet timeline
-activity; unfollow ends one participation while retaining group access. Its authorized
-reads provide group discovery, metadata, timeline pages, and current participant summaries,
-with group audience and `thread.read` checked independently of participation. Agent-use permission
-is declared in the agent domain; execution remains future work.
-The group surface supplies team creation, private or public, authorized reads, public discovery
-and joining, an internal audience check, and membership admission/departure, with separate
-creation and Group-scoped membership-management permissions. Every group operation but joining a
-public group requires membership of the group as well as its grant, so no role reaches a group from
-outside it. Self-leave needs no management grant; workspace removal also settles group
-admissions. The notification surface includes its record, store contract,
-authorized inbox and source reads, human acknowledgment, activity-driven generation, and pending-agent-input settlement.
-Notification reads derive the recipient from the current actor and require active membership.
-`NotificationService.resolveSource` returns a typed timeline item after ownership, historical
-reference validation, and current group access plus `thread.read` checks. It makes no state changes;
-its HTTP/UI integration remains pending. `NotificationService.acknowledge` records human `Seen`
-as private state outside the journal. Its HTTP/UI action and other recipients' outcomes remain
-pending. Member and invitation operations include listing: members you
-may read, and every invitation for holders of `invitation.manage`.
-
-`@amends-dev/gateway` is how hosts enter core: it bootstraps workspaces, binds one
-workspace's storage, resolves an authenticated identity into the actor, and runs
-core's services with only public outcomes. It also holds the host
-contracts: workspace storage, sign-in, session token resolution, and the workspace
-directory. `@amends-dev/api-http` declares the HTTP contract shared by servers and
-browser clients, and `@amends-dev/server-http` implements it over the gateway,
-including the contract's bearer authentication over session token resolution.
-Additional protocols add their own contract and handler packages over the same
-gateway, adapting the same session token resolution to their own authentication.
-
-`@amends-dev/storage-conformance` holds the [test suites](./storage-conformance/README.md)
-for the gateway's storage contracts. Each storage adapter supplies a harness and runs
-them against itself.
-
-`@amends-dev/harness` is the [harness contract](./harness/README.md): an agent's sessions and
-turns, streamed in one format whichever agent runs them, and the bridge through which a host drives
-an agent inside a sandbox. `@amends-dev/sandbox` is the sandbox contract every provider implements,
-with the conformance suites each provider runs against itself; it knows nothing of harnesses.
-`@amends-dev/toolkit` gives every kind of [tool source](./toolkit/README.md) one shape.
-`@amends-dev/connection` holds the [integrations](./connection/README.md) a host installs, what
-each gives a workspace's connections, and the model catalog. The agents and sandbox providers
-themselves, with their dependencies, live in `adapters/`.
-
-`@amends-dev/cluster` runs [jobs](./cluster/README.md), the work outside requests, on Effect
-Cluster, with their retries and pruning.
+Documentation marks constructors with `@category constructors` and layers with `@category layers`.
+Add a configuration or acquisition variant only for a real use.
